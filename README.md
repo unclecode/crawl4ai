@@ -55,7 +55,7 @@ git clone https://github.com/unclecode/crawl4ai.git
 cd crawl4ai
 ```
 
-3. Open `crawler/config.py` and set your favorite LLM provider and API token:
+3. Open `crawler/config.py` and set your favorite LLM provider and API token.
 
 4. Build the Docker image:
 ```
@@ -175,7 +175,7 @@ for res in results:
 
 This code demonstrates how to use the Crawl4AI library to fetch a single page or multiple pages. The `WebCrawler` is initialized with the path to the database, and the `fetch_page` and `fetch_pages` methods are used to crawl the specified URLs.
 
-Make sure to set the `GROQ_API_TOKEN` environment variable with your Groq API token when using the library.
+Make sure to check the config.py tp set required environment variables.
 
 That's it! You can now integrate Crawl4AI into your Python projects and leverage its web crawling capabilities. 🎉
 
@@ -205,13 +205,13 @@ DEFAULT_PROVIDER = "openai/gpt-4-turbo"
 
 # Provider-model dictionary
 PROVIDER_MODELS = {
-    "groq/llama3-70b-8192": os.getenv("GROQ_API_KEY", "YOUR_GROQ_TOKEN"),
-    "groq/llama3-8b-8192": os.getenv("GROQ_API_KEY", "YOUR_GROQ_TOKEN"),
-    "openai/gpt-3.5-turbo": os.getenv("OPENAI_API_KEY", "YOUR_OPENAI_TOKEN"),
-    "openai/gpt-4-turbo": os.getenv("OPENAI_API_KEY", "YOUR_OPENAI_TOKEN"),
-    "anthropic/claude-3-haiku-20240307": os.getenv("ANTHROPIC_API_KEY", "YOUR_ANTHROPIC_TOKEN"),
-    "anthropic/claude-3-opus-20240229": os.getenv("ANTHROPIC_API_KEY", "YOUR_ANTHROPIC_TOKEN"),
-    "anthropic/claude-3-sonnet-20240229": os.getenv("ANTHROPIC_API_KEY", "YOUR_ANTHROPIC_TOKEN"),
+    "groq/llama3-70b-8192": os.getenv("GROQ_API_KEY"),
+    "groq/llama3-8b-8192": os.getenv("GROQ_API_KEY"),
+    "openai/gpt-3.5-turbo": os.getenv("OPENAI_API_KEY"),
+    "openai/gpt-4-turbo": os.getenv("OPENAI_API_KEY"),
+    "anthropic/claude-3-haiku-20240307": os.getenv("ANTHROPIC_API_KEY"),
+    "anthropic/claude-3-opus-20240229": os.getenv("ANTHROPIC_API_KEY"),
+    "anthropic/claude-3-sonnet-20240229": os.getenv("ANTHROPIC_API_KEY"),
 }
 
 # Chunk token threshold
