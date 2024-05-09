@@ -46,9 +46,53 @@ pip install -e .
 ```python
 from crawl4ai.web_crawler import WebCrawler
 from crawl4ai.models import UrlModel
+import os
+
+crawler = WebCrawler(db_path='crawler_data.db')
 ```
 
-3. Use the Crawl4AI library in your project as needed. Refer to the [Usage with Python](#usage-with-python-) section for more details.
+a. Fetch a single page:
+```python
+single_url = UrlModel(url='https://kidocode.com', forced=False)
+result = crawl4ai.fetch_page(
+    single_url, 
+    provider= "openai/gpt-3.5-turbo", 
+    api_token = os.getenv('OPENAI_API_KEY'), 
+    extract_blocks_flag=True,
+    word_count_threshold=5 # Minimum word count for a HTML tag to be considered as a worthy block
+)
+print(result.model_dump())
+```
+
+b. Fetch multiple pages:
+```python
+urls = [
+    UrlModel(url='http://example.com', forced=False),
+    UrlModel(url='http://example.org', forced=False)
+]
+results = crawl4ai.fetch_pages(
+    urls, 
+    provider= "openai/gpt-3.5-turbo", 
+    api_token = os.getenv('OPENAI_API_KEY'), 
+    extract_blocks_flag=True, 
+    word_count_threshold=5
+)
+
+for res in results:
+    print(res.model_dump())
+```
+
+The response model is a `CrawlResponse` object that contains the following attributes:
+```python
+class CrawlResult(BaseModel):
+    url: str
+    html: str
+    success: bool
+    cleaned_html: str = None
+    markdown: str = None
+    parsed_json: str = None
+    error_message: str = None
+```
 
 ### Running Crawl4AI as a Local Server 🚀
 
@@ -82,20 +126,13 @@ docker run -d -p 8000:80 crawl4ai
 
 6. Access the application at `http://localhost:8000`.
 
-For more detailed instructions and advanced configuration options, please refer to the [installation guide](https://github.com/unclecode/crawl4ai/blob/main/INSTALL.md).
-
-Choose the approach that best suits your needs. If you want to integrate Crawl4AI into your existing Python projects, installing it as a library is the way to go. If you prefer to run Crawl4AI as a standalone service and interact with it via API endpoints, running it as a local server using Docker is the recommended approach.
-
-## Usage with Python 🐍
-
-Here's an example of how to use Crawl4AI with Python to crawl a webpage and retrieve the extracted data:
-
-1. Make sure you have the `requests` library installed. You can install it using pip:
+- CURL Example:
 ```sh
-pip install requests
+curl -X POST -H "Content-Type: application/json" -d '{"urls":["https://techcrunch.com/"],"provider_model":"openai/gpt-3.5-turbo","api_token":"your_api_token","include_raw_html":true,"forced":false,"extract_blocks":true,"word_count_threshold":10}' http://localhost:8000/crawl
 ```
+**Set the api_token to your OpenAI API key or any other provider you are using.**
 
-2. Use the following Python code to send a request to the Crawl4AI server and retrieve the crawled data:
+- Python Example:
 ```python
 import requests
 import os
@@ -133,58 +170,9 @@ The response from the server includes the parsed JSON, cleaned HTML, and markdow
 
 Make sure to replace `"http://localhost:8000/crawl"` with the appropriate server URL if your Crawl4AI server is running on a different host or port.
 
-## Using Crawl4AI as a Python Library 📚
+Choose the approach that best suits your needs. If you want to integrate Crawl4AI into your existing Python projects, installing it as a library is the way to go. If you prefer to run Crawl4AI as a standalone service and interact with it via API endpoints, running it as a local server using Docker is the recommended approach.
 
-You can also use Crawl4AI as a Python library in your own projects. Here's an example of how to use the Crawl4AI library:
-
-1. Install the required dependencies:
-```sh
-pip install -r requirements.txt
-```
-
-2. Import the necessary modules and initialize the `WebCrawler`:
-```python
-from crawl4ai.web_crawler import WebCrawler
-from crawl4ai.models import UrlModel
-import os
-
-crawler = WebCrawler(db_path='crawler_data.db')
-```
-
-3. Fetch a single page:
-```python
-single_url = UrlModel(url='https://kidocode.com', forced=False)
-result = crawl4ai.fetch_page(
-    single_url, 
-    provider= "openai/gpt-3.5-turbo", 
-    api_token = os.getenv('OPENAI_API_KEY'), 
-    extract_blocks_flag=True,
-    word_count_threshold=5 # Minimum word count for a HTML tag to be considered as a worthy block
-)
-print(result.model_dump())
-```
-
-4. Fetch multiple pages:
-```python
-urls = [
-    UrlModel(url='http://example.com', forced=False),
-    UrlModel(url='http://example.org', forced=False)
-]
-results = crawl4ai.fetch_pages(
-    urls, 
-    provider= "openai/gpt-3.5-turbo", 
-    api_token = os.getenv('OPENAI_API_KEY'), 
-    extract_blocks_flag=True, 
-    word_count_threshold=5
-)
-
-for res in results:
-    print(res.json())
-```
-
-This code demonstrates how to use the Crawl4AI library to fetch a single page or multiple pages. The `WebCrawler` is initialized with the path to the database, and the `fetch_page` and `fetch_pages` methods are used to crawl the specified URLs.
-
-Make sure to check the config.py tp set required environment variables.
+**Make sure to check the config.py tp set required environment variables.**
 
 That's it! You can now integrate Crawl4AI into your Python projects and leverage its web crawling capabilities. 🎉
 
