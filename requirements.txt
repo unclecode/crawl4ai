@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+selenium
+pydantic
+aiohttp
+aiosqlite
+chromedriver_autoinstaller
+httpx
+requests
+bs4
+html2text
+litellm
+python-dotenv
