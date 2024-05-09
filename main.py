@@ -4,13 +4,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, HttpUrl
 from typing import List, Optional
-from crawler.web_crawler import WebCrawler
-from crawler.models import UrlModel
+from crawl4ai.web_crawler import WebCrawler
+from crawl4ai.models import UrlModel
 import asyncio
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import chromedriver_autoinstaller
 from functools import lru_cache
-from crawler.database import get_total_count, clear_db
+from crawl4ai.database import get_total_count, clear_db
 import os
 import uuid
 
