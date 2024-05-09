@@ -144,7 +144,7 @@ crawler = WebCrawler(db_path='crawler_data.db')
 
 3. Fetch a single page:
 ```python
-single_url = UrlModel(url='https://kidocode.com', forced=True)
+single_url = UrlModel(url='https://kidocode.com', forced=False)
 result = crawl4ai.fetch_page(
     single_url, 
     provider= "openai/gpt-3.5-turbo", 

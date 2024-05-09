@@ -8,7 +8,7 @@ def main():
     crawler = WebCrawler(db_path='crawler_data.db')
 
     # Fetch a single page
-    single_url = UrlModel(url='https://www.nbcnews.com/business', forced=True)
+    single_url = UrlModel(url='https://www.nbcnews.com/business', forced=False)
     result = crawler.fetch_page(
         single_url, 
         provider= "openai/gpt-3.5-turbo", 
