@@ -191,6 +191,45 @@ That's it! You can now integrate Crawl4AI into your Python projects and leverage
 | `extract_blocks`     | Whether to extract meaningful blocks of text from the HTML.                                     | No       | `false`       |
 | `word_count_threshold` | The minimum number of words a block must contain to be considered meaningful (minimum value is 5). | No       | `5`           |
 
+## 🛠️ Configuration 
+Crawl4AI allows you to configure various parameters and settings in the `crawler/config.py` file. Here's an example of how you can adjust the parameters:
+
+```
+import os
+from dotenv import load_dotenv
+
+load_dotenv()  # Load environment variables from .env file
+
+# Default provider
+DEFAULT_PROVIDER = "openai/gpt-4-turbo"
+
+# Provider-model dictionary
+PROVIDER_MODELS = {
+    "groq/llama3-70b-8192": os.getenv("GROQ_API_KEY", "YOUR_GROQ_TOKEN"),
+    "groq/llama3-8b-8192": os.getenv("GROQ_API_KEY", "YOUR_GROQ_TOKEN"),
+    "openai/gpt-3.5-turbo": os.getenv("OPENAI_API_KEY", "YOUR_OPENAI_TOKEN"),
+    "openai/gpt-4-turbo": os.getenv("OPENAI_API_KEY", "YOUR_OPENAI_TOKEN"),
+    "anthropic/claude-3-haiku-20240307": os.getenv("ANTHROPIC_API_KEY", "YOUR_ANTHROPIC_TOKEN"),
+    "anthropic/claude-3-opus-20240229": os.getenv("ANTHROPIC_API_KEY", "YOUR_ANTHROPIC_TOKEN"),
+    "anthropic/claude-3-sonnet-20240229": os.getenv("ANTHROPIC_API_KEY", "YOUR_ANTHROPIC_TOKEN"),
+}
+
+# Chunk token threshold
+CHUNK_TOKEN_THRESHOLD = 1000
+
+# Threshold for the minimum number of words in an HTML tag to be considered 
+MIN_WORD_THRESHOLD = 5
+```
+In the `crawler/config.py` file, you can:
+
+- Set the default provider using the `DEFAULT_PROVIDER` variable.
+- Add or modify the provider-model dictionary (`PROVIDER_MODELS`) to include your desired providers and their corresponding API keys. Crawl4AI supports various providers such as Groq, OpenAI, Anthropic, and more. You can add any provider supported by LiteLLM, as well as Ollama.
+- Adjust the `CHUNK_TOKEN_THRESHOLD` value to control the splitting of web content into chunks for parallel processing. A higher value means fewer chunks and faster processing, but it may cause issues with weaker LLMs during extraction.
+- Modify the `MIN_WORD_THRESHOLD` value to set the minimum number of words an HTML tag must contain to be considered a meaningful block.
+
+Make sure to set the appropriate API keys for each provider in the `PROVIDER_MODELS` dictionary. You can either directly provide the API key or use environment variables to store them securely.
+
+Remember to update the `crawler/config.py` file based on your specific requirements and the providers you want to use with Crawl4AI.
 
 ## Contributing 🤝
 
