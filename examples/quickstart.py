@@ -1,6 +1,6 @@
-from crawler.web_crawler import WebCrawler
-from crawler.models import UrlModel
-from crawler.utils import get_content_of_website
+from crawl4ai.web_crawler import WebCrawler
+from crawl4ai.models import UrlModel
+from crawl4ai.utils import get_content_of_website
 import os
 
 def main():
