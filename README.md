@@ -18,7 +18,7 @@ Crawl4AI is a powerful, free web crawling service designed to extract useful inf
 
 ## Getting Started 🚀
 
-To get started with Crawl4AI, simply visit our web application at [https://crawl4ai.your-domain.io](https://crawl4ai.uccode.io) and enter the URL(s) you want to crawl. The application will process the URLs and provide you with the extracted data in various formats.
+To get started with Crawl4AI, simply visit our web application at [https://crawl4ai.uccode.io](https://crawl4ai.uccode.io) and enter the URL(s) you want to crawl. The application will process the URLs and provide you with the extracted data in various formats.
 
 ## Installation 💻
 
