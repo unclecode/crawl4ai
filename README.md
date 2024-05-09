@@ -29,8 +29,17 @@ There are two ways to use Crawl4AI: as a library in your Python projects or as a
 To install Crawl4AI as a library, follow these steps:
 
 1. Install the package from GitHub:
-```
+```sh
 pip install git+https://github.com/unclecode/crawl4ai.git
+```
+
+Alternatively, you can clone the repository and install the package locally:
+```sh
+virtualenv venv
+source venv/bin/activate
+git clone https://github.com/unclecode/crawl4ai.git
+cd crawl4ai
+pip install -e .
 ```
 
 2. Import the necessary modules in your Python script:
@@ -46,28 +55,28 @@ from crawl4ai.models import UrlModel
 To run Crawl4AI as a standalone local server, follow these steps:
 
 1. Clone the repository:
-```
+```sh
 git clone https://github.com/unclecode/crawl4ai.git
 ```
 
 2. Navigate to the project directory:
-```
+```sh
 cd crawl4ai
 ```
 
 3. Open `crawler/config.py` and set your favorite LLM provider and API token.
 
 4. Build the Docker image:
-```
+```sh
 docker build -t crawl4ai .
 ```
    For Mac users, use the following command instead:
-```
+```sh
 docker build --platform linux/amd64 -t crawl4ai .
 ```
 
 5. Run the Docker container:
-```
+```sh
 docker run -d -p 8000:80 crawl4ai
 ```
 
@@ -82,7 +91,7 @@ Choose the approach that best suits your needs. If you want to integrate Crawl4A
 Here's an example of how to use Crawl4AI with Python to crawl a webpage and retrieve the extracted data:
 
 1. Make sure you have the `requests` library installed. You can install it using pip:
-```
+```sh
 pip install requests
 ```
 
@@ -129,7 +138,7 @@ Make sure to replace `"http://localhost:8000/crawl"` with the appropriate server
 You can also use Crawl4AI as a Python library in your own projects. Here's an example of how to use the Crawl4AI library:
 
 1. Install the required dependencies:
-```
+```sh
 pip install -r requirements.txt
 ```
 
