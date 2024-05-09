@@ -78,6 +78,8 @@ for res in results:
     print(res.model_dump())
 ```
 
+Running for the first time will download the chrome driver for selenium. Also creates a SQLite database file `crawler_data.db` in the current directory. This file will store the crawled data for future reference.
+
 The response model is a `CrawlResponse` object that contains the following attributes:
 ```python
 class CrawlResult(BaseModel):
