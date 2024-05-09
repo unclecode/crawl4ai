@@ -194,7 +194,7 @@ That's it! You can now integrate Crawl4AI into your Python projects and leverage
 ## 🛠️ Configuration 
 Crawl4AI allows you to configure various parameters and settings in the `crawler/config.py` file. Here's an example of how you can adjust the parameters:
 
-```
+```python
 import os
 from dotenv import load_dotenv
 
