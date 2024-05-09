@@ -49,10 +49,8 @@ from crawl4ai.models import UrlModel
 import os
 
 crawler = WebCrawler(db_path='crawler_data.db')
-```
 
-a. Fetch a single page:
-```python
+# Single page crawl
 single_url = UrlModel(url='https://kidocode.com', forced=False)
 result = crawl4ai.fetch_page(
     single_url, 
@@ -62,10 +60,8 @@ result = crawl4ai.fetch_page(
     word_count_threshold=5 # Minimum word count for a HTML tag to be considered as a worthy block
 )
 print(result.model_dump())
-```
 
-b. Fetch multiple pages:
-```python
+# Multiple page crawl
 urls = [
     UrlModel(url='http://example.com', forced=False),
     UrlModel(url='http://example.org', forced=False)
@@ -127,10 +123,10 @@ docker run -d -p 8000:80 crawl4ai
 6. Access the application at `http://localhost:8000`.
 
 - CURL Example:
+Set the api_token to your OpenAI API key or any other provider you are using.
 ```sh
 curl -X POST -H "Content-Type: application/json" -d '{"urls":["https://techcrunch.com/"],"provider_model":"openai/gpt-3.5-turbo","api_token":"your_api_token","include_raw_html":true,"forced":false,"extract_blocks":true,"word_count_threshold":10}' http://localhost:8000/crawl
 ```
-**Set the api_token to your OpenAI API key or any other provider you are using.**
 
 - Python Example:
 ```python
