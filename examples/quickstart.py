@@ -8,13 +8,13 @@ def main():
     crawler = WebCrawler(db_path='crawler_data.db')
 
     # Fetch a single page
-    single_url = UrlModel(url='https://kidocode.com', forced=True)
+    single_url = UrlModel(url='https://techcrunch.com/', forced=True)
     result = crawler.fetch_page(
         single_url, 
         provider= "openai/gpt-3.5-turbo", 
         api_token = os.getenv('OPENAI_API_KEY'), 
         extract_blocks_flag=True,
-        word_count_threshold=5
+        word_count_threshold=10
     )
     print(result.model_dump())
 

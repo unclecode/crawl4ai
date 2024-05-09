@@ -51,3 +51,11 @@ def get_total_count(db_path: str) -> int:
         return result[0]
     except Exception as e:
         return 0
+    
+# Crete function to cler the database
+def clear_db(db_path: str):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM crawled_data')
+    conn.commit()
+    conn.close()

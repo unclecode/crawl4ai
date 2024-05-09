@@ -10,7 +10,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import chromedriver_autoinstaller
 from functools import lru_cache
-from crawler.database import get_total_count
+from crawler.database import get_total_count, clear_db
 import os
 import uuid
 
@@ -55,6 +55,12 @@ async def read_index():
 async def get_total_url_count():
     count = get_total_count(db_path='crawler_data.db')
     return JSONResponse(content={"count": count})
+
+# Add endpoit to clear db
+@app.get("/clear-db")
+async def clear_database():
+    clear_db(db_path='crawler_data.db')
+    return JSONResponse(content={"message": "Database cleared."})
 
 @app.post("/crawl")
 async def crawl_urls(urls_input: UrlsInput, request: Request):
