@@ -55,10 +55,7 @@ git clone https://github.com/unclecode/crawl4ai.git
 cd crawl4ai
 ```
 
-3. Create a `.env` file in the root folder and set your Groq API token:
-```
-GROQ_API_TOKEN=your_groq_api_token
-```
+3. Open `crawler/config.py` and set your favorite LLM provider and API token:
 
 4. Build the Docker image:
 ```
@@ -71,7 +68,7 @@ docker build --platform linux/amd64 -t crawl4ai .
 
 5. Run the Docker container:
 ```
-docker run -p 8000:80 crawl4ai
+docker run -d -p 8000:80 crawl4ai
 ```
 
 6. Access the application at `http://localhost:8000`.

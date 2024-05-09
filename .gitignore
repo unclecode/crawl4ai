@@ -163,3 +163,4 @@ cython_debug/
 
 Crawl4AI.egg-info/
 Crawl4AI.egg-info/*
+crawler_data.db
