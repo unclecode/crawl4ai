@@ -209,7 +209,7 @@ For more information on contributing, please see our [contribution guidelines](h
 
 ## License 📄
 
-Crawl4AI is released under the [MIT License](https://github.com/unclecode/crawl4ai/blob/main/LICENSE).
+Crawl4AI is released under the [Apache 2.0 License](https://github.com/unclecode/crawl4ai/blob/main/LICENSE).
 
 ## Contact 📧
 
@@ -217,6 +217,5 @@ If you have any questions, suggestions, or feedback, please feel free to reach o
 
 - GitHub: [unclecode](https://github.com/unclecode)
 - Twitter: [@unclecode](https://twitter.com/unclecode)
-- Discord: [your-invite-link](https://discord.gg/your-invite-link)
 
 Let's work together to make the web more accessible and useful for AI applications! 💪🌐🤖
