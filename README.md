@@ -22,11 +22,32 @@ To get started with Crawl4AI, simply visit our web application at [https://crawl
 
 ## Installation 💻
 
-To install and run Crawl4AI locally or on your own server, follow these steps:
+There are two ways to use Crawl4AI: as a library in your Python projects or as a standalone local server.
+
+### Using Crawl4AI as a Library 📚
+
+To install Crawl4AI as a library, follow these steps:
+
+1. Install the package from GitHub:
+```
+pip install git+https://github.com/unclecode/crawl4ai.git
+```
+
+2. Import the necessary modules in your Python script:
+```python
+from crawler.web_crawler import WebCrawler
+from crawler.models import UrlModel
+```
+
+3. Use the Crawl4AI library in your project as needed. Refer to the [Usage with Python](#usage-with-python-) section for more details.
+
+### Running Crawl4AI as a Local Server 🚀
+
+To run Crawl4AI as a standalone local server, follow these steps:
 
 1. Clone the repository:
 ```
-git clone https://github.com/your-username/crawl4ai.git
+git clone https://github.com/unclecode/crawl4ai.git
 ```
 
 2. Navigate to the project directory:
@@ -55,7 +76,9 @@ docker run -p 8000:80 crawl4ai
 
 6. Access the application at `http://localhost:8000`.
 
-For more detailed instructions and advanced configuration options, please refer to the [installation guide](https://github.com/your-username/crawl4ai/blob/main/INSTALL.md).
+For more detailed instructions and advanced configuration options, please refer to the [installation guide](https://github.com/unclecode/crawl4ai/blob/main/INSTALL.md).
+
+Choose the approach that best suits your needs. If you want to integrate Crawl4AI into your existing Python projects, installing it as a library is the way to go. If you prefer to run Crawl4AI as a standalone service and interact with it via API endpoints, running it as a local server using Docker is the recommended approach.
 
 ## Usage with Python 🐍
 
