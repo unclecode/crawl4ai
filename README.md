@@ -35,8 +35,8 @@ pip install git+https://github.com/unclecode/crawl4ai.git
 
 2. Import the necessary modules in your Python script:
 ```python
-from crawler.web_crawler import WebCrawler
-from crawler.models import UrlModel
+from crawl4ai.web_crawler import WebCrawler
+from crawl4ai.models import UrlModel
 ```
 
 3. Use the Crawl4AI library in your project as needed. Refer to the [Usage with Python](#usage-with-python-) section for more details.
@@ -135,8 +135,8 @@ pip install -r requirements.txt
 
 2. Import the necessary modules and initialize the `WebCrawler`:
 ```python
-from crawler.web_crawler import WebCrawler
-from crawler.models import UrlModel
+from crawl4ai.web_crawler import WebCrawler
+from crawl4ai.models import UrlModel
 import os
 
 crawler = WebCrawler(db_path='crawler_data.db')
@@ -145,7 +145,7 @@ crawler = WebCrawler(db_path='crawler_data.db')
 3. Fetch a single page:
 ```python
 single_url = UrlModel(url='https://kidocode.com', forced=True)
-result = crawler.fetch_page(
+result = crawl4ai.fetch_page(
     single_url, 
     provider= "openai/gpt-3.5-turbo", 
     api_token = os.getenv('OPENAI_API_KEY'), 
@@ -161,7 +161,7 @@ urls = [
     UrlModel(url='http://example.com', forced=False),
     UrlModel(url='http://example.org', forced=False)
 ]
-results = crawler.fetch_pages(
+results = crawl4ai.fetch_pages(
     urls, 
     provider= "openai/gpt-3.5-turbo", 
     api_token = os.getenv('OPENAI_API_KEY'), 
