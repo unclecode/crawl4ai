@@ -13,6 +13,9 @@ from functools import lru_cache
 from crawl4ai.database import get_total_count, clear_db
 import os
 import uuid
+# Import the CORS middleware
+from fastapi.middleware.cors import CORSMiddleware  
+
 
 # Task management
 tasks = {}
@@ -24,6 +27,16 @@ current_requests = 0
 lock = asyncio.Lock()
 
 app = FastAPI()
+
+# CORS configuration
+origins = ["*"]  # Allow all origins
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,  # List of origins that are allowed to make requests
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
 
 # Mount the pages directory as a static directory
 app.mount("/pages", StaticFiles(directory=__location__ + "/pages"), name="pages")
