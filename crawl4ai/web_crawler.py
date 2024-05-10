@@ -112,6 +112,8 @@ class WebCrawler:
                         parsed_json.extend(future.result())
 
             parsed_json = json.dumps(parsed_json)
+        else:
+            parsed_json = "{}"
 
         # Cache the result
         cleaned_html = beautify_html(cleaned_html)
