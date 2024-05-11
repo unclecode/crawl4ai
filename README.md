@@ -55,8 +55,11 @@ single_url = UrlModel(url='https://kidocode.com', forced=False)
 result = crawl4ai.fetch_page(
     single_url, 
     provider= "openai/gpt-3.5-turbo", 
-    api_token = os.getenv('OPENAI_API_KEY'), 
-    extract_blocks_flag=True,
+    api_token = os.getenv('OPENAI_API_KEY'),
+    # Set `extract_blocks_flag` to True to enable the LLM to generate semantically clustered chunks
+    # and return them as JSON. Depending on the model and data size, this may take up to 1 minute.
+    # Without this setting, it will take between 5 to 20 seconds.
+    extract_blocks_flag=False 
     word_count_threshold=5 # Minimum word count for a HTML tag to be considered as a worthy block
 )
 print(result.model_dump())
@@ -127,8 +130,9 @@ docker run -d -p 8000:80 crawl4ai
 - CURL Example:
 Set the api_token to your OpenAI API key or any other provider you are using.
 ```sh
-curl -X POST -H "Content-Type: application/json" -d '{"urls":["https://techcrunch.com/"],"provider_model":"openai/gpt-3.5-turbo","api_token":"your_api_token","include_raw_html":true,"forced":false,"extract_blocks":true,"word_count_threshold":10}' http://localhost:8000/crawl
+curl -X POST -H "Content-Type: application/json" -d '{"urls":["https://techcrunch.com/"],"provider_model":"openai/gpt-3.5-turbo","api_token":"your_api_token","include_raw_html":true,"forced":false,"extract_blocks_flag":false,"word_count_threshold":10}' http://localhost:8000/crawl
 ```
+Set `extract_blocks_flag` to True to enable the LLM to generate semantically clustered chunks and return them as JSON. Depending on the model and data size, this may take up to 1 minute. Without this setting, it will take between 5 to 20 seconds.
 
 - Python Example:
 ```python
@@ -144,7 +148,10 @@ data = {
   "api_token": "your_api_token",
   "include_raw_html": true,
   "forced": false,
-  "extract_blocks": true,
+    # Set `extract_blocks_flag` to True to enable the LLM to generate semantically clustered chunks
+    # and return them as JSON. Depending on the model and data size, this may take up to 1 minute.
+    # Without this setting, it will take between 5 to 20 seconds.
+  "extract_blocks_flag": False,
   "word_count_threshold": 5
 }
 
@@ -183,7 +190,7 @@ That's it! You can now integrate Crawl4AI into your Python projects and leverage
 | `api_token`          | Your API token for the specified provider.                                                        | Yes      | -             |
 | `include_raw_html`   | Whether to include the raw HTML content in the response.                                        | No       | `false`       |
 | `forced`             | Whether to force a fresh crawl even if the URL has been previously crawled.                     | No       | `false`       |
-| `extract_blocks`     | Whether to extract meaningful blocks of text from the HTML.                                     | No       | `false`       |
+| `extract_blocks_flag`| Whether to extract semantical blocks of text from the HTML.                                     | No       | `false`       |
 | `word_count_threshold` | The minimum number of words a block must contain to be considered meaningful (minimum value is 5). | No       | `5`           |
 
 ## 🛠️ Configuration 
