@@ -75,7 +75,7 @@ class WebCrawler:
 
         parsed_json = []
         if extract_blocks_flag:
-            print(f"[LOG] 🚀 Extracting semantic blocks for {url_model.url}")
+            print(f"[LOG] 🔥 Extracting semantic blocks for {url_model.url}")
             t = time.time()
             # Split markdown into sections
             sections = chunking_strategy.chunk(markdown)                          
