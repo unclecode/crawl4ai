@@ -8,6 +8,17 @@
 
 Crawl4AI is a powerful, free web crawling service designed to extract useful information from web pages and make it accessible for large language models (LLMs) and AI applications. 🆓🌐
 
+## 🚧 Work in Progress 👷‍♂️
+
+- 🔧 Separate Crawl and Extract JSON Semantic Chunk: Enhancing flexibility and efficiency in large-scale web crawling tasks.
+- 🔍 Colab Integration: Exploring integration with Google Colab for easy experimentation in a collaborative notebook environment.
+- 🎯 XPath and CSS Selector Support: Adding support for selective retrieval of specific elements from web pages.
+- 📷 Image Captioning: Incorporating image captioning capabilities to extract meaningful descriptions from images.
+- 💾 Embedding Data Generation and Storage: Developing functionalities to generate and store embedding data for each crawled website.
+- 🔍 Semantic Search Engine: Building a semantic search engine that fetches content, performs vector search similarity, and generates labeled chunk data based on user queries and URLs.
+
+For more details, refer to the [CHANGELOG.md](https://github.com/unclecode/crawl4ai/edit/main/CHANGELOG.md) file.
+
 ## Features ✨
 
 - 🕷️ Efficient web crawling to extract valuable data from websites
