@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 import re
-import spacy
-import nltk
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize, TextTilingTokenizer
+# spacy = lazy_import.lazy_module('spacy')
+# nl = lazy_import.lazy_module('nltk')
+# from nltk.corpus import stopwords
+# from nltk.tokenize import word_tokenize, TextTilingTokenizer
 from collections import Counter
 import string
 
@@ -34,8 +34,10 @@ class RegexChunking(ChunkingStrategy):
         return paragraphs
     
 # NLP-based sentence chunking using spaCy
+
 class NlpSentenceChunking(ChunkingStrategy):
     def __init__(self, model='en_core_web_sm'):
+        import spacy
         self.nlp = spacy.load(model)
 
     def chunk(self, text: str) -> list:
@@ -44,8 +46,10 @@ class NlpSentenceChunking(ChunkingStrategy):
     
 # Topic-based segmentation using TextTiling
 class TopicSegmentationChunking(ChunkingStrategy):
+    
     def __init__(self, num_keywords=3):
-        self.tokenizer = TextTilingTokenizer()
+        import nltk as nl
+        self.tokenizer = nl.toknize.TextTilingTokenizer()
         self.num_keywords = num_keywords
 
     def chunk(self, text: str) -> list:
@@ -55,8 +59,9 @@ class TopicSegmentationChunking(ChunkingStrategy):
 
     def extract_keywords(self, text: str) -> list:
         # Tokenize and remove stopwords and punctuation
-        tokens = word_tokenize(text)
-        tokens = [token.lower() for token in tokens if token not in stopwords.words('english') and token not in string.punctuation]
+        import nltk as nl
+        tokens = nl.toknize.word_tokenize(text)
+        tokens = [token.lower() for token in tokens if token not in nl.corpus.stopwords.words('english') and token not in string.punctuation]
 
         # Calculate frequency distribution
         freq_dist = Counter(tokens)
