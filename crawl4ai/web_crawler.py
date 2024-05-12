@@ -1,6 +1,7 @@
 import asyncio
 import os, time
 import json
+from pathlib import Path
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -29,12 +30,27 @@ class WebCrawler:
 
         # Automatically install or update chromedriver
         chromedriver_autoinstaller.install()
+        
+        # Initialize WebDriver for crawling     
+        self.service = Service(chromedriver_autoinstaller.install())
+        self.driver = webdriver.Chrome(service=self.service, options=self.options)
+        
+        # Create the .crawl4ai folder in the user's home directory if it doesn't exist
+        self.crawl4ai_folder = os.path.join(Path.home(), ".crawl4ai")
+        os.makedirs(self.crawl4ai_folder, exist_ok=True)        
+        os.makedirs(f"{self.crawl4ai_folder}/cache", exist_ok=True)
        
 
-    def fetch_page(self, url_model: UrlModel, provider: str = DEFAULT_PROVIDER, api_token: str = None, extract_blocks_flag: bool = True, word_count_threshold = MIN_WORD_THRESHOLD) -> CrawlResult:
+    def fetch_page(self, 
+                   url_model: UrlModel, 
+                   provider: str = DEFAULT_PROVIDER, 
+                   api_token: str = None, 
+                   extract_blocks_flag: bool = True, 
+                   word_count_threshold = MIN_WORD_THRESHOLD,
+                   use_cached_html: bool = False) -> CrawlResult:
         # make sure word_count_threshold is not lesser than MIN_WORD_THRESHOLD
-        if word_count_threshold < MIN_WORD_THRESHOLD:
-            word_count_threshold = MIN_WORD_THRESHOLD
+        # if word_count_threshold < MIN_WORD_THRESHOLD:
+        #     word_count_threshold = MIN_WORD_THRESHOLD
             
         # Check cache first
         cached = get_cached_url(self.db_path, str(url_model.url))
@@ -51,23 +67,41 @@ class WebCrawler:
             
 
         # Initialize WebDriver for crawling
-        service = Service(chromedriver_autoinstaller.install())
-        driver = webdriver.Chrome(service=service, options=self.options)
-
-        try:
-            driver.get(str(url_model.url))
-            WebDriverWait(driver, 10).until(
-                EC.presence_of_all_elements_located((By.TAG_NAME, "html"))
-            )
-            html = driver.page_source
+        if use_cached_html:
+            # load html from crawl4ai_folder/cache
+            valid_file_name = str(url_model.url).replace("/", "_").replace(":", "_")
+            if os.path.exists(os.path.join(self.crawl4ai_folder, "cache", valid_file_name)):
+                with open(os.path.join(self.crawl4ai_folder, "cache", valid_file_name), "r") as f:
+                    html = f.read()
+            else:
+                raise Exception("Cached HTML file not found")
+            
             success = True
             error_message = ""
-        except Exception as e:
-            html = ""
-            success = False
-            error_message = str(e)
-        finally:
-            driver.quit()
+        else:
+            service = self.service
+            driver = self.driver
+
+            try:
+                driver.get(str(url_model.url))
+                WebDriverWait(driver, 10).until(
+                    EC.presence_of_all_elements_located((By.TAG_NAME, "html"))
+                )
+                html = driver.page_source
+                success = True
+                error_message = ""
+                
+                # Save html in crawl4ai_folder/cache
+                valid_file_name = str(url_model.url).replace("/", "_").replace(":", "_")
+                with open(os.path.join(self.crawl4ai_folder, "cache", valid_file_name), "w") as f:
+                    f.write(html)
+                
+            except Exception as e:
+                html = ""
+                success = False
+                error_message = str(e)
+            finally:
+                driver.quit()
 
         # Extract content from HTML
         result = get_content_of_website(html, word_count_threshold)
