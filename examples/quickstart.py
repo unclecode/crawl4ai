@@ -8,11 +8,12 @@ def main():
     crawler = WebCrawler(db_path='crawler_data.db')
 
     # Fetch a single page
-    single_url = UrlModel(url='https://www.nbcnews.com/business', forced=False)
+    single_url = UrlModel(url='https://www.nbcnews.com/business', forced=True)
     result = crawler.fetch_page(
         single_url, 
         provider= "openai/gpt-3.5-turbo", 
         api_token = os.getenv('OPENAI_API_KEY'), 
+        use_cached_html = True,
         extract_blocks_flag=True,
         word_count_threshold=10
     )

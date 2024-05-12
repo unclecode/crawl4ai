@@ -11,3 +11,5 @@ bs4
 html2text
 litellm
 python-dotenv
+nltk
+spacy

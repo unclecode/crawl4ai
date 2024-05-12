@@ -1,4 +1,5 @@
-import requests
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from bs4 import BeautifulSoup, Comment, element, Tag, NavigableString
 import html2text
 import json
@@ -272,7 +273,8 @@ def get_content_of_website(html, word_count_threshold = MIN_WORD_THRESHOLD):
         h = CustomHTML2Text()
         h.ignore_links = True
         markdown = h.handle(cleaned_html)
-
+        markdown = markdown.replace('    ```', '```')
+            
         # Return the Markdown content
         return{
             'markdown': markdown,
@@ -417,3 +419,49 @@ def extract_blocks_batch(batch_data, provider = "groq/llama3-70b-8192", api_toke
         all_blocks.append(blocks)
     
     return sum(all_blocks, [])
+
+
+def merge_chunks_based_on_token_threshold(chunks, token_threshold):
+    """
+    Merges small chunks into larger ones based on the total token threshold.
+
+    :param chunks: List of text chunks to be merged based on token count.
+    :param token_threshold: Max number of tokens for each merged chunk.
+    :return: List of merged text chunks.
+    """
+    merged_sections = []
+    current_chunk = []
+    total_token_so_far = 0
+
+    for chunk in chunks:
+        chunk_token_count = len(chunk.split()) * 1.3  # Estimate token count with a factor
+        if total_token_so_far + chunk_token_count < token_threshold:
+            current_chunk.append(chunk)
+            total_token_so_far += chunk_token_count
+        else:
+            if current_chunk:
+                merged_sections.append('\n\n'.join(current_chunk))
+            current_chunk = [chunk]
+            total_token_so_far = chunk_token_count
+
+    # Add the last chunk if it exists
+    if current_chunk:
+        merged_sections.append('\n\n'.join(current_chunk))
+
+    return merged_sections
+
+def process_sections(url: str, sections: list, provider: str, api_token: str) -> list:
+    parsed_json = []
+    if provider.startswith("groq/"):
+        # Sequential processing with a delay
+        for section in sections:
+            parsed_json.extend(extract_blocks(url, section, provider, api_token))
+            time.sleep(0.5)  # 500 ms delay between each processing
+    else:
+        # Parallel processing using ThreadPoolExecutor
+        with ThreadPoolExecutor() as executor:
+            futures = [executor.submit(extract_blocks, url, section, provider, api_token) for section in sections]
+            for future in as_completed(futures):
+                parsed_json.extend(future.result())
+    
+    return parsed_json
