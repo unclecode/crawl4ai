@@ -198,12 +198,15 @@ class HierarchicalClusteringStrategy(ExtractionStrategy):
         :return: A list of dictionaries representing the clusters.
         """
         # Assume `html` is a list of text chunks for this strategy
+        t = time.time()
         text_chunks = html.split(self.DEL)  # Split by lines or paragraphs as needed
 
         # Perform clustering
         labels = self.hierarchical_clustering(text_chunks)
+        print(f"Clustering done in {time.time() - t:.2f} seconds")
 
         # Organize texts by their cluster labels, retaining order
+        t = time.time()
         clusters = {}
         for index, label in enumerate(labels):
             clusters.setdefault(label, []).append(text_chunks[index])
@@ -220,6 +223,8 @@ class HierarchicalClusteringStrategy(ExtractionStrategy):
             tok_k = self.top_k
             top_categories = sorted(doc.cats.items(), key=lambda x: x[1], reverse=True)[:tok_k]
             cluster['tags'] = [cat for cat, _ in top_categories]
+        
+        print(f"Processing done in {time.time() - t:.2f} seconds")
         
         return cluster_list
 
