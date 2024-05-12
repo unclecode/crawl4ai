@@ -76,13 +76,16 @@ class WebCrawler:
         parsed_json = []
         if extract_blocks_flag:
             print(f"[LOG] 🚀 Extracting semantic blocks for {url_model.url}")
+            t = time.time()
             # Split markdown into sections
             sections = chunking_strategy.chunk(markdown)                          
             # sections = merge_chunks_based_on_token_threshold(sections, CHUNK_TOKEN_THRESHOLD)
 
             parsed_json = extraction_strategy.run(str(url_model.url), sections, provider, api_token)
             parsed_json = json.dumps(parsed_json)
-            print(f"[LOG] 🚀 Extraction done for {url_model.url}")
+            
+            
+            print(f"[LOG] 🚀 Extraction done for {url_model.url}, time taken: {time.time() - t} seconds.")
         else:
             parsed_json = "{}"
             print(f"[LOG] 🚀 Skipping extraction for {url_model.url}")
