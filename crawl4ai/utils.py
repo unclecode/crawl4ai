@@ -3,15 +3,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from bs4 import BeautifulSoup, Comment, element, Tag, NavigableString
 import html2text
 import json
+import html
 import re
 import os
-import litellm
-from litellm import completion, batch_completion
+from html2text import HTML2Text
 from .prompts import PROMPT_EXTRACT_BLOCKS
 from .config import *
-import re
-import html
-from html2text import HTML2Text
 
 
 def beautify_html(escaped_html):
@@ -303,17 +300,16 @@ def extract_xml_data(tags, string):
 
     return data
     
-import time
-import litellm
-
 # Function to perform the completion with exponential backoff
 def perform_completion_with_backoff(provider, prompt_with_variables, api_token):
+    from litellm import completion 
+    from litellm.exceptions import RateLimitError
     max_attempts = 3
     base_delay = 2  # Base delay in seconds, you can adjust this based on your needs
     
     for attempt in range(max_attempts):
         try:
-            response = completion(
+            response =completion(
                 model=provider,
                 messages=[
                     {"role": "user", "content": prompt_with_variables}
@@ -322,7 +318,7 @@ def perform_completion_with_backoff(provider, prompt_with_variables, api_token):
                 api_key=api_token
             )
             return response  # Return the successful response
-        except litellm.exceptions.RateLimitError as e:
+        except RateLimitError as e:
             print("Rate limit error:", str(e))
             
             # Check if we have exhausted our max attempts
@@ -378,7 +374,7 @@ def extract_blocks(url, html, provider = DEFAULT_PROVIDER, api_token = None):
 
 def extract_blocks_batch(batch_data, provider = "groq/llama3-70b-8192", api_token = None):
     api_token = os.getenv('GROQ_API_KEY', None) if not api_token else api_token
-    
+    from litellm import batch_completion
     messages = []
     
     for url, html in batch_data:        
