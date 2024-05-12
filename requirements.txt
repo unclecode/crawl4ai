@@ -12,4 +12,4 @@ html2text
 litellm
 python-dotenv
 nltk
-spacy
+# spacy
