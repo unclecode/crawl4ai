@@ -3,15 +3,17 @@ from dotenv import load_dotenv
 
 load_dotenv()  # Load environment variables from .env file
 
-# Default provider
+# Default provider, ONLY used when the extraction strategy is LLMExtractionStrategy
 DEFAULT_PROVIDER = "openai/gpt-4-turbo"
 
-# Provider-model dictionary
+# Provider-model dictionary, ONLY used when the extraction strategy is LLMExtractionStrategy
 PROVIDER_MODELS = {
+    "ollama/llama3": "no-token-needed", # Any model from Ollama no need for API token
     "groq/llama3-70b-8192": os.getenv("GROQ_API_KEY"),
     "groq/llama3-8b-8192": os.getenv("GROQ_API_KEY"),
     "openai/gpt-3.5-turbo": os.getenv("OPENAI_API_KEY"),
     "openai/gpt-4-turbo": os.getenv("OPENAI_API_KEY"),
+    "openai/gpt-4o": os.getenv("OPENAI_API_KEY"),
     "anthropic/claude-3-haiku-20240307": os.getenv("ANTHROPIC_API_KEY"),
     "anthropic/claude-3-opus-20240229": os.getenv("ANTHROPIC_API_KEY"),
     "anthropic/claude-3-sonnet-20240229": os.getenv("ANTHROPIC_API_KEY"),

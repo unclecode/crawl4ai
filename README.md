@@ -56,40 +56,28 @@ pip install -e .
 2. Import the necessary modules in your Python script:
 ```python
 from crawl4ai.web_crawler import WebCrawler
-from crawl4ai.models import UrlModel
+from crawl4ai.chunking_strategy import *
+from crawl4ai.extraction_strategy import *
 import os
 
-crawler = WebCrawler(db_path='crawler_data.db')
+crawler = WebCrawler()
+crawler.warmup() # IMPORTANT: Warmup the engine before running the first crawl
 
 # Single page crawl
-single_url = UrlModel(url='https://kidocode.com', forced=False)
-result = crawl4ai.fetch_page(
-    single_url, 
-    provider= "openai/gpt-3.5-turbo", 
-    api_token = os.getenv('OPENAI_API_KEY'),
-    # Set `extract_blocks_flag` to True to enable the LLM to generate semantically clustered chunks
-    # and return them as JSON. Depending on the model and data size, this may take up to 1 minute.
-    # Without this setting, it will take between 5 to 20 seconds.
-    extract_blocks_flag=False 
-    word_count_threshold=5 # Minimum word count for a HTML tag to be considered as a worthy block
+result = crawler.run(
+    url='https://www.nbcnews.com/business',
+    word_count_threshold=5, # Minimum word count for a HTML tag to be considered as a worthy block
+    chunking_strategy= RegexChunking( patterns = ["\n\n"]), # Default is RegexChunking
+    extraction_strategy= CosineStrategy(word_count_threshold=20, max_dist=0.2, linkage_method='ward', top_k=3) # Default is CosineStrategy
+    # extraction_strategy= LLMExtractionStrategy(provider= "openai/gpt-4o", api_token = os.getenv('OPENAI_API_KEY')),
+    bypass_cache=False,
+    extract_blocks =True, # Whether to extract semantical blocks of text from the HTML
+    css_selector = "", # Eg: "div.article-body"
+    verbose=True,
+    include_raw_html=True, # Whether to include the raw HTML content in the response
 )
+
 print(result.model_dump())
-
-# Multiple page crawl
-urls = [
-    UrlModel(url='http://example.com', forced=False),
-    UrlModel(url='http://example.org', forced=False)
-]
-results = crawl4ai.fetch_pages(
-    urls, 
-    provider= "openai/gpt-3.5-turbo", 
-    api_token = os.getenv('OPENAI_API_KEY'), 
-    extract_blocks_flag=True, 
-    word_count_threshold=5
-)
-
-for res in results:
-    print(res.model_dump())
 ```
 
 Running for the first time will download the chrome driver for selenium. Also creates a SQLite database file `crawler_data.db` in the current directory. This file will store the crawled data for future reference.
@@ -150,23 +138,22 @@ Set `extract_blocks_flag` to True to enable the LLM to generate semantically clu
 import requests
 import os
 
-url = "http://localhost:8000/crawl"  # Replace with the appropriate server URL
 data = {
   "urls": [
-    "https://example.com"
+    "https://www.nbcnews.com/business"
   ],
   "provider_model": "groq/llama3-70b-8192",
-  "api_token": "your_api_token",
   "include_raw_html": true,
-  "forced": false,
-    # Set `extract_blocks_flag` to True to enable the LLM to generate semantically clustered chunks
-    # and return them as JSON. Depending on the model and data size, this may take up to 1 minute.
-    # Without this setting, it will take between 5 to 20 seconds.
-  "extract_blocks_flag": False,
-  "word_count_threshold": 5
+  "bypass_cache": false,
+  "extract_blocks": true,
+  "word_count_threshold": 10,
+  "extraction_strategy": "CosineStrategy",
+  "chunking_strategy": "RegexChunking",
+  "css_selector": "",
+  "verbose": true
 }
 
-response = requests.post(url, json=data)
+response = requests.post("http://crawl4ai.uccode.io/crawl", json=data) # OR http://localhost:8000 if your run locally 
 
 if response.status_code == 200:
     result = response.json()["results"][0]
@@ -180,9 +167,9 @@ else:
     print("Error:", response.status_code, response.text)
 ```
 
-This code sends a POST request to the Crawl4AI server running on localhost, specifying the target URL (`https://example.com`) and the desired options (`grq_api_token`, `include_raw_html`, and `forced`). The server processes the request and returns the crawled data in JSON format.
+This code sends a POST request to the Crawl4AI server running on localhost, specifying the target URL (`http://crawl4ai.uccode.io/crawl`) and the desired options. The server processes the request and returns the crawled data in JSON format.
 
-The response from the server includes the parsed JSON, cleaned HTML, and markdown representations of the crawled webpage. You can access and use this data in your Python application as needed.
+The response from the server includes the semantical clusters, cleaned HTML, and markdown representations of the crawled webpage. You can access and use this data in your Python application as needed.
 
 Make sure to replace `"http://localhost:8000/crawl"` with the appropriate server URL if your Crawl4AI server is running on a different host or port.
 
@@ -194,15 +181,17 @@ That's it! You can now integrate Crawl4AI into your Python projects and leverage
 
 ## 📖 Parameters
 
-| Parameter            | Description                                                                                     | Required | Default Value |
-|----------------------|-------------------------------------------------------------------------------------------------|----------|---------------|
-| `urls`               | A list of URLs to crawl and extract data from.                                                  | Yes      | -             |
-| `provider_model`     | The provider and model to use for extracting relevant information (e.g., "groq/llama3-70b-8192"). | Yes      | -             |
-| `api_token`          | Your API token for the specified provider.                                                        | Yes      | -             |
-| `include_raw_html`   | Whether to include the raw HTML content in the response.                                        | No       | `false`       |
-| `forced`             | Whether to force a fresh crawl even if the URL has been previously crawled.                     | No       | `false`       |
-| `extract_blocks_flag`| Whether to extract semantical blocks of text from the HTML.                                     | No       | `false`       |
-| `word_count_threshold` | The minimum number of words a block must contain to be considered meaningful (minimum value is 5). | No       | `5`           |
+| Parameter             | Description                                                                                           | Required | Default Value       |
+|-----------------------|-------------------------------------------------------------------------------------------------------|----------|---------------------|
+| `urls`                | A list of URLs to crawl and extract data from.                                                        | Yes      | -                   |
+| `include_raw_html`    | Whether to include the raw HTML content in the response.                                              | No       | `false`             |
+| `bypass_cache`        | Whether to force a fresh crawl even if the URL has been previously crawled.                           | No       | `false`             |
+| `extract_blocks`      | Whether to extract semantical blocks of text from the HTML.                                           | No       | `true`              |
+| `word_count_threshold`| The minimum number of words a block must contain to be considered meaningful (minimum value is 5).    | No       | `5`                 |
+| `extraction_strategy` | The strategy to use for extracting content from the HTML (e.g., "CosineStrategy").                    | No       | `CosineStrategy`    |
+| `chunking_strategy`   | The strategy to use for chunking the text before processing (e.g., "RegexChunking").                  | No       | `RegexChunking`     |
+| `css_selector`        | The CSS selector to target specific parts of the HTML for extraction.                                 | No       | `None`              |
+| `verbose`             | Whether to enable verbose logging.                                                                    | No       | `true`              |
 
 ## 🛠️ Configuration 
 Crawl4AI allows you to configure various parameters and settings in the `crawler/config.py` file. Here's an example of how you can adjust the parameters:
@@ -213,15 +202,17 @@ from dotenv import load_dotenv
 
 load_dotenv()  # Load environment variables from .env file
 
-# Default provider
+# Default provider, ONLY used when the extraction strategy is LLMExtractionStrategy
 DEFAULT_PROVIDER = "openai/gpt-4-turbo"
 
-# Provider-model dictionary
+# Provider-model dictionary, ONLY used when the extraction strategy is LLMExtractionStrategy
 PROVIDER_MODELS = {
+    "ollama/llama3": "no-token-needed", # Any model from Ollama no need for API token
     "groq/llama3-70b-8192": os.getenv("GROQ_API_KEY"),
     "groq/llama3-8b-8192": os.getenv("GROQ_API_KEY"),
     "openai/gpt-3.5-turbo": os.getenv("OPENAI_API_KEY"),
     "openai/gpt-4-turbo": os.getenv("OPENAI_API_KEY"),
+    "openai/gpt-4o": os.getenv("OPENAI_API_KEY"),
     "anthropic/claude-3-haiku-20240307": os.getenv("ANTHROPIC_API_KEY"),
     "anthropic/claude-3-opus-20240229": os.getenv("ANTHROPIC_API_KEY"),
     "anthropic/claude-3-sonnet-20240229": os.getenv("ANTHROPIC_API_KEY"),
@@ -229,11 +220,13 @@ PROVIDER_MODELS = {
 
 # Chunk token threshold
 CHUNK_TOKEN_THRESHOLD = 1000
-
 # Threshold for the minimum number of words in an HTML tag to be considered 
 MIN_WORD_THRESHOLD = 5
 ```
+
 In the `crawler/config.py` file, you can:
+
+REMEBER: You only need to set the API keys for the providers in case you choose LLMExtractStrategy as the extraction strategy. If you choose CosineStrategy, you don't need to set the API keys.
 
 - Set the default provider using the `DEFAULT_PROVIDER` variable.
 - Add or modify the provider-model dictionary (`PROVIDER_MODELS`) to include your desired providers and their corresponding API keys. Crawl4AI supports various providers such as Groq, OpenAI, Anthropic, and more. You can add any provider supported by LiteLLM, as well as Ollama.
