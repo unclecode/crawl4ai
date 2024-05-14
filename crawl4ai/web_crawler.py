@@ -2,7 +2,7 @@ import os, time
 from pathlib import Path
 
 from .models import UrlModel, CrawlResult
-from .database import init_db, get_cached_url, cache_url
+from .database import init_db, get_cached_url, cache_url, DB_PATH
 from .utils import *
 from .chunking_strategy import *
 from .extraction_strategy import *
@@ -10,6 +10,7 @@ from .crawler_strategy import *
 from typing import List
 from concurrent.futures import ThreadPoolExecutor
 from .config import *
+# from .model_loader import load_bert_base_uncased, load_bge_small_en_v1_5, load_spacy_model
 
 
 class WebCrawler:
@@ -36,11 +37,11 @@ class WebCrawler:
         
     def warmup(self):
         print("[LOG] 🌤️ Warming up the WebCrawler")
-        single_url = UrlModel(url='https://crawl4ai.uccode.io/', forced=False)
         result = self.run(
-            single_url, 
+            url='https://crawl4ai.uccode.io/',
             word_count_threshold=5,
-            extraction_strategy= CosinegStrategy(),
+            extraction_strategy= CosineStrategy(),
+            bypass_cache=False,
             verbose = False
         )
         self.ready = True
@@ -60,10 +61,11 @@ class WebCrawler:
         **kwargs,
     ) -> CrawlResult:
         return self.run(
-            url_model,
+            url_model.url,
             word_count_threshold,
             extraction_strategy,
             chunking_strategy,
+            bypass_cache=url_model.forced,
             **kwargs,
         )
         pass
@@ -71,77 +73,85 @@ class WebCrawler:
 
     def run(
         self,
-        url_model: UrlModel,
+        url: str,
         word_count_threshold=MIN_WORD_THRESHOLD,
         extraction_strategy: ExtractionStrategy = NoExtractionStrategy(),
         chunking_strategy: ChunkingStrategy = RegexChunking(),
+        bypass_cache: bool = False,
+        css_selector: str = None,
         verbose=True,
         **kwargs,
     ) -> CrawlResult:
+        # Check if extraction strategy is an instance of ExtractionStrategy if not raise an error
+        if not isinstance(extraction_strategy, ExtractionStrategy):
+            raise ValueError("Unsupported extraction strategy")
+        if not isinstance(chunking_strategy, ChunkingStrategy):
+            raise ValueError("Unsupported chunking strategy")
+        
         # make sure word_count_threshold is not lesser than MIN_WORD_THRESHOLD
         if word_count_threshold < MIN_WORD_THRESHOLD:
             word_count_threshold = MIN_WORD_THRESHOLD
 
         # Check cache first
-        cached = get_cached_url(self.db_path, str(url_model.url))
-        if cached and not url_model.forced:
-            return CrawlResult(
-                **{
-                    "url": cached[0],
-                    "html": cached[1],
-                    "cleaned_html": cached[2],
-                    "markdown": cached[3],
-                    "parsed_json": cached[4],
-                    "success": cached[5],
-                    "error_message": "",
-                }
-            )
+        if not bypass_cache:
+            cached = get_cached_url(url)
+            if cached:
+                return CrawlResult(
+                    **{
+                        "url": cached[0],
+                        "html": cached[1],
+                        "cleaned_html": cached[2],
+                        "markdown": cached[3],
+                        "parsed_json": cached[4],
+                        "success": cached[5],
+                        "error_message": "",
+                    }
+                )
 
         # Initialize WebDriver for crawling
         t = time.time()
-        try:
-            html = self.crawler_strategy.crawl(str(url_model.url))
-            success = True
-            error_message = ""
-        except Exception as e:
-            html = ""
-            success = False
-            error_message = str(e)
-
+        html = self.crawler_strategy.crawl(url)
+        success = True
+        error_message = ""
         # Extract content from HTML
-        result = get_content_of_website(html, word_count_threshold)
+        try:
+            result = get_content_of_website(html, word_count_threshold, css_selector=css_selector)
+            if result is None:
+                raise ValueError(f"Failed to extract content from the website: {url}")
+        except InvalidCSSSelectorError as e:
+            raise ValueError(str(e))
+        
         cleaned_html = result.get("cleaned_html", html)
         markdown = result.get("markdown", "")
 
         # Print a profession LOG style message, show time taken and say crawling is done
         if verbose:
             print(
-                f"[LOG] 🚀 Crawling done for {url_model.url}, success: {success}, time taken: {time.time() - t} seconds"
+                f"[LOG] 🚀 Crawling done for {url}, success: {success}, time taken: {time.time() - t} seconds"
             )
 
         parsed_json = []
         if verbose:
-            print(f"[LOG] 🔥 Extracting semantic blocks for {url_model.url}")
+            print(f"[LOG] 🔥 Extracting semantic blocks for {url}, Strategy: {extraction_strategy.name}")
         t = time.time()
         # Split markdown into sections
         sections = chunking_strategy.chunk(markdown)
         # sections = merge_chunks_based_on_token_threshold(sections, CHUNK_TOKEN_THRESHOLD)
 
         parsed_json = extraction_strategy.run(
-            str(url_model.url), sections,
+            url, sections,
         )
         parsed_json = json.dumps(parsed_json)
 
         if verbose:
             print(
-                f"[LOG] 🚀 Extraction done for {url_model.url}, time taken: {time.time() - t} seconds."
+                f"[LOG] 🚀 Extraction done for {url}, time taken: {time.time() - t} seconds."
             )
 
         # Cache the result
         cleaned_html = beautify_html(cleaned_html)
         cache_url(
-            self.db_path,
-            str(url_model.url),
+            url,
             html,
             cleaned_html,
             markdown,
@@ -150,7 +160,7 @@ class WebCrawler:
         )
 
         return CrawlResult(
-            url=str(url_model.url),
+            url=url,
             html=html,
             cleaned_html=cleaned_html,
             markdown=markdown,

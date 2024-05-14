@@ -10,6 +10,8 @@ from html2text import HTML2Text
 from .prompts import PROMPT_EXTRACT_BLOCKS
 from .config import *
 
+class InvalidCSSSelectorError(Exception):
+    pass
 
 def beautify_html(escaped_html):
     """
@@ -140,13 +142,25 @@ class CustomHTML2Text(HTML2Text):
 
         super().handle_tag(tag, attrs, start)
 
-def get_content_of_website(html, word_count_threshold = MIN_WORD_THRESHOLD):
+def get_content_of_website(html, word_count_threshold = MIN_WORD_THRESHOLD, css_selector = None):
     try:
+        if not html:
+            return None
         # Parse HTML content with BeautifulSoup
         soup = BeautifulSoup(html, 'html.parser')
 
         # Get the content within the <body> tag
         body = soup.body
+        
+        # If css_selector is provided, extract content based on the selector
+        if css_selector:
+            selected_elements = body.select(css_selector)
+            if not selected_elements:
+                raise InvalidCSSSelectorError(f"Invalid CSS selector , No elements found for CSS selector: {css_selector}")
+            div_tag = soup.new_tag('div')
+            for el in selected_elements:
+                div_tag.append(el)
+            body = div_tag
 
         # Remove script, style, and other tags that don't carry useful content from body
         for tag in body.find_all(['script', 'style', 'link', 'meta', 'noscript']):
@@ -255,7 +269,7 @@ def get_content_of_website(html, word_count_threshold = MIN_WORD_THRESHOLD):
 
 
         # Remove comments
-        for comment in soup.find_all(text=lambda text: isinstance(text, Comment)):
+        for comment in soup.find_all(string=lambda text: isinstance(text, Comment)): 
             comment.extract()
 
         # Remove consecutive empty newlines and replace multiple spaces with a single space
@@ -281,7 +295,7 @@ def get_content_of_website(html, word_count_threshold = MIN_WORD_THRESHOLD):
 
     except Exception as e:
         print('Error processing HTML content:', str(e))
-        return None
+        raise InvalidCSSSelectorError(f"Invalid CSS selector: {css_selector}") from e
 
 def extract_xml_tags(string):
     tags = re.findall(r'<(\w+)>', string)
