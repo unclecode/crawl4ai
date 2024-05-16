@@ -169,3 +169,6 @@ test_pad.py
 test_pad*.py
 .data/
 Crawl4AI.egg-info/
+
+requirements0.txt
+a.txt
