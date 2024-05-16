@@ -117,7 +117,10 @@ To install Crawl4AI as a library, follow these steps:
 
 1. Install the package from GitHub:
 ```bash
+virtualenv venv
+source venv/bin/activate
 pip install git+https://github.com/unclecode/crawl4ai.git
+python docs/examples/quickstart.py
 ```
 
 2. Alternatively, you can clone the repository and install the package locally:
@@ -191,6 +194,8 @@ For more information about the available parameters and their descriptions, refe
 
 
 ## Python Library Usage 🚀
+
+    🔥 A great way to try out Crawl4AI is to run `quickstart.py` in the `docs/examples` directory. This script demonstrates how to use Crawl4AI to crawl a website and extract content from it.
 
 ### Quickstart Guide
 

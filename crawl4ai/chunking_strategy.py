@@ -6,6 +6,7 @@ import re
 # from nltk.tokenize import word_tokenize, TextTilingTokenizer
 from collections import Counter
 import string
+from .model_loader import load_spacy_en_core_web_sm
 
 # Define the abstract base class for chunking strategies
 class ChunkingStrategy(ABC):
@@ -37,13 +38,7 @@ class RegexChunking(ChunkingStrategy):
 
 class NlpSentenceChunking(ChunkingStrategy):
     def __init__(self, model='en_core_web_sm'):
-        import spacy
-        try:
-            self.nlp = spacy.load(model)
-        except IOError:
-            spacy.cli.download("en_core_web_sm")
-            self.nlp = spacy.load(model)
-            # raise ImportError(f"Spacy model '{model}' not found. Please download the model using 'python -m spacy download {model}'")
+        self.nlp = load_spacy_en_core_web_sm()
 
     def chunk(self, text: str) -> list:
         doc = self.nlp(text)

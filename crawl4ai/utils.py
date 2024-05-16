@@ -9,9 +9,18 @@ import os
 from html2text import HTML2Text
 from .prompts import PROMPT_EXTRACT_BLOCKS
 from .config import *
+from pathlib import Path
 
 class InvalidCSSSelectorError(Exception):
     pass
+
+
+def get_home_folder():
+    home_folder = os.path.join(Path.home(), ".crawl4ai")
+    os.makedirs(home_folder, exist_ok=True)
+    os.makedirs(f"{home_folder}/cache", exist_ok=True)
+    os.makedirs(f"{home_folder}/models", exist_ok=True)
+    return home_folder    
 
 def beautify_html(escaped_html):
     """
