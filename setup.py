@@ -1,9 +1,20 @@
 from setuptools import setup, find_packages
+from setuptools.command.install import install as _install
+import subprocess
 
-# Read the requirements from requirements.txt
-with open("requirements.txt") as f:
-    requirements = f.read().splitlines()
-    
+class InstallCommand(_install):
+    def run(self):
+        # Run the standard install first
+        _install.run(self)
+        # Now handle the dependencies manually
+        self.manual_dependencies_install()
+
+    def manual_dependencies_install(self):
+        with open('requirements.txt') as f:
+            dependencies = f.read().splitlines()
+        for dependency in dependencies:
+            subprocess.check_call([self.executable, '-m', 'pip', 'install', dependency])
+
 setup(
     name="Crawl4AI",
     version="0.1.0",
@@ -15,7 +26,10 @@ setup(
     author_email="unclecode@kidocode.com",
     license="MIT",
     packages=find_packages(),
-    install_requires=requirements,
+    install_requires=[],  # Leave this empty to avoid default dependency resolution
+    cmdclass={
+        'install': InstallCommand,
+    },
     entry_points={
         'console_scripts': [
             'crawl4ai-download-models=crawl4ai.model_loader:main',
