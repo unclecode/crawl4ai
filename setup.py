@@ -1,6 +1,7 @@
 from setuptools import setup, find_packages
 from setuptools.command.install import install as _install
 import subprocess
+import sys
 
 class InstallCommand(_install):
     def run(self):
@@ -13,7 +14,7 @@ class InstallCommand(_install):
         with open('requirements.txt') as f:
             dependencies = f.read().splitlines()
         for dependency in dependencies:
-            subprocess.check_call([self.executable, '-m', 'pip', 'install', dependency])
+            subprocess.check_call([sys.executable, '-m', 'pip', 'install', dependency])
 
 setup(
     name="Crawl4AI",
