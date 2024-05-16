@@ -43,7 +43,7 @@ def load_spacy_model():
     model_folder = os.path.join(home_folder, name)
     
     # Check if the model directory already exists
-    if True or not (Path(model_folder).exists() and any(Path(model_folder).iterdir())):
+    if not (Path(model_folder).exists() and any(Path(model_folder).iterdir())):
         repo_url = "https://github.com/unclecode/crawl4ai.git"
         # branch = "main"
         branch = MODEL_REPO_BRANCH 

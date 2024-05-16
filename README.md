@@ -119,8 +119,8 @@ To install Crawl4AI as a library, follow these steps:
 ```bash
 virtualenv venv
 source venv/bin/activate
+pip install transformers torch chromedriver_autoinstaller
 pip install git+https://github.com/unclecode/crawl4ai.git
-python docs/examples/quickstart.py
 ```
 
 2. Alternatively, you can clone the repository and install the package locally:
@@ -129,6 +129,7 @@ virtualenv venv
 source venv/bin/activate
 git clone https://github.com/unclecode/crawl4ai.git
 cd crawl4ai
+pip install transformers torch chromedriver_autoinstaller
 pip install -e .
 ```
 
