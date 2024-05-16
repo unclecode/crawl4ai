@@ -34,13 +34,16 @@ class WebCrawler:
         # if not db_path:
             # self.db_path = f"{self.crawl4ai_folder}/crawl4ai.db"
         
-        flush_db()
+        # flush_db()
         init_db()
         
         self.ready = False
         
     def warmup(self):
-        print("[LOG] 🌤️ Warming up the WebCrawler")
+        
+        
+        
+        print("[LOG] 🌤️  Warming up the WebCrawler")
         result = self.run(
             url='https://crawl4ai.uccode.io/',
             word_count_threshold=5,
