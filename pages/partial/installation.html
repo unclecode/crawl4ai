@@ -27,7 +27,11 @@
             Install the package from GitHub:
             <pre
                 class="bg-zinc-800 p-4 rounded mt-2 text-zinc-100"
-            ><code>pip install git+https://github.com/unclecode/crawl4ai.git</code></pre>
+            ><code>virtualenv venv
+source venv/bin/activate
+pip install git+https://github.com/unclecode/crawl4ai.git
+pip install transformers torch chromedriver_autoinstaller
+            </code></pre>
         </li>
         <li class="mb-4">
             Alternatively, you can clone the repository and install the package locally:
@@ -37,6 +41,7 @@
 source venv/bin/activate
 git clone https://github.com/unclecode/crawl4ai.git
 cd crawl4ai
+pip install transformers torch chromedriver_autoinstaller
 pip install -e .
 </code></pre>
         </li>
