@@ -1,8 +1,9 @@
 import os, time
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 from pathlib import Path
 
 from .models import UrlModel, CrawlResult
-from .database import init_db, get_cached_url, cache_url, DB_PATH
+from .database import init_db, get_cached_url, cache_url, DB_PATH, flush_db
 from .utils import *
 from .chunking_strategy import *
 from .extraction_strategy import *
@@ -16,11 +17,13 @@ from .config import *
 class WebCrawler:
     def __init__(
         self,
-        db_path: str = None,
+        # db_path: str = None,
         crawler_strategy: CrawlerStrategy = LocalSeleniumCrawlerStrategy(),
+        always_by_pass_cache: bool = False,
     ):
-        self.db_path = db_path
+        # self.db_path = db_path
         self.crawler_strategy = crawler_strategy
+        self.always_by_pass_cache = always_by_pass_cache
 
         # Create the .crawl4ai folder in the user's home directory if it doesn't exist
         self.crawl4ai_folder = os.path.join(Path.home(), ".crawl4ai")
@@ -28,10 +31,11 @@ class WebCrawler:
         os.makedirs(f"{self.crawl4ai_folder}/cache", exist_ok=True)
 
         # If db_path is not provided, use the default path
-        if not db_path:
-            self.db_path = f"{self.crawl4ai_folder}/crawl4ai.db"
+        # if not db_path:
+            # self.db_path = f"{self.crawl4ai_folder}/crawl4ai.db"
         
-        init_db(self.db_path)
+        flush_db()
+        init_db()
         
         self.ready = False
         
@@ -93,7 +97,7 @@ class WebCrawler:
             word_count_threshold = MIN_WORD_THRESHOLD
 
         # Check cache first
-        if not bypass_cache:
+        if not bypass_cache and not self.always_by_pass_cache:
             cached = get_cached_url(url)
             if cached:
                 return CrawlResult(
@@ -102,7 +106,7 @@ class WebCrawler:
                         "html": cached[1],
                         "cleaned_html": cached[2],
                         "markdown": cached[3],
-                        "parsed_json": cached[4],
+                        "extracted_content": cached[4],
                         "success": cached[5],
                         "error_message": "",
                     }
@@ -130,7 +134,7 @@ class WebCrawler:
                 f"[LOG] 🚀 Crawling done for {url}, success: {success}, time taken: {time.time() - t} seconds"
             )
 
-        parsed_json = []
+        extracted_content = []
         if verbose:
             print(f"[LOG] 🔥 Extracting semantic blocks for {url}, Strategy: {extraction_strategy.name}")
         t = time.time()
@@ -138,10 +142,10 @@ class WebCrawler:
         sections = chunking_strategy.chunk(markdown)
         # sections = merge_chunks_based_on_token_threshold(sections, CHUNK_TOKEN_THRESHOLD)
 
-        parsed_json = extraction_strategy.run(
+        extracted_content = extraction_strategy.run(
             url, sections,
         )
-        parsed_json = json.dumps(parsed_json)
+        extracted_content = json.dumps(extracted_content)
 
         if verbose:
             print(
@@ -155,7 +159,7 @@ class WebCrawler:
             html,
             cleaned_html,
             markdown,
-            parsed_json,
+            extracted_content,
             success,
         )
 
@@ -164,7 +168,7 @@ class WebCrawler:
             html=html,
             cleaned_html=cleaned_html,
             markdown=markdown,
-            parsed_json=parsed_json,
+            extracted_content=extracted_content,
             success=success,
             error_message=error_message,
         )

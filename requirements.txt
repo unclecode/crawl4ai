@@ -13,4 +13,5 @@ litellm
 python-dotenv
 nltk
 lazy_import
+rich
 # spacy

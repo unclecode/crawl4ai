@@ -18,15 +18,16 @@ class CrawlerStrategy(ABC):
         pass
 
 class CloudCrawlerStrategy(CrawlerStrategy):
-    def crawl(self, url: str, use_cached_html = False, css_selector = None) -> str:
+    def __init__(self, use_cached_html = False):
+        super().__init__()
+        self.use_cached_html = use_cached_html
+        
+    def crawl(self, url: str) -> str:
         data = {
             "urls": [url],
-            "provider_model": "",
-            "api_token": "token",
             "include_raw_html": True,
             "forced": True,
             "extract_blocks": False,
-            "word_count_threshold": 10
         }
 
         response = requests.post("http://crawl4ai.uccode.io/crawl", json=data)
@@ -35,19 +36,24 @@ class CloudCrawlerStrategy(CrawlerStrategy):
         return html
 
 class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
-    def __init__(self):
+    def __init__(self, use_cached_html=False, js_code=None):
+        super().__init__()
         self.options = Options()
         self.options.headless = True
         self.options.add_argument("--no-sandbox")
         self.options.add_argument("--disable-dev-shm-usage")
+        self.options.add_argument("--disable-gpu")
+        self.options.add_argument("--disable-extensions")
         self.options.add_argument("--headless")
+        self.use_cached_html = use_cached_html
+        self.js_code = js_code
 
         # chromedriver_autoinstaller.install()
         self.service = Service(chromedriver_autoinstaller.install())
         self.driver = webdriver.Chrome(service=self.service, options=self.options)
 
-    def crawl(self, url: str, use_cached_html = False, css_selector = None) -> str:
-        if use_cached_html:
+    def crawl(self, url: str) -> str:
+        if self.use_cached_html:
             cache_file_path = os.path.join(Path.home(), ".crawl4ai", "cache", url.replace("/", "_"))
             if os.path.exists(cache_file_path):
                 with open(cache_file_path, "r") as f:
@@ -58,6 +64,15 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
             WebDriverWait(self.driver, 10).until(
                 EC.presence_of_all_elements_located((By.TAG_NAME, "html"))
             )
+            
+            # Execute JS code if provided
+            if self.js_code:
+                self.driver.execute_script(self.js_code)
+                # Optionally, wait for some condition after executing the JS code
+                WebDriverWait(self.driver, 10).until(
+                    lambda driver: driver.execute_script("return document.readyState") == "complete"
+                )
+            
             html = self.driver.page_source
             
             # Store in cache

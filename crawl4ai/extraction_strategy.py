@@ -3,19 +3,20 @@ from typing import Any, List, Dict, Optional, Union
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import json, time
 # from optimum.intel import IPEXModel
-from .prompts import PROMPT_EXTRACT_BLOCKS
+from .prompts import PROMPT_EXTRACT_BLOCKS, PROMPT_EXTRACT_BLOCKS_WITH_INSTRUCTION
 from .config import *
 from .utils import *
 from functools import partial
 from .model_loader import load_bert_base_uncased, load_bge_small_en_v1_5, load_spacy_model
-
-
+from transformers import pipeline
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
 class ExtractionStrategy(ABC):
     """
     Abstract base class for all extraction strategies.
     """
     
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.DEL = "<|DEL|>"
         self.name = self.__class__.__name__
 
@@ -38,12 +39,12 @@ class ExtractionStrategy(ABC):
         :param sections: List of sections (strings) to process.
         :return: A list of processed JSON blocks.
         """
-        parsed_json = []
+        extracted_content = []
         with ThreadPoolExecutor() as executor:
             futures = [executor.submit(self.extract, url, section, **kwargs) for section in sections]
             for future in as_completed(futures):
-                parsed_json.extend(future.result())
-        return parsed_json    
+                extracted_content.extend(future.result())
+        return extracted_content    
 
 class NoExtractionStrategy(ExtractionStrategy):
     def extract(self, url: str, html: str, *q, **kwargs) -> List[Dict[str, Any]]:
@@ -53,37 +54,41 @@ class NoExtractionStrategy(ExtractionStrategy):
         return [{"index": i, "tags": [], "content": section} for i, section in enumerate(sections)]
     
 class LLMExtractionStrategy(ExtractionStrategy):
-    def __init__(self, provider: str = DEFAULT_PROVIDER, api_token: Optional[str] = None):
+    def __init__(self, provider: str = DEFAULT_PROVIDER, api_token: Optional[str] = None, instruction:str = None, **kwargs):
         """
         Initialize the strategy with clustering parameters.
 
-        :param word_count_threshold: Minimum number of words per cluster.
-        :param max_dist: The maximum cophenetic distance on the dendrogram to form clusters.
-        :param linkage_method: The linkage method for hierarchical clustering.
+        :param provider: The provider to use for extraction.
+        :param api_token: The API token for the provider.
+        :param instruction: The instruction to use for the LLM model.
         """
         super().__init__()    
         self.provider = provider
         self.api_token = api_token or PROVIDER_MODELS.get(provider, None) or os.getenv("OPENAI_API_KEY")
+        self.instruction = instruction
         
         if not self.api_token:
             raise ValueError("API token must be provided for LLMExtractionStrategy. Update the config.py or set OPENAI_API_KEY environment variable.")
         
             
-    def extract(self, url: str, html: str) -> List[Dict[str, Any]]:
-        print("[LOG] Extracting blocks from URL:", url)
+    def extract(self, url: str, ix:int, html: str) -> List[Dict[str, Any]]:
+        # print("[LOG] Extracting blocks from URL:", url)
+        print(f"[LOG] Call LLM for {url} - block index: {ix}")
         variable_values = {
             "URL": url,
             "HTML": escape_json_string(sanitize_html(html)),
         }
+        
+        if self.instruction:
+            variable_values["REQUEST"] = self.instruction
 
-        prompt_with_variables = PROMPT_EXTRACT_BLOCKS
+        prompt_with_variables = PROMPT_EXTRACT_BLOCKS if not self.instruction else PROMPT_EXTRACT_BLOCKS_WITH_INSTRUCTION
         for variable in variable_values:
             prompt_with_variables = prompt_with_variables.replace(
                 "{" + variable + "}", variable_values[variable]
             )
         
         response = perform_completion_with_backoff(self.provider, prompt_with_variables, self.api_token)
-        
         try:
             blocks = extract_xml_data(["blocks"], response.choices[0].message.content)['blocks']
             blocks = json.loads(blocks)
@@ -101,7 +106,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
                     "content": unparsed
                 })
         
-        print("[LOG] Extracted", len(blocks), "blocks from URL:", url)
+        print("[LOG] Extracted", len(blocks), "blocks from URL:", url, "block index:", ix)
         return blocks
     
     def _merge(self, documents):
@@ -130,29 +135,30 @@ class LLMExtractionStrategy(ExtractionStrategy):
         """
         
         merged_sections = self._merge(sections)
-        parsed_json = []
+        extracted_content = []
         if self.provider.startswith("groq/"):
             # Sequential processing with a delay
-            for section in merged_sections:
-                parsed_json.extend(self.extract(url, section))
+            for ix, section in enumerate(merged_sections):
+                extracted_content.extend(self.extract(ix, url, section))
                 time.sleep(0.5)  # 500 ms delay between each processing
         else:
             # Parallel processing using ThreadPoolExecutor
             with ThreadPoolExecutor(max_workers=4) as executor:
                 extract_func = partial(self.extract, url)
-                futures = [executor.submit(extract_func, section) for section in merged_sections]
+                futures = [executor.submit(extract_func, ix, section) for ix, section in enumerate(merged_sections)]
                 
                 for future in as_completed(futures):
-                    parsed_json.extend(future.result())
+                    extracted_content.extend(future.result())
 
         
-        return parsed_json        
+        return extracted_content        
   
 class CosineStrategy(ExtractionStrategy):
-    def __init__(self, word_count_threshold=20, max_dist=0.2, linkage_method='ward', top_k=3, model_name = 'BAAI/bge-small-en-v1.5'):
+    def __init__(self, semantic_filter = None, word_count_threshold=10, max_dist=0.2, linkage_method='ward', top_k=3, model_name = 'BAAI/bge-small-en-v1.5', **kwargs):
         """
         Initialize the strategy with clustering parameters.
 
+        :param semantic_filter: A keyword filter for document filtering.
         :param word_count_threshold: Minimum number of words per cluster.
         :param max_dist: The maximum cophenetic distance on the dendrogram to form clusters.
         :param linkage_method: The linkage method for hierarchical clustering.
@@ -163,11 +169,14 @@ class CosineStrategy(ExtractionStrategy):
         from transformers import AutoTokenizer, AutoModel     
         import spacy  
 
+        self.semantic_filter = semantic_filter
         self.word_count_threshold = word_count_threshold
         self.max_dist = max_dist
         self.linkage_method = linkage_method
         self.top_k = top_k
         self.timer = time.time()
+        
+        self.buffer_embeddings = np.array([])
 
         if model_name == "bert-base-uncased":
             self.tokenizer, self.model = load_bert_base_uncased()
@@ -177,13 +186,42 @@ class CosineStrategy(ExtractionStrategy):
         self.nlp = load_spacy_model()
         print(f"[LOG] Model loaded {model_name}, models/reuters, took " + str(time.time() - self.timer) + " seconds")
 
-    def get_embeddings(self, sentences: List[str]):
+
+    def filter_documents_embeddings(self, documents: List[str], semantic_filter: str, threshold: float = 0.5) -> List[str]:
+        """
+        Filter documents based on the cosine similarity of their embeddings with the semantic_filter embedding.
+
+        :param documents: List of text chunks (documents).
+        :param semantic_filter: A string containing the keywords for filtering.
+        :param threshold: Cosine similarity threshold for filtering documents.
+        :return: Filtered list of documents.
+        """
+        if not semantic_filter:
+            return documents
+        # Compute embedding for the keyword filter
+        query_embedding = self.get_embeddings([semantic_filter])[0]
+        
+        # Compute embeddings for the docu  ments
+        document_embeddings = self.get_embeddings(documents)
+        
+        # Calculate cosine similarity between the query embedding and document embeddings
+        similarities = cosine_similarity([query_embedding], document_embeddings).flatten()
+        
+        # Filter documents based on the similarity threshold
+        filtered_docs = [doc for doc, sim in zip(documents, similarities) if sim >= threshold]
+        
+        return filtered_docs
+
+    def get_embeddings(self, sentences: List[str], bypass_buffer=True):
         """
         Get BERT embeddings for a list of sentences.
 
         :param sentences: List of text chunks (sentences).
         :return: NumPy array of embeddings.
         """
+        # if self.buffer_embeddings.any() and not bypass_buffer:
+        #     return self.buffer_embeddings
+        
         import torch 
         # Tokenize sentences and convert to tensor
         encoded_input = self.tokenizer(sentences, padding=True, truncation=True, return_tensors='pt')
@@ -193,6 +231,7 @@ class CosineStrategy(ExtractionStrategy):
             
         # Get embeddings from the last hidden state (mean pooling)
         embeddings = model_output.last_hidden_state.mean(1)
+        self.buffer_embeddings = embeddings.numpy()
         return embeddings.numpy()
 
     def hierarchical_clustering(self, sentences: List[str]):
@@ -206,7 +245,7 @@ class CosineStrategy(ExtractionStrategy):
         from scipy.cluster.hierarchy import linkage, fcluster
         from scipy.spatial.distance import pdist
         self.timer = time.time()
-        embeddings = self.get_embeddings(sentences)
+        embeddings = self.get_embeddings(sentences, bypass_buffer=False)
         # print(f"[LOG] 🚀 Embeddings computed in {time.time() - self.timer:.2f} seconds")
         # Compute pairwise cosine distances
         distance_matrix = pdist(embeddings, 'cosine')
@@ -247,6 +286,12 @@ class CosineStrategy(ExtractionStrategy):
         # Assume `html` is a list of text chunks for this strategy
         t = time.time()
         text_chunks = html.split(self.DEL)  # Split by lines or paragraphs as needed
+        
+        # Pre-filter documents using embeddings and semantic_filter
+        text_chunks = self.filter_documents_embeddings(text_chunks, self.semantic_filter)
+
+        if not text_chunks:
+            return []
 
         # Perform clustering
         labels = self.hierarchical_clustering(text_chunks)
@@ -290,7 +335,7 @@ class CosineStrategy(ExtractionStrategy):
         return self.extract(url, self.DEL.join(sections), **kwargs)
     
 class TopicExtractionStrategy(ExtractionStrategy):
-    def __init__(self, num_keywords: int = 3):
+    def __init__(self, num_keywords: int = 3, **kwargs):
         """
         Initialize the topic extraction strategy with parameters for topic segmentation.
 
@@ -358,7 +403,7 @@ class TopicExtractionStrategy(ExtractionStrategy):
         return self.extract(url, self.DEL.join(sections), **kwargs)
     
 class ContentSummarizationStrategy(ExtractionStrategy):
-    def __init__(self, model_name: str = "sshleifer/distilbart-cnn-12-6"):
+    def __init__(self, model_name: str = "sshleifer/distilbart-cnn-12-6", **kwargs):
         """
         Initialize the content summarization strategy with a specific model.
 
