@@ -322,7 +322,6 @@ result = crawler.run(url="https://www.nbcnews.com/business")
 | `urls`                | A list of URLs to crawl and extract data from.                                                        | Yes      | -                   |
 | `include_raw_html`    | Whether to include the raw HTML content in the response.                                              | No       | `false`             |
 | `bypass_cache`        | Whether to force a fresh crawl even if the URL has been previously crawled.                           | No       | `false`             |
-| `extract_blocks`      | Whether to extract semantical blocks of text from the HTML.                                           | No       | `true`              |
 | `word_count_threshold`| The minimum number of words a block must contain to be considered meaningful (minimum value is 5).    | No       | `5`                 |
 | `extraction_strategy` | The strategy to use for extracting content from the HTML (e.g., "CosineStrategy").                    | No       | `CosineStrategy`    |
 | `chunking_strategy`   | The strategy to use for chunking the text before processing (e.g., "RegexChunking").                  | No       | `RegexChunking`     |
