@@ -16,6 +16,11 @@ setup(
     license="MIT",
     packages=find_packages(),
     install_requires=requirements,
+    entry_points={
+        'console_scripts': [
+            'crawl4ai-download-models=crawl4ai.model_loader:main',
+        ],
+    },
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",

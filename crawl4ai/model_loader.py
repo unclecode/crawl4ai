@@ -4,6 +4,7 @@ from pathlib import Path
 import subprocess, os
 import shutil
 from .config import MODEL_REPO_BRANCH
+import argparse
 
 @lru_cache()
 def load_bert_base_uncased():
@@ -84,3 +85,39 @@ def load_spacy_model():
             print(f"An error occurred: {e}")
 
     return spacy.load(model_folder)
+
+
+def download_all_models(remove_existing=False):
+    """Download all models required for Crawl4AI."""
+    if remove_existing:
+        print("[LOG] Removing existing models...")
+        home_folder = get_home_folder()
+        model_folders = [
+            os.path.join(home_folder, "models/reuters"),
+            os.path.join(home_folder, "models"),
+        ]
+        for folder in model_folders:
+            if Path(folder).exists():
+                shutil.rmtree(folder)
+        print("[LOG] Existing models removed.")
+
+    # Load each model to trigger download
+    print("[LOG] Downloading BERT Base Uncased...")
+    load_bert_base_uncased()
+    print("[LOG] Downloading BGE Small EN v1.5...")
+    load_bge_small_en_v1_5()
+    print("[LOG] Downloading spaCy EN Core Web SM...")
+    load_spacy_en_core_web_sm()
+    print("[LOG] Downloading custom spaCy model...")
+    load_spacy_model()
+    print("[LOG] ✅ All models downloaded successfully.")
+
+def main():
+    parser = argparse.ArgumentParser(description="Crawl4AI Model Downloader")
+    parser.add_argument('--remove-existing', action='store_true', help="Remove existing models before downloading")
+    args = parser.parse_args()
+    
+    download_all_models(remove_existing=args.remove_existing)
+
+if __name__ == "__main__":
+    main()
