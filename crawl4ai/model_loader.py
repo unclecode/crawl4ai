@@ -1,10 +1,16 @@
 from functools import lru_cache
-from .utils import get_home_folder
 from pathlib import Path
 import subprocess, os
 import shutil
 from .config import MODEL_REPO_BRANCH
 import argparse
+
+def get_home_folder():
+    home_folder = os.path.join(Path.home(), ".crawl4ai")
+    os.makedirs(home_folder, exist_ok=True)
+    os.makedirs(f"{home_folder}/cache", exist_ok=True)
+    os.makedirs(f"{home_folder}/models", exist_ok=True)
+    return home_folder 
 
 @lru_cache()
 def load_bert_base_uncased():
@@ -89,6 +95,8 @@ def load_spacy_model():
 
 def download_all_models(remove_existing=False):
     """Download all models required for Crawl4AI."""
+    print("[LOG] Welcome to the Crawl4AI Model Downloader!")
+    print("[LOG] This script will download all the models required for Crawl4AI.")
     if remove_existing:
         print("[LOG] Removing existing models...")
         home_folder = get_home_folder()
