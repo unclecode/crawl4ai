@@ -24,11 +24,29 @@ Crawl4AI makes even complex web crawling tasks simple and intuitive. Below is an
 
 **Example Task:**
 
-1. Execute custom JavaScript to click a "Load More" button.
-2. Filter the data to include only content related to "technology".
-3. Use a CSS selector to extract only paragraphs (`<p>` tags).
+1. Instantiate a WebCrawler object.
+2. Execute custom JavaScript to click a "Load More" button.
+3. Filter the data to include only content related to "technology".
+4. Use a CSS selector to extract only paragraphs (`<p>` tags).
 
 **Example Code:**
+
+Simply, firtsy install the package:
+```bash
+virtualenv venv
+source venv/bin/activate
+# Install the required packages
+pip install transformers torch chromedriver_autoinstaller
+# Install Crawl4AI
+pip install git+https://github.com/unclecode/crawl4ai.git
+```
+
+Run the following command to load the required models. This is optional, but it will boost the performance and speed of the crawler. You need to do this only once.
+```bash
+crawl4ai-download-models
+```
+
+Now, you can run the following code:
 
 ```python
 # Import necessary modules
@@ -122,6 +140,10 @@ source venv/bin/activate
 pip install transformers torch chromedriver_autoinstaller
 pip install git+https://github.com/unclecode/crawl4ai.git
 ```
+
+    💡 Better to run the following CLI-command to load the required models. This is optional, but it will boost the performance and speed of the crawler. You need to do this only once.
+
+    crawl4ai-download-models
 
 2. Alternatively, you can clone the repository and install the package locally:
 ```bash
