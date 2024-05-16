@@ -38,7 +38,12 @@ class RegexChunking(ChunkingStrategy):
 class NlpSentenceChunking(ChunkingStrategy):
     def __init__(self, model='en_core_web_sm'):
         import spacy
-        self.nlp = spacy.load(model)
+        try:
+            self.nlp = spacy.load(model)
+        except IOError:
+            spacy.cli.download("en_core_web_sm")
+            self.nlp = spacy.load(model)
+            # raise ImportError(f"Spacy model '{model}' not found. Please download the model using 'python -m spacy download {model}'")
 
     def chunk(self, text: str) -> list:
         doc = self.nlp(text)

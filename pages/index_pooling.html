@@ -283,7 +283,7 @@
                     .post("/crawl", data)
                     .then((response) => {
                         const result = response.data.results[0];
-                        const parsedJson = JSON.parse(result.parsed_json);
+                        const parsedJson = JSON.parse(result.extracted_content);
                         document.getElementById("json-result").textContent = JSON.stringify(parsedJson, null, 2);
                         document.getElementById("cleaned-html-result").textContent = result.cleaned_html;
                         document.getElementById("markdown-result").textContent = result.markdown;

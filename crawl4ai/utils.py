@@ -461,17 +461,17 @@ def merge_chunks_based_on_token_threshold(chunks, token_threshold):
     return merged_sections
 
 def process_sections(url: str, sections: list, provider: str, api_token: str) -> list:
-    parsed_json = []
+    extracted_content = []
     if provider.startswith("groq/"):
         # Sequential processing with a delay
         for section in sections:
-            parsed_json.extend(extract_blocks(url, section, provider, api_token))
+            extracted_content.extend(extract_blocks(url, section, provider, api_token))
             time.sleep(0.5)  # 500 ms delay between each processing
     else:
         # Parallel processing using ThreadPoolExecutor
         with ThreadPoolExecutor() as executor:
             futures = [executor.submit(extract_blocks, url, section, provider, api_token) for section in sections]
             for future in as_completed(futures):
-                parsed_json.extend(future.result())
+                extracted_content.extend(future.result())
     
-    return parsed_json
+    return extracted_content

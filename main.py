@@ -7,6 +7,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware  
+from fastapi.templating import Jinja2Templates
 
 from pydantic import BaseModel, HttpUrl
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -35,7 +36,7 @@ app.add_middleware(
 
 # Mount the pages directory as a static directory
 app.mount("/pages", StaticFiles(directory=__location__ + "/pages"), name="pages")
-
+templates = Jinja2Templates(directory=__location__ + "/pages")
 # chromedriver_autoinstaller.install()  # Ensure chromedriver is installed
 @lru_cache()
 def get_crawler():
@@ -51,16 +52,24 @@ class CrawlRequest(BaseModel):
     extract_blocks: bool = True
     word_count_threshold: Optional[int] = 5
     extraction_strategy: Optional[str] = "CosineStrategy"
+    extraction_strategy_args: Optional[dict] = {}
     chunking_strategy: Optional[str] = "RegexChunking"
+    chunking_strategy_args: Optional[dict] = {}
     css_selector: Optional[str] = None
     verbose: Optional[bool] = True
 
 
 @app.get("/", response_class=HTMLResponse)
-async def read_index():
-    with open(f"{__location__}/pages/index.html", "r") as file:
-        html_content = file.read()
-    return HTMLResponse(content=html_content, status_code=200)
+async def read_index(request: Request):
+    partials_dir = os.path.join(__location__, "pages", "partial")
+    partials = {}
+
+    for filename in os.listdir(partials_dir):
+        if filename.endswith(".html"):
+            with open(os.path.join(partials_dir, filename), "r") as file:
+                partials[filename[:-5]] = file.read()
+
+    return templates.TemplateResponse("index.html", {"request": request, **partials})
 
 @app.get("/total-count")
 async def get_total_url_count():
@@ -73,11 +82,11 @@ async def clear_database():
     clear_db()
     return JSONResponse(content={"message": "Database cleared."})
 
-def import_strategy(module_name: str, class_name: str):
+def import_strategy(module_name: str, class_name: str, *args, **kwargs):
     try:
         module = importlib.import_module(module_name)
         strategy_class = getattr(module, class_name)
-        return strategy_class()
+        return strategy_class(*args, **kwargs)
     except ImportError:
         raise HTTPException(status_code=400, detail=f"Module {module_name} not found.")
     except AttributeError:
@@ -95,8 +104,8 @@ async def crawl_urls(crawl_request: CrawlRequest, request: Request):
         current_requests += 1
 
     try:
-        extraction_strategy = import_strategy("crawl4ai.extraction_strategy", crawl_request.extraction_strategy)
-        chunking_strategy = import_strategy("crawl4ai.chunking_strategy", crawl_request.chunking_strategy)
+        extraction_strategy = import_strategy("crawl4ai.extraction_strategy", crawl_request.extraction_strategy, **crawl_request.extraction_strategy_args)
+        chunking_strategy = import_strategy("crawl4ai.chunking_strategy", crawl_request.chunking_strategy, **crawl_request.chunking_strategy_args)
 
         # Use ThreadPoolExecutor to run the synchronous WebCrawler in async manner
         with ThreadPoolExecutor() as executor:
