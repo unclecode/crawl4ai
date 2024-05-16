@@ -35,8 +35,6 @@ Simply, firtsy install the package:
 ```bash
 virtualenv venv
 source venv/bin/activate
-# Install the required packages
-pip install transformers torch chromedriver_autoinstaller
 # Install Crawl4AI
 pip install git+https://github.com/unclecode/crawl4ai.git
 ```
@@ -137,7 +135,6 @@ To install Crawl4AI as a library, follow these steps:
 ```bash
 virtualenv venv
 source venv/bin/activate
-pip install transformers torch chromedriver_autoinstaller
 pip install git+https://github.com/unclecode/crawl4ai.git
 ```
 
@@ -151,7 +148,6 @@ virtualenv venv
 source venv/bin/activate
 git clone https://github.com/unclecode/crawl4ai.git
 cd crawl4ai
-pip install transformers torch chromedriver_autoinstaller
 pip install -e .
 ```
 

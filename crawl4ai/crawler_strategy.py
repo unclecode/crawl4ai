@@ -6,7 +6,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import InvalidArgumentException
-import chromedriver_autoinstaller
+
 from typing import List
 import requests
 import os
@@ -38,6 +38,7 @@ class CloudCrawlerStrategy(CrawlerStrategy):
 class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
     def __init__(self, use_cached_html=False, js_code=None):
         super().__init__()
+        print("[LOG] 🚀 Initializing LocalSeleniumCrawlerStrategy")
         self.options = Options()
         self.options.headless = True
         self.options.add_argument("--no-sandbox")
@@ -49,6 +50,7 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
         self.js_code = js_code
 
         # chromedriver_autoinstaller.install()
+        import chromedriver_autoinstaller
         self.service = Service(chromedriver_autoinstaller.install())
         self.driver = webdriver.Chrome(service=self.service, options=self.options)
 

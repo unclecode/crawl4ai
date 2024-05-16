@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 import subprocess, os
 import shutil
-from .config import MODEL_REPO_BRANCH
+from crawl4ai.config import MODEL_REPO_BRANCH
 import argparse
 
 def get_home_folder():
@@ -39,7 +39,6 @@ def load_spacy_en_core_web_sm():
         nlp = spacy.load("en_core_web_sm")    
     print("[LOG] ✅ spaCy model loaded successfully")
     return nlp
-
 
 @lru_cache()
 def load_spacy_model():
@@ -92,11 +91,8 @@ def load_spacy_model():
 
     return spacy.load(model_folder)
 
-
 def download_all_models(remove_existing=False):
     """Download all models required for Crawl4AI."""
-    print("[LOG] Welcome to the Crawl4AI Model Downloader!")
-    print("[LOG] This script will download all the models required for Crawl4AI.")
     if remove_existing:
         print("[LOG] Removing existing models...")
         home_folder = get_home_folder()
@@ -121,6 +117,8 @@ def download_all_models(remove_existing=False):
     print("[LOG] ✅ All models downloaded successfully.")
 
 def main():
+    print("[LOG] Welcome to the Crawl4AI Model Downloader!")
+    print("[LOG] This script will download all the models required for Crawl4AI.")
     parser = argparse.ArgumentParser(description="Crawl4AI Model Downloader")
     parser.add_argument('--remove-existing', action='store_true', help="Remove existing models before downloading")
     args = parser.parse_args()
