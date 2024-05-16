@@ -22,6 +22,10 @@ def print_result(result):
     for key, value in result.model_dump().items():
         if isinstance(value, str) and value:
             console.print(f"\t{key}: [green]{value[:20]}...[/green]")
+    if result.extracted_content:
+        items = json.loads(result.extracted_content)
+        print(f"\t[bold]{len(items)} blocks is extracted![/bold]")
+
 
 def cprint(message, press_any_key=False):
     console.print(message)
