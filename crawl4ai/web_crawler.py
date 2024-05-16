@@ -63,7 +63,7 @@ class WebCrawler:
         extract_blocks_flag: bool = True,
         word_count_threshold=MIN_WORD_THRESHOLD,
         use_cached_html: bool = False,
-        extraction_strategy: ExtractionStrategy = LLMExtractionStrategy(),
+        extraction_strategy: ExtractionStrategy = NoExtractionStrategy(),
         chunking_strategy: ChunkingStrategy = RegexChunking(),
         **kwargs,
     ) -> CrawlResult:
