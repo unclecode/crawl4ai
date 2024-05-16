@@ -63,7 +63,7 @@ class WebCrawler:
         extract_blocks_flag: bool = True,
         word_count_threshold=MIN_WORD_THRESHOLD,
         use_cached_html: bool = False,
-        extraction_strategy: ExtractionStrategy = NoExtractionStrategy(),
+        extraction_strategy: ExtractionStrategy = CosineStrategy(),
         chunking_strategy: ChunkingStrategy = RegexChunking(),
         **kwargs,
     ) -> CrawlResult:
@@ -82,7 +82,7 @@ class WebCrawler:
         self,
         url: str,
         word_count_threshold=MIN_WORD_THRESHOLD,
-        extraction_strategy: ExtractionStrategy = NoExtractionStrategy(),
+        extraction_strategy: ExtractionStrategy = CosineStrategy(),
         chunking_strategy: ChunkingStrategy = RegexChunking(),
         bypass_cache: bool = False,
         css_selector: str = None,
@@ -184,7 +184,7 @@ class WebCrawler:
         extract_blocks_flag: bool = True,
         word_count_threshold=MIN_WORD_THRESHOLD,
         use_cached_html: bool = False,
-        extraction_strategy: ExtractionStrategy = NoExtractionStrategy(),
+        extraction_strategy: ExtractionStrategy = CosineStrategy(),
         chunking_strategy: ChunkingStrategy = RegexChunking(),
         **kwargs,
     ) -> List[CrawlResult]:
