@@ -18,11 +18,11 @@ class WebCrawler:
     def __init__(
         self,
         # db_path: str = None,
-        crawler_strategy: CrawlerStrategy = LocalSeleniumCrawlerStrategy(),
+        crawler_strategy: CrawlerStrategy = None,
         always_by_pass_cache: bool = False,
     ):
         # self.db_path = db_path
-        self.crawler_strategy = crawler_strategy
+        self.crawler_strategy = crawler_strategy or LocalSeleniumCrawlerStrategy()
         self.always_by_pass_cache = always_by_pass_cache
 
         # Create the .crawl4ai folder in the user's home directory if it doesn't exist
