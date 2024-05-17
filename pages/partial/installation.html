@@ -29,7 +29,7 @@
                 class="bg-zinc-800 p-4 rounded mt-2 text-zinc-100"
             ><code>virtualenv venv
 source venv/bin/activate
-pip install git+https://github.com/unclecode/crawl4ai.git
+pip install "crawl4ai[all] @ git+https://github.com/unclecode/crawl4ai.git"
             </code></pre>
         </li>
         <li class="mb-4">
@@ -46,7 +46,7 @@ pip install git+https://github.com/unclecode/crawl4ai.git
 source venv/bin/activate
 git clone https://github.com/unclecode/crawl4ai.git
 cd crawl4ai
-pip install -e .
+pip install -e .[all]
 </code></pre>
         </li>
         <li class="">

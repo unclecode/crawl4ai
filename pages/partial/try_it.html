@@ -46,9 +46,9 @@
                             id="extraction-strategy-select"
                             class="border border-zinc-700 rounded px-4 py-1 bg-zinc-900 text-zinc-300"
                         >
+                            <option value="NoExtractionStrategy" selected>NoExtractionStrategy</option>
                             <option value="CosineStrategy">CosineStrategy</option>
                             <option value="LLMExtractionStrategy">LLMExtractionStrategy</option>
-                            <option value="NoExtractionStrategy">NoExtractionStrategy</option>
                         </select>
                     </div>
                     <div class="flex flex-col">
@@ -99,7 +99,7 @@
                 </div>
                 <div  class="flex gap-2">
                     <!-- Add two textarea one for getting Keyword Filter and another one Instruction, make both grow whole with-->
-                    <div id = "semantic_filter_div" class="flex flex-col flex-1">
+                    <div id = "semantic_filter_div" class="flex flex-col flex-1 hidden">
                         <label for="keyword-filter" class="text-lime-500 font-bold text-xs">Keyword Filter</label>
                         <textarea
                             id="semantic_filter"
@@ -131,10 +131,10 @@
                 </div>
             </div>
 
+            <div id="loading" class="hidden">
+                <p class="text-white">Loading... Please wait.</p>
+            </div>
             <div id="result" class="flex-1">
-                <div id="loading" class="hidden">
-                    <p class="text-white">Loading... Please wait.</p>
-                </div>
                 <div class="tab-buttons flex gap-2">
                     <button class="tab-btn px-4 py-1 text-sm bg-zinc-700 rounded-t text-lime-500" data-tab="json">
                         JSON
@@ -181,19 +181,19 @@
                     </button> -->
                 </div>
                 <div class="tab-content result bg-zinc-900 p-2 rounded h-full border border-zinc-700 text-sm">
-                    <pre class="h-full flex relative">
+                    <pre class="h-full flex relative overflow-x-auto">
                         <code id="curl-code" class="language-bash"></code>
                         <button class="absolute top-2 right-2 bg-zinc-700 text-white px-2 py-1 rounded copy-btn" data-target="curl-code">Copy</button>
                     </pre>
-                    <pre class="hidden h-full flex relative">
+                    <pre class="hidden h-full flex relative overflow-x-auto">
                         <code id="python-code" class="language-python"></code>
                         <button class="absolute top-2 right-2 bg-zinc-700 text-white px-2 py-1 rounded copy-btn" data-target="python-code">Copy</button>
                     </pre>
-                    <pre class="hidden h-full flex relative">
+                    <pre class="hidden h-full flex relative overflow-x-auto">
                         <code id="nodejs-code" class="language-javascript"></code>
                         <button class="absolute top-2 right-2 bg-zinc-700 text-white px-2 py-1 rounded copy-btn" data-target="nodejs-code">Copy</button>
                     </pre>
-                    <pre class="hidden h-full flex relative">
+                    <pre class="hidden h-full flex relative overflow-x-auto">
                         <code id="library-code" class="language-python"></code>
                         <button class="absolute top-2 right-2 bg-zinc-700 text-white px-2 py-1 rounded copy-btn" data-target="library-code">Copy</button>
                     </pre>

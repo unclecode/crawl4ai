@@ -170,22 +170,11 @@ def main():
     cprint("If this is the first time you're running Crawl4ai, this might take a few seconds to load required model files.")
 
     crawler = create_crawler()
-    
-    cprint("For the rest of this guide, I set crawler.always_by_pass_cache to True to force the crawler to bypass the cache. This is to ensure that we get fresh results for each run.")
-    crawler.always_by_pass_cache = True
-
-
-    cprint("\n🔍 [bold cyan]Time to explore another chunking strategy: NlpSentenceChunking![/bold cyan]", True)
-    cprint("NlpSentenceChunking uses NLP techniques to split the text into sentences. Let's see how it performs!")
-    result = crawler.run(
-        url="https://www.nbcnews.com/business",
-        chunking_strategy=NlpSentenceChunking()
-    )
-    cprint("[LOG] 📦 [bold yellow]NlpSentenceChunking result:[/bold yellow]")
-    print_result(result)
 
     basic_usage(crawler)
     understanding_parameters(crawler)
+    
+    crawler.always_by_pass_cache = True
     add_chunking_strategy(crawler)
     add_extraction_strategy(crawler)
     add_llm_extraction_strategy(crawler)

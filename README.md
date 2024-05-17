@@ -22,31 +22,25 @@ Crawl4AI has one clear task: to simplify crawling and extract useful information
 
 ## Power and Simplicity of Crawl4AI 🚀
 
-Crawl4AI makes even complex web crawling tasks simple and intuitive. Below is an example of how you can execute JavaScript, filter data using keywords, and use a CSS selector to extract specific content—all in one go!
+To show the simplicity take a look at the first example:
 
-**Example Task:**
+```python
+from crawl4ai import WebCrawler
+
+# Create the WebCrawler instance 
+crawler = WebCrawler()
+
+# Run the crawler with keyword filtering and CSS selector
+result = crawler.run(url="https://www.example.com")
+print(result) # {url, html, markdown, extracted_content, metadata}
+```
+
+Now let's try a complex task. Below is an example of how you can execute JavaScript, filter data using keywords, and use a CSS selector to extract specific content—all in one go!
 
 1. Instantiate a WebCrawler object.
 2. Execute custom JavaScript to click a "Load More" button.
-3. Filter the data to include only content related to "technology".
+3. Extract semantical chunks of content and filter the data to include only content related to technology.
 4. Use a CSS selector to extract only paragraphs (`<p>` tags).
-
-**Example Code:**
-
-Simply, firtsy install the package:
-```bash
-virtualenv venv
-source venv/bin/activate
-# Install Crawl4AI
-pip install git+https://github.com/unclecode/crawl4ai.git
-```
-
-Run the following command to load the required models. This is optional, but it will boost the performance and speed of the crawler. You need to do this only once.
-```bash
-crawl4ai-download-models
-```
-
-Now, you can run the following code:
 
 ```python
 # Import necessary modules
@@ -137,7 +131,7 @@ To install Crawl4AI as a library, follow these steps:
 ```bash
 virtualenv venv
 source venv/bin/activate
-pip install git+https://github.com/unclecode/crawl4ai.git
+pip install "crawl4ai[all] @ git+https://github.com/unclecode/crawl4ai.git"
 ```
 
     💡 Better to run the following CLI-command to load the required models. This is optional, but it will boost the performance and speed of the crawler. You need to do this only once.
@@ -150,12 +144,12 @@ virtualenv venv
 source venv/bin/activate
 git clone https://github.com/unclecode/crawl4ai.git
 cd crawl4ai
-pip install -e .
+pip install -e .[all]
 ```
 
 3. Use docker to run the local server:
 ```bash
-docker build -t crawl4ai . 
+docker build -t crawl4ai .
 # For Mac users
 # docker build --platform linux/amd64 -t crawl4ai .
 docker run -d -p 8000:80 crawl4ai
@@ -349,7 +343,7 @@ result = crawler.run(url="https://www.nbcnews.com/business")
 | `include_raw_html`    | Whether to include the raw HTML content in the response.                                              | No       | `false`             |
 | `bypass_cache`        | Whether to force a fresh crawl even if the URL has been previously crawled.                           | No       | `false`             |
 | `word_count_threshold`| The minimum number of words a block must contain to be considered meaningful (minimum value is 5).    | No       | `5`                 |
-| `extraction_strategy` | The strategy to use for extracting content from the HTML (e.g., "CosineStrategy").                    | No       | `CosineStrategy`    |
+| `extraction_strategy` | The strategy to use for extracting content from the HTML (e.g., "CosineStrategy").                    | No       | `NoExtractionStrategy`    |
 | `chunking_strategy`   | The strategy to use for chunking the text before processing (e.g., "RegexChunking").                  | No       | `RegexChunking`     |
 | `css_selector`        | The CSS selector to target specific parts of the HTML for extraction.                                 | No       | `None`              |
 | `verbose`             | Whether to enable verbose logging.                                                                    | No       | `true`              |
