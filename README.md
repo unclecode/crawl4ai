@@ -160,11 +160,11 @@ For more information about how to run Crawl4AI as a local server, please refer t
 
 ## Using the Local server ot REST API 🌐
 
-You can also use Crawl4AI through the REST API. This method allows you to send HTTP requests to the Crawl4AI server and receive structured data in response. The base URL for the API is `https://crawl4ai.com/crawl`. If you run the local server, you can use `http://localhost:8000/crawl`. (Port is dependent on your docker configuration)
+You can also use Crawl4AI through the REST API. This method allows you to send HTTP requests to the Crawl4AI server and receive structured data in response. The base URL for the API is `https://crawl4ai.com/crawl` [COMING SOON]. If you run the local server, you can use `http://localhost:8000/crawl`. (Port is dependent on your docker configuration)
 
 ### Example Usage
 
-To use the REST API, send a POST request to `https://crawl4ai.com/crawl` with the following parameters in the request body.
+To use the REST API, send a POST request to `http://localhost:8000/crawl` with the following parameters in the request body.
 
 **Example Request:**
 ```json
