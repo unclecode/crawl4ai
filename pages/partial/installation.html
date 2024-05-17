@@ -1,0 +1,65 @@
+<section id="installation" class="content-section active">
+    <h1 class="text-2xl font-bold">Installation 💻</h1>
+    <p class="mb-4">
+        There are three ways to use Crawl4AI: 
+        <ol class="list-decimal list-inside mb-4">
+            <li class="">
+                As a library
+            </li>
+            <li class="">
+                As a local server (Docker)
+            </li>
+            <li class="">
+                As a Google Colab notebook. <a href="https://colab.research.google.com/drive/1wz8u30rvbq6Scodye9AGCw8Qg_Z8QGsk"
+                ><img
+                    src="https://colab.research.google.com/assets/colab-badge.svg"
+                    alt="Open In Colab"
+                    style="display: inline-block; width: 100px; height: 20px"
+            /></a>
+            </li>
+    </p>
+
+
+    <p class="my-4">To install Crawl4AI as a library, follow these steps:</p>
+
+    <ol class="list-decimal list-inside mb-4">
+        <li class="mb-4">
+            Install the package from GitHub:
+            <pre
+                class="bg-zinc-800 p-4 rounded mt-2 text-zinc-100"
+            ><code>virtualenv venv
+source venv/bin/activate
+pip install "crawl4ai[all] @ git+https://github.com/unclecode/crawl4ai.git"
+            </code></pre>
+        </li>
+        <li class="mb-4">
+            Run the following command to load the required models. This is optional, but it will boost the performance and speed of the crawler. You need to do this only once.
+            <pre
+                class="bg-zinc-800 p-4 rounded mt-2 text-zinc-100"
+            ><code>crawl4ai-download-models</code></pre>
+        </li>
+        <li class="mb-4">
+            Alternatively, you can clone the repository and install the package locally:
+            <pre
+                class="bg-zinc-800 p-4 rounded mt-2 text-zinc-100"
+            ><code  class = "language-python bash">virtualenv venv
+source venv/bin/activate
+git clone https://github.com/unclecode/crawl4ai.git
+cd crawl4ai
+pip install -e .[all]
+</code></pre>
+        </li>
+        <li class="">
+            Use docker to run the local server:
+            <pre
+                class="bg-zinc-800 p-4 rounded mt-2 text-zinc-100"
+            ><code  class = "language-python bash">docker build -t crawl4ai . 
+# docker build --platform linux/amd64 -t crawl4ai . For Mac users
+docker run -d -p 8000:80 crawl4ai</code></pre>
+        </li>
+    </ol>
+    <p class="mb-4">
+        For more information about how to run Crawl4AI as a local server, please refer to the
+        <a href="https://github.com/unclecode/crawl4ai" class="text-blue-400">GitHub repository</a>.
+    </p>
+</section>

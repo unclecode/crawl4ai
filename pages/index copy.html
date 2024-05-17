@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Crawl4AI</title>
+
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet" />
+
+        <!-- <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.3/dist/tailwind.min.css" rel="stylesheet" /> -->
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+        <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/monokai.min.css"
+        />
+        <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+        <style>
+            :root {
+                --ifm-font-size-base: 100%;
+                --ifm-line-height-base: 1.65;
+                --ifm-font-family-base: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans,
+                    sans-serif, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji",
+                    "Segoe UI Emoji", "Segoe UI Symbol";
+            }
+            html {
+                -webkit-font-smoothing: antialiased;
+                -webkit-text-size-adjust: 100%;
+                text-size-adjust: 100%;
+                font: var(--ifm-font-size-base) / var(--ifm-line-height-base) var(--ifm-font-family-base);
+            }
+            body {
+                background-color: #1a202c;
+                color: #fff;
+            }
+            .tab-content {
+                max-height: 400px;
+                overflow: auto;
+            }
+            pre {
+                white-space: pre-wrap;
+                font-size: 14px;
+            }
+            pre code {
+                width: 100%;
+            }
+        </style>
+        <style>
+            /* Custom styling for docs-item class and Markdown generated elements */
+            .docs-item {
+                background-color: #2d3748; /* bg-gray-800 */
+                padding: 1rem; /* p-4 */
+                border-radius: 0.375rem; /* rounded */
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* shadow-md */
+                margin-bottom: 1rem; /* space between items */
+            }
+
+            .docs-item h3,
+            .docs-item h4 {
+                color: #ffffff; /* text-white */
+                font-size: 1.25rem; /* text-xl */
+                font-weight: 700; /* font-bold */
+                margin-bottom: 0.5rem; /* mb-2 */
+            }
+
+            .docs-item p {
+                color: #e2e8f0; /* text-gray-300 */
+                margin-bottom: 0.5rem; /* mb-2 */
+            }
+
+            .docs-item code {
+                background-color: #1a202c; /* bg-gray-900 */
+                color: #e2e8f0; /* text-gray-300 */
+                padding: 0.25rem 0.5rem; /* px-2 py-1 */
+                border-radius: 0.25rem; /* rounded */
+            }
+
+            .docs-item pre {
+                background-color: #1a202c; /* bg-gray-900 */
+                color: #e2e8f0; /* text-gray-300 */
+                padding: 0.5rem; /* p-2 */
+                border-radius: 0.375rem; /* rounded */
+                overflow: auto; /* overflow-auto */
+                margin-bottom: 0.5rem; /* mb-2 */
+            }
+
+            .docs-item div {
+                color: #e2e8f0; /* text-gray-300 */
+                font-size: 1rem; /* prose prose-sm */
+                line-height: 1.25rem; /* line-height for readability */
+            }
+
+            /* Adjustments to make prose class more suitable for dark mode */
+            .prose {
+                max-width: none; /* max-w-none */
+            }
+
+            .prose p,
+            .prose ul {
+                margin-bottom: 1rem; /* mb-4 */
+            }
+
+            .prose code {
+                /* background-color: #4a5568; */ /* bg-gray-700 */
+                color: #65a30d; /* text-white */
+                padding: 0.25rem 0.5rem; /* px-1 py-0.5 */
+                border-radius: 0.25rem; /* rounded */
+                display: inline-block; /* inline-block */
+            }
+
+            .prose pre {
+                background-color: #1a202c; /* bg-gray-900 */
+                color: #ffffff; /* text-white */
+                padding: 0.5rem; /* p-2 */
+                border-radius: 0.375rem; /* rounded */
+            }
+
+            .prose h3 {
+                color: #65a30d; /* text-white */
+                font-size: 1.25rem; /* text-xl */
+                font-weight: 700; /* font-bold */
+                margin-bottom: 0.5rem; /* mb-2 */
+            }
+        </style>
+    </head>
+    <body class="bg-black text-gray-200">
+        <header class="bg-zinc-950 text-white py-4 flex">
+            <div class="mx-auto px-4">
+                <h1 class="text-2xl font-bold">🔥🕷️ Crawl4AI: Web Data for your Thoughts</h1>
+            </div>
+            <div class="mx-auto px-4 flex font-bold text-xl gap-2">
+                <span>📊 Total Website Processed</span>
+                <span id="total-count" class="text-lime-400">2</span>
+            </div>
+        </header>
+
+        <section class="try-it py-8 px-16 pb-20">
+            <div class="container mx-auto px-4">
+                <h2 class="text-2xl font-bold mb-4">Try It Now</h2>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <div class="space-y-4">
+                        <div class="flex flex-col">
+                            <label for="url-input" class="text-lime-500 font-bold text-xs">URL(s)</label>
+                            <input
+                                type="text"
+                                id="url-input"
+                                value="https://www.nbcnews.com/business"
+                                class="border border-zinc-700 rounded px-4 py-0 bg-zinc-900 text-lime-500"
+                                placeholder="Enter URL(s) separated by commas"
+                            />
+                        </div>
+                        <div class="flex flex-col">
+                            <label for="threshold" class="text-lime-500 font-bold text-xs">Min Words Threshold</label>
+                            <select
+                                id="threshold"
+                                class="border border-zinc-700 rounded px-4 py-0 bg-zinc-900 text-lime-500"
+                            >
+                                <option value="5">5</option>
+                                <option value="10" selected>10</option>
+                                <option value="15">15</option>
+                                <option value="20">20</option>
+                                <option value="25">25</option>
+                            </select>
+                        </div>
+                        <div class="flex flex-col">
+                            <label for="css-selector" class="text-lime-500 font-bold text-xs">CSS Selector</label>
+                            <input
+                                type="text"
+                                id="css-selector"
+                                class="border border-zinc-700 rounded px-4 py-0 bg-zinc-900 text-lime-500"
+                                placeholder="Enter CSS Selector"
+                            />
+                        </div>
+                        <div class="flex flex-col">
+                            <label for="extraction-strategy-select" class="text-lime-500 font-bold text-xs"
+                                >Extraction Strategy</label
+                            >
+                            <select
+                                id="extraction-strategy-select"
+                                class="border border-zinc-700 rounded px-4 py-1 bg-zinc-900 text-lime-500"
+                            >
+                                <option value="CosineStrategy">CosineStrategy</option>
+                                <option value="LLMExtractionStrategy">LLMExtractionStrategy</option>
+                                <option value="NoExtractionStrategy">NoExtractionStrategy</option>
+                            </select>
+                        </div>
+                        <div class="flex flex-col">
+                            <label for="chunking-strategy-select" class="text-lime-500 font-bold text-xs"
+                                >Chunking Strategy</label
+                            >
+                            <select
+                                id="chunking-strategy-select"
+                                class="border border-zinc-700 rounded px-4 py-1 bg-zinc-900 text-lime-500"
+                            >
+                                <option value="RegexChunking">RegexChunking</option>
+                                <option value="NlpSentenceChunking">NlpSentenceChunking</option>
+                                <option value="TopicSegmentationChunking">TopicSegmentationChunking</option>
+                                <option value="FixedLengthWordChunking">FixedLengthWordChunking</option>
+                                <option value="SlidingWindowChunking">SlidingWindowChunking</option>
+                            </select>
+                        </div>
+                        <div class="flex flex-col">
+                            <label for="provider-model-select" class="text-lime-500 font-bold text-xs"
+                                >Provider Model</label
+                            >
+                            <select
+                                id="provider-model-select"
+                                class="border border-zinc-700 rounded px-4 py-0 bg-zinc-900 text-lime-500"
+                                disabled
+                            >
+                                <option value="groq/llama3-70b-8192">groq/llama3-70b-8192</option>
+                                <option value="groq/llama3-8b-8192">groq/llama3-8b-8192</option>
+                                <option value="openai/gpt-4-turbo">gpt-4-turbo</option>
+                                <option value="openai/gpt-3.5-turbo">gpt-3.5-turbo</option>
+                                <option value="anthropic/claude-3-haiku-20240307">claude-3-haiku</option>
+                                <option value="anthropic/claude-3-opus-20240229">claude-3-opus</option>
+                                <option value="anthropic/claude-3-sonnet-20240229">claude-3-sonnet</option>
+                            </select>
+                        </div>
+                        <div class="flex flex-col">
+                            <label for="token-input" class="text-lime-500 font-bold text-xs">API Token</label>
+                            <input
+                                type="password"
+                                id="token-input"
+                                class="border border-zinc-700 rounded px-4 py-0 bg-zinc-900 text-lime-500"
+                                placeholder="Enter Groq API token"
+                                disabled
+                            />
+                        </div>
+                        <div class="flex gap-3">
+                            <div class="flex items-center gap-2">
+                                <input type="checkbox" id="bypass-cache-checkbox" />
+                                <label for="bypass-cache-checkbox" class="text-lime-500 font-bold">Bypass Cache</label>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <input type="checkbox" id="extract-blocks-checkbox" checked />
+                                <label for="extract-blocks-checkbox" class="text-lime-500 font-bold"
+                                    >Extract Blocks</label
+                                >
+                            </div>
+                            <button id="crawl-btn" class="bg-lime-600 text-black font-bold px-4 py-0 rounded">
+                                Crawl
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="result" class=" ">
+                        <div id="loading" class="hidden">
+                            <p class="text-white">Loading... Please wait.</p>
+                        </div>
+                        <div class="tab-buttons flex gap-2">
+                            <button
+                                class="tab-btn px-4 py-1 text-sm bg-zinc-700 rounded-t text-lime-500"
+                                data-tab="json"
+                            >
+                                JSON
+                            </button>
+                            <button
+                                class="tab-btn px-4 py-1 text-sm bg-zinc-700 rounded-t text-lime-500"
+                                data-tab="cleaned-html"
+                            >
+                                Cleaned HTML
+                            </button>
+                            <button
+                                class="tab-btn px-4 py-1 text-sm bg-zinc-700 rounded-t text-lime-500"
+                                data-tab="markdown"
+                            >
+                                Markdown
+                            </button>
+                        </div>
+                        <div class="tab-content code bg-zinc-900 p-2 rounded h-full border border-zinc-700 text-sm">
+                            <pre class="h-full flex"><code id="json-result" class="language-json"></code></pre>
+                            <pre
+                                class="hidden h-full flex"
+                            ><code id="cleaned-html-result" class="language-html"></code></pre>
+                            <pre
+                                class="hidden h-full flex"
+                            ><code id="markdown-result" class="language-markdown"></code></pre>
+                        </div>
+                    </div>
+
+                    <div id="code_help" class=" ">
+                        <div class="tab-buttons flex gap-2">
+                            <button
+                                class="code-tab-btn px-4 py-1 text-sm bg-zinc-700 rounded-t text-lime-500"
+                                data-tab="curl"
+                            >
+                                cURL
+                            </button>
+                            <button
+                                class="code-tab-btn px-4 py-1 text-sm bg-zinc-700 rounded-t text-lime-500"
+                                data-tab="library"
+                            >
+                                Python Library
+                            </button>
+                            <button
+                                class="code-tab-btn px-4 py-1 text-sm bg-zinc-700 rounded-t text-lime-500"
+                                data-tab="python"
+                            >
+                                Python (Request)
+                            </button>
+                            <button
+                                class="code-tab-btn px-4 py-1 text-sm bg-zinc-700 rounded-t text-lime-500"
+                                data-tab="nodejs"
+                            >
+                                Node.js
+                            </button>
+                        </div>
+                        <div class="tab-content result bg-zinc-900 p-2 rounded h-full border border-zinc-700 text-sm">
+                            <pre class="h-full flex relative">
+                                <code id="curl-code" class="language-bash"></code>
+                                <button class="absolute top-2 right-2 bg-zinc-700 text-white px-2 py-1 rounded copy-btn" data-target="curl-code">Copy</button>
+                            </pre>
+                            <pre class="hidden h-full flex relative">
+                                <code id="python-code" class="language-python"></code>
+                                <button class="absolute top-2 right-2 bg-zinc-700 text-white px-2 py-1 rounded copy-btn" data-target="python-code">Copy</button>
+                            </pre>
+                            <pre class="hidden h-full flex relative">
+                                <code id="nodejs-code" class="language-javascript"></code>
+                                <button class="absolute top-2 right-2 bg-zinc-700 text-white px-2 py-1 rounded copy-btn" data-target="nodejs-code">Copy</button>
+                            </pre>
+                            <pre class="hidden h-full flex relative">
+                                <code id="library-code" class="language-python"></code>
+                                <button class="absolute top-2 right-2 bg-zinc-700 text-white px-2 py-1 rounded copy-btn" data-target="library-code">Copy</button>
+                            </pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <section class="bg-zinc-900 text-zinc-300 p-6 px-20">
+            <div class="grid grid-cols-2 gap-4 p-4 bg-zinc-900 text-lime-500">
+                <!-- Step 1 -->
+                <div class="col-span-2 bg-yellow-500 p-2 rounded text-zinc-900">
+                    🌟 <strong>Welcome to the Crawl4ai Quickstart Guide! Let's dive into some web crawling fun!</strong>
+                </div>
+                <div class="bg-zinc-800 p-2 rounded">
+                    First Step: Create an instance of WebCrawler and call the <code>warmup()</code> function.
+                </div>
+                <div>
+                    <pre><code class="language-python">crawler = WebCrawler()
+            crawler.warmup()</code></pre>
+                </div>
+
+                <!-- Step 2 -->
+                <div class="col-span-2 bg-yellow-500 p-2 rounded text-zinc-900">
+                    🧠 <strong>Understanding 'bypass_cache' and 'include_raw_html' parameters:</strong>
+                </div>
+                <div class="bg-zinc-800 p-2 rounded">First crawl (caches the result):</div>
+                <div>
+                    <pre><code class="language-python">result = crawler.run(url="https://www.nbcnews.com/business")</code></pre>
+                </div>
+                <div class="bg-zinc-800 p-2 rounded">Second crawl (Force to crawl again):</div>
+                <div>
+                    <pre><code class="language-python">result = crawler.run(url="https://www.nbcnews.com/business", bypass_cache=True)</code></pre>
+                </div>
+                <div class="bg-zinc-800 p-2 rounded">Crawl result without raw HTML content:</div>
+                <div>
+                    <pre><code class="language-python">result = crawler.run(url="https://www.nbcnews.com/business", include_raw_html=False)</code></pre>
+                </div>
+
+                <!-- Step 3 -->
+                <div class="col-span-2 bg-yellow-500 p-2 rounded text-zinc-900">
+                    📄
+                    <strong
+                        >The 'include_raw_html' parameter, when set to True, includes the raw HTML content in the
+                        response. By default, it is set to True.</strong
+                    >
+                </div>
+                <div class="bg-zinc-800 p-2 rounded">Set <code>always_by_pass_cache</code> to True:</div>
+                <div>
+                    <pre><code class="language-python">crawler.always_by_pass_cache = True</code></pre>
+                </div>
+
+                <!-- Step 4 -->
+                <div class="col-span-2 bg-yellow-500 p-2 rounded text-zinc-900">
+                    🧩 <strong>Let's add a chunking strategy: RegexChunking!</strong>
+                </div>
+                <div class="bg-zinc-800 p-2 rounded">Using RegexChunking:</div>
+                <div>
+                    <pre><code class="language-python">result = crawler.run(
+                url="https://www.nbcnews.com/business",
+                chunking_strategy=RegexChunking(patterns=["\n\n"])
+            )</code></pre>
+                </div>
+                <div class="bg-zinc-800 p-2 rounded">Using NlpSentenceChunking:</div>
+                <div>
+                    <pre><code class="language-python">result = crawler.run(
+                url="https://www.nbcnews.com/business",
+                chunking_strategy=NlpSentenceChunking()
+            )</code></pre>
+                </div>
+
+                <!-- Step 5 -->
+                <div class="col-span-2 bg-yellow-500 p-2 rounded text-zinc-900">
+                    🧠 <strong>Let's get smarter with an extraction strategy: CosineStrategy!</strong>
+                </div>
+                <div class="bg-zinc-800 p-2 rounded">Using CosineStrategy:</div>
+                <div>
+                    <pre><code class="language-python">result = crawler.run(
+                url="https://www.nbcnews.com/business",
+                extraction_strategy=CosineStrategy(word_count_threshold=10, max_dist=0.2, linkage_method="ward", top_k=3)
+            )</code></pre>
+                </div>
+
+                <!-- Step 6 -->
+                <div class="col-span-2 bg-yellow-500 p-2 rounded text-zinc-900">
+                    🤖 <strong>Time to bring in the big guns: LLMExtractionStrategy without instructions!</strong>
+                </div>
+                <div class="bg-zinc-800 p-2 rounded">Using LLMExtractionStrategy without instructions:</div>
+                <div>
+                    <pre><code class="language-python">result = crawler.run(
+                url="https://www.nbcnews.com/business",
+                extraction_strategy=LLMExtractionStrategy(provider="openai/gpt-4o", api_token=os.getenv('OPENAI_API_KEY'))
+            )</code></pre>
+                </div>
+
+                <!-- Step 7 -->
+                <div class="col-span-2 bg-yellow-500 p-2 rounded text-zinc-900">
+                    📜 <strong>Let's make it even more interesting: LLMExtractionStrategy with instructions!</strong>
+                </div>
+                <div class="bg-zinc-800 p-2 rounded">Using LLMExtractionStrategy with instructions:</div>
+                <div>
+                    <pre><code class="language-python">result = crawler.run(
+                url="https://www.nbcnews.com/business",
+                extraction_strategy=LLMExtractionStrategy(
+                    provider="openai/gpt-4o",
+                    api_token=os.getenv('OPENAI_API_KEY'),
+                    instruction="I am interested in only financial news"
+                )
+            )</code></pre>
+                </div>
+
+                <!-- Step 8 -->
+                <div class="col-span-2 bg-yellow-500 p-2 rounded text-zinc-900">
+                    🎯 <strong>Targeted extraction: Let's use a CSS selector to extract only H2 tags!</strong>
+                </div>
+                <div class="bg-zinc-800 p-2 rounded">Using CSS selector to extract H2 tags:</div>
+                <div>
+                    <pre><code class="language-python">result = crawler.run(
+                url="https://www.nbcnews.com/business",
+                css_selector="h2"
+            )</code></pre>
+                </div>
+
+                <!-- Step 9 -->
+                <div class="col-span-2 bg-yellow-500 p-2 rounded text-zinc-900">
+                    🖱️ <strong>Let's get interactive: Passing JavaScript code to click 'Load More' button!</strong>
+                </div>
+                <div class="bg-zinc-800 p-2 rounded">Using JavaScript to click 'Load More' button:</div>
+                <div>
+                    <pre><code class="language-python">js_code = """
+            const loadMoreButton = Array.from(document.querySelectorAll('button')).find(button => button.textContent.includes('Load More'));
+            loadMoreButton && loadMoreButton.click();
+            """
+            crawler_strategy = LocalSeleniumCrawlerStrategy(js_code=js_code)
+            crawler = WebCrawler(crawler_strategy=crawler_strategy, always_by_pass_cache=True)
+            result = crawler.run(url="https://www.nbcnews.com/business")</code></pre>
+                </div>
+
+                <!-- Conclusion -->
+                <div class="col-span-2 bg-yellow-500 p-2 rounded text-zinc-900">
+                    🎉
+                    <strong
+                        >Congratulations! You've made it through the Crawl4ai Quickstart Guide! Now go forth and crawl
+                        the web like a pro! 🕸️</strong
+                    >
+                </div>
+            </div>
+        </section>
+        <section class="bg-zinc-900 text-zinc-300 p-6 px-20">
+            <h1 class="text-3xl font-bold mb-4">Installation 💻</h1>
+            <p class="mb-4">
+                There are two ways to use Crawl4AI: as a library in your Python projects or as a standalone local
+                server.
+            </p>
+
+            <p class="mb-4">
+                You can also try Crawl4AI in a Google Colab
+                <a href="https://colab.research.google.com/drive/1wz8u30rvbq6Scodye9AGCw8Qg_Z8QGsk"
+                    ><img
+                        src="https://colab.research.google.com/assets/colab-badge.svg"
+                        alt="Open In Colab"
+                        style="display: inline-block; width: 100px; height: 20px"
+                /></a>
+            </p>
+
+            <h2 class="text-2xl font-bold mb-2">Using Crawl4AI as a Library 📚</h2>
+            <p class="mb-4">To install Crawl4AI as a library, follow these steps:</p>
+
+            <ol class="list-decimal list-inside mb-4">
+                <li class="mb-2">
+                    Install the package from GitHub:
+                    <pre
+                        class="bg-zinc-800 p-4 rounded mt-2 text-zinc-100"
+                    ><code>pip install git+https://github.com/unclecode/crawl4ai.git</code></pre>
+                </li>
+                <li class="mb-2">
+                    Alternatively, you can clone the repository and install the package locally:
+                    <pre
+                        class="bg-zinc-800 p-4 rounded mt-2 text-zinc-100"
+                    ><code  class = "language-python bash">virtualenv venv
+source venv/bin/activate
+git clone https://github.com/unclecode/crawl4ai.git
+cd crawl4ai
+pip install -e .
+        </code></pre>
+                </li>
+                <li>
+                    Import the necessary modules in your Python script:
+                    <pre
+                        class="bg-zinc-800 p-4 rounded mt-2 text-zinc-100"
+                    ><code class = "language-python hljs">from crawl4ai.web_crawler import WebCrawler
+from crawl4ai.chunking_strategy import *
+from crawl4ai.extraction_strategy import *
+import os
+
+crawler = WebCrawler()
+
+# Single page crawl
+single_url = UrlModel(url='https://www.nbcnews.com/business', forced=False)
+result = crawl4ai.fetch_page(
+    url='https://www.nbcnews.com/business',
+    word_count_threshold=5, # Minimum word count for a HTML tag to be considered as a worthy block
+    chunking_strategy= RegexChunking( patterns = ["\\n\\n"]), # Default is RegexChunking
+    extraction_strategy= CosineStrategy(word_count_threshold=10, max_dist=0.2, linkage_method='ward', top_k=3) # Default is CosineStrategy
+    # extraction_strategy= LLMExtractionStrategy(provider= "openai/gpt-4o", api_token = os.getenv('OPENAI_API_KEY')),
+    bypass_cache=False,
+    extract_blocks =True, # Whether to extract semantical blocks of text from the HTML
+    css_selector = "", # Eg: "div.article-body"
+    verbose=True,
+    include_raw_html=True, # Whether to include the raw HTML content in the response
+)
+print(result.model_dump())
+        </code></pre>
+                </li>
+            </ol>
+            <p class="mb-4">
+                For more information about how to run Crawl4AI as a local server, please refer to the
+                <a href="https://github.com/unclecode/crawl4ai" class="text-blue-400">GitHub repository</a>.
+            </p>
+            
+        </section>
+
+        <section class="bg-zinc-900 text-zinc-300 p-6 px-20">
+            <h1 class="text-3xl font-bold mb-4">📖 Parameters</h1>
+            <div class="overflow-x-auto">
+                <table class="min-w-full bg-zinc-800 border border-zinc-700">
+                    <thead>
+                        <tr>
+                            <th class="py-2 px-4 border-b border-zinc-700">Parameter</th>
+                            <th class="py-2 px-4 border-b border-zinc-700">Description</th>
+                            <th class="py-2 px-4 border-b border-zinc-700">Required</th>
+                            <th class="py-2 px-4 border-b border-zinc-700">Default Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="py-2 px-4 border-b border-zinc-700">urls</td>
+                            <td class="py-2 px-4 border-b border-zinc-700">
+                                A list of URLs to crawl and extract data from.
+                            </td>
+                            <td class="py-2 px-4 border-b border-zinc-700">Yes</td>
+                            <td class="py-2 px-4 border-b border-zinc-700">-</td>
+                        </tr>
+                        <tr>
+                            <td class="py-2 px-4 border-b border-zinc-700">include_raw_html</td>
+                            <td class="py-2 px-4 border-b border-zinc-700">
+                                Whether to include the raw HTML content in the response.
+                            </td>
+                            <td class="py-2 px-4 border-b border-zinc-700">No</td>
+                            <td class="py-2 px-4 border-b border-zinc-700">false</td>
+                        </tr>
+                        <tr>
+                            <td class="py-2 px-4 border-b border-zinc-700">bypass_cache</td>
+                            <td class="py-2 px-4 border-b border-zinc-700">
+                                Whether to force a fresh crawl even if the URL has been previously crawled.
+                            </td>
+                            <td class="py-2 px-4 border-b border-zinc-700">No</td>
+                            <td class="py-2 px-4 border-b border-zinc-700">false</td>
+                        </tr>
+                        <tr>
+                            <td class="py-2 px-4 border-b border-zinc-700">extract_blocks</td>
+                            <td class="py-2 px-4 border-b border-zinc-700">
+                                Whether to extract semantical blocks of text from the HTML.
+                            </td>
+                            <td class="py-2 px-4 border-b border-zinc-700">No</td>
+                            <td class="py-2 px-4 border-b border-zinc-700">true</td>
+                        </tr>
+                        <tr>
+                            <td class="py-2 px-4 border-b border-zinc-700">word_count_threshold</td>
+                            <td class="py-2 px-4 border-b border-zinc-700">
+                                The minimum number of words a block must contain to be considered meaningful (minimum
+                                value is 5).
+                            </td>
+                            <td class="py-2 px-4 border-b border-zinc-700">No</td>
+                            <td class="py-2 px-4 border-b border-zinc-700">5</td>
+                        </tr>
+                        <tr>
+                            <td class="py-2 px-4 border-b border-zinc-700">extraction_strategy</td>
+                            <td class="py-2 px-4 border-b border-zinc-700">
+                                The strategy to use for extracting content from the HTML (e.g., "CosineStrategy").
+                            </td>
+                            <td class="py-2 px-4 border-b border-zinc-700">No</td>
+                            <td class="py-2 px-4 border-b border-zinc-700">CosineStrategy</td>
+                        </tr>
+                        <tr>
+                            <td class="py-2 px-4 border-b border-zinc-700">chunking_strategy</td>
+                            <td class="py-2 px-4 border-b border-zinc-700">
+                                The strategy to use for chunking the text before processing (e.g., "RegexChunking").
+                            </td>
+                            <td class="py-2 px-4 border-b border-zinc-700">No</td>
+                            <td class="py-2 px-4 border-b border-zinc-700">RegexChunking</td>
+                        </tr>
+                        <tr>
+                            <td class="py-2 px-4 border-b border-zinc-700">css_selector</td>
+                            <td class="py-2 px-4 border-b border-zinc-700">
+                                The CSS selector to target specific parts of the HTML for extraction.
+                            </td>
+                            <td class="py-2 px-4 border-b border-zinc-700">No</td>
+                            <td class="py-2 px-4 border-b border-zinc-700">None</td>
+                        </tr>
+                        <tr>
+                            <td class="py-2 px-4">verbose</td>
+                            <td class="py-2 px-4">Whether to enable verbose logging.</td>
+                            <td class="py-2 px-4">No</td>
+                            <td class="py-2 px-4">true</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="extraction" class="py-8 px-20">
+            <div class="overflow-x-auto mx-auto px-6">
+                <h2 class="text-2xl font-bold mb-4">Extraction Strategies</h2>
+                <div id="extraction-strategies" class="space-y-4"></div>
+            </div>
+        </section>
+
+        <section id="chunking" class="py-8 px-20">
+            <div class="overflow-x-auto mx-auto px-6">
+                <h2 class="text-2xl font-bold mb-4">Chunking Strategies</h2>
+                <div id="chunking-strategies" class="space-y-4"></div>
+            </div>
+        </section>
+
+        <section class="hero bg-zinc-900 py-8 px-20">
+            <div class="container mx-auto px-4">
+                <h2 class="text-3xl font-bold mb-4">🤔 Why building this?</h2>
+                <p class="text-lg mb-4">
+                    In recent times, we've witnessed a surge of startups emerging, riding the AI hype wave and charging
+                    for services that should rightfully be accessible to everyone. 🌍💸 One such example is scraping and
+                    crawling web pages and transforming them into a format suitable for Large Language Models (LLMs).
+                    🕸️🤖 We believe that building a business around this is not the right approach; instead, it should
+                    definitely be open-source. 🆓🌟 So, if you possess the skills to build such tools and share our
+                    philosophy, we invite you to join our "Robinhood" band and help set these products free for the
+                    benefit of all. 🤝💪
+                </p>
+            </div>
+        </section>
+
+        <section class="installation py-8 px-20">
+            <div class="container mx-auto px-4">
+                <h2 class="text-2xl font-bold mb-4">⚙️ Installation</h2>
+                <p class="mb-4">
+                    To install and run Crawl4AI as a library or a local server, please refer to the 📚
+                    <a href="https://github.com/unclecode/crawl4ai" class="text-blue-400">GitHub repository</a>.
+                </p>
+            </div>
+        </section>
+
+        <footer class="bg-zinc-900 text-white py-4">
+            <div class="container mx-auto px-4">
+                <div class="flex justify-between items-center">
+                    <p>© 2024 Crawl4AI. All rights reserved.</p>
+                    <div class="social-links">
+                        <a
+                            href="https://github.com/unclecode/crawl4ai"
+                            class="text-white hover:text-gray-300 mx-2"
+                            target="_blank"
+                            >😺 GitHub</a
+                        >
+                        <a
+                            href="https://twitter.com/unclecode"
+                            class="text-white hover:text-gray-300 mx-2"
+                            target="_blank"
+                            >🐦 Twitter</a
+                        >
+                    </div>
+                </div>
+            </div>
+        </footer>
+
+        <script>
+            // JavaScript to manage dynamic form changes and logic
+            document.getElementById("extraction-strategy-select").addEventListener("change", function () {
+                const strategy = this.value;
+                const providerModelSelect = document.getElementById("provider-model-select");
+                const tokenInput = document.getElementById("token-input");
+
+                if (strategy === "LLMExtractionStrategy") {
+                    providerModelSelect.disabled = false;
+                    tokenInput.disabled = false;
+                } else {
+                    providerModelSelect.disabled = true;
+                    tokenInput.disabled = true;
+                }
+            });
+
+            // Get the selected provider model and token from local storage
+            const storedProviderModel = localStorage.getItem("provider_model");
+            const storedToken = localStorage.getItem(storedProviderModel);
+
+            if (storedProviderModel) {
+                document.getElementById("provider-model-select").value = storedProviderModel;
+            }
+
+            if (storedToken) {
+                document.getElementById("token-input").value = storedToken;
+            }
+
+            // Handle provider model dropdown change
+            document.getElementById("provider-model-select").addEventListener("change", () => {
+                const selectedProviderModel = document.getElementById("provider-model-select").value;
+                const storedToken = localStorage.getItem(selectedProviderModel);
+
+                if (storedToken) {
+                    document.getElementById("token-input").value = storedToken;
+                } else {
+                    document.getElementById("token-input").value = "";
+                }
+            });
+
+            // Fetch total count from the database
+            axios
+                .get("/total-count")
+                .then((response) => {
+                    document.getElementById("total-count").textContent = response.data.count;
+                })
+                .catch((error) => console.error(error));
+
+            // Handle crawl button click
+            document.getElementById("crawl-btn").addEventListener("click", () => {
+                // validate input to have both URL and API token
+                if (!document.getElementById("url-input").value || !document.getElementById("token-input").value) {
+                    alert("Please enter both URL(s) and API token.");
+                    return;
+                }
+
+                const selectedProviderModel = document.getElementById("provider-model-select").value;
+                const apiToken = document.getElementById("token-input").value;
+                const extractBlocks = document.getElementById("extract-blocks-checkbox").checked;
+                const bypassCache = document.getElementById("bypass-cache-checkbox").checked;
+
+                // Save the selected provider model and token to local storage
+                localStorage.setItem("provider_model", selectedProviderModel);
+                localStorage.setItem(selectedProviderModel, apiToken);
+
+                const urlsInput = document.getElementById("url-input").value;
+                const urls = urlsInput.split(",").map((url) => url.trim());
+                const data = {
+                    urls: urls,
+                    provider_model: selectedProviderModel,
+                    api_token: apiToken,
+                    include_raw_html: true,
+                    bypass_cache: bypassCache,
+                    extract_blocks: extractBlocks,
+                    word_count_threshold: parseInt(document.getElementById("threshold").value),
+                    extraction_strategy: document.getElementById("extraction-strategy-select").value,
+                    chunking_strategy: document.getElementById("chunking-strategy-select").value,
+                    css_selector: document.getElementById("css-selector").value,
+                    verbose: true,
+                };
+
+                // save api token to local storage
+                localStorage.setItem("api_token", document.getElementById("token-input").value);
+
+                document.getElementById("loading").classList.remove("hidden");
+                //document.getElementById("result").classList.add("hidden");
+                //document.getElementById("code_help").classList.add("hidden");
+
+                axios
+                    .post("/crawl", data)
+                    .then((response) => {
+                        const result = response.data.results[0];
+                        const parsedJson = JSON.parse(result.extracted_content);
+                        document.getElementById("json-result").textContent = JSON.stringify(parsedJson, null, 2);
+                        document.getElementById("cleaned-html-result").textContent = result.cleaned_html;
+                        document.getElementById("markdown-result").textContent = result.markdown;
+
+                        // Update code examples dynamically
+                        const extractionStrategy = data.extraction_strategy;
+                        const isLLMExtraction = extractionStrategy === "LLMExtractionStrategy";
+
+                        document.getElementById(
+                            "curl-code"
+                        ).textContent = `curl -X POST -H "Content-Type: application/json" -d '${JSON.stringify({
+                            ...data,
+                            api_token: isLLMExtraction ? "your_api_token" : undefined,
+                        })}' http://crawl4ai.uccode.io/crawl`;
+
+                        document.getElementById(
+                            "python-code"
+                        ).textContent = `import requests\n\ndata = ${JSON.stringify(
+                            { ...data, api_token: isLLMExtraction ? "your_api_token" : undefined },
+                            null,
+                            2
+                        )}\n\nresponse = requests.post("http://crawl4ai.uccode.io/crawl", json=data) # OR local host if your run locally \nprint(response.json())`;
+
+                        document.getElementById(
+                            "nodejs-code"
+                        ).textContent = `const axios = require('axios');\n\nconst data = ${JSON.stringify(
+                            { ...data, api_token: isLLMExtraction ? "your_api_token" : undefined },
+                            null,
+                            2
+                        )};\n\naxios.post("http://crawl4ai.uccode.io/crawl", data) // OR local host if your run locally \n    .then(response => console.log(response.data))\n    .catch(error => console.error(error));`;
+
+                        document.getElementById(
+                            "library-code"
+                        ).textContent = `from crawl4ai.web_crawler import WebCrawler\nfrom crawl4ai.extraction_strategy import *\nfrom crawl4ai.chunking_strategy import *\n\ncrawler = WebCrawler()\ncrawler.warmup()\n\nresult = crawler.run(\n    url='${
+                            urls[0]
+                        }',\n    word_count_threshold=${data.word_count_threshold},\n    extraction_strategy=${
+                            isLLMExtraction
+                                ? `${extractionStrategy}(provider="${data.provider_model}", api_token="${data.api_token}")`
+                                : extractionStrategy + "()"
+                        },\n    chunking_strategy=${data.chunking_strategy}(),\n    bypass_cache=${
+                            data.bypass_cache
+                        },\n    css_selector="${data.css_selector}"\n)\nprint(result)`;
+
+                        // Highlight code syntax
+                        hljs.highlightAll();
+
+                        // Select JSON tab by default
+                        document.querySelector('.tab-btn[data-tab="json"]').click();
+
+                        document.getElementById("loading").classList.add("hidden");
+                        document.getElementById("result").classList.remove("hidden");
+                        document.getElementById("code_help").classList.remove("hidden");
+
+                        // increment the total count
+                        document.getElementById("total-count").textContent =
+                            parseInt(document.getElementById("total-count").textContent) + 1;
+                    })
+                    .catch((error) => {
+                        console.error(error);
+                        document.getElementById("loading").classList.add("hidden");
+                    });
+            });
+
+            // Handle tab clicks
+            document.querySelectorAll(".tab-btn").forEach((btn) => {
+                btn.addEventListener("click", () => {
+                    const tab = btn.dataset.tab;
+                    document
+                        .querySelectorAll(".tab-btn")
+                        .forEach((b) => b.classList.remove("bg-lime-700", "text-white"));
+                    btn.classList.add("bg-lime-700", "text-white");
+                    document.querySelectorAll(".tab-content.code pre").forEach((el) => el.classList.add("hidden"));
+                    document.getElementById(`${tab}-result`).parentElement.classList.remove("hidden");
+                });
+            });
+
+            // Handle code tab clicks
+            document.querySelectorAll(".code-tab-btn").forEach((btn) => {
+                btn.addEventListener("click", () => {
+                    const tab = btn.dataset.tab;
+                    document
+                        .querySelectorAll(".code-tab-btn")
+                        .forEach((b) => b.classList.remove("bg-lime-700", "text-white"));
+                    btn.classList.add("bg-lime-700", "text-white");
+                    document.querySelectorAll(".tab-content.result pre").forEach((el) => el.classList.add("hidden"));
+                    document.getElementById(`${tab}-code`).parentElement.classList.remove("hidden");
+                });
+            });
+
+            // Handle copy to clipboard button clicks
+
+            async function copyToClipboard(text) {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    return navigator.clipboard.writeText(text);
+                } else {
+                    return fallbackCopyTextToClipboard(text);
+                }
+            }
+
+            function fallbackCopyTextToClipboard(text) {
+                return new Promise((resolve, reject) => {
+                    const textArea = document.createElement("textarea");
+                    textArea.value = text;
+
+                    // Avoid scrolling to bottom
+                    textArea.style.top = "0";
+                    textArea.style.left = "0";
+                    textArea.style.position = "fixed";
+
+                    document.body.appendChild(textArea);
+                    textArea.focus();
+                    textArea.select();
+
+                    try {
+                        const successful = document.execCommand("copy");
+                        if (successful) {
+                            resolve();
+                        } else {
+                            reject();
+                        }
+                    } catch (err) {
+                        reject(err);
+                    }
+
+                    document.body.removeChild(textArea);
+                });
+            }
+
+            document.querySelectorAll(".copy-btn").forEach((btn) => {
+                btn.addEventListener("click", () => {
+                    const target = btn.dataset.target;
+                    const code = document.getElementById(target).textContent;
+                    //navigator.clipboard.writeText(code).then(() => {
+                    copyToClipboard(code).then(() => {
+                        btn.textContent = "Copied!";
+                        setTimeout(() => {
+                            btn.textContent = "Copy";
+                        }, 2000);
+                    });
+                });
+            });
+
+            document.addEventListener("DOMContentLoaded", async () => {
+                try {
+                    const extractionResponse = await fetch("/strategies/extraction");
+                    const extractionStrategies = await extractionResponse.json();
+
+                    const chunkingResponse = await fetch("/strategies/chunking");
+                    const chunkingStrategies = await chunkingResponse.json();
+
+                    renderStrategies("extraction-strategies", extractionStrategies);
+                    renderStrategies("chunking-strategies", chunkingStrategies);
+                } catch (error) {
+                    console.error("Error fetching strategies:", error);
+                }
+            });
+
+            function renderStrategies(containerId, strategies) {
+                const container = document.getElementById(containerId);
+                container.innerHTML = ""; // Clear any existing content
+                strategies = JSON.parse(strategies);
+                Object.entries(strategies).forEach(([strategy, description]) => {
+                    const strategyElement = document.createElement("div");
+                    strategyElement.classList.add("bg-zinc-800", "p-4", "rounded", "shadow-md", "docs-item");
+
+                    const strategyDescription = document.createElement("div");
+                    strategyDescription.classList.add("text-gray-300", "prose", "prose-sm");
+                    strategyDescription.innerHTML = marked.parse(description);
+
+                    strategyElement.appendChild(strategyDescription);
+
+                    container.appendChild(strategyElement);
+                });
+            }
+
+            // Highlight code syntax
+            hljs.highlightAll();
+        </script>
+    </body>
+</html>

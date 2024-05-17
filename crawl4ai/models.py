@@ -11,5 +11,6 @@ class CrawlResult(BaseModel):
     success: bool
     cleaned_html: str = None
     markdown: str = None
-    parsed_json: str = None
+    extracted_content: str = None
+    metadata: dict = None
     error_message: str = None
