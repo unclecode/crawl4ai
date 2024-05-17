@@ -15,15 +15,15 @@ def get_home_folder():
 @lru_cache()
 def load_bert_base_uncased():
     from transformers import BertTokenizer, BertModel, AutoTokenizer, AutoModel
-    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', resume_download=None)
-    model = BertModel.from_pretrained('bert-base-uncased', resume_download=None)
+    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased') #, resume_download=None)
+    model = BertModel.from_pretrained('bert-base-uncased') #, resume_download=None)
     return tokenizer, model
 
 @lru_cache()
 def load_bge_small_en_v1_5():
     from transformers import BertTokenizer, BertModel, AutoTokenizer, AutoModel
-    tokenizer = AutoTokenizer.from_pretrained('BAAI/bge-small-en-v1.5', resume_download=None)
-    model = AutoModel.from_pretrained('BAAI/bge-small-en-v1.5', resume_download=None)
+    tokenizer = AutoTokenizer.from_pretrained('BAAI/bge-small-en-v1.5') #, resume_download=None)
+    model = AutoModel.from_pretrained('BAAI/bge-small-en-v1.5') #, resume_download=None)
     model.eval()
     return tokenizer, model
 
