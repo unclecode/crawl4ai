@@ -2,7 +2,6 @@ aiohttp==3.9.5
 aiosqlite==0.20.0
 bs4==0.0.2
 fastapi==0.111.0
-typer==0.9.0 
 html2text==2024.2.26
 httpx==0.27.0
 lazy_import==0.2.2
@@ -15,6 +14,6 @@ rich==13.7.1
 scikit-learn==1.4.2
 selenium==4.20.0
 uvicorn==0.29.0
-transformers==4.40.2
+# transformers==4.40.2
 chromedriver-autoinstaller==0.6.4
-torch==2.3.0
+# torch==2.3.0
