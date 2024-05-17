@@ -8,23 +8,6 @@
 
 Crawl4AI has one clear task: to simplify crawling and extract useful information from web pages, making it accessible for large language models (LLMs) and AI applications. 🆓🌐
 
-<<<<<<< HEAD
-## 🚀 New Changes Will be Released Soon
-
-- 🚀 10x faster!!
-- 📜 Execute custome JavaScript before crawling!
-- 🤝 Colab friendly!
-- 📚 Chunking strategies: topic-based, regex, sentence, and more!
-- 🧠 Extraction strategies: cosine clustering, LLM, and more!
-- 🎯 CSS selector support
-- 📝 Pass instructions/keywords to refine extraction
-
-## 🚧 Work in Progress 👷‍♂️
-
-- 📷 Image Captioning: Incorporating image captioning capabilities to extract descriptions from images.
-- 💾 Embedding Vector Data: Generate and store embedding data for each crawled website.
-- 🔍 Semantic Search Engine: Building a semantic search engine that fetches content, performs vector search similarity, and generates labeled chunk data based on user queries and URLs.
-=======
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1wz8u30rvbq6Scodye9AGCw8Qg_Z8QGsk)
 
 ## Recent Changes
@@ -120,7 +103,6 @@ With Crawl4AI, you can perform advanced web crawling and data extraction tasks w
 8. [Contributing](#contributing-)
 9. [License](#license-)
 10. [Contact](#contact-)
->>>>>>> new-release-0.0.2-no-spacy
 
 
 ## Features ✨
