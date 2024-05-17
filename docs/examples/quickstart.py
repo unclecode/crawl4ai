@@ -12,7 +12,7 @@ console = Console()
 
 @lru_cache()
 def create_crawler():
-    crawler = WebCrawler()
+    crawler = WebCrawler(verbose=True)
     crawler.warmup()
     return crawler
 
@@ -86,7 +86,7 @@ def add_extraction_strategy(crawler):
     cprint("CosineStrategy uses cosine similarity to extract semantically similar blocks of text. Let's see it in action!")
     result = crawler.run(
         url="https://www.nbcnews.com/business",
-        extraction_strategy=CosineStrategy(word_count_threshold=10, max_dist=0.2, linkage_method="ward", top_k=3)
+        extraction_strategy=CosineStrategy(word_count_threshold=10, max_dist=0.2, linkage_method="ward", top_k=3, verbose=True)
     )
     cprint("[LOG] 📦 [bold yellow]CosineStrategy result:[/bold yellow]")
     print_result(result)
@@ -171,7 +171,7 @@ def main():
 
     crawler = create_crawler()
 
-    basic_usage(crawler)
+    # basic_usage(crawler)
     understanding_parameters(crawler)
     
     crawler.always_by_pass_cache = True

@@ -108,7 +108,7 @@ def load_spacy_model():
         repo_folder = os.path.join(home_folder, "crawl4ai")
         model_folder = os.path.join(home_folder, name)
 
-        print("[LOG] ⏬ Downloading model for the first time...")
+        # print("[LOG] ⏬ Downloading Spacy model for the first time...")
 
         # Remove existing repo folder if it exists
         if Path(repo_folder).exists():
@@ -136,7 +136,7 @@ def load_spacy_model():
             shutil.rmtree(repo_folder)
 
             # Print completion message
-            print("[LOG] ✅ Model downloaded successfully")
+            # print("[LOG] ✅ Spacy Model downloaded successfully")
         except subprocess.CalledProcessError as e:
             print(f"An error occurred while cloning the repository: {e}")
         except Exception as e:
@@ -164,7 +164,8 @@ def download_all_models(remove_existing=False):
     print("[LOG] Downloading BGE Small EN v1.5...")
     load_bge_small_en_v1_5()
     print("[LOG] Downloading text classifier...")
-    load_text_multilabel_classifier()
+    _, device = load_text_multilabel_classifier()
+    print(f"[LOG] Text classifier loaded on {device}")
     print("[LOG] Downloading custom NLTK Punkt model...")
     load_nltk_punkt()
     print("[LOG] ✅ All models downloaded successfully.")
