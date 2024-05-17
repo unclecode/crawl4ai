@@ -149,9 +149,10 @@ pip install -e .[all]
 
 3. Use docker to run the local server:
 ```bash
-docker build -t crawl4ai .
 # For Mac users
 # docker build --platform linux/amd64 -t crawl4ai .
+# For other users
+# docker build -t crawl4ai .
 docker run -d -p 8000:80 crawl4ai
 ```
 
