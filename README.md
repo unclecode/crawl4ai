@@ -210,7 +210,7 @@ For more information about the available parameters and their descriptions, refe
 
 ## Python Library Usage 🚀
 
-    🔥 A great way to try out Crawl4AI is to run `quickstart.py` in the `docs/examples` directory. This script demonstrates how to use Crawl4AI to crawl a website and extract content from it.
+🔥 A great way to try out Crawl4AI is to run `quickstart.py` in the `docs/examples` directory. This script demonstrates how to use Crawl4AI to crawl a website and extract content from it.
 
 ### Quickstart Guide
 
