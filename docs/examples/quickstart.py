@@ -128,7 +128,7 @@ def add_llm_extraction_strategy(crawler):
     print_result(result)
     
     result = crawler.run(
-        url="https://www.example.com",
+        url="https://www.nbcnews.com/business",
         extraction_strategy=LLMExtractionStrategy(
             provider="openai/gpt-4o",
             api_token=os.getenv('OPENAI_API_KEY'),
