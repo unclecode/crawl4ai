@@ -69,9 +69,12 @@ axios
 // Handle crawl button click
 document.getElementById("crawl-btn").addEventListener("click", () => {
     // validate input to have both URL and API token
-    if (!document.getElementById("url-input").value || !document.getElementById("token-input").value) {
-        alert("Please enter both URL(s) and API token.");
-        return;
+    // if selected extraction strategy is LLMExtractionStrategy, then API token is required
+    if (document.getElementById("extraction-strategy-select").value === "LLMExtractionStrategy") {
+        if (!document.getElementById("url-input").value || !document.getElementById("token-input").value) {
+            alert("Please enter both URL(s) and API token.");
+            return;
+        }
     }
 
     const selectedProviderModel = document.getElementById("provider-model-select").value;
@@ -87,8 +90,6 @@ document.getElementById("crawl-btn").addEventListener("click", () => {
     const urls = urlsInput.split(",").map((url) => url.trim());
     const data = {
         urls: urls,
-        provider_model: selectedProviderModel,
-        api_token: apiToken,
         include_raw_html: true,
         bypass_cache: bypassCache,
         extract_blocks: extractBlocks,
@@ -112,8 +113,8 @@ document.getElementById("crawl-btn").addEventListener("click", () => {
     localStorage.setItem("api_token", document.getElementById("token-input").value);
 
     document.getElementById("loading").classList.remove("hidden");
-    document.getElementById("result").classList.add("hidden");
-    document.getElementById("code_help").classList.add("hidden");
+    document.getElementById("result").style.visibility = "hidden";
+    document.getElementById("code_help").style.visibility = "hidden";
 
     axios
         .post("/crawl", data)
@@ -128,18 +129,20 @@ document.getElementById("crawl-btn").addEventListener("click", () => {
             const extractionStrategy = data.extraction_strategy;
             const isLLMExtraction = extractionStrategy === "LLMExtractionStrategy";
 
+            // REMOVE API TOKEN FROM CODE EXAMPLES
+            data.extraction_strategy_args.api_token = "your_api_token";
             document.getElementById(
                 "curl-code"
             ).textContent = `curl -X POST -H "Content-Type: application/json" -d '${JSON.stringify({
                 ...data,
                 api_token: isLLMExtraction ? "your_api_token" : undefined,
-            })}' http://crawl4ai.uccode.io/crawl`;
+            }, null, 2)}' http://crawl4ai.com/crawl`;
 
             document.getElementById("python-code").textContent = `import requests\n\ndata = ${JSON.stringify(
                 { ...data, api_token: isLLMExtraction ? "your_api_token" : undefined },
                 null,
                 2
-            )}\n\nresponse = requests.post("http://crawl4ai.uccode.io/crawl", json=data) # OR local host if your run locally \nprint(response.json())`;
+            )}\n\nresponse = requests.post("http://crawl4ai.com/crawl", json=data) # OR local host if your run locally \nprint(response.json())`;
 
             document.getElementById(
                 "nodejs-code"
@@ -147,7 +150,7 @@ document.getElementById("crawl-btn").addEventListener("click", () => {
                 { ...data, api_token: isLLMExtraction ? "your_api_token" : undefined },
                 null,
                 2
-            )};\n\naxios.post("http://crawl4ai.uccode.io/crawl", data) // OR local host if your run locally \n    .then(response => console.log(response.data))\n    .catch(error => console.error(error));`;
+            )};\n\naxios.post("http://crawl4ai.com/crawl", data) // OR local host if your run locally \n    .then(response => console.log(response.data))\n    .catch(error => console.error(error));`;
 
             document.getElementById(
                 "library-code"
@@ -169,8 +172,8 @@ document.getElementById("crawl-btn").addEventListener("click", () => {
 
             document.getElementById("loading").classList.add("hidden");
 
-            document.getElementById("result").classList.remove("hidden");
-            document.getElementById("code_help").classList.remove("hidden");
+            document.getElementById("result").style.visibility = "visible";
+            document.getElementById("code_help").style.visibility = "visible";
 
             // increment the total count
             document.getElementById("total-count").textContent =
