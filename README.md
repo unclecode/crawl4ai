@@ -134,7 +134,7 @@ source venv/bin/activate
 pip install "crawl4ai[all] @ git+https://github.com/unclecode/crawl4ai.git"
 ```
 
-    💡 Better to run the following CLI-command to load the required models. This is optional, but it will boost the performance and speed of the crawler. You need to do this only once.
+💡 Better to run the following CLI-command to load the required models. This is optional, but it will boost the performance and speed of the crawler. You need to do this only once.
 
     crawl4ai-download-models
 
