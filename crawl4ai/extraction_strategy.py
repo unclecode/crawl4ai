@@ -178,11 +178,15 @@ class CosineStrategy(ExtractionStrategy):
         
         self.buffer_embeddings = np.array([])
 
+        if self.verbose:
+            print(f"[LOG] Loading Extraction Model {model_name}")
+
         if model_name == "bert-base-uncased":
             self.tokenizer, self.model = load_bert_base_uncased()
         elif model_name == "BAAI/bge-small-en-v1.5":
             self.tokenizer, self.model = load_bge_small_en_v1_5()
 
+            
         self.nlp, self.device = load_text_multilabel_classifier()
         
         if self.verbose:

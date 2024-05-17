@@ -36,7 +36,7 @@ class CloudCrawlerStrategy(CrawlerStrategy):
         return html
 
 class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
-    def __init__(self, use_cached_html=False, js_code=None):
+    def __init__(self, use_cached_html=False, js_code=None, **kwargs):
         super().__init__()
         print("[LOG] 🚀 Initializing LocalSeleniumCrawlerStrategy")
         self.options = Options()
@@ -48,6 +48,7 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
         self.options.add_argument("--headless")
         self.use_cached_html = use_cached_html
         self.js_code = js_code
+        self.verbose = kwargs.get("verbose", False)
 
         # chromedriver_autoinstaller.install()
         import chromedriver_autoinstaller
@@ -62,6 +63,8 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
                     return f.read()
 
         try:
+            if self.verbose:
+                print(f"[LOG] 🕸️ Crawling {url} using LocalSeleniumCrawlerStrategy...")
             self.driver.get(url)
             WebDriverWait(self.driver, 10).until(
                 EC.presence_of_all_elements_located((By.TAG_NAME, "html"))
@@ -81,6 +84,9 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
             cache_file_path = os.path.join(Path.home(), ".crawl4ai", "cache", url.replace("/", "_"))
             with open(cache_file_path, "w") as f:
                 f.write(html)
+                
+            if self.verbose:
+                print(f"[LOG] ✅ Crawled {url} successfully!")
             
             return html
         except InvalidArgumentException:
