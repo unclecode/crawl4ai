@@ -3,6 +3,33 @@ from spacy.training import Example
 import random
 import nltk
 from nltk.corpus import reuters
+import torch
+
+def save_spacy_model_as_torch(nlp, model_dir="models/reuters"):
+    # Extract the TextCategorizer component
+    textcat = nlp.get_pipe("textcat_multilabel")
+
+    # Convert the weights to a PyTorch state dictionary
+    state_dict = {name: torch.tensor(param.data) for name, param in textcat.model.named_parameters()}
+
+    # Save the state dictionary
+    torch.save(state_dict, f"{model_dir}/model_weights.pth")
+
+    # Extract and save the vocabulary
+    vocab = extract_vocab(nlp)
+    with open(f"{model_dir}/vocab.txt", "w") as vocab_file:
+        for word, idx in vocab.items():
+            vocab_file.write(f"{word}\t{idx}\n")
+    
+    print(f"Model weights and vocabulary saved to: {model_dir}")
+
+def extract_vocab(nlp):
+    # Extract vocabulary from the SpaCy model
+    vocab = {word: i for i, word in enumerate(nlp.vocab.strings)}
+    return vocab
+
+nlp = spacy.load("models/reuters")
+save_spacy_model_as_torch(nlp, model_dir="models")
 
 def train_and_save_reuters_model(model_dir="models/reuters"):
     # Ensure the Reuters corpus is downloaded
@@ -96,8 +123,6 @@ def train_model(model_dir, additional_epochs=0):
     nlp.to_disk(model_dir)
     print(f"Model saved to: {model_dir}")
 
-
-
 def load_model_and_predict(model_dir, text, tok_k = 3):
     # Load the trained model from the specified directory
     nlp = spacy.load(model_dir)
@@ -110,7 +135,6 @@ def load_model_and_predict(model_dir, text, tok_k = 3):
     print(f"Top {tok_k} categories:")
     
     return top_categories    
-
 
 if __name__ == "__main__":
     train_and_save_reuters_model()

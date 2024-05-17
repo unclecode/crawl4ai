@@ -59,12 +59,6 @@ def understanding_parameters(crawler):
     cprint(f"[LOG] 📦 [bold yellow]Second crawl took {end_time - start_time} seconds and result (forced to crawl):[/bold yellow]")
     print_result(result)
 
-    # Retrieve raw HTML content
-    cprint("\n🔄 [bold cyan]'include_raw_html' parameter example:[/bold cyan]", True)
-    result = crawler.run(url="https://www.nbcnews.com/business", include_raw_html=False)
-    cprint("[LOG] 📦 [bold yellow]Crawl result (without raw HTML content):[/bold yellow]")
-    print_result(result)
-
 def add_chunking_strategy(crawler):
     # Adding a chunking strategy: RegexChunking
     cprint("\n🧩 [bold cyan]Let's add a chunking strategy: RegexChunking![/bold cyan]", True)
@@ -177,8 +171,18 @@ def main():
 
     crawler = create_crawler()
     
-    cprint("For the rest of this guide, I set crawler.always_by_pass_cache to True to force the crawler to bypass the cache. This is to ensure that we get fresh results for each run.", True)
+    cprint("For the rest of this guide, I set crawler.always_by_pass_cache to True to force the crawler to bypass the cache. This is to ensure that we get fresh results for each run.")
     crawler.always_by_pass_cache = True
+
+
+    cprint("\n🔍 [bold cyan]Time to explore another chunking strategy: NlpSentenceChunking![/bold cyan]", True)
+    cprint("NlpSentenceChunking uses NLP techniques to split the text into sentences. Let's see how it performs!")
+    result = crawler.run(
+        url="https://www.nbcnews.com/business",
+        chunking_strategy=NlpSentenceChunking()
+    )
+    cprint("[LOG] 📦 [bold yellow]NlpSentenceChunking result:[/bold yellow]")
+    print_result(result)
 
     basic_usage(crawler)
     understanding_parameters(crawler)

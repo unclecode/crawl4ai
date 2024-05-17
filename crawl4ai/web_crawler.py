@@ -11,7 +11,6 @@ from .crawler_strategy import *
 from typing import List
 from concurrent.futures import ThreadPoolExecutor
 from .config import *
-# from .model_loader import load_bert_base_uncased, load_bge_small_en_v1_5, load_spacy_model
 
 
 class WebCrawler:

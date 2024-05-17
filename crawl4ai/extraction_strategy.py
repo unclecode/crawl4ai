@@ -7,7 +7,7 @@ from .prompts import PROMPT_EXTRACT_BLOCKS, PROMPT_EXTRACT_BLOCKS_WITH_INSTRUCTI
 from .config import *
 from .utils import *
 from functools import partial
-from .model_loader import load_bert_base_uncased, load_bge_small_en_v1_5, load_spacy_model
+from .model_loader import *
 
 
 import numpy as np
@@ -45,14 +45,13 @@ class ExtractionStrategy(ABC):
             for future in as_completed(futures):
                 extracted_content.extend(future.result())
         return extracted_content    
-
 class NoExtractionStrategy(ExtractionStrategy):
     def extract(self, url: str, html: str, *q, **kwargs) -> List[Dict[str, Any]]:
         return [{"index": 0, "content": html}]
     
     def run(self, url: str, sections: List[str], *q, **kwargs) -> List[Dict[str, Any]]:
         return [{"index": i, "tags": [], "content": section} for i, section in enumerate(sections)]
-    
+   
 class LLMExtractionStrategy(ExtractionStrategy):
     def __init__(self, provider: str = DEFAULT_PROVIDER, api_token: Optional[str] = None, instruction:str = None, **kwargs):
         """
@@ -166,10 +165,6 @@ class CosineStrategy(ExtractionStrategy):
         """
         super().__init__()
         
-        from transformers import BertTokenizer, BertModel, pipeline
-        from transformers import AutoTokenizer, AutoModel     
-        import spacy  
-
         self.semantic_filter = semantic_filter
         self.word_count_threshold = word_count_threshold
         self.max_dist = max_dist
@@ -184,9 +179,8 @@ class CosineStrategy(ExtractionStrategy):
         elif model_name == "BAAI/bge-small-en-v1.5":
             self.tokenizer, self.model = load_bge_small_en_v1_5()
 
-        self.nlp = load_spacy_model()
+        self.nlp = load_text_multilabel_classifier()
         print(f"[LOG] Model loaded {model_name}, models/reuters, took " + str(time.time() - self.timer) + " seconds")
-
 
     def filter_documents_embeddings(self, documents: List[str], semantic_filter: str, threshold: float = 0.5) -> List[str]:
         """
@@ -310,13 +304,19 @@ class CosineStrategy(ExtractionStrategy):
 
         # Convert filtered clusters to a sorted list of dictionaries
         cluster_list = [{"index": int(idx), "tags" : [], "content": " ".join(filtered_clusters[idx])} for idx in sorted(filtered_clusters)]
+        
+        labels = self.nlp([cluster['content'] for cluster in cluster_list])
+        
+        for cluster, label in zip(cluster_list, labels):
+            cluster['tags'] = label
 
         # Process the text with the loaded model
-        for cluster in  cluster_list:
-            doc = self.nlp(cluster['content'])
-            tok_k = self.top_k
-            top_categories = sorted(doc.cats.items(), key=lambda x: x[1], reverse=True)[:tok_k]
-            cluster['tags'] = [cat for cat, _ in top_categories]
+        # for cluster in  cluster_list:
+        #     cluster['tags'] = self.nlp(cluster['content'])[0]['label']
+            # doc = self.nlp(cluster['content'])
+            # tok_k = self.top_k
+            # top_categories = sorted(doc.cats.items(), key=lambda x: x[1], reverse=True)[:tok_k]
+            # cluster['tags'] = [cat for cat, _ in top_categories]
         
         # print(f"[LOG] 🚀 Categorization done in {time.time() - t:.2f} seconds")
         

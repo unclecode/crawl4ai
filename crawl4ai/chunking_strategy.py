@@ -1,12 +1,8 @@
 from abc import ABC, abstractmethod
 import re
-# spacy = lazy_import.lazy_module('spacy')
-# nl = lazy_import.lazy_module('nltk')
-# from nltk.corpus import stopwords
-# from nltk.tokenize import word_tokenize, TextTilingTokenizer
 from collections import Counter
 import string
-from .model_loader import load_spacy_en_core_web_sm
+from .model_loader import load_nltk_punkt
 
 # Define the abstract base class for chunking strategies
 class ChunkingStrategy(ABC):
@@ -34,15 +30,24 @@ class RegexChunking(ChunkingStrategy):
             paragraphs = new_paragraphs
         return paragraphs
     
-# NLP-based sentence chunking using spaCy
-
+# NLP-based sentence chunking 
 class NlpSentenceChunking(ChunkingStrategy):
-    def __init__(self, model='en_core_web_sm'):
-        self.nlp = load_spacy_en_core_web_sm()
+    def __init__(self):
+        load_nltk_punkt()
+        pass
 
     def chunk(self, text: str) -> list:
-        doc = self.nlp(text)
-        return [sent.text.strip() for sent in doc.sents]
+        # Improved regex for sentence splitting
+        # sentence_endings = re.compile(
+        #     r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<![A-Z][A-Z]\.)(?<![A-Za-z]\.)(?<=\.|\?|\!|\n)\s'
+        # )
+        # sentences = sentence_endings.split(text)
+        # sens =  [sent.strip() for sent in sentences if sent]            
+        from nltk.tokenize import sent_tokenize
+        sentences = sent_tokenize(text)
+        sens =  [sent.strip() for sent in sentences]        
+        
+        return list(set(sens))
     
 # Topic-based segmentation using TextTiling
 class TopicSegmentationChunking(ChunkingStrategy):
