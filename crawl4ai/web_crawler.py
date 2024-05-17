@@ -62,14 +62,14 @@ class WebCrawler:
         extract_blocks_flag: bool = True,
         word_count_threshold=MIN_WORD_THRESHOLD,
         use_cached_html: bool = False,
-        extraction_strategy: ExtractionStrategy = CosineStrategy(),
+        extraction_strategy: ExtractionStrategy = None,
         chunking_strategy: ChunkingStrategy = RegexChunking(),
         **kwargs,
     ) -> CrawlResult:
         return self.run(
             url_model.url,
             word_count_threshold,
-            extraction_strategy,
+            extraction_strategy or CosineStrategy(),
             chunking_strategy,
             bypass_cache=url_model.forced,
             **kwargs,
@@ -81,13 +81,14 @@ class WebCrawler:
         self,
         url: str,
         word_count_threshold=MIN_WORD_THRESHOLD,
-        extraction_strategy: ExtractionStrategy = CosineStrategy(),
+        extraction_strategy: ExtractionStrategy = None,
         chunking_strategy: ChunkingStrategy = RegexChunking(),
         bypass_cache: bool = False,
         css_selector: str = None,
         verbose=True,
         **kwargs,
     ) -> CrawlResult:
+        extraction_strategy = extraction_strategy or CosineStrategy()
         # Check if extraction strategy is an instance of ExtractionStrategy if not raise an error
         if not isinstance(extraction_strategy, ExtractionStrategy):
             raise ValueError("Unsupported extraction strategy")
@@ -183,11 +184,11 @@ class WebCrawler:
         extract_blocks_flag: bool = True,
         word_count_threshold=MIN_WORD_THRESHOLD,
         use_cached_html: bool = False,
-        extraction_strategy: ExtractionStrategy = CosineStrategy(),
+        extraction_strategy: ExtractionStrategy = None,
         chunking_strategy: ChunkingStrategy = RegexChunking(),
         **kwargs,
     ) -> List[CrawlResult]:
-
+        extraction_strategy = extraction_strategy or CosineStrategy()
         def fetch_page_wrapper(url_model, *args, **kwargs):
             return self.fetch_page(url_model, *args, **kwargs)
 
