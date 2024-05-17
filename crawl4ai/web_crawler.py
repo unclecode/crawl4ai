@@ -39,9 +39,6 @@ class WebCrawler:
         self.ready = False
         
     def warmup(self):
-        
-        
-        
         print("[LOG] 🌤️  Warming up the WebCrawler")
         result = self.run(
             url='https://crawl4ai.uccode.io/',
