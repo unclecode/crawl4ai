@@ -43,7 +43,7 @@ class WebCrawler:
         result = self.run(
             url='https://crawl4ai.uccode.io/',
             word_count_threshold=5,
-            extraction_strategy= CosineStrategy(),
+            extraction_strategy= NoExtractionStrategy(),
             bypass_cache=False,
             verbose = False
         )
@@ -66,7 +66,7 @@ class WebCrawler:
         return self.run(
             url_model.url,
             word_count_threshold,
-            extraction_strategy or CosineStrategy(),
+            extraction_strategy or NoExtractionStrategy(),
             chunking_strategy,
             bypass_cache=url_model.forced,
             **kwargs,
@@ -85,7 +85,7 @@ class WebCrawler:
         verbose=True,
         **kwargs,
     ) -> CrawlResult:
-        extraction_strategy = extraction_strategy or CosineStrategy()
+        extraction_strategy = extraction_strategy or NoExtractionStrategy()
         # Check if extraction strategy is an instance of ExtractionStrategy if not raise an error
         if not isinstance(extraction_strategy, ExtractionStrategy):
             raise ValueError("Unsupported extraction strategy")
@@ -185,7 +185,7 @@ class WebCrawler:
         chunking_strategy: ChunkingStrategy = RegexChunking(),
         **kwargs,
     ) -> List[CrawlResult]:
-        extraction_strategy = extraction_strategy or CosineStrategy()
+        extraction_strategy = extraction_strategy or NoExtractionStrategy()
         def fetch_page_wrapper(url_model, *args, **kwargs):
             return self.fetch_page(url_model, *args, **kwargs)
 
