@@ -165,3 +165,10 @@ Crawl4AI.egg-info/
 Crawl4AI.egg-info/*
 crawler_data.db
 .vscode/
+test_pad.py
+test_pad*.py
+.data/
+Crawl4AI.egg-info/
+
+requirements0.txt
+a.txt
