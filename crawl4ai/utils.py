@@ -1,16 +1,26 @@
-import requests
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from bs4 import BeautifulSoup, Comment, element, Tag, NavigableString
 import html2text
 import json
+import html
 import re
 import os
-import litellm
-from litellm import completion, batch_completion
+from html2text import HTML2Text
 from .prompts import PROMPT_EXTRACT_BLOCKS
 from .config import *
-import re
-import html
+from pathlib import Path
 
+class InvalidCSSSelectorError(Exception):
+    pass
+
+
+def get_home_folder():
+    home_folder = os.path.join(Path.home(), ".crawl4ai")
+    os.makedirs(home_folder, exist_ok=True)
+    os.makedirs(f"{home_folder}/cache", exist_ok=True)
+    os.makedirs(f"{home_folder}/models", exist_ok=True)
+    return home_folder    
 
 def beautify_html(escaped_html):
     """
@@ -77,7 +87,8 @@ def split_and_parse_json_objects(json_string):
 
 def sanitize_html(html):
     # Replace all weird and special characters with an empty string
-    sanitized_html = re.sub(r'[^\w\s.,;:!?=\[\]{}()<>\/\\\-"]', '', html)
+    sanitized_html = html
+    # sanitized_html = re.sub(r'[^\w\s.,;:!?=\[\]{}()<>\/\\\-"]', '', html)
 
     # Escape all double and single quotes
     sanitized_html = sanitized_html.replace('"', '\\"').replace("'", "\\'")
@@ -113,14 +124,52 @@ def escape_json_string(s):
     
     return s
 
+class CustomHTML2Text(HTML2Text):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ignore_links = True
+        self.inside_pre = False
+        self.inside_code = False
 
-def get_content_of_website(html, word_count_threshold = MIN_WORD_THRESHOLD):
+    def handle_tag(self, tag, attrs, start):
+        if tag == 'pre':
+            if start:
+                self.o('```\n')
+                self.inside_pre = True
+            else:
+                self.o('\n```')
+                self.inside_pre = False
+        # elif tag == 'code' and not self.inside_pre:
+        #     if start:
+        #         if not self.inside_pre:
+        #             self.o('`')
+        #         self.inside_code = True
+        #     else:
+        #         if not self.inside_pre:
+        #             self.o('`')
+        #         self.inside_code = False
+
+        super().handle_tag(tag, attrs, start)
+
+def get_content_of_website(html, word_count_threshold = MIN_WORD_THRESHOLD, css_selector = None):
     try:
+        if not html:
+            return None
         # Parse HTML content with BeautifulSoup
         soup = BeautifulSoup(html, 'html.parser')
 
         # Get the content within the <body> tag
         body = soup.body
+        
+        # If css_selector is provided, extract content based on the selector
+        if css_selector:
+            selected_elements = body.select(css_selector)
+            if not selected_elements:
+                raise InvalidCSSSelectorError(f"Invalid CSS selector , No elements found for CSS selector: {css_selector}")
+            div_tag = soup.new_tag('div')
+            for el in selected_elements:
+                div_tag.append(el)
+            body = div_tag
 
         # Remove script, style, and other tags that don't carry useful content from body
         for tag in body.find_all(['script', 'style', 'link', 'meta', 'noscript']):
@@ -139,17 +188,28 @@ def get_content_of_website(html, word_count_threshold = MIN_WORD_THRESHOLD):
             else:
                 img.decompose()
 
+
+        # Create a function that replace content of all"pre" tage with its inner text
+        def replace_pre_tags_with_text(node):
+            for child in node.find_all('pre'):
+                # set child inner html to its text
+                child.string = child.get_text()
+            return node
+        
+        # Replace all "pre" tags with their inner text
+        body = replace_pre_tags_with_text(body)
+
         # Recursively remove empty elements, their parent elements, and elements with word count below threshold
-        def remove_empty_and_low_word_count_elements(node):
+        def remove_empty_and_low_word_count_elements(node, word_count_threshold):
             for child in node.contents:
                 if isinstance(child, element.Tag):
-                    remove_empty_and_low_word_count_elements(child)
+                    remove_empty_and_low_word_count_elements(child, word_count_threshold)
                     word_count = len(child.get_text(strip=True).split())
                     if (len(child.contents) == 0 and not child.get_text(strip=True)) or word_count < word_count_threshold:
                         child.decompose()
             return node
 
-        body = remove_empty_and_low_word_count_elements(body)
+        body = remove_empty_and_low_word_count_elements(body, word_count_threshold)
         
         def remove_small_text_tags(body: Tag, word_count_threshold: int = MIN_WORD_THRESHOLD):
             # We'll use a list to collect all tags that don't meet the word count requirement
@@ -214,9 +274,11 @@ def get_content_of_website(html, word_count_threshold = MIN_WORD_THRESHOLD):
             return node
 
         body = flatten_nested_elements(body)
+        
+
 
         # Remove comments
-        for comment in soup.find_all(text=lambda text: isinstance(text, Comment)):
+        for comment in soup.find_all(string=lambda text: isinstance(text, Comment)): 
             comment.extract()
 
         # Remove consecutive empty newlines and replace multiple spaces with a single space
@@ -228,9 +290,11 @@ def get_content_of_website(html, word_count_threshold = MIN_WORD_THRESHOLD):
 
         # Convert cleaned HTML to Markdown
         h = html2text.HTML2Text()
+        h = CustomHTML2Text()
         h.ignore_links = True
         markdown = h.handle(cleaned_html)
-
+        markdown = markdown.replace('    ```', '```')
+            
         # Return the Markdown content
         return{
             'markdown': markdown,
@@ -240,13 +304,7 @@ def get_content_of_website(html, word_count_threshold = MIN_WORD_THRESHOLD):
 
     except Exception as e:
         print('Error processing HTML content:', str(e))
-        return None
-
-# Example usage
-# word_count_threshold = 5  # Adjust this value according to your desired threshold
-# markdown_content = get_content_of_website(word_count_threshold)
-# print(markdown_content)
-
+        raise InvalidCSSSelectorError(f"Invalid CSS selector: {css_selector}") from e
 
 def extract_xml_tags(string):
     tags = re.findall(r'<(\w+)>', string)
@@ -265,17 +323,16 @@ def extract_xml_data(tags, string):
 
     return data
     
-import time
-import litellm
-
 # Function to perform the completion with exponential backoff
 def perform_completion_with_backoff(provider, prompt_with_variables, api_token):
+    from litellm import completion 
+    from litellm.exceptions import RateLimitError
     max_attempts = 3
     base_delay = 2  # Base delay in seconds, you can adjust this based on your needs
     
     for attempt in range(max_attempts):
         try:
-            response = completion(
+            response =completion(
                 model=provider,
                 messages=[
                     {"role": "user", "content": prompt_with_variables}
@@ -284,7 +341,7 @@ def perform_completion_with_backoff(provider, prompt_with_variables, api_token):
                 api_key=api_token
             )
             return response  # Return the successful response
-        except litellm.exceptions.RateLimitError as e:
+        except RateLimitError as e:
             print("Rate limit error:", str(e))
             
             # Check if we have exhausted our max attempts
@@ -318,23 +375,6 @@ def extract_blocks(url, html, provider = DEFAULT_PROVIDER, api_token = None):
         
     response = perform_completion_with_backoff(provider, prompt_with_variables, api_token)
         
-    # try:
-    #     response = completion(
-    #         model = provider,
-    #         messages = [
-    #             {"role": "user", "content": prompt_with_variables}
-    #         ],
-    #         temperature = 0.01,
-    #         api_key = api_token
-    #     )
-    # except litellm.exceptions.RateLimitError as e:
-    #     print("Rate limit error:", str(e))
-    #     return [{
-    #         "index": 0,
-    #         "tags": ["error"],
-    #         "content": ["Rate limit error. Please try again later."]
-    #     }]
-
     try:
         blocks = extract_xml_data(["blocks"], response.choices[0].message.content)['blocks']
         blocks = json.loads(blocks)
@@ -357,7 +397,7 @@ def extract_blocks(url, html, provider = DEFAULT_PROVIDER, api_token = None):
 
 def extract_blocks_batch(batch_data, provider = "groq/llama3-70b-8192", api_token = None):
     api_token = os.getenv('GROQ_API_KEY', None) if not api_token else api_token
-    
+    from litellm import batch_completion
     messages = []
     
     for url, html in batch_data:        
@@ -398,3 +438,49 @@ def extract_blocks_batch(batch_data, provider = "groq/llama3-70b-8192", api_toke
         all_blocks.append(blocks)
     
     return sum(all_blocks, [])
+
+
+def merge_chunks_based_on_token_threshold(chunks, token_threshold):
+    """
+    Merges small chunks into larger ones based on the total token threshold.
+
+    :param chunks: List of text chunks to be merged based on token count.
+    :param token_threshold: Max number of tokens for each merged chunk.
+    :return: List of merged text chunks.
+    """
+    merged_sections = []
+    current_chunk = []
+    total_token_so_far = 0
+
+    for chunk in chunks:
+        chunk_token_count = len(chunk.split()) * 1.3  # Estimate token count with a factor
+        if total_token_so_far + chunk_token_count < token_threshold:
+            current_chunk.append(chunk)
+            total_token_so_far += chunk_token_count
+        else:
+            if current_chunk:
+                merged_sections.append('\n\n'.join(current_chunk))
+            current_chunk = [chunk]
+            total_token_so_far = chunk_token_count
+
+    # Add the last chunk if it exists
+    if current_chunk:
+        merged_sections.append('\n\n'.join(current_chunk))
+
+    return merged_sections
+
+def process_sections(url: str, sections: list, provider: str, api_token: str) -> list:
+    extracted_content = []
+    if provider.startswith("groq/"):
+        # Sequential processing with a delay
+        for section in sections:
+            extracted_content.extend(extract_blocks(url, section, provider, api_token))
+            time.sleep(0.5)  # 500 ms delay between each processing
+    else:
+        # Parallel processing using ThreadPoolExecutor
+        with ThreadPoolExecutor() as executor:
+            futures = [executor.submit(extract_blocks, url, section, provider, api_token) for section in sections]
+            for future in as_completed(futures):
+                extracted_content.extend(future.result())
+    
+    return extracted_content

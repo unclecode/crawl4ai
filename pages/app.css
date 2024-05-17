@@ -1,0 +1,131 @@
+:root {
+    --ifm-font-size-base: 100%;
+    --ifm-line-height-base: 1.65;
+    --ifm-font-family-base: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif,
+        BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+        "Segoe UI Symbol";
+}
+html {
+    -webkit-font-smoothing: antialiased;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    font: var(--ifm-font-size-base) / var(--ifm-line-height-base) var(--ifm-font-family-base);
+}
+body {
+    background-color: #1a202c;
+    color: #fff;
+}
+.tab-content {
+    max-height: 400px;
+    overflow: auto;
+}
+pre {
+    white-space: pre-wrap;
+    font-size: 14px;
+}
+pre code {
+    width: 100%;
+}
+
+/* Custom styling for docs-item class and Markdown generated elements */
+.docs-item {
+    background-color: #2d3748; /* bg-gray-800 */
+    padding: 1rem; /* p-4 */
+    border-radius: 0.375rem; /* rounded */
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* shadow-md */
+    margin-bottom: 1rem; /* space between items */
+    line-height: 1.5; /* leading-normal */
+}
+
+.docs-item h3,
+.docs-item h4 {
+    color: #ffffff; /* text-white */
+    font-size: 1.25rem; /* text-xl */
+    font-weight: 700; /* font-bold */
+    margin-bottom: 0.5rem; /* mb-2 */
+}
+.docs-item h4 {
+    font-size: 1rem; /* text-xl */
+}
+
+.docs-item p {
+    color: #e2e8f0; /* text-gray-300 */
+    margin-bottom: 0.5rem; /* mb-2 */
+}
+
+.docs-item code {
+    background-color: #1a202c; /* bg-gray-900 */
+    color: #e2e8f0; /* text-gray-300 */
+    padding: 0.25rem 0.5rem; /* px-2 py-1 */
+    border-radius: 0.25rem; /* rounded */
+    font-size: 0.875rem; /* text-sm */
+}
+
+.docs-item pre {
+    background-color: #1a202c; /* bg-gray-900 */
+    color: #e2e8f0; /* text-gray-300 */
+    padding: 0.5rem; /* p-2 */
+    border-radius: 0.375rem; /* rounded */
+    overflow: auto; /* overflow-auto */
+    margin-bottom: 0.5rem; /* mb-2 */
+}
+
+.docs-item div {
+    color: #e2e8f0; /* text-gray-300 */
+    font-size: 1rem; /* prose prose-sm */
+    line-height: 1.25rem; /* line-height for readability */
+}
+
+/* Adjustments to make prose class more suitable for dark mode */
+.prose {
+    max-width: none; /* max-w-none */
+}
+
+.prose p,
+.prose ul {
+    margin-bottom: 1rem; /* mb-4 */
+}
+
+.prose code {
+    /* background-color: #4a5568; */ /* bg-gray-700 */
+    color: #65a30d; /* text-white */
+    padding: 0.25rem 0.5rem; /* px-1 py-0.5 */
+    border-radius: 0.25rem; /* rounded */
+    display: inline-block; /* inline-block */
+}
+
+.prose pre {
+    background-color: #1a202c; /* bg-gray-900 */
+    color: #ffffff; /* text-white */
+    padding: 0.5rem; /* p-2 */
+    border-radius: 0.375rem; /* rounded */
+}
+
+.prose h3 {
+    color: #65a30d; /* text-white */
+    font-size: 1.25rem; /* text-xl */
+    font-weight: 700; /* font-bold */
+    margin-bottom: 0.5rem; /* mb-2 */
+}
+
+body {
+    background-color: #1a1a1a;
+    color: #b3ff00;
+}
+.sidebar {
+    color: #b3ff00;
+    border-right: 1px solid #333;
+}
+.sidebar a {
+    color: #b3ff00;
+    text-decoration: none;
+}
+.sidebar a:hover {
+    background-color: #555;
+}
+.content-section {
+    display: none;
+}
+.content-section.active {
+    display: block;
+}

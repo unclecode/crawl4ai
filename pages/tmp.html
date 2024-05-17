@@ -1,0 +1,434 @@
+<div class="w-3/4 p-4">
+    <section id="installation" class="content-section active">
+        <h1 class="text-2xl font-bold">Installation 💻</h1>
+        <p class="mb-4">There are three ways to use Crawl4AI:</p>
+        <ol class="list-decimal list-inside mb-4">
+            <li class="">As a library</li>
+            <li class="">As a local server (Docker)</li>
+            <li class="">
+                As a Google Colab notebook.
+                <a href="https://colab.research.google.com/drive/1wz8u30rvbq6Scodye9AGCw8Qg_Z8QGsk"
+                    ><img
+                        src="https://colab.research.google.com/assets/colab-badge.svg"
+                        alt="Open In Colab"
+                        style="display: inline-block; width: 100px; height: 20px"
+                /></a>
+            </li>
+            <p></p>
+
+            <p class="my-4">To install Crawl4AI as a library, follow these steps:</p>
+
+            <ol class="list-decimal list-inside mb-4">
+                <li class="mb-4">
+                    Install the package from GitHub:
+                    <pre
+                        class="bg-zinc-800 p-4 rounded mt-2 text-zinc-100"
+                    ><code class="hljs language-bash">pip install git+https://github.com/unclecode/crawl4ai.git</code></pre>
+                </li>
+                <li class="mb-4">
+                    Alternatively, you can clone the repository and install the package locally:
+                    <pre
+                        class="bg-zinc-800 p-4 rounded mt-2 text-zinc-100"
+                    ><code class="language-python bash hljs">virtualenv venv
+source venv/<span class="hljs-built_in">bin</span>/activate
+git clone https://github.com/unclecode/crawl4ai.git
+cd crawl4ai
+pip install -e .
+</code></pre>
+                </li>
+                <li class="">
+                    Use docker to run the local server:
+                    <pre
+                        class="bg-zinc-800 p-4 rounded mt-2 text-zinc-100"
+                    ><code class="language-python bash hljs">docker build -t crawl4ai . 
+<span class="hljs-comment"># docker build --platform linux/amd64 -t crawl4ai . For Mac users</span>
+docker run -d -p <span class="hljs-number">8000</span>:<span class="hljs-number">80</span> crawl4ai</code></pre>
+                </li>
+            </ol>
+            <p class="mb-4">
+                For more information about how to run Crawl4AI as a local server, please refer to the
+                <a href="https://github.com/unclecode/crawl4ai" class="text-blue-400">GitHub repository</a>.
+            </p>
+        </ol>
+    </section>
+    <section id="how-to-guide" class="content-section">
+        <h1 class="text-2xl font-bold">How to Guide</h1>
+        <div class="flex flex-col gap-4 p-4 bg-zinc-900 text-lime-500">
+            <!-- Step 1 -->
+            <div class="col-span-2 bg-lime-800 p-2 rounded text-zinc-50">
+                🌟
+                <strong>Welcome to the Crawl4ai Quickstart Guide! Let's dive into some web crawling fun!</strong>
+            </div>
+            <div class="">
+                First Step: Create an instance of WebCrawler and call the
+                <code>warmup()</code> function.
+            </div>
+            <div>
+                <pre><code class="language-python hljs">crawler = WebCrawler()
+crawler.warmup()</code></pre>
+            </div>
+
+            <!-- Step 2 -->
+            <div class="col-span-2 bg-lime-800 p-2 rounded text-zinc-50">
+                🧠 <strong>Understanding 'bypass_cache' and 'include_raw_html' parameters:</strong>
+            </div>
+            <div class="">First crawl (caches the result):</div>
+            <div>
+                <pre><code class="language-python hljs">result = crawler.run(url=<span class="hljs-string">"https://www.nbcnews.com/business"</span>)</code></pre>
+            </div>
+            <div class="">Second crawl (Force to crawl again):</div>
+            <div>
+                <pre><code class="language-python hljs">result = crawler.run(url=<span class="hljs-string">"https://www.nbcnews.com/business"</span>, bypass_cache=<span class="hljs-literal">True</span>)</code></pre>
+                <div class="bg-red-900 p-2 text-zinc-50">
+                    ⚠️ Don't forget to set <code>`bypass_cache`</code> to True if you want to try different strategies
+                    for the same URL. Otherwise, the cached result will be returned. You can also set
+                    <code>`always_by_pass_cache`</code> in constructor to True to always bypass the cache.
+                </div>
+            </div>
+            <div class="">Crawl result without raw HTML content:</div>
+            <div>
+                <pre><code class="language-python hljs">result = crawler.run(url=<span class="hljs-string">"https://www.nbcnews.com/business"</span>, include_raw_html=<span class="hljs-literal">False</span>)</code></pre>
+            </div>
+
+            <!-- Step 3 -->
+            <div class="col-span-2 bg-lime-800 p-2 rounded text-zinc-50">
+                📄
+                <strong
+                    >The 'include_raw_html' parameter, when set to True, includes the raw HTML content in the response.
+                    By default, it is set to True.</strong
+                >
+            </div>
+            <div class="">Set <code>always_by_pass_cache</code> to True:</div>
+            <div>
+                <pre><code class="language-python hljs">crawler.always_by_pass_cache = <span class="hljs-literal">True</span></code></pre>
+            </div>
+
+            <!-- Step 4 -->
+            <div class="col-span-2 bg-lime-800 p-2 rounded text-zinc-50">
+                🧩 <strong>Let's add a chunking strategy: RegexChunking!</strong>
+            </div>
+            <div class="">Using RegexChunking:</div>
+            <div>
+                <pre><code class="language-python hljs">result = crawler.run(
+url=<span class="hljs-string">"https://www.nbcnews.com/business"</span>,
+chunking_strategy=RegexChunking(patterns=[<span class="hljs-string">"\n\n"</span>])
+)</code></pre>
+            </div>
+            <div class="">Using NlpSentenceChunking:</div>
+            <div>
+                <pre><code class="language-python hljs">result = crawler.run(
+url=<span class="hljs-string">"https://www.nbcnews.com/business"</span>,
+chunking_strategy=NlpSentenceChunking()
+)</code></pre>
+            </div>
+
+            <!-- Step 5 -->
+            <div class="col-span-2 bg-lime-800 p-2 rounded text-zinc-50">
+                🧠 <strong>Let's get smarter with an extraction strategy: CosineStrategy!</strong>
+            </div>
+            <div class="">Using CosineStrategy:</div>
+            <div>
+                <pre><code class="language-python hljs">result = crawler.run(
+url=<span class="hljs-string">"https://www.nbcnews.com/business"</span>,
+extraction_strategy=CosineStrategy(word_count_threshold=<span class="hljs-number">20</span>, max_dist=<span class="hljs-number">0.2</span>, linkage_method=<span class="hljs-string">"ward"</span>, top_k=<span class="hljs-number">3</span>)
+)</code></pre>
+            </div>
+
+            <!-- Step 6 -->
+            <div class="col-span-2 bg-lime-800 p-2 rounded text-zinc-50">
+                🤖
+                <strong>Time to bring in the big guns: LLMExtractionStrategy without instructions!</strong>
+            </div>
+            <div class="">Using LLMExtractionStrategy without instructions:</div>
+            <div>
+                <pre><code class="language-python hljs">result = crawler.run(
+url=<span class="hljs-string">"https://www.nbcnews.com/business"</span>,
+extraction_strategy=LLMExtractionStrategy(provider=<span class="hljs-string">"openai/gpt-4o"</span>, api_token=os.getenv(<span class="hljs-string">'OPENAI_API_KEY'</span>))
+)</code></pre>
+            </div>
+
+            <!-- Step 7 -->
+            <div class="col-span-2 bg-lime-800 p-2 rounded text-zinc-50">
+                📜
+                <strong>Let's make it even more interesting: LLMExtractionStrategy with instructions!</strong>
+            </div>
+            <div class="">Using LLMExtractionStrategy with instructions:</div>
+            <div>
+                <pre><code class="language-python hljs">result = crawler.run(
+url=<span class="hljs-string">"https://www.nbcnews.com/business"</span>,
+extraction_strategy=LLMExtractionStrategy(
+provider=<span class="hljs-string">"openai/gpt-4o"</span>,
+api_token=os.getenv(<span class="hljs-string">'OPENAI_API_KEY'</span>),
+instruction=<span class="hljs-string">"I am interested in only financial news"</span>
+)
+)</code></pre>
+            </div>
+
+            <!-- Step 8 -->
+            <div class="col-span-2 bg-lime-800 p-2 rounded text-zinc-50">
+                🎯
+                <strong>Targeted extraction: Let's use a CSS selector to extract only H2 tags!</strong>
+            </div>
+            <div class="">Using CSS selector to extract H2 tags:</div>
+            <div>
+                <pre><code class="language-python hljs">result = crawler.run(
+url=<span class="hljs-string">"https://www.nbcnews.com/business"</span>,
+css_selector=<span class="hljs-string">"h2"</span>
+)</code></pre>
+            </div>
+
+            <!-- Step 9 -->
+            <div class="col-span-2 bg-lime-800 p-2 rounded text-zinc-50">
+                🖱️
+                <strong>Let's get interactive: Passing JavaScript code to click 'Load More' button!</strong>
+            </div>
+            <div class="">Using JavaScript to click 'Load More' button:</div>
+            <div>
+                <pre><code class="language-python hljs">js_code = <span class="hljs-string">"""
+const loadMoreButton = Array.from(document.querySelectorAll('button')).find(button =&gt; button.textContent.includes('Load More'));
+loadMoreButton &amp;&amp; loadMoreButton.click();
+"""</span>
+crawler_strategy = LocalSeleniumCrawlerStrategy(js_code=js_code)
+crawler = WebCrawler(crawler_strategy=crawler_strategy, always_by_pass_cache=<span class="hljs-literal">True</span>)
+result = crawler.run(url=<span class="hljs-string">"https://www.nbcnews.com/business"</span>)</code></pre>
+            </div>
+
+            <!-- Conclusion -->
+            <div class="col-span-2 bg-lime-800 p-2 rounded text-zinc-50">
+                🎉
+                <strong
+                    >Congratulations! You've made it through the Crawl4ai Quickstart Guide! Now go forth and crawl the
+                    web like a pro! 🕸️</strong
+                >
+            </div>
+        </div>
+    </section>
+
+    <section id="chunking-strategies" class="content-section">
+        <div class="bg-zinc-800 p-4 rounded shadow-md docs-item">
+            <div class="text-gray-300 prose prose-sm">
+                <h3>RegexChunking</h3>
+                <p>
+                    <code>RegexChunking</code> is a text chunking strategy that splits a given text into smaller parts
+                    using regular expressions. This is useful for preparing large texts for processing by language
+                    models, ensuring they are divided into manageable segments.
+                </p>
+                <h4>Constructor Parameters:</h4>
+                <ul>
+                    <li>
+                        <code>patterns</code> (list, optional): A list of regular expression patterns used to split the
+                        text. Default is to split by double newlines (<code>['\n\n']</code>).
+                    </li>
+                </ul>
+                <h4>Example usage:</h4>
+                <pre><code class="language-python">chunker = RegexChunking(patterns=[r'\n\n', r'\. '])
+chunks = chunker.chunk("This is a sample text. It will be split into chunks.")
+</code></pre>
+            </div>
+        </div>
+        <div class="bg-zinc-800 p-4 rounded shadow-md docs-item">
+            <div class="text-gray-300 prose prose-sm">
+                <h3>NlpSentenceChunking</h3>
+                <p>
+                    <code>NlpSentenceChunking</code> uses a natural language processing model to chunk a given text into
+                    sentences. This approach leverages SpaCy to accurately split text based on sentence boundaries.
+                </p>
+                <h4>Constructor Parameters:</h4>
+                <ul>
+                    <li>
+                        None.
+                    </li>
+                </ul>
+                <h4>Example usage:</h4>
+                <pre><code class="language-python">chunker = NlpSentenceChunking()
+chunks = chunker.chunk("This is a sample text. It will be split into sentences.")
+</code></pre>
+            </div>
+        </div>
+        <div class="bg-zinc-800 p-4 rounded shadow-md docs-item">
+            <div class="text-gray-300 prose prose-sm">
+                <h3>TopicSegmentationChunking</h3>
+                <p>
+                    <code>TopicSegmentationChunking</code> uses the TextTiling algorithm to segment a given text into
+                    topic-based chunks. This method identifies thematic boundaries in the text.
+                </p>
+                <h4>Constructor Parameters:</h4>
+                <ul>
+                    <li>
+                        <code>num_keywords</code> (int, optional): The number of keywords to extract for each topic
+                        segment. Default is <code>3</code>.
+                    </li>
+                </ul>
+                <h4>Example usage:</h4>
+                <pre><code class="language-python">chunker = TopicSegmentationChunking(num_keywords=3)
+chunks = chunker.chunk("This is a sample text. It will be split into topic-based segments.")
+</code></pre>
+            </div>
+        </div>
+        <div class="bg-zinc-800 p-4 rounded shadow-md docs-item">
+            <div class="text-gray-300 prose prose-sm">
+                <h3>FixedLengthWordChunking</h3>
+                <p>
+                    <code>FixedLengthWordChunking</code> splits a given text into chunks of fixed length, based on the
+                    number of words.
+                </p>
+                <h4>Constructor Parameters:</h4>
+                <ul>
+                    <li>
+                        <code>chunk_size</code> (int, optional): The number of words in each chunk. Default is
+                        <code>100</code>.
+                    </li>
+                </ul>
+                <h4>Example usage:</h4>
+                <pre><code class="language-python">chunker = FixedLengthWordChunking(chunk_size=100)
+chunks = chunker.chunk("This is a sample text. It will be split into fixed-length word chunks.")
+</code></pre>
+            </div>
+        </div>
+        <div class="bg-zinc-800 p-4 rounded shadow-md docs-item">
+            <div class="text-gray-300 prose prose-sm">
+                <h3>SlidingWindowChunking</h3>
+                <p>
+                    <code>SlidingWindowChunking</code> uses a sliding window approach to chunk a given text. Each chunk
+                    has a fixed length, and the window slides by a specified step size.
+                </p>
+                <h4>Constructor Parameters:</h4>
+                <ul>
+                    <li>
+                        <code>window_size</code> (int, optional): The number of words in each chunk. Default is
+                        <code>100</code>.
+                    </li>
+                    <li>
+                        <code>step</code> (int, optional): The number of words to slide the window. Default is
+                        <code>50</code>.
+                    </li>
+                </ul>
+                <h4>Example usage:</h4>
+                <pre><code class="language-python">chunker = SlidingWindowChunking(window_size=100, step=50)
+chunks = chunker.chunk("This is a sample text. It will be split using a sliding window approach.")
+</code></pre>
+            </div>
+        </div>
+    </section>
+    <section id="extraction-strategies" class="content-section">
+        <div class="bg-zinc-800 p-4 rounded shadow-md docs-item">
+            <div class="text-gray-300 prose prose-sm">
+                <h3>NoExtractionStrategy</h3>
+                <p>
+                    <code>NoExtractionStrategy</code> is a basic extraction strategy that returns the entire HTML
+                    content without any modification. It is useful for cases where no specific extraction is required.
+                    Only clean html, and amrkdown.
+                </p>
+                <h4>Constructor Parameters:</h4>
+                <p>None.</p>
+                <h4>Example usage:</h4>
+                <pre><code class="language-python">extractor = NoExtractionStrategy()
+extracted_content = extractor.extract(url, html)
+</code></pre>
+            </div>
+        </div>
+        <div class="bg-zinc-800 p-4 rounded shadow-md docs-item">
+            <div class="text-gray-300 prose prose-sm">
+                <h3>LLMExtractionStrategy</h3>
+                <p>
+                    <code>LLMExtractionStrategy</code> uses a Language Model (LLM) to extract meaningful blocks or
+                    chunks from the given HTML content. This strategy leverages an external provider for language model
+                    completions.
+                </p>
+                <h4>Constructor Parameters:</h4>
+                <ul>
+                    <li>
+                        <code>provider</code> (str, optional): The provider to use for the language model completions.
+                        Default is <code>DEFAULT_PROVIDER</code> (e.g., openai/gpt-4).
+                    </li>
+                    <li>
+                        <code>api_token</code> (str, optional): The API token for the provider. If not provided, it will
+                        try to load from the environment variable <code>OPENAI_API_KEY</code>.
+                    </li>
+                    <li>
+                        <code>instruction</code> (str, optional): An instruction to guide the LLM on how to perform the
+                        extraction. This allows users to specify the type of data they are interested in or set the tone
+                        of the response. Default is <code>None</code>.
+                    </li>
+                </ul>
+                <h4>Example usage:</h4>
+                <pre><code class="language-python">extractor = LLMExtractionStrategy(provider='openai', api_token='your_api_token', instruction='Extract only news about AI.')
+extracted_content = extractor.extract(url, html)
+</code></pre>
+                <p>
+                    By providing clear instructions, users can tailor the extraction process to their specific needs,
+                    enhancing the relevance and utility of the extracted content.
+                </p>
+            </div>
+        </div>
+        <div class="bg-zinc-800 p-4 rounded shadow-md docs-item">
+            <div class="text-gray-300 prose prose-sm">
+                <h3>CosineStrategy</h3>
+                <p>
+                    <code>CosineStrategy</code> uses hierarchical clustering based on cosine similarity to extract
+                    clusters of text from the given HTML content. This strategy is suitable for identifying related
+                    content sections.
+                </p>
+                <h4>Constructor Parameters:</h4>
+                <ul>
+                    <li>
+                        <code>semantic_filter</code> (str, optional): A string containing keywords for filtering relevant
+                        documents before clustering. If provided, documents are filtered based on their cosine
+                        similarity to the keyword filter embedding. Default is <code>None</code>.
+                    </li>
+                    <li>
+                        <code>word_count_threshold</code> (int, optional): Minimum number of words per cluster. Default
+                        is <code>20</code>.
+                    </li>
+                    <li>
+                        <code>max_dist</code> (float, optional): The maximum cophenetic distance on the dendrogram to
+                        form clusters. Default is <code>0.2</code>.
+                    </li>
+                    <li>
+                        <code>linkage_method</code> (str, optional): The linkage method for hierarchical clustering.
+                        Default is <code>'ward'</code>.
+                    </li>
+                    <li>
+                        <code>top_k</code> (int, optional): Number of top categories to extract. Default is
+                        <code>3</code>.
+                    </li>
+                    <li>
+                        <code>model_name</code> (str, optional): The model name for embedding generation. Default is
+                        <code>'BAAI/bge-small-en-v1.5'</code>.
+                    </li>
+                </ul>
+                <h4>Example usage:</h4>
+                <pre><code class="language-python">extractor = CosineStrategy(semantic_filter='artificial intelligence', word_count_threshold=10, max_dist=0.2, linkage_method='ward', top_k=3, model_name='BAAI/bge-small-en-v1.5')
+extracted_content = extractor.extract(url, html)
+</code></pre>
+                <h4>Cosine Similarity Filtering</h4>
+                <p>
+                    When a <code>semantic_filter</code> is provided, the <code>CosineStrategy</code> applies an
+                    embedding-based filtering process to select relevant documents before performing hierarchical
+                    clustering.
+                </p>
+            </div>
+        </div>
+        <div class="bg-zinc-800 p-4 rounded shadow-md docs-item">
+            <div class="text-gray-300 prose prose-sm">
+                <h3>TopicExtractionStrategy</h3>
+                <p>
+                    <code>TopicExtractionStrategy</code> uses the TextTiling algorithm to segment the HTML content into
+                    topics and extracts keywords for each segment. This strategy is useful for identifying and
+                    summarizing thematic content.
+                </p>
+                <h4>Constructor Parameters:</h4>
+                <ul>
+                    <li>
+                        <code>num_keywords</code> (int, optional): Number of keywords to represent each topic segment.
+                        Default is <code>3</code>.
+                    </li>
+                </ul>
+                <h4>Example usage:</h4>
+                <pre><code class="language-python">extractor = TopicExtractionStrategy(num_keywords=3)
+extracted_content = extractor.extract(url, html)
+</code></pre>
+            </div>
+        </div>
+    </section>
+</div>
