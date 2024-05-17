@@ -1,4 +1,7 @@
 from setuptools import setup, find_packages
+import os
+import subprocess
+from setuptools.command.install import install
 
 # Read the requirements from requirements.txt
 with open("requirements.txt") as f:
@@ -9,6 +12,12 @@ requirements_without_torch = [req for req in requirements if not req.startswith(
 requirements_without_transformers = [req for req in requirements if not req.startswith("transformers")]
 requirements_without_nltk = [req for req in requirements if not req.startswith("nltk")]
 requirements_without_torch_transformers_nlkt = [req for req in requirements if not req.startswith("torch") and not req.startswith("transformers") and not req.startswith("nltk")]
+
+class CustomInstallCommand(install):
+    """Customized setuptools install command to install spacy without dependencies."""
+    def run(self):
+        install.run(self)
+        subprocess.check_call([os.sys.executable, '-m', 'pip', 'install', 'spacy', '--no-deps'])
 
 setup(
     name="Crawl4AI",
@@ -26,6 +35,9 @@ setup(
         "all": requirements,  # Include all requirements
         "colab": requirements_without_torch,  # Exclude torch for Colab
         "crawl": requirements_without_torch_transformers_nlkt
+    },
+    cmdclass={
+        'install': CustomInstallCommand,
     },
     entry_points={
         'console_scripts': [
