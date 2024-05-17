@@ -31,7 +31,7 @@ from crawl4ai import WebCrawler
 crawler = WebCrawler()
 
 # Run the crawler with keyword filtering and CSS selector
-result = crawler.run(url="https://www.example.com")
+result = crawler.run(url="https://www.nbcnews.com/business")
 print(result) # {url, html, markdown, extracted_content, metadata}
 ```
 
@@ -63,7 +63,7 @@ crawler = WebCrawler(crawler_strategy=crawler_strategy)
 
 # Run the crawler with keyword filtering and CSS selector
 result = crawler.run(
-    url="https://www.example.com",
+    url="https://www.nbcnews.com/business",
     extraction_strategy=CosineStrategy(
         semantic_filter="technology",
     ),
@@ -71,7 +71,7 @@ result = crawler.run(
 
 # Run the crawler with LLM extraction strategy
 result = crawler.run(
-    url="https://www.example.com",
+    url="https://www.nbcnews.com/business",
     extraction_strategy=LLMExtractionStrategy(
         provider="openai/gpt-4o",
         api_token=os.getenv('OPENAI_API_KEY'),
@@ -93,16 +93,16 @@ With Crawl4AI, you can perform advanced web crawling and data extraction tasks w
 
 ## Table of Contents
 
-1. [Features](#features)
-2. [Installation](#installation)
-3. [REST API/Local Server](#using-the-local-server-ot-rest-api)
-4. [Python Library Usage](#usage)
-5. [Parameters](#parameters)
-6. [Chunking Strategies](#chunking-strategies)
-7. [Extraction Strategies](#extraction-strategies)
-8. [Contributing](#contributing)
-9. [License](#license)
-10. [Contact](#contact)
+1. [Features](#features-)
+2. [Installation](#installation-)
+3. [REST API/Local Server](#using-the-local-server-ot-rest-api-)
+4. [Python Library Usage](#python-library-usage-)
+5. [Parameters](#parameters-)
+6. [Chunking Strategies](#chunking-strategies-)
+7. [Extraction Strategies](#extraction-strategies-)
+8. [Contributing](#contributing-)
+9. [License](#license-)
+10. [Contact](#contact-)
 
 
 ## Features ✨
@@ -168,7 +168,7 @@ To use the REST API, send a POST request to `https://crawl4ai.com/crawl` with th
 **Example Request:**
 ```json
 {
-    "urls": ["https://www.example.com"],
+    "urls": ["https://www.nbcnews.com/business"],
     "include_raw_html": false,
     "bypass_cache": true,
     "word_count_threshold": 5,
@@ -195,7 +195,7 @@ To use the REST API, send a POST request to `https://crawl4ai.com/crawl` with th
     "status": "success",
     "data": [
         {
-            "url": "https://www.example.com",
+            "url": "https://www.nbcnews.com/business",
             "extracted_content": "...",
             "html": "...",
             "markdown": "...",

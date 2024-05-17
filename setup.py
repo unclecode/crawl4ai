@@ -12,7 +12,7 @@ requirements_without_torch_transformers_nlkt = [req for req in requirements if n
 
 setup(
     name="Crawl4AI",
-    version="0.1.2",
+    version="0.2.0",
     description="🔥🕷️ Crawl4AI: Open-source LLM Friendly Web Crawler & Scrapper",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
