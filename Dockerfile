@@ -24,7 +24,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list \
     && apt-get update \
     && apt-get install -y google-chrome-stable \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && apt install chromium-chromedriver -y
+
+# Install spacy library using pip
+RUN pip install spacy
 
 # Set display port and dbus env to avoid hanging
 ENV DISPLAY=:99
