@@ -14,6 +14,6 @@ rich==13.7.1
 scikit-learn==1.4.2
 selenium==4.20.0
 uvicorn==0.29.0
-# transformers==4.40.2
+transformers==4.40.2
 chromedriver-autoinstaller==0.6.4
-# torch==2.3.0
+torch
