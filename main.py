@@ -44,14 +44,12 @@ def get_crawler():
     return WebCrawler()
 
 class CrawlRequest(BaseModel):
-    urls: List[HttpUrl]
-    provider_model: str
-    api_token: str
+    urls: List[str]
     include_raw_html: Optional[bool] = False
     bypass_cache: bool = False
     extract_blocks: bool = True
     word_count_threshold: Optional[int] = 5
-    extraction_strategy: Optional[str] = "CosineStrategy"
+    extraction_strategy: Optional[str] = "NoExtractionStrategy"
     extraction_strategy_args: Optional[dict] = {}
     chunking_strategy: Optional[str] = "RegexChunking"
     chunking_strategy_args: Optional[dict] = {}
@@ -95,9 +93,6 @@ def import_strategy(module_name: str, class_name: str, *args, **kwargs):
 @app.post("/crawl")
 async def crawl_urls(crawl_request: CrawlRequest, request: Request):
     global current_requests
-    # Raise error if api_token is not provided
-    if not crawl_request.api_token:
-        raise HTTPException(status_code=401, detail="API token is required.")
     async with lock:
         if current_requests >= MAX_CONCURRENT_REQUESTS:
             raise HTTPException(status_code=429, detail="Too many requests - please try again later.")
