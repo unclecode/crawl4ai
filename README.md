@@ -462,7 +462,7 @@ extracted_content = extractor.extract(url, html)
 
 **Example usage:**
 ```python
-extractor = CosineStrategy(semantic_filter='artificial intelligence', word_count_threshold=10, max_dist=0.2, linkage_method='ward', top_k=3, model_name='BAAI/bge-small-en-v1.5')
+extractor = CosineStrategy(semantic_filter='finance rental prices', word_count_threshold=10, max_dist=0.2, linkage_method='ward', top_k=3, model_name='BAAI/bge-small-en-v1.5')
 extracted_content = extractor.extract(url, html)
 ```
 
