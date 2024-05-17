@@ -4,7 +4,6 @@ bs4==0.0.2
 fastapi==0.111.0
 html2text==2024.2.26
 httpx==0.27.0
-lazy_import==0.2.2
 litellm==1.37.11
 nltk==3.8.1
 pydantic==2.7.1
