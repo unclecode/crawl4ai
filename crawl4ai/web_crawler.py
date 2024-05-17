@@ -86,6 +86,7 @@ class WebCrawler:
         **kwargs,
     ) -> CrawlResult:
         extraction_strategy = extraction_strategy or NoExtractionStrategy()
+        extraction_strategy.verbose = verbose
         # Check if extraction strategy is an instance of ExtractionStrategy if not raise an error
         if not isinstance(extraction_strategy, ExtractionStrategy):
             raise ValueError("Unsupported extraction strategy")

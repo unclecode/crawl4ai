@@ -19,6 +19,7 @@ class ExtractionStrategy(ABC):
     def __init__(self, **kwargs):
         self.DEL = "<|DEL|>"
         self.name = self.__class__.__name__
+        self.verbose = kwargs.get("verbose", False)
 
     @abstractmethod
     def extract(self, url: str, html: str, *q, **kwargs) -> List[Dict[str, Any]]:
@@ -61,10 +62,11 @@ class LLMExtractionStrategy(ExtractionStrategy):
         :param api_token: The API token for the provider.
         :param instruction: The instruction to use for the LLM model.
         """
-        super().__init__()    
+        super().__init__() 
         self.provider = provider
         self.api_token = api_token or PROVIDER_MODELS.get(provider, None) or os.getenv("OPENAI_API_KEY")
         self.instruction = instruction
+        self.verbose = kwargs.get("verbose", False)
         
         if not self.api_token:
             raise ValueError("API token must be provided for LLMExtractionStrategy. Update the config.py or set OPENAI_API_KEY environment variable.")
@@ -105,7 +107,8 @@ class LLMExtractionStrategy(ExtractionStrategy):
                     "content": unparsed
                 })
         
-        print("[LOG] Extracted", len(blocks), "blocks from URL:", url, "block index:", ix)
+        if self.verbose:
+            print("[LOG] Extracted", len(blocks), "blocks from URL:", url, "block index:", ix)
         return blocks
     
     def _merge(self, documents):
@@ -171,6 +174,7 @@ class CosineStrategy(ExtractionStrategy):
         self.linkage_method = linkage_method
         self.top_k = top_k
         self.timer = time.time()
+        self.verbose = kwargs.get("verbose", False)
         
         self.buffer_embeddings = np.array([])
 
@@ -180,7 +184,9 @@ class CosineStrategy(ExtractionStrategy):
             self.tokenizer, self.model = load_bge_small_en_v1_5()
 
         self.nlp = load_text_multilabel_classifier()
-        print(f"[LOG] Model loaded {model_name}, models/reuters, took " + str(time.time() - self.timer) + " seconds")
+        
+        if self.verbose:
+            print(f"[LOG] Model loaded {model_name}, models/reuters, took " + str(time.time() - self.timer) + " seconds")
 
     def filter_documents_embeddings(self, documents: List[str], semantic_filter: str, threshold: float = 0.5) -> List[str]:
         """
