@@ -258,6 +258,8 @@ result = crawler.run(
 
 ### Extraction strategy: CosineStrategy
 
+So far, the extracted content is just the result of chunking. To extract meaningful content, you can use extraction strategies. These strategies cluster consecutive chunks into meaningful blocks, keeping the same order as the text in the HTML. This approach is perfect for use in RAG applications and semantical search queries.
+
 Using CosineStrategy:
 ```python
 result = crawler.run(
@@ -368,11 +370,11 @@ chunks = chunker.chunk("This is a sample text. It will be split into chunks.")
 `NlpSentenceChunking` uses a natural language processing model to chunk a given text into sentences. This approach leverages SpaCy to accurately split text based on sentence boundaries.
 
 **Constructor Parameters:**
-- `model` (str, optional): The SpaCy model to use for sentence detection. Default is `'en_core_web_sm'`.
+- None.
 
 **Example usage:**
 ```python
-chunker = NlpSentenceChunking(model='en_core_web_sm')
+chunker = NlpSentenceChunking()
 chunks = chunker.chunk("This is a sample text. It will be split into sentences.")
 ```
 
