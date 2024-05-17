@@ -136,13 +136,13 @@ document.getElementById("crawl-btn").addEventListener("click", () => {
             ).textContent = `curl -X POST -H "Content-Type: application/json" -d '${JSON.stringify({
                 ...data,
                 api_token: isLLMExtraction ? "your_api_token" : undefined,
-            }, null, 2)}' http://crawl4ai.com/crawl`;
+            }, null, 2)}' http://localhost:8000/crawl`;
 
             document.getElementById("python-code").textContent = `import requests\n\ndata = ${JSON.stringify(
                 { ...data, api_token: isLLMExtraction ? "your_api_token" : undefined },
                 null,
                 2
-            )}\n\nresponse = requests.post("http://crawl4ai.com/crawl", json=data) # OR local host if your run locally \nprint(response.json())`;
+            )}\n\nresponse = requests.post("http://localhost:8000/crawl", json=data) # OR local host if your run locally \nprint(response.json())`;
 
             document.getElementById(
                 "nodejs-code"
@@ -150,7 +150,7 @@ document.getElementById("crawl-btn").addEventListener("click", () => {
                 { ...data, api_token: isLLMExtraction ? "your_api_token" : undefined },
                 null,
                 2
-            )};\n\naxios.post("http://crawl4ai.com/crawl", data) // OR local host if your run locally \n    .then(response => console.log(response.data))\n    .catch(error => console.error(error));`;
+            )};\n\naxios.post("http://localhost:8000/crawl", data) // OR local host if your run locally \n    .then(response => console.log(response.data))\n    .catch(error => console.error(error));`;
 
             document.getElementById(
                 "library-code"
