@@ -6,6 +6,9 @@ with open("requirements.txt") as f:
 
 # Define the requirements for different environments
 requirements_without_torch = [req for req in requirements if not req.startswith("torch")]
+requirements_without_transformers = [req for req in requirements if not req.startswith("transformers")]
+requirements_without_nltk = [req for req in requirements if not req.startswith("nltk")]
+requirements_without_torch_transformers_nlkt = [req for req in requirements if not req.startswith("torch") and not req.startswith("transformers") and not req.startswith("nltk")]
 
 setup(
     name="Crawl4AI",
@@ -18,9 +21,11 @@ setup(
     author_email="unclecode@kidocode.com",
     license="MIT",
     packages=find_packages(),
-    install_requires=requirements,
+    install_requires=requirements_without_torch_transformers_nlkt,
     extras_require={
+        "all": requirements,  # Include all requirements
         "colab": requirements_without_torch,  # Exclude torch for Colab
+        "crawl": requirements_without_torch_transformers_nlkt
     },
     entry_points={
         'console_scripts': [
