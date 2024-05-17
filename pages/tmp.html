@@ -236,12 +236,11 @@ chunks = chunker.chunk("This is a sample text. It will be split into chunks.")
                 <h4>Constructor Parameters:</h4>
                 <ul>
                     <li>
-                        <code>model</code> (str, optional): The SpaCy model to use for sentence detection. Default is
-                        <code>'en_core_web_sm'</code>.
+                        None.
                     </li>
                 </ul>
                 <h4>Example usage:</h4>
-                <pre><code class="language-python">chunker = NlpSentenceChunking(model='en_core_web_sm')
+                <pre><code class="language-python">chunker = NlpSentenceChunking()
 chunks = chunker.chunk("This is a sample text. It will be split into sentences.")
 </code></pre>
             </div>
