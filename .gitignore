@@ -174,3 +174,4 @@ requirements0.txt
 a.txt
 
 *.sh
+.idea
