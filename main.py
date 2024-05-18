@@ -2,6 +2,8 @@ import os
 import importlib
 import asyncio
 from functools import lru_cache
+import logging
+logging.basicConfig(level=logging.DEBUG)
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -77,7 +79,7 @@ async def get_total_url_count():
 # Add endpoit to clear db
 @app.get("/clear-db")
 async def clear_database():
-    clear_db()
+    # clear_db()
     return JSONResponse(content={"message": "Database cleared."})
 
 def import_strategy(module_name: str, class_name: str, *args, **kwargs):
@@ -86,12 +88,15 @@ def import_strategy(module_name: str, class_name: str, *args, **kwargs):
         strategy_class = getattr(module, class_name)
         return strategy_class(*args, **kwargs)
     except ImportError:
+        print("ImportError: Module not found.")
         raise HTTPException(status_code=400, detail=f"Module {module_name} not found.")
     except AttributeError:
+        print("AttributeError: Class not found.")
         raise HTTPException(status_code=400, detail=f"Class {class_name} not found in {module_name}.")
 
 @app.post("/crawl")
 async def crawl_urls(crawl_request: CrawlRequest, request: Request):
+    logging.debug(f"[LOG] Crawl request for URL: {crawl_request.urls}")
     global current_requests
     async with lock:
         if current_requests >= MAX_CONCURRENT_REQUESTS:
@@ -99,10 +104,12 @@ async def crawl_urls(crawl_request: CrawlRequest, request: Request):
         current_requests += 1
 
     try:
+        logging.debug("[LOG] Loading extraction and chunking strategies...")
         extraction_strategy = import_strategy("crawl4ai.extraction_strategy", crawl_request.extraction_strategy, **crawl_request.extraction_strategy_args)
         chunking_strategy = import_strategy("crawl4ai.chunking_strategy", crawl_request.chunking_strategy, **crawl_request.chunking_strategy_args)
 
         # Use ThreadPoolExecutor to run the synchronous WebCrawler in async manner
+        logging.debug("[LOG] Running the WebCrawler...")
         with ThreadPoolExecutor() as executor:
             loop = asyncio.get_event_loop()
             futures = [
