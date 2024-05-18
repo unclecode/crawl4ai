@@ -141,7 +141,8 @@ class LLMExtractionStrategy(ExtractionStrategy):
         if self.provider.startswith("groq/"):
             # Sequential processing with a delay
             for ix, section in enumerate(merged_sections):
-                extracted_content.extend(self.extract(ix, url, section))
+                extract_func = partial(self.extract, url)
+                extracted_content.extend(extract_func(ix, section))
                 time.sleep(0.5)  # 500 ms delay between each processing
         else:
             # Parallel processing using ThreadPoolExecutor
@@ -315,6 +316,9 @@ class CosineStrategy(ExtractionStrategy):
         # Convert filtered clusters to a sorted list of dictionaries
         cluster_list = [{"index": int(idx), "tags" : [], "content": " ".join(filtered_clusters[idx])} for idx in sorted(filtered_clusters)]
         
+        if self.verbose:
+            print(f"[LOG] 🚀 Assign tags using {self.device}")
+        
         if self.device == "gpu":
             labels = self.nlp([cluster['content'] for cluster in cluster_list])
             
@@ -322,11 +326,20 @@ class CosineStrategy(ExtractionStrategy):
                 cluster['tags'] = label
         elif self.device == "cpu":
             # Process the text with the loaded model
-            for cluster in  cluster_list:
-                doc = self.nlp(cluster['content'])
+            texts = [cluster['content'] for cluster in cluster_list]
+            # Batch process texts
+            docs = self.nlp.pipe(texts, disable=["tagger", "parser", "ner", "lemmatizer"])
+
+            for doc, cluster in zip(docs, cluster_list):
                 tok_k = self.top_k
                 top_categories = sorted(doc.cats.items(), key=lambda x: x[1], reverse=True)[:tok_k]
                 cluster['tags'] = [cat for cat, _ in top_categories]
+                            
+            # for cluster in  cluster_list:
+            #     doc = self.nlp(cluster['content'])
+            #     tok_k = self.top_k
+            #     top_categories = sorted(doc.cats.items(), key=lambda x: x[1], reverse=True)[:tok_k]
+            #     cluster['tags'] = [cat for cat, _ in top_categories]
         
         if self.verbose:
             print(f"[LOG] 🚀 Categorization done in {time.time() - t:.2f} seconds")

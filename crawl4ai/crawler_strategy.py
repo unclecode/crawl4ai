@@ -42,10 +42,23 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
         self.options = Options()
         self.options.headless = True
         self.options.add_argument("--no-sandbox")
+        self.options.add_argument("--headless")
         self.options.add_argument("--disable-dev-shm-usage")
         self.options.add_argument("--disable-gpu")
         self.options.add_argument("--disable-extensions")
-        self.options.add_argument("--headless")
+        self.options.add_argument("--disable-infobars")
+        self.options.add_argument("--disable-logging")
+        self.options.add_argument("--disable-popup-blocking")
+        self.options.add_argument("--disable-translate")
+        self.options.add_argument("--disable-default-apps")
+        self.options.add_argument("--disable-background-networking")
+        self.options.add_argument("--disable-sync")
+        self.options.add_argument("--disable-features=NetworkService,NetworkServiceInProcess")
+        self.options.add_argument("--disable-browser-side-navigation")
+        self.options.add_argument("--dns-prefetch-disable")
+        self.options.add_argument("--disable-web-security")
+        self.options.add_argument("--log-level=3")
+        self.use_cached_html = use_cached_html
         self.use_cached_html = use_cached_html
         self.js_code = js_code
         self.verbose = kwargs.get("verbose", False)

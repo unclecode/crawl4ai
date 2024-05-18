@@ -171,7 +171,7 @@ def main():
 
     crawler = create_crawler()
 
-    # basic_usage(crawler)
+    basic_usage(crawler)
     understanding_parameters(crawler)
     
     crawler.always_by_pass_cache = True
