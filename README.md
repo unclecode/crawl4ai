@@ -28,7 +28,9 @@ To show the simplicity take a look at the first example:
 from crawl4ai import WebCrawler
 
 # Create the WebCrawler instance 
-crawler = WebCrawler()
+crawler = WebCrawler() 
+
+
 
 # Run the crawler with keyword filtering and CSS selector
 result = crawler.run(url="https://www.nbcnews.com/business")
@@ -156,11 +158,11 @@ pip install -e .[all]
 docker run -d -p 8000:80 crawl4ai
 ```
 
-For more information about how to run Crawl4AI as a local server, please refer to the [GitHub repository](https://github.com/unclecode/crawl4ai).
+
 
 ## Using the Local server ot REST API 🌐
 
-You can also use Crawl4AI through the REST API. This method allows you to send HTTP requests to the Crawl4AI server and receive structured data in response. The base URL for the API is `https://crawl4ai.com/crawl` [COMING SOON]. If you run the local server, you can use `http://localhost:8000/crawl`. (Port is dependent on your docker configuration)
+You can also use Crawl4AI through the REST API. This method allows you to send HTTP requests to the Crawl4AI server and receive structured data in response. The base URL for the API is `https://crawl4ai.com/crawl` [Available now, on a CPU server, of course will be faster on GPU]. If you run the local server, you can use `http://localhost:8000/crawl`. (Port is dependent on your docker configuration)
 
 ### Example Usage
 
