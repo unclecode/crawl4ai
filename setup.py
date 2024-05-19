@@ -21,7 +21,7 @@ class CustomInstallCommand(install):
 
 setup(
     name="Crawl4AI",
-    version="0.2.1",
+    version="0.2.2",
     description="🔥🕷️ Crawl4AI: Open-source LLM Friendly Web Crawler & Scrapper",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
