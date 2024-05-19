@@ -16,7 +16,7 @@ class ChunkingStrategy(ABC):
     
 # Regex-based chunking
 class RegexChunking(ChunkingStrategy):
-    def __init__(self, patterns=None):
+    def __init__(self, patterns=None, **kwargs):
         if patterns is None:
             patterns = [r'\n\n']  # Default split pattern
         self.patterns = patterns
@@ -32,7 +32,7 @@ class RegexChunking(ChunkingStrategy):
     
 # NLP-based sentence chunking 
 class NlpSentenceChunking(ChunkingStrategy):
-    def __init__(self):
+    def __init__(self, **kwargs):
         load_nltk_punkt()
         pass
 
@@ -52,7 +52,7 @@ class NlpSentenceChunking(ChunkingStrategy):
 # Topic-based segmentation using TextTiling
 class TopicSegmentationChunking(ChunkingStrategy):
     
-    def __init__(self, num_keywords=3):
+    def __init__(self, num_keywords=3, **kwargs):
         import nltk as nl
         self.tokenizer = nl.toknize.TextTilingTokenizer()
         self.num_keywords = num_keywords
@@ -82,7 +82,7 @@ class TopicSegmentationChunking(ChunkingStrategy):
     
 # Fixed-length word chunks
 class FixedLengthWordChunking(ChunkingStrategy):
-    def __init__(self, chunk_size=100):
+    def __init__(self, chunk_size=100, **kwargs):
         self.chunk_size = chunk_size
 
     def chunk(self, text: str) -> list:
@@ -91,7 +91,7 @@ class FixedLengthWordChunking(ChunkingStrategy):
     
 # Sliding window chunking
 class SlidingWindowChunking(ChunkingStrategy):
-    def __init__(self, window_size=100, step=50):
+    def __init__(self, window_size=100, step=50, **kwargs):
         self.window_size = window_size
         self.step = step
 

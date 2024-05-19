@@ -43,7 +43,7 @@ templates = Jinja2Templates(directory=__location__ + "/pages")
 @lru_cache()
 def get_crawler():
     # Initialize and return a WebCrawler instance
-    return WebCrawler()
+    return WebCrawler(verbose = True)
 
 class CrawlRequest(BaseModel):
     urls: List[str]
@@ -105,6 +105,9 @@ async def crawl_urls(crawl_request: CrawlRequest, request: Request):
 
     try:
         logging.debug("[LOG] Loading extraction and chunking strategies...")
+        crawl_request.extraction_strategy_args['verbose'] = True
+        crawl_request.chunking_strategy_args['verbose'] = True
+        
         extraction_strategy = import_strategy("crawl4ai.extraction_strategy", crawl_request.extraction_strategy, **crawl_request.extraction_strategy_args)
         chunking_strategy = import_strategy("crawl4ai.chunking_strategy", crawl_request.chunking_strategy, **crawl_request.chunking_strategy_args)
 

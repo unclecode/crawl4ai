@@ -46,6 +46,7 @@ class ExtractionStrategy(ABC):
             for future in as_completed(futures):
                 extracted_content.extend(future.result())
         return extracted_content    
+    
 class NoExtractionStrategy(ExtractionStrategy):
     def extract(self, url: str, html: str, *q, **kwargs) -> List[Dict[str, Any]]:
         return [{"index": 0, "content": html}]
@@ -187,7 +188,7 @@ class CosineStrategy(ExtractionStrategy):
         if self.verbose:
             print(f"[LOG] Loading Extraction Model for {self.device.type} device.")
 
-        if self.device.type == "cpu":
+        if False and self.device.type == "cpu":
             self.model = load_onnx_all_MiniLM_l6_v2()
             self.tokenizer = self.model.tokenizer
             self.get_embedding_method = "direct"
@@ -273,7 +274,7 @@ class CosineStrategy(ExtractionStrategy):
         # if self.buffer_embeddings.any() and not bypass_buffer:
         #     return self.buffer_embeddings
         
-        if self.device.type in ["gpu", "cuda", "mps"]:
+        if self.device.type in [ "cpu", "gpu", "cuda", "mps"]:
             import torch 
             # Tokenize sentences and convert to tensor
             if batch_size is None:
@@ -295,7 +296,17 @@ class CosineStrategy(ExtractionStrategy):
             
             self.buffer_embeddings = np.vstack(all_embeddings)
         elif self.device.type == "cpu":      
-            self.buffer_embeddings = self.model(sentences)
+            # self.buffer_embeddings = self.model(sentences)
+            if batch_size is None:
+                batch_size = self.default_batch_size
+                
+            all_embeddings = []
+            for i in range(0, len(sentences), batch_size):
+                batch_sentences = sentences[i:i + batch_size]
+                embeddings = self.model(batch_sentences)
+                all_embeddings.append(embeddings)
+                
+            self.buffer_embeddings = np.vstack(all_embeddings)
         return self.buffer_embeddings
 
     def hierarchical_clustering(self, sentences: List[str], embeddings = None):

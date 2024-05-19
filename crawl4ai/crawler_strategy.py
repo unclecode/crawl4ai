@@ -6,6 +6,24 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import InvalidArgumentException
+import logging
+logger = logging.getLogger('selenium.webdriver.remote.remote_connection')
+logger.setLevel(logging.WARNING)
+
+logger_driver = logging.getLogger('selenium.webdriver.common.service')
+logger_driver.setLevel(logging.WARNING)
+
+urllib3_logger = logging.getLogger('urllib3.connectionpool')
+urllib3_logger.setLevel(logging.WARNING)
+
+# Disable http.client logging
+http_client_logger = logging.getLogger('http.client')
+http_client_logger.setLevel(logging.WARNING)
+
+# Disable driver_finder and service logging
+driver_finder_logger = logging.getLogger('selenium.webdriver.common.driver_finder')
+driver_finder_logger.setLevel(logging.WARNING)
+
 
 from typing import List
 import requests
@@ -43,20 +61,20 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
         self.options.headless = True
         self.options.add_argument("--no-sandbox")
         self.options.add_argument("--headless")
-        self.options.add_argument("--disable-dev-shm-usage")
+        # self.options.add_argument("--disable-dev-shm-usage")
         self.options.add_argument("--disable-gpu")
-        self.options.add_argument("--disable-extensions")
-        self.options.add_argument("--disable-infobars")
-        self.options.add_argument("--disable-logging")
-        self.options.add_argument("--disable-popup-blocking")
-        self.options.add_argument("--disable-translate")
-        self.options.add_argument("--disable-default-apps")
-        self.options.add_argument("--disable-background-networking")
-        self.options.add_argument("--disable-sync")
-        self.options.add_argument("--disable-features=NetworkService,NetworkServiceInProcess")
-        self.options.add_argument("--disable-browser-side-navigation")
-        self.options.add_argument("--dns-prefetch-disable")
-        self.options.add_argument("--disable-web-security")
+        # self.options.add_argument("--disable-extensions")
+        # self.options.add_argument("--disable-infobars")
+        # self.options.add_argument("--disable-logging")
+        # self.options.add_argument("--disable-popup-blocking")
+        # self.options.add_argument("--disable-translate")
+        # self.options.add_argument("--disable-default-apps")
+        # self.options.add_argument("--disable-background-networking")
+        # self.options.add_argument("--disable-sync")
+        # self.options.add_argument("--disable-features=NetworkService,NetworkServiceInProcess")
+        # self.options.add_argument("--disable-browser-side-navigation")
+        # self.options.add_argument("--dns-prefetch-disable")
+        # self.options.add_argument("--disable-web-security")
         self.options.add_argument("--log-level=3")
         self.use_cached_html = use_cached_html
         self.use_cached_html = use_cached_html
@@ -66,6 +84,7 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
         # chromedriver_autoinstaller.install()
         import chromedriver_autoinstaller
         self.service = Service(chromedriver_autoinstaller.install())
+        self.service.log_path = "NUL"
         self.driver = webdriver.Chrome(service=self.service, options=self.options)
 
     def crawl(self, url: str) -> str:
