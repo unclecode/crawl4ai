@@ -157,7 +157,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
         return extracted_content        
   
 class CosineStrategy(ExtractionStrategy):
-    def __init__(self, semantic_filter = None, word_count_threshold=10, max_dist=0.2, linkage_method='ward', top_k=3, model_name = 'BAAI/bge-small-en-v1.5', **kwargs):
+    def __init__(self, semantic_filter = None, word_count_threshold=10, max_dist=0.2, linkage_method='ward', top_k=3, model_name = 'sentence-transformers/all-MiniLM-L6-v2', sim_threshold = 0.3, **kwargs):
         """
         Initialize the strategy with clustering parameters.
 
@@ -174,56 +174,96 @@ class CosineStrategy(ExtractionStrategy):
         self.max_dist = max_dist
         self.linkage_method = linkage_method
         self.top_k = top_k
+        self.sim_threshold = sim_threshold
         self.timer = time.time()
         self.verbose = kwargs.get("verbose", False)
         
         self.buffer_embeddings = np.array([])
+        self.get_embedding_method = "direct"
+        
+        self.device = get_device()
+        self.default_batch_size = calculate_batch_size(self.device)
 
         if self.verbose:
-            print(f"[LOG] Loading Extraction Model {model_name}")
+            print(f"[LOG] Loading Extraction Model for {self.device.type} device.")
 
-        if model_name == "bert-base-uncased":
-            self.tokenizer, self.model = load_bert_base_uncased()
-        elif model_name == "BAAI/bge-small-en-v1.5":
+        if self.device.type == "cpu":
+            self.model = load_onnx_all_MiniLM_l6_v2()
+            self.tokenizer = self.model.tokenizer
+            self.get_embedding_method = "direct"
+        else:
             self.tokenizer, self.model = load_bge_small_en_v1_5()
-
-        self.model.eval()  # Ensure the model is in evaluation mode
-        self.buffer_embeddings = None
+            self.model.eval()  
+            self.get_embedding_method = "batch"
         
+        self.buffer_embeddings = np.array([])
+
+        # if model_name == "bert-base-uncased":
+        #     self.tokenizer, self.model = load_bert_base_uncased()
+        #     self.model.eval()  # Ensure the model is in evaluation mode
+        #     self.get_embedding_method = "batch"
+        # elif model_name == "BAAI/bge-small-en-v1.5":
+        #     self.tokenizer, self.model = load_bge_small_en_v1_5()
+        #     self.model.eval()  # Ensure the model is in evaluation mode
+        #     self.get_embedding_method = "batch"
+        # elif model_name == "sentence-transformers/all-MiniLM-L6-v2":
+        #     self.model = load_onnx_all_MiniLM_l6_v2()
+        #     self.tokenizer = self.model.tokenizer
+        #     self.get_embedding_method = "direct"
+       
+        
+        if self.verbose:
+            print(f"[LOG] Loading Multilabel Classifier for {self.device.type} device.")
+            
         self.nlp, self.device = load_text_multilabel_classifier()
         # self.default_batch_size = 16 if self.device.type == 'cpu' else 64
-        self.default_batch_size = calculate_batch_size(self.device)
         
         if self.verbose:
             print(f"[LOG] Model loaded {model_name}, models/reuters, took " + str(time.time() - self.timer) + " seconds")
 
-    def filter_documents_embeddings(self, documents: List[str], semantic_filter: str, threshold: float = 0.5) -> List[str]:
+    def filter_documents_embeddings(self, documents: List[str], semantic_filter: str, at_least_k: int = 20) -> List[str]:
         """
-        Filter documents based on the cosine similarity of their embeddings with the semantic_filter embedding.
+        Filter and sort documents based on the cosine similarity of their embeddings with the semantic_filter embedding.
 
         :param documents: List of text chunks (documents).
         :param semantic_filter: A string containing the keywords for filtering.
         :param threshold: Cosine similarity threshold for filtering documents.
-        :return: Filtered list of documents.
+        :param at_least_k: Minimum number of documents to return.
+        :return: List of filtered documents, ensuring at least `at_least_k` documents.
         """
-        from sklearn.metrics.pairwise import cosine_similarity
+        
         if not semantic_filter:
             return documents
+        
+        if len(documents) < at_least_k:
+            at_least_k = len(documents) // 2
+        
+        from sklearn.metrics.pairwise import cosine_similarity
+        
         # Compute embedding for the keyword filter
         query_embedding = self.get_embeddings([semantic_filter])[0]
         
-        # Compute embeddings for the docu  ments
+        # Compute embeddings for the documents
         document_embeddings = self.get_embeddings(documents)
         
         # Calculate cosine similarity between the query embedding and document embeddings
         similarities = cosine_similarity([query_embedding], document_embeddings).flatten()
         
         # Filter documents based on the similarity threshold
-        filtered_docs = [doc for doc, sim in zip(documents, similarities) if sim >= threshold]
+        filtered_docs = [(doc, sim) for doc, sim in zip(documents, similarities) if sim >= self.sim_threshold]
         
-        return filtered_docs
-
-    def get_embeddings(self, sentences: List[str], batch_size=None, bypass_buffer=True):
+        # If the number of filtered documents is less than at_least_k, sort remaining documents by similarity
+        if len(filtered_docs) < at_least_k:
+            remaining_docs = [(doc, sim) for doc, sim in zip(documents, similarities) if sim < self.sim_threshold]
+            remaining_docs.sort(key=lambda x: x[1], reverse=True)
+            filtered_docs.extend(remaining_docs[:at_least_k - len(filtered_docs)])
+        
+        # Extract the document texts from the tuples
+        filtered_docs = [doc for doc, _ in filtered_docs]
+        
+        return filtered_docs[:at_least_k]
+    
+    def get_embeddings(self, sentences: List[str], batch_size=None, bypass_buffer=False):
         """
         Get BERT embeddings for a list of sentences.
 
@@ -233,29 +273,32 @@ class CosineStrategy(ExtractionStrategy):
         # if self.buffer_embeddings.any() and not bypass_buffer:
         #     return self.buffer_embeddings
         
-        import torch 
-        # Tokenize sentences and convert to tensor
-        if batch_size is None:
-            batch_size = self.default_batch_size
-                    
-        all_embeddings = []
-        for i in range(0, len(sentences), batch_size):
-            batch_sentences = sentences[i:i + batch_size]
-            encoded_input = self.tokenizer(batch_sentences, padding=True, truncation=True, return_tensors='pt')
-            encoded_input = {key: tensor.to(self.device) for key, tensor in encoded_input.items()}
+        if self.device.type in ["gpu", "cuda", "mps"]:
+            import torch 
+            # Tokenize sentences and convert to tensor
+            if batch_size is None:
+                batch_size = self.default_batch_size
+                        
+            all_embeddings = []
+            for i in range(0, len(sentences), batch_size):
+                batch_sentences = sentences[i:i + batch_size]
+                encoded_input = self.tokenizer(batch_sentences, padding=True, truncation=True, return_tensors='pt')
+                encoded_input = {key: tensor.to(self.device) for key, tensor in encoded_input.items()}
+                
+                # Ensure no gradients are calculated
+                with torch.no_grad():
+                    model_output = self.model(**encoded_input)
+                
+                # Get embeddings from the last hidden state (mean pooling)
+                embeddings = model_output.last_hidden_state.mean(dim=1).cpu().numpy()
+                all_embeddings.append(embeddings)
             
-            # Ensure no gradients are calculated
-            with torch.no_grad():
-                model_output = self.model(**encoded_input)
-            
-            # Get embeddings from the last hidden state (mean pooling)
-            embeddings = model_output.last_hidden_state.mean(dim=1).cpu().numpy()
-            all_embeddings.append(embeddings)
-        
-        self.buffer_embeddings = np.vstack(all_embeddings)
+            self.buffer_embeddings = np.vstack(all_embeddings)
+        elif self.device.type == "cpu":      
+            self.buffer_embeddings = self.model(sentences)
         return self.buffer_embeddings
 
-    def hierarchical_clustering(self, sentences: List[str]):
+    def hierarchical_clustering(self, sentences: List[str], embeddings = None):
         """
         Perform hierarchical clustering on sentences and return cluster labels.
 
@@ -266,7 +309,7 @@ class CosineStrategy(ExtractionStrategy):
         from scipy.cluster.hierarchy import linkage, fcluster
         from scipy.spatial.distance import pdist
         self.timer = time.time()
-        embeddings = self.get_embeddings(sentences, bypass_buffer=False)
+        embeddings = self.get_embeddings(sentences, bypass_buffer=True)
         # print(f"[LOG] 🚀 Embeddings computed in {time.time() - self.timer:.2f} seconds")
         # Compute pairwise cosine distances
         distance_matrix = pdist(embeddings, 'cosine')

@@ -86,7 +86,7 @@ def add_extraction_strategy(crawler):
     cprint("CosineStrategy uses cosine similarity to extract semantically similar blocks of text. Let's see it in action!")
     result = crawler.run(
         url="https://www.nbcnews.com/business",
-        extraction_strategy=CosineStrategy(word_count_threshold=10, max_dist=0.2, linkage_method="ward", top_k=3, verbose=True)
+        extraction_strategy=CosineStrategy(word_count_threshold=10, max_dist=0.2, linkage_method="ward", top_k=3, sim_threshold = 0.3, verbose=True)
     )
     cprint("[LOG] 📦 [bold yellow]CosineStrategy result:[/bold yellow]")
     print_result(result)

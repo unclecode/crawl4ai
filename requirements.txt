@@ -16,3 +16,5 @@ uvicorn==0.29.0
 transformers==4.40.2
 chromedriver-autoinstaller==0.6.4
 torch==2.3.0
+onnxruntime==1.14.1
+tokenizers==0.13.2
