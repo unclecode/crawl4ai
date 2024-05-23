@@ -2,7 +2,7 @@ aiohttp==3.9.5
 aiosqlite==0.20.0
 bs4==0.0.2
 fastapi==0.111.0
-html2text==2024.2.26
+html2text
 httpx==0.27.0
 litellm==1.37.11
 nltk==3.8.1
@@ -15,6 +15,6 @@ selenium==4.20.0
 uvicorn==0.29.0
 transformers==4.40.2
 chromedriver-autoinstaller==0.6.4
-torch==2.3.0
-onnxruntime==1.14.1
+torch
+onnxruntime
 tokenizers==0.13.2
