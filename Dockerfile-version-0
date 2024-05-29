@@ -1,5 +1,7 @@
 # Use an official Python runtime as a parent image
 FROM python:3.10-slim
+# In case you had some weird issues, try this Image
+# FROM python:3.10-slim-bookworm as builder
 
 # Set the working directory in the container
 WORKDIR /usr/src/app
