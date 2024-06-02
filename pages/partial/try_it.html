@@ -20,6 +20,7 @@
                             id="threshold"
                             class="border border-zinc-700 rounded px-4 py-1 bg-zinc-900 text-zinc-300"
                         >
+                            <option value="1">1</option>
                             <option value="5">5</option>
                             <option value="10" selected>10</option>
                             <option value="15">15</option>
@@ -123,8 +124,8 @@
                         <input type="checkbox" id="bypass-cache-checkbox" />
                         <label for="bypass-cache-checkbox" class="text-lime-500 font-bold">Bypass Cache</label>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <input type="checkbox" id="extract-blocks-checkbox" checked />
+                    <div class="flex items-center gap-2 hidden">
+                        <input type="checkbox" id="extract-blocks-checkbox" />
                         <label for="extract-blocks-checkbox" class="text-lime-500 font-bold">Extract Blocks</label>
                     </div>
                     <button id="crawl-btn" class="bg-lime-600 text-black font-bold px-4 py-0 rounded">Crawl</button>
