@@ -139,13 +139,14 @@ crawler.warmup()</code></pre>
         </div>
         <div class="">Using JavaScript to click 'Load More' button:</div>
         <div>
-            <pre><code class="language-python">js_code = """
+            <pre><code class="language-python">js_code = ["""
 const loadMoreButton = Array.from(document.querySelectorAll('button')).find(button => button.textContent.includes('Load More'));
 loadMoreButton && loadMoreButton.click();
-"""
+"""]
 crawler_strategy = LocalSeleniumCrawlerStrategy(js_code=js_code)
 crawler = WebCrawler(crawler_strategy=crawler_strategy, always_by_pass_cache=True)
 result = crawler.run(url="https://www.nbcnews.com/business")</code></pre>
+        <div class="">Remember that you can pass multiple JavaScript code snippets in the list. They all will be executed in the order they are passed.</div>
         </div>
 
         <!-- Conclusion -->
