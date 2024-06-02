@@ -7,11 +7,16 @@ from setuptools.command.install import install
 with open("requirements.txt") as f:
     requirements = f.read().splitlines()
 
+# Read the requirements from requirements.txt
+with open("requirements.crawl.txt") as f:
+    requirements_crawl_only = f.read().splitlines()
+
 # Define the requirements for different environments
 requirements_without_torch = [req for req in requirements if not req.startswith("torch")]
 requirements_without_transformers = [req for req in requirements if not req.startswith("transformers")]
 requirements_without_nltk = [req for req in requirements if not req.startswith("nltk")]
 requirements_without_torch_transformers_nlkt = [req for req in requirements if not req.startswith("torch") and not req.startswith("transformers") and not req.startswith("nltk")]
+requirements_crawl_only = [req for req in requirements if not req.startswith("torch") and not req.startswith("transformers") and not req.startswith("nltk")]
 
 class CustomInstallCommand(install):
     """Customized setuptools install command to install spacy without dependencies."""
@@ -21,7 +26,7 @@ class CustomInstallCommand(install):
 
 setup(
     name="Crawl4AI",
-    version="0.2.1",
+    version="0.2.2",
     description="🔥🕷️ Crawl4AI: Open-source LLM Friendly Web Crawler & Scrapper",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
@@ -34,7 +39,7 @@ setup(
     extras_require={
         "all": requirements,  # Include all requirements
         "colab": requirements_without_torch,  # Exclude torch for Colab
-        "crawl": requirements_without_torch_transformers_nlkt
+        "crawl": requirements_crawl_only,  # Include only crawl requirements
     },
     cmdclass={
         'install': CustomInstallCommand,
