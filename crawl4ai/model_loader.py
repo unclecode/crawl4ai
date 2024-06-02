@@ -35,8 +35,7 @@ def calculate_batch_size(device):
         else:
             return 32
     else:
-        return 16  # Default batch size
-    
+        return 16  # Default batch size   
     
 @lru_cache()
 def get_device():
@@ -258,8 +257,8 @@ def download_all_models(remove_existing=False):
     # load_bert_base_uncased()
     # print("[LOG] Downloading BGE Small EN v1.5...")
     # load_bge_small_en_v1_5()
-    print("[LOG] Downloading ONNX model...")
-    load_onnx_all_MiniLM_l6_v2()
+    # print("[LOG] Downloading ONNX model...")
+    # load_onnx_all_MiniLM_l6_v2()
     print("[LOG] Downloading text classifier...")
     _, device = load_text_multilabel_classifier()
     print(f"[LOG] Text classifier loaded on {device}")

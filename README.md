@@ -10,8 +10,14 @@ Crawl4AI has one clear task: to simplify crawling and extract useful information
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1wz8u30rvbq6Scodye9AGCw8Qg_Z8QGsk)
 
-## Recent Changes v0.2.0
+## Recent Changes 
 
+### v0.2.2
+- Support multiple JS scripts
+- Fixed some of bugs
+- Resolved a few issue relevant to Colab installation
+
+### v0.2.0
 - 🚀 10x faster!!
 - 📜 Execute custom JavaScript before crawling!
 - 🤝 Colab friendly!

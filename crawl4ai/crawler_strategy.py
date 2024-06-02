@@ -103,12 +103,18 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
             )
             
             # Execute JS code if provided
-            if self.js_code:
+            if self.js_code and type(self.js_code) == str:
                 self.driver.execute_script(self.js_code)
                 # Optionally, wait for some condition after executing the JS code
                 WebDriverWait(self.driver, 10).until(
                     lambda driver: driver.execute_script("return document.readyState") == "complete"
                 )
+            elif self.js_code and type(self.js_code) == list:
+                for js in self.js_code:
+                    self.driver.execute_script(js)
+                    WebDriverWait(self.driver, 10).until(
+                        lambda driver: driver.execute_script("return document.readyState") == "complete"
+                    )
             
             html = self.driver.page_source
             

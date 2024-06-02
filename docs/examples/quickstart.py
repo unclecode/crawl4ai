@@ -164,6 +164,22 @@ def interactive_extraction(crawler):
     cprint("[LOG] 📦 [bold yellow]JavaScript Code (Load More button) result:[/bold yellow]")
     print_result(result)
 
+def multiple_scrip(crawler):
+    # Passing JavaScript code to interact with the page
+    cprint("\n🖱️ [bold cyan]Let's get interactive: Passing JavaScript code to click 'Load More' button![/bold cyan]", True)
+    cprint("In this example we try to click the 'Load More' button on the page using JavaScript code.")
+    js_code = ["""
+    const loadMoreButton = Array.from(document.querySelectorAll('button')).find(button => button.textContent.includes('Load More'));
+    loadMoreButton && loadMoreButton.click();
+    """] * 2
+    crawler_strategy = LocalSeleniumCrawlerStrategy(js_code=js_code)
+    crawler = WebCrawler(crawler_strategy=crawler_strategy, always_by_pass_cache=True)
+    result = crawler.run(
+        url="https://www.nbcnews.com/business",
+    )
+    cprint("[LOG] 📦 [bold yellow]JavaScript Code (Load More button) result:[/bold yellow]")
+    print_result(result)
+
 def main():
     cprint("🌟 [bold green]Welcome to the Crawl4ai Quickstart Guide! Let's dive into some web crawling fun! 🌐[/bold green]")
     cprint("⛳️ [bold cyan]First Step: Create an instance of WebCrawler and call the `warmup()` function.[/bold cyan]")
@@ -180,6 +196,7 @@ def main():
     add_llm_extraction_strategy(crawler)
     targeted_extraction(crawler)
     interactive_extraction(crawler)
+    multiple_scrip(crawler)
 
     cprint("\n🎉 [bold green]Congratulations! You've made it through the Crawl4ai Quickstart Guide! Now go forth and crawl the web like a pro! 🕸️[/bold green]")
 
