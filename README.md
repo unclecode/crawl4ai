@@ -41,6 +41,23 @@ result = crawler.run(url="https://www.nbcnews.com/business")
 print(result) # {url, html, markdown, extracted_content, metadata}
 ```
 
+If you don't want to install Selenium, you can use the REST API or local server. 
+
+```python
+import requests
+
+data = {
+  "urls": [
+    "https://www.nbcnews.com/business"
+  ],
+  "word_count_threshold": 10,
+  "extraction_strategy": "NoExtractionStrategy",
+}
+
+response = requests.post("https://crawl4ai.com/crawl", json=data) # OR local host if your run locally 
+print(response.json())
+```
+
 Now let's try a complex task. Below is an example of how you can execute JavaScript, filter data using keywords, and use a CSS selector to extract specific content—all in one go!
 
 1. Instantiate a WebCrawler object.
