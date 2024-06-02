@@ -36,8 +36,6 @@ from crawl4ai import WebCrawler
 # Create the WebCrawler instance 
 crawler = WebCrawler() 
 
-
-
 # Run the crawler with keyword filtering and CSS selector
 result = crawler.run(url="https://www.nbcnews.com/business")
 print(result) # {url, html, markdown, extracted_content, metadata}
