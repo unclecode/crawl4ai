@@ -4,17 +4,10 @@ bs4
 fastapi
 html2text
 httpx
-litellm
-nltk
 pydantic
 python-dotenv
 requests
 rich
-scikit-learn
 selenium
 uvicorn
-transformers
 chromedriver-autoinstaller
-torch
-onnxruntime
-tokenizers

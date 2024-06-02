@@ -66,7 +66,7 @@ async def read_index(request: Request):
 
     for filename in os.listdir(partials_dir):
         if filename.endswith(".html"):
-            with open(os.path.join(partials_dir, filename), "r") as file:
+            with open(os.path.join(partials_dir, filename), "r", encoding="utf8") as file:
                 partials[filename[:-5]] = file.read()
 
     return templates.TemplateResponse("index.html", {"request": request, **partials})

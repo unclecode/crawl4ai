@@ -188,14 +188,15 @@ class CosineStrategy(ExtractionStrategy):
         if self.verbose:
             print(f"[LOG] Loading Extraction Model for {self.device.type} device.")
 
-        if False and self.device.type == "cpu":
-            self.model = load_onnx_all_MiniLM_l6_v2()
-            self.tokenizer = self.model.tokenizer
-            self.get_embedding_method = "direct"
-        else:
-            self.tokenizer, self.model = load_bge_small_en_v1_5()
-            self.model.eval()  
-            self.get_embedding_method = "batch"
+        # if False and self.device.type == "cpu":
+        #     self.model = load_onnx_all_MiniLM_l6_v2()
+        #     self.tokenizer = self.model.tokenizer
+        #     self.get_embedding_method = "direct"
+        # else:
+
+        self.tokenizer, self.model = load_bge_small_en_v1_5()
+        self.model.eval()  
+        self.get_embedding_method = "batch"
         
         self.buffer_embeddings = np.array([])
 

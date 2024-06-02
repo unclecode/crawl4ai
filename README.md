@@ -1,4 +1,4 @@
-# Crawl4AI v0.2.0 🕷️🤖
+# Crawl4AI v0.2.2 🕷️🤖
 
 [![GitHub Stars](https://img.shields.io/github/stars/unclecode/crawl4ai?style=social)](https://github.com/unclecode/crawl4ai/stargazers)
 [![GitHub Forks](https://img.shields.io/github/forks/unclecode/crawl4ai?style=social)](https://github.com/unclecode/crawl4ai/network/members)
@@ -10,8 +10,14 @@ Crawl4AI has one clear task: to simplify crawling and extract useful information
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1wz8u30rvbq6Scodye9AGCw8Qg_Z8QGsk)
 
-## Recent Changes v0.2.0
+## Recent Changes 
 
+### v0.2.2
+- Support multiple JS scripts
+- Fixed some of bugs
+- Resolved a few issue relevant to Colab installation
+
+### v0.2.0
 - 🚀 10x faster!!
 - 📜 Execute custom JavaScript before crawling!
 - 🤝 Colab friendly!
@@ -29,8 +35,6 @@ from crawl4ai import WebCrawler
 
 # Create the WebCrawler instance 
 crawler = WebCrawler() 
-
-
 
 # Run the crawler with keyword filtering and CSS selector
 result = crawler.run(url="https://www.nbcnews.com/business")
