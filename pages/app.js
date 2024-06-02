@@ -109,6 +109,19 @@ document.getElementById("crawl-btn").addEventListener("click", () => {
         verbose: true,
     };
 
+    // import requests
+
+    // data = {
+    //   "urls": [
+    //     "https://www.nbcnews.com/business"
+    //   ],
+    //   "word_count_threshold": 10,
+    //   "extraction_strategy": "NoExtractionStrategy",
+    // }
+    
+    // response = requests.post("https://crawl4ai.com/crawl", json=data) # OR local host if your run locally 
+    // print(response.json())
+
     // save api token to local storage
     localStorage.setItem("api_token", document.getElementById("token-input").value);
 
@@ -131,18 +144,46 @@ document.getElementById("crawl-btn").addEventListener("click", () => {
 
             // REMOVE API TOKEN FROM CODE EXAMPLES
             data.extraction_strategy_args.api_token = "your_api_token";
+
+            if (data.extraction_strategy === "NoExtractionStrategy") {
+                delete data.extraction_strategy_args;
+                delete data.extrac_blocks;
+            }
+
+            if (data.chunking_strategy === "RegexChunking") {
+                delete data.chunking_strategy_args;
+            }
+
+            delete data.verbose;
+
+            if (data.css_selector === "") {
+                delete data.css_selector;
+            }
+
+            if (!data.bypass_cache) {
+                delete data.bypass_cache;
+            }
+
+            if (!data.extract_blocks) {
+                delete data.extract_blocks;
+            }
+
+            if (!data.include_raw_html) {
+                delete data.include_raw_html;
+            }
+
             document.getElementById(
                 "curl-code"
             ).textContent = `curl -X POST -H "Content-Type: application/json" -d '${JSON.stringify({
                 ...data,
                 api_token: isLLMExtraction ? "your_api_token" : undefined,
-            }, null, 2)}' http://localhost:8000/crawl`;
+            }, null, 2)}' https://crawl4ai.com/crawl`;
 
             document.getElementById("python-code").textContent = `import requests\n\ndata = ${JSON.stringify(
                 { ...data, api_token: isLLMExtraction ? "your_api_token" : undefined },
                 null,
                 2
-            )}\n\nresponse = requests.post("http://localhost:8000/crawl", json=data) # OR local host if your run locally \nprint(response.json())`;
+            )}\n\nresponse = requests.post("https://crawl4ai.com/crawl", json=data) # OR local host if your run locally \nprint(response.json())`;
 
             document.getElementById(
                 "nodejs-code"
@@ -150,7 +191,7 @@ document.getElementById("crawl-btn").addEventListener("click", () => {
                 { ...data, api_token: isLLMExtraction ? "your_api_token" : undefined },
                 null,
                 2
-            )};\n\naxios.post("http://localhost:8000/crawl", data) // OR local host if your run locally \n    .then(response => console.log(response.data))\n    .catch(error => console.error(error));`;
+            )};\n\naxios.post("https://crawl4ai.com/crawl", data) // OR local host if your run locally \n    .then(response => console.log(response.data))\n    .catch(error => console.error(error));`;
 
             document.getElementById(
                 "library-code"
