@@ -175,3 +175,7 @@ a.txt
 
 *.sh
 .idea
+docs/examples/.chainlit/
+docs/examples/.chainlit/*
+.chainlit/config.toml
+.chainlit/translations/en-US.json
