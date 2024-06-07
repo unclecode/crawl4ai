@@ -50,6 +50,20 @@ crawler.warmup()</code></pre>
         <div>
             <pre><code class="language-python">crawler.always_by_pass_cache = True</code></pre>
         </div>
+        <!-- Step 3.5 Screenshot -->
+        <div class="col-span-2 bg-lime-800 p-2 rounded text-zinc-50">
+            📸
+            <strong>Let's take a screenshot of the page!</strong>
+        </div>
+        <div>
+            <pre><code class="language-python">result = crawler.run(
+    url="https://www.nbcnews.com/business",
+    screenshot=True
+)
+with open("screenshot.png", "wb") as f:
+    f.write(base64.b64decode(result.screenshot))</code></pre>
+        </div>
+
 
         <!-- Step 4 -->
         <div class="col-span-2 bg-lime-800 p-2 rounded text-zinc-50">

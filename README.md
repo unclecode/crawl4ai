@@ -13,8 +13,8 @@ Crawl4AI has one clear task: to simplify crawling and extract useful information
 ## Recent Changes 
 
 ### v0.2.3
-- 🎨 Extract and return all media tags (Images, Audio, and Video).
-- 🖼️ Take screenshots of the page.
+- 🎨 Extract and return all media tags (Images, Audio, and Video). Check `result.media`
+- 🖼️ Take [screenshots](#taking-screenshots-) of the page.
 
 ### v0.2.2
 - Support multiple JS scripts
@@ -266,6 +266,14 @@ Crawl result without raw HTML content:
 result = crawler.run(url="https://www.nbcnews.com/business", include_raw_html=False)
 ```
 
+### Taking Screenshots
+
+```python
+result = crawler.run(url="https://www.nbcnews.com/business", screenshot=True)
+with open("screenshot.png", "wb") as f:
+    f.write(base64.b64decode(result.screenshot))
+```
+
 ### Adding a chunking strategy: RegexChunking
 
 Using RegexChunking:
@@ -372,6 +380,7 @@ result = crawler.run(url="https://www.nbcnews.com/business")
 | `urls`                | A list of URLs to crawl and extract data from.                                                        | Yes      | -                   |
 | `include_raw_html`    | Whether to include the raw HTML content in the response.                                              | No       | `false`             |
 | `bypass_cache`        | Whether to force a fresh crawl even if the URL has been previously crawled.                           | No       | `false`             |
+| `screenshots`         | Whether to take screenshots of the page.                                                              | No       | `false`             |
 | `word_count_threshold`| The minimum number of words a block must contain to be considered meaningful (minimum value is 5).    | No       | `5`                 |
 | `extraction_strategy` | The strategy to use for extracting content from the HTML (e.g., "CosineStrategy").                    | No       | `NoExtractionStrategy`    |
 | `chunking_strategy`   | The strategy to use for chunking the text before processing (e.g., "RegexChunking").                  | No       | `RegexChunking`     |

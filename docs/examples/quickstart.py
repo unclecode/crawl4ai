@@ -35,8 +35,18 @@ def cprint(message, press_any_key=False):
 
 def basic_usage(crawler):
     cprint("🛠️ [bold cyan]Basic Usage: Simply provide a URL and let Crawl4ai do the magic![/bold cyan]")
-    result = crawler.run(url="https://www.nbcnews.com/business", screenshot=True)
+    result = crawler.run(url="https://www.nbcnews.com/business")
     cprint("[LOG] 📦 [bold yellow]Basic crawl result:[/bold yellow]")
+    print_result(result)
+
+def screenshot_usage(crawler):
+    cprint("\n📸 [bold cyan]Let's take a screenshot of the page![/bold cyan]")
+    result = crawler.run(url="https://www.nbcnews.com/business", screenshot=True)
+    cprint("[LOG] 📦 [bold yellow]Screenshot result:[/bold yellow]")
+    # Save the screenshot to a file
+    with open("screenshot.png", "wb") as f:
+        f.write(base64.b64decode(result.screenshot))
+    cprint("Screenshot saved to 'screenshot.png'!")
     print_result(result)
 
 def understanding_parameters(crawler):
@@ -187,11 +197,11 @@ def main():
 
     crawler = create_crawler()
 
-    crawler.always_by_pass_cache = True
     basic_usage(crawler)
     understanding_parameters(crawler)
     
     crawler.always_by_pass_cache = True
+    screenshot_usage(crawler)
     add_chunking_strategy(crawler)
     add_extraction_strategy(crawler)
     add_llm_extraction_strategy(crawler)
