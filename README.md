@@ -229,7 +229,7 @@ To use the REST API, send a POST request to `http://localhost:8000/crawl` with t
 }
 ```
 
-For more information about the available parameters and their descriptions, refer to the [Parameters](#parameters) section.
+For more information about the available parameters and their descriptions, refer to the [Parameters](#parameters-) section.
 
 
 ## Python Library Usage 🚀
