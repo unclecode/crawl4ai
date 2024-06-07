@@ -32,6 +32,24 @@ Crawl4AI has one clear task: to simplify crawling and extract useful information
 
 ## Power and Simplicity of Crawl4AI 🚀
 
+The most easy way! If you don't want to install any library, you can use the REST API on my server. But remember, this is just a simple server. I may improve its capacity if I see there is demand.
+
+```
+import requests
+
+data = {
+  "urls": [
+    "https://www.nbcnews.com/business"
+  ],
+  "word_count_threshold": 5,
+  "screenshot": True
+}
+
+response = requests.post("https://crawl4ai.com/crawl", json=data) # OR local host if your run locally 
+response_data = response.json()
+print(response_data['results'][0].keys())
+```
+
 To show the simplicity take a look at the first example:
 
 ```python
