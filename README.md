@@ -14,7 +14,7 @@ Crawl4AI has one clear task: to simplify crawling and extract useful information
 
 ### v0.2.3
 - 🎨 Extract and return all media tags (Images, Audio, and Video). Check `result.media`
-- 🖼️ Take [screenshots](#taking-screenshots-) of the page.
+- 🖼️ Take [screenshots](#taking-screenshots) of the page.
 
 ### v0.2.2
 - Support multiple JS scripts
