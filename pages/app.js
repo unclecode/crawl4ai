@@ -137,6 +137,7 @@ document.getElementById("crawl-btn").addEventListener("click", () => {
             document.getElementById("json-result").textContent = JSON.stringify(parsedJson, null, 2);
             document.getElementById("cleaned-html-result").textContent = result.cleaned_html;
             document.getElementById("markdown-result").textContent = result.markdown;
+            document.getElementById("media-result").textContent = JSON.stringify( result.media, null, 2);
 
             // Update code examples dynamically
             const extractionStrategy = data.extraction_strategy;

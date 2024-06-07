@@ -1,4 +1,4 @@
-<section class="try-it py-8 px-16 pb-20 bg-zinc-900">
+<section class="try-it py-8 px-16 pb-20 bg-zinc-900 overflow-hidden">
     <div class="container mx-auto ">
         <h2 class="text-2xl font-bold mb-4 text-lime-500">Try It Now</h2>
         <div class="flex gap-4">
@@ -135,7 +135,7 @@
             <div id="loading" class="hidden">
                 <p class="text-white">Loading... Please wait.</p>
             </div>
-            <div id="result" class="flex-1">
+            <div id="result" class="flex-1  overflow-x-auto">
                 <div class="tab-buttons flex gap-2">
                     <button class="tab-btn px-4 py-1 text-sm bg-zinc-700 rounded-t text-lime-500" data-tab="json">
                         JSON
@@ -149,15 +149,19 @@
                     <button class="tab-btn px-4 py-1 text-sm bg-zinc-700 rounded-t text-lime-500" data-tab="markdown">
                         Markdown
                     </button>
+                    <button class="tab-btn px-4 py-1 text-sm bg-zinc-700 rounded-t text-lime-500" data-tab="media">
+                        Medias
+                    </button>
                 </div>
                 <div class="tab-content code bg-zinc-900 p-2 rounded h-full border border-zinc-700 text-sm">
                     <pre class="h-full flex"><code id="json-result" class="language-json"></code></pre>
                     <pre class="hidden h-full flex"><code id="cleaned-html-result" class="language-html"></code></pre>
                     <pre class="hidden h-full flex"><code id="markdown-result" class="language-markdown"></code></pre>
+                    <pre class="hidden h-full flex"><code id="media-result" class="language-json"></code></pre>
                 </div>
             </div>
 
-            <div id="code_help" class="flex-1">
+            <div id="code_help" class="flex-1  overflow-x-auto">
                 <div class="tab-buttons flex gap-2">
                     <button class="code-tab-btn px-4 py-1 text-sm bg-zinc-700 rounded-t text-lime-500" data-tab="curl">
                         cURL

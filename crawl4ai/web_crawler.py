@@ -110,6 +110,7 @@ class WebCrawler:
                         "markdown": cached[3],
                         "extracted_content": cached[4],
                         "success": cached[5],
+                        "media": json.loads(cached[6]),
                         "error_message": "",
                     }
                 )
@@ -129,6 +130,7 @@ class WebCrawler:
         
         cleaned_html = result.get("cleaned_html", html)
         markdown = result.get("markdown", "")
+        media = result.get("media", [])
 
         # Print a profession LOG style message, show time taken and say crawling is done
         if verbose:
@@ -163,6 +165,7 @@ class WebCrawler:
             markdown,
             extracted_content,
             success,
+            json.dumps(media),
         )
 
         return CrawlResult(
@@ -170,6 +173,7 @@ class WebCrawler:
             html=html,
             cleaned_html=cleaned_html,
             markdown=markdown,
+            media=media,
             extracted_content=extracted_content,
             success=success,
             error_message=error_message,

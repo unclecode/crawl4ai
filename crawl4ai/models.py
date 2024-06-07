@@ -1,5 +1,5 @@
 from pydantic import BaseModel, HttpUrl
-from typing import List
+from typing import List, Dict
 
 class UrlModel(BaseModel):
     url: HttpUrl
@@ -10,6 +10,7 @@ class CrawlResult(BaseModel):
     html: str
     success: bool
     cleaned_html: str = None
+    media: Dict[str, List[Dict]] = {}
     markdown: str = None
     extracted_content: str = None
     metadata: dict = None
