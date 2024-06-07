@@ -1,13 +1,12 @@
 import os
 from pathlib import Path
 import sqlite3
-from typing import Optional
 from typing import Optional, Tuple
 
 DB_PATH = os.path.join(Path.home(), ".crawl4ai")
 os.makedirs(DB_PATH, exist_ok=True)
 DB_PATH = os.path.join(DB_PATH, "crawl4ai.db")
-        
+
 def init_db():
     global DB_PATH
     conn = sqlite3.connect(DB_PATH)
@@ -19,22 +18,34 @@ def init_db():
             cleaned_html TEXT,
             markdown TEXT,
             extracted_content TEXT,
-            success BOOLEAN
+            success BOOLEAN,
+            media TEXT
         )
     ''')
     conn.commit()
     conn.close()
 
-def check_db_path():
-    if not DB_PATH:
-        raise ValueError("Database path is not set or is empty.")
-
-def get_cached_url(url: str) -> Optional[Tuple[str, str, str, str, str, bool]]:
+def alter_db_add_media():
     check_db_path()
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-        cursor.execute('SELECT url, html, cleaned_html, markdown, extracted_content, success FROM crawled_data WHERE url = ?', (url,))
+        cursor.execute('ALTER TABLE crawled_data ADD COLUMN media TEXT DEFAULT ""')
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Error altering database to add media column: {e}")
+
+def check_db_path():
+    if not DB_PATH:
+        raise ValueError("Database path is not set or is empty.")
+
+def get_cached_url(url: str) -> Optional[Tuple[str, str, str, str, str, bool, str]]:
+    check_db_path()
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute('SELECT url, html, cleaned_html, markdown, extracted_content, success, media FROM crawled_data WHERE url = ?', (url,))
         result = cursor.fetchone()
         conn.close()
         return result
@@ -42,21 +53,22 @@ def get_cached_url(url: str) -> Optional[Tuple[str, str, str, str, str, bool]]:
         print(f"Error retrieving cached URL: {e}")
         return None
 
-def cache_url(url: str, html: str, cleaned_html: str, markdown: str, extracted_content: str, success: bool):
+def cache_url(url: str, html: str, cleaned_html: str, markdown: str, extracted_content: str, success: bool, media: str = ""):
     check_db_path()
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('''
-            INSERT INTO crawled_data (url, html, cleaned_html, markdown, extracted_content, success)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO crawled_data (url, html, cleaned_html, markdown, extracted_content, success, media)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(url) DO UPDATE SET
                 html = excluded.html,
                 cleaned_html = excluded.cleaned_html,
                 markdown = excluded.markdown,
                 extracted_content = excluded.extracted_content,
-                success = excluded.success
-        ''', (url, html, cleaned_html, markdown, extracted_content, success))
+                success = excluded.success,
+                media = excluded.media
+        ''', (url, html, cleaned_html, markdown, extracted_content, success, media))
         conn.commit()
         conn.close()
     except Exception as e:
@@ -96,3 +108,19 @@ def flush_db():
         conn.close()
     except Exception as e:
         print(f"Error flushing database: {e}")
+
+def update_existing_records():
+    check_db_path()
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute('UPDATE crawled_data SET media = "" WHERE media IS NULL')
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Error updating existing records: {e}")
+
+if __name__ == "__main__":
+    init_db()  # Initialize the database if not already initialized
+    alter_db_add_media()  # Add the new column to the table
+    update_existing_records()  # Update existing records to set the new column to an empty string

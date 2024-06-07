@@ -136,7 +136,7 @@ async def crawl_urls(crawl_request: CrawlRequest, request: Request):
             for result in results:
                 result.html = None
 
-        return {"results": [result.dict() for result in results]}
+        return {"results": [result.model_dump() for result in results]}
     finally:
         async with lock:
             current_requests -= 1
