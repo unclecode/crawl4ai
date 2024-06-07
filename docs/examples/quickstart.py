@@ -166,10 +166,11 @@ def interactive_extraction(crawler):
     const loadMoreButton = Array.from(document.querySelectorAll('button')).find(button => button.textContent.includes('Load More'));
     loadMoreButton && loadMoreButton.click();
     """
-    crawler_strategy = LocalSeleniumCrawlerStrategy(js_code=js_code)
-    crawler = WebCrawler(crawler_strategy=crawler_strategy, always_by_pass_cache=True)
+    # crawler_strategy = LocalSeleniumCrawlerStrategy(js_code=js_code)
+    # crawler = WebCrawler(crawler_strategy=crawler_strategy, always_by_pass_cache=True)
     result = crawler.run(
         url="https://www.nbcnews.com/business",
+        js = js_code
     )
     cprint("[LOG] 📦 [bold yellow]JavaScript Code (Load More button) result:[/bold yellow]")
     print_result(result)
@@ -182,10 +183,11 @@ def multiple_scrip(crawler):
     const loadMoreButton = Array.from(document.querySelectorAll('button')).find(button => button.textContent.includes('Load More'));
     loadMoreButton && loadMoreButton.click();
     """] * 2
-    crawler_strategy = LocalSeleniumCrawlerStrategy(js_code=js_code)
-    crawler = WebCrawler(crawler_strategy=crawler_strategy, always_by_pass_cache=True)
+    # crawler_strategy = LocalSeleniumCrawlerStrategy(js_code=js_code)
+    # crawler = WebCrawler(crawler_strategy=crawler_strategy, always_by_pass_cache=True)
     result = crawler.run(
         url="https://www.nbcnews.com/business",
+        js = js_code  
     )
     cprint("[LOG] 📦 [bold yellow]JavaScript Code (Load More button) result:[/bold yellow]")
     print_result(result)

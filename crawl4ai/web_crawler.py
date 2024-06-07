@@ -123,6 +123,8 @@ class WebCrawler:
 
         # Initialize WebDriver for crawling
         t = time.time()
+        if kwargs.get("js", None):
+            self.crawler_strategy.js_code = kwargs.get("js")
         html = self.crawler_strategy.crawl(url)
         base64_image = None
         if screenshot:
