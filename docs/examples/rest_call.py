@@ -8,6 +8,14 @@ data = {
     "screenshot": True,
 }
 
+# Example of filtering the content using CSS selectors
+# data = {
+#     "urls": [
+#         "https://www.nbcnews.com/business"
+#     ],
+#     "css_selector": "article",
+#     "screenshot": True,
+# }
 
 # Example of executing a JS script on the page before extracting the content
 # data = {
