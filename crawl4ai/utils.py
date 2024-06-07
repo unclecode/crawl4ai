@@ -514,3 +514,15 @@ def process_sections(url: str, sections: list, provider: str, api_token: str) ->
                 extracted_content.extend(future.result())
     
     return extracted_content
+
+
+def wrap_text(draw, text, font, max_width):
+    # Wrap the text to fit within the specified width
+    lines = []
+    words = text.split()
+    while words:
+        line = ''
+        while words and draw.textbbox((0, 0), line + words[0], font=font)[2] <= max_width:
+            line += (words.pop(0) + ' ')
+        lines.append(line)
+    return '\n'.join(lines)

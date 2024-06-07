@@ -7,6 +7,15 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import InvalidArgumentException
 import logging
+import base64
+from PIL import Image, ImageDraw, ImageFont
+from io import BytesIO
+from typing import List
+import requests
+import os
+from pathlib import Path
+from .utils import wrap_text
+
 logger = logging.getLogger('selenium.webdriver.remote.remote_connection')
 logger.setLevel(logging.WARNING)
 
@@ -25,14 +34,15 @@ driver_finder_logger = logging.getLogger('selenium.webdriver.common.driver_finde
 driver_finder_logger.setLevel(logging.WARNING)
 
 
-from typing import List
-import requests
-import os
-from pathlib import Path
+
 
 class CrawlerStrategy(ABC):
     @abstractmethod
     def crawl(self, url: str, **kwargs) -> str:
+        pass
+    
+    @abstractmethod
+    def take_screenshot(self, save_path: str):
         pass
 
 class CloudCrawlerStrategy(CrawlerStrategy):
@@ -131,6 +141,63 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
             raise InvalidArgumentException(f"Invalid URL {url}")
         except Exception as e:
             raise Exception(f"Failed to crawl {url}: {str(e)}")
+
+    def take_screenshot(self) -> str:
+        try:
+            # Get the dimensions of the page
+            total_width = self.driver.execute_script("return document.body.scrollWidth")
+            total_height = self.driver.execute_script("return document.body.scrollHeight")
+
+            # Set the window size to the dimensions of the page
+            self.driver.set_window_size(total_width, total_height)
+
+            # Take screenshot
+            screenshot = self.driver.get_screenshot_as_png()
+
+            # Open the screenshot with PIL
+            image = Image.open(BytesIO(screenshot))
+
+            # Convert to JPEG and compress
+            buffered = BytesIO()
+            image.save(buffered, format="JPEG", quality=85)
+            img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+
+            if self.verbose:
+                print(f"[LOG] 📸 Screenshot taken and converted to base64")
+
+            return img_base64
+
+        except Exception as e:
+            error_message = f"Failed to take screenshot: {str(e)}"
+            print(error_message)
+
+            # Generate an image with black background
+            img = Image.new('RGB', (800, 600), color='black')
+            draw = ImageDraw.Draw(img)
+            
+            # Load a font
+            try:
+                font = ImageFont.truetype("arial.ttf", 40)
+            except IOError:
+                font = ImageFont.load_default(size=40)
+
+            # Define text color and wrap the text
+            text_color = (255, 255, 255)
+            max_width = 780
+            wrapped_text = wrap_text(draw, error_message, font, max_width)
+
+            # Calculate text position
+            text_position = (10, 10)
+            
+            # Draw the text on the image
+            draw.text(text_position, wrapped_text, fill=text_color, font=font)
+            
+            # Convert to base64
+            buffered = BytesIO()
+            img.save(buffered, format="JPEG")
+            img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+
+            return img_base64
 
     def quit(self):
         self.driver.quit()

@@ -124,6 +124,10 @@
                         <input type="checkbox" id="bypass-cache-checkbox" checked />
                         <label for="bypass-cache-checkbox" class="text-lime-500 font-bold">Bypass Cache</label>
                     </div>
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" id="screenshot-checkbox" checked />
+                        <label for="screenshot-checkbox" class="text-lime-500 font-bold">Screenshot</label>
+                    </div>
                     <div class="flex items-center gap-2 hidden">
                         <input type="checkbox" id="extract-blocks-checkbox" />
                         <label for="extract-blocks-checkbox" class="text-lime-500 font-bold">Extract Blocks</label>
@@ -152,12 +156,16 @@
                     <button class="tab-btn px-4 py-1 text-sm bg-zinc-700 rounded-t text-lime-500" data-tab="media">
                         Medias
                     </button>
+                    <button class="tab-btn px-4 py-1 text-sm bg-zinc-700 rounded-t text-lime-500" data-tab="screenshot">
+                        Screenshot
+                    </button>
                 </div>
                 <div class="tab-content code bg-zinc-900 p-2 rounded h-full border border-zinc-700 text-sm">
                     <pre class="h-full flex"><code id="json-result" class="language-json"></code></pre>
                     <pre class="hidden h-full flex"><code id="cleaned-html-result" class="language-html"></code></pre>
                     <pre class="hidden h-full flex"><code id="markdown-result" class="language-markdown"></code></pre>
                     <pre class="hidden h-full flex"><code id="media-result" class="language-json"></code></pre>
+                    <pre class="hidden h-full flex"><code id="screenshot-result"></code></pre>
                 </div>
             </div>
 

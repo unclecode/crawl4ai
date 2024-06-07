@@ -35,7 +35,7 @@ def cprint(message, press_any_key=False):
 
 def basic_usage(crawler):
     cprint("🛠️ [bold cyan]Basic Usage: Simply provide a URL and let Crawl4ai do the magic![/bold cyan]")
-    result = crawler.run(url="https://www.nbcnews.com/business")
+    result = crawler.run(url="https://www.nbcnews.com/business", screenshot=True)
     cprint("[LOG] 📦 [bold yellow]Basic crawl result:[/bold yellow]")
     print_result(result)
 
@@ -187,6 +187,7 @@ def main():
 
     crawler = create_crawler()
 
+    crawler.always_by_pass_cache = True
     basic_usage(crawler)
     understanding_parameters(crawler)
     
