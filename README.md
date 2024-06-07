@@ -34,7 +34,7 @@ Crawl4AI has one clear task: to simplify crawling and extract useful information
 
 The most easy way! If you don't want to install any library, you can use the REST API on my server. But remember, this is just a simple server. I may improve its capacity if I see there is demand.
 
-```
+```python
 import requests
 
 data = {
