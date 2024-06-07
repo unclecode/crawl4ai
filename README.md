@@ -1,4 +1,4 @@
-# Crawl4AI v0.2.2 🕷️🤖
+# Crawl4AI v0.2.3 🕷️🤖
 
 [![GitHub Stars](https://img.shields.io/github/stars/unclecode/crawl4ai?style=social)](https://github.com/unclecode/crawl4ai/stargazers)
 [![GitHub Forks](https://img.shields.io/github/forks/unclecode/crawl4ai?style=social)](https://github.com/unclecode/crawl4ai/network/members)
@@ -11,6 +11,10 @@ Crawl4AI has one clear task: to simplify crawling and extract useful information
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1wz8u30rvbq6Scodye9AGCw8Qg_Z8QGsk)
 
 ## Recent Changes 
+
+### v0.2.3
+- 🎨 Extract and return all media tags (Images, Audio, and Video).
+- 🖼️ Take screenshots of the page.
 
 ### v0.2.2
 - Support multiple JS scripts

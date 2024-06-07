@@ -56,6 +56,7 @@ class CrawlRequest(BaseModel):
     chunking_strategy: Optional[str] = "RegexChunking"
     chunking_strategy_args: Optional[dict] = {}
     css_selector: Optional[str] = None
+    screenshot: Optional[bool] = False
     verbose: Optional[bool] = True
 
 
@@ -125,6 +126,7 @@ async def crawl_urls(crawl_request: CrawlRequest, request: Request):
                     chunking_strategy,
                     crawl_request.bypass_cache,
                     crawl_request.css_selector,
+                    crawl_request.screenshot,
                     crawl_request.verbose
                 )
                 for url in crawl_request.urls
