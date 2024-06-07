@@ -1,13 +1,26 @@
-import requests
+
+
+
+import requests, base64
 
 data = {
   "urls": [
     "https://www.nbcnews.com/business"
   ],
-  "word_count_threshold": 5,
   "screenshot": True
 }
 
 response = requests.post("https://crawl4ai.com/crawl", json=data) # OR local host if your run locally 
-response_data = response.json()
-print(response_data['results'][0].keys())
+result = response.json()['results'][0]
+
+
+print(result['markdown'])
+print(result['cleaned_html'])
+print(result['media'])
+print(result['extracted_content'])
+with open("screenshot.png", "wb") as f:
+    f.write(base64.b64decode(result['screenshot']))
+
+
+
+
