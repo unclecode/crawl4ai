@@ -157,9 +157,8 @@ with open("screenshot.png", "wb") as f:
 const loadMoreButton = Array.from(document.querySelectorAll('button')).find(button => button.textContent.includes('Load More'));
 loadMoreButton && loadMoreButton.click();
 """]
-crawler_strategy = LocalSeleniumCrawlerStrategy(js_code=js_code)
-crawler = WebCrawler(crawler_strategy=crawler_strategy, always_by_pass_cache=True)
-result = crawler.run(url="https://www.nbcnews.com/business")</code></pre>
+crawler = WebCrawler(verbos=crawler_strategy, always_by_pass_cache=True)
+result = crawler.run(url="https://www.nbcnews.com/business", js = js_code)</code></pre>
         <div class="">Remember that you can pass multiple JavaScript code snippets in the list. They all will be executed in the order they are passed.</div>
         </div>
 

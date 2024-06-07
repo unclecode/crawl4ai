@@ -95,20 +95,17 @@ from crawl4ai.extraction_strategy import *
 from crawl4ai.crawler_strategy import *
 
 # Define the JavaScript code to click the "Load More" button
-js_code = """
+js_code = ["""
 const loadMoreButton = Array.from(document.querySelectorAll('button')).find(button => button.textContent.includes('Load More'));
 loadMoreButton && loadMoreButton.click();
-"""
+"""]
 
-# Define the crawling strategy
-crawler_strategy = LocalSeleniumCrawlerStrategy(js_code=js_code)
-
-# Create the WebCrawler instance with the defined strategy
-crawler = WebCrawler(crawler_strategy=crawler_strategy)
-
+crawler = WebCrawler(verbose=True)
+crawler.warmup()
 # Run the crawler with keyword filtering and CSS selector
 result = crawler.run(
     url="https://www.nbcnews.com/business",
+    js = js_code,
     extraction_strategy=CosineStrategy(
         semantic_filter="technology",
     ),
@@ -117,6 +114,7 @@ result = crawler.run(
 # Run the crawler with LLM extraction strategy
 result = crawler.run(
     url="https://www.nbcnews.com/business",
+    js = js_code,
     extraction_strategy=LLMExtractionStrategy(
         provider="openai/gpt-4o",
         api_token=os.getenv('OPENAI_API_KEY'),
