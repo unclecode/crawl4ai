@@ -39,6 +39,16 @@ def basic_usage(crawler):
     cprint("[LOG] 📦 [bold yellow]Basic crawl result:[/bold yellow]")
     print_result(result)
 
+def screenshot_usage(crawler):
+    cprint("\n📸 [bold cyan]Let's take a screenshot of the page![/bold cyan]")
+    result = crawler.run(url="https://www.nbcnews.com/business", screenshot=True)
+    cprint("[LOG] 📦 [bold yellow]Screenshot result:[/bold yellow]")
+    # Save the screenshot to a file
+    with open("screenshot.png", "wb") as f:
+        f.write(base64.b64decode(result.screenshot))
+    cprint("Screenshot saved to 'screenshot.png'!")
+    print_result(result)
+
 def understanding_parameters(crawler):
     cprint("\n🧠 [bold cyan]Understanding 'bypass_cache' and 'include_raw_html' parameters:[/bold cyan]")
     cprint("By default, Crawl4ai caches the results of your crawls. This means that subsequent crawls of the same URL will be much faster! Let's see this in action.")
@@ -191,6 +201,7 @@ def main():
     understanding_parameters(crawler)
     
     crawler.always_by_pass_cache = True
+    screenshot_usage(crawler)
     add_chunking_strategy(crawler)
     add_extraction_strategy(crawler)
     add_llm_extraction_strategy(crawler)

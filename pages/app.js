@@ -104,6 +104,7 @@ document.getElementById("crawl-btn").addEventListener("click", () => {
         chunking_strategy: document.getElementById("chunking-strategy-select").value,
         chunking_strategy_args: {},
         css_selector: document.getElementById("css-selector").value,
+        screenshot: document.getElementById("screenshot-checkbox").checked,
         // instruction: document.getElementById("instruction").value,
         // semantic_filter: document.getElementById("semantic_filter").value,
         verbose: true,
@@ -137,7 +138,15 @@ document.getElementById("crawl-btn").addEventListener("click", () => {
             document.getElementById("json-result").textContent = JSON.stringify(parsedJson, null, 2);
             document.getElementById("cleaned-html-result").textContent = result.cleaned_html;
             document.getElementById("markdown-result").textContent = result.markdown;
-
+            document.getElementById("media-result").textContent = JSON.stringify( result.media, null, 2);
+            if (result.screenshot){
+                const imgElement = document.createElement("img");
+                // Set the src attribute with the base64 data
+                imgElement.src = `data:image/png;base64,${result.screenshot}`;
+                document.getElementById("screenshot-result").innerHTML = "";
+                document.getElementById("screenshot-result").appendChild(imgElement);
+            }
+            
             // Update code examples dynamically
             const extractionStrategy = data.extraction_strategy;
             const isLLMExtraction = extractionStrategy === "LLMExtractionStrategy";

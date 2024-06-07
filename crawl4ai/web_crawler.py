@@ -59,6 +59,8 @@ class WebCrawler:
         api_token: str = None,
         extract_blocks_flag: bool = True,
         word_count_threshold=MIN_WORD_THRESHOLD,
+        css_selector: str = None,
+        screenshot: bool = False,
         use_cached_html: bool = False,
         extraction_strategy: ExtractionStrategy = None,
         chunking_strategy: ChunkingStrategy = RegexChunking(),
@@ -70,6 +72,8 @@ class WebCrawler:
             extraction_strategy or NoExtractionStrategy(),
             chunking_strategy,
             bypass_cache=url_model.forced,
+            css_selector=css_selector,
+            screenshot=screenshot,
             **kwargs,
         )
         pass
@@ -83,6 +87,7 @@ class WebCrawler:
         chunking_strategy: ChunkingStrategy = RegexChunking(),
         bypass_cache: bool = False,
         css_selector: str = None,
+        screenshot: bool = False,
         verbose=True,
         **kwargs,
     ) -> CrawlResult:
@@ -110,6 +115,8 @@ class WebCrawler:
                         "markdown": cached[3],
                         "extracted_content": cached[4],
                         "success": cached[5],
+                        "media": json.loads(cached[6] or "{}"),
+                        "screenshot": cached[7],
                         "error_message": "",
                     }
                 )
@@ -117,6 +124,9 @@ class WebCrawler:
         # Initialize WebDriver for crawling
         t = time.time()
         html = self.crawler_strategy.crawl(url)
+        base64_image = None
+        if screenshot:
+            base64_image = self.crawler_strategy.take_screenshot()
         success = True
         error_message = ""
         # Extract content from HTML
@@ -129,6 +139,7 @@ class WebCrawler:
         
         cleaned_html = result.get("cleaned_html", html)
         markdown = result.get("markdown", "")
+        media = result.get("media", [])
 
         # Print a profession LOG style message, show time taken and say crawling is done
         if verbose:
@@ -163,6 +174,8 @@ class WebCrawler:
             markdown,
             extracted_content,
             success,
+            json.dumps(media),
+            screenshot=base64_image,
         )
 
         return CrawlResult(
@@ -170,6 +183,8 @@ class WebCrawler:
             html=html,
             cleaned_html=cleaned_html,
             markdown=markdown,
+            media=media,
+            screenshot=base64_image,
             extracted_content=extracted_content,
             success=success,
             error_message=error_message,
@@ -183,6 +198,8 @@ class WebCrawler:
         extract_blocks_flag: bool = True,
         word_count_threshold=MIN_WORD_THRESHOLD,
         use_cached_html: bool = False,
+        css_selector: str = None,
+        screenshot: bool = False,
         extraction_strategy: ExtractionStrategy = None,
         chunking_strategy: ChunkingStrategy = RegexChunking(),
         **kwargs,
@@ -200,6 +217,8 @@ class WebCrawler:
                     [api_token] * len(url_models),
                     [extract_blocks_flag] * len(url_models),
                     [word_count_threshold] * len(url_models),
+                    [css_selector] * len(url_models),
+                    [screenshot] * len(url_models),
                     [use_cached_html] * len(url_models),
                     [extraction_strategy] * len(url_models),
                     [chunking_strategy] * len(url_models),

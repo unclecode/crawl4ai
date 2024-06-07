@@ -180,6 +180,35 @@ def get_content_of_website(html, word_count_threshold = MIN_WORD_THRESHOLD, css_
             if tag.name != 'img':
                 tag.attrs = {}
 
+        # Extract all img tgas inti [{src: '', alt: ''}]
+        media = {
+            'images': [],
+            'videos': [],
+            'audios': []
+        }
+        for img in body.find_all('img'):
+            media['images'].append({
+                'src': img.get('src'),
+                'alt': img.get('alt'),
+                "type": "image"
+            })
+            
+        # Extract all video tags into [{src: '', alt: ''}]
+        for video in body.find_all('video'):
+            media['videos'].append({
+                'src': video.get('src'),
+                'alt': video.get('alt'),
+                "type": "video"
+            })
+            
+        # Extract all audio tags into [{src: '', alt: ''}]
+        for audio in body.find_all('audio'):
+            media['audios'].append({
+                'src': audio.get('src'),
+                'alt': audio.get('alt'),
+                "type": "audio"
+            })
+        
         # Replace images with their alt text or remove them if no alt text is available
         for img in body.find_all('img'):
             alt_text = img.get('alt')
@@ -299,7 +328,8 @@ def get_content_of_website(html, word_count_threshold = MIN_WORD_THRESHOLD, css_
         return{
             'markdown': markdown,
             'cleaned_html': cleaned_html,
-            'success': True
+            'success': True,
+            'media': media
         }
 
     except Exception as e:
@@ -484,3 +514,15 @@ def process_sections(url: str, sections: list, provider: str, api_token: str) ->
                 extracted_content.extend(future.result())
     
     return extracted_content
+
+
+def wrap_text(draw, text, font, max_width):
+    # Wrap the text to fit within the specified width
+    lines = []
+    words = text.split()
+    while words:
+        line = ''
+        while words and draw.textbbox((0, 0), line + words[0], font=font)[2] <= max_width:
+            line += (words.pop(0) + ' ')
+        lines.append(line)
+    return '\n'.join(lines)
