@@ -151,7 +151,7 @@ class CustomHTML2Text(HTML2Text):
 
         super().handle_tag(tag, attrs, start)
 
-def get_content_of_website(html, word_count_threshold = MIN_WORD_THRESHOLD, css_selector = None):
+def get_content_of_website(url, html, word_count_threshold = MIN_WORD_THRESHOLD, css_selector = None):
     try:
         if not html:
             return None
@@ -170,6 +170,28 @@ def get_content_of_website(html, word_count_threshold = MIN_WORD_THRESHOLD, css_
             for el in selected_elements:
                 div_tag.append(el)
             body = div_tag
+            
+        links = {
+            'internal': [],
+            'external': []
+        }
+        
+        # Extract all internal and external links
+        for a in body.find_all('a', href=True):
+            href = a['href']
+            url_base = url.split('/')[2]
+            if href.startswith('http') and url_base not in href:
+                links['external'].append({
+                    'href': href,
+                    'text': a.get_text()
+                })
+            else:
+                links['internal'].append(
+                    {
+                        'href': href,
+                        'text': a.get_text()
+                    }
+                )
 
         # Remove script, style, and other tags that don't carry useful content from body
         for tag in body.find_all(['script', 'style', 'link', 'meta', 'noscript']):
@@ -329,7 +351,8 @@ def get_content_of_website(html, word_count_threshold = MIN_WORD_THRESHOLD, css_
             'markdown': markdown,
             'cleaned_html': cleaned_html,
             'success': True,
-            'media': media
+            'media': media,
+            'links': links
         }
 
     except Exception as e:
