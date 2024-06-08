@@ -89,8 +89,11 @@ class WebCrawler:
         css_selector: str = None,
         screenshot: bool = False,
         verbose=True,
+        user_agent: str = None,
         **kwargs,
     ) -> CrawlResult:
+        if user_agent:
+            self.crawler_strategy.update_user_agent(user_agent)
         extraction_strategy = extraction_strategy or NoExtractionStrategy()
         extraction_strategy.verbose = verbose
         # Check if extraction strategy is an instance of ExtractionStrategy if not raise an error
@@ -117,7 +120,8 @@ class WebCrawler:
                         "success": cached[5],
                         "media": json.loads(cached[6] or "{}"),
                         "links": json.loads(cached[7] or "{}"),
-                        "screenshot": cached[8],
+                        "metadata": json.loads(cached[8] or "{}"), # "metadata": "{}
+                        "screenshot": cached[9],
                         "error_message": "",
                     }
                 )
@@ -135,6 +139,7 @@ class WebCrawler:
         # Extract content from HTML
         try:
             result = get_content_of_website(url, html, word_count_threshold, css_selector=css_selector)
+            metadata = extract_metadata(html)
             if result is None:
                 raise ValueError(f"Failed to extract content from the website: {url}")
         except InvalidCSSSelectorError as e:
@@ -180,6 +185,7 @@ class WebCrawler:
             success,
             json.dumps(media),
             json.dumps(links),
+            json.dumps(metadata),
             screenshot=base64_image,
         )
 
@@ -190,6 +196,7 @@ class WebCrawler:
             markdown=markdown,
             media=media,
             links=links,
+            metadata=metadata,
             screenshot=base64_image,
             extracted_content=extracted_content,
             success=success,

@@ -14,6 +14,9 @@ Crawl4AI has one clear task: to simplify crawling and extract useful information
 
 ### v0.2.3
 - 🎨 Extract and return all media tags (Images, Audio, and Video). Check `result.media`
+- 🔗 Extrat all external and internal links. Check `result.links`
+- 📚 Extract metadata from the page. Check `result.metadata`
+- 🕵️ Support `user_agent` parameter to set the user agent for the HTTP requests.
 - 🖼️ Take [screenshots](#taking-screenshots) of the page.
 
 ### v0.2.2
@@ -32,7 +35,7 @@ Crawl4AI has one clear task: to simplify crawling and extract useful information
 
 ## Power and Simplicity of Crawl4AI 🚀
 
-The most easy way! If you don't want to install any library, you can use the REST API on my server. But remember, this is just a simple server. I may improve its capacity if I see there is demand.
+The most easy way! If you don't want to install any library, you can use the REST API on my server. But remember, this is just a simple server. I may improve its capacity if I see there is demand. You can find ll examples of REST API in this colab notebook. [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1zODYjhemJ5bUmYceWpVoBMVpd0ofzNBZ?usp=sharing)
 
 ```python
 import requests
@@ -41,7 +44,6 @@ data = {
   "urls": [
     "https://www.nbcnews.com/business"
   ],
-  "word_count_threshold": 5,
   "screenshot": True
 }
 
@@ -242,8 +244,12 @@ To use the REST API, send a POST request to `http://localhost:8000/crawl` with t
             "url": "https://www.nbcnews.com/business",
             "extracted_content": "...",
             "html": "...",
+            "cleaned_html": "...",
             "markdown": "...",
-            "metadata": {...}
+            "media": {...},
+            "links": {...},
+            "metadata": {...},
+            "screenshots": "...",
         }
     ]
 }
@@ -280,6 +286,24 @@ result = crawler.run(url="https://www.nbcnews.com/business", bypass_cache=True)
 Crawl result without raw HTML content:
 ```python
 result = crawler.run(url="https://www.nbcnews.com/business", include_raw_html=False)
+```
+
+### Result Structure
+
+The result object contains the following fields:
+```python
+class CrawlResult(BaseModel):
+    url: str
+    html: str
+    success: bool
+    cleaned_html: Optional[str] = None
+    media: Dict[str, List[Dict]] = {} # Media tags in the page {"images": [], "audio": [], "video": []}
+    links: Dict[str, List[Dict]] = {} # Links in the page {"external": [], "internal": []}
+    screenshot: Optional[str] = None # Base64 encoded screenshot
+    markdown: Optional[str] = None
+    extracted_content: Optional[str] = None
+    metadata: Optional[dict] = None
+    error_message: Optional[str] = None
 ```
 
 ### Taking Screenshots
@@ -401,6 +425,7 @@ result = crawler.run(url="https://www.nbcnews.com/business")
 | `extraction_strategy` | The strategy to use for extracting content from the HTML (e.g., "CosineStrategy").                    | No       | `NoExtractionStrategy`    |
 | `chunking_strategy`   | The strategy to use for chunking the text before processing (e.g., "RegexChunking").                  | No       | `RegexChunking`     |
 | `css_selector`        | The CSS selector to target specific parts of the HTML for extraction.                                 | No       | `None`              |
+| `user_agent`          | The user agent to use for the HTTP requests.                                                          | No       | `Mozilla/5.0`       |
 | `verbose`             | Whether to enable verbose logging.                                                                    | No       | `true`              |
 
 ## Chunking Strategies 📚

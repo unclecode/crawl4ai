@@ -359,6 +359,47 @@ def get_content_of_website(url, html, word_count_threshold = MIN_WORD_THRESHOLD,
         print('Error processing HTML content:', str(e))
         raise InvalidCSSSelectorError(f"Invalid CSS selector: {css_selector}") from e
 
+
+
+def extract_metadata(html):
+    metadata = {}
+    
+    if not html:
+        return metadata
+    
+    # Parse HTML content with BeautifulSoup
+    soup = BeautifulSoup(html, 'html.parser')
+
+    # Title
+    title_tag = soup.find('title')
+    metadata['title'] = title_tag.string if title_tag else None
+
+    # Meta description
+    description_tag = soup.find('meta', attrs={'name': 'description'})
+    metadata['description'] = description_tag['content'] if description_tag else None
+
+    # Meta keywords
+    keywords_tag = soup.find('meta', attrs={'name': 'keywords'})
+    metadata['keywords'] = keywords_tag['content'] if keywords_tag else None
+
+    # Meta author
+    author_tag = soup.find('meta', attrs={'name': 'author'})
+    metadata['author'] = author_tag['content'] if author_tag else None
+
+    # Open Graph metadata
+    og_tags = soup.find_all('meta', attrs={'property': lambda value: value and value.startswith('og:')})
+    for tag in og_tags:
+        property_name = tag['property']
+        metadata[property_name] = tag['content']
+
+    # Twitter Card metadata
+    twitter_tags = soup.find_all('meta', attrs={'name': lambda value: value and value.startswith('twitter:')})
+    for tag in twitter_tags:
+        property_name = tag['name']
+        metadata[property_name] = tag['content']
+
+    return metadata
+
 def extract_xml_tags(string):
     tags = re.findall(r'<(\w+)>', string)
     return list(set(tags))
