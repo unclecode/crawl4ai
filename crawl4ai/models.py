@@ -11,6 +11,7 @@ class CrawlResult(BaseModel):
     success: bool
     cleaned_html: Optional[str] = None
     media: Dict[str, List[Dict]] = {}
+    links: Dict[str, List[Dict]] = {}
     screenshot: Optional[str] = None
     markdown: Optional[str] = None
     extracted_content: Optional[str] = None
