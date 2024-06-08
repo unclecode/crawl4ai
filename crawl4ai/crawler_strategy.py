@@ -44,6 +44,10 @@ class CrawlerStrategy(ABC):
     @abstractmethod
     def take_screenshot(self, save_path: str):
         pass
+    
+    @abstractmethod
+    def update_user_agent(self, user_agent: str):
+        pass
 
 class CloudCrawlerStrategy(CrawlerStrategy):
     def __init__(self, use_cached_html = False):
@@ -69,6 +73,8 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
         print("[LOG] 🚀 Initializing LocalSeleniumCrawlerStrategy")
         self.options = Options()
         self.options.headless = True
+        if kwargs.get("user_agent"):
+            self.options.add_argument("--user-agent=" + kwargs.get("user_agent"))
         self.options.add_argument("--no-sandbox")
         self.options.add_argument("--headless")
         # self.options.add_argument("--disable-dev-shm-usage")
@@ -95,6 +101,11 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
         import chromedriver_autoinstaller
         self.service = Service(chromedriver_autoinstaller.install())
         self.service.log_path = "NUL"
+        self.driver = webdriver.Chrome(service=self.service, options=self.options)
+
+    def update_user_agent(self, user_agent: str):
+        self.options.add_argument(f"user-agent={user_agent}")
+        self.driver.quit()
         self.driver = webdriver.Chrome(service=self.service, options=self.options)
 
     def crawl(self, url: str) -> str:
