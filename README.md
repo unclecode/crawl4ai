@@ -56,7 +56,7 @@ print(response_data['results'][0].keys())
 # 'metadata', 'error_message'])
 ```
 
-To show the simplicity take a look at the first example:
+But you muore control then take a look at the first example of using the Python library.
 
 ```python
 from crawl4ai import WebCrawler
@@ -66,24 +66,7 @@ crawler = WebCrawler()
 
 # Run the crawler with keyword filtering and CSS selector
 result = crawler.run(url="https://www.nbcnews.com/business")
-print(result) # {url, html, markdown, extracted_content, metadata}
-```
-
-If you don't want to install Selenium, you can use the REST API or local server. 
-
-```python
-import requests
-
-data = {
-  "urls": [
-    "https://www.nbcnews.com/business"
-  ],
-  "word_count_threshold": 10,
-  "extraction_strategy": "NoExtractionStrategy",
-}
-
-response = requests.post("https://crawl4ai.com/crawl", json=data) # OR local host if your run locally 
-print(response.json())
+print(result) # {url, html, cleaned_html, markdown, media, links, extracted_content, metadata, screenshots}
 ```
 
 Now let's try a complex task. Below is an example of how you can execute JavaScript, filter data using keywords, and use a CSS selector to extract specific content—all in one go!
