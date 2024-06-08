@@ -20,6 +20,7 @@ def init_db():
             extracted_content TEXT,
             success BOOLEAN,
             media TEXT DEFAULT "{}",
+            link TEXT DEFAULT "{}",
             screenshot TEXT DEFAULT ""
         )
     ''')
@@ -41,12 +42,12 @@ def check_db_path():
     if not DB_PATH:
         raise ValueError("Database path is not set or is empty.")
 
-def get_cached_url(url: str) -> Optional[Tuple[str, str, str, str, str, bool, str]]:
+def get_cached_url(url: str) -> Optional[Tuple[str, str, str, str, str, str, bool, str]]:
     check_db_path()
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-        cursor.execute('SELECT url, html, cleaned_html, markdown, extracted_content, success, media, screenshot FROM crawled_data WHERE url = ?', (url,))
+        cursor.execute('SELECT url, html, cleaned_html, markdown, extracted_content, success, media, links, screenshot FROM crawled_data WHERE url = ?', (url,))
         result = cursor.fetchone()
         conn.close()
         return result
@@ -54,23 +55,24 @@ def get_cached_url(url: str) -> Optional[Tuple[str, str, str, str, str, bool, st
         print(f"Error retrieving cached URL: {e}")
         return None
 
-def cache_url(url: str, html: str, cleaned_html: str, markdown: str, extracted_content: str, success: bool, media : str = "{}", screenshot: str = ""):
+def cache_url(url: str, html: str, cleaned_html: str, markdown: str, extracted_content: str, success: bool, media : str = "{}", links : str = "{}", screenshot: str = ""):
     check_db_path()
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('''
-            INSERT INTO crawled_data (url, html, cleaned_html, markdown, extracted_content, success, screenshot)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO crawled_data (url, html, cleaned_html, markdown, extracted_content, success, media, links, screenshot)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(url) DO UPDATE SET
                 html = excluded.html,
                 cleaned_html = excluded.cleaned_html,
                 markdown = excluded.markdown,
                 extracted_content = excluded.extracted_content,
                 success = excluded.success,
-                media = excluded.media,                
+                media = excluded.media,      
+                links = excluded.links,          
                 screenshot = excluded.screenshot
-        ''', (url, html, cleaned_html, markdown, extracted_content, success, media, screenshot))
+        ''', (url, html, cleaned_html, markdown, extracted_content, success, media, links, screenshot))
         conn.commit()
         conn.close()
     except Exception as e:
@@ -124,5 +126,5 @@ def update_existing_records(new_column: str = "media", default_value: str = "{}"
 
 if __name__ == "__main__":
     init_db()  # Initialize the database if not already initialized
-    alter_db_add_screenshot()  # Add the new column to the table
-    update_existing_records()  # Update existing records to set the new column to an empty string
+    alter_db_add_screenshot("links")  # Add the new column to the table
+    update_existing_records("links")  # Update existing records to set the new column to an empty string

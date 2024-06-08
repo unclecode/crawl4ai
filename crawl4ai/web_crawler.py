@@ -116,7 +116,8 @@ class WebCrawler:
                         "extracted_content": cached[4],
                         "success": cached[5],
                         "media": json.loads(cached[6] or "{}"),
-                        "screenshot": cached[7],
+                        "links": json.loads(cached[7] or "{}"),
+                        "screenshot": cached[8],
                         "error_message": "",
                     }
                 )
@@ -133,15 +134,16 @@ class WebCrawler:
         error_message = ""
         # Extract content from HTML
         try:
-            result = get_content_of_website(html, word_count_threshold, css_selector=css_selector)
+            result = get_content_of_website(url, html, word_count_threshold, css_selector=css_selector)
             if result is None:
                 raise ValueError(f"Failed to extract content from the website: {url}")
         except InvalidCSSSelectorError as e:
             raise ValueError(str(e))
         
-        cleaned_html = result.get("cleaned_html", html)
+        cleaned_html = result.get("cleaned_html", "")
         markdown = result.get("markdown", "")
         media = result.get("media", [])
+        links = result.get("links", [])
 
         # Print a profession LOG style message, show time taken and say crawling is done
         if verbose:
@@ -177,6 +179,7 @@ class WebCrawler:
             extracted_content,
             success,
             json.dumps(media),
+            json.dumps(links),
             screenshot=base64_image,
         )
 
@@ -186,6 +189,7 @@ class WebCrawler:
             cleaned_html=cleaned_html,
             markdown=markdown,
             media=media,
+            links=links,
             screenshot=base64_image,
             extracted_content=extracted_content,
             success=success,
@@ -229,3 +233,102 @@ class WebCrawler:
             )
 
         return results
+
+
+    def run_less_db(
+            self,
+            url: str,
+            word_count_threshold=MIN_WORD_THRESHOLD,
+            extraction_strategy: ExtractionStrategy = None,
+            chunking_strategy: ChunkingStrategy = RegexChunking(),
+            bypass_cache: bool = False,
+            css_selector: str = None,
+            screenshot: bool = False,
+            verbose=True,
+            **kwargs,
+        ) -> CrawlResult:
+            extraction_strategy = extraction_strategy or NoExtractionStrategy()
+            extraction_strategy.verbose = verbose
+            if not isinstance(extraction_strategy, ExtractionStrategy):
+                raise ValueError("Unsupported extraction strategy")
+            if not isinstance(chunking_strategy, ChunkingStrategy):
+                raise ValueError("Unsupported chunking strategy")
+            
+            if word_count_threshold < MIN_WORD_THRESHOLD:
+                word_count_threshold = MIN_WORD_THRESHOLD
+
+            # Check cache first
+            cached = None
+            extracted_content = None
+            if not bypass_cache and not self.always_by_pass_cache:
+                cached = get_cached_url(url)
+            
+            if cached:
+                html = cached[1]
+                extracted_content = cached[2]
+            else:
+                html = self.crawler_strategy.crawl(url)
+                cache_url(url, html)
+            
+            return self.process_html(url, html, extracted_content, word_count_threshold, extraction_strategy, chunking_strategy, css_selector, screenshot, verbose, **kwargs)
+
+    def process_html(
+            self,
+            url: str,
+            html: str,
+            extracted_content: str,
+            word_count_threshold: int,
+            extraction_strategy: ExtractionStrategy,
+            chunking_strategy: ChunkingStrategy,
+            css_selector: str,
+            screenshot: bool,
+            verbose: bool,
+            **kwargs,
+        ) -> CrawlResult:
+            t = time.time()
+            base64_image = None
+            if screenshot:
+                base64_image = self.crawler_strategy.take_screenshot()
+
+            # Extract content from HTML
+            try:
+                result = get_content_of_website(url, html, word_count_threshold, css_selector=css_selector)
+                if result is None:
+                    raise ValueError(f"Failed to extract content from the website: {url}")
+            except InvalidCSSSelectorError as e:
+                raise ValueError(str(e))
+            
+            cleaned_html = result.get("cleaned_html", "")
+            markdown = result.get("markdown", "")
+            media = result.get("media", [])
+            links = result.get("links", [])
+
+            if verbose:
+                print(f"[LOG] 🚀 Crawling done for {url}, success: True, time taken: {time.time() - t} seconds")
+
+            if verbose:
+                print(f"[LOG] 🔥 Extracting semantic blocks for {url}, Strategy: {extraction_strategy.name}")
+            
+            sections = chunking_strategy.chunk(markdown)
+            
+            if extracted_content is None:
+                extracted_content = extraction_strategy.run(url, sections)
+                extracted_content = json.dumps(extracted_content)
+                # Cache the extracted content
+                cache_url(url, html, extracted_content)
+
+            if verbose:
+                print(f"[LOG] 🚀 Extraction done for {url}, time taken: {time.time() - t} seconds.")
+
+            return CrawlResult(
+                url=url,
+                html=html,
+                cleaned_html=cleaned_html,
+                markdown=markdown,
+                media=media,
+                links=links,
+                screenshot=base64_image,
+                extracted_content=extracted_content,
+                success=True,
+                error_message="",
+            )
