@@ -51,6 +51,9 @@ data = {
 response = requests.post("https://crawl4ai.com/crawl", json=data) # OR local host if your run locally 
 response_data = response.json()
 print(response_data['results'][0].keys())
+# dict_keys(['url', 'html', 'success', 'cleaned_html', 'media', 
+# 'links', 'screenshot', 'markdown', 'extracted_content', 
+# 'metadata', 'error_message'])
 ```
 
 To show the simplicity take a look at the first example:
