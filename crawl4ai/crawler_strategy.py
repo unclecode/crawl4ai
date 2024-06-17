@@ -109,8 +109,12 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
         self.driver = webdriver.Chrome(service=self.service, options=self.options)
 
     def crawl(self, url: str) -> str:
+        # Create md5 hash of the URL
+        import hashlib
+        url_hash = hashlib.md5(url.encode()).hexdigest()
+        
         if self.use_cached_html:
-            cache_file_path = os.path.join(Path.home(), ".crawl4ai", "cache", url.replace("/", "_"))
+            cache_file_path = os.path.join(Path.home(), ".crawl4ai", "cache", url_hash)
             if os.path.exists(cache_file_path):
                 with open(cache_file_path, "r") as f:
                     return f.read()
@@ -140,7 +144,7 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
             html = self.driver.page_source
             
             # Store in cache
-            cache_file_path = os.path.join(Path.home(), ".crawl4ai", "cache", url.replace("/", "_"))
+            cache_file_path = os.path.join(Path.home(), ".crawl4ai", "cache", url_hash)
             with open(cache_file_path, "w") as f:
                 f.write(html)
                 
