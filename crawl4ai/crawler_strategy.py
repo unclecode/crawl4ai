@@ -139,6 +139,13 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
         self.driver = webdriver.Chrome(service=self.service, options=self.options)
         self.driver = self.execute_hook('on_driver_created', self.driver)
 
+    def set_custom_headers(self, headers: dict):
+        # Enable Network domain for sending headers
+        self.driver.execute_cdp_cmd('Network.enable', {})
+        # Set extra HTTP headers
+        self.driver.execute_cdp_cmd('Network.setExtraHTTPHeaders', {'headers': headers})
+
+
     def crawl(self, url: str) -> str:
         # Create md5 hash of the URL
         import hashlib

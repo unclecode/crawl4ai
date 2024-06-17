@@ -198,12 +198,11 @@ def using_crawler_hooks(crawler):
         print("[HOOK] on_driver_created")
         # Example customization: maximize the window
         driver.maximize_window()
-        return driver
-
-    def before_get_url(driver):
-        print("[HOOK] before_get_url")
+        
         # Example customization: logging in to a hypothetical website
         driver.get('https://example.com/login')
+        
+        from selenium.webdriver.support.ui import WebDriverWait
         WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.NAME, 'username'))
         )
@@ -215,8 +214,18 @@ def using_crawler_hooks(crawler):
         )
         # Add a custom cookie
         driver.add_cookie({'name': 'test_cookie', 'value': 'cookie_value'})
-        return driver
+        return driver        
+        
 
+    def before_get_url(driver):
+        print("[HOOK] before_get_url")
+        # Example customization: add a custom header
+        # Enable Network domain for sending headers
+        driver.execute_cdp_cmd('Network.enable', {})
+        # Add a custom header
+        driver.execute_cdp_cmd('Network.setExtraHTTPHeaders', {'headers': {'X-Test-Header': 'test'}})
+        return driver
+    
     def after_get_url(driver):
         print("[HOOK] after_get_url")
         # Example customization: log the URL
@@ -225,9 +234,9 @@ def using_crawler_hooks(crawler):
 
     def before_return_html(driver, html):
         print("[HOOK] before_return_html")
-        # Example customization: modify the HTML (for demonstration purposes)
-        modified_html = html.replace('Example Domain', 'Test Domain')
-        return driver, modified_html    
+        # Example customization: log the HTML
+        print(len(html))
+        return driver
     
     cprint("\n🔗 [bold cyan]Using Crawler Hooks: Let's see how we can customize the crawler using hooks![/bold cyan]", True)
     
