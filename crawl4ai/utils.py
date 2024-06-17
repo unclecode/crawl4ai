@@ -250,6 +250,15 @@ def get_content_of_website(url, html, word_count_threshold = MIN_WORD_THRESHOLD,
         # Replace all "pre" tags with their inner text
         body = replace_pre_tags_with_text(body)
 
+
+        # List of inline styling tags
+        inline_styling_tags = ['b', 'i', 'u', 'span', 'del', 'ins', 'sub', 'sup', 'strong', 'em', 'code', 'kbd', 'var', 's', 'q', 'abbr', 'cite', 'dfn', 'time', 'small', 'mark']
+        # Iterate over each tag and unwrap it
+        for tag in inline_styling_tags:
+            for match in soup.find_all(tag):
+                match.unwrap()
+                
+
         # Recursively remove empty elements, their parent elements, and elements with word count below threshold
         def remove_empty_and_low_word_count_elements(node, word_count_threshold):
             for child in node.contents:
