@@ -13,6 +13,9 @@ Crawl4AI has one clear task: to simplify crawling and extract useful information
 
 ## Recent Changes 
 
+### v0.2.34
+- 🐞 Resolve the issue with the long url. (Issue #22)
+
 ### v0.2.3
 - 🎨 Extract and return all media tags (Images, Audio, and Video). Check `result.media`
 - 🔗 Extrat all external and internal links. Check `result.links`
