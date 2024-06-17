@@ -151,6 +151,38 @@ class CustomHTML2Text(HTML2Text):
 
         super().handle_tag(tag, attrs, start)
 
+def replace_inline_tags(soup, tags):
+    tag_replacements = {
+        'b': lambda tag: f"**{tag.text}**",
+        'i': lambda tag: f"*{tag.text}*",
+        'u': lambda tag: f"__{tag.text}__",
+        'span': lambda tag: f"{tag.text}",
+        'del': lambda tag: f"~~{tag.text}~~",
+        'ins': lambda tag: f"++{tag.text}++",
+        'sub': lambda tag: f"~{tag.text}~",
+        'sup': lambda tag: f"^^{tag.text}^^",
+        'strong': lambda tag: f"**{tag.text}**",
+        'em': lambda tag: f"*{tag.text}*",
+        'code': lambda tag: f"`{tag.text}`",
+        'kbd': lambda tag: f"`{tag.text}`",
+        'var': lambda tag: f"_{tag.text}_",
+        's': lambda tag: f"~~{tag.text}~~",
+        'q': lambda tag: f'"{tag.text}"',
+        'abbr': lambda tag: f"{tag.text} ({tag.get('title', '')})",
+        'cite': lambda tag: f"_{tag.text}_",
+        'dfn': lambda tag: f"_{tag.text}_",
+        'time': lambda tag: f"{tag.text}",
+        'small': lambda tag: f"<small>{tag.text}</small>",
+        'mark': lambda tag: f"=={tag.text}=="
+    }
+
+    for tag_name in tags:
+        for tag in soup.find_all(tag_name):
+            replacement_text = tag_replacements.get(tag_name, lambda t: t.text)(tag)
+            tag.replace_with(replacement_text)
+
+    return soup
+
 def get_content_of_website(url, html, word_count_threshold = MIN_WORD_THRESHOLD, css_selector = None):
     try:
         if not html:
@@ -249,6 +281,9 @@ def get_content_of_website(url, html, word_count_threshold = MIN_WORD_THRESHOLD,
         
         # Replace all "pre" tags with their inner text
         body = replace_pre_tags_with_text(body)
+        
+        # Replace inline tags with their text content
+        body = replace_inline_tags(body, ['b', 'i', 'u', 'span', 'del', 'ins', 'sub', 'sup', 'strong', 'em', 'code', 'kbd', 'var', 's', 'q', 'abbr', 'cite', 'dfn', 'time', 'small', 'mark'])
 
         # Recursively remove empty elements, their parent elements, and elements with word count below threshold
         def remove_empty_and_low_word_count_elements(node, word_count_threshold):
