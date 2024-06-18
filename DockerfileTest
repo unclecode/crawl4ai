@@ -1,0 +1,37 @@
+
+# First stage: Build and install dependencies
+FROM python:3.10-slim-bookworm as builder
+
+# Set the working directory in the container
+WORKDIR /usr/src/app
+
+# Install build dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    wget \
+    curl \
+    unzip 
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir spacy
+
+# Copy the rest of the application code
+COPY . .
+
+# Set environment to use Chrome and ChromeDriver properly
+ENV CHROME_BIN=/usr/bin/google-chrome \
+    CHROMEDRIVER=/usr/local/bin/chromedriver \
+    DISPLAY=:99 \
+    DBUS_SESSION_BUS_ADDRESS=/dev/null \
+    PYTHONUNBUFFERED=1
+
+# Ensure the PATH environment variable includes the location of the installed packages
+ENV PATH /usr/local/bin:$PATH   
+
+# Make port 80 available to the world outside this container
+EXPOSE 80
+
+# Print helloworld when the container launches
+CMD ["echo", "Hello, World!"]

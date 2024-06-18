@@ -53,7 +53,6 @@ def set_model_device(model):
     model.to(device)    
     return model, device
 
-@lru_cache()
 def get_home_folder():
     home_folder = os.path.join(Path.home(), ".crawl4ai")
     os.makedirs(home_folder, exist_ok=True)
@@ -202,7 +201,7 @@ def load_spacy_model():
         repo_folder = os.path.join(home_folder, "crawl4ai")
         model_folder = os.path.join(home_folder, name)
 
-        # print("[LOG] ⏬ Downloading Spacy model for the first time...")
+        print("[LOG] ⏬ Downloading Spacy model for the first time...")
 
         # Remove existing repo folder if it exists
         if Path(repo_folder).exists():
@@ -230,7 +229,7 @@ def load_spacy_model():
             shutil.rmtree(repo_folder)
 
             # Print completion message
-            # print("[LOG] ✅ Spacy Model downloaded successfully")
+            print("[LOG] ✅ Spacy Model downloaded successfully")
         except subprocess.CalledProcessError as e:
             print(f"An error occurred while cloning the repository: {e}")
         except Exception as e:
@@ -255,8 +254,8 @@ def download_all_models(remove_existing=False):
     # Load each model to trigger download
     # print("[LOG] Downloading BERT Base Uncased...")
     # load_bert_base_uncased()
-    # print("[LOG] Downloading BGE Small EN v1.5...")
-    # load_bge_small_en_v1_5()
+    print("[LOG] Downloading BGE Small EN v1.5...")
+    load_bge_small_en_v1_5()
     # print("[LOG] Downloading ONNX model...")
     # load_onnx_all_MiniLM_l6_v2()
     print("[LOG] Downloading text classifier...")

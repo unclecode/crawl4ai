@@ -1,7 +1,17 @@
 from setuptools import setup, find_packages
-import os
+import os, sys
+from pathlib import Path
 import subprocess
 from setuptools.command.install import install
+
+def get_home_folder():
+    home_folder = os.path.join(Path.home(), ".crawl4ai")
+    os.makedirs(home_folder, exist_ok=True)
+    os.makedirs(f"{home_folder}/cache", exist_ok=True)
+    os.makedirs(f"{home_folder}/models", exist_ok=True)
+    return home_folder 
+
+home_folder = get_home_folder()
 
 # Read the requirements from requirements.txt
 with open("requirements.txt") as f:

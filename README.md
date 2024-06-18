@@ -188,7 +188,7 @@ pip install -e .[all]
 # docker build --platform linux/amd64 -t crawl4ai .
 # For other users
 # docker build -t crawl4ai .
-docker run -d -p 8000:80 crawl4ai
+docker run -d -p 8000:80 --name crawl4ai_container_1 crawl4ai
 ```
 
 
