@@ -104,6 +104,7 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
         # Hooks
         self.hooks = {
             'on_driver_created': None,
+            'on_user_agent_updated': None,
             'before_get_url': None,
             'after_get_url': None,
             'before_return_html': None
@@ -114,6 +115,7 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
         self.service = Service(chromedriver_autoinstaller.install())
         self.service.log_path = "NUL"
         self.driver = webdriver.Chrome(service=self.service, options=self.options)
+        self.driver = self.execute_hook('on_driver_created', self.driver)
 
     def set_hook(self, hook_type: str, hook: Callable):
         if hook_type in self.hooks:
@@ -137,7 +139,7 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
         self.options.add_argument(f"user-agent={user_agent}")
         self.driver.quit()
         self.driver = webdriver.Chrome(service=self.service, options=self.options)
-        self.driver = self.execute_hook('on_driver_created', self.driver)
+        self.driver = self.execute_hook('on_user_agent_updated', self.driver)
 
     def set_custom_headers(self, headers: dict):
         # Enable Network domain for sending headers
