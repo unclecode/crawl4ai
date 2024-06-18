@@ -9,6 +9,8 @@
   - before_return_html: Called when the data is parsed and ready.
   - on_user_agent_updated: Called when the user changes the user_agent, causing the driver to reinitialize.
 - Added an example in `quickstart.py` in the example folder under the docs.
+- Enhancement issue #24: Replaced inline HTML tags (e.g., DEL, INS, SUB, ABBR) with textual format for better context handling in LLM.
+
 
 ## [0.2.4] - 2024-06-17
 ### Fixed
