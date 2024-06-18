@@ -1,4 +1,4 @@
-# Crawl4AI v0.2.3 🕷️🤖
+# Crawl4AI v0.2.5 🕷️🤖
 
 [![GitHub Stars](https://img.shields.io/github/stars/unclecode/crawl4ai?style=social)](https://github.com/unclecode/crawl4ai/stargazers)
 [![GitHub Forks](https://img.shields.io/github/forks/unclecode/crawl4ai?style=social)](https://github.com/unclecode/crawl4ai/network/members)
@@ -8,9 +8,22 @@
 
 Crawl4AI has one clear task: to simplify crawling and extract useful information from web pages, making it accessible for large language models (LLMs) and AI applications. 🆓🌐
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1wz8u30rvbq6Scodye9AGCw8Qg_Z8QGsk)
+- Use as REST API: Check  [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1zODYjhemJ5bUmYceWpVoBMVpd0ofzNBZ?usp=sharing)
+- Use as Python library: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1wz8u30rvbq6Scodye9AGCw8Qg_Z8QGsk)
 
 ## Recent Changes 
+
+### v0.2.5
+- 🌟 Added six important hooks to the crawler:
+  - 🟢 on_driver_created: Called when the driver is ready for initializations.
+  - 🔵 before_get_url: Called right before Selenium fetches the URL.
+  - 🟣 after_get_url: Called after Selenium fetches the URL.
+  - 🟠 before_return_html: Called when the data is parsed and ready.
+  - 🟡 on_user_agent_updated: Called when the user changes the user_agent, causing the driver to reinitialize.
+- 📄 Added an example in [`quickstart.py`](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/quickstart.py) in the example folder under the docs.
+
+### v0.2.4
+- 🐞 Resolve the issue with the long url. (Issue #22)
 
 ### v0.2.3
 - 🎨 Extract and return all media tags (Images, Audio, and Video). Check `result.media`
@@ -50,9 +63,12 @@ data = {
 response = requests.post("https://crawl4ai.com/crawl", json=data) # OR local host if your run locally 
 response_data = response.json()
 print(response_data['results'][0].keys())
+# dict_keys(['url', 'html', 'success', 'cleaned_html', 'media', 
+# 'links', 'screenshot', 'markdown', 'extracted_content', 
+# 'metadata', 'error_message'])
 ```
 
-To show the simplicity take a look at the first example:
+But you muore control then take a look at the first example of using the Python library.
 
 ```python
 from crawl4ai import WebCrawler
@@ -62,24 +78,7 @@ crawler = WebCrawler()
 
 # Run the crawler with keyword filtering and CSS selector
 result = crawler.run(url="https://www.nbcnews.com/business")
-print(result) # {url, html, markdown, extracted_content, metadata}
-```
-
-If you don't want to install Selenium, you can use the REST API or local server. 
-
-```python
-import requests
-
-data = {
-  "urls": [
-    "https://www.nbcnews.com/business"
-  ],
-  "word_count_threshold": 10,
-  "extraction_strategy": "NoExtractionStrategy",
-}
-
-response = requests.post("https://crawl4ai.com/crawl", json=data) # OR local host if your run locally 
-print(response.json())
+print(result) # {url, html, cleaned_html, markdown, media, links, extracted_content, metadata, screenshots}
 ```
 
 Now let's try a complex task. Below is an example of how you can execute JavaScript, filter data using keywords, and use a CSS selector to extract specific content—all in one go!

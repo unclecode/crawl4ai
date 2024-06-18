@@ -192,6 +192,64 @@ def multiple_scrip(crawler):
     cprint("[LOG] 📦 [bold yellow]JavaScript Code (Load More button) result:[/bold yellow]")
     print_result(result)
 
+def using_crawler_hooks(crawler):
+    # Example usage of the hooks for authentication and setting a cookie
+    def on_driver_created(driver):
+        print("[HOOK] on_driver_created")
+        # Example customization: maximize the window
+        driver.maximize_window()
+        
+        # Example customization: logging in to a hypothetical website
+        driver.get('https://example.com/login')
+        
+        from selenium.webdriver.support.ui import WebDriverWait
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.NAME, 'username'))
+        )
+        driver.find_element(By.NAME, 'username').send_keys('testuser')
+        driver.find_element(By.NAME, 'password').send_keys('password123')
+        driver.find_element(By.NAME, 'login').click()
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.ID, 'welcome'))
+        )
+        # Add a custom cookie
+        driver.add_cookie({'name': 'test_cookie', 'value': 'cookie_value'})
+        return driver        
+        
+
+    def before_get_url(driver):
+        print("[HOOK] before_get_url")
+        # Example customization: add a custom header
+        # Enable Network domain for sending headers
+        driver.execute_cdp_cmd('Network.enable', {})
+        # Add a custom header
+        driver.execute_cdp_cmd('Network.setExtraHTTPHeaders', {'headers': {'X-Test-Header': 'test'}})
+        return driver
+    
+    def after_get_url(driver):
+        print("[HOOK] after_get_url")
+        # Example customization: log the URL
+        print(driver.current_url)
+        return driver
+
+    def before_return_html(driver, html):
+        print("[HOOK] before_return_html")
+        # Example customization: log the HTML
+        print(len(html))
+        return driver
+    
+    cprint("\n🔗 [bold cyan]Using Crawler Hooks: Let's see how we can customize the crawler using hooks![/bold cyan]", True)
+    
+    crawler.set_hook('on_driver_created', on_driver_created)
+    crawler.set_hook('before_get_url', before_get_url)
+    crawler.set_hook('after_get_url', after_get_url)
+    crawler.set_hook('before_return_html', before_return_html)
+    
+    result = crawler.run(url="https://example.com")
+    
+    cprint("[LOG] 📦 [bold yellow]Crawler Hooks result:[/bold yellow]")
+    print_result(result= result)
+
 def main():
     cprint("🌟 [bold green]Welcome to the Crawl4ai Quickstart Guide! Let's dive into some web crawling fun! 🌐[/bold green]")
     cprint("⛳️ [bold cyan]First Step: Create an instance of WebCrawler and call the `warmup()` function.[/bold cyan]")
