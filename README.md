@@ -1,4 +1,4 @@
-# Crawl4AI v0.2.3 🕷️🤖
+# Crawl4AI v0.2.5 🕷️🤖
 
 [![GitHub Stars](https://img.shields.io/github/stars/unclecode/crawl4ai?style=social)](https://github.com/unclecode/crawl4ai/stargazers)
 [![GitHub Forks](https://img.shields.io/github/forks/unclecode/crawl4ai?style=social)](https://github.com/unclecode/crawl4ai/network/members)
@@ -20,8 +20,7 @@ Crawl4AI has one clear task: to simplify crawling and extract useful information
   - 🟣 after_get_url: Called after Selenium fetches the URL.
   - 🟠 before_return_html: Called when the data is parsed and ready.
   - 🟡 on_user_agent_updated: Called when the user changes the user_agent, causing the driver to reinitialize.
-- 📄 Added an example in `quickstart.py` in the example folder under the docs.
-
+- 📄 Added an example in [`quickstart.py`](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/quickstart.py) in the example folder under the docs.
 
 ### v0.2.4
 - 🐞 Resolve the issue with the long url. (Issue #22)
