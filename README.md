@@ -13,6 +13,16 @@ Crawl4AI has one clear task: to simplify crawling and extract useful information
 
 ## Recent Changes 
 
+### v0.2.5
+- 🌟 Added six important hooks to the crawler:
+  - 🟢 on_driver_created: Called when the driver is ready for initializations.
+  - 🔵 before_get_url: Called right before Selenium fetches the URL.
+  - 🟣 after_get_url: Called after Selenium fetches the URL.
+  - 🟠 before_return_html: Called when the data is parsed and ready.
+  - 🟡 on_user_agent_updated: Called when the user changes the user_agent, causing the driver to reinitialize.
+- 📄 Added an example in `quickstart.py` in the example folder under the docs.
+
+
 ### v0.2.4
 - 🐞 Resolve the issue with the long url. (Issue #22)
 
