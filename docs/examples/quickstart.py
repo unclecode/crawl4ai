@@ -203,6 +203,9 @@ def using_crawler_hooks(crawler):
         driver.get('https://example.com/login')
         
         from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support import expected_conditions as EC
+        
         WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.NAME, 'username'))
         )
