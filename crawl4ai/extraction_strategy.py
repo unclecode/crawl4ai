@@ -71,6 +71,8 @@ class LLMExtractionStrategy(ExtractionStrategy):
         self.instruction = instruction
         self.extract_type = extraction_type
         self.schema = schema
+        if schema:
+            self.extract_type = "schema"
         
         self.chunk_token_threshold = kwargs.get("chunk_token_threshold", CHUNK_TOKEN_THRESHOLD)
         self.overlap_rate = kwargs.get("overlap_rate", OVERLAP_RATE)
