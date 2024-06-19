@@ -165,3 +165,34 @@ Please provide your output within <blocks> tags, like this:
 **Make sure to follow the user instruction to extract blocks aligin with the instruction.**
 
 Remember, the output should be a complete, parsable JSON wrapped in <blocks> tags, with no omissions or errors. The JSON objects should semantically break down the content into relevant blocks, maintaining the original order."""
+
+PROMPT_EXTRACT_SCHEMA_WITH_INSTRUCTION = """Here is the content from the URL:
+<url>{URL}</url>
+
+<url_content>
+{HTML}
+</url_content>
+
+The user has made the following request for what information to extract from the above content:
+
+<user_request>
+{REQUEST}
+</user_request>
+
+<schema_block>
+{SCHEMA}
+</schema_block>
+
+Please carefully read the URL content and the user's request. If the user provided a desired JSON schema in the <schema_block> above, extract the requested information from the URL content according to that schema. If no schema was provided, infer an appropriate JSON schema based on the user's request that will best capture the key information they are looking for.
+
+Extraction instructions:
+Return the extracted information as a list of JSON objects, with each object in the list corresponding to a block of content from the URL, in the same order as it appears on the page. Wrap the entire JSON list in <blocks> tags.
+
+Quality Reflection:
+Before outputting your final answer, double check that the JSON you are returning is complete, containing all the information requested by the user, and is valid JSON that could be parsed by json.loads() with no errors or omissions. The outputted JSON objects should fully match the schema, either provided or inferred.
+
+Quality Score:
+After reflecting, score the quality and completeness of the JSON data you are about to return on a scale of 1 to 5. Write the score inside <score> tags.
+
+Result
+Output the final list of JSON objects, wrapped in <blocks> tags."""

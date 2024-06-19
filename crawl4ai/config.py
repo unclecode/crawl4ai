@@ -21,7 +21,9 @@ PROVIDER_MODELS = {
 
 
 # Chunk token threshold
-CHUNK_TOKEN_THRESHOLD = 1000
+CHUNK_TOKEN_THRESHOLD = 500
+OVERLAP_RATE = 0.1
+WORD_TOKEN_RATE = 1.3
 
 # Threshold for the minimum number of word in a HTML tag to be considered 
-MIN_WORD_THRESHOLD = 5
+MIN_WORD_THRESHOLD = 1

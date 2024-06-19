@@ -22,6 +22,7 @@ Crawl4AI has one clear task: to simplify crawling and extract useful information
   - 🟡 on_user_agent_updated: Called when the user changes the user_agent, causing the driver to reinitialize.
 - 📄 Added an example in [`quickstart.py`](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/quickstart.py) in the example folder under the docs.
 - ✨ Maintaining the semantic context of inline tags (e.g., abbreviation, DEL, INS) for improved LLM-friendliness.
+- 🐳 Updated Dockerfile to ensure compatibility across multiple platforms (Hopefully!).
 
 ### v0.2.4
 - 🐞 Resolve the issue with the long url. (Issue #22)
