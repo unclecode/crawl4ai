@@ -42,7 +42,7 @@ class WebCrawler:
     def warmup(self):
         print("[LOG] 🌤️  Warming up the WebCrawler")
         result = self.run(
-            url='https://crawl4ai.uccode.io/',
+            url='https://google.com/',
             word_count_threshold=5,
             extraction_strategy= NoExtractionStrategy(),
             bypass_cache=False,
@@ -176,7 +176,7 @@ class WebCrawler:
             t = time.time()
             # Extract content from HTML
             try:
-                result = get_content_of_website(url, html, word_count_threshold, css_selector=css_selector)
+                result = get_content_of_website(url, html, word_count_threshold, css_selector=css_selector, only_text=kwargs.get("only_text", False))
                 metadata = extract_metadata(html)
                 if result is None:
                     raise ValueError(f"Failed to extract content from the website: {url}")

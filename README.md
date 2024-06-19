@@ -21,33 +21,29 @@ Crawl4AI has one clear task: to simplify crawling and extract useful information
   - 🟠 before_return_html: Called when the data is parsed and ready.
   - 🟡 on_user_agent_updated: Called when the user changes the user_agent, causing the driver to reinitialize.
 - 📄 Added an example in [`quickstart.py`](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/quickstart.py) in the example folder under the docs.
+- ✨ Maintaining the semantic context of inline tags (e.g., abbreviation, DEL, INS) for improved LLM-friendliness.
+- 🐳 Updated Dockerfile to ensure compatibility across multiple platforms (Hopefully!).
 
-### v0.2.4
-- 🐞 Resolve the issue with the long url. (Issue #22)
+Check the [Changelog](https://github.com/unclecode/crawl4ai/blob/main/CHANGELOG.md) for more details.
 
-### v0.2.3
-- 🎨 Extract and return all media tags (Images, Audio, and Video). Check `result.media`
-- 🔗 Extrat all external and internal links. Check `result.links`
-- 📚 Extract metadata from the page. Check `result.metadata`
+
+## Features ✨
+- 🆓 Completely free to use and open-source (If one can assume this as a feature ;))
+- 🤖 LLM-friendly output formats (JSON, cleaned HTML, markdown)
+- 🌍 Supports crawling multiple URLs simultaneously
+- 🎨 Extract and return all media tags (Images, Audio, and Video).
+- 🔗 Extrat all external and internal links. 
+- 📚 Extract metadata from the page. 
+- 🔄 Custom hooks for authentication, headers, and page modifications before crawling
 - 🕵️ Support `user_agent` parameter to set the user agent for the HTTP requests.
 - 🖼️ Take [screenshots](#taking-screenshots) of the page.
-
-### v0.2.2
-- Support multiple JS scripts
-- Fixed some of bugs
-- Resolved a few issue relevant to Colab installation
-
-### v0.2.0
-- 🚀 10x faster!!
-- 📜 Execute custom JavaScript before crawling!
-- 🤝 Colab friendly!
-- 📚 Chunking strategies: topic-based, regex, sentence, and more!
-- 🧠 Extraction strategies: cosine clustering, LLM, and more!
+- 📜 Execute multiple custom JavaScripts before crawling
+- 📚 Chunking strategies: topic-based, regex, sentence, and more
+- 🧠 Extraction strategies: cosine clustering, LLM, and more
 - 🎯 CSS selector support
 - 📝 Pass instructions/keywords to refine extraction
 
 ## Power and Simplicity of Crawl4AI 🚀
-
 The most easy way! If you don't want to install any library, you can use the REST API on my server. But remember, this is just a simple server. I may improve its capacity if I see there is demand. You can find ll examples of REST API in this colab notebook. [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1zODYjhemJ5bUmYceWpVoBMVpd0ofzNBZ?usp=sharing)
 
 ```python
@@ -81,6 +77,53 @@ result = crawler.run(url="https://www.nbcnews.com/business")
 print(result) # {url, html, cleaned_html, markdown, media, links, extracted_content, metadata, screenshots}
 ```
 
+### Extract with LLM
+Next example is crawling all OpenAI models withh their fees from the official page. ['OpenAI Models and Pricing'](https://openai.com/api/pricing/)
+
+```python
+import os
+import time
+from crawl4ai.web_crawler import WebCrawler
+from crawl4ai.chunking_strategy import *
+from crawl4ai.extraction_strategy import *
+from crawl4ai.crawler_strategy import *
+
+url = r'https://openai.com/api/pricing/'
+
+crawler = WebCrawler()
+crawler.warmup()
+
+from pydantic import BaseModel, Field
+
+class OpenAIModelFee(BaseModel):
+    model_name: str = Field(..., description="Name of the OpenAI model.")
+    input_fee: str = Field(..., description="Fee for input token for the OpenAI model.")
+    output_fee: str = Field(..., description="Fee for output token for the OpenAI model.")
+
+result = crawler.run(
+    url=url,
+    word_count_threshold=1,
+    extraction_strategy= LLMExtractionStrategy(
+        provider= "openai/gpt-4o", api_token = os.getenv('OPENAI_API_KEY'), 
+        schema=OpenAIModelFee.model_json_schema(),
+        extraction_type="schema",
+        instruction="From the crawled content, extract all mentioned model names along with their "\
+            "fees for input and output tokens. Make sure not to miss anything in the entire content. "\
+            'One extracted model JSON format should look like this: '\
+            '{ "model_name": "GPT-4", "input_fee": "US$10.00 / 1M tokens", "output_fee": "US$30.00 / 1M tokens" }'
+    ),
+    bypass_cache=True,
+)
+
+model_fees = json.loads(result.extracted_content)
+
+print(len(model_fees))
+
+with open(".data/data.json", "w") as f:
+    f.write(result.extracted_content)
+```
+
+## Execute JS, Filter Data with CSS Selector, and Clustring using Cosine Strategy
 Now let's try a complex task. Below is an example of how you can execute JavaScript, filter data using keywords, and use a CSS selector to extract specific content—all in one go!
 
 1. Instantiate a WebCrawler object.
@@ -107,21 +150,10 @@ crawler.warmup()
 result = crawler.run(
     url="https://www.nbcnews.com/business",
     js = js_code,
+    css_selector="p"
     extraction_strategy=CosineStrategy(
         semantic_filter="technology",
     ),
-)
-
-# Run the crawler with LLM extraction strategy
-result = crawler.run(
-    url="https://www.nbcnews.com/business",
-    js = js_code,
-    extraction_strategy=LLMExtractionStrategy(
-        provider="openai/gpt-4o",
-        api_token=os.getenv('OPENAI_API_KEY'),
-        instruction="Extract only content related to technology"
-    ),
-    css_selector="p"
 )
 
 # Display the extracted result

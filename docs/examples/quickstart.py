@@ -35,7 +35,13 @@ def cprint(message, press_any_key=False):
 
 def basic_usage(crawler):
     cprint("🛠️ [bold cyan]Basic Usage: Simply provide a URL and let Crawl4ai do the magic![/bold cyan]")
-    result = crawler.run(url="https://www.nbcnews.com/business")
+    result = crawler.run(url="https://www.nbcnews.com/business", only_text = True)
+    cprint("[LOG] 📦 [bold yellow]Basic crawl result:[/bold yellow]")
+    print_result(result)
+
+def basic_usage_some_params(crawler):
+    cprint("🛠️ [bold cyan]Basic Usage: Simply provide a URL and let Crawl4ai do the magic![/bold cyan]")
+    result = crawler.run(url="https://www.nbcnews.com/business", word_count_threshold=1, only_text = True)
     cprint("[LOG] 📦 [bold yellow]Basic crawl result:[/bold yellow]")
     print_result(result)
 
@@ -203,6 +209,9 @@ def using_crawler_hooks(crawler):
         driver.get('https://example.com/login')
         
         from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support import expected_conditions as EC
+        
         WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.NAME, 'username'))
         )
@@ -257,7 +266,9 @@ def main():
 
     crawler = create_crawler()
 
+    crawler.always_by_pass_cache = True
     basic_usage(crawler)
+    # basic_usage_some_params(crawler)
     understanding_parameters(crawler)
     
     crawler.always_by_pass_cache = True
