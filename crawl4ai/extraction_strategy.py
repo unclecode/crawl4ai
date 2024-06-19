@@ -77,6 +77,9 @@ class LLMExtractionStrategy(ExtractionStrategy):
         self.chunk_token_threshold = kwargs.get("chunk_token_threshold", CHUNK_TOKEN_THRESHOLD)
         self.overlap_rate = kwargs.get("overlap_rate", OVERLAP_RATE)
         self.word_token_rate = kwargs.get("word_token_rate", WORD_TOKEN_RATE)
+        self.apply_chunking = kwargs.get("apply_chunking", True)
+        if not self.apply_chunking:
+            self.chunk_token_threshold = 1e9
         
         self.verbose = kwargs.get("verbose", False)
         
