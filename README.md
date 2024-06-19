@@ -43,31 +43,7 @@ Check the [Changelog](https://github.com/unclecode/crawl4ai/blob/main/CHANGELOG.
 - 🎯 CSS selector support
 - 📝 Pass instructions/keywords to refine extraction
 
-- 🐞 Resolve the issue with the long url. (Issue #22)
-
-### v0.2.3
-- 🎨 Extract and return all media tags (Images, Audio, and Video). Check `result.media`
-- 🔗 Extrat all external and internal links. Check `result.links`
-- 📚 Extract metadata from the page. Check `result.metadata`
-- 🕵️ Support `user_agent` parameter to set the user agent for the HTTP requests.
-- 🖼️ Take [screenshots](#taking-screenshots) of the page.
-
-### v0.2.2
-- Support multiple JS scripts
-- Fixed some of bugs
-- Resolved a few issue relevant to Colab installation
-
-### v0.2.0
-- 🚀 10x faster!!
-- 📜 Execute custom JavaScript before crawling!
-- 🤝 Colab friendly!
-- 📚 Chunking strategies: topic-based, regex, sentence, and more!
-- 🧠 Extraction strategies: cosine clustering, LLM, and more!
-- 🎯 CSS selector support
-- 📝 Pass instructions/keywords to refine extraction
-
 ## Power and Simplicity of Crawl4AI 🚀
-
 The most easy way! If you don't want to install any library, you can use the REST API on my server. But remember, this is just a simple server. I may improve its capacity if I see there is demand. You can find ll examples of REST API in this colab notebook. [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1zODYjhemJ5bUmYceWpVoBMVpd0ofzNBZ?usp=sharing)
 
 ```python
