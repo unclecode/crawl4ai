@@ -1,6 +1,5 @@
-
 # First stage: Build and install dependencies
-FROM python:3.10-slim-bookworm as builder
+FROM python:3.10-slim-bookworm
 
 # Set the working directory in the container
 WORKDIR /usr/src/app
@@ -9,51 +8,30 @@ WORKDIR /usr/src/app
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     wget \
+    git \
     curl \
-    unzip 
+    unzip \
+    gnupg \
+    xvfb \
+    ca-certificates \
+    apt-transport-https \
+    software-properties-common && \
+    rm -rf /var/lib/apt/lists/*    
 
 # Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir spacy torch torchvision torchaudio onnxruntime uvicorn && \
+    pip install --no-cache-dir spacy torch onnxruntime uvicorn && \
     python -m spacy download en_core_web_sm
+    # pip install --no-cache-dir spacy torch torchvision torchaudio onnxruntime uvicorn && \
 
-# Download and install ChromeDriver
-RUN CHROMEDRIVER_VERSION=$(curl -sS chromedriver.storage.googleapis.com/LATEST_RELEASE) && \
-    wget -N https://chromedriver.storage.googleapis.com/$CHROMEDRIVER_VERSION/chromedriver_linux64.zip -P /tmp && \
-    unzip /tmp/chromedriver_linux64.zip -d /tmp && \
-    mv /tmp/chromedriver /usr/local/bin/chromedriver && \
-    chmod +x /usr/local/bin/chromedriver && \
-    rm /tmp/chromedriver_linux64.zip
-
-# Second stage: Create final runtime image
-FROM python:3.10-slim-bookworm
-
-# Set the working directory in the container
-WORKDIR /usr/src/app
-
-# Install runtime dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    wget \
-    git \
-    xvfb \
-    gnupg2 \
-    ca-certificates \
-    apt-transport-https \
-    software-properties-common && \
-    wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - && \
-    echo "deb http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list && \
+# Install Google Chrome and ChromeDriver
+RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - && \
+    sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list' && \
     apt-get update && \
-    apt-get install -y --no-install-recommends google-chrome-stable && \
-    rm -rf /var/lib/apt/lists/* /etc/apt/sources.list.d/google-chrome.list
-
-# Copy Chromedriver from the builder stage
-COPY --from=builder /usr/local/bin/chromedriver /usr/local/bin/chromedriver
-
-# Copy installed Python packages from builder stage
-COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
+    apt-get install -y google-chrome-stable && \
+    wget -O /tmp/chromedriver.zip http://chromedriver.storage.googleapis.com/`curl -sS chromedriver.storage.googleapis.com/LATEST_RELEASE`/chromedriver_linux64.zip && \
+    unzip /tmp/chromedriver.zip chromedriver -d /usr/local/bin/
 
 # Copy the rest of the application code
 COPY . .
@@ -65,11 +43,18 @@ ENV CHROME_BIN=/usr/bin/google-chrome \
     DBUS_SESSION_BUS_ADDRESS=/dev/null \
     PYTHONUNBUFFERED=1
 
+#  pip install -e .[all]
+RUN pip install --no-cache-dir -e .[all]
+
 # Ensure the PATH environment variable includes the location of the installed packages
-ENV PATH /usr/local/bin:$PATH   
+ENV PATH /opt/conda/bin:$PATH   
 
 # Make port 80 available to the world outside this container
 EXPOSE 80
+
+# Download models call cli "crawl4ai-download-models"
+RUN crawl4ai-download-models
+# RUN python crawl4ai/model_loader.py
 
 # Run uvicorn
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80", "--workers", "4"]

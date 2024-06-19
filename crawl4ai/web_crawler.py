@@ -42,7 +42,7 @@ class WebCrawler:
     def warmup(self):
         print("[LOG] 🌤️  Warming up the WebCrawler")
         result = self.run(
-            url='https://crawl4ai.uccode.io/',
+            url='https://google.com/',
             word_count_threshold=5,
             extraction_strategy= NoExtractionStrategy(),
             bypass_cache=False,

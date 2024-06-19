@@ -79,8 +79,15 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
         self.options.headless = True
         if kwargs.get("user_agent"):
             self.options.add_argument("--user-agent=" + kwargs.get("user_agent"))
+        else:
+            # Set user agent
+            user_agent = kwargs.get("user_agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+            self.options.add_argument(f"--user-agent={user_agent}")          
+            
         self.options.add_argument("--no-sandbox")
-        self.options.add_argument("--headless")
+        self.options.headless = kwargs.get("headless", True)
+        if self.options.headless:
+            self.options.add_argument("--headless")
         # self.options.add_argument("--disable-dev-shm-usage")
         self.options.add_argument("--disable-gpu")
         # self.options.add_argument("--disable-extensions")
@@ -112,10 +119,19 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
 
         # chromedriver_autoinstaller.install()
         import chromedriver_autoinstaller
-        self.service = Service(chromedriver_autoinstaller.install())
+        crawl4ai_folder = os.path.join(Path.home(), ".crawl4ai")
+        chromedriver_path = chromedriver_autoinstaller.utils.download_chromedriver(crawl4ai_folder, False)
+        # self.service = Service(chromedriver_autoinstaller.install())
+        self.service = Service(chromedriver_path)
         self.service.log_path = "NUL"
         self.driver = webdriver.Chrome(service=self.service, options=self.options)
         self.driver = self.execute_hook('on_driver_created', self.driver)
+        
+        if kwargs.get("cookies"):
+            for cookie in kwargs.get("cookies"):
+                self.driver.add_cookie(cookie)
+            
+        
 
     def set_hook(self, hook_type: str, hook: Callable):
         if hook_type in self.hooks:
