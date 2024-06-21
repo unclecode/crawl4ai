@@ -182,3 +182,5 @@ docs/examples/.chainlit/*
 
 local/
 .files/
+
+a.txt
