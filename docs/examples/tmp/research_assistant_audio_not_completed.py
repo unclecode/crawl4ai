@@ -73,7 +73,15 @@ async def on_message(message: cl.Message):
             "url": url,
             "content": result
         }    
-
+    
+    # for url in urls:
+    #     # Crawl the content of each URL and add it to the session context with a reference number
+    #     ref_number = f"REF_{len(user_session['context']) + 1}"
+    #     crawled_content = crawl_url(url)
+    #     user_session["context"][ref_number] = {
+    #         "url": url,
+    #         "content": crawled_content
+    #     }
 
     user_session["history"].append({
         "role": "user",
@@ -157,7 +165,12 @@ async def on_audio_chunk(chunk: cl.AudioChunk):
 @cl.step(type="tool")
 async def speech_to_text(audio_file):
     cli = Groq()
-       
+    
+    # response = cli.audio.transcriptions.create(
+    #     file=audio_file, #(filename, file.read()),
+    #     model="whisper-large-v3",
+    # )
+    
     response = await client.audio.transcriptions.create(
         model="whisper-large-v3", file=audio_file
     )
@@ -172,6 +185,19 @@ async def on_audio_end(elements: list[ElementBased]):
     audio_buffer.seek(0)  # Move the file pointer to the beginning
     audio_file = audio_buffer.read()
     audio_mime_type: str = cl.user_session.get("audio_mime_type")
+
+    # input_audio_el = cl.Audio(
+    #     mime=audio_mime_type, content=audio_file, name=audio_buffer.name
+    # )
+    # await cl.Message(
+    #     author="You", 
+    #     type="user_message",
+    #     content="",
+    #     elements=[input_audio_el, *elements]
+    # ).send()
+    
+    # answer_message = await cl.Message(content="").send()
+    
     
     start_time = time.time()
     whisper_input = (audio_buffer.name, audio_file, audio_mime_type)
@@ -187,6 +213,23 @@ async def on_audio_end(elements: list[ElementBased]):
     await user_msg.send()
     await on_message(user_msg)
 
+    # images = [file for file in elements if "image" in file.mime]
+
+    # text_answer = await generate_text_answer(transcription, images)
+    
+    # output_name, output_audio = await text_to_speech(text_answer, audio_mime_type)
+    
+    # output_audio_el = cl.Audio(
+    #     name=output_name,
+    #     auto_play=True,
+    #     mime=audio_mime_type,
+    #     content=output_audio,
+    # )
+    
+    # answer_message.elements = [output_audio_el]
+    
+    # answer_message.content = transcription
+    # await answer_message.update()
 
 if __name__ == "__main__":
     from chainlit.cli import run_chainlit
