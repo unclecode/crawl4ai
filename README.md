@@ -169,30 +169,15 @@ With Crawl4AI, you can perform advanced web crawling and data extraction tasks w
 
 ## Table of Contents
 
-1. [Features](#features-)
-2. [Installation](#installation-)
-3. [REST API/Local Server](#using-the-local-server-ot-rest-api-)
-4. [Python Library Usage](#python-library-usage-)
-5. [Parameters](#parameters-)
-6. [Chunking Strategies](#chunking-strategies-)
-7. [Extraction Strategies](#extraction-strategies-)
-8. [Contributing](#contributing-)
-9. [License](#license-)
-10. [Contact](#contact-)
-
-
-## Features ✨
-
-- 🕷️ Efficient web crawling to extract valuable data from websites
-- 🤖 LLM-friendly output formats (JSON, cleaned HTML, markdown)
-- 🌍 Supports crawling multiple URLs simultaneously
-- 🌃 Replace media tags with ALT.
-- 🆓 Completely free to use and open-source
-- 📜 Execute custom JavaScript before crawling
-- 📚 Chunking strategies: topic-based, regex, sentence, and more
-- 🧠 Extraction strategies: cosine clustering, LLM, and more
-- 🎯 CSS selector support
-- 📝 Pass instructions/keywords to refine extraction
+1. [Installation](#installation-)
+2. [REST API/Local Server](#using-the-local-server-ot-rest-api-)
+3. [Python Library Usage](#python-library-usage-)
+4. [Parameters](#parameters-)
+5. [Chunking Strategies](#chunking-strategies-)
+6. [Extraction Strategies](#extraction-strategies-)
+7. [Contributing](#contributing-)
+8. [License](#license-)
+9. [Contact](#contact-)
 
 ## Installation 💻
 
