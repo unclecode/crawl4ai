@@ -49,7 +49,7 @@ crawler.warmup()
 result = crawler.run(url="https://www.nbcnews.com/business")
 
 # Print the extracted content
-print(result.extracted_content)
+print(result.markdown)
 ```
 
 ### Extract Structured Data from Web Pages 📊
