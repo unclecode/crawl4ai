@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.2.6] - 2024-06-22
+### Fixed
+- Fix issue #19: Update Dockerfile to ensure compatibility across multiple platforms.
+
 ## [0.2.5] - 2024-06-18
 ### Added
 - Added five important hooks to the crawler:
