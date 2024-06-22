@@ -29,12 +29,16 @@
     --global-font-color: #eaeaea; /* Light font color for global elements */
 
     --background-color: #222225;
+
+    --background-color: #070708;
     --page-width: 70em;
     --font-color: #e8e9ed;
     --invert-font-color: #222225;
     --secondary-color: #a3abba;
+    --secondary-color: #d5cec0;
     --tertiary-color: #a3abba;
     --primary-color: #09b5a5; /* Updated to the brand color */
+    --primary-color: #50ffff; /* Updated to the brand color */
     --error-color: #ff3c74;
     --progress-bar-background: #3f3f44;
     --progress-bar-fill: #09b5a5; /* Updated to the brand color */
