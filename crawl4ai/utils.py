@@ -632,3 +632,8 @@ def wrap_text(draw, text, font, max_width):
             line += (words.pop(0) + ' ')
         lines.append(line)
     return '\n'.join(lines)
+
+
+def format_html(html_string):
+    soup = BeautifulSoup(html_string, 'html.parser')
+    return soup.prettify()

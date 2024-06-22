@@ -38,6 +38,7 @@ app.add_middleware(
 
 # Mount the pages directory as a static directory
 app.mount("/pages", StaticFiles(directory=__location__ + "/pages"), name="pages")
+app.mount("/mkdocs", StaticFiles(directory="site", html=True), name="mkdocs")
 templates = Jinja2Templates(directory=__location__ + "/pages")
 # chromedriver_autoinstaller.install()  # Ensure chromedriver is installed
 @lru_cache()
@@ -62,6 +63,11 @@ class CrawlRequest(BaseModel):
 
 
 @app.get("/", response_class=HTMLResponse)
+async def read_index(request: Request):
+    # redirect to site/index.html
+    return templates.TemplateResponse("index.html", {"request": request})
+
+@app.get("/old", response_class=HTMLResponse)
 async def read_index(request: Request):
     partials_dir = os.path.join(__location__, "pages", "partial")
     partials = {}
@@ -159,4 +165,4 @@ async def get_chunking_strategies():
             
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8080)

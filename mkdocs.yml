@@ -1,0 +1,42 @@
+site_name: Crawl4AI Documentation
+docs_dir: docs/md
+nav:
+  - Home: index.md
+  - Demo: demo.md  # Add this line
+  - First Steps:
+      - Introduction: introduction.md
+      - Installation: installation.md
+      - Quick Start: quickstart.md
+  - Examples:
+      - Intro: examples/index.md
+      - LLM Extraction: examples/llm_extraction.md
+      - JS Execution & CSS Filtering: examples/js_execution_css_filtering.md
+      - Hooks & Auth: examples/hooks_auth.md
+      - Summarization: examples/summarization.md
+      - Research Assistant: examples/research_assistant.md
+  - Full Details of Using Crawler:
+      - Crawl Request Parameters: full_details/crawl_request_parameters.md
+      - Crawl Result Class: full_details/crawl_result_class.md
+      - Advanced Features: full_details/advanced_features.md
+      - Chunking Strategies: full_details/chunking_strategies.md
+      - Extraction Strategies: full_details/extraction_strategies.md
+  - API Reference:
+      - Core Classes and Functions: api/core_classes_and_functions.md
+      - Detailed API Documentation: api/detailed_api_documentation.md
+  - Miscellaneous:
+      - Change Log: changelog.md
+      - Contact: contact.md
+
+theme:
+  name: terminal
+  palette: dark
+
+# Add the css/extra.css
+extra_css:
+  - assets/styles.css
+  - assets/highlight.css
+  - assets/dmvendor.css
+
+extra_javascript:
+  - assets/highlight.min.js
+  - assets/highlight_init.js

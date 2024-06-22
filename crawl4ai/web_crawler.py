@@ -140,24 +140,28 @@ class WebCrawler:
 
             # Check cache first
             cached = None
+            screenshot_data = None
             extracted_content = None
             if not bypass_cache and not self.always_by_pass_cache:
                 cached = get_cached_url(url)
             
             if cached:
                 html = cached[1]
-                extracted_content = cached[2]
+                extracted_content = cached[4]
                 if screenshot:
-                    screenshot = cached[9]
+                    screenshot_data = cached[9]
+                    if not screenshot_data:
+                        cached = None
             
-            else:
+            if not cached or not html:
                 if user_agent:
                     self.crawler_strategy.update_user_agent(user_agent)
                 html = self.crawler_strategy.crawl(url)
                 if screenshot:
-                    screenshot = self.crawler_strategy.take_screenshot()
+                    screenshot_data = self.crawler_strategy.take_screenshot()
+
             
-            return self.process_html(url, html, extracted_content, word_count_threshold, extraction_strategy, chunking_strategy, css_selector, screenshot, verbose, bool(cached), **kwargs)
+            return self.process_html(url, html, extracted_content, word_count_threshold, extraction_strategy, chunking_strategy, css_selector, screenshot_data, verbose, bool(cached), **kwargs)
 
     def process_html(
             self,
@@ -197,7 +201,7 @@ class WebCrawler:
 
                 sections = chunking_strategy.chunk(markdown)
                 extracted_content = extraction_strategy.run(url, sections)
-                extracted_content = json.dumps(extracted_content)
+                extracted_content = json.dumps(extracted_content, indent=4, default=str)
 
                 if verbose:
                     print(f"[LOG] 🚀 Extraction done for {url}, time taken: {time.time() - t} seconds.")
@@ -217,11 +221,11 @@ class WebCrawler:
                     json.dumps(metadata),
                     screenshot=screenshot,
                 )                
-
+            
             return CrawlResult(
                 url=url,
                 html=html,
-                cleaned_html=cleaned_html,
+                cleaned_html=format_html(cleaned_html),
                 markdown=markdown,
                 media=media,
                 links=links,
