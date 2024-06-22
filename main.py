@@ -10,6 +10,10 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware  
 from fastapi.templating import Jinja2Templates
+from fastapi.exceptions import RequestValidationError
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import FileResponse
+from fastapi.responses import RedirectResponse
 
 from pydantic import BaseModel, HttpUrl
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -39,10 +43,9 @@ app.add_middleware(
 # Mount the pages directory as a static directory
 app.mount("/pages", StaticFiles(directory=__location__ + "/pages"), name="pages")
 app.mount("/mkdocs", StaticFiles(directory="site", html=True), name="mkdocs")
-app.mount("/", StaticFiles(directory="site", html=True), name="mkdocs")
 site_templates = Jinja2Templates(directory=__location__ + "/site")
 templates = Jinja2Templates(directory=__location__ + "/pages")
-# chromedriver_autoinstaller.install()  # Ensure chromedriver is installed
+
 @lru_cache()
 def get_crawler():
     # Initialize and return a WebCrawler instance
@@ -63,7 +66,9 @@ class CrawlRequest(BaseModel):
     user_agent: Optional[str] = None
     verbose: Optional[bool] = True
 
-
+@app.get("/")
+def read_root():
+    return RedirectResponse(url="/mkdocs")
 
 @app.get("/old", response_class=HTMLResponse)
 async def read_index(request: Request):
@@ -82,7 +87,6 @@ async def get_total_url_count():
     count = get_total_count()
     return JSONResponse(content={"count": count})
 
-# Add endpoit to clear db
 @app.get("/clear-db")
 async def clear_database():
     # clear_db()
@@ -151,7 +155,6 @@ async def crawl_urls(crawl_request: CrawlRequest, request: Request):
             
 @app.get("/strategies/extraction", response_class=JSONResponse)
 async def get_extraction_strategies():
-    # Load docs/extraction_strategies.json" and return as JSON response
     with open(f"{__location__}/docs/extraction_strategies.json", "r") as file:
         return JSONResponse(content=file.read())
 
@@ -159,8 +162,8 @@ async def get_extraction_strategies():
 async def get_chunking_strategies():
     with open(f"{__location__}/docs/chunking_strategies.json", "r") as file:
         return JSONResponse(content=file.read())
-    
-            
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8080)
