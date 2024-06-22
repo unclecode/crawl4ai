@@ -64,6 +64,11 @@ class CrawlRequest(BaseModel):
 
 @app.get("/", response_class=HTMLResponse)
 async def read_index(request: Request):
+    # redirect to site/index.html
+    return templates.TemplateResponse("index.html", {"request": request})
+
+@app.get("/old", response_class=HTMLResponse)
+async def read_index(request: Request):
     partials_dir = os.path.join(__location__, "pages", "partial")
     partials = {}
 

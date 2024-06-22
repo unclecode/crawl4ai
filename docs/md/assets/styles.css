@@ -15,7 +15,6 @@
     --mono-font-stack: Menlo, Monaco, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono,
         Courier New, monospace, serif;
 
-    
     --background-color: #151515; /* Dark background */
     --font-color: #eaeaea; /* Light font color for contrast */
     --invert-font-color: #151515; /* Dark color for inverted elements */
@@ -73,11 +72,78 @@ pre, code {
     border-bottom: 1px dashed var(--secondary-color);
 } */
 
-.terminal-mkdocs-main-content{
+.terminal-mkdocs-main-content {
     line-height: var(--global-line-height);
 }
 
-strong, .highlight {
+strong,
+.highlight {
     /* background: url(//s2.svgbox.net/pen-brushes.svg?ic=brush-1&color=50ffff); */
     background-color: #50ffff33;
+}
+
+.terminal-card > header {
+    color: var(--font-color);
+    text-align: center;
+    background-color: var(--progress-bar-background);
+    padding: 0.3em 0.5em;
+}
+.btn.btn-sm {
+    color: var(--font-color);
+    padding: 0.2em 0.5em;
+    font-size: 0.8em;
+}
+
+.loading-message {
+    display: none;
+    margin-top: 20px;
+}
+
+.response-section {
+    display: none;
+    padding-top: 20px;
+}
+
+.tabs {
+    display: flex;
+    flex-direction: column;
+}
+.tab-list {
+    display: flex;
+    padding: 0;
+    margin: 0;
+    list-style-type: none;
+    border-bottom: 1px solid var(--font-color);
+}
+.tab-item {
+    cursor: pointer;
+    padding: 10px;
+    border: 1px solid var(--font-color);
+    margin-right: -1px;
+    border-bottom: none;
+}
+.tab-item:hover,
+.tab-item:focus,
+.tab-item:active {
+    background-color: var(--progress-bar-background);
+}
+.tab-content {
+    display: none;
+    border: 1px solid var(--font-color);
+    border-top: none;
+}
+.tab-content:first-of-type {
+    display: block;
+}
+
+.tab-content header {
+    padding: 0.5em;
+    display: flex; 
+    justify-content: end; 
+    align-items: center;
+    background-color: var(--progress-bar-background);
+}
+.tab-content pre {
+    margin: 0;
+    max-height: 300px; overflow: auto; border:none;
 }
