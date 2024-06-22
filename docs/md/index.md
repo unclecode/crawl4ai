@@ -2,6 +2,11 @@
 
 Welcome to the official documentation for Crawl4AI! 🕷️🤖 Crawl4AI is an open-source Python library designed to simplify web crawling and extract useful information from web pages. This documentation will guide you through the features, usage, and customization of Crawl4AI.
 
+
+## Try the [Demo](demo.md)
+
+Just try it now and crawl different pages to see how it works. You can set the links, see the structures of the output, and also view the Python sample code on how to run it. The old demo is available at [/old_demo](/old) where you can see more details.
+
 ## Introduction
 
 Crawl4AI has one clear task: to make crawling and data extraction from web pages easy and efficient, especially for large language models (LLMs) and AI applications. Whether you are using it as a REST API or a Python library, Crawl4AI offers a robust and flexible solution.

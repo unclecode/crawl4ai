@@ -2,9 +2,11 @@ site_name: Crawl4AI Documentation
 docs_dir: docs/md
 nav:
   - Home: index.md
-  - Introduction: introduction.md
-  - Installation: installation.md
-  - Quick Start: quickstart.md
+  - Demo: demo.md  # Add this line
+  - First Steps:
+      - Introduction: introduction.md
+      - Installation: installation.md
+      - Quick Start: quickstart.md
   - Examples:
       - Intro: examples/index.md
       - LLM Extraction: examples/llm_extraction.md
@@ -21,8 +23,9 @@ nav:
   - API Reference:
       - Core Classes and Functions: api/core_classes_and_functions.md
       - Detailed API Documentation: api/detailed_api_documentation.md
-  - Change Log: changelog.md
-  - Contact: contact.md
+  - Miscellaneous:
+      - Change Log: changelog.md
+      - Contact: contact.md
 
 theme:
   name: terminal
