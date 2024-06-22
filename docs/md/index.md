@@ -1,4 +1,4 @@
-# Crawl4AI Documentation
+# Crawl4AI v0.2.6
 
 Welcome to the official documentation for Crawl4AI! 🕷️🤖 Crawl4AI is an open-source Python library designed to simplify web crawling and extract useful information from web pages. This documentation will guide you through the features, usage, and customization of Crawl4AI.
 

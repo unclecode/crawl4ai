@@ -155,7 +155,7 @@
                 screenshot: screenshot
             };
 
-            fetch('/crawl', {
+            fetch('https://crawl4ai.com/crawl', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
