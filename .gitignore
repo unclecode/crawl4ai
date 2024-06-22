@@ -184,3 +184,5 @@ local/
 .files/
 
 a.txt
+.lambda_function.py
+ec2*
