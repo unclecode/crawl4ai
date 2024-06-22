@@ -54,7 +54,12 @@ EXPOSE 80
 
 # Download models call cli "crawl4ai-download-models"
 RUN crawl4ai-download-models
-# RUN python crawl4ai/model_loader.py
+
+# Instakk mkdocs
+RUN pip install mkdocs mkdocs-terminal
+
+# Call mkdocs to build the documentation
+RUN mkdocs build
 
 # Run uvicorn
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80", "--workers", "4"]
