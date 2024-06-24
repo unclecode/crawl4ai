@@ -52,6 +52,35 @@ result = crawler.run(url="https://www.nbcnews.com/business")
 print(result.markdown)
 ```
 
+### Speed-First Design 🚀
+
+Perhaps the most important design principle for this library is speed. We need to ensure it can handle many links and resources in parallel as quickly as possible. By combining this speed with fast LLMs like Groq, the results will be truly amazing.
+
+```python
+import time
+from crawl4ai.web_crawler import WebCrawler
+crawler = WebCrawler()
+crawler.warmup()
+
+start = time.time()
+url = r"https://www.nbcnews.com/business"
+result = crawler.run( url, word_count_threshold=10, bypass_cache=True)
+end = time.time()
+print(f"Time taken: {end - start}")
+```
+
+Let's take a look the calculated time for the above code snippet:
+
+```bash
+[LOG] 🚀 Crawling done, success: True, time taken: 0.05835 seconds
+[LOG] 🔥 Extracting semantic blocks, Strategy: NoExtractionStrategy
+[LOG] 🚀 Extraction, time taken: 0.0588 seconds.
+Time taken: 4.29332
+```
+
+It took around 4.29 seconds to crawl the page, extract the content, and return the result.
+
+
 ### Extract Structured Data from Web Pages 📊
 
 Crawl all OpenAI models and their fees from the official page.

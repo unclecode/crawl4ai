@@ -189,7 +189,8 @@ class WebCrawler:
                 # print(f"[LOG] 🚀 Crawling done for {url}, success: True, time taken: {time.time() - t1} seconds")
                 t1 = time.time()
                 result = get_content_of_website_optimized(url, html, word_count_threshold, css_selector=css_selector, only_text=kwargs.get("only_text", False))
-                print(f"[LOG] 🚀 Crawling done for {url}, success: True, time taken: {time.time() - t1} seconds")
+                if verbose:
+                    print(f"[LOG] 🚀 Crawling done for {url}, success: True, time taken: {time.time() - t1} seconds")
                 
                 if result is None:
                     raise ValueError(f"Failed to extract content from the website: {url}")
@@ -201,9 +202,6 @@ class WebCrawler:
             media = result.get("media", [])
             links = result.get("links", [])
             metadata = result.get("metadata", {})
-
-            if verbose:
-                print(f"[LOG] 🚀 Crawling done for {url}, success: True, time taken: {time.time() - t} seconds")
                         
             if extracted_content is None:
                 if verbose:
