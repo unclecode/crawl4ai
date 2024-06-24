@@ -47,7 +47,7 @@ class WebCrawler:
             extraction_strategy= NoExtractionStrategy(),
             bypass_cache=False,
             verbose = False,
-            warmup=True
+            # warmup=True
         )
         self.ready = True
         print("[LOG] 🌞 WebCrawler is ready to crawl")
@@ -160,7 +160,11 @@ class WebCrawler:
             if not cached or not html:
                 if user_agent:
                     self.crawler_strategy.update_user_agent(user_agent)
+                t1 = time.time()
                 html = self.crawler_strategy.crawl(url)
+                t2 = time.time()
+                if verbose:
+                    print(f"[LOG] 🚀 Crawling done for {url}, success: {bool(html)}, time taken: {t2 - t1} seconds")
                 if screenshot:
                     screenshot_data = self.crawler_strategy.take_screenshot()
 
@@ -190,7 +194,7 @@ class WebCrawler:
                 t1 = time.time()
                 result = get_content_of_website_optimized(url, html, word_count_threshold, css_selector=css_selector, only_text=kwargs.get("only_text", False))
                 if verbose:
-                    print(f"[LOG] 🚀 Crawling done for {url}, success: True, time taken: {time.time() - t1} seconds")
+                    print(f"[LOG] 🚀 Content extracted for {url}, success: True, time taken: {time.time() - t1} seconds")
                 
                 if result is None:
                     raise ValueError(f"Failed to extract content from the website: {url}")

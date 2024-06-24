@@ -72,14 +72,12 @@ print(f"Time taken: {end - start}")
 Let's take a look the calculated time for the above code snippet:
 
 ```bash
-[LOG] 🚀 Crawling done, success: True, time taken: 0.05835 seconds
-[LOG] 🔥 Extracting semantic blocks, Strategy: NoExtractionStrategy
-[LOG] 🚀 Extraction, time taken: 0.0588 seconds.
-Time taken: 4.29332
+[LOG] 🚀 Crawling done, success: True, time taken: 1.3623387813568115 seconds
+[LOG] 🚀 Content extracted, success: True, time taken: 0.05715131759643555 seconds
+[LOG] 🚀 Extraction, time taken: 0.05750393867492676 seconds.
+Time taken: 1.439958095550537
 ```
-
-It took around 4.29 seconds to crawl the page, extract the content, and return the result.
-
+Fetching the content from the page took 1.3623 seconds, and extracting the content took 0.0575 seconds. 🚀
 
 ### Extract Structured Data from Web Pages 📊
 
