@@ -119,3 +119,7 @@ For questions, suggestions, or feedback, feel free to reach out:
 - Website: [crawl4ai.com](https://crawl4ai.com)
 
 Happy Crawling! 🕸️🚀
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=unclecode/crawl4ai&type=Date)](https://star-history.com/#unclecode/crawl4ai&Date)
