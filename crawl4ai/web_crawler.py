@@ -46,7 +46,8 @@ class WebCrawler:
             word_count_threshold=5,
             extraction_strategy= NoExtractionStrategy(),
             bypass_cache=False,
-            verbose = False
+            verbose = False,
+            warmup=True
         )
         self.ready = True
         print("[LOG] 🌞 WebCrawler is ready to crawl")
@@ -145,6 +146,9 @@ class WebCrawler:
             if not bypass_cache and not self.always_by_pass_cache:
                 cached = get_cached_url(url)
             
+            if kwargs.get("warmup", True) and not self.ready:
+                return None
+            
             if cached:
                 html = cached[1]
                 extracted_content = cached[4]
@@ -180,8 +184,13 @@ class WebCrawler:
             t = time.time()
             # Extract content from HTML
             try:
-                result = get_content_of_website(url, html, word_count_threshold, css_selector=css_selector, only_text=kwargs.get("only_text", False))
-                metadata = extract_metadata(html)
+                # t1 = time.time()
+                # result = get_content_of_website(url, html, word_count_threshold, css_selector=css_selector, only_text=kwargs.get("only_text", False))
+                # print(f"[LOG] 🚀 Crawling done for {url}, success: True, time taken: {time.time() - t1} seconds")
+                t1 = time.time()
+                result = get_content_of_website_optimized(url, html, word_count_threshold, css_selector=css_selector, only_text=kwargs.get("only_text", False))
+                print(f"[LOG] 🚀 Crawling done for {url}, success: True, time taken: {time.time() - t1} seconds")
+                
                 if result is None:
                     raise ValueError(f"Failed to extract content from the website: {url}")
             except InvalidCSSSelectorError as e:
@@ -191,6 +200,7 @@ class WebCrawler:
             markdown = result.get("markdown", "")
             media = result.get("media", [])
             links = result.get("links", [])
+            metadata = result.get("metadata", {})
 
             if verbose:
                 print(f"[LOG] 🚀 Crawling done for {url}, success: True, time taken: {time.time() - t} seconds")
