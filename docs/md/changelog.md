@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.2.7] - 2024-06-27
+### Fixed
+- Speed up twice the extraction function.
+
 ## [0.2.6] - 2024-06-22
 ### Fixed
 - Fix issue #19: Update Dockerfile to ensure compatibility across multiple platforms.
