@@ -10,6 +10,7 @@ from html2text import HTML2Text
 from .prompts import PROMPT_EXTRACT_BLOCKS
 from .config import *
 from pathlib import Path
+from typing import Dict, Any
 
 class InvalidCSSSelectorError(Exception):
     pass
@@ -175,16 +176,25 @@ def replace_inline_tags(soup, tags, only_text=False):
         'small': lambda tag: f"<small>{tag.text}</small>",
         'mark': lambda tag: f"=={tag.text}=="
     }
+    
+    replacement_data = [(tag, tag_replacements.get(tag, lambda t: t.text)) for tag in tags]
 
-    for tag_name in tags:
+    for tag_name, replacement_func in replacement_data:
         for tag in soup.find_all(tag_name):
-            if not only_text:
-                replacement_text = tag_replacements.get(tag_name, lambda t: t.text)(tag)
-                tag.replace_with(replacement_text)
-            else:
-                tag.replace_with(tag.text)
+            replacement_text = tag.text if only_text else replacement_func(tag)
+            tag.replace_with(replacement_text)
 
-    return soup
+    return soup    
+
+    # for tag_name in tags:
+    #     for tag in soup.find_all(tag_name):
+    #         if not only_text:
+    #             replacement_text = tag_replacements.get(tag_name, lambda t: t.text)(tag)
+    #             tag.replace_with(replacement_text)
+    #         else:
+    #             tag.replace_with(tag.text)
+
+    # return soup
 
 def get_content_of_website(url, html, word_count_threshold = MIN_WORD_THRESHOLD, css_selector = None, **kwargs):
     try:
@@ -388,13 +398,21 @@ def get_content_of_website(url, html, word_count_threshold = MIN_WORD_THRESHOLD,
         markdown = h.handle(cleaned_html)
         markdown = markdown.replace('    ```', '```')
             
+        try:
+            meta = extract_metadata(html, soup)
+        except Exception as e:
+            print('Error extracting metadata:', str(e))
+            meta = {}
+                
+        
         # Return the Markdown content
         return{
             'markdown': markdown,
             'cleaned_html': cleaned_html,
             'success': True,
             'media': media,
-            'links': links
+            'links': links,
+            'metadata': meta
         }
 
     except Exception as e:
@@ -402,15 +420,131 @@ def get_content_of_website(url, html, word_count_threshold = MIN_WORD_THRESHOLD,
         raise InvalidCSSSelectorError(f"Invalid CSS selector: {css_selector}") from e
 
 
+def get_content_of_website_optimized(url: str, html: str, word_count_threshold: int = MIN_WORD_THRESHOLD, css_selector: str = None, **kwargs) -> Dict[str, Any]:
+    if not html:
+        return None
 
-def extract_metadata(html):
+    soup = BeautifulSoup(html, 'html.parser')
+    body = soup.body
+
+    if css_selector:
+        selected_elements = body.select(css_selector)
+        if not selected_elements:
+            raise InvalidCSSSelectorError(f"Invalid CSS selector, No elements found for CSS selector: {css_selector}")
+        body = soup.new_tag('div')
+        for el in selected_elements:
+            body.append(el)
+
+    links = {'internal': [], 'external': []}
+    media = {'images': [], 'videos': [], 'audios': []}
+
+    def process_element(element: element.PageElement) -> None:
+        if isinstance(element, NavigableString):
+            if isinstance(element, Comment):
+                element.extract()
+            return
+
+        # if not isinstance(element, element.Tag):
+        #     return
+
+        if element.name in ['script', 'style', 'link', 'meta', 'noscript']:
+            element.decompose()
+            return
+
+        if element.name == 'a' and element.get('href'):
+            href = element['href']
+            url_base = url.split('/')[2]
+            link_data = {'href': href, 'text': element.get_text()}
+            if href.startswith('http') and url_base not in href:
+                links['external'].append(link_data)
+            else:
+                links['internal'].append(link_data)
+
+        elif element.name == 'img':
+            media['images'].append({
+                'src': element.get('src'),
+                'alt': element.get('alt'),
+                'type': 'image'
+            })
+            alt_text = element.get('alt')
+            if alt_text:
+                element.replace_with(soup.new_string(alt_text))
+            else:
+                element.decompose()
+            return
+
+        elif element.name in ['video', 'audio']:
+            media[f"{element.name}s"].append({
+                'src': element.get('src'),
+                'alt': element.get('alt'),
+                'type': element.name
+            })
+
+        if element.name != 'pre':
+            if element.name in ['b', 'i', 'u', 'span', 'del', 'ins', 'sub', 'sup', 'strong', 'em', 'code', 'kbd', 'var', 's', 'q', 'abbr', 'cite', 'dfn', 'time', 'small', 'mark']:
+                if kwargs.get('only_text', False):
+                    element.replace_with(element.get_text())
+                else:
+                    element.unwrap()
+            elif element.name != 'img':
+                element.attrs = {}
+
+        word_count = len(element.get_text(strip=True).split())
+        if word_count < word_count_threshold:
+            element.decompose()
+            return
+
+        for child in list(element.children):
+            process_element(child)
+
+        if not element.contents and not element.get_text(strip=True):
+            element.decompose()
+
+    process_element(body)
+
+    def flatten_nested_elements(node):
+        if isinstance(node, NavigableString):
+            return node
+        if len(node.contents) == 1 and isinstance(node.contents[0], element.Tag) and node.contents[0].name == node.name:
+            return flatten_nested_elements(node.contents[0])
+        node.contents = [flatten_nested_elements(child) for child in node.contents]
+        return node
+
+    body = flatten_nested_elements(body)
+
+    cleaned_html = str(body).replace('\n\n', '\n').replace('  ', ' ')
+    cleaned_html = sanitize_html(cleaned_html)
+
+    h = CustomHTML2Text()
+    h.ignore_links = True
+    markdown = h.handle(cleaned_html)
+    markdown = markdown.replace('    ```', '```')
+
+    try:
+        meta = extract_metadata(html, soup)
+    except Exception as e:
+        print('Error extracting metadata:', str(e))
+        meta = {}
+
+    return {
+        'markdown': markdown,
+        'cleaned_html': cleaned_html,
+        'success': True,
+        'media': media,
+        'links': links,
+        'metadata': meta
+    }
+
+
+def extract_metadata(html, soup = None):
     metadata = {}
     
     if not html:
         return metadata
     
     # Parse HTML content with BeautifulSoup
-    soup = BeautifulSoup(html, 'html.parser')
+    if not soup:
+        soup = BeautifulSoup(html, 'html.parser')
 
     # Title
     title_tag = soup.find('title')
