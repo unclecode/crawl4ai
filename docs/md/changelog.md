@@ -1,6 +1,12 @@
 # Changelog
 
-## [0.2.7] - 2024-06-27
+## [0.2.71] 2024-06-26
+• Refactored `crawler_strategy.py` to handle exceptions and improve error messages
+• Improved `get_content_of_website_optimized` function in `utils.py` for better performance
+• Updated `utils.py` with latest changes
+• Migrated to `ChromeDriverManager` for resolving Chrome driver download issues
+
+## [0.2.71] - 2024-06-25
 ### Fixed
 - Speed up twice the extraction function.
 
