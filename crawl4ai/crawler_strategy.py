@@ -6,6 +6,9 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import InvalidArgumentException
+from selenium.webdriver.chrome.service import Service as ChromeService
+from webdriver_manager.chrome import ChromeDriverManager
+
 import logging
 import base64
 from PIL import Image, ImageDraw, ImageFont
@@ -118,10 +121,15 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
         }
 
         # chromedriver_autoinstaller.install()
-        import chromedriver_autoinstaller
-        crawl4ai_folder = os.path.join(Path.home(), ".crawl4ai")
-        chromedriver_path = chromedriver_autoinstaller.utils.download_chromedriver(crawl4ai_folder, False)
+        # import chromedriver_autoinstaller
+        # crawl4ai_folder = os.path.join(Path.home(), ".crawl4ai")
+        # driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=self.options)
+        # chromedriver_path = chromedriver_autoinstaller.install()
+        # chromedriver_path = chromedriver_autoinstaller.utils.download_chromedriver()
         # self.service = Service(chromedriver_autoinstaller.install())
+        
+        
+        chromedriver_path = ChromeDriverManager().install()
         self.service = Service(chromedriver_path)
         self.service.log_path = "NUL"
         self.driver = webdriver.Chrome(service=self.service, options=self.options)
