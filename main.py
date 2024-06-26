@@ -49,7 +49,9 @@ templates = Jinja2Templates(directory=__location__ + "/pages")
 @lru_cache()
 def get_crawler():
     # Initialize and return a WebCrawler instance
-    return WebCrawler(verbose = True)
+    crawler = WebCrawler(verbose = True)
+    crawler.warmup()
+    return crawler
 
 class CrawlRequest(BaseModel):
     urls: List[str]
