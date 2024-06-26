@@ -5,7 +5,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
-from selenium.common.exceptions import InvalidArgumentException
+from selenium.common.exceptions import InvalidArgumentException, WebDriverException
 from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
 
@@ -220,9 +220,18 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
             
             return html
         except InvalidArgumentException:
-            raise InvalidArgumentException(f"Invalid URL {url}")
+            if not hasattr(e, 'msg'):
+                e.msg = str(e)
+            raise InvalidArgumentException(f"Failed to crawl {url}: {e.msg}")
+        except WebDriverException as e:
+            # If e does nlt have msg attribute create it and set it to str(e)
+            if not hasattr(e, 'msg'):
+                e.msg = str(e)
+            raise WebDriverException(f"Failed to crawl {url}: {e.msg}")  
         except Exception as e:
-            raise Exception(f"Failed to crawl {url}: {str(e)}")
+            if not hasattr(e, 'msg'):
+                e.msg = str(e)
+            raise Exception(f"Failed to crawl {url}: {e.msg}")
 
     def take_screenshot(self) -> str:
         try:
