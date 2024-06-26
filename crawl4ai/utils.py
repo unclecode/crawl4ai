@@ -771,3 +771,5 @@ def wrap_text(draw, text, font, max_width):
 def format_html(html_string):
     soup = BeautifulSoup(html_string, 'html.parser')
     return soup.prettify()
+
+
