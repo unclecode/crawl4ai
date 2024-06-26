@@ -52,6 +52,33 @@ result = crawler.run(url="https://www.nbcnews.com/business")
 print(result.markdown)
 ```
 
+### Speed-First Design 🚀
+
+Perhaps the most important design principle for this library is speed. We need to ensure it can handle many links and resources in parallel as quickly as possible. By combining this speed with fast LLMs like Groq, the results will be truly amazing.
+
+```python
+import time
+from crawl4ai.web_crawler import WebCrawler
+crawler = WebCrawler()
+crawler.warmup()
+
+start = time.time()
+url = r"https://www.nbcnews.com/business"
+result = crawler.run( url, word_count_threshold=10, bypass_cache=True)
+end = time.time()
+print(f"Time taken: {end - start}")
+```
+
+Let's take a look the calculated time for the above code snippet:
+
+```bash
+[LOG] 🚀 Crawling done, success: True, time taken: 1.3623387813568115 seconds
+[LOG] 🚀 Content extracted, success: True, time taken: 0.05715131759643555 seconds
+[LOG] 🚀 Extraction, time taken: 0.05750393867492676 seconds.
+Time taken: 1.439958095550537
+```
+Fetching the content from the page took 1.3623 seconds, and extracting the content took 0.0575 seconds. 🚀
+
 ### Extract Structured Data from Web Pages 📊
 
 Crawl all OpenAI models and their fees from the official page.
@@ -60,19 +87,30 @@ Crawl all OpenAI models and their fees from the official page.
 import os
 from crawl4ai import WebCrawler
 from crawl4ai.extraction_strategy import LLMExtractionStrategy
+from pydantic import BaseModel, Field
+
+class OpenAIModelFee(BaseModel):
+    model_name: str = Field(..., description="Name of the OpenAI model.")
+    input_fee: str = Field(..., description="Fee for input token for the OpenAI model.")
+    output_fee: str = Field(..., description="Fee for output token ßfor the OpenAI model.")
 
 url = 'https://openai.com/api/pricing/'
 crawler = WebCrawler()
 crawler.warmup()
 
 result = crawler.run(
-    url=url,
-    extraction_strategy=LLMExtractionStrategy(
-        provider="openai/gpt-4",
-        api_token=os.getenv('OPENAI_API_KEY'),
-        instruction="Extract all model names and their fees for input and output tokens."
-    ),
-)
+        url=url,
+        word_count_threshold=1,
+        extraction_strategy= LLMExtractionStrategy(
+            provider= "openai/gpt-4o", api_token = os.getenv('OPENAI_API_KEY'), 
+            schema=OpenAIModelFee.schema(),
+            extraction_type="schema",
+            instruction="""From the crawled content, extract all mentioned model names along with their fees for input and output tokens. 
+            Do not miss any models in the entire content. One extracted model JSON format should look like this: 
+            {"model_name": "GPT-4", "input_fee": "US$10.00 / 1M tokens", "output_fee": "US$30.00 / 1M tokens"}."""
+        ),            
+        bypass_cache=True,
+    )
 
 print(result.extracted_content)
 ```
@@ -119,3 +157,7 @@ For questions, suggestions, or feedback, feel free to reach out:
 - Website: [crawl4ai.com](https://crawl4ai.com)
 
 Happy Crawling! 🕸️🚀
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=unclecode/crawl4ai&type=Date)](https://star-history.com/#unclecode/crawl4ai&Date)
