@@ -1,10 +1,15 @@
 # Changelog
 
-## [0.2.71] 2024-06-26
-• Refactored `crawler_strategy.py` to handle exceptions and improve error messages
-• Improved `get_content_of_website_optimized` function in `utils.py` for better performance
-• Updated `utils.py` with latest changes
-• Migrated to `ChromeDriverManager` for resolving Chrome driver download issues
+## [0.2.71] - 2024-06-26
+
+**Improved Error Handling and Performance** 🚧
+
+* 🚫 Refactored `crawler_strategy.py` to handle exceptions and provide better error messages, making it more robust and reliable.
+* 💻 Optimized the `get_content_of_website_optimized` function in `utils.py` for improved performance, reducing potential bottlenecks.
+* 💻 Updated `utils.py` with the latest changes, ensuring consistency and accuracy.
+* 🚫 Migrated to `ChromeDriverManager` to resolve Chrome driver download issues, providing a smoother user experience.
+
+These changes focus on refining the existing codebase, resulting in a more stable, efficient, and user-friendly experience. With these improvements, you can expect fewer errors and better performance in the crawler strategy and utility functions.
 
 ## [0.2.71] - 2024-06-25
 ### Fixed
