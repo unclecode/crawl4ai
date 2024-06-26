@@ -5,7 +5,10 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
-from selenium.common.exceptions import InvalidArgumentException
+from selenium.common.exceptions import InvalidArgumentException, WebDriverException
+from selenium.webdriver.chrome.service import Service as ChromeService
+from webdriver_manager.chrome import ChromeDriverManager
+
 import logging
 import base64
 from PIL import Image, ImageDraw, ImageFont
@@ -118,10 +121,15 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
         }
 
         # chromedriver_autoinstaller.install()
-        import chromedriver_autoinstaller
-        crawl4ai_folder = os.path.join(Path.home(), ".crawl4ai")
-        chromedriver_path = chromedriver_autoinstaller.utils.download_chromedriver(crawl4ai_folder, False)
+        # import chromedriver_autoinstaller
+        # crawl4ai_folder = os.path.join(Path.home(), ".crawl4ai")
+        # driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=self.options)
+        # chromedriver_path = chromedriver_autoinstaller.install()
+        # chromedriver_path = chromedriver_autoinstaller.utils.download_chromedriver()
         # self.service = Service(chromedriver_autoinstaller.install())
+        
+        
+        chromedriver_path = ChromeDriverManager().install()
         self.service = Service(chromedriver_path)
         self.service.log_path = "NUL"
         self.driver = webdriver.Chrome(service=self.service, options=self.options)
@@ -212,9 +220,18 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
             
             return html
         except InvalidArgumentException:
-            raise InvalidArgumentException(f"Invalid URL {url}")
+            if not hasattr(e, 'msg'):
+                e.msg = str(e)
+            raise InvalidArgumentException(f"Failed to crawl {url}: {e.msg}")
+        except WebDriverException as e:
+            # If e does nlt have msg attribute create it and set it to str(e)
+            if not hasattr(e, 'msg'):
+                e.msg = str(e)
+            raise WebDriverException(f"Failed to crawl {url}: {e.msg}")  
         except Exception as e:
-            raise Exception(f"Failed to crawl {url}: {str(e)}")
+            if not hasattr(e, 'msg'):
+                e.msg = str(e)
+            raise Exception(f"Failed to crawl {url}: {e.msg}")
 
     def take_screenshot(self) -> str:
         try:

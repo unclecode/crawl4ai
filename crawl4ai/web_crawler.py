@@ -129,47 +129,57 @@ class WebCrawler:
             verbose=True,
             **kwargs,
         ) -> CrawlResult:
-            extraction_strategy = extraction_strategy or NoExtractionStrategy()
-            extraction_strategy.verbose = verbose
-            if not isinstance(extraction_strategy, ExtractionStrategy):
-                raise ValueError("Unsupported extraction strategy")
-            if not isinstance(chunking_strategy, ChunkingStrategy):
-                raise ValueError("Unsupported chunking strategy")
-            
-            if word_count_threshold < MIN_WORD_THRESHOLD:
-                word_count_threshold = MIN_WORD_THRESHOLD
+            try:
+                extraction_strategy = extraction_strategy or NoExtractionStrategy()
+                extraction_strategy.verbose = verbose
+                if not isinstance(extraction_strategy, ExtractionStrategy):
+                    raise ValueError("Unsupported extraction strategy")
+                if not isinstance(chunking_strategy, ChunkingStrategy):
+                    raise ValueError("Unsupported chunking strategy")
+                
+                # if word_count_threshold < MIN_WORD_THRESHOLD:
+                #     word_count_threshold = MIN_WORD_THRESHOLD
+                    
+                word_count_threshold = max(word_count_threshold, 0)
 
-            # Check cache first
-            cached = None
-            screenshot_data = None
-            extracted_content = None
-            if not bypass_cache and not self.always_by_pass_cache:
-                cached = get_cached_url(url)
-            
-            if kwargs.get("warmup", True) and not self.ready:
-                return None
-            
-            if cached:
-                html = cached[1]
-                extracted_content = cached[4]
-                if screenshot:
-                    screenshot_data = cached[9]
-                    if not screenshot_data:
-                        cached = None
-            
-            if not cached or not html:
-                if user_agent:
-                    self.crawler_strategy.update_user_agent(user_agent)
-                t1 = time.time()
-                html = self.crawler_strategy.crawl(url)
-                t2 = time.time()
-                if verbose:
-                    print(f"[LOG] 🚀 Crawling done for {url}, success: {bool(html)}, time taken: {t2 - t1} seconds")
-                if screenshot:
-                    screenshot_data = self.crawler_strategy.take_screenshot()
+                # Check cache first
+                cached = None
+                screenshot_data = None
+                extracted_content = None
+                if not bypass_cache and not self.always_by_pass_cache:
+                    cached = get_cached_url(url)
+                
+                if kwargs.get("warmup", True) and not self.ready:
+                    return None
+                
+                if cached:
+                    html = cached[1]
+                    extracted_content = cached[4]
+                    if screenshot:
+                        screenshot_data = cached[9]
+                        if not screenshot_data:
+                            cached = None
+                
+                if not cached or not html:
+                    if user_agent:
+                        self.crawler_strategy.update_user_agent(user_agent)
+                    t1 = time.time()
+                    html = self.crawler_strategy.crawl(url)
+                    t2 = time.time()
+                    if verbose:
+                        print(f"[LOG] 🚀 Crawling done for {url}, success: {bool(html)}, time taken: {t2 - t1} seconds")
+                    if screenshot:
+                        screenshot_data = self.crawler_strategy.take_screenshot()
 
-            
-            return self.process_html(url, html, extracted_content, word_count_threshold, extraction_strategy, chunking_strategy, css_selector, screenshot_data, verbose, bool(cached), **kwargs)
+                
+                crawl_result = self.process_html(url, html, extracted_content, word_count_threshold, extraction_strategy, chunking_strategy, css_selector, screenshot_data, verbose, bool(cached), **kwargs)
+                crawl_result.success = bool(html)
+                return crawl_result
+            except Exception as e:
+                if not hasattr(e, "msg"):
+                    e.msg = str(e)
+                print(f"[ERROR] 🚫 Failed to crawl {url}, error: {e.msg}")    
+                return CrawlResult(url=url, html="", success=False, error_message=e.msg)
 
     def process_html(
             self,

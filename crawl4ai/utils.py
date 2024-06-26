@@ -438,18 +438,17 @@ def get_content_of_website_optimized(url: str, html: str, word_count_threshold: 
     links = {'internal': [], 'external': []}
     media = {'images': [], 'videos': [], 'audios': []}
 
-    def process_element(element: element.PageElement) -> None:
+    def process_element(element: element.PageElement) -> bool:
         if isinstance(element, NavigableString):
             if isinstance(element, Comment):
                 element.extract()
-            return
-
-        # if not isinstance(element, element.Tag):
-        #     return
+            return False
 
         if element.name in ['script', 'style', 'link', 'meta', 'noscript']:
             element.decompose()
-            return
+            return False
+
+        keep_element = False
 
         if element.name == 'a' and element.get('href'):
             href = element['href']
@@ -459,6 +458,7 @@ def get_content_of_website_optimized(url: str, html: str, word_count_threshold: 
                 links['external'].append(link_data)
             else:
                 links['internal'].append(link_data)
+            keep_element = True
 
         elif element.name == 'img':
             media['images'].append({
@@ -466,12 +466,7 @@ def get_content_of_website_optimized(url: str, html: str, word_count_threshold: 
                 'alt': element.get('alt'),
                 'type': 'image'
             })
-            alt_text = element.get('alt')
-            if alt_text:
-                element.replace_with(soup.new_string(alt_text))
-            else:
-                element.decompose()
-            return
+            return True  # Always keep image elements
 
         elif element.name in ['video', 'audio']:
             media[f"{element.name}s"].append({
@@ -479,6 +474,7 @@ def get_content_of_website_optimized(url: str, html: str, word_count_threshold: 
                 'alt': element.get('alt'),
                 'type': element.name
             })
+            return True  # Always keep video and audio elements
 
         if element.name != 'pre':
             if element.name in ['b', 'i', 'u', 'span', 'del', 'ins', 'sub', 'sup', 'strong', 'em', 'code', 'kbd', 'var', 's', 'q', 'abbr', 'cite', 'dfn', 'time', 'small', 'mark']:
@@ -489,16 +485,25 @@ def get_content_of_website_optimized(url: str, html: str, word_count_threshold: 
             elif element.name != 'img':
                 element.attrs = {}
 
-        word_count = len(element.get_text(strip=True).split())
-        if word_count < word_count_threshold:
-            element.decompose()
-            return
-
+        # Process children
         for child in list(element.children):
-            process_element(child)
+            if isinstance(child, NavigableString) and not isinstance(child, Comment):
+                if len(child.strip()) > 0:
+                    keep_element = True
+            else:
+                if process_element(child):
+                    keep_element = True
+            
 
-        if not element.contents and not element.get_text(strip=True):
+        # Check word count
+        if not keep_element:
+            word_count = len(element.get_text(strip=True).split())
+            keep_element = word_count >= word_count_threshold
+
+        if not keep_element:
             element.decompose()
+
+        return keep_element
 
     process_element(body)
 
@@ -771,3 +776,5 @@ def wrap_text(draw, text, font, max_width):
 def format_html(html_string):
     soup = BeautifulSoup(html_string, 'html.parser')
     return soup.prettify()
+
+

@@ -186,3 +186,5 @@ local/
 a.txt
 .lambda_function.py
 ec2*
+
+update_changelog.sh
