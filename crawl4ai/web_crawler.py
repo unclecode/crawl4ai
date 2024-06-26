@@ -136,8 +136,10 @@ class WebCrawler:
             if not isinstance(chunking_strategy, ChunkingStrategy):
                 raise ValueError("Unsupported chunking strategy")
             
-            if word_count_threshold < MIN_WORD_THRESHOLD:
-                word_count_threshold = MIN_WORD_THRESHOLD
+            # if word_count_threshold < MIN_WORD_THRESHOLD:
+            #     word_count_threshold = MIN_WORD_THRESHOLD
+                
+            word_count_threshold = max(word_count_threshold, 0)
 
             # Check cache first
             cached = None
