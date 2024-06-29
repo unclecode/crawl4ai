@@ -83,14 +83,20 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
         if kwargs.get("user_agent"):
             self.options.add_argument("--user-agent=" + kwargs.get("user_agent"))
         else:
-            # Set user agent
             user_agent = kwargs.get("user_agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
-            self.options.add_argument(f"--user-agent={user_agent}")          
-            
-        self.options.add_argument("--no-sandbox")
+            self.options.add_argument(f"--user-agent={user_agent}")
+            self.options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+                  
         self.options.headless = kwargs.get("headless", True)
         if self.options.headless:
             self.options.add_argument("--headless")
+        
+        self.options.add_argument("--disable-gpu")  
+        self.options.add_argument("--window-size=1920,1080")
+        self.options.add_argument("--no-sandbox")
+        self.options.add_argument("--disable-dev-shm-usage")
+        self.options.add_argument("--disable-blink-features=AutomationControlled")     
+        
         # self.options.add_argument("--disable-dev-shm-usage")
         self.options.add_argument("--disable-gpu")
         # self.options.add_argument("--disable-extensions")
@@ -187,10 +193,24 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
             self.driver = self.execute_hook('before_get_url', self.driver)
             if self.verbose:
                 print(f"[LOG] 🕸️ Crawling {url} using LocalSeleniumCrawlerStrategy...")
-            self.driver.get(url)
+            self.driver.get(url) #<html><head></head><body></body></html>
+            html = self.driver.page_source                
             WebDriverWait(self.driver, 10).until(
-                EC.presence_of_all_elements_located((By.TAG_NAME, "html"))
+                EC.presence_of_all_elements_located((By.TAG_NAME, "body"))
             )
+            can_not_be_done_headless = False # Look at my creativity for naming variables
+            # TODO: Very ugly way for now but it works
+            if html == "<html><head></head><body></body></html>":
+                can_not_be_done_headless = True
+                options = Options()
+                options.headless = False
+                # set window size very small
+                options.add_argument("--window-size=10,10")
+                driver = webdriver.Chrome(service=self.service, options=options)
+                driver.get(url)
+                html = driver.page_source
+                driver.quit()
+            
             self.driver = self.execute_hook('after_get_url', self.driver)
             
             # Execute JS code if provided
@@ -207,7 +227,8 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
                         lambda driver: driver.execute_script("return document.readyState") == "complete"
                     )
             
-            html = self.driver.page_source
+            if not can_not_be_done_headless:
+                html = self.driver.page_source
             self.driver = self.execute_hook('before_return_html', self.driver, html)
             
             # Store in cache
