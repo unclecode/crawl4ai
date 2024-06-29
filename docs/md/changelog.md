@@ -1,5 +1,16 @@
 # Changelog
 
+## [v0.2.72] - 2024-06-30
+
+This release brings exciting updates and improvements to our project! 🎉
+
+* 📚 **Documentation Updates**: Our documentation has been revamped to reflect the latest changes and additions.
+* 🚀 **New Modes in setup.py**: We've added support for three new modes in setup.py: default, torch, and transformers. This enhances the project's flexibility and usability.
+* 🐳 **Docker File Updates**: The Docker file has been updated to ensure seamless compatibility with the new modes and improvements.
+* 🕷️ **Temporary Solution for Headless Crawling**: We've implemented a temporary solution to overcome issues with crawling websites in headless mode.
+
+These changes aim to improve the overall user experience, provide more flexibility, and enhance the project's performance. We're thrilled to share these updates with you and look forward to continuing to evolve and improve our project!
+
 ## [0.2.71] - 2024-06-26
 
 **Improved Error Handling and Performance** 🚧
