@@ -11,7 +11,7 @@ Crawl4AI simplifies web crawling and data extraction, making it accessible for l
 ## Try it Now!
 
 - Use as REST API: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1zODYjhemJ5bUmYceWpVoBMVpd0ofzNBZ?usp=sharing)
-- Use as Python library: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1wz8u30rvbq6Scodye9AGCw8Qg_Z8QGsk)
+- Use as Python library: This collab is a bit outdated. I'm updating it with the newest versions, so please refer to the website for the latest documentation. This will be updated in a few days, and you'll have the latest version here. Thank you so much. [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1wz8u30rvbq6Scodye9AGCw8Qg_Z8QGsk)
 
 ✨ visit our [Documentation Website](https://crawl4ai.com/mkdocs/)
 

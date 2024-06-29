@@ -1,9 +1,10 @@
 # Installation 💻
 
 There are three ways to use Crawl4AI:
+
 1. As a library (Recommended)
 2. As a local server (Docker) or using the REST API
-3. As a Google Colab notebook. [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1wz8u30rvbq6Scodye9AGCw8Qg_Z8QGsk)
+3. As a Google Colab notebook.    
 
 ## Library Installation
 
@@ -70,4 +71,9 @@ docker run -d -p 8000:80 crawl4ai
 
 ## Using Google Colab
 
-You can also use Crawl4AI in a Google Colab notebook for easy setup and experimentation. Simply open the following Colab notebook and follow the instructions: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1wz8u30rvbq6Scodye9AGCw8Qg_Z8QGsk)
+
+You can also use Crawl4AI in a Google Colab notebook for easy setup and experimentation. Simply open the following Colab notebook and follow the instructions: 
+
+    ⚠️ This collab is a bit outdated. I'm updating it with the newest versions, so please refer to the website for the latest documentation. This will be updated in a few days, and you'll have the latest version here. Thank you so much.
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1wz8u30rvbq6Scodye9AGCw8Qg_Z8QGsk)
