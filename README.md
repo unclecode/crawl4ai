@@ -52,6 +52,13 @@ result = crawler.run(url="https://www.nbcnews.com/business")
 print(result.markdown)
 ```
 
+## How to install 🛠    
+```bash
+virtualenv venv
+source venv/bin/activate
+pip install "crawl4ai @ git+https://github.com/unclecode/crawl4ai.git"
+```️
+
 ### Speed-First Design 🚀
 
 Perhaps the most important design principle for this library is speed. We need to ensure it can handle many links and resources in parallel as quickly as possible. By combining this speed with fast LLMs like Groq, the results will be truly amazing.
