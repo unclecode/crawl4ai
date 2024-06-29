@@ -1,6 +1,5 @@
 from setuptools import setup, find_packages
 import os
-import sys
 from pathlib import Path
 import subprocess
 from setuptools.command.install import install
@@ -14,16 +13,10 @@ os.makedirs(f"{crawl4ai_folder}/cache", exist_ok=True)
 with open("requirements.txt") as f:
     requirements = f.read().splitlines()
 
-# Read the requirements from requirements.txt
-with open("requirements.crawl.txt") as f:
-    requirements_crawl_only = f.read().splitlines()
-
 # Define the requirements for different environments
-requirements_without_torch = [req for req in requirements if not req.startswith("torch")]
-requirements_without_transformers = [req for req in requirements if not req.startswith("transformers")]
-requirements_without_nltk = [req for req in requirements if not req.startswith("nltk")]
-requirements_without_torch_transformers_nlkt = [req for req in requirements if not req.startswith("torch") and not req.startswith("transformers") and not req.startswith("nltk")]
-requirements_crawl_only = [req for req in requirements if not req.startswith("torch") and not req.startswith("transformers") and not req.startswith("nltk")]
+default_requirements = [req for req in requirements if not req.startswith(("torch", "transformers", "onnxruntime", "nltk", "spacy", "tokenizers", "scikit-learn", "numpy"))]
+torch_requirements = [req for req in requirements if req.startswith(("torch", "nltk", "spacy", "scikit-learn", "numpy"))]
+transformer_requirements = [req for req in requirements if req.startswith(("transformers", "tokenizers", "onnxruntime"))]
 
 class CustomInstallCommand(install):
     """Customized setuptools install command to install spacy without dependencies."""
@@ -42,11 +35,11 @@ setup(
     author_email="unclecode@kidocode.com",
     license="MIT",
     packages=find_packages(),
-    install_requires=requirements_without_torch_transformers_nlkt,
+    install_requires=default_requirements,
     extras_require={
-        "all": requirements,  # Include all requirements
-        "colab": requirements_without_torch,  # Exclude torch for Colab
-        "crawl": requirements_crawl_only,  # Include only crawl requirements
+        "torch": torch_requirements,
+        "transformer": transformer_requirements,
+        "all": requirements,
     },
     cmdclass={
         'install': CustomInstallCommand,
