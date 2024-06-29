@@ -1,4 +1,4 @@
-# Crawl4AI v0.2.71 🕷️🤖
+# Crawl4AI v0.2.72 🕷️🤖
 
 [![GitHub Stars](https://img.shields.io/github/stars/unclecode/crawl4ai?style=social)](https://github.com/unclecode/crawl4ai/stargazers)
 [![GitHub Forks](https://img.shields.io/github/forks/unclecode/crawl4ai?style=social)](https://github.com/unclecode/crawl4ai/network/members)
@@ -51,6 +51,13 @@ result = crawler.run(url="https://www.nbcnews.com/business")
 # Print the extracted content
 print(result.markdown)
 ```
+
+## How to install 🛠    
+```bash
+virtualenv venv
+source venv/bin/activate
+pip install "crawl4ai @ git+https://github.com/unclecode/crawl4ai.git"
+```️
 
 ### Speed-First Design 🚀
 

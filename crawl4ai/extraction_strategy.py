@@ -10,7 +10,7 @@ from functools import partial
 from .model_loader import *
 import math
 
-import numpy as np
+
 class ExtractionStrategy(ABC):
     """
     Abstract base class for all extraction strategies.
@@ -218,6 +218,8 @@ class CosineStrategy(ExtractionStrategy):
         :param top_k: Number of top categories to extract.
         """
         super().__init__()
+        
+        import numpy as np
         
         self.semantic_filter = semantic_filter
         self.word_count_threshold = word_count_threshold

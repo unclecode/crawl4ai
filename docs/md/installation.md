@@ -7,33 +7,60 @@ There are three ways to use Crawl4AI:
 
 ## Library Installation
 
-To install Crawl4AI as a library, follow these steps:
+Crawl4AI offers flexible installation options to suit various use cases. Choose the option that best fits your needs:
 
-1. Install the package from GitHub:
+- **Default Installation** (Basic functionality):
+```bash
+virtualenv venv
+source venv/bin/activate
+pip install "crawl4ai @ git+https://github.com/unclecode/crawl4ai.git"
 ```
+Use this for basic web crawling and scraping tasks.
+
+- **Installation with PyTorch** (For advanced text clustering):
+```bash
+virtualenv venv
+source venv/bin/activate
+pip install "crawl4ai[torch] @ git+https://github.com/unclecode/crawl4ai.git"
+```
+Choose this if you need the CosineSimilarity cluster strategy.
+
+- **Installation with Transformers** (For summarization and Hugging Face models):
+```bash
+virtualenv venv
+source venv/bin/activate
+pip install "crawl4ai[transformer] @ git+https://github.com/unclecode/crawl4ai.git"
+```
+Opt for this if you require text summarization or plan to use Hugging Face models.
+
+- **Full Installation** (All features):
+```bash
 virtualenv venv
 source venv/bin/activate
 pip install "crawl4ai[all] @ git+https://github.com/unclecode/crawl4ai.git"
 ```
+This installs all dependencies for full functionality.
 
-💡 Better to run the following CLI-command to load the required models. This is optional, but it will boost the performance and speed of the crawler. You need to do this only once.
-```
-crawl4ai-download-models
-```
-
-2. Alternatively, you can clone the repository and install the package locally:
-```
+- **Development Installation** (For contributors):
+```bash
 virtualenv venv
 source venv/bin/activate
 git clone https://github.com/unclecode/crawl4ai.git
 cd crawl4ai
-pip install -e .[all]
+pip install -e ".[all]"
+```
+Use this if you plan to modify the source code.
+
+💡 After installation, if you have used "torch", "transformer" or "all", it's recommended to run the following CLI command to load the required models. This is optional but will boost the performance and speed of the crawler. You need to do this only once, this is only for when you install using []
+```bash
+crawl4ai-download-models
 ```
 
 ## Using Docker for Local Server
 
-3. Use Docker to run the local server:
-```
+To run Crawl4AI as a local server using Docker:
+
+```bash
 # For Mac users
 # docker build --platform linux/amd64 -t crawl4ai .
 # For other users
