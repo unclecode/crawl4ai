@@ -9,7 +9,7 @@ from selenium.common.exceptions import InvalidArgumentException, WebDriverExcept
 from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
 
-import logging
+import logging, time
 import base64
 from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
@@ -177,7 +177,19 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
         # Set extra HTTP headers
         self.driver.execute_cdp_cmd('Network.setExtraHTTPHeaders', {'headers': headers})
 
+    def _ensure_page_load(self,  max_checks=6, check_interval=0.01):
+        initial_length = len(self.driver.page_source)
+        
+        for ix in range(max_checks):
+            print(f"Checking page load: {ix}")
+            time.sleep(check_interval)
+            current_length = len(self.driver.page_source)
+            
+            if current_length != initial_length:
+                break
 
+        return self.driver.page_source
+    
     def crawl(self, url: str) -> str:
         # Create md5 hash of the URL
         import hashlib
@@ -194,10 +206,14 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
             if self.verbose:
                 print(f"[LOG] 🕸️ Crawling {url} using LocalSeleniumCrawlerStrategy...")
             self.driver.get(url) #<html><head></head><body></body></html>
-            html = self.driver.page_source                
+            
+            WebDriverWait(self.driver, 20).until(
+                lambda d: d.execute_script('return document.readyState') == 'complete'
+            )
             WebDriverWait(self.driver, 10).until(
                 EC.presence_of_all_elements_located((By.TAG_NAME, "body"))
             )
+            html = self._ensure_page_load() # self.driver.page_source                
             can_not_be_done_headless = False # Look at my creativity for naming variables
             # TODO: Very ugly way for now but it works
             if html == "<html><head></head><body></body></html>":
