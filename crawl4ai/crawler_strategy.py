@@ -9,6 +9,7 @@ from selenium.common.exceptions import InvalidArgumentException, WebDriverExcept
 from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
 
+from .config import *
 import logging, time
 import base64
 from PIL import Image, ImageDraw, ImageFont
@@ -181,7 +182,7 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
         initial_length = len(self.driver.page_source)
         
         for ix in range(max_checks):
-            print(f"Checking page load: {ix}")
+            # print(f"Checking page load: {ix}")
             time.sleep(check_interval)
             current_length = len(self.driver.page_source)
             
@@ -190,7 +191,7 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
 
         return self.driver.page_source
     
-    def crawl(self, url: str) -> str:
+    def crawl(self, url: str, **kwargs) -> str:
         # Create md5 hash of the URL
         import hashlib
         url_hash = hashlib.md5(url.encode()).hexdigest()
@@ -213,15 +214,17 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
             WebDriverWait(self.driver, 10).until(
                 EC.presence_of_all_elements_located((By.TAG_NAME, "body"))
             )
+            self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
             html = self._ensure_page_load() # self.driver.page_source                
             can_not_be_done_headless = False # Look at my creativity for naming variables
             # TODO: Very ugly way for now but it works
-            if html == "<html><head></head><body></body></html>":
+            if not kwargs.get('bypass_headless', False) and html == "<html><head></head><body></body></html>":
+                print("[LOG] 🙌 Page could not be loaded in headless mode. Trying non-headless mode...")
                 can_not_be_done_headless = True
                 options = Options()
                 options.headless = False
                 # set window size very small
-                options.add_argument("--window-size=10,10")
+                options.add_argument("--window-size=5,5")
                 driver = webdriver.Chrome(service=self.service, options=options)
                 driver.get(url)
                 html = driver.page_source

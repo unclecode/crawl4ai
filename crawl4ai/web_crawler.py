@@ -11,6 +11,8 @@ from .crawler_strategy import *
 from typing import List
 from concurrent.futures import ThreadPoolExecutor
 from .config import *
+import warnings
+warnings.filterwarnings("ignore", message='Field "model_name" has conflict with protected namespace "model_".')
 
 
 class WebCrawler:
@@ -164,7 +166,7 @@ class WebCrawler:
                     if user_agent:
                         self.crawler_strategy.update_user_agent(user_agent)
                     t1 = time.time()
-                    html = self.crawler_strategy.crawl(url)
+                    html = self.crawler_strategy.crawl(url, **kwargs)
                     t2 = time.time()
                     if verbose:
                         print(f"[LOG] 🚀 Crawling done for {url}, success: {bool(html)}, time taken: {t2 - t1} seconds")

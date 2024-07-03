@@ -419,7 +419,6 @@ def get_content_of_website(url, html, word_count_threshold = MIN_WORD_THRESHOLD,
         print('Error processing HTML content:', str(e))
         raise InvalidCSSSelectorError(f"Invalid CSS selector: {css_selector}") from e
 
-
 def get_content_of_website_optimized(url: str, html: str, word_count_threshold: int = MIN_WORD_THRESHOLD, css_selector: str = None, **kwargs) -> Dict[str, Any]:
     if not html:
         return None
@@ -544,7 +543,6 @@ def get_content_of_website_optimized(url: str, html: str, word_count_threshold: 
         'metadata': meta
     }
 
-
 def extract_metadata(html, soup = None):
     metadata = {}
     
@@ -603,11 +601,15 @@ def extract_xml_data(tags, string):
     return data
     
 # Function to perform the completion with exponential backoff
-def perform_completion_with_backoff(provider, prompt_with_variables, api_token):
+def perform_completion_with_backoff(provider, prompt_with_variables, api_token, json_response = False):
     from litellm import completion 
     from litellm.exceptions import RateLimitError
     max_attempts = 3
     base_delay = 2  # Base delay in seconds, you can adjust this based on your needs
+    
+    extra_args = {}
+    if json_response:
+        extra_args["response_format"] = { "type": "json_object" }
     
     for attempt in range(max_attempts):
         try:
@@ -617,7 +619,8 @@ def perform_completion_with_backoff(provider, prompt_with_variables, api_token):
                     {"role": "user", "content": prompt_with_variables}
                 ],
                 temperature=0.01,
-                api_key=api_token
+                api_key=api_token,
+                **extra_args
             )
             return response  # Return the successful response
         except RateLimitError as e:
