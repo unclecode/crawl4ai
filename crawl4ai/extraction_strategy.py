@@ -101,7 +101,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
             prompt_with_variables = PROMPT_EXTRACT_BLOCKS_WITH_INSTRUCTION
             
         if self.extract_type == "schema":
-            variable_values["SCHEMA"] = json.dumps(self.schema)
+            variable_values["SCHEMA"] = json.dumps(self.schema, indent=2)
             prompt_with_variables = PROMPT_EXTRACT_SCHEMA_WITH_INSTRUCTION
 
         for variable in variable_values:
@@ -109,7 +109,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
                 "{" + variable + "}", variable_values[variable]
             )
         
-        response = perform_completion_with_backoff(self.provider, prompt_with_variables, self.api_token)
+        response = perform_completion_with_backoff(self.provider, prompt_with_variables, self.api_token) # , json_response=self.extract_type == "schema")
         try:
             blocks = extract_xml_data(["blocks"], response.choices[0].message.content)['blocks']
             blocks = json.loads(blocks)
@@ -196,6 +196,10 @@ class LLMExtractionStrategy(ExtractionStrategy):
                 time.sleep(0.5)  # 500 ms delay between each processing
         else:
             # Parallel processing using ThreadPoolExecutor
+            # extract_func = partial(self.extract, url)
+            # for ix, section in enumerate(merged_sections):
+            #     extracted_content.append(extract_func(ix, section))            
+            
             with ThreadPoolExecutor(max_workers=4) as executor:
                 extract_func = partial(self.extract, url)
                 futures = [executor.submit(extract_func, ix, section) for ix, section in enumerate(merged_sections)]
