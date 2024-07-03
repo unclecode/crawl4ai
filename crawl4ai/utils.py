@@ -419,7 +419,6 @@ def get_content_of_website(url, html, word_count_threshold = MIN_WORD_THRESHOLD,
         print('Error processing HTML content:', str(e))
         raise InvalidCSSSelectorError(f"Invalid CSS selector: {css_selector}") from e
 
-
 def get_content_of_website_optimized(url: str, html: str, word_count_threshold: int = MIN_WORD_THRESHOLD, css_selector: str = None, **kwargs) -> Dict[str, Any]:
     if not html:
         return None
@@ -439,71 +438,75 @@ def get_content_of_website_optimized(url: str, html: str, word_count_threshold: 
     media = {'images': [], 'videos': [], 'audios': []}
 
     def process_element(element: element.PageElement) -> bool:
-        if isinstance(element, NavigableString):
-            if isinstance(element, Comment):
-                element.extract()
-            return False
+        try:
+            if isinstance(element, NavigableString):
+                if isinstance(element, Comment):
+                    element.extract()
+                return False
 
-        if element.name in ['script', 'style', 'link', 'meta', 'noscript']:
-            element.decompose()
-            return False
+            if element.name in ['script', 'style', 'link', 'meta', 'noscript']:
+                element.decompose()
+                return False
 
-        keep_element = False
+            keep_element = False
 
-        if element.name == 'a' and element.get('href'):
-            href = element['href']
-            url_base = url.split('/')[2]
-            link_data = {'href': href, 'text': element.get_text()}
-            if href.startswith('http') and url_base not in href:
-                links['external'].append(link_data)
-            else:
-                links['internal'].append(link_data)
-            keep_element = True
-
-        elif element.name == 'img':
-            media['images'].append({
-                'src': element.get('src'),
-                'alt': element.get('alt'),
-                'type': 'image'
-            })
-            return True  # Always keep image elements
-
-        elif element.name in ['video', 'audio']:
-            media[f"{element.name}s"].append({
-                'src': element.get('src'),
-                'alt': element.get('alt'),
-                'type': element.name
-            })
-            return True  # Always keep video and audio elements
-
-        if element.name != 'pre':
-            if element.name in ['b', 'i', 'u', 'span', 'del', 'ins', 'sub', 'sup', 'strong', 'em', 'code', 'kbd', 'var', 's', 'q', 'abbr', 'cite', 'dfn', 'time', 'small', 'mark']:
-                if kwargs.get('only_text', False):
-                    element.replace_with(element.get_text())
+            if element.name == 'a' and element.get('href'):
+                href = element['href']
+                url_base = url.split('/')[2]
+                link_data = {'href': href, 'text': element.get_text()}
+                if href.startswith('http') and url_base not in href:
+                    links['external'].append(link_data)
                 else:
-                    element.unwrap()
-            elif element.name != 'img':
-                element.attrs = {}
+                    links['internal'].append(link_data)
+                keep_element = True
 
-        # Process children
-        for child in list(element.children):
-            if isinstance(child, NavigableString) and not isinstance(child, Comment):
-                if len(child.strip()) > 0:
-                    keep_element = True
-            else:
-                if process_element(child):
-                    keep_element = True
-            
+            elif element.name == 'img':
+                media['images'].append({
+                    'src': element.get('src'),
+                    'alt': element.get('alt'),
+                    'type': 'image'
+                })
+                return True  # Always keep image elements
 
-        # Check word count
-        if not keep_element:
-            word_count = len(element.get_text(strip=True).split())
-            keep_element = word_count >= word_count_threshold
+            elif element.name in ['video', 'audio']:
+                media[f"{element.name}s"].append({
+                    'src': element.get('src'),
+                    'alt': element.get('alt'),
+                    'type': element.name
+                })
+                return True  # Always keep video and audio elements
 
-        if not keep_element:
-            element.decompose()
+            if element.name != 'pre':
+                if element.name in ['b', 'i', 'u', 'span', 'del', 'ins', 'sub', 'sup', 'strong', 'em', 'code', 'kbd', 'var', 's', 'q', 'abbr', 'cite', 'dfn', 'time', 'small', 'mark']:
+                    if kwargs.get('only_text', False):
+                        element.replace_with(element.get_text())
+                    else:
+                        element.unwrap()
+                elif element.name != 'img':
+                    element.attrs = {}
 
-        return keep_element
+            # Process children
+            for child in list(element.children):
+                if isinstance(child, NavigableString) and not isinstance(child, Comment):
+                    if len(child.strip()) > 0:
+                        keep_element = True
+                else:
+                    if process_element(child):
+                        keep_element = True
+                
+
+            # Check word count
+            if not keep_element:
+                word_count = len(element.get_text(strip=True).split())
+                keep_element = word_count >= word_count_threshold
+
+            if not keep_element:
+                element.decompose()
+
+            return keep_element
+        except Exception as e:
+            print('Error processing element:', str(e))
+            return False
 
     process_element(body)
 
@@ -539,7 +542,6 @@ def get_content_of_website_optimized(url: str, html: str, word_count_threshold: 
         'links': links,
         'metadata': meta
     }
-
 
 def extract_metadata(html, soup = None):
     metadata = {}
@@ -599,11 +601,15 @@ def extract_xml_data(tags, string):
     return data
     
 # Function to perform the completion with exponential backoff
-def perform_completion_with_backoff(provider, prompt_with_variables, api_token):
+def perform_completion_with_backoff(provider, prompt_with_variables, api_token, json_response = False):
     from litellm import completion 
     from litellm.exceptions import RateLimitError
     max_attempts = 3
     base_delay = 2  # Base delay in seconds, you can adjust this based on your needs
+    
+    extra_args = {}
+    if json_response:
+        extra_args["response_format"] = { "type": "json_object" }
     
     for attempt in range(max_attempts):
         try:
@@ -613,7 +619,8 @@ def perform_completion_with_backoff(provider, prompt_with_variables, api_token):
                     {"role": "user", "content": prompt_with_variables}
                 ],
                 temperature=0.01,
-                api_key=api_token
+                api_key=api_token,
+                **extra_args
             )
             return response  # Return the successful response
         except RateLimitError as e:

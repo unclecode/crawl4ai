@@ -18,17 +18,11 @@ default_requirements = [req for req in requirements if not req.startswith(("torc
 torch_requirements = [req for req in requirements if req.startswith(("torch", "nltk", "spacy", "scikit-learn", "numpy"))]
 transformer_requirements = [req for req in requirements if req.startswith(("transformers", "tokenizers", "onnxruntime"))]
 
-class CustomInstallCommand(install):
-    """Customized setuptools install command to install spacy without dependencies."""
-    def run(self):
-        install.run(self)
-        subprocess.check_call([os.sys.executable, '-m', 'pip', 'install', 'spacy', '--no-deps'])
-
 setup(
     name="Crawl4AI",
-    version="0.2.72",
+    version="0.2.73",
     description="🔥🕷️ Crawl4AI: Open-source LLM Friendly Web Crawler & Scrapper",
-    long_description=open("README.md").read(),
+    long_description=open("README.md", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
     url="https://github.com/unclecode/crawl4ai",
     author="Unclecode",
@@ -40,9 +34,6 @@ setup(
         "torch": torch_requirements,
         "transformer": transformer_requirements,
         "all": requirements,
-    },
-    cmdclass={
-        'install': CustomInstallCommand,
     },
     entry_points={
         'console_scripts': [

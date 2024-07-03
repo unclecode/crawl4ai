@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.2.73] - 2024-07-03
+
+💡 In this release, we've bumped the version to v0.2.73 and refreshed our documentation to ensure you have the best experience with our project.
+
+* Supporting website need "with-head" mode to crawl the website with head.
+* Fixing the installation issues for setup.py and dockerfile.
+* Resolve multiple issues.
+
 ## [v0.2.72] - 2024-06-30
 
 This release brings exciting updates and improvements to our project! 🎉
