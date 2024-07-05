@@ -116,7 +116,6 @@ class LLMExtractionStrategy(ExtractionStrategy):
             for block in blocks:
                 block['error'] = False
         except Exception as e:
-            print("Error extracting blocks:", str(e))
             parsed, unparsed = split_and_parse_json_objects(response.choices[0].message.content)
             blocks = parsed
             if unparsed:

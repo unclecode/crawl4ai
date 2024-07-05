@@ -5,9 +5,14 @@ import subprocess
 from setuptools.command.install import install
 
 # Create the .crawl4ai folder in the user's home directory if it doesn't exist
+# If the folder already exists, remove the cache folder
 crawl4ai_folder = os.path.join(Path.home(), ".crawl4ai")
+if os.path.exists(f"{crawl4ai_folder}/cache"):
+    subprocess.run(["rm", "-rf", f"{crawl4ai_folder}/cache"])
 os.makedirs(crawl4ai_folder, exist_ok=True)
 os.makedirs(f"{crawl4ai_folder}/cache", exist_ok=True)
+
+
 
 # Read the requirements from requirements.txt
 with open("requirements.txt") as f:
