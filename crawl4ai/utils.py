@@ -96,7 +96,7 @@ def sanitize_html(html):
 
     return sanitized_html
 
-def sanitize_input_encode(self, text: str) -> str:
+def sanitize_input_encode(text: str) -> str:
     """Sanitize input to handle potential encoding issues."""
     try:
         # Attempt to encode and decode as UTF-8 to handle potential encoding issues
