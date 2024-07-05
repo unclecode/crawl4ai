@@ -96,6 +96,16 @@ def sanitize_html(html):
 
     return sanitized_html
 
+def sanitize_input_encode(self, text: str) -> str:
+    """Sanitize input to handle potential encoding issues."""
+    try:
+        # Attempt to encode and decode as UTF-8 to handle potential encoding issues
+        return text.encode('utf-8', errors='ignore').decode('utf-8')
+    except UnicodeEncodeError as e:
+        print(f"Warning: Encoding issue detected. Some characters may be lost. Error: {e}")
+        # Fall back to ASCII if UTF-8 fails
+        return text.encode('ascii', errors='ignore').decode('ascii')
+
 def escape_json_string(s):
     """
     Escapes characters in a string to be JSON safe.
