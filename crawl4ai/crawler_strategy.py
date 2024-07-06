@@ -8,6 +8,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import InvalidArgumentException, WebDriverException
 from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
+from urllib3.exceptions import MaxRetryError
 
 from .config import *
 import logging, time
@@ -219,7 +220,7 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
             can_not_be_done_headless = False # Look at my creativity for naming variables
             
             # TODO: Very ugly way for now but it works
-            if kwargs.get('bypass_headless', True) or html == "<html><head></head><body></body></html>":
+            if kwargs.get('bypass_headless', False) or html == "<html><head></head><body></body></html>":
                 print("[LOG] 🙌 Page could not be loaded in headless mode. Trying non-headless mode...")
                 can_not_be_done_headless = True
                 options = Options()
