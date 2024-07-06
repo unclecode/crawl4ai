@@ -215,11 +215,14 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
             WebDriverWait(self.driver, 10).until(
                 EC.presence_of_all_elements_located((By.TAG_NAME, "body"))
             )
+            
             self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            html = sanitize_input_encode(self._ensure_page_load()) # self.driver.page_source                
+            
+            self.driver = self.execute_hook('after_get_url', self.driver)
+            html = sanitize_input_encode(self._ensure_page_load()) # self.driver.page_source                                        
             can_not_be_done_headless = False # Look at my creativity for naming variables
             
-            # TODO: Very ugly way for now but it works
+            # TODO: Very ugly approach, but promise to change it!
             if kwargs.get('bypass_headless', False) or html == "<html><head></head><body></body></html>":
                 print("[LOG] 🙌 Page could not be loaded in headless mode. Trying non-headless mode...")
                 can_not_be_done_headless = True
@@ -229,10 +232,9 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
                 options.add_argument("--window-size=5,5")
                 driver = webdriver.Chrome(service=self.service, options=options)
                 driver.get(url)
+                self.driver = self.execute_hook('after_get_url', driver)
                 html = sanitize_input_encode(driver.page_source)
                 driver.quit()
-            
-            self.driver = self.execute_hook('after_get_url', self.driver)
             
             # Execute JS code if provided
             if self.js_code and type(self.js_code) == str:
