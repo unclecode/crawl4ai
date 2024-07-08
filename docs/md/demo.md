@@ -14,6 +14,7 @@
             <div class="form-group">
                 <button class="btn btn-default" type="submit">Submit</button>
             </div>
+
         </fieldset>
     </form>
 
@@ -93,6 +94,10 @@
         </div>
     </section>
 
+    <div id="error" class="error-message" style="display: none; margin-top:1em;">
+        <div class="terminal-alert terminal-alert-error"></div>
+    </div>
+
     <script>
         function showTab(tabId) {
             const tabs = document.querySelectorAll('.tab-content');
@@ -162,7 +167,17 @@
                 },
                 body: JSON.stringify(data)
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    if (response.status === 429) {
+                        return response.json().then(err => { 
+                            throw Object.assign(new Error('Rate limit exceeded'), { status: 429, details: err });
+                        });
+                    }
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
             .then(data => {
                 data = data.results[0]; // Only one URL is requested
                 document.getElementById('loading').style.display = 'none';
@@ -187,11 +202,29 @@ result = crawler.run(
 print(result)
                 `;
                 redo(document.getElementById('pythonCode'), pythonCode);
+                document.getElementById('error').style.display = 'none';
             })
             .catch(error => {
                 document.getElementById('loading').style.display = 'none';
-                document.getElementById('response').style.display = 'block';
-                document.getElementById('markdownContent').textContent = 'Error: ' + error;
+                document.getElementById('error').style.display = 'block';
+                let errorMessage = 'An unexpected error occurred. Please try again later.';
+                
+                if (error.status === 429) {
+                    const details = error.details;
+                    if (details.retry_after) {
+                        errorMessage = `Rate limit exceeded. Please wait ${parseFloat(details.retry_after).toFixed(1)} seconds before trying again.`;
+                    } else if (details.reset_at) {
+                        const resetTime = new Date(details.reset_at);
+                        const waitTime = Math.ceil((resetTime - new Date()) / 1000);
+                        errorMessage = `Rate limit exceeded. Please try again after ${waitTime} seconds.`;
+                    } else {
+                        errorMessage = `Rate limit exceeded. Please try again later.`;
+                    }
+                } else if (error.message) {
+                    errorMessage = error.message;
+                }
+                
+                document.querySelector('#error .terminal-alert').textContent = errorMessage;
             });
         });
     </script>
