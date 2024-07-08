@@ -176,40 +176,28 @@ print(f"JavaScript Code (Load More button) result: {result}")
 Let's see how we can customize the crawler using hooks!
 
 ```python
-def on_driver_created(driver):
-    print("[HOOK] on_driver_created")
-    driver.maximize_window()
-    driver.get('https://example.com/login')
-    driver.find_element(By.NAME, 'username').send_keys('testuser')
-    driver.find_element(By.NAME, 'password').send_keys('password123')
-    driver.find_element(By.NAME, 'login').click()
-    driver.add_cookie({'name': 'test_cookie', 'value': 'cookie_value'})
-    return driver        
+import time
 
-def before_get_url(driver):
-    print("[HOOK] before_get_url")
-    driver.execute_cdp_cmd('Network.enable', {})
-    driver.execute_cdp_cmd('Network.setExtraHTTPHeaders', {'headers': {'X-Test-Header': 'test'}})
-    return driver
+from crawl4ai.web_crawler import WebCrawler
+from crawl4ai.crawler_strategy import *
 
-def after_get_url(driver):
-    print("[HOOK] after_get_url")
-    print(driver.current_url)
-    return driver
+def delay(driver):
+    print("Delaying for 5 seconds...")
+    time.sleep(5)
+    print("Resuming...")
+    
+def create_crawler():
+    crawler_strategy = LocalSeleniumCrawlerStrategy(verbose=True)
+    crawler_strategy.set_hook('after_get_url', delay)
+    crawler = WebCrawler(verbose=True, crawler_strategy=crawler_strategy)
+    crawler.warmup()
+    return crawler
 
-def before_return_html(driver, html):
-    print("[HOOK] before_return_html")
-    print(len(html))
-    return driver
-
-crawler.set_hook('on_driver_created', on_driver_created)
-crawler.set_hook('before_get_url', before_get_url)
-crawler.set_hook('after_get_url', after_get_url)
-crawler.set_hook('before_return_html', before_return_html)
-
-result = crawler.run(url="https://example.com")
-print(f"Crawler Hooks result: {result}")
+crawler = create_crawler()
+result = crawler.run(url="https://www.nbcnews.com/business", bypass_cache=True)
 ```
+
+check [Hooks](examples/hooks_auth.md) for more examples.
 
 ## Congratulations! 🎉
 

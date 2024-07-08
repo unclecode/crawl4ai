@@ -20,7 +20,7 @@ def init_db():
             extracted_content TEXT,
             success BOOLEAN,
             media TEXT DEFAULT "{}",
-            link TEXT DEFAULT "{}",
+            links TEXT DEFAULT "{}",
             metadata TEXT DEFAULT "{}",
             screenshot TEXT DEFAULT ""
         )
@@ -127,6 +127,9 @@ def update_existing_records(new_column: str = "media", default_value: str = "{}"
         print(f"Error updating existing records: {e}")
 
 if __name__ == "__main__":
-    init_db()  # Initialize the database if not already initialized
-    alter_db_add_screenshot("metadata")  # Add the new column to the table
-    update_existing_records("metadata")  # Update existing records to set the new column to an empty string
+    # Delete the existing database file
+    if os.path.exists(DB_PATH):
+        os.remove(DB_PATH)
+    init_db()  
+    # alter_db_add_screenshot("COL_NAME")
+    

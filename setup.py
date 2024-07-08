@@ -5,9 +5,14 @@ import subprocess
 from setuptools.command.install import install
 
 # Create the .crawl4ai folder in the user's home directory if it doesn't exist
+# If the folder already exists, remove the cache folder
 crawl4ai_folder = os.path.join(Path.home(), ".crawl4ai")
+if os.path.exists(f"{crawl4ai_folder}/cache"):
+    subprocess.run(["rm", "-rf", f"{crawl4ai_folder}/cache"])
 os.makedirs(crawl4ai_folder, exist_ok=True)
 os.makedirs(f"{crawl4ai_folder}/cache", exist_ok=True)
+
+
 
 # Read the requirements from requirements.txt
 with open("requirements.txt") as f:
@@ -20,7 +25,7 @@ transformer_requirements = [req for req in requirements if req.startswith(("tran
 
 setup(
     name="Crawl4AI",
-    version="0.2.73",
+    version="0.2.74",
     description="🔥🕷️ Crawl4AI: Open-source LLM Friendly Web Crawler & Scrapper",
     long_description=open("README.md", encoding="utf-8").read(),
     long_description_content_type="text/markdown",

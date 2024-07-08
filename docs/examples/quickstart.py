@@ -249,15 +249,40 @@ def using_crawler_hooks(crawler):
     
     cprint("\n🔗 [bold cyan]Using Crawler Hooks: Let's see how we can customize the crawler using hooks![/bold cyan]", True)
     
-    crawler.set_hook('on_driver_created', on_driver_created)
-    crawler.set_hook('before_get_url', before_get_url)
-    crawler.set_hook('after_get_url', after_get_url)
-    crawler.set_hook('before_return_html', before_return_html)
+    crawler_strategy = LocalSeleniumCrawlerStrategy(verbose=True)
+    crawler_strategy.set_hook('on_driver_created', on_driver_created)
+    crawler_strategy.set_hook('before_get_url', before_get_url)
+    crawler_strategy.set_hook('after_get_url', after_get_url)
+    crawler_strategy.set_hook('before_return_html', before_return_html)
     
+    crawler = WebCrawler(verbose=True, crawler_strategy=crawler_strategy)
+    crawler.warmup()    
     result = crawler.run(url="https://example.com")
     
     cprint("[LOG] 📦 [bold yellow]Crawler Hooks result:[/bold yellow]")
     print_result(result= result)
+    
+def using_crawler_hooks_dleay_example(crawler):
+    def delay(driver):
+        print("Delaying for 5 seconds...")
+        time.sleep(5)
+        print("Resuming...")
+        
+    def create_crawler():
+        crawler_strategy = LocalSeleniumCrawlerStrategy(verbose=True)
+        crawler_strategy.set_hook('after_get_url', delay)
+        crawler = WebCrawler(verbose=True, crawler_strategy=crawler_strategy)
+        crawler.warmup()
+        return crawler
+
+    cprint("\n🔗 [bold cyan]Using Crawler Hooks: Let's add a delay after fetching the url to make sure entire page is fetched.[/bold cyan]")
+    crawler = create_crawler()
+    result = crawler.run(url="https://google.com", bypass_cache=True)    
+    
+    cprint("[LOG] 📦 [bold yellow]Crawler Hooks result:[/bold yellow]")
+    print_result(result)
+    
+    
 
 def main():
     cprint("🌟 [bold green]Welcome to the Crawl4ai Quickstart Guide! Let's dive into some web crawling fun! 🌐[/bold green]")

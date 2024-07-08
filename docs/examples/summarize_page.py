@@ -42,5 +42,5 @@ page_summary = json.loads(result.extracted_content)
 
 print(page_summary)
 
-with open(".data/page_summary.json", "w") as f:
+with open(".data/page_summary.json", "w", encoding="utf-8") as f:
     f.write(result.extracted_content)
