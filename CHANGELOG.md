@@ -1,5 +1,14 @@
 # Changelog
 
+## [v0.2.74] - 2024-07-08
+A slew of exciting updates to improve the crawler's stability and robustness! 🎉
+
+- 💻 **UTF encoding fix**: Resolved the Windows \"charmap\" error by adding UTF encoding.
+- 🛡️ **Error handling**: Implemented MaxRetryError exception handling in LocalSeleniumCrawlerStrategy.
+- 🧹 **Input sanitization**: Improved input sanitization and handled encoding issues in LLMExtractionStrategy.
+- 🚮 **Database cleanup**: Removed existing database file and initialized a new one.
+
+
 ## [v0.2.73] - 2024-07-03
 
 💡 In this release, we've bumped the version to v0.2.73 and refreshed our documentation to ensure you have the best experience with our project.

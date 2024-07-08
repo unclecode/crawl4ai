@@ -45,7 +45,7 @@ model_fees = json.loads(result.extracted_content)
 
 print(len(model_fees))
 
-with open(".data/data.json", "w") as f:
+with open(".data/data.json", "w", encoding="utf-8") as f:
     f.write(result.extracted_content)
 ```
 
@@ -71,7 +71,7 @@ model_fees = json.loads(result.extracted_content)
 
 print(len(model_fees))
 
-with open(".data/data.json", "w") as f:
+with open(".data/data.json", "w", encoding="utf-8") as f:
     f.write(result.extracted_content)
 ```
 

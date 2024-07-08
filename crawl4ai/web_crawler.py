@@ -155,8 +155,8 @@ class WebCrawler:
                     return None
                 
                 if cached:
-                    html = cached[1]
-                    extracted_content = cached[4]
+                    html = sanitize_input_encode(cached[1])
+                    extracted_content = sanitize_input_encode(cached[4])
                     if screenshot:
                         screenshot_data = cached[9]
                         if not screenshot_data:
@@ -166,7 +166,7 @@ class WebCrawler:
                     if user_agent:
                         self.crawler_strategy.update_user_agent(user_agent)
                     t1 = time.time()
-                    html = self.crawler_strategy.crawl(url, **kwargs)
+                    html = sanitize_input_encode(self.crawler_strategy.crawl(url, **kwargs))
                     t2 = time.time()
                     if verbose:
                         print(f"[LOG] 🚀 Crawling done for {url}, success: {bool(html)}, time taken: {t2 - t1} seconds")
@@ -213,8 +213,8 @@ class WebCrawler:
             except InvalidCSSSelectorError as e:
                 raise ValueError(str(e))
             
-            cleaned_html = result.get("cleaned_html", "")
-            markdown = result.get("markdown", "")
+            cleaned_html = sanitize_input_encode(result.get("cleaned_html", ""))
+            markdown = sanitize_input_encode(result.get("markdown", ""))
             media = result.get("media", [])
             links = result.get("links", [])
             metadata = result.get("metadata", {})

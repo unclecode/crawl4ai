@@ -96,6 +96,16 @@ def sanitize_html(html):
 
     return sanitized_html
 
+def sanitize_input_encode(text: str) -> str:
+    """Sanitize input to handle potential encoding issues."""
+    try:
+        # Attempt to encode and decode as UTF-8 to handle potential encoding issues
+        return text.encode('utf-8', errors='ignore').decode('utf-8')
+    except UnicodeEncodeError as e:
+        print(f"Warning: Encoding issue detected. Some characters may be lost. Error: {e}")
+        # Fall back to ASCII if UTF-8 fails
+        return text.encode('ascii', errors='ignore').decode('ascii')
+
 def escape_json_string(s):
     """
     Escapes characters in a string to be JSON safe.
@@ -664,7 +674,6 @@ def extract_blocks(url, html, provider = DEFAULT_PROVIDER, api_token = None):
         for block in blocks:
             block['error'] = False
     except Exception as e:
-        print("Error extracting blocks:", str(e))
         parsed, unparsed = split_and_parse_json_objects(response.choices[0].message.content)
         blocks = parsed
         # Append all unparsed segments as onr error block and content is list of unparsed segments
@@ -710,7 +719,6 @@ def extract_blocks_batch(batch_data, provider = "groq/llama3-70b-8192", api_toke
             blocks = json.loads(blocks)
 
         except Exception as e:
-            print("Error extracting blocks:", str(e))
             blocks = [{
                 "index": 0,
                 "tags": ["error"],

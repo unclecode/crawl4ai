@@ -116,7 +116,6 @@ class LLMExtractionStrategy(ExtractionStrategy):
             for block in blocks:
                 block['error'] = False
         except Exception as e:
-            print("Error extracting blocks:", str(e))
             parsed, unparsed = split_and_parse_json_objects(response.choices[0].message.content)
             blocks = parsed
             if unparsed:
@@ -192,7 +191,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
             # Sequential processing with a delay
             for ix, section in enumerate(merged_sections):
                 extract_func = partial(self.extract, url)
-                extracted_content.extend(extract_func(ix, section))
+                extracted_content.extend(extract_func(ix, sanitize_input_encode(section)))
                 time.sleep(0.5)  # 500 ms delay between each processing
         else:
             # Parallel processing using ThreadPoolExecutor
@@ -202,10 +201,21 @@ class LLMExtractionStrategy(ExtractionStrategy):
             
             with ThreadPoolExecutor(max_workers=4) as executor:
                 extract_func = partial(self.extract, url)
-                futures = [executor.submit(extract_func, ix, section) for ix, section in enumerate(merged_sections)]
+                futures = [executor.submit(extract_func, ix, sanitize_input_encode(section)) for ix, section in enumerate(merged_sections)]
                 
                 for future in as_completed(futures):
-                    extracted_content.extend(future.result())
+                    try:
+                        extracted_content.extend(future.result())
+                    except Exception as e:
+                        if self.verbose:
+                            print(f"Error in thread execution: {e}")
+                        # Add error information to extracted_content
+                        extracted_content.append({
+                            "index": 0,
+                            "error": True,
+                            "tags": ["error"],
+                            "content": str(e)
+                        })
 
         
         return extracted_content        
