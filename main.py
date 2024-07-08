@@ -51,6 +51,8 @@ app.state.limiter = limiter
 
 # Dictionary to store last request times for each client
 last_request_times = {}
+last_rate_limit = {}
+
 
 def get_rate_limit():
     limit = os.environ.get('ACCESS_PER_MIN', "5")
@@ -58,15 +60,18 @@ def get_rate_limit():
 
 # Custom rate limit exceeded handler
 async def custom_rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
-    try_after = last_request_times.get(request.client.host, 0) + 10 - time.time()
-    reset_at = time.time() + try_after
+    if request.client.host not in last_rate_limit or time.time() - last_rate_limit[request.client.host] > 60:
+        last_rate_limit[request.client.host] = time.time()
+    retry_after = 60 - (time.time() - last_rate_limit[request.client.host])
+    reset_at = time.time() + retry_after
     return JSONResponse(
         status_code=429,
         content={
             "detail": "Rate limit exceeded",
             "limit": str(exc.limit.limit),
-            "reset_at": reset_at,
-            "message": f"You have exceeded the rate limit of {exc.limit.limit}. Please try again after {try_after} seconds."
+            "retry_after": retry_after,
+            'reset_at': reset_at,
+            "message": f"You have exceeded the rate limit of {exc.limit.limit}."
         }
     )
     
@@ -95,7 +100,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                         content={
                             "detail": "Too many requests",
                             "message": "Rate limit exceeded. Please wait 10 seconds between requests.",
-                            "retry_after": max(0, SPAN - time_since_last_request)
+                            "retry_after": max(0, SPAN - time_since_last_request),
+                            "reset_at": current_time + max(0, SPAN - time_since_last_request),
                         }
                     )
             
