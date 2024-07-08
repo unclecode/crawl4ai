@@ -14,6 +14,9 @@ Let's see how we can customize the crawler using hooks! In this example, we'll:
 ### Hook Definitions
 
 ```python
+from crawl4ai.web_crawler import WebCrawler
+from crawl4ai.crawler_strategy import *
+
 def on_driver_created(driver):
     print("[HOOK] on_driver_created")
     # Example customization: maximize the window
@@ -66,12 +69,13 @@ def before_return_html(driver, html):
 
 ```python
 print("\n🔗 [bold cyan]Using Crawler Hooks: Let's see how we can customize the crawler using hooks![/bold cyan]", True)
-crawler = WebCrawler(verbose=True)
+crawler_strategy = LocalSeleniumCrawlerStrategy(verbose=True)
+crawler_strategy.set_hook('on_driver_created', on_driver_created)
+crawler_strategy.set_hook('before_get_url', before_get_url)
+crawler_strategy.set_hook('after_get_url', after_get_url)
+crawler_strategy.set_hook('before_return_html', before_return_html)
+crawler = WebCrawler(verbose=True, crawler_strategy=crawler_strategy)
 crawler.warmup()
-crawler.set_hook('on_driver_created', on_driver_created)
-crawler.set_hook('before_get_url', before_get_url)
-crawler.set_hook('after_get_url', after_get_url)
-crawler.set_hook('before_return_html', before_return_html)
 
 result = crawler.run(url="https://example.com")
 
