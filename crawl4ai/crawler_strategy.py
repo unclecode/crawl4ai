@@ -256,7 +256,7 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
             
             # Store in cache
             cache_file_path = os.path.join(Path.home(), ".crawl4ai", "cache", url_hash)
-            with open(cache_file_path, "w") as f:
+            with open(cache_file_path, "w", encoding="utf-8") as f:
                 f.write(html)
                 
             if self.verbose:

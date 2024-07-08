@@ -91,7 +91,7 @@ This example demonstrates how to use `Crawl4AI` to extract a summary from a web 
     Save the extracted data to a file for further use.
 
     ```python
-    with open(".data/page_summary.json", "w") as f:
+    with open(".data/page_summary.json", "w", encoding="utf-8") as f:
         f.write(result.extracted_content)
     ```
 
