@@ -1,5 +1,14 @@
 # Changelog
 
+## [v0.2.75] - 2024-07-19
+
+Minor improvements for a more maintainable codebase:
+
+- 🔄 Fixed typos in `chunking_strategy.py` and `crawler_strategy.py` to improve code readability
+- 🔄 Removed `.test_pads/` directory from `.gitignore` to keep our repository clean and organized
+
+These changes may seem small, but they contribute to a more stable and sustainable codebase. By fixing typos and updating our `.gitignore` settings, we're ensuring that our code is easier to maintain and scale in the long run.
+
 ## [v0.2.74] - 2024-07-08
 A slew of exciting updates to improve the crawler's stability and robustness! 🎉
 
