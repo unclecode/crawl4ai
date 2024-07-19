@@ -292,15 +292,22 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
             # Open the screenshot with PIL
             image = Image.open(BytesIO(screenshot))
 
+            # Convert image to RGB mode
+            rgb_image = image.convert('RGB')
+
             # Convert to JPEG and compress
             buffered = BytesIO()
-            image.save(buffered, format="JPEG", quality=85)
+            rgb_image.save(buffered, format="JPEG", quality=85)
             img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
 
             if self.verbose:
                 print(f"[LOG] 📸 Screenshot taken and converted to base64")
 
             return img_base64
+        except Exception as e:
+            if self.verbose:
+                print(f"[ERROR] Failed to take screenshot: {str(e)}")
+            return ""
 
         except Exception as e:
             error_message = sanitize_input_encode(f"Failed to take screenshot: {str(e)}")
