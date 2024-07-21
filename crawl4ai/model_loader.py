@@ -3,7 +3,7 @@ from pathlib import Path
 import subprocess, os
 import shutil
 import tarfile
-from crawl4ai.config import MODEL_REPO_BRANCH
+from .model_loader import *
 import argparse
 import urllib.request
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
