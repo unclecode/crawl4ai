@@ -526,7 +526,7 @@ def get_content_of_website_optimized(url: str, html: str, word_count_threshold: 
                     current_tag = current_tag.parent
                     # Get the text content of the parent tag
                     if current_tag:
-                        text_content = current_tag.get_text(separator='. ',strip=True)
+                        text_content = current_tag.get_text(separator=' ',strip=True)
                         # Check if the text content has at least word_count_threshold
                         if len(text_content.split()) >= word_count_threshold:
                             return text_content
@@ -535,7 +535,7 @@ def get_content_of_website_optimized(url: str, html: str, word_count_threshold: 
             if not is_valid_image(img, img.parent, img.parent.get('class', [])):
                 return None
             score = score_image_for_usefulness(img, url, index, total_images)
-            if score <= 2:
+            if score <= IMAGE_SCORE_THRESHOLD:
                 return None
             return {
                 'src': img.get('src', ''),
