@@ -496,7 +496,7 @@ def get_content_of_website_optimized(url: str, html: str, word_count_threshold: 
                 height_value, height_unit = parse_dimension(image_height)
                 image_width =  img.get('width')
                 width_value, width_unit = parse_dimension(image_width)
-                image_size = int(fetch_image_file_size(img,base_url) or 0)
+                image_size = 0 #int(fetch_image_file_size(img,base_url) or 0)
                 image_format = os.path.splitext(img.get('src',''))[1].lower()
                 score = 0
                 if height_value:
