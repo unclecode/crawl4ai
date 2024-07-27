@@ -137,10 +137,9 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
         # self.service = Service(chromedriver_autoinstaller.install())
         
         
-        chromedriver_path = ChromeDriverManager().install()
-        self.service = Service(chromedriver_path)
-        self.service.log_path = "NUL"
-        self.driver = webdriver.Chrome(service=self.service, options=self.options)
+        # Use selenium-manager (built into Selenium 4.10.0+)
+        self.service = Service()
+        self.driver = webdriver.Chrome(options=self.options)
         self.driver = self.execute_hook('on_driver_created', self.driver)
         
         if kwargs.get("cookies"):
