@@ -3,7 +3,8 @@ version: '3.8'
 services:
   web:
     build: .
-    command: uvicorn main:app --host 0.0.0.0 --port 80 --workers $(nproc)
+    command: uvicorn main:app --host 0.0.0.0 --port 80 --workers ${NUM_WORKERS:-4} #Create a ".env" file with NUM_WORKERS=<number of workers>
+    container_name: crawl4ai
     ports:
       - "80:80"
     environment:

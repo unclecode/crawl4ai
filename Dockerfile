@@ -32,6 +32,7 @@ RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key
 
 # Update webdriver_manager to version 4.0.2
 RUN pip install --no-cache-dir webdriver_manager==4.0.2
+RUN pip install slowapi
 
 # Set environment to use Chrome properly
 ENV CHROME_BIN=/usr/bin/google-chrome \
