@@ -137,10 +137,15 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
         # self.service = Service(chromedriver_autoinstaller.install())
         
         
-        chromedriver_path = ChromeDriverManager().install()
-        self.service = Service(chromedriver_path)
-        self.service.log_path = "NUL"
-        self.driver = webdriver.Chrome(service=self.service, options=self.options)
+        # chromedriver_path = ChromeDriverManager().install()
+        # self.service = Service(chromedriver_path)
+        # self.service.log_path = "NUL"
+        # self.driver = webdriver.Chrome(service=self.service, options=self.options)
+        
+        # Use selenium-manager (built into Selenium 4.10.0+)
+        self.service = Service()
+        self.driver = webdriver.Chrome(options=self.options)
+        
         self.driver = self.execute_hook('on_driver_created', self.driver)
         
         if kwargs.get("cookies"):
@@ -292,7 +297,7 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
             # Open the screenshot with PIL
             image = Image.open(BytesIO(screenshot))
 
-            # Convert image to RGB mode
+            # Convert image to RGB mode (this will handle both RGB and RGBA images)
             rgb_image = image.convert('RGB')
 
             # Convert to JPEG and compress
@@ -305,11 +310,6 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
 
             return img_base64
         except Exception as e:
-            if self.verbose:
-                print(f"[ERROR] Failed to take screenshot: {str(e)}")
-            return ""
-
-        except Exception as e:
             error_message = sanitize_input_encode(f"Failed to take screenshot: {str(e)}")
             print(error_message)
 
@@ -321,7 +321,7 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
             try:
                 font = ImageFont.truetype("arial.ttf", 40)
             except IOError:
-                font = ImageFont.load_default(size=40)
+                font = ImageFont.load_default()
 
             # Define text color and wrap the text
             text_color = (255, 255, 255)
@@ -340,6 +340,6 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
             img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
 
             return img_base64
-
+        
     def quit(self):
         self.driver.quit()

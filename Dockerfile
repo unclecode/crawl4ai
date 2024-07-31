@@ -24,17 +24,17 @@ COPY . .
 # Install Crawl4AI using the local setup.py (which will use the default installation)
 RUN pip install --no-cache-dir .
 
-# Install Google Chrome and ChromeDriver
+# Install Google Chrome
 RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - && \
     sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list' && \
     apt-get update && \
-    apt-get install -y google-chrome-stable && \
-    wget -O /tmp/chromedriver.zip http://chromedriver.storage.googleapis.com/`curl -sS chromedriver.storage.googleapis.com/LATEST_RELEASE`/chromedriver_linux64.zip && \
-    unzip /tmp/chromedriver.zip chromedriver -d /usr/local/bin/
+    apt-get install -y google-chrome-stable
 
-# Set environment to use Chrome and ChromeDriver properly
+# Update webdriver_manager to version 4.0.2
+RUN pip install --no-cache-dir webdriver_manager==4.0.2
+
+# Set environment to use Chrome properly
 ENV CHROME_BIN=/usr/bin/google-chrome \
-    CHROMEDRIVER=/usr/local/bin/chromedriver \
     DISPLAY=:99 \
     DBUS_SESSION_BUS_ADDRESS=/dev/null \
     PYTHONUNBUFFERED=1
