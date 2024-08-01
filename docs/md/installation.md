@@ -59,15 +59,76 @@ crawl4ai-download-models
 
 ## Using Docker for Local Server
 
-To run Crawl4AI as a local server using Docker:
+Crawl4AI can be run as a local server using Docker. The Dockerfile supports different installation options to cater to various use cases. Here's how you can build and run the Docker image:
+
+### Default Installation
+
+The default installation includes the basic Crawl4AI package without additional dependencies or pre-downloaded models.
 
 ```bash
-# For Mac users
-# docker build --platform linux/amd64 -t crawl4ai .
+# For Mac users (M1/M2)
+docker build --platform linux/amd64 -t crawl4ai .
+
 # For other users
-# docker build -t crawl4ai .
+docker build -t crawl4ai .
+
+# Run the container
 docker run -d -p 8000:80 crawl4ai
 ```
+
+### Full Installation (All Dependencies and Models)
+
+This option installs all dependencies and downloads the models.
+
+```bash
+# For Mac users (M1/M2)
+docker build --platform linux/amd64 --build-arg INSTALL_OPTION=all -t crawl4ai:all .
+
+# For other users
+docker build --build-arg INSTALL_OPTION=all -t crawl4ai:all .
+
+# Run the container
+docker run -d -p 8000:80 crawl4ai:all
+```
+
+### Torch Installation
+
+This option installs torch-related dependencies and downloads the models.
+
+```bash
+# For Mac users (M1/M2)
+docker build --platform linux/amd64 --build-arg INSTALL_OPTION=torch -t crawl4ai:torch .
+
+# For other users
+docker build --build-arg INSTALL_OPTION=torch -t crawl4ai:torch .
+
+# Run the container
+docker run -d -p 8000:80 crawl4ai:torch
+```
+
+### Transformer Installation
+
+This option installs transformer-related dependencies and downloads the models.
+
+```bash
+# For Mac users (M1/M2)
+docker build --platform linux/amd64 --build-arg INSTALL_OPTION=transformer -t crawl4ai:transformer .
+
+# For other users
+docker build --build-arg INSTALL_OPTION=transformer -t crawl4ai:transformer .
+
+# Run the container
+docker run -d -p 8000:80 crawl4ai:transformer
+```
+
+### Notes
+
+- The `--platform linux/amd64` flag is necessary for Mac users with M1/M2 chips to ensure compatibility.
+- The `-t` flag tags the image with a name (and optionally a tag in the 'name:tag' format).
+- The `-d` flag runs the container in detached mode.
+- The `-p 8000:80` flag maps port 8000 on the host to port 80 in the container.
+
+Choose the installation option that best suits your needs. The default installation is suitable for basic usage, while the other options provide additional capabilities for more advanced use cases.
 
 ## Using Google Colab
 
