@@ -10,10 +10,9 @@ Crawl4AI simplifies web crawling and data extraction, making it accessible for l
 
 ## Try it Now!
 
-- Use as REST API: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1zODYjhemJ5bUmYceWpVoBMVpd0ofzNBZ?usp=sharing)
-- Use as Python library: This collab is a bit outdated. I'm updating it with the newest versions, so please refer to the website for the latest documentation. This will be updated in a few days, and you'll have the latest version here. Thank you so much. [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1wz8u30rvbq6Scodye9AGCw8Qg_Z8QGsk)
-
 ✨ visit our [Documentation Website](https://crawl4ai.com/mkdocs/)
+
+✨ Check [Demo](https://crawl4ai.com/mkdocs/demo)
 
 ## Features ✨
 
@@ -52,14 +51,33 @@ result = crawler.run(url="https://www.nbcnews.com/business")
 print(result.markdown)
 ```
 
-## How to install 🛠    
+## How to install 🛠 
+
+### Using pip 🐍
 ```bash
 virtualenv venv
 source venv/bin/activate
 pip install "crawl4ai @ git+https://github.com/unclecode/crawl4ai.git"
-```️
+```
 
-### Speed-First Design 🚀
+### Using Docker 🐳
+
+```bash
+# For Mac users (M1/M2)
+# docker build --platform linux/amd64 -t crawl4ai .
+docker build -t crawl4ai .
+docker run -d -p 8000:80 crawl4ai
+```
+
+### Using Docker Hub 🐳
+
+```bash
+docker pull unclecode/crawl4ai:latest
+docker run -d -p 8000:80 unclecode/crawl4ai:latest
+```
+
+
+## Speed-First Design 🚀
 
 Perhaps the most important design principle for this library is speed. We need to ensure it can handle many links and resources in parallel as quickly as possible. By combining this speed with fast LLMs like Groq, the results will be truly amazing.
 
