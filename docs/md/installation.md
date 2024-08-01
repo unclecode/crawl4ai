@@ -77,3 +77,9 @@ You can also use Crawl4AI in a Google Colab notebook for easy setup and experime
     ⚠️ This collab is a bit outdated. I'm updating it with the newest versions, so please refer to the website for the latest documentation. This will be updated in a few days, and you'll have the latest version here. Thank you so much.
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1wz8u30rvbq6Scodye9AGCw8Qg_Z8QGsk)
+
+## Using Docker hub
+To pull an image from Docker Hub, you can use the docker pull command followed by the image name and tag. For example, to pull the stable version of the fryser007/crawl4ai image, you would use the following command:
+```bash
+docker pull fryser007/crawl4ai:stable
+```
