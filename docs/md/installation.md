@@ -2,11 +2,11 @@
 
 There are three ways to use Crawl4AI:
 
-1. As a library (Recommended)
-2. As a local server (Docker) or using the REST API
-3. As a Google Colab notebook.    
+1. As a library (Recommended).
+2. As a local server (Docker) or using the REST API.
+3. As a local server (Docker) using the pre-built image from Docker Hub.
 
-## Library Installation
+## Option 1: Library Installation
 
 Crawl4AI offers flexible installation options to suit various use cases. Choose the option that best fits your needs:
 
@@ -57,7 +57,7 @@ Use this if you plan to modify the source code.
 crawl4ai-download-models
 ```
 
-## Using Docker for Local Server
+## Option 2: Using Docker for Local Server
 
 Crawl4AI can be run as a local server using Docker. The Dockerfile supports different installation options to cater to various use cases. Here's how you can build and run the Docker image:
 
@@ -130,11 +130,62 @@ docker run -d -p 8000:80 crawl4ai:transformer
 
 Choose the installation option that best suits your needs. The default installation is suitable for basic usage, while the other options provide additional capabilities for more advanced use cases.
 
-## Using Google Colab
+## Option 3: Using the Pre-built Image from Docker Hub
+
+You can use pre-built Crawl4AI images from Docker Hub, which are available for all platforms (Mac, Linux, Windows). We have official images as well as a community-contributed image (Thanks to https://github.com/FractalMind):
+
+### Default Installation
+
+```bash
+
+# Pull the image
+
+docker pull unclecode/crawl4ai:latest
+
+# Run the container
+
+docker run -d -p 8000:80 unclecode/crawl4ai:latest
+
+```
+
+### Community-Contributed Image
+
+A stable version of Crawl4AI is also available, created and maintained by a community member:
+
+```bash
+
+# Pull the community-contributed image
+
+docker pull ryser007/crawl4ai:stable
+
+# Run the container
+
+docker run -d -p 8000:80 ryser007/crawl4ai:stable
+
+```
+
+We'd like to express our gratitude to GitHub user [@FractalMind](https://github.com/FractalMind) for creating and maintaining this stable version of the Crawl4AI Docker image. Community contributions like this are invaluable to the project.
 
 
-You can also use Crawl4AI in a Google Colab notebook for easy setup and experimentation. Simply open the following Colab notebook and follow the instructions: 
+### Testing the Installation
 
-    ⚠️ This collab is a bit outdated. I'm updating it with the newest versions, so please refer to the website for the latest documentation. This will be updated in a few days, and you'll have the latest version here. Thank you so much.
+After running the container, you can test if it's working correctly:
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1wz8u30rvbq6Scodye9AGCw8Qg_Z8QGsk)
+- On Mac and Linux:
+
+  ```bash
+
+  curl http://localhost:8000
+
+  ```
+
+- On Windows (PowerShell):
+
+  ```powershell
+
+  Invoke-WebRequest -Uri http://localhost:8000
+
+  ```
+
+  Or open a web browser and navigate to http://localhost:8000
+
