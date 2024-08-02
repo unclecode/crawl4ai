@@ -1,4 +1,4 @@
-# Crawl4AI v0.2.75 🕷️🤖
+# Crawl4AI v0.2.7765 🕷️🤖
 
 [![GitHub Stars](https://img.shields.io/github/stars/unclecode/crawl4ai?style=social)](https://github.com/unclecode/crawl4ai/stargazers)
 [![GitHub Forks](https://img.shields.io/github/forks/unclecode/crawl4ai?style=social)](https://github.com/unclecode/crawl4ai/network/members)
@@ -9,6 +9,8 @@
 Crawl4AI simplifies web crawling and data extraction, making it accessible for large language models (LLMs) and AI applications. 🆓🌐
 
 ## Try it Now!
+
+✨ Play around with this [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1sJPAmeLj5PMrg2VgOwMJ2ubGIcK0cJeX?usp=sharing)
 
 ✨ visit our [Documentation Website](https://crawl4ai.com/mkdocs/)
 
@@ -30,6 +32,18 @@ Crawl4AI simplifies web crawling and data extraction, making it accessible for l
 - 🧠 Advanced extraction strategies: cosine clustering, LLM, and more
 - 🎯 CSS selector support
 - 📝 Passes instructions/keywords to refine extraction
+
+# Crawl4AI
+
+## 🌟 Shoutout to Contributors of v0.2.76!
+
+A big thank you to the amazing contributors who've made this release possible:
+
+- [@aravindkarnam](https://github.com/aravindkarnam) for the new image description feature
+- [@FractalMind](https://github.com/FractalMind) for our official Docker Hub image
+- [@ketonkss4](https://github.com/ketonkss4) for helping streamline our Selenium setup
+
+Your contributions are driving Crawl4AI forward! 🚀
 
 ## Cool Examples 🚀
 

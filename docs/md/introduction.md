@@ -20,18 +20,6 @@ Crawl4AI is designed to simplify the process of crawling web pages and extractin
 - **🎯 CSS Selector Support**: Extract specific content using CSS selectors.
 - **📝 Instruction/Keyword Refinement**: Pass instructions or keywords to refine the extraction process.
 
-## Recent Changes (v0.2.5) 🌟
-
-- **New Hooks**: Added six important hooks to the crawler:
-  - 🟢 `on_driver_created`: Called when the driver is ready for initializations.
-  - 🔵 `before_get_url`: Called right before Selenium fetches the URL.
-  - 🟣 `after_get_url`: Called after Selenium fetches the URL.
-  - 🟠 `before_return_html`: Called when the data is parsed and ready.
-  - 🟡 `on_user_agent_updated`: Called when the user changes the user agent, causing the driver to reinitialize.
-- **New Example**: Added an example in [`quickstart.py`](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/quickstart.py) in the example folder under the docs.
-- **Improved Semantic Context**: Maintaining the semantic context of inline tags (e.g., abbreviation, DEL, INS) for improved LLM-friendliness.
-- **Dockerfile Update**: Updated Dockerfile to ensure compatibility across multiple platforms.
-
 Check the [Changelog](https://github.com/unclecode/crawl4ai/blob/main/CHANGELOG.md) for more details.
 
 ## Power and Simplicity of Crawl4AI 🚀
