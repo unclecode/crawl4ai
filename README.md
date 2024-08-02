@@ -8,15 +8,20 @@
 
 Crawl4AI simplifies web crawling and data extraction, making it accessible for large language models (LLMs) and AI applications. 🆓🌐
 
-## [v0.2.76] - 2024-08-02
+#### [v0.2.76] - 2024-08-02
 
 Major improvements in functionality, performance, and cross-platform compatibility! 🚀
 
-- 🐳 **Docker enhancements**: Significantly improved Dockerfile for easy installation on Linux, Mac, and Windows.
-- 🌐 **Official Docker Hub image**: Launched our first official image on Docker Hub for streamlined deployment (unclecode/crawl4ai).
-- 🔧 **Selenium upgrade**: Removed dependency on ChromeDriver, now using Selenium's built-in capabilities for better compatibility.
-- 🖼️ **Image description**: Implemented ability to generate textual descriptions for extracted images from web pages.
-- ⚡ **Performance boost**: Various improvements to enhance overall speed and performance.
+- 🐳 **Docker enhancements**:
+  - Significantly improved Dockerfile for easy installation on Linux, Mac, and Windows.
+- 🌐 **Official Docker Hub image**:
+  - Launched our first official image on Docker Hub for streamlined deployment (unclecode/crawl4ai).
+- 🔧 **Selenium upgrade**:
+  - Removed dependency on ChromeDriver, now using Selenium's built-in capabilities for better compatibility.
+- 🖼️ **Image description**:
+  - Implemented ability to generate textual descriptions for extracted images from web pages.
+- ⚡ **Performance boost**:
+  - Various improvements to enhance overall speed and performance.
   
 ## Try it Now!
 
