@@ -55,7 +55,7 @@ class TopicSegmentationChunking(ChunkingStrategy):
     
     def __init__(self, num_keywords=3, **kwargs):
         import nltk as nl
-        self.tokenizer = nl.toknize.TextTilingTokenizer()
+        self.tokenizer = nl.tokenize.TextTilingTokenizer()
         self.num_keywords = num_keywords
 
     def chunk(self, text: str) -> list:

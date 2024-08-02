@@ -27,3 +27,14 @@ WORD_TOKEN_RATE = 1.3
 
 # Threshold for the minimum number of word in a HTML tag to be considered 
 MIN_WORD_THRESHOLD = 1
+IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD = 1
+
+# Threshold for the Image extraction - Range is 1 to 6
+# Images are scored based on point based system, to filter based on usefulness. Points are assigned
+# to each image based on the following aspects.
+# If either height or width exceeds 150px
+# If image size is greater than 10Kb
+# If alt property is set
+# If image format is in jpg, png or webp
+# If image is in the first half of the total images extracted from the page
+IMAGE_SCORE_THRESHOLD = 2
