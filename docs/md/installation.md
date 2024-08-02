@@ -8,6 +8,8 @@ There are three ways to use Crawl4AI:
 
 ## Option 1: Library Installation
 
+You can try this Colab for a quick start: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1sJPAmeLj5PMrg2VgOwMJ2ubGIcK0cJeX#scrollTo=g1RrmI4W_rPk)
+
 Crawl4AI offers flexible installation options to suit various use cases. Choose the option that best fits your needs:
 
 - **Default Installation** (Basic functionality):
