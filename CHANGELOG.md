@@ -1,5 +1,22 @@
 # Changelog
 
+## [v0.2.76] - 2024-08-02
+
+Major improvements in functionality, performance, and cross-platform compatibility! 🚀
+
+- 🐳 **Docker enhancements**: Significantly improved Dockerfile for easy installation on Linux, Mac, and Windows.
+- 🌐 **Official Docker Hub image**: Launched our first official image on Docker Hub for streamlined deployment.
+- 🔧 **Selenium upgrade**: Removed dependency on ChromeDriver, now using Selenium's built-in capabilities for better compatibility.
+- 🖼️ **Image description**: Implemented ability to generate textual descriptions for extracted images from web pages.
+- ⚡ **Performance boost**: Various improvements to enhance overall speed and performance.
+
+A big shoutout to our amazing community contributors:
+- [@aravindkarnam](https://github.com/aravindkarnam) for developing the textual description extraction feature.
+- [@FractalMind](https://github.com/FractalMind) for creating the first official Docker Hub image and fixing Dockerfile errors.
+- [@ketonkss4](https://github.com/ketonkss4) for identifying Selenium's new capabilities, helping us reduce dependencies.
+
+Your contributions are driving Crawl4AI forward! 🙌
+
 ## [v0.2.75] - 2024-07-19
 
 Minor improvements for a more maintainable codebase:

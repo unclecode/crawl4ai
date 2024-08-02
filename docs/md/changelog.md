@@ -1,7 +1,5 @@
 # Changelog
 
-# Changelog
-
 ## [v0.2.76] - 2024-08-02
 
 Major improvements in functionality, performance, and cross-platform compatibility! 🚀
