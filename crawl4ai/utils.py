@@ -438,6 +438,8 @@ def get_content_of_website_optimized(url: str, html: str, word_count_threshold: 
 
     soup = BeautifulSoup(html, 'html.parser')
     body = soup.body
+    
+    image_description_min_word_threshold = kwargs.get('image_description_min_word_threshold', IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD)
 
     if css_selector:
         selected_elements = body.select(css_selector)
@@ -530,7 +532,7 @@ def get_content_of_website_optimized(url: str, html: str, word_count_threshold: 
                     if current_tag:
                         text_content = current_tag.get_text(separator=' ',strip=True)
                         # Check if the text content has at least word_count_threshold
-                        if len(text_content.split()) >= word_count_threshold:
+                        if len(text_content.split()) >= image_description_min_word_threshold:
                             return text_content
                 return None
 
