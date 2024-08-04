@@ -9,6 +9,7 @@ from .utils import *
 from functools import partial
 from .model_loader import *
 import math
+import numpy as np
 
 
 class ExtractionStrategy(ABC):
@@ -248,6 +249,9 @@ class CosineStrategy(ExtractionStrategy):
         self.get_embedding_method = "direct"
         
         self.device = get_device()
+        import torch
+        self.device = torch.device('cpu')
+        
         self.default_batch_size = calculate_batch_size(self.device)
 
         if self.verbose:
@@ -260,7 +264,9 @@ class CosineStrategy(ExtractionStrategy):
         # else:
 
         self.tokenizer, self.model = load_bge_small_en_v1_5()
+        self.model.to(self.device)
         self.model.eval()  
+        
         self.get_embedding_method = "batch"
         
         self.buffer_embeddings = np.array([])
@@ -282,7 +288,7 @@ class CosineStrategy(ExtractionStrategy):
         if self.verbose:
             print(f"[LOG] Loading Multilabel Classifier for {self.device.type} device.")
             
-        self.nlp, self.device = load_text_multilabel_classifier()
+        self.nlp, _ = load_text_multilabel_classifier()
         # self.default_batch_size = 16 if self.device.type == 'cpu' else 64
         
         if self.verbose:
@@ -453,21 +459,21 @@ class CosineStrategy(ExtractionStrategy):
         if self.verbose:
             print(f"[LOG] 🚀 Assign tags using {self.device}")
         
-        if self.device.type in ["gpu", "cuda", "mps"]:
+        if self.device.type in ["gpu", "cuda", "mps", "cpu"]:
             labels = self.nlp([cluster['content'] for cluster in cluster_list])
             
             for cluster, label in zip(cluster_list, labels):
                 cluster['tags'] = label
-        elif self.device == "cpu":
-            # Process the text with the loaded model
-            texts = [cluster['content'] for cluster in cluster_list]
-            # Batch process texts
-            docs = self.nlp.pipe(texts, disable=["tagger", "parser", "ner", "lemmatizer"])
+        # elif self.device.type == "cpu":
+        #     # Process the text with the loaded model
+        #     texts = [cluster['content'] for cluster in cluster_list]
+        #     # Batch process texts
+        #     docs = self.nlp.pipe(texts, disable=["tagger", "parser", "ner", "lemmatizer"])
 
-            for doc, cluster in zip(docs, cluster_list):
-                tok_k = self.top_k
-                top_categories = sorted(doc.cats.items(), key=lambda x: x[1], reverse=True)[:tok_k]
-                cluster['tags'] = [cat for cat, _ in top_categories]
+        #     for doc, cluster in zip(docs, cluster_list):
+        #         tok_k = self.top_k
+        #         top_categories = sorted(doc.cats.items(), key=lambda x: x[1], reverse=True)[:tok_k]
+        #         cluster['tags'] = [cat for cat, _ in top_categories]
                             
             # for cluster in  cluster_list:
             #     doc = self.nlp(cluster['content'])

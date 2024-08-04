@@ -25,7 +25,7 @@ transformer_requirements = [req for req in requirements if req.startswith(("tran
 
 setup(
     name="Crawl4AI",
-    version="0.2.76",
+    version="0.2.77",
     description="🔥🕷️ Crawl4AI: Open-source LLM Friendly Web Crawler & Scrapper",
     long_description=open("README.md", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
