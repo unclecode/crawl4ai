@@ -1,4 +1,4 @@
-# Crawl4AI v0.2.76 🕷️🤖
+# Crawl4AI v0.2.77 🕷️🤖
 
 [![GitHub Stars](https://img.shields.io/github/stars/unclecode/crawl4ai?style=social)](https://github.com/unclecode/crawl4ai/stargazers)
 [![GitHub Forks](https://img.shields.io/github/forks/unclecode/crawl4ai?style=social)](https://github.com/unclecode/crawl4ai/network/members)
@@ -8,7 +8,7 @@
 
 Crawl4AI simplifies web crawling and data extraction, making it accessible for large language models (LLMs) and AI applications. 🆓🌐
 
-#### [v0.2.76] - 2024-08-02
+#### [v0.2.77] - 2024-08-02
 
 Major improvements in functionality, performance, and cross-platform compatibility! 🚀
 
@@ -50,7 +50,7 @@ Major improvements in functionality, performance, and cross-platform compatibili
 
 # Crawl4AI
 
-## 🌟 Shoutout to Contributors of v0.2.76!
+## 🌟 Shoutout to Contributors of v0.2.77!
 
 A big thank you to the amazing contributors who've made this release possible:
 

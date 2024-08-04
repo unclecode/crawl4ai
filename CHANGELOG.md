@@ -1,5 +1,16 @@
 # Changelog
 
+## [v0.2.77] - 2024-08-04
+
+Significant improvements in text processing and performance:
+
+- 🚀 **Dependency reduction**: Removed dependency on spaCy model for text chunk labeling in cosine extraction strategy.
+- 🤖 **Transformer upgrade**: Implemented text sequence classification using a transformer model for labeling text chunks.
+- ⚡ **Performance enhancement**: Improved model loading speed due to removal of spaCy dependency.
+- 🔧 **Future-proofing**: Laid groundwork for potential complete removal of spaCy dependency in future versions.
+
+These changes address issue #68 and provide a foundation for faster, more efficient text processing in Crawl4AI.
+
 ## [v0.2.76] - 2024-08-02
 
 Major improvements in functionality, performance, and cross-platform compatibility! 🚀
