@@ -834,7 +834,6 @@ def extract_blocks_batch(batch_data, provider = "groq/llama3-70b-8192", api_toke
     
     return sum(all_blocks, [])
 
-
 def merge_chunks_based_on_token_threshold(chunks, token_threshold):
     """
     Merges small chunks into larger ones based on the total token threshold.
@@ -880,7 +879,6 @@ def process_sections(url: str, sections: list, provider: str, api_token: str) ->
     
     return extracted_content
 
-
 def wrap_text(draw, text, font, max_width):
     # Wrap the text to fit within the specified width
     lines = []
@@ -891,7 +889,6 @@ def wrap_text(draw, text, font, max_width):
             line += (words.pop(0) + ' ')
         lines.append(line)
     return '\n'.join(lines)
-
 
 def format_html(html_string):
     soup = BeautifulSoup(html_string, 'html.parser')
