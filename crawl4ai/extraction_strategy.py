@@ -101,7 +101,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
             variable_values["REQUEST"] = self.instruction
             prompt_with_variables = PROMPT_EXTRACT_BLOCKS_WITH_INSTRUCTION
             
-        if self.extract_type == "schema":
+        if self.extract_type == "schema" and self.schema:
             variable_values["SCHEMA"] = json.dumps(self.schema, indent=2)
             prompt_with_variables = PROMPT_EXTRACT_SCHEMA_WITH_INSTRUCTION
 
