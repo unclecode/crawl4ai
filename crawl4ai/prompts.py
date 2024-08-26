@@ -29,7 +29,7 @@ To generate the JSON objects:
 
 5. Make sure the generated JSON is complete and parsable, with no errors or omissions.
 
-6. Make sur to escape any special characters in the HTML content, and also single or double quote to avoid JSON parsing issues.
+6. Make sure to escape any special characters in the HTML content, and also single or double quote to avoid JSON parsing issues.
 
 Please provide your output within <blocks> tags, like this:
 
@@ -87,7 +87,7 @@ To generate the JSON objects:
 
 5. Make sure the generated JSON is complete and parsable, with no errors or omissions.
 
-6. Make sur to escape any special characters in the HTML content, and also single or double quote to avoid JSON parsing issues.
+6. Make sure to escape any special characters in the HTML content, and also single or double quote to avoid JSON parsing issues.
 
 7. Never alter the extracted content, just copy and paste it as it is.
 
@@ -142,7 +142,7 @@ To generate the JSON objects:
 
 5. Make sure the generated JSON is complete and parsable, with no errors or omissions.
 
-6. Make sur to escape any special characters in the HTML content, and also single or double quote to avoid JSON parsing issues.
+6. Make sure to escape any special characters in the HTML content, and also single or double quote to avoid JSON parsing issues.
 
 7. Never alter the extracted content, just copy and paste it as it is.
 
