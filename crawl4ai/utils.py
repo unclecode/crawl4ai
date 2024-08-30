@@ -452,6 +452,19 @@ def get_content_of_website_optimized(url: str, html: str, word_count_threshold: 
     links = {'internal': [], 'external': []}
     media = {'images': [], 'videos': [], 'audios': []}
 
+    # Extract meaningful text for media files from closest parent
+    def find_closest_parent_with_useful_text(tag):
+            current_tag = tag
+            while current_tag:
+                current_tag = current_tag.parent
+                # Get the text content of the parent tag
+                if current_tag:
+                    text_content = current_tag.get_text(separator=' ',strip=True)
+                    # Check if the text content has at least word_count_threshold
+                    if len(text_content.split()) >= image_description_min_word_threshold:
+                        return text_content
+            return None
+
     def process_image(img, url, index, total_images):
             #Check if an image has valid display and inside undesired html elements
             def is_valid_image(img, parent, parent_classes):
@@ -523,19 +536,6 @@ def get_content_of_website_optimized(url: str, html: str, word_count_threshold: 
                     score+=1
                 return score
 
-            # Extract meaningful text for images from closest parent
-            def find_closest_parent_with_useful_text(tag):
-                current_tag = tag
-                while current_tag:
-                    current_tag = current_tag.parent
-                    # Get the text content of the parent tag
-                    if current_tag:
-                        text_content = current_tag.get_text(separator=' ',strip=True)
-                        # Check if the text content has at least word_count_threshold
-                        if len(text_content.split()) >= image_description_min_word_threshold:
-                            return text_content
-                return None
-
             if not is_valid_image(img, img.parent, img.parent.get('class', [])):
                 return None
             score = score_image_for_usefulness(img, url, index, total_images)
@@ -579,7 +579,16 @@ def get_content_of_website_optimized(url: str, html: str, word_count_threshold: 
                 media[f"{element.name}s"].append({
                     'src': element.get('src'),
                     'alt': element.get('alt'),
-                    'type': element.name
+                    'type': element.name,
+                    'description': find_closest_parent_with_useful_text(element)
+                })
+                source_tags = element.find_all('source')
+                for source_tag in source_tags:
+                    media[f"{element.name}s"].append({
+                    'src': source_tag.get('src'),
+                    'alt': element.get('alt'),
+                    'type': element.name,
+                    'description': find_closest_parent_with_useful_text(element)
                 })
                 return True  # Always keep video and audio elements
 
