@@ -79,6 +79,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
         self.overlap_rate = kwargs.get("overlap_rate", OVERLAP_RATE)
         self.word_token_rate = kwargs.get("word_token_rate", WORD_TOKEN_RATE)
         self.apply_chunking = kwargs.get("apply_chunking", True)
+        self.base_url = kwargs.get("base_url", None)
         if not self.apply_chunking:
             self.chunk_token_threshold = 1e9
         
@@ -110,7 +111,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
                 "{" + variable + "}", variable_values[variable]
             )
         
-        response = perform_completion_with_backoff(self.provider, prompt_with_variables, self.api_token) # , json_response=self.extract_type == "schema")
+        response = perform_completion_with_backoff(self.provider, prompt_with_variables, self.api_token, base_url=self.base_url) # , json_response=self.extract_type == "schema")
         try:
             blocks = extract_xml_data(["blocks"], response.choices[0].message.content)['blocks']
             blocks = json.loads(blocks)
