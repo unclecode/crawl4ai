@@ -244,6 +244,7 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
                 driver.quit()
             
             # Execute JS code if provided
+            self.js_code = kwargs.get("js_code", self.js_code)
             if self.js_code and type(self.js_code) == str:
                 self.driver.execute_script(self.js_code)
                 # Optionally, wait for some condition after executing the JS code
