@@ -122,7 +122,7 @@ class WebCrawler:
                 if not isinstance(chunking_strategy, ChunkingStrategy):
                     raise ValueError("Unsupported chunking strategy")
                 
-                word_count_threshold = max(word_count_threshold, 0)
+                word_count_threshold = max(word_count_threshold, MIN_WORD_THRESHOLD)
 
                 cached = None
                 screenshot_data = None

@@ -17,3 +17,4 @@ class CrawlResult(BaseModel):
     extracted_content: Optional[str] = None
     metadata: Optional[dict] = None
     error_message: Optional[str] = None
+    session_id: Optional[str] = None
