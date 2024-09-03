@@ -44,7 +44,8 @@ class AsyncWebCrawler:
         await self.crawler_strategy.__aexit__(exc_type, exc_val, exc_tb)
 
     async def awarmup(self):
-        print("[LOG] 🌤️  Warming up the AsyncWebCrawler")
+        if self.verbose:
+            print("[LOG] 🌤️  Warming up the AsyncWebCrawler")
         await async_db_manager.ainit_db()
         await self.arun(
             url="https://google.com/",
@@ -53,7 +54,8 @@ class AsyncWebCrawler:
             verbose=False,
         )
         self.ready = True
-        print("[LOG] 🌞 AsyncWebCrawler is ready to crawl")
+        if self.verbose:
+            print("[LOG] 🌞 AsyncWebCrawler is ready to crawl")
 
     async def arun(
         self,
@@ -215,7 +217,7 @@ class AsyncWebCrawler:
                 )
 
             # Check if extraction strategy is type of JsonCssExtractionStrategy
-            if isinstance(extraction_strategy, JsonCssExtractionStrategy) or isinstance(extraction_strategy, EnhancedJsonCssExtractionStrategy):
+            if isinstance(extraction_strategy, JsonCssExtractionStrategy) or isinstance(extraction_strategy, JsonCssExtractionStrategy):
                 extraction_strategy.verbose = verbose
                 extracted_content = extraction_strategy.run(url, [html])
                 extracted_content = json.dumps(extracted_content, indent=4, default=str)
