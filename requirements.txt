@@ -22,3 +22,5 @@ onnxruntime==1.18.0
 tokenizers==0.19.1
 pillow==10.3.0
 slowapi==0.1.9
+langchain==0.2.6
+langchain-core==0.2.11

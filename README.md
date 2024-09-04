@@ -215,6 +215,36 @@ result = crawler.run(
 )
 
 print(result.markdown)
+
+
+### Using with Langchain
+```
+from crawl4ai.langchain import Crawl4aiLoader
+
+crawl4aiLoader = Crawl4aiLoader(url='https://en.wikipedia.org/wiki/Cricket')
+documents = crawl4aiLoader.load()
+print(documents[0].page_content)
+print(documents[0].metadata)
+```
+Note: `page_content` returned consists `markdown` when no extraction strategy is passed. When an extraction strategy is passed, the `page_content` of document is `extracted_content`.
+
+The entire `CrawlResult` from crawl4ai is accessbile through the `metadata` field of the returned documents document.
+
+You can pas these documents directly down to further processing like text splitters. Here's an example
+```
+from crawl4ai.langchain import Crawl4aiLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+crawl4aiLoader = Crawl4aiLoader(url='https://en.wikipedia.org/wiki/Royal_Enfield_Interceptor_650')
+documents = crawl4aiLoader.load()
+text_splitter = RecursiveCharacterTextSplitter(
+    # Set a really small chunk size, just to show.
+    chunk_size=500,
+    chunk_overlap=20,
+    length_function=len,
+    is_separator_regex=False,
+)
+texts = text_splitter.split_documents(documents)
 ```
 
 ## Documentation 📚
