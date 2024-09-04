@@ -16,40 +16,23 @@ warnings.filterwarnings("ignore", message='Field "model_name" has conflict with 
 
 
 class WebCrawler:
-    def __init__(
-        self,
-        # db_path: str = None,
-        crawler_strategy: CrawlerStrategy = None,
-        always_by_pass_cache: bool = False,
-        verbose: bool = False,
-    ):
-        # self.db_path = db_path
+    def __init__(self, crawler_strategy: CrawlerStrategy = None, always_by_pass_cache: bool = False, verbose: bool = False):
         self.crawler_strategy = crawler_strategy or LocalSeleniumCrawlerStrategy(verbose=verbose)
         self.always_by_pass_cache = always_by_pass_cache
-
-        # Create the .crawl4ai folder in the user's home directory if it doesn't exist
         self.crawl4ai_folder = os.path.join(Path.home(), ".crawl4ai")
         os.makedirs(self.crawl4ai_folder, exist_ok=True)
         os.makedirs(f"{self.crawl4ai_folder}/cache", exist_ok=True)
-
-        # If db_path is not provided, use the default path
-        # if not db_path:
-            # self.db_path = f"{self.crawl4ai_folder}/crawl4ai.db"
-        
-        # flush_db()
         init_db()
-        
         self.ready = False
         
     def warmup(self):
         print("[LOG] 🌤️  Warming up the WebCrawler")
-        result = self.run(
+        self.run(
             url='https://google.com/',
             word_count_threshold=5,
-            extraction_strategy= NoExtractionStrategy(),
+            extraction_strategy=NoExtractionStrategy(),
             bypass_cache=False,
-            verbose = False,
-            # warmup=True
+            verbose=False
         )
         self.ready = True
         print("[LOG] 🌞 WebCrawler is ready to crawl")
@@ -139,12 +122,8 @@ class WebCrawler:
                 if not isinstance(chunking_strategy, ChunkingStrategy):
                     raise ValueError("Unsupported chunking strategy")
                 
-                # if word_count_threshold < MIN_WORD_THRESHOLD:
-                #     word_count_threshold = MIN_WORD_THRESHOLD
-                    
-                word_count_threshold = max(word_count_threshold, 0)
+                word_count_threshold = max(word_count_threshold, MIN_WORD_THRESHOLD)
 
-                # Check cache first
                 cached = None
                 screenshot_data = None
                 extracted_content = None
@@ -169,7 +148,7 @@ class WebCrawler:
                     html = sanitize_input_encode(self.crawler_strategy.crawl(url, **kwargs))
                     t2 = time.time()
                     if verbose:
-                        print(f"[LOG] 🚀 Crawling done for {url}, success: {bool(html)}, time taken: {t2 - t1} seconds")
+                        print(f"[LOG] 🚀 Crawling done for {url}, success: {bool(html)}, time taken: {t2 - t1:.2f} seconds")
                     if screenshot:
                         screenshot_data = self.crawler_strategy.take_screenshot()
 
@@ -200,13 +179,10 @@ class WebCrawler:
             t = time.time()
             # Extract content from HTML
             try:
-                # t1 = time.time()
-                # result = get_content_of_website(url, html, word_count_threshold, css_selector=css_selector, only_text=kwargs.get("only_text", False))
-                # print(f"[LOG] 🚀 Crawling done for {url}, success: True, time taken: {time.time() - t1} seconds")
                 t1 = time.time()
                 result = get_content_of_website_optimized(url, html, word_count_threshold, css_selector=css_selector, only_text=kwargs.get("only_text", False))
                 if verbose:
-                    print(f"[LOG] 🚀 Content extracted for {url}, success: True, time taken: {time.time() - t1} seconds")
+                    print(f"[LOG] 🚀 Content extracted for {url}, success: True, time taken: {time.time() - t1:.2f} seconds")
                 
                 if result is None:
                     raise ValueError(f"Failed to extract content from the website: {url}")
@@ -228,7 +204,7 @@ class WebCrawler:
                 extracted_content = json.dumps(extracted_content, indent=4, default=str)
 
                 if verbose:
-                    print(f"[LOG] 🚀 Extraction done for {url}, time taken: {time.time() - t} seconds.")
+                    print(f"[LOG] 🚀 Extraction done for {url}, time taken: {time.time() - t:.2f} seconds.")
                 
             screenshot = None if not screenshot else screenshot
             

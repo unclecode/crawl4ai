@@ -190,6 +190,33 @@ result = crawler.run(
 print(result.extracted_content)
 ```
 
+### Extract Structured Data from Web Pages With Proxy and BaseUrl
+
+```python
+from crawl4ai import WebCrawler
+from crawl4ai.extraction_strategy import LLMExtractionStrategy
+
+def create_crawler():
+    crawler = WebCrawler(verbose=True, proxy="http://127.0.0.1:7890")
+    crawler.warmup()
+    return crawler
+
+crawler = create_crawler()
+
+crawler.warmup()
+
+result = crawler.run(
+    url="https://www.nbcnews.com/business",
+    extraction_strategy=LLMExtractionStrategy(
+        provider="openai/gpt-4o",
+        api_token="sk-",
+        base_url="https://api.openai.com/v1"
+    )
+)
+
+print(result.markdown)
+
+
 ### Using with Langchain
 ```
 from crawl4ai.langchain import Crawl4aiLoader
