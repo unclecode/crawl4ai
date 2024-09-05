@@ -322,6 +322,8 @@ As you can see, Crawl4AI outperforms Firecrawl significantly:
 - Simple crawl: Crawl4AI is over 4 times faster than Firecrawl.
 - With JavaScript execution: Even when executing JavaScript to load more content (doubling the number of images found), Crawl4AI is still faster than Firecrawl's simple crawl.
 
+You can find the full comparison code in our repository at `docs/examples/crawl4ai_vs_firecrawl.py`.
+
 ### Using with Langchain
 ```
 from crawl4ai.langchain import Crawl4aiLoader
@@ -331,11 +333,11 @@ documents = crawl4aiLoader.load()
 print(documents[0].page_content)
 print(documents[0].metadata)
 ```
-Note: `page_content` returned consists `markdown` when no extraction strategy is passed. When an extraction strategy is passed, the `page_content` of document is `extracted_content`.
+Note: `page_content` returned by the loader is `markdown` of `CrawlResult`, when no extraction strategy is passed to `Crawl4aiLoader`. When an extraction strategy is passed, the `page_content` of document is set to `extracted_content` of `CrawlResult`.
 
-The entire `CrawlResult` from crawl4ai is accessbile through the `metadata` field of the returned documents document.
+The entire `CrawlResult` from crawl4ai is accessbile through the `metadata` field of the returned documents.
 
-You can pas these documents directly down to further processing like text splitters. Here's an example
+You can pass these documents directly down to further processing like text splitters. Here's an example
 ```
 from crawl4ai.langchain import Crawl4aiLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -351,9 +353,6 @@ text_splitter = RecursiveCharacterTextSplitter(
 )
 texts = text_splitter.split_documents(documents)
 ```
-
-You can find the full comparison code in our repository at `docs/examples/crawl4ai_vs_firecrawl.py`.
-
 
 ## Documentation 📚
 
