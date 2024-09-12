@@ -12,6 +12,7 @@ import json, uuid
 import hashlib
 from pathlib import Path
 from playwright.async_api import ProxySettings
+from pydantic import BaseModel
 
 def calculate_semaphore_count():
     cpu_count = os.cpu_count()
@@ -20,13 +21,18 @@ def calculate_semaphore_count():
     memory_based_cap = int(memory_gb / 2)  # Assume 2GB per instance
     return min(base_count, memory_based_cap)
 
+class AsyncCrawlResponse(BaseModel):
+    html: str
+    response_headers: Dict[str, str]
+    status_code: int
+
 class AsyncCrawlerStrategy(ABC):
     @abstractmethod
-    async def crawl(self, url: str, **kwargs) -> str:
+    async def crawl(self, url: str, **kwargs) -> AsyncCrawlResponse:
         pass
     
     @abstractmethod
-    async def crawl_many(self, urls: List[str], **kwargs) -> List[str]:
+    async def crawl_many(self, urls: List[str], **kwargs) -> List[AsyncCrawlResponse]:
         pass
     
     @abstractmethod
@@ -140,7 +146,10 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         for sid in expired_sessions:
             asyncio.create_task(self.kill_session(sid))
 
-    async def crawl(self, url: str, **kwargs) -> str:
+    async def crawl(self, url: str, **kwargs) -> AsyncCrawlResponse:
+        response_headers = {}
+        status_code = None
+        
         self._cleanup_expired_sessions()
         session_id = kwargs.get("session_id")
         if session_id:
@@ -168,13 +177,25 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             if self.use_cached_html:
                 cache_file_path = os.path.join(Path.home(), ".crawl4ai", "cache", hashlib.md5(url.encode()).hexdigest())
                 if os.path.exists(cache_file_path):
+                    html = ""
                     with open(cache_file_path, "r") as f:
-                        return f.read()
+                        html = f.read()
+                    # retrieve response headers and status code from cache
+                    with open(cache_file_path + ".meta", "r") as f:
+                        meta = json.load(f)
+                        response_headers = meta.get("response_headers", {})
+                        status_code = meta.get("status_code")
+                    response = AsyncCrawlResponse(html=html, response_headers=response_headers, status_code=status_code)
+                    return response
 
             if not kwargs.get("js_only", False):
                 await self.execute_hook('before_goto', page)
-                await page.goto(url, wait_until="domcontentloaded", timeout=60000)
+                response = await page.goto(url, wait_until="domcontentloaded", timeout=60000)
                 await self.execute_hook('after_goto', page)
+                
+                # Get status code and headers
+                status_code = response.status
+                response_headers = response.headers
 
             await page.wait_for_selector('body')
             await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
@@ -202,8 +223,15 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 cache_file_path = os.path.join(Path.home(), ".crawl4ai", "cache", hashlib.md5(url.encode()).hexdigest())
                 with open(cache_file_path, "w", encoding="utf-8") as f:
                     f.write(html)
+                # store response headers and status code in cache
+                with open(cache_file_path + ".meta", "w", encoding="utf-8") as f:
+                    json.dump({
+                        "response_headers": response_headers,
+                        "status_code": status_code
+                    }, f)
 
-            return html
+            response = AsyncCrawlResponse(html=html, response_headers=response_headers, status_code=status_code)
+            return response
         except Error as e:
             raise Error(f"Failed to crawl {url}: {str(e)}")
         finally:
@@ -218,7 +246,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         # except Exception as e:
         #     raise Exception(f"Failed to crawl {url}: {str(e)}")
 
-    async def crawl_many(self, urls: List[str], **kwargs) -> List[str]:
+    async def crawl_many(self, urls: List[str], **kwargs) -> List[AsyncCrawlResponse]:
         semaphore_count = kwargs.get('semaphore_count', calculate_semaphore_count())
         semaphore = asyncio.Semaphore(semaphore_count)
 
