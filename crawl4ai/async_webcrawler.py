@@ -8,7 +8,7 @@ from .models import CrawlResult
 from .async_database import async_db_manager
 from .chunking_strategy import *
 from .extraction_strategy import *
-from .async_crawler_strategy import AsyncCrawlerStrategy, AsyncPlaywrightCrawlerStrategy
+from .async_crawler_strategy import AsyncCrawlerStrategy, AsyncPlaywrightCrawlerStrategy, AsyncCrawlResponse
 from .content_scrapping_strategy import WebScrappingStrategy
 from .config import MIN_WORD_THRESHOLD, IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD
 from .utils import (
@@ -101,7 +101,8 @@ class AsyncWebCrawler:
                 t1 = time.time()
                 if user_agent:
                     self.crawler_strategy.update_user_agent(user_agent)
-                html = await self.crawler_strategy.crawl(url, **kwargs)
+                async_response : AsyncCrawlResponse = await self.crawler_strategy.crawl(url, **kwargs)
+                html = sanitize_input_encode(async_response.html)
                 t2 = time.time()
                 if verbose:
                     print(
@@ -121,8 +122,11 @@ class AsyncWebCrawler:
                 screenshot_data,
                 verbose,
                 bool(cached),
+                async_response=async_response,
                 **kwargs,
             )
+            crawl_result.status_code = async_response.status_code
+            crawl_result.responser_headers = async_response.response_headers
             crawl_result.success = bool(html)
             crawl_result.session_id = kwargs.get("session_id", None)
             return crawl_result
