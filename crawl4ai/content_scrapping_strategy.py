@@ -43,6 +43,10 @@ class WebScrappingStrategy(ContentScrappingStrategy):
         
         image_description_min_word_threshold = kwargs.get('image_description_min_word_threshold', IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD)
 
+        for tag in kwargs.get('excluded_tags', []) or []:
+            for el in body.select(tag):
+                el.decompose()
+        
         if css_selector:
             selected_elements = body.select(css_selector)
             if not selected_elements:
