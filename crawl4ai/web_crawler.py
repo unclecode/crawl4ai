@@ -225,7 +225,7 @@ class WebCrawler:
 
                 sections = chunking_strategy.chunk(markdown)
                 extracted_content = extraction_strategy.run(url, sections)
-                extracted_content = json.dumps(extracted_content, indent=4, default=str)
+                extracted_content = json.dumps(extracted_content, indent=4, default=str,ensure_ascii=False)
 
                 if verbose:
                     print(f"[LOG] 🚀 Extraction done for {url}, time taken: {time.time() - t} seconds.")
