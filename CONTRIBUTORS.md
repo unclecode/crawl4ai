@@ -12,6 +12,7 @@ We would like to thank the following people for their contributions to Crawl4AI:
 - [Aravind Karnam](https://github.com/aravindkarnam) - Developed textual description extraction feature
 - [FractalMind](https://github.com/FractalMind) - Created the first official Docker Hub image and fixed Dockerfile errors
 - [ketonkss4](https://github.com/ketonkss4) - Identified Selenium's new capabilities, helping reduce dependencies
+- [jonymusky](https://github.com/jonymusky) - Javascript execution documentation
 
 ## Other Contributors
 
