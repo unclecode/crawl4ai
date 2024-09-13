@@ -173,11 +173,13 @@ print(result.extracted_content)
 
 ```python
 from crawl4ai import WebCrawler
-from crawl4ai.chunking_strategy import CosineStrategy
-
+from crawl4ai.crawler_strategy import LocalSeleniumCrawlerStrategy
+from crawl4ai.extraction_strategy import CosineStrategy
 js_code = ["const loadMoreButton = Array.from(document.querySelectorAll('button')).find(button => button.textContent.includes('Load More')); loadMoreButton && loadMoreButton.click();"]
 
-crawler = WebCrawler()
+crawler_strategy = LocalSeleniumCrawlerStrategy(js_code=js_code)
+
+crawler = WebCrawler(crawler_strategy=crawler_strategy)
 crawler.warmup()
 
 result = crawler.run(

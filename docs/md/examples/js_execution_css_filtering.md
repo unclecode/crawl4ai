@@ -7,30 +7,26 @@ In this example, we'll demonstrate how to use Crawl4AI to execute JavaScript, fi
 ```python
 # Import necessary modules
 from crawl4ai import WebCrawler
-from crawl4ai.chunking_strategy import *
-from crawl4ai.extraction_strategy import *
-from crawl4ai.crawler_strategy import *
+from crawl4ai.crawler_strategy import LocalSeleniumCrawlerStrategy
+from crawl4ai.extraction_strategy import CosineStrategy
 
 # Define the JavaScript code to click the "Load More" button
-js_code = ["""
-const loadMoreButton = Array.from(document.querySelectorAll('button')).find(button => button.textContent.includes('Load More'));
-loadMoreButton && loadMoreButton.click();
-"""]
+js_code = ["const loadMoreButton = Array.from(document.querySelectorAll('button')).find(button => button.textContent.includes('Load More')); loadMoreButton && loadMoreButton.click();"]
 
-crawler = WebCrawler(verbose=True)
+# Needed to execute JS, define the CrawlerStrategy
+crawler_strategy = LocalSeleniumCrawlerStrategy(js_code=js_code)
+
+crawler = WebCrawler(crawler_strategy=crawler_strategy)
 crawler.warmup()
-# Run the crawler with keyword filtering and CSS selector
+
 result = crawler.run(
     url="https://www.nbcnews.com/business",
-    js=js_code,
     css_selector="p",
-    extraction_strategy=CosineStrategy(
-        semantic_filter="technology",
-    ),
+    bypass_cache=True,
+    extraction_strategy=CosineStrategy(semantic_filter="technology")
 )
 
-# Display the extracted result
-print(result)
+print(result.extracted_content)
 ```
 
 ### Explanation
