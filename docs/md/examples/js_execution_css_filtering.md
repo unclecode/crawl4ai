@@ -25,6 +25,7 @@ result = crawler.run(
     extraction_strategy=CosineStrategy(semantic_filter="technology")
 )
 
+# Display the extracted result
 print(result)
 ```
 
