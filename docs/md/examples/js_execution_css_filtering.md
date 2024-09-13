@@ -22,11 +22,10 @@ crawler.warmup()
 result = crawler.run(
     url="https://www.nbcnews.com/business",
     css_selector="p",
-    bypass_cache=True,
     extraction_strategy=CosineStrategy(semantic_filter="technology")
 )
 
-print(result.extracted_content)
+print(result)
 ```
 
 ### Explanation
