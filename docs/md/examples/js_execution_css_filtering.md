@@ -19,6 +19,7 @@ crawler_strategy = LocalSeleniumCrawlerStrategy(js_code=js_code)
 crawler = WebCrawler(crawler_strategy=crawler_strategy)
 crawler.warmup()
 
+# Run the crawler with keyword filtering and CSS selector
 result = crawler.run(
     url="https://www.nbcnews.com/business",
     css_selector="p",
