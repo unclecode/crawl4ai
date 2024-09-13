@@ -56,6 +56,7 @@ Represents the result of a crawl operation.
   - `media` (Dict[str, List[Dict]]): Media tags in the page (images, audio, video).
   - `links` (Dict[str, List[Dict]]): Links in the page (external, internal).
   - `screenshot` (Optional[str]): Base64 encoded screenshot.
+  - `wait_for` (Optional[str or function]): Wait for an element
   - `markdown` (Optional[str]): Extracted content in Markdown format.
   - `extracted_content` (Optional[str]): Extracted meaningful content.
   - `metadata` (Optional[dict]): Metadata from the page.

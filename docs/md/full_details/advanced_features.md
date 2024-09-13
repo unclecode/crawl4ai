@@ -136,3 +136,62 @@ In this example, we use the `css_selector` parameter to extract only the H2 tags
 ---
 
 With these advanced features, you can leverage Crawl4AI to perform sophisticated web crawling and data extraction tasks. Whether you need to take screenshots, extract specific elements, customize the crawling process, or set custom headers, Crawl4AI provides the flexibility and power to meet your needs. Happy crawling! 🕷️🚀
+
+## Taking Screenshots and Using Wait Conditions ⏳📸
+
+Crawl4AI provides flexibility in the crawling process by allowing you to capture screenshots and wait for specific elements to appear on a page before proceeding. This is particularly useful when dealing with dynamically loaded content.
+
+In this example, we will demonstrate how to:
+
+	•	Use JavaScript code to click a button on the page.
+	•	Implement a wait condition to ensure that at least 150 rows are loaded before extracting content.
+	•	Capture a screenshot of the loaded page for visual validation.
+
+Here’s an example using the LocalSeleniumCrawlerStrategy:
+
+```python
+import base64
+from crawl4ai import WebCrawler
+from crawl4ai.crawler_strategy import LocalSeleniumCrawlerStrategy
+from selenium.webdriver.common.by import By
+
+# Define the JavaScript code to click a button
+js_code = """document.querySelector('.Tbl__btn').click();"""
+
+# Define the wait condition to wait for 150 rows to load
+def wait_for_150_rows(driver):
+    elements = driver.find_elements(By.CSS_SELECTOR, '.Tbl-Row')
+    return len(elements) >= 150
+
+# Create the CrawlerStrategy with the JS code
+crawler_strategy = LocalSeleniumCrawlerStrategy(js_code=js_code)
+
+# Initialize the WebCrawler with the strategy
+crawler = WebCrawler(crawler_strategy=crawler_strategy)
+crawler.warmup()
+
+# Run the crawler and take a screenshot
+result = crawler.run(
+    url="https://example.com/",
+    bypass_cache=True,
+    screenshot=True,
+    wait_for=wait_for_150_rows
+)
+
+# If the crawl was successful, save the screenshot
+if result.success:
+    with open("screenshot.png", "wb") as f:
+        f.write(base64.b64decode(result.screenshot))
+        
+print(result.markdown)
+```
+
+In this case, the crawler will:
+
+1.	Load the URL.
+2.	Click the “Load More” button using the provided JavaScript code.
+3.	Wait until 150 rows are loaded.
+4.	Capture a screenshot and return the extracted content in markdown format.
+
+
+This approach is ideal for situations where you need to verify the appearance of a webpage or ensure that specific elements have been loaded before continuing.

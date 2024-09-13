@@ -243,6 +243,7 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
             
             # Execute JS code if provided
             if self.js_code and type(self.js_code) == str:
+                print("[LOG] 🔄 Executing JS code...")
                 self.driver.execute_script(self.js_code)
                 # Optionally, wait for some condition after executing the JS code
                 WebDriverWait(self.driver, 10).until(
@@ -250,11 +251,25 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
                 )
             elif self.js_code and type(self.js_code) == list:
                 for js in self.js_code:
+                    print("[LOG] 🔄 Executing JS code...")
                     self.driver.execute_script(js)
                     WebDriverWait(self.driver, 10).until(
                         lambda driver: driver.execute_script("return document.readyState") == "complete"
                     )
             
+
+            # Optionally, wait for some condition after executing the JS code
+            wait_for = kwargs.get('wait_for', False)
+            if wait_for:
+                if callable(wait_for):
+                    print("[LOG] 🔄 Waiting for condition...")
+                    WebDriverWait(self.driver, 20).until(wait_for)
+                else:
+                    print("[LOG] 🔄 Waiting for condition...")
+                    WebDriverWait(self.driver, 20).until(
+                        EC.presence_of_element_located((By.CSS_SELECTOR, wait_for))
+                    )       
+                    
             if not can_not_be_done_headless:
                 html = sanitize_input_encode(self.driver.page_source)
             self.driver = self.execute_hook('before_return_html', self.driver, html)
