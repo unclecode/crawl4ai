@@ -5,5 +5,5 @@ from ..async_webcrawler import AsyncWebCrawler
 
 class ScraperStrategy(ABC):
     @abstractmethod
-    async def ascrape(self, url: str, crawl_result: CrawlResult, crawler: AsyncWebCrawler) -> ScraperResult:
+    async def ascrape(self, url: str, crawler: AsyncWebCrawler) -> ScraperResult:
         pass
