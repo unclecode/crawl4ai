@@ -8,6 +8,10 @@ Welcome to the examples section of Crawl4AI documentation! In this section, you 
 
 This example demonstrates how to use Crawl4AI to extract information using Large Language Models (LLMs). You will learn how to configure the `LLMExtractionStrategy` to get structured data from web pages.
 
+### [JSON CSS Extraction](json_css_extraction.md)
+
+This example demonstrates how to use Crawl4AI to extract structured data without using LLM, and just focusing on page structure. You will learn how to use the `JsonCssExtractionStrategy` to extract data using CSS selectors.
+
 ### [JS Execution & CSS Filtering](js_execution_css_filtering.md)
 
 Learn how to execute custom JavaScript code and filter data using CSS selectors. This example shows how to perform complex web interactions and extract specific content from web pages.

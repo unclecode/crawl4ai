@@ -5,6 +5,9 @@ The `CrawlResult` class is the heart of Crawl4AI's output, encapsulating all the
 ## Class Definition
 
 ```python
+from pydantic import BaseModel
+from typing import Dict, List, Optional
+
 class CrawlResult(BaseModel):
     url: str
     html: str
@@ -17,6 +20,9 @@ class CrawlResult(BaseModel):
     extracted_content: Optional[str] = None
     metadata: Optional[dict] = None
     error_message: Optional[str] = None
+    session_id: Optional[str] = None
+    responser_headers: Optional[dict] = None
+    status_code: Optional[int] = None
 ```
 
 ## Fields Explanation
@@ -34,7 +40,7 @@ A flag indicating whether the crawling and extraction were successful. If any er
 The cleaned HTML content of the web page. This field holds the HTML after removing unwanted tags like `<script>`, `<style>`, and others that do not contribute to the useful content.
 
 ### `media: Dict[str, List[Dict]]`
-A dictionary containing lists of extracted media elements from the web page. The media elements are categorized into images, videos, and audios. Here’s how they are structured:
+A dictionary containing lists of extracted media elements from the web page. The media elements are categorized into images, videos, and audios. Here's how they are structured:
 
 - **Images**: Each image is represented as a dictionary with `src` (source URL) and `alt` (alternate text).
 - **Videos**: Each video is represented similarly with `src` and `alt`.
@@ -88,33 +94,11 @@ A dictionary containing metadata extracted from the web page, such as title, des
 ### `error_message: Optional[str]`
 If an error occurs during crawling, this field will contain the error message, helping you debug and understand what went wrong. 🚨
 
-## Example Usage
+### `session_id: Optional[str]`
+A unique identifier for the crawling session. This can be useful for tracking and managing multiple crawling sessions.
 
-Here's a quick example to illustrate how you might use the `CrawlResult` in your code:
+### `responser_headers: Optional[dict]`
+A dictionary containing the response headers from the web server. This can provide additional information about the server and the response.
 
-```python
-from crawl4ai import WebCrawler
-
-# Create the WebCrawler instance
-crawler = WebCrawler()
-
-# Run the crawler on a URL
-result = crawler.run(url="https://www.example.com")
-
-# Check if the crawl was successful
-if result.success:
-    print("Crawl succeeded!")
-    print("URL:", result.url)
-    print("HTML:", result.html[:100])  # Print the first 100 characters of the HTML
-    print("Cleaned HTML:", result.cleaned_html[:100])
-    print("Media:", result.media)
-    print("Links:", result.links)
-    print("Screenshot:", result.screenshot)
-    print("Markdown:", result.markdown[:100])
-    print("Extracted Content:", result.extracted_content)
-    print("Metadata:", result.metadata)
-else:
-    print("Crawl failed with error:", result.error_message)
-```
-
-With this setup, you can easily access all the valuable data extracted from the web page and integrate it into your applications. Happy crawling! 🕷️🤖
+### `status_code: Optional[int]`
+The HTTP status code of the response. This indicates the success or failure of the HTTP request (e.g., 200 for success, 404 for not found, etc.).
