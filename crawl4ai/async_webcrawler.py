@@ -80,6 +80,7 @@ class AsyncWebCrawler:
             
             word_count_threshold = max(word_count_threshold, MIN_WORD_THRESHOLD)
 
+            async_response : AsyncCrawlResponse = None
             cached = None
             screenshot_data = None
             extracted_content = None
@@ -125,8 +126,8 @@ class AsyncWebCrawler:
                 async_response=async_response,
                 **kwargs,
             )
-            crawl_result.status_code = async_response.status_code
-            crawl_result.responser_headers = async_response.response_headers
+            crawl_result.status_code = async_response.status_code if async_response else 200
+            crawl_result.responser_headers = async_response.response_headers if async_response else {}
             crawl_result.success = bool(html)
             crawl_result.session_id = kwargs.get("session_id", None)
             return crawl_result
@@ -224,11 +225,11 @@ class AsyncWebCrawler:
             if isinstance(extraction_strategy, JsonCssExtractionStrategy) or isinstance(extraction_strategy, JsonCssExtractionStrategy):
                 extraction_strategy.verbose = verbose
                 extracted_content = extraction_strategy.run(url, [html])
-                extracted_content = json.dumps(extracted_content, indent=4, default=str)
+                extracted_content = json.dumps(extracted_content, indent=4, default=str, ensure_ascii=False)
             else:
                 sections = chunking_strategy.chunk(markdown)
                 extracted_content = extraction_strategy.run(url, sections)
-                extracted_content = json.dumps(extracted_content, indent=4, default=str)
+                extracted_content = json.dumps(extracted_content, indent=4, default=str, ensure_ascii=False)
 
         if verbose:
             print(

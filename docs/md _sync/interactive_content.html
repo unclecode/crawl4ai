@@ -1,0 +1,28 @@
+<h1>Try Our Library</h1>
+<form id="apiForm">
+    <label for="inputField">Enter some input:</label>
+    <input type="text" id="inputField" name="inputField" required>
+    <button type="submit">Submit</button>
+</form>
+<div id="result"></div>
+
+<script>
+    document.getElementById('apiForm').addEventListener('submit', function(event) {
+        event.preventDefault();
+        const input = document.getElementById('inputField').value;
+        fetch('https://your-api-endpoint.com/api', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ input: input })
+        })
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('result').textContent = JSON.stringify(data);
+        })
+        .catch(error => {
+            document.getElementById('result').textContent = 'Error: ' + error;
+        });
+    });
+</script>

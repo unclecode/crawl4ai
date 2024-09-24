@@ -80,7 +80,6 @@ def load_bge_small_en_v1_5():
     model, device = set_model_device(model)
     return tokenizer, model
 
-
 @lru_cache()
 def load_text_classifier():
     from transformers import AutoTokenizer, AutoModelForSequenceClassification
@@ -146,7 +145,6 @@ def load_nltk_punkt():
     except LookupError:
         nltk.download('punkt')
     return nltk.data.find('tokenizers/punkt')
-
 
 @lru_cache()
 def load_spacy_model():

@@ -1,4 +1,4 @@
-# Make sur to install the required packageschainlit and groq
+# Make sure to install the required packageschainlit and groq
 import os, time
 from openai import AsyncOpenAI
 import chainlit as cl

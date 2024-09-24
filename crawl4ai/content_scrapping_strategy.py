@@ -50,7 +50,16 @@ class WebScrappingStrategy(ContentScrappingStrategy):
         if css_selector:
             selected_elements = body.select(css_selector)
             if not selected_elements:
-                raise InvalidCSSSelectorError(f"Invalid CSS selector, No elements found for CSS selector: {css_selector}")
+                return {
+                    'markdown': '',
+                    'cleaned_html': '',
+                    'success': True,
+                    'media': {'images': [], 'videos': [], 'audios': []},
+                    'links': {'internal': [], 'external': []},
+                    'metadata': {},
+                    'message': f"No elements found for CSS selector: {css_selector}"
+                }
+                # raise InvalidCSSSelectorError(f"Invalid CSS selector, No elements found for CSS selector: {css_selector}")
             body = soup.new_tag('div')
             for el in selected_elements:
                 body.append(el)
