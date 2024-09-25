@@ -16,8 +16,6 @@ Crawl4AI simplifies asynchronous web crawling and data extraction, making it acc
 
 ✨ Visit our [Documentation Website](https://crawl4ai.com/mkdocs/)
 
-✨ Check out the [Demo](https://crawl4ai.com/mkdocs/demo)
-
 ## Features ✨
 
 - 🆓 Completely free and open-source
@@ -57,21 +55,9 @@ For basic web crawling and scraping tasks:
 pip install crawl4ai
 ```
 
-#### Installation with PyTorch
+By default this will install the asynchronous version of Crawl4AI, using Playwright for web crawling.
 
-For advanced text clustering (includes CosineSimilarity cluster strategy):
-
-```bash
-pip install crawl4ai[torch]
-```
-
-#### Installation with Transformers
-
-For text summarization and Hugging Face models:
-
-```bash
-pip install crawl4ai[transformer]
-```
+    👉 Note: The standard version of Crawl4AI uses Playwright for asynchronous crawling. If you encounter an error saying that Playwright is not installed, you can run playwright install. However, this should be done automatically during the setup process.
 
 #### Installation with Synchronous Version
 
@@ -81,50 +67,19 @@ If you need the synchronous version using Selenium:
 pip install crawl4ai[sync]
 ```
 
-#### Installation with Cosine Similarity
+#### Development Installation
 
-For using the cosine similarity strategy:
-
-```bash
-pip install crawl4ai[cosine]
-```
-
-#### Full Installation
-
-For all features:
+For contributors who plan to modify the source code:
 
 ```bash
-pip install crawl4ai[all]
-```
-
-After installation, run the following command to install Playwright dependencies:
-
-```bash
-playwright install
-```
-
-If you've installed the "torch", "transformer", or "all" options, it's recommended to run:
-
-```bash
-crawl4ai-download-models
+git clone https://github.com/unclecode/crawl4ai.git
+cd crawl4ai
+pip install -e .
 ```
 
 ### Using Docker 🐳
 
-```bash
-# For Mac users (M1/M2)
-docker build --platform linux/amd64 -t crawl4ai .
-# For other users
-docker build -t crawl4ai .
-docker run -d -p 8000:80 crawl4ai
-```
-
-### Using Docker Hub 🐳
-
-```bash
-docker pull unclecode/crawl4ai:latest
-docker run -d -p 8000:80 unclecode/crawl4ai:latest
-```
+We're in the process of creating Docker images and pushing them to Docker Hub. This will provide an easy way to run Crawl4AI in a containerized environment. Stay tuned for updates!
 
 For more detailed installation instructions and options, please refer to our [Installation Guide](https://crawl4ai.com/mkdocs/installation).
 
