@@ -72,8 +72,9 @@ Comprehensive details on using the crawler, including:
 
 - [Crawl Request Parameters](full_details/crawl_request_parameters.md)
 - [Crawl Result Class](full_details/crawl_result_class.md)
+- [Session Based Crawling](full_details/session_based_crawling.md)
+- [Advanced Structured Data Extraction JsonCssExtraction](full_details/advanced_jsoncss_extraction.md)
 - [Advanced Features](full_details/advanced_features.md)
-- [Advanced JsonCssExtraction](full_details/advanced_jsoncss_extraction.md)
 - [Chunking Strategies](full_details/chunking_strategies.md)
 - [Extraction Strategies](full_details/extraction_strategies.md)
 
