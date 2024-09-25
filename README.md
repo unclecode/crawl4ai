@@ -1,4 +1,4 @@
-# Crawl4AI 0.3.0 Async Version 🕷️🤖
+# Crawl4AI (Async Version) 🕷️🤖
 
 [![GitHub Stars](https://img.shields.io/github/stars/unclecode/crawl4ai?style=social)](https://github.com/unclecode/crawl4ai/stargazers)
 [![GitHub Forks](https://img.shields.io/github/forks/unclecode/crawl4ai?style=social)](https://github.com/unclecode/crawl4ai/network/members)
