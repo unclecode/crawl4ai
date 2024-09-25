@@ -1,4 +1,5 @@
 from setuptools import setup, find_packages
+from setuptools.command.install import install
 import os
 from pathlib import Path
 import shutil
@@ -16,7 +17,8 @@ crawl4ai_folder.mkdir(exist_ok=True)
 cache_folder.mkdir(exist_ok=True)
 
 # Read the requirements from requirements.txt
-with open("requirements.txt") as f:
+__location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
+with open(os.path.join(__location__, "requirements.txt")) as f:
     requirements = f.read().splitlines()
     
 # Read version from __init__.py
@@ -43,6 +45,11 @@ def post_install():
     except FileNotFoundError:
         print("Playwright not found. Please ensure it's installed and run 'playwright install' manually.")
 
+class PostInstallCommand(install):
+    def run(self):
+        install.run(self)
+        post_install()
+        
 setup(
     name="Crawl4AI",
     version=version,
@@ -79,6 +86,6 @@ setup(
     ],
     python_requires=">=3.7",
     cmdclass={
-        'install': post_install,
+        'install': PostInstallCommand,
     },
 )
