@@ -190,3 +190,5 @@ a.txt
 ec2*
 
 update_changelog.sh
+
+.DS_Store
