@@ -3,9 +3,9 @@ import os, sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 import asyncio
-import nest_asyncio
+# import nest_asyncio
+# nest_asyncio.apply()
 
-nest_asyncio.apply()
 import time
 import json
 import os

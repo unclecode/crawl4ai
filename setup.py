@@ -29,11 +29,11 @@ with open("crawl4ai/__init__.py") as f:
             break
 
 # Define the requirements for different environments
-default_requirements = [req for req in requirements if not req.startswith(("torch", "transformers", "onnxruntime", "nltk", "spacy", "tokenizers", "scikit-learn", "selenium"))]
-torch_requirements = [req for req in requirements if req.startswith(("torch", "nltk", "spacy", "scikit-learn", "numpy"))]
-transformer_requirements = [req for req in requirements if req.startswith(("transformers", "tokenizers", "onnxruntime"))]
-sync_requirements = ["selenium"]
+default_requirements = requirements
+torch_requirements = ["torch", "nltk", "spacy", "scikit-learn"]
+transformer_requirements = ["transformers", "tokenizers", "onnxruntime"]
 cosine_similarity_requirements = ["torch", "transformers", "nltk", "spacy"]
+sync_requirements = ["selenium"]
 
 def post_install():
     print("Running post-installation setup...")
@@ -65,9 +65,9 @@ setup(
     extras_require={
         "torch": torch_requirements,
         "transformer": transformer_requirements,
-        "sync": sync_requirements,
         "cosine": cosine_similarity_requirements,
-        "all": requirements + sync_requirements + cosine_similarity_requirements,
+        "sync": sync_requirements,
+        "all": default_requirements + torch_requirements + transformer_requirements + cosine_similarity_requirements + sync_requirements,
     },
     entry_points={
         'console_scripts': [
