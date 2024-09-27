@@ -8,7 +8,8 @@
 
 Crawl4AI simplifies asynchronous web crawling and data extraction, making it accessible for large language models (LLMs) and AI applications. 🆓🌐
 
-> Looking for the synchronous version? Check out [README.sync.md](./README.sync.md).
+> Looking for the synchronous version? Check out [README.sync.md](./README.sync.md). You can also access the previous version in the branch [V0.2.76](https://github.com/unclecode/crawl4ai/blob/v0.2.76).
+
 
 ## Try it Now!
 
