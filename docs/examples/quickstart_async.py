@@ -1,6 +1,6 @@
 import os, sys
 # append parent directory to system path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))); os.environ['FIRECRAWL_API_KEY'] = "fc-84b370ccfad44beabc686b38f1769692";
 
 import asyncio
 # import nest_asyncio
@@ -46,12 +46,12 @@ async def js_and_css():
         ]
         result = await crawler.arun(
             url="https://www.nbcnews.com/business",
-            # js_code=js_code,
-            css_selector="article.tease-card",
+            js_code=js_code,
+            # css_selector="article.tease-card",
             # wait_for=wait_for,
             bypass_cache=True,
         )
-        print(result.extracted_content[:500])  # Print first 500 characters
+        print(result.markdown[:500])  # Print first 500 characters
 
 async def use_proxy():
     print("\n--- Using a Proxy ---")
@@ -270,7 +270,7 @@ async def crawl_dynamic_content_pages_method_3():
         js_next_page = """
         const commits = document.querySelectorAll('li.Box-sc-g0xbh4-0 h4');
         if (commits.length > 0) {
-            window.lastCommit = commits[0].textContent.trim();
+            window.firstCommit = commits[0].textContent.trim();
         }
         const button = document.querySelector('a[data-testid="pagination-next-button"]');
         if (button) button.click();
@@ -280,7 +280,7 @@ async def crawl_dynamic_content_pages_method_3():
             const commits = document.querySelectorAll('li.Box-sc-g0xbh4-0 h4');
             if (commits.length === 0) return false;
             const firstCommit = commits[0].textContent.trim();
-            return firstCommit !== window.lastCommit;
+            return firstCommit !== window.firstCommit;
         }"""
         
         schema = {
@@ -321,12 +321,26 @@ async def crawl_dynamic_content_pages_method_3():
         print(f"Successfully crawled {len(all_commits)} commits across 3 pages")
 
 async def speed_comparison():
-    print("\n--- Speed Comparison ---")
+    # print("\n--- Speed Comparison ---")
+    # print("Firecrawl (simulated):")
+    # print("Time taken: 7.02 seconds")
+    # print("Content length: 42074 characters")
+    # print("Images found: 49")
+    # print()
+    # Simulated Firecrawl performance
+    from firecrawl import FirecrawlApp
+    app = FirecrawlApp(api_key=os.environ['FIRECRAWL_API_KEY'])
+    start = time.time()
+    scrape_status = app.scrape_url(
+    'https://www.nbcnews.com/business',
+    params={'formats': ['markdown', 'html']}
+    )
+    end = time.time()
     print("Firecrawl (simulated):")
-    print("Time taken: 7.02 seconds")
-    print("Content length: 42074 characters")
-    print("Images found: 49")
-    print()
+    print(f"Time taken: {end - start:.2f} seconds")
+    print(f"Content length: {len(scrape_status['markdown'])} characters")
+    print(f"Images found: {scrape_status['markdown'].count('cldnry.s-nbcnews.com')}")
+    print()    
 
     async with AsyncWebCrawler() as crawler:
         # Crawl4AI simple crawl
@@ -375,10 +389,10 @@ async def main():
     await simple_crawl()
     await js_and_css()
     await use_proxy()
-    await extract_structured_data_using_llm()
     await extract_structured_data_using_css_extractor()
-    await crawl_dynamic_content_pages_method_1()
-    await crawl_dynamic_content_pages_method_2()
+    await extract_structured_data_using_llm()
+    # await crawl_dynamic_content_pages_method_1()
+    # await crawl_dynamic_content_pages_method_2()
     await crawl_dynamic_content_pages_method_3()
     await speed_comparison()
 
