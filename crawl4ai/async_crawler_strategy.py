@@ -43,6 +43,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         self.use_cached_html = use_cached_html
         self.user_agent = kwargs.get("user_agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
         self.proxy = kwargs.get("proxy")
+        self.ignore_https_errors = kwargs.get("ignore_https_errors", False)
         self.headless = kwargs.get("headless", True)
         self.headers = {}
         self.sessions = {}
@@ -174,6 +175,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             if not context:
                 context = await self.browser.new_context(
                     user_agent=self.user_agent,
+                    ignore_https_errors=True if self.ignore_https_errors else False,
                     proxy={"server": self.proxy} if self.proxy else None
                 )
                 await context.set_extra_http_headers(self.headers)
@@ -182,6 +184,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         else:
             context = await self.browser.new_context(
                     user_agent=self.user_agent,
+                    ignore_https_errors=True if self.ignore_https_errors else False,
                     proxy={"server": self.proxy} if self.proxy else None
             )
             await context.set_extra_http_headers(self.headers)
@@ -353,7 +356,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         return [result if not isinstance(result, Exception) else str(result) for result in results]
 
     async def take_screenshot(self, url: str) -> str:
-        async with await self.browser.new_context(user_agent=self.user_agent) as context:
+        async with await self.browser.new_context(user_agent=self.user_agent, ignore_https_errors=True if self.ignore_https_errors else False) as context:
             page = await context.new_page()
             try:
                 await page.goto(url, wait_until="domcontentloaded")

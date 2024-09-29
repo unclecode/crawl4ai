@@ -21,6 +21,18 @@ async def test_custom_user_agent():
         assert custom_user_agent in result.html
 
 @pytest.mark.asyncio
+async def test_disabled_ssl_verification():
+    crawler_strategy = AsyncPlaywrightCrawlerStrategy(verbose=True, ignore_https_errors=True)
+    async with AsyncWebCrawler(verbose=True, crawler_strategy=crawler_strategy) as crawler:
+        url = "https://expired.badssl.com/"
+        result = await crawler.arun(url=url, bypass_cache=True)
+        assert result.success
+        assert result.url == url
+        assert result.html
+        assert result.markdown
+        assert result.cleaned_html
+
+@pytest.mark.asyncio
 async def test_custom_headers():
     async with AsyncWebCrawler(verbose=True) as crawler:
         custom_headers = {"X-Test-Header": "TestValue"}
