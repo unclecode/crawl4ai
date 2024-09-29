@@ -3,24 +3,15 @@ import base64, time
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, Any, List, Optional
 import os
-import psutil
 from playwright.async_api import async_playwright, Page, Browser, Error
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
-from .utils import sanitize_input_encode
+from .utils import sanitize_input_encode, calculate_semaphore_count
 import json, uuid
 import hashlib
 from pathlib import Path
 from playwright.async_api import ProxySettings
 from pydantic import BaseModel
-
-def calculate_semaphore_count():
-    cpu_count = os.cpu_count()
-    memory_gb = psutil.virtual_memory().total / (1024 ** 3)  # Convert to GB
-    base_count = max(1, cpu_count // 2)
-    memory_based_cap = int(memory_gb / 2)  # Assume 2GB per instance
-    return min(base_count, memory_based_cap)
-
 class AsyncCrawlResponse(BaseModel):
     html: str
     response_headers: Dict[str, str]

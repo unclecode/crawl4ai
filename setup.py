@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 
 # Create the .crawl4ai folder in the user's home directory if it doesn't exist
 # If the folder already exists, remove the cache folder
@@ -35,21 +36,23 @@ transformer_requirements = ["transformers", "tokenizers", "onnxruntime"]
 cosine_similarity_requirements = ["torch", "transformers", "nltk", "spacy"]
 sync_requirements = ["selenium"]
 
-def post_install():
-    print("Running post-installation setup...")
+def install_playwright():
+    print("Installing Playwright browsers...")
     try:
-        subprocess.check_call(["playwright", "install"])
+        subprocess.check_call([sys.executable, "-m", "playwright", "install"])
         print("Playwright installation completed successfully.")
-    except subprocess.CalledProcessError:
-        print("Error during Playwright installation. Please run 'playwright install' manually.")
-    except FileNotFoundError:
-        print("Playwright not found. Please ensure it's installed and run 'playwright install' manually.")
+    except subprocess.CalledProcessError as e:
+        print(f"Error during Playwright installation: {e}")
+        print("Please run 'python -m playwright install' manually after the installation.")
+    except Exception as e:
+        print(f"Unexpected error during Playwright installation: {e}")
+        print("Please run 'python -m playwright install' manually after the installation.")
 
 class PostInstallCommand(install):
     def run(self):
         install.run(self)
-        post_install()
-        
+        install_playwright()
+
 setup(
     name="Crawl4AI",
     version=version,
@@ -61,7 +64,7 @@ setup(
     author_email="unclecode@kidocode.com",
     license="MIT",
     packages=find_packages(),
-    install_requires=default_requirements,
+    install_requires=default_requirements + ["playwright"],  # Add playwright to default requirements
     extras_require={
         "torch": torch_requirements,
         "transformer": transformer_requirements,

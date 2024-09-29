@@ -6,6 +6,7 @@ import json
 import html
 import re
 import os
+import platform
 from html2text import HTML2Text
 from .prompts import PROMPT_EXTRACT_BLOCKS
 from .config import *
@@ -18,6 +19,46 @@ from requests.exceptions import InvalidSchema
 class InvalidCSSSelectorError(Exception):
     pass
 
+def calculate_semaphore_count():
+    cpu_count = os.cpu_count()
+    memory_gb = get_system_memory() / (1024 ** 3)  # Convert to GB
+    base_count = max(1, cpu_count // 2)
+    memory_based_cap = int(memory_gb / 2)  # Assume 2GB per instance
+    return min(base_count, memory_based_cap)
+
+def get_system_memory():
+    system = platform.system()
+    if system == "Linux":
+        with open('/proc/meminfo', 'r') as mem:
+            for line in mem:
+                if line.startswith('MemTotal:'):
+                    return int(line.split()[1]) * 1024  # Convert KB to bytes
+    elif system == "Darwin":  # macOS
+        import subprocess
+        output = subprocess.check_output(['sysctl', '-n', 'hw.memsize']).decode('utf-8')
+        return int(output.strip())
+    elif system == "Windows":
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        c_ulonglong = ctypes.c_ulonglong
+        class MEMORYSTATUSEX(ctypes.Structure):
+            _fields_ = [
+                ('dwLength', ctypes.c_ulong),
+                ('dwMemoryLoad', ctypes.c_ulong),
+                ('ullTotalPhys', c_ulonglong),
+                ('ullAvailPhys', c_ulonglong),
+                ('ullTotalPageFile', c_ulonglong),
+                ('ullAvailPageFile', c_ulonglong),
+                ('ullTotalVirtual', c_ulonglong),
+                ('ullAvailVirtual', c_ulonglong),
+                ('ullAvailExtendedVirtual', c_ulonglong),
+            ]
+        memoryStatus = MEMORYSTATUSEX()
+        memoryStatus.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+        kernel32.GlobalMemoryStatusEx(ctypes.byref(memoryStatus))
+        return memoryStatus.ullTotalPhys
+    else:
+        raise OSError("Unsupported operating system")
 
 def get_home_folder():
     home_folder = os.path.join(Path.home(), ".crawl4ai")
