@@ -24,9 +24,12 @@ class AsyncWebCrawler:
         crawler_strategy: Optional[AsyncCrawlerStrategy] = None,
         always_by_pass_cache: bool = False,
         verbose: bool = False,
+        proxy: Optional[str] = None,
     ):
+        self.proxy = proxy  
         self.crawler_strategy = crawler_strategy or AsyncPlaywrightCrawlerStrategy(
-            verbose=verbose
+            verbose=verbose,
+            proxy=self.proxy
         )
         self.always_by_pass_cache = always_by_pass_cache
         self.crawl4ai_folder = os.path.join(Path.home(), ".crawl4ai")

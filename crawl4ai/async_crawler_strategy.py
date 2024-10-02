@@ -59,6 +59,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             'after_goto': None,
             'before_return_html': None
         }
+        self.proxy = kwargs.get("proxy")
 
     async def __aenter__(self):
         await self.start()
@@ -73,7 +74,6 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         if self.browser is None:
             browser_args = {
                 "headless": self.headless,
-                # "headless": False,
                 "args": [
                     "--disable-gpu",
                     "--disable-dev-shm-usage",
@@ -84,9 +84,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             
             # Add proxy settings if a proxy is specified
             if self.proxy:
-                proxy_settings = ProxySettings(server=self.proxy)
+                proxy_settings = {"server": self.proxy}
                 browser_args["proxy"] = proxy_settings
-                
                 
             self.browser = await self.playwright.chromium.launch(**browser_args)
             await self.execute_hook('on_browser_created', self.browser)
