@@ -12,10 +12,12 @@ import hashlib
 from pathlib import Path
 from playwright.async_api import ProxySettings
 from pydantic import BaseModel
+
 class AsyncCrawlResponse(BaseModel):
     html: str
     response_headers: Dict[str, str]
     status_code: int
+    screenshot: Optional[str] = None
 
 class AsyncCrawlerStrategy(ABC):
     @abstractmethod
@@ -139,6 +141,45 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             asyncio.create_task(self.kill_session(sid))
             
             
+    async def smart_wait(self, page: Page, wait_for: str, timeout: float = 30000):
+        wait_for = wait_for.strip()
+        
+        if wait_for.startswith('js:'):
+            # Explicitly specified JavaScript
+            js_code = wait_for[3:].strip()
+            return await self.csp_compliant_wait(page, js_code, timeout)
+        elif wait_for.startswith('css:'):
+            # Explicitly specified CSS selector
+            css_selector = wait_for[4:].strip()
+            try:
+                await page.wait_for_selector(css_selector, timeout=timeout)
+            except Error as e:
+                if 'Timeout' in str(e):
+                    raise TimeoutError(f"Timeout after {timeout}ms waiting for selector '{css_selector}'")
+                else:
+                    raise ValueError(f"Invalid CSS selector: '{css_selector}'")
+        else:
+            # Auto-detect based on content
+            if wait_for.startswith('()') or wait_for.startswith('function'):
+                # It's likely a JavaScript function
+                return await self.csp_compliant_wait(page, wait_for, timeout)
+            else:
+                # Assume it's a CSS selector first
+                try:
+                    await page.wait_for_selector(wait_for, timeout=timeout)
+                except Error as e:
+                    if 'Timeout' in str(e):
+                        raise TimeoutError(f"Timeout after {timeout}ms waiting for selector '{wait_for}'")
+                    else:
+                        # If it's not a timeout error, it might be an invalid selector
+                        # Let's try to evaluate it as a JavaScript function as a fallback
+                        try:
+                            return await self.csp_compliant_wait(page, f"() => {{{wait_for}}}", timeout)
+                        except Error:
+                            raise ValueError(f"Invalid wait_for parameter: '{wait_for}'. "
+                                            "It should be either a valid CSS selector, a JavaScript function, "
+                                            "or explicitly prefixed with 'js:' or 'css:'.")
+    
     async def csp_compliant_wait(self, page: Page, user_wait_function: str, timeout: float = 30000):
         wrapper_js = f"""
         async () => {{
@@ -250,19 +291,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             wait_for = kwargs.get("wait_for")
             if wait_for:
                 try:
-                    await self.csp_compliant_wait(page, wait_for, timeout=kwargs.get("timeout", 30000))
+                    await self.smart_wait(page, wait_for, timeout=kwargs.get("timeout", 30000))
                 except Exception as e:
-                    raise RuntimeError(f"Custom wait condition failed: {str(e)}")                
-                # try:
-                #     await page.wait_for_function(wait_for)
-                #     # if callable(wait_for):
-                #     #     await page.wait_for_function(wait_for)
-                #     # elif isinstance(wait_for, str):
-                #     #     await page.wait_for_selector(wait_for)
-                #     # else:
-                #     #     raise ValueError("wait_for must be either a callable or a CSS selector string")
-                # except Error as e:
-                #     raise Error(f"Custom wait condition failed: {str(e)}")
+                    raise RuntimeError(f"Wait condition failed: {str(e)}")
 
             html = await page.content()
             page = await self.execute_hook('before_return_html', page, html)
