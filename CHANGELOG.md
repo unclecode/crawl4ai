@@ -1,5 +1,14 @@
 # Changelog
 
+## [v0.3.5] - 2024-09-02
+
+Enhance AsyncWebCrawler with smart waiting and screenshot capabilities
+
+- Implement smart_wait function in AsyncPlaywrightCrawlerStrategy
+- Add screenshot support to AsyncCrawlResponse and AsyncWebCrawler
+- Improve error handling and timeout management in crawling process
+- Fix typo in CrawlResult model (responser_headers -> response_headers)
+
 ## [v0.2.77] - 2024-08-04
 
 Significant improvements in text processing and performance:

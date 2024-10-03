@@ -80,6 +80,7 @@ class AsyncWebCrawler:
             
             word_count_threshold = max(word_count_threshold, MIN_WORD_THRESHOLD)
 
+            async_response: AsyncCrawlResponse = None
             cached = None
             screenshot_data = None
             extracted_content = None
@@ -101,15 +102,14 @@ class AsyncWebCrawler:
                 t1 = time.time()
                 if user_agent:
                     self.crawler_strategy.update_user_agent(user_agent)
-                async_response : AsyncCrawlResponse = await self.crawler_strategy.crawl(url, **kwargs)
+                async_response: AsyncCrawlResponse = await self.crawler_strategy.crawl(url, screenshot=screenshot, **kwargs)
                 html = sanitize_input_encode(async_response.html)
+                screenshot_data = async_response.screenshot
                 t2 = time.time()
                 if verbose:
                     print(
                         f"[LOG] 🚀 Crawling done for {url}, success: {bool(html)}, time taken: {t2 - t1:.2f} seconds"
                     )
-                if screenshot:
-                    screenshot_data = await self.crawler_strategy.take_screenshot(url)
 
             crawl_result = await self.aprocess_html(
                 url,
@@ -125,8 +125,8 @@ class AsyncWebCrawler:
                 async_response=async_response,
                 **kwargs,
             )
-            crawl_result.status_code = async_response.status_code
-            crawl_result.responser_headers = async_response.response_headers
+            crawl_result.status_code = async_response.status_code if async_response else 200
+            crawl_result.response_headers = async_response.response_headers if async_response else {}
             crawl_result.success = bool(html)
             crawl_result.session_id = kwargs.get("session_id", None)
             return crawl_result
@@ -224,11 +224,11 @@ class AsyncWebCrawler:
             if isinstance(extraction_strategy, JsonCssExtractionStrategy) or isinstance(extraction_strategy, JsonCssExtractionStrategy):
                 extraction_strategy.verbose = verbose
                 extracted_content = extraction_strategy.run(url, [html])
-                extracted_content = json.dumps(extracted_content, indent=4, default=str)
+                extracted_content = json.dumps(extracted_content, indent=4, default=str, ensure_ascii=False)
             else:
                 sections = chunking_strategy.chunk(markdown)
                 extracted_content = extraction_strategy.run(url, sections)
-                extracted_content = json.dumps(extracted_content, indent=4, default=str)
+                extracted_content = json.dumps(extracted_content, indent=4, default=str, ensure_ascii=False)
 
         if verbose:
             print(

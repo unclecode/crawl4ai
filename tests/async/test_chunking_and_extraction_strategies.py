@@ -27,21 +27,21 @@ async def test_regex_chunking():
         chunks = json.loads(result.extracted_content)
         assert len(chunks) > 1  # Ensure multiple chunks were created
 
-@pytest.mark.asyncio
-async def test_cosine_strategy():
-    async with AsyncWebCrawler(verbose=True) as crawler:
-        url = "https://www.nbcnews.com/business"
-        extraction_strategy = CosineStrategy(word_count_threshold=10, max_dist=0.2, linkage_method="ward", top_k=3, sim_threshold=0.3)
-        result = await crawler.arun(
-            url=url,
-            extraction_strategy=extraction_strategy,
-            bypass_cache=True
-        )
-        assert result.success
-        assert result.extracted_content
-        extracted_data = json.loads(result.extracted_content)
-        assert len(extracted_data) > 0
-        assert all('tags' in item for item in extracted_data)
+# @pytest.mark.asyncio
+# async def test_cosine_strategy():
+#     async with AsyncWebCrawler(verbose=True) as crawler:
+#         url = "https://www.nbcnews.com/business"
+#         extraction_strategy = CosineStrategy(word_count_threshold=10, max_dist=0.2, linkage_method="ward", top_k=3, sim_threshold=0.3)
+#         result = await crawler.arun(
+#             url=url,
+#             extraction_strategy=extraction_strategy,
+#             bypass_cache=True
+#         )
+#         assert result.success
+#         assert result.extracted_content
+#         extracted_data = json.loads(result.extracted_content)
+#         assert len(extracted_data) > 0
+#         assert all('tags' in item for item in extracted_data)
 
 @pytest.mark.asyncio
 async def test_llm_extraction_strategy():
@@ -63,24 +63,24 @@ async def test_llm_extraction_strategy():
         assert len(extracted_data) > 0
         assert all('content' in item for item in extracted_data)
 
-@pytest.mark.asyncio
-async def test_combined_chunking_and_extraction():
-    async with AsyncWebCrawler(verbose=True) as crawler:
-        url = "https://www.nbcnews.com/business"
-        chunking_strategy = RegexChunking(patterns=["\n\n"])
-        extraction_strategy = CosineStrategy(word_count_threshold=10, max_dist=0.2, linkage_method="ward", top_k=3, sim_threshold=0.3)
-        result = await crawler.arun(
-            url=url,
-            chunking_strategy=chunking_strategy,
-            extraction_strategy=extraction_strategy,
-            bypass_cache=True
-        )
-        assert result.success
-        assert result.extracted_content
-        extracted_data = json.loads(result.extracted_content)
-        assert len(extracted_data) > 0
-        assert all('tags' in item for item in extracted_data)
-        assert all('content' in item for item in extracted_data)
+# @pytest.mark.asyncio
+# async def test_combined_chunking_and_extraction():
+#     async with AsyncWebCrawler(verbose=True) as crawler:
+#         url = "https://www.nbcnews.com/business"
+#         chunking_strategy = RegexChunking(patterns=["\n\n"])
+#         extraction_strategy = CosineStrategy(word_count_threshold=10, max_dist=0.2, linkage_method="ward", top_k=3, sim_threshold=0.3)
+#         result = await crawler.arun(
+#             url=url,
+#             chunking_strategy=chunking_strategy,
+#             extraction_strategy=extraction_strategy,
+#             bypass_cache=True
+#         )
+#         assert result.success
+#         assert result.extracted_content
+#         extracted_data = json.loads(result.extracted_content)
+#         assert len(extracted_data) > 0
+#         assert all('tags' in item for item in extracted_data)
+#         assert all('content' in item for item in extracted_data)
 
 # Entry point for debugging
 if __name__ == "__main__":

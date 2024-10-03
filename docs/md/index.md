@@ -1,43 +1,39 @@
-# Crawl4AI v0.2.77
+# Crawl4AI
 
 Welcome to the official documentation for Crawl4AI! 🕷️🤖 Crawl4AI is an open-source Python library designed to simplify web crawling and extract useful information from web pages. This documentation will guide you through the features, usage, and customization of Crawl4AI.
 
-
-## Try the [Demo](demo.md)
-
-Just try it now and crawl different pages to see how it works. You can set the links, see the structures of the output, and also view the Python sample code on how to run it. The old demo is available at [/old_demo](/old) where you can see more details.
-
 ## Introduction
 
-Crawl4AI has one clear task: to make crawling and data extraction from web pages easy and efficient, especially for large language models (LLMs) and AI applications. Whether you are using it as a REST API or a Python library, Crawl4AI offers a robust and flexible solution.
+Crawl4AI has one clear task: to make crawling and data extraction from web pages easy and efficient, especially for large language models (LLMs) and AI applications. Whether you are using it as a REST API or a Python library, Crawl4AI offers a robust and flexible solution with full asynchronous support.
 
 ## Quick Start
 
-Here's a quick example to show you how easy it is to use Crawl4AI:
+Here's a quick example to show you how easy it is to use Crawl4AI with its new asynchronous capabilities:
 
 ```python
-from crawl4ai import WebCrawler
+import asyncio
+from crawl4ai import AsyncWebCrawler
 
-# Create an instance of WebCrawler
-crawler = WebCrawler()
+async def main():
+    # Create an instance of AsyncWebCrawler
+    async with AsyncWebCrawler(verbose=True) as crawler:
+        # Run the crawler on a URL
+        result = await crawler.arun(url="https://www.nbcnews.com/business")
 
-# Warm up the crawler (load necessary models)
-crawler.warmup()
+        # Print the extracted content
+        print(result.markdown)
 
-# Run the crawler on a URL
-result = crawler.run(url="https://www.nbcnews.com/business")
-
-# Print the extracted content
-print(result.extracted_content)
+# Run the async main function
+asyncio.run(main())
 ```
 
 ### Explanation
 
-1. **Importing the Library**: We start by importing the `WebCrawler` class from the `crawl4ai` library.
-2. **Creating an Instance**: An instance of `WebCrawler` is created.
-3. **Warming Up**: The `warmup()` method prepares the crawler by loading necessary models and settings.
-4. **Running the Crawler**: The `run()` method is used to crawl the specified URL and extract meaningful content.
-5. **Printing the Result**: The extracted content is printed, showcasing the data extracted from the web page.
+1. **Importing the Library**: We start by importing the `AsyncWebCrawler` class from the `crawl4ai` library and the `asyncio` module.
+2. **Creating an Async Context**: We use an async context manager to create an instance of `AsyncWebCrawler`.
+3. **Running the Crawler**: The `arun()` method is used to asynchronously crawl the specified URL and extract meaningful content.
+4. **Printing the Result**: The extracted content is printed, showcasing the data extracted from the web page.
+5. **Running the Async Function**: We use `asyncio.run()` to execute our async main function.
 
 ## Documentation Structure
 
@@ -63,6 +59,7 @@ A step-by-step guide to get you up and running with Crawl4AI, including installa
 
 This section contains practical examples demonstrating different use cases of Crawl4AI:
 
+- [Structured Data Extraction](examples/json_css_extraction.md)
 - [LLM Extraction](examples/llm_extraction.md)
 - [JS Execution & CSS Filtering](examples/js_execution_css_filtering.md)
 - [Hooks & Auth](examples/hooks_auth.md)
@@ -75,16 +72,11 @@ Comprehensive details on using the crawler, including:
 
 - [Crawl Request Parameters](full_details/crawl_request_parameters.md)
 - [Crawl Result Class](full_details/crawl_result_class.md)
+- [Session Based Crawling](full_details/session_based_crawling.md)
+- [Advanced Structured Data Extraction JsonCssExtraction](full_details/advanced_jsoncss_extraction.md)
 - [Advanced Features](full_details/advanced_features.md)
 - [Chunking Strategies](full_details/chunking_strategies.md)
 - [Extraction Strategies](full_details/extraction_strategies.md)
-
-### [API Reference](api/core_classes_and_functions.md)
-
-Detailed documentation of the API, covering:
-
-- [Core Classes and Functions](api/core_classes_and_functions.md)
-- [Detailed API Documentation](api/detailed_api_documentation.md)
 
 ### [Change Log](changelog.md)
 
@@ -96,6 +88,6 @@ Information on how to get in touch with the developers, report issues, and contr
 
 ## Get Started
 
-To get started with Crawl4AI, follow the quick start guide above or explore the detailed sections of this documentation. Whether you are a beginner or an advanced user, Crawl4AI has something to offer to make your web crawling and data extraction tasks easier and more efficient.
+To get started with Crawl4AI, follow the quick start guide above or explore the detailed sections of this documentation. Whether you are a beginner or an advanced user, Crawl4AI has something to offer to make your web crawling and data extraction tasks easier, more efficient, and now fully asynchronous.
 
 Happy Crawling! 🕸️🚀

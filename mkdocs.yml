@@ -2,13 +2,13 @@ site_name: Crawl4AI Documentation
 docs_dir: docs/md
 nav:
   - Home: index.md
-  - Demo: demo.md  # Add this line
   - First Steps:
       - Introduction: introduction.md
       - Installation: installation.md
       - Quick Start: quickstart.md
   - Examples:
       - Intro: examples/index.md
+      - Structured Data Extraction: examples/json_css_extraction.md
       - LLM Extraction: examples/llm_extraction.md
       - JS Execution & CSS Filtering: examples/js_execution_css_filtering.md
       - Hooks & Auth: examples/hooks_auth.md
@@ -17,12 +17,11 @@ nav:
   - Full Details of Using Crawler:
       - Crawl Request Parameters: full_details/crawl_request_parameters.md
       - Crawl Result Class: full_details/crawl_result_class.md
+      - Session Based Crawling: full_details/session_based_crawling.md
       - Advanced Features: full_details/advanced_features.md
+      - Advanced JsonCssExtraction: full_details/advanced_jsoncss_extraction.md
       - Chunking Strategies: full_details/chunking_strategies.md
       - Extraction Strategies: full_details/extraction_strategies.md
-  - API Reference:
-      - Core Classes and Functions: api/core_classes_and_functions.md
-      - Detailed API Documentation: api/detailed_api_documentation.md
   - Miscellaneous:
       - Change Log: changelog.md
       - Contact: contact.md

@@ -190,3 +190,14 @@ a.txt
 ec2*
 
 update_changelog.sh
+
+.DS_Store
+docs/.DS_Store
+tmp/
+test_env/
+**/.DS_Store
+**/.DS_Store
+
+todo.md
+git_changes.py
+git_changes.md

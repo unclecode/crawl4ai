@@ -1,4 +1,4 @@
-# Crawl4AI Async Version 🕷️🤖
+# Crawl4AI (Async Version) 🕷️🤖
 
 [![GitHub Stars](https://img.shields.io/github/stars/unclecode/crawl4ai?style=social)](https://github.com/unclecode/crawl4ai/stargazers)
 [![GitHub Forks](https://img.shields.io/github/forks/unclecode/crawl4ai?style=social)](https://github.com/unclecode/crawl4ai/network/members)
@@ -8,15 +8,14 @@
 
 Crawl4AI simplifies asynchronous web crawling and data extraction, making it accessible for large language models (LLMs) and AI applications. 🆓🌐
 
-> Looking for the synchronous version? Check out [README.sync.md](./README.sync.md).
+> Looking for the synchronous version? Check out [README.sync.md](./README.sync.md). You can also access the previous version in the branch [V0.2.76](https://github.com/unclecode/crawl4ai/blob/v0.2.76).
+
 
 ## Try it Now!
 
 ✨ Play around with this [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1REChY6fXQf-EaVYLv0eHEWvzlYxGm0pd?usp=sharing)
 
 ✨ Visit our [Documentation Website](https://crawl4ai.com/mkdocs/)
-
-✨ Check out the [Demo](https://crawl4ai.com/mkdocs/demo)
 
 ## Features ✨
 
@@ -40,31 +39,61 @@ Crawl4AI simplifies asynchronous web crawling and data extraction, making it acc
 - 🔄 Session management for complex multi-page crawling scenarios
 - 🌐 Asynchronous architecture for improved performance and scalability
 
-
 ## Installation 🛠️
 
+Crawl4AI offers flexible installation options to suit various use cases. You can install it as a Python package or use Docker.
+
 ### Using pip 🐍
+
+Choose the installation option that best fits your needs:
+
+#### Basic Installation
+
+For basic web crawling and scraping tasks:
+
 ```bash
-virtualenv venv
-source venv/bin/activate
-pip install "crawl4ai @ git+https://github.com/unclecode/crawl4ai.git"
+pip install crawl4ai
+```
+
+By default, this will install the asynchronous version of Crawl4AI, using Playwright for web crawling.
+
+👉 Note: When you install Crawl4AI, the setup script should automatically install and set up Playwright. However, if you encounter any Playwright-related errors, you can manually install it using one of these methods:
+
+1. Through the command line:
+   ```bash
+   playwright install
+   ```
+
+2. If the above doesn't work, try this more specific command:
+   ```bash
+   python -m playwright install chromium
+   ```
+
+This second method has proven to be more reliable in some cases.
+
+#### Installation with Synchronous Version
+
+If you need the synchronous version using Selenium:
+
+```bash
+pip install crawl4ai[sync]
+```
+
+#### Development Installation
+
+For contributors who plan to modify the source code:
+
+```bash
+git clone https://github.com/unclecode/crawl4ai.git
+cd crawl4ai
+pip install -e .
 ```
 
 ### Using Docker 🐳
 
-```bash
-# For Mac users (M1/M2)
-# docker build --platform linux/amd64 -t crawl4ai .
-docker build -t crawl4ai .
-docker run -d -p 8000:80 crawl4ai
-```
+We're in the process of creating Docker images and pushing them to Docker Hub. This will provide an easy way to run Crawl4AI in a containerized environment. Stay tuned for updates!
 
-### Using Docker Hub 🐳
-
-```bash
-docker pull unclecode/crawl4ai:latest
-docker run -d -p 8000:80 unclecode/crawl4ai:latest
-```
+For more detailed installation instructions and options, please refer to our [Installation Guide](https://crawl4ai.com/mkdocs/installation).
 
 ## Quick Start 🚀
 
@@ -122,108 +151,7 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-### Extracting Structured Data with OpenAI
-
-```python
-import os
-import asyncio
-from crawl4ai import AsyncWebCrawler
-from crawl4ai.extraction_strategy import LLMExtractionStrategy
-from pydantic import BaseModel, Field
-
-class OpenAIModelFee(BaseModel):
-    model_name: str = Field(..., description="Name of the OpenAI model.")
-    input_fee: str = Field(..., description="Fee for input token for the OpenAI model.")
-    output_fee: str = Field(..., description="Fee for output token for the OpenAI model.")
-
-async def main():
-    async with AsyncWebCrawler(verbose=True) as crawler:
-        result = await crawler.arun(
-            url='https://openai.com/api/pricing/',
-            word_count_threshold=1,
-            extraction_strategy=LLMExtractionStrategy(
-                provider="openai/gpt-4o", api_token=os.getenv('OPENAI_API_KEY'), 
-                schema=OpenAIModelFee.schema(),
-                extraction_type="schema",
-                instruction="""From the crawled content, extract all mentioned model names along with their fees for input and output tokens. 
-                Do not miss any models in the entire content. One extracted model JSON format should look like this: 
-                {"model_name": "GPT-4", "input_fee": "US$10.00 / 1M tokens", "output_fee": "US$30.00 / 1M tokens"}."""
-            ),            
-            bypass_cache=True,
-        )
-        print(result.extracted_content)
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
-
-### Advanced Multi-Page Crawling with JavaScript Execution
-
-Crawl4AI excels at handling complex scenarios, such as crawling multiple pages with dynamic content loaded via JavaScript. Here's an example of crawling GitHub commits across multiple pages:
-
-```python
-import asyncio
-import re
-from bs4 import BeautifulSoup
-from crawl4ai import AsyncWebCrawler
-
-async def crawl_typescript_commits():
-    first_commit = ""
-    async def on_execution_started(page):
-        nonlocal first_commit 
-        try:
-            while True:
-                await page.wait_for_selector('li.Box-sc-g0xbh4-0 h4')
-                commit = await page.query_selector('li.Box-sc-g0xbh4-0 h4')
-                commit = await commit.evaluate('(element) => element.textContent')
-                commit = re.sub(r'\s+', '', commit)
-                if commit and commit != first_commit:
-                    first_commit = commit
-                    break
-                await asyncio.sleep(0.5)
-        except Exception as e:
-            print(f"Warning: New content didn't appear after JavaScript execution: {e}")
-
-    async with AsyncWebCrawler(verbose=True) as crawler:
-        crawler.crawler_strategy.set_hook('on_execution_started', on_execution_started)
-
-        url = "https://github.com/microsoft/TypeScript/commits/main"
-        session_id = "typescript_commits_session"
-        all_commits = []
-
-        js_next_page = """
-        const button = document.querySelector('a[data-testid="pagination-next-button"]');
-        if (button) button.click();
-        """
-
-        for page in range(3):  # Crawl 3 pages
-            result = await crawler.arun(
-                url=url,
-                session_id=session_id,
-                css_selector="li.Box-sc-g0xbh4-0",
-                js=js_next_page if page > 0 else None,
-                bypass_cache=True,
-                js_only=page > 0
-            )
-
-            assert result.success, f"Failed to crawl page {page + 1}"
-
-            soup = BeautifulSoup(result.cleaned_html, 'html.parser')
-            commits = soup.select("li")
-            all_commits.extend(commits)
-
-            print(f"Page {page + 1}: Found {len(commits)} commits")
-
-        await crawler.crawler_strategy.kill_session(session_id)
-        print(f"Successfully crawled {len(all_commits)} commits across 3 pages")
-
-if __name__ == "__main__":
-    asyncio.run(crawl_typescript_commits())
-```
-
-This example demonstrates Crawl4AI's ability to handle complex scenarios where content is loaded asynchronously. It crawls multiple pages of GitHub commits, executing JavaScript to load new content and using custom hooks to ensure data is loaded before proceeding.
-
-### Using JsonCssExtractionStrategy
+### Extracting Structured Data without LLM
 
 The `JsonCssExtractionStrategy` allows for precise extraction of structured data from web pages using CSS selectors.
 
@@ -294,6 +222,112 @@ async def extract_news_teasers():
 if __name__ == "__main__":
     asyncio.run(extract_news_teasers())
 ```
+
+For more advanced usage examples, check out our [Examples](https://crawl4ai.com/mkdocs/full_details/advanced_jsoncss_extraction.md) section in the documentation.
+
+### Extracting Structured Data with OpenAI
+
+```python
+import os
+import asyncio
+from crawl4ai import AsyncWebCrawler
+from crawl4ai.extraction_strategy import LLMExtractionStrategy
+from pydantic import BaseModel, Field
+
+class OpenAIModelFee(BaseModel):
+    model_name: str = Field(..., description="Name of the OpenAI model.")
+    input_fee: str = Field(..., description="Fee for input token for the OpenAI model.")
+    output_fee: str = Field(..., description="Fee for output token for the OpenAI model.")
+
+async def main():
+    async with AsyncWebCrawler(verbose=True) as crawler:
+        result = await crawler.arun(
+            url='https://openai.com/api/pricing/',
+            word_count_threshold=1,
+            extraction_strategy=LLMExtractionStrategy(
+                provider="openai/gpt-4o", api_token=os.getenv('OPENAI_API_KEY'), 
+                schema=OpenAIModelFee.schema(),
+                extraction_type="schema",
+                instruction="""From the crawled content, extract all mentioned model names along with their fees for input and output tokens. 
+                Do not miss any models in the entire content. One extracted model JSON format should look like this: 
+                {"model_name": "GPT-4", "input_fee": "US$10.00 / 1M tokens", "output_fee": "US$30.00 / 1M tokens"}."""
+            ),            
+            bypass_cache=True,
+        )
+        print(result.extracted_content)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Session Management and Dynamic Content Crawling
+
+Crawl4AI excels at handling complex scenarios, such as crawling multiple pages with dynamic content loaded via JavaScript. Here's an example of crawling GitHub commits across multiple pages:
+
+```python
+import asyncio
+import re
+from bs4 import BeautifulSoup
+from crawl4ai import AsyncWebCrawler
+
+async def crawl_typescript_commits():
+    first_commit = ""
+    async def on_execution_started(page):
+        nonlocal first_commit 
+        try:
+            while True:
+                await page.wait_for_selector('li.Box-sc-g0xbh4-0 h4')
+                commit = await page.query_selector('li.Box-sc-g0xbh4-0 h4')
+                commit = await commit.evaluate('(element) => element.textContent')
+                commit = re.sub(r'\s+', '', commit)
+                if commit and commit != first_commit:
+                    first_commit = commit
+                    break
+                await asyncio.sleep(0.5)
+        except Exception as e:
+            print(f"Warning: New content didn't appear after JavaScript execution: {e}")
+
+    async with AsyncWebCrawler(verbose=True) as crawler:
+        crawler.crawler_strategy.set_hook('on_execution_started', on_execution_started)
+
+        url = "https://github.com/microsoft/TypeScript/commits/main"
+        session_id = "typescript_commits_session"
+        all_commits = []
+
+        js_next_page = """
+        const button = document.querySelector('a[data-testid="pagination-next-button"]');
+        if (button) button.click();
+        """
+
+        for page in range(3):  # Crawl 3 pages
+            result = await crawler.arun(
+                url=url,
+                session_id=session_id,
+                css_selector="li.Box-sc-g0xbh4-0",
+                js=js_next_page if page > 0 else None,
+                bypass_cache=True,
+                js_only=page > 0
+            )
+
+            assert result.success, f"Failed to crawl page {page + 1}"
+
+            soup = BeautifulSoup(result.cleaned_html, 'html.parser')
+            commits = soup.select("li")
+            all_commits.extend(commits)
+
+            print(f"Page {page + 1}: Found {len(commits)} commits")
+
+        await crawler.crawler_strategy.kill_session(session_id)
+        print(f"Successfully crawled {len(all_commits)} commits across 3 pages")
+
+if __name__ == "__main__":
+    asyncio.run(crawl_typescript_commits())
+```
+
+This example demonstrates Crawl4AI's ability to handle complex scenarios where content is loaded asynchronously. It crawls multiple pages of GitHub commits, executing JavaScript to load new content and using custom hooks to ensure data is loaded before proceeding.
+
+For more advanced usage examples, check out our [Examples](https://crawl4ai.com/mkdocs/full_details/session_based_crawling.md) section in the documentation.
+
 
 ## Speed Comparison 🚀
 

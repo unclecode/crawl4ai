@@ -3,28 +3,21 @@ import base64, time
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, Any, List, Optional
 import os
-import psutil
 from playwright.async_api import async_playwright, Page, Browser, Error
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
-from .utils import sanitize_input_encode
+from .utils import sanitize_input_encode, calculate_semaphore_count
 import json, uuid
 import hashlib
 from pathlib import Path
 from playwright.async_api import ProxySettings
 from pydantic import BaseModel
 
-def calculate_semaphore_count():
-    cpu_count = os.cpu_count()
-    memory_gb = psutil.virtual_memory().total / (1024 ** 3)  # Convert to GB
-    base_count = max(1, cpu_count // 2)
-    memory_based_cap = int(memory_gb / 2)  # Assume 2GB per instance
-    return min(base_count, memory_based_cap)
-
 class AsyncCrawlResponse(BaseModel):
     html: str
     response_headers: Dict[str, str]
     status_code: int
+    screenshot: Optional[str] = None
 
 class AsyncCrawlerStrategy(ABC):
     @abstractmethod
@@ -52,6 +45,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         self.use_cached_html = use_cached_html
         self.user_agent = kwargs.get("user_agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
         self.proxy = kwargs.get("proxy")
+        self.headless = kwargs.get("headless", True)
         self.headers = {}
         self.sessions = {}
         self.session_ttl = 1800 
@@ -80,7 +74,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             self.playwright = await async_playwright().start()
         if self.browser is None:
             browser_args = {
-                "headless": True,
+                "headless": self.headless,
                 # "headless": False,
                 "args": [
                     "--disable-gpu",
@@ -145,6 +139,70 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                             if current_time - last_used > self.session_ttl]
         for sid in expired_sessions:
             asyncio.create_task(self.kill_session(sid))
+            
+            
+    async def smart_wait(self, page: Page, wait_for: str, timeout: float = 30000):
+        wait_for = wait_for.strip()
+        
+        if wait_for.startswith('js:'):
+            # Explicitly specified JavaScript
+            js_code = wait_for[3:].strip()
+            return await self.csp_compliant_wait(page, js_code, timeout)
+        elif wait_for.startswith('css:'):
+            # Explicitly specified CSS selector
+            css_selector = wait_for[4:].strip()
+            try:
+                await page.wait_for_selector(css_selector, timeout=timeout)
+            except Error as e:
+                if 'Timeout' in str(e):
+                    raise TimeoutError(f"Timeout after {timeout}ms waiting for selector '{css_selector}'")
+                else:
+                    raise ValueError(f"Invalid CSS selector: '{css_selector}'")
+        else:
+            # Auto-detect based on content
+            if wait_for.startswith('()') or wait_for.startswith('function'):
+                # It's likely a JavaScript function
+                return await self.csp_compliant_wait(page, wait_for, timeout)
+            else:
+                # Assume it's a CSS selector first
+                try:
+                    await page.wait_for_selector(wait_for, timeout=timeout)
+                except Error as e:
+                    if 'Timeout' in str(e):
+                        raise TimeoutError(f"Timeout after {timeout}ms waiting for selector '{wait_for}'")
+                    else:
+                        # If it's not a timeout error, it might be an invalid selector
+                        # Let's try to evaluate it as a JavaScript function as a fallback
+                        try:
+                            return await self.csp_compliant_wait(page, f"() => {{{wait_for}}}", timeout)
+                        except Error:
+                            raise ValueError(f"Invalid wait_for parameter: '{wait_for}'. "
+                                            "It should be either a valid CSS selector, a JavaScript function, "
+                                            "or explicitly prefixed with 'js:' or 'css:'.")
+    
+    async def csp_compliant_wait(self, page: Page, user_wait_function: str, timeout: float = 30000):
+        wrapper_js = f"""
+        async () => {{
+            const userFunction = {user_wait_function};
+            const startTime = Date.now();
+            while (true) {{
+                if (await userFunction()) {{
+                    return true;
+                }}
+                if (Date.now() - startTime > {timeout}) {{
+                    throw new Error('Timeout waiting for condition');
+                }}
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }}
+        }}
+        """
+        
+        try:
+            await page.evaluate(wrapper_js)
+        except TimeoutError:
+            raise TimeoutError(f"Timeout after {timeout}ms waiting for condition")
+        except Exception as e:
+            raise RuntimeError(f"Error in wait condition: {str(e)}")
 
     async def crawl(self, url: str, **kwargs) -> AsyncCrawlResponse:
         response_headers = {}
@@ -196,6 +254,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 # Get status code and headers
                 status_code = response.status
                 response_headers = response.headers
+            else:
+                status_code = 200
+                response_headers = {}
 
             await page.wait_for_selector('body')
             await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
@@ -203,7 +264,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             js_code = kwargs.get("js_code", kwargs.get("js", self.js_code))
             if js_code:
                 if isinstance(js_code, str):
-                    await page.evaluate(js_code)
+                    r = await page.evaluate(js_code)
                 elif isinstance(js_code, list):
                     for js in js_code:
                         await page.evaluate(js)
@@ -212,6 +273,27 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 await page.wait_for_load_state('networkidle')
                 # Check for on execution even
                 await self.execute_hook('on_execution_started', page)
+                
+            # New code to handle the wait_for parameter
+            # Example usage:
+            # await crawler.crawl(
+            #     url,
+            #     js_code="// some JavaScript code",
+            #     wait_for="""() => {
+            #         return document.querySelector('#my-element') !== null;
+            #     }"""
+            # )
+            # Example of using a CSS selector:
+            # await crawler.crawl(
+            #     url,
+            #     wait_for="#my-element"
+            # )
+            wait_for = kwargs.get("wait_for")
+            if wait_for:
+                try:
+                    await self.smart_wait(page, wait_for, timeout=kwargs.get("timeout", 30000))
+                except Exception as e:
+                    raise RuntimeError(f"Wait condition failed: {str(e)}")
 
             html = await page.content()
             page = await self.execute_hook('before_return_html', page, html)
@@ -246,6 +328,49 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         # except Exception as e:
         #     raise Exception(f"Failed to crawl {url}: {str(e)}")
 
+    async def execute_js(self, session_id: str, js_code: str, wait_for_js: str = None, wait_for_css: str = None) -> AsyncCrawlResponse:
+        """
+        Execute JavaScript code in a specific session and optionally wait for a condition.
+        
+        :param session_id: The ID of the session to execute the JS code in.
+        :param js_code: The JavaScript code to execute.
+        :param wait_for_js: JavaScript condition to wait for after execution.
+        :param wait_for_css: CSS selector to wait for after execution.
+        :return: AsyncCrawlResponse containing the page's HTML and other information.
+        :raises ValueError: If the session does not exist.
+        """
+        if not session_id:
+            raise ValueError("Session ID must be provided")
+        
+        if session_id not in self.sessions:
+            raise ValueError(f"No active session found for session ID: {session_id}")
+        
+        context, page, last_used = self.sessions[session_id]
+        
+        try:
+            await page.evaluate(js_code)
+            
+            if wait_for_js:
+                await page.wait_for_function(wait_for_js)
+            
+            if wait_for_css:
+                await page.wait_for_selector(wait_for_css)
+            
+            # Get the updated HTML content
+            html = await page.content()
+            
+            # Get response headers and status code (assuming these are available)
+            response_headers = await page.evaluate("() => JSON.stringify(performance.getEntriesByType('resource')[0].responseHeaders)")
+            status_code = await page.evaluate("() => performance.getEntriesByType('resource')[0].responseStatus")
+            
+            # Update the last used time for this session
+            self.sessions[session_id] = (context, page, time.time())
+            
+            return AsyncCrawlResponse(html=html, response_headers=response_headers, status_code=status_code)
+        except Error as e:
+            raise Error(f"Failed to execute JavaScript or wait for condition in session {session_id}: {str(e)}")
+    
+    
     async def crawl_many(self, urls: List[str], **kwargs) -> List[AsyncCrawlResponse]:
         semaphore_count = kwargs.get('semaphore_count', calculate_semaphore_count())
         semaphore = asyncio.Semaphore(semaphore_count)
