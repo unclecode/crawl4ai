@@ -1,4 +1,4 @@
-PROMPT_EXTRACT_BLOCKS = """YHere is the URL of the webpage:
+PROMPT_EXTRACT_BLOCKS = """Here is the URL of the webpage:
 <url>{URL}</url>
 
 And here is the cleaned HTML content of that webpage:
