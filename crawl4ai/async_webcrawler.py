@@ -45,7 +45,7 @@ class AsyncWebCrawler:
 
     async def awarmup(self):
         if self.verbose:
-            print("[LOG] 🌤️  Warming up the AsyncWebCrawler")
+            print("[LOG] �  Warming up the AsyncWebCrawler")
         await async_db_manager.ainit_db()
         await self.arun(
             url="https://google.com/",
@@ -55,7 +55,7 @@ class AsyncWebCrawler:
         )
         self.ready = True
         if self.verbose:
-            print("[LOG] 🌞 AsyncWebCrawler is ready to crawl")
+            print("[LOG] � AsyncWebCrawler is ready to crawl")
 
     async def arun(
         self,
@@ -108,8 +108,11 @@ class AsyncWebCrawler:
                 t2 = time.time()
                 if verbose:
                     print(
-                        f"[LOG] 🚀 Crawling done for {url}, success: {bool(html)}, time taken: {t2 - t1:.2f} seconds"
+                        f"[LOG] � Crawling done for {url}, success: {bool(html)}, time taken: {t2 - t1:.2f} seconds"
                     )
+
+            if html is None:
+                raise ValueError(f"Failed to crawl {url}: HTML content is None")
 
             crawl_result = await self.aprocess_html(
                 url,
@@ -133,7 +136,7 @@ class AsyncWebCrawler:
         except Exception as e:
             if not hasattr(e, "msg"):
                 e.msg = str(e)
-            print(f"[ERROR] 🚫 Failed to crawl {url}, error: {e.msg}")
+            print(f"[ERROR] � Failed to crawl {url}, error: {e.msg}")
             return CrawlResult(url=url, html="", success=False, error_message=e.msg)
 
     async def arun_many(
@@ -148,7 +151,7 @@ class AsyncWebCrawler:
         user_agent: str = None,
         verbose=True,
         **kwargs,
-    ) -> List[CrawlResult]:
+    ) -> List<CrawlResult]:
         tasks = [
             self.arun(
                 url,
@@ -198,7 +201,7 @@ class AsyncWebCrawler:
             )
             if verbose:
                 print(
-                    f"[LOG] 🚀 Content extracted for {url}, success: True, time taken: {time.time() - t1:.2f} seconds"
+                    f"[LOG] � Content extracted for {url}, success: True, time taken: {time.time() - t1:.2f} seconds"
                 )
 
             if result is None:
@@ -217,7 +220,7 @@ class AsyncWebCrawler:
         if extracted_content is None and extraction_strategy and chunking_strategy:
             if verbose:
                 print(
-                    f"[LOG] 🔥 Extracting semantic blocks for {url}, Strategy: {self.__class__.__name__}"
+                    f"[LOG] � Extracting semantic blocks for {url}, Strategy: {self.__class__.__name__}"
                 )
 
             # Check if extraction strategy is type of JsonCssExtractionStrategy
@@ -232,7 +235,7 @@ class AsyncWebCrawler:
 
         if verbose:
             print(
-                f"[LOG] 🚀 Extraction done for {url}, time taken: {time.time() - t:.2f} seconds."
+                f"[LOG] � Extraction done for {url}, time taken: {time.time() - t:.2f} seconds."
             )
 
         screenshot = None if not screenshot else screenshot

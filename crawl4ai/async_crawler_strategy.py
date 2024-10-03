@@ -230,7 +230,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
         try:
             if self.verbose:
-                print(f"[LOG] 🕸️ Crawling {url} using AsyncPlaywrightCrawlerStrategy...")
+                print(f"[LOG] � Crawling {url} using AsyncPlaywrightCrawlerStrategy...")
 
             if self.use_cached_html:
                 cache_file_path = os.path.join(Path.home(), ".crawl4ai", "cache", hashlib.md5(url.encode()).hexdigest())
@@ -296,6 +296,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     raise RuntimeError(f"Wait condition failed: {str(e)}")
 
             html = await page.content()
+            if html is None:
+                raise ValueError(f"Failed to crawl {url}: HTML content is None")
             page = await self.execute_hook('before_return_html', page, html)
 
             if self.verbose:

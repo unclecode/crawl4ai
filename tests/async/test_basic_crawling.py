@@ -28,6 +28,7 @@ async def test_invalid_url():
         result = await crawler.arun(url=url, bypass_cache=True)
         assert not result.success
         assert result.error_message
+        assert "HTML content is None" in result.error_message
 
 @pytest.mark.asyncio
 async def test_multiple_urls():
