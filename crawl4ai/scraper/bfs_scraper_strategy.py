@@ -13,6 +13,7 @@ from aiolimiter import AsyncLimiter
 from tenacity import retry, stop_after_attempt, wait_exponential
 from collections import defaultdict
 import logging
+from typing import Dict
 logging.basicConfig(level=logging.DEBUG)
 
 rate_limiter = AsyncLimiter(1, 1)  # 1 request per second
@@ -44,7 +45,7 @@ class BFSScraperStrategy(ScraperStrategy):
     async def retry_crawl(self, crawler: AsyncWebCrawler, url: str) -> CrawlResult:
         return await crawler.arun(url)
     
-    async def process_url(self, url: str, depth: int, crawler: AsyncWebCrawler, queue: asyncio.PriorityQueue, visited: set) -> CrawlResult:
+    async def process_url(self, url: str, depth: int, crawler: AsyncWebCrawler, queue: asyncio.PriorityQueue, visited: set, depths: Dict[str, int]) -> CrawlResult:
         def normalize_url(url: str) -> str:
             parsed = urlparse(url)
             return urlunparse(parsed._replace(fragment=""))
@@ -98,34 +99,39 @@ class BFSScraperStrategy(ScraperStrategy):
                 absolute_link = urljoin(url, link['href'])
                 normalized_link = normalize_url(absolute_link)
                 if self.filter_chain.apply(normalized_link) and normalized_link not in visited:
-                    new_depth = depth + 1
+                    new_depth = depths[url] + 1
                     if new_depth <= self.max_depth:
                         # URL Scoring
                         score = self.url_scorer.score(normalized_link)
                         await queue.put((score, new_depth, normalized_link))
+                        depths[normalized_link] = new_depth
 
         return crawl_result
 
-    async def ascrape(self, start_url: str, crawler: AsyncWebCrawler) -> ScraperResult:
+    async def ascrape(self, start_url: str, crawler: AsyncWebCrawler, parallel_processing:bool = True) -> ScraperResult:
         queue = asyncio.PriorityQueue()
         queue.put_nowait((0, 0, start_url))
         visited = set()
-        crawled_urls = []
         extracted_data = {}
+        depths = {start_url: 0}
 
         while not queue.empty():
             tasks = []
             while not queue.empty() and len(tasks) < self.max_concurrent:
                 _, depth, url = await queue.get()
                 if url not in visited:
-                    task = asyncio.create_task(self.process_url(url, depth, crawler, queue, visited))
-                    tasks.append(task)
+                    if parallel_processing:
+                        task = asyncio.create_task(self.process_url(url, depth, crawler, queue, visited, depths))
+                        tasks.append(task)
+                    else:
+                        result = await self.process_url(url, depth, crawler, queue, visited, depths)
+                        if result:
+                            extracted_data[result.url] = result
 
-            if tasks:
+            if parallel_processing and tasks:
                 results = await asyncio.gather(*tasks)
                 for result in results:
                     if result:
-                        crawled_urls.append(result.url)
                         extracted_data[result.url] = result
 
-        return ScraperResult(url=start_url, crawled_urls=crawled_urls, extracted_data=extracted_data)
+        return ScraperResult(url=start_url, crawled_urls=list(visited), extracted_data=extracted_data)

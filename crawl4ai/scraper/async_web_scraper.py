@@ -23,8 +23,8 @@ class AsyncWebScraper:
         self.strategy = strategy
         self.batch_processor = BatchProcessor(batch_size, concurrency_limit)
 
-    async def ascrape(self, url: str) -> ScraperResult:
-        return await self.strategy.ascrape(url, self.crawler)
+    async def ascrape(self, url: str, parallel_processing: bool = True) -> ScraperResult:
+        return await self.strategy.ascrape(url, self.crawler, parallel_processing)
 
     async def ascrape_many(self, urls: List[str]) -> List[ScraperResult]:
         all_results = []
