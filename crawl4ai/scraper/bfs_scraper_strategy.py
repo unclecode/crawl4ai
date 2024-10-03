@@ -32,13 +32,17 @@ class BFSScraperStrategy(ScraperStrategy):
     
     # Robots.txt Parser
     def get_robot_parser(self, url: str) -> RobotFileParser:
-        domain = urlparse(url).netloc
-        if domain not in self.robot_parsers:
+        domain = urlparse(url)
+        scheme = domain.scheme if domain.scheme else 'http'  # Default to 'http' if no scheme provided
+        netloc = domain.netloc
+
+        if netloc not in self.robot_parsers:
             rp = RobotFileParser()
-            rp.set_url(f"https://{domain}/robots.txt")
+            rp.set_url(f"{scheme}://{netloc}/robots.txt")
             rp.read()
-            self.robot_parsers[domain] = rp
-        return self.robot_parsers[domain]
+            self.robot_parsers[netloc] = rp
+        return self.robot_parsers[netloc]
+
     
     # Retry with exponential backoff
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
@@ -56,7 +60,7 @@ class BFSScraperStrategy(ScraperStrategy):
             return None
         
         # Robots.txt Compliance
-        if not self.get_robot_parser(url).can_fetch("YourUserAgent", url):
+        if not self.get_robot_parser(url).can_fetch(crawler.crawler_strategy.user_agent, url):
             logging.info(f"Skipping {url} as per robots.txt")
             return None
         
