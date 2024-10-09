@@ -1,10 +1,10 @@
 aiosqlite==0.20.0
 html2text==2024.2.26
-lxml==5.3.0
-litellm==1.48.0
+lxml==5.3.3
+litellm==1.49.0
 numpy>=1.26.0,<2.1.1
 pillow==10.4.0
-playwright==1.47.0
+playwright==1.50.0
 python-dotenv==1.0.1
-requests>=2.26.0,<2.32.3
-beautifulsoup4==4.12.3
+requests>=2.26.0,<2.31.0
+beautifulsoup4==4.12.4
