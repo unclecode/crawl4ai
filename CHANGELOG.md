@@ -1,37 +1,51 @@
 # Changelog
 
-## [0.3.6] - 2024-10-12
+## [v0.3.6] - 2024-10-12
 
-### Added
-- New `.tests/` directory added to `.gitignore`
-- Screenshot functionality:
-  - Added `screenshot` column to the database schema
-  - Implemented `take_screenshot` method in `AsyncPlaywrightCrawlerStrategy`
-  - Added option to capture screenshots when crawling
-- Delayed content retrieval:
-  - New `get_delayed_content` method in `AsyncCrawlResponse`
-- Database schema updates:
-  - Auto-update mechanism for database schema
-  - New columns: 'media', 'links', 'metadata', 'screenshot'
-- LLM extraction examples in `quickstart_async.py`:
-  - Support for OpenAI, Hugging Face, and Ollama models
+### 1. Screenshot Capture
+- **What's new**: Added ability to capture screenshots during crawling.
+- **Why it matters**: You can now visually verify the content of crawled pages, which is useful for debugging and content verification.
+- **How to use**: Set `screenshot=True` when calling `crawler.arun()`.
 
-### Changed
-- Updated version number to 0.3.6 in `__init__.py`
-- Improved error handling and logging in various components
-- Enhanced `WebScrappingStrategy` to handle image processing more efficiently
-- Modified `AsyncPlaywrightCrawlerStrategy` to support custom timeout values
+### 2. Delayed Content Retrieval
+- **What's new**: Introduced `get_delayed_content` method in `AsyncCrawlResponse`.
+- **Why it matters**: Allows you to retrieve content after a specified delay, useful for pages that load content dynamically.
+- **How to use**: Access `result.get_delayed_content(delay_in_seconds)` after crawling.
 
-### Fixed
-- Adjusted image processing in `WebScrappingStrategy` to prevent premature decomposition of img tags
+### 3. Custom Page Timeout
+- **What's new**: Added `page_timeout` parameter to control page load timeout.
+- **Why it matters**: Gives you more control over crawling behavior, especially for slow-loading pages.
+- **How to use**: Set `page_timeout=your_desired_timeout` (in milliseconds) when calling `crawler.arun()`.
 
-### Removed
-- Removed `pypi_build.sh` from version control (added to `.gitignore`)
+### 4. Enhanced LLM Support
+- **What's new**: Added support for multiple LLM providers (OpenAI, Hugging Face, Ollama).
+- **Why it matters**: Provides more flexibility in choosing AI models for content extraction.
+- **How to use**: Specify the desired provider when using `LLMExtractionStrategy`.
 
-### Developer Notes
-- Added examples for using different LLM providers in `quickstart_async.py`
-- Improved error messages for better debugging
-- Enhanced type hinting throughout the codebase
+## Improvements
+
+### 1. Database Schema Auto-updates
+- **What's new**: Automatic database schema updates.
+- **Why it matters**: Ensures your database stays compatible with the latest version without manual intervention.
+
+### 2. Enhanced Error Handling
+- **What's new**: Improved error messages and logging.
+- **Why it matters**: Makes debugging easier with more informative error messages.
+
+### 3. Optimized Image Processing
+- **What's new**: Refined image handling in `WebScrappingStrategy`.
+- **Why it matters**: Improves the accuracy of content extraction for pages with images.
+
+## Bug Fixes
+
+- Fixed an issue where image tags were being prematurely removed during content extraction.
+
+## Developer Notes
+
+- Added examples for using different LLM providers in `quickstart_async.py`.
+- Enhanced type hinting throughout the codebase for better development experience.
+
+We're constantly working to improve crawl4ai. These updates aim to provide you with more control, flexibility, and reliability in your web crawling tasks. As always, we appreciate your feedback and suggestions for future improvements!
 
 ## [v0.3.5] - 2024-09-02
 
