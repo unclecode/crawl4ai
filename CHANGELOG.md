@@ -1,6 +1,36 @@
 # Changelog
 
-## [v0.3.6] - 2024-10-12
+## [v0.3.6] - 2024-10-12 - Part 1
+
+### 1. Improved Crawling Control
+- **New Hook**: Added `before_retrieve_html` hook in `AsyncPlaywrightCrawlerStrategy`.
+- **Delayed HTML Retrieval**: Introduced `delay_before_return_html` parameter to allow waiting before retrieving HTML content.
+  - Useful for pages with delayed content loading.
+- **Flexible Timeout**: `smart_wait` function now uses `page_timeout` (default 60 seconds) instead of a fixed 30-second timeout.
+  - Provides better handling for slow-loading pages.
+
+### 2. Enhanced LLM Extraction Strategy
+- **Custom Arguments**: Added support for passing extra arguments to LLM providers via `extra_args` parameter.
+- **Custom Headers**: Users can now pass custom headers to the extraction strategy.
+  - Enables more flexibility when interacting with different LLM APIs.
+
+### 3. AsyncWebCrawler Improvements
+- **Flexible Initialization**: `AsyncWebCrawler` now accepts arbitrary keyword arguments.
+  - These are passed directly to the crawler strategy, allowing for more customized setups.
+
+### 4. Utility Function Enhancements
+- **Improved API Interaction**: `perform_completion_with_backoff` function now supports additional arguments.
+  - Allows for more customized API calls to LLM providers.
+
+## Examples and Documentation
+- Updated `quickstart_async.py` with examples of using custom headers in LLM extraction.
+- Added more diverse examples of LLM provider usage, including OpenAI, Hugging Face, and Ollama.
+
+## Developer Notes
+- Refactored code for better maintainability and flexibility.
+- Enhanced error handling and logging for improved debugging experience.
+
+## [v0.3.6] - 2024-10-12 - Part 2
 
 ### 1. Screenshot Capture
 - **What's new**: Added ability to capture screenshots during crawling.
@@ -45,7 +75,6 @@
 - Added examples for using different LLM providers in `quickstart_async.py`.
 - Enhanced type hinting throughout the codebase for better development experience.
 
-We're constantly working to improve crawl4ai. These updates aim to provide you with more control, flexibility, and reliability in your web crawling tasks. As always, we appreciate your feedback and suggestions for future improvements!
 
 ## [v0.3.5] - 2024-09-02
 

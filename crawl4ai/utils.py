@@ -775,7 +775,14 @@ def extract_xml_data(tags, string):
     return data
     
 # Function to perform the completion with exponential backoff
-def perform_completion_with_backoff(provider, prompt_with_variables, api_token, json_response = False, base_url=None):
+def perform_completion_with_backoff(
+    provider, 
+    prompt_with_variables, 
+    api_token, 
+    json_response = False, 
+    base_url=None,
+    **kwargs
+    ):
     from litellm import completion 
     from litellm.exceptions import RateLimitError
     max_attempts = 3
@@ -784,6 +791,9 @@ def perform_completion_with_backoff(provider, prompt_with_variables, api_token, 
     extra_args = {}
     if json_response:
         extra_args["response_format"] = { "type": "json_object" }
+        
+    if kwargs.get("extra_args"):
+        extra_args.update(kwargs["extra_args"])
     
     for attempt in range(max_attempts):
         try:

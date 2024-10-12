@@ -96,12 +96,16 @@ class OpenAIModelFee(BaseModel):
         ..., description="Fee for output token for the OpenAI model."
     )
 
-async def extract_structured_data_using_llm(provider: str, api_token: str = None):
+async def extract_structured_data_using_llm(provider: str, api_token: str = None, extra_headers: Dict[str, str] = None):
     print(f"\n--- Extracting Structured Data with {provider} ---")
     
     if api_token is None and provider != "ollama":
         print(f"API token is required for {provider}. Skipping this example.")
         return
+
+    extra_args = {}
+    if extra_headers:
+        extra_args["extra_headers"] = extra_headers
 
     async with AsyncWebCrawler(verbose=True) as crawler:
         result = await crawler.arun(
@@ -115,6 +119,7 @@ async def extract_structured_data_using_llm(provider: str, api_token: str = None
                 instruction="""From the crawled content, extract all mentioned model names along with their fees for input and output tokens. 
                 Do not miss any models in the entire content. One extracted model JSON format should look like this: 
                 {"model_name": "GPT-4", "input_fee": "US$10.00 / 1M tokens", "output_fee": "US$30.00 / 1M tokens"}.""",
+                extra_args=extra_args
             ),
             bypass_cache=True,
         )
@@ -414,9 +419,16 @@ async def main():
 
     # LLM extraction examples
     await extract_structured_data_using_llm()
-    await extract_structured_data_using_llm("openai/gpt-4", os.getenv("OPENAI_API_KEY"))
     await extract_structured_data_using_llm("huggingface/meta-llama/Meta-Llama-3.1-8B-Instruct", os.getenv("HUGGINGFACE_API_KEY"))
+    await extract_structured_data_using_llm("openai/gpt-4", os.getenv("OPENAI_API_KEY"))
     await extract_structured_data_using_llm("ollama/llama3.2")    
+
+    # You always can pass custom headers to the extraction strategy
+    custom_headers = {
+        "Authorization": "Bearer your-custom-token",
+        "X-Custom-Header": "Some-Value"
+    }
+    await extract_structured_data_using_llm(extra_headers=custom_headers)
     
     # await crawl_dynamic_content_pages_method_1()
     # await crawl_dynamic_content_pages_method_2()

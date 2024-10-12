@@ -63,7 +63,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             'on_execution_started': None,
             'before_goto': None,
             'after_goto': None,
-            'before_return_html': None
+            'before_return_html': None,
+            'before_retrieve_html': None
         }
 
     async def __aenter__(self):
@@ -295,7 +296,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             wait_for = kwargs.get("wait_for")
             if wait_for:
                 try:
-                    await self.smart_wait(page, wait_for, timeout=kwargs.get("timeout", 30000))
+                    await self.smart_wait(page, wait_for, timeout=kwargs.get("page_timeout", 60000))
                 except Exception as e:
                     raise RuntimeError(f"Wait condition failed: {str(e)}")
 
@@ -304,8 +305,13 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             if kwargs.get("screenshot"):
                 screenshot_data = await self.take_screenshot(url)
             
+            await self.execute_hook('before_retrieve_html', page)
+            # Check if delay_before_return_html is set then wait for that time
+            delay_before_return_html = kwargs.get("delay_before_return_html")
+            if delay_before_return_html:
+                await asyncio.sleep(delay_before_return_html)
             html = await page.content()
-            page = await self.execute_hook('before_return_html', page, html)
+            await self.execute_hook('before_return_html', page, html)
 
             if self.verbose:
                 print(f"[LOG] ✅ Crawled {url} successfully!")
