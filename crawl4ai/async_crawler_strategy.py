@@ -1,7 +1,7 @@
 import asyncio
 import base64, time
 from abc import ABC, abstractmethod
-from typing import Callable, Dict, Any, List, Optional
+from typing import Callable, Dict, Any, List, Optional, Awaitable
 import os
 from playwright.async_api import async_playwright, Page, Browser, Error
 from io import BytesIO
@@ -18,6 +18,10 @@ class AsyncCrawlResponse(BaseModel):
     response_headers: Dict[str, str]
     status_code: int
     screenshot: Optional[str] = None
+    get_delayed_content: Optional[Callable[[Optional[float]], Awaitable[str]]] = None
+
+    class Config:
+        arbitrary_types_allowed = True
 
 class AsyncCrawlerStrategy(ABC):
     @abstractmethod
@@ -248,7 +252,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
             if not kwargs.get("js_only", False):
                 await self.execute_hook('before_goto', page)
-                response = await page.goto(url, wait_until="domcontentloaded", timeout=60000)
+                response = await page.goto(url, wait_until="domcontentloaded", timeout=kwargs.get("page_timeout", 60000))
                 await self.execute_hook('after_goto', page)
                 
                 # Get status code and headers
@@ -295,6 +299,11 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 except Exception as e:
                     raise RuntimeError(f"Wait condition failed: {str(e)}")
 
+            # Check if kwargs has screenshot=True then take screenshot
+            screenshot_data = None
+            if kwargs.get("screenshot"):
+                screenshot_data = await self.take_screenshot(url)
+            
             html = await page.content()
             page = await self.execute_hook('before_return_html', page, html)
 
@@ -312,7 +321,20 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         "status_code": status_code
                     }, f)
 
-            response = AsyncCrawlResponse(html=html, response_headers=response_headers, status_code=status_code)
+            
+            async def get_delayed_content(delay: float = 5.0) -> str:
+                if self.verbose:
+                    print(f"[LOG] Waiting for {delay} seconds before retrieving content for {url}")
+                await asyncio.sleep(delay)
+                return await page.content()
+                
+            response = AsyncCrawlResponse(
+                html=html, 
+                response_headers=response_headers, 
+                status_code=status_code,
+                screenshot=screenshot_data,
+                get_delayed_content=get_delayed_content
+            )
             return response
         except Error as e:
             raise Error(f"Failed to crawl {url}: {str(e)}")
@@ -383,11 +405,13 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         results = await asyncio.gather(*tasks, return_exceptions=True)
         return [result if not isinstance(result, Exception) else str(result) for result in results]
 
-    async def take_screenshot(self, url: str) -> str:
+    async def take_screenshot(self, url: str, wait_time = 1000) -> str:
         async with await self.browser.new_context(user_agent=self.user_agent) as context:
             page = await context.new_page()
             try:
-                await page.goto(url, wait_until="domcontentloaded")
+                await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+                # Wait for a specified time (default is 1 second)
+                await page.wait_for_timeout(wait_time)
                 screenshot = await page.screenshot(full_page=True)
                 return base64.b64encode(screenshot).decode('utf-8')
             except Exception as e:
