@@ -1,5 +1,38 @@
 # Changelog
 
+## [0.3.6] - 2024-10-12
+
+### Added
+- New `.tests/` directory added to `.gitignore`
+- Screenshot functionality:
+  - Added `screenshot` column to the database schema
+  - Implemented `take_screenshot` method in `AsyncPlaywrightCrawlerStrategy`
+  - Added option to capture screenshots when crawling
+- Delayed content retrieval:
+  - New `get_delayed_content` method in `AsyncCrawlResponse`
+- Database schema updates:
+  - Auto-update mechanism for database schema
+  - New columns: 'media', 'links', 'metadata', 'screenshot'
+- LLM extraction examples in `quickstart_async.py`:
+  - Support for OpenAI, Hugging Face, and Ollama models
+
+### Changed
+- Updated version number to 0.3.6 in `__init__.py`
+- Improved error handling and logging in various components
+- Enhanced `WebScrappingStrategy` to handle image processing more efficiently
+- Modified `AsyncPlaywrightCrawlerStrategy` to support custom timeout values
+
+### Fixed
+- Adjusted image processing in `WebScrappingStrategy` to prevent premature decomposition of img tags
+
+### Removed
+- Removed `pypi_build.sh` from version control (added to `.gitignore`)
+
+### Developer Notes
+- Added examples for using different LLM providers in `quickstart_async.py`
+- Improved error messages for better debugging
+- Enhanced type hinting throughout the codebase
+
 ## [v0.3.5] - 2024-09-02
 
 Enhance AsyncWebCrawler with smart waiting and screenshot capabilities

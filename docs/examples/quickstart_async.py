@@ -66,6 +66,29 @@ async def use_proxy():
     #     )
     #     print(result.markdown[:500])  # Print first 500 characters
 
+
+async def capture_and_save_screenshot(url: str, output_path: str):
+    async with AsyncWebCrawler(verbose=True) as crawler:
+        result = await crawler.arun(
+            url=url,
+            screenshot=True,
+            bypass_cache=True
+        )
+        
+        if result.success and result.screenshot:
+            import base64
+            
+            # Decode the base64 screenshot data
+            screenshot_data = base64.b64decode(result.screenshot)
+            
+            # Save the screenshot as a JPEG file
+            with open(output_path, 'wb') as f:
+                f.write(screenshot_data)
+            
+            print(f"Screenshot saved successfully to {output_path}")
+        else:
+            print("Failed to capture screenshot")
+
 class OpenAIModelFee(BaseModel):
     model_name: str = Field(..., description="Name of the OpenAI model.")
     input_fee: str = Field(..., description="Fee for input token for the OpenAI model.")
@@ -73,13 +96,11 @@ class OpenAIModelFee(BaseModel):
         ..., description="Fee for output token for the OpenAI model."
     )
 
-async def extract_structured_data_using_llm():
-    print("\n--- Extracting Structured Data with OpenAI ---")
-    print(
-        "Note: Set your OpenAI API key as an environment variable to run this example."
-    )
-    if not os.getenv("OPENAI_API_KEY"):
-        print("OpenAI API key not found. Skipping this example.")
+async def extract_structured_data_using_llm(provider: str, api_token: str = None):
+    print(f"\n--- Extracting Structured Data with {provider} ---")
+    
+    if api_token is None and provider != "ollama":
+        print(f"API token is required for {provider}. Skipping this example.")
         return
 
     async with AsyncWebCrawler(verbose=True) as crawler:
@@ -87,8 +108,8 @@ async def extract_structured_data_using_llm():
             url="https://openai.com/api/pricing/",
             word_count_threshold=1,
             extraction_strategy=LLMExtractionStrategy(
-                provider="openai/gpt-4o",
-                api_token=os.getenv("OPENAI_API_KEY"),
+                provider=provider,
+                api_token=api_token,
                 schema=OpenAIModelFee.schema(),
                 extraction_type="schema",
                 instruction="""From the crawled content, extract all mentioned model names along with their fees for input and output tokens. 
@@ -390,7 +411,13 @@ async def main():
     await js_and_css()
     await use_proxy()
     await extract_structured_data_using_css_extractor()
+
+    # LLM extraction examples
     await extract_structured_data_using_llm()
+    await extract_structured_data_using_llm("openai/gpt-4", os.getenv("OPENAI_API_KEY"))
+    await extract_structured_data_using_llm("huggingface/meta-llama/Meta-Llama-3.1-8B-Instruct", os.getenv("HUGGINGFACE_API_KEY"))
+    await extract_structured_data_using_llm("ollama/llama3.2")    
+    
     # await crawl_dynamic_content_pages_method_1()
     # await crawl_dynamic_content_pages_method_2()
     await crawl_dynamic_content_pages_method_3()

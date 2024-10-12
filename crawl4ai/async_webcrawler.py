@@ -202,11 +202,11 @@ class AsyncWebCrawler:
                 )
 
             if result is None:
-                raise ValueError(f"Failed to extract content from the website: {url}")
+                raise ValueError(f"Process HTML, Failed to extract content from the website: {url}")
         except InvalidCSSSelectorError as e:
             raise ValueError(str(e))
         except Exception as e:
-            raise ValueError(f"Failed to extract content from the website: {url}, error: {str(e)}")
+            raise ValueError(f"Process HTML, Failed to extract content from the website: {url}, error: {str(e)}")
 
         cleaned_html = sanitize_input_encode(result.get("cleaned_html", ""))
         markdown = sanitize_input_encode(result.get("markdown", ""))

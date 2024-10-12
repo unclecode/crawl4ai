@@ -170,10 +170,12 @@ class WebScrappingStrategy(ContentScrappingStrategy):
                     if isinstance(element, Comment):
                         element.extract()
                     return False
+                
+                # if element.name == 'img':
+                #     process_image(element, url, 0, 1)
+                #     return True
 
                 if element.name in ['script', 'style', 'link', 'meta', 'noscript']:
-                    if element.name == 'img':
-                        process_image(element, url, 0, 1)
                     element.decompose()
                     return False
 
