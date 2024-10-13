@@ -10,6 +10,7 @@ import time
 import json
 import os
 import re
+from typing import Dict
 from bs4 import BeautifulSoup
 from pydantic import BaseModel, Field
 from crawl4ai import AsyncWebCrawler
@@ -17,6 +18,8 @@ from crawl4ai.extraction_strategy import (
     JsonCssExtractionStrategy,
     LLMExtractionStrategy,
 )
+
+__location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
 print("Crawl4AI: Advanced Web Crawling and Data Extraction")
 print("GitHub Repository: https://github.com/unclecode/crawl4ai")
@@ -30,7 +33,7 @@ async def simple_crawl():
         result = await crawler.arun(url="https://www.nbcnews.com/business")
         print(result.markdown[:500])  # Print first 500 characters
 
-async def js_and_css():
+async def simple_example_with_running_js_code():
     print("\n--- Executing JavaScript and Using CSS Selectors ---")
     # New code to handle the wait_for parameter
     wait_for = """() => {
@@ -47,8 +50,17 @@ async def js_and_css():
         result = await crawler.arun(
             url="https://www.nbcnews.com/business",
             js_code=js_code,
-            # css_selector="article.tease-card",
             # wait_for=wait_for,
+            bypass_cache=True,
+        )
+        print(result.markdown[:500])  # Print first 500 characters
+
+async def simple_example_with_css_selector():
+    print("\n--- Using CSS Selectors ---")
+    async with AsyncWebCrawler(verbose=True) as crawler:
+        result = await crawler.arun(
+            url="https://www.nbcnews.com/business",
+            css_selector=".wide-tease-item__description",
             bypass_cache=True,
         )
         print(result.markdown[:500])  # Print first 500 characters
@@ -65,7 +77,6 @@ async def use_proxy():
     #         bypass_cache=True
     #     )
     #     print(result.markdown[:500])  # Print first 500 characters
-
 
 async def capture_and_save_screenshot(url: str, output_path: str):
     async with AsyncWebCrawler(verbose=True) as crawler:
@@ -413,8 +424,10 @@ async def speed_comparison():
 
 async def main():
     await simple_crawl()
-    await js_and_css()
+    await simple_example_with_running_js_code()
+    await simple_example_with_css_selector()
     await use_proxy()
+    await capture_and_save_screenshot("https://www.example.com", os.path.join(__location__, "tmp/example_screenshot.jpg"))
     await extract_structured_data_using_css_extractor()
 
     # LLM extraction examples
