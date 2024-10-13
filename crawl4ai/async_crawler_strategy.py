@@ -312,7 +312,12 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         "status_code": status_code
                     }, f)
 
-            response = AsyncCrawlResponse(html=html, response_headers=response_headers, status_code=status_code)
+            if kwargs.get("screenshot", False):
+                screenshot_data = await self.take_screenshot(url)
+
+            response = AsyncCrawlResponse(
+                html=html, response_headers=response_headers, status_code=status_code, screenshot=screenshot_data
+            )
             return response
         except Error as e:
             raise Error(f"Failed to crawl {url}: {str(e)}")
