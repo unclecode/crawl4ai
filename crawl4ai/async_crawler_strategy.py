@@ -51,6 +51,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         self.session_ttl = 1800 
         self.js_code = js_code
         self.verbose = kwargs.get("verbose", False)
+        self.timeout = int(kwargs.get("timeout", 60000))
         self.playwright = None
         self.browser = None
         self.hooks = {
@@ -248,7 +249,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
             if not kwargs.get("js_only", False):
                 await self.execute_hook('before_goto', page)
-                response = await page.goto(url, wait_until="domcontentloaded", timeout=60000)
+                response = await page.goto(url, wait_until="domcontentloaded", timeout=self.timeout)
                 await self.execute_hook('after_goto', page)
                 
                 # Get status code and headers
