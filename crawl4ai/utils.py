@@ -131,7 +131,7 @@ def split_and_parse_json_objects(json_string):
     return parsed_objects, unparsed_segments
 
 def sanitize_html(html):
-    # Replace all weird and special characters with an empty string
+    # Replace all unwanted and special characters with an empty string
     sanitized_html = html
     # sanitized_html = re.sub(r'[^\w\s.,;:!?=\[\]{}()<>\/\\\-"]', '', html)
 
@@ -301,7 +301,7 @@ def get_content_of_website(url, html, word_count_threshold = MIN_WORD_THRESHOLD,
             if tag.name != 'img':
                 tag.attrs = {}
 
-        # Extract all img tgas inti [{src: '', alt: ''}]
+        # Extract all img tags into [{src: '', alt: ''}]
         media = {
             'images': [],
             'videos': [],
@@ -339,7 +339,7 @@ def get_content_of_website(url, html, word_count_threshold = MIN_WORD_THRESHOLD,
                 img.decompose()
 
 
-        # Create a function that replace content of all"pre" tage with its inner text
+        # Create a function that replace content of all "pre" tag with its inner text
         def replace_pre_tags_with_text(node):
             for child in node.find_all('pre'):
                 # set child inner html to its text
@@ -502,7 +502,7 @@ def get_content_of_website_optimized(url: str, html: str, word_count_threshold: 
             current_tag = tag
             while current_tag:
                 current_tag = current_tag.parent
-                # Get the text content of the parent tag
+                # Get the text content from the parent tag
                 if current_tag:
                     text_content = current_tag.get_text(separator=' ',strip=True)
                     # Check if the text content has at least word_count_threshold
