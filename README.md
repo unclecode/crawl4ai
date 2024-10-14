@@ -10,6 +10,14 @@ Crawl4AI simplifies asynchronous web crawling and data extraction, making it acc
 
 > Looking for the synchronous version? Check out [README.sync.md](./README.sync.md). You can also access the previous version in the branch [V0.2.76](https://github.com/unclecode/crawl4ai/blob/v0.2.76).
 
+## New update 0.3.6
+- 🌐 Multi-browser support (Chromium, Firefox, WebKit)
+- 🖼️ Improved image processing with lazy-loading detection
+- 🔧 Custom page timeout parameter for better control over crawling behavior
+- 🕰️ Enhanced handling of delayed content loading
+- 🔑 Custom headers support for LLM interactions
+- 🖼️ iframe content extraction for comprehensive page analysis
+- ⏱️ Flexible timeout and delayed content retrieval options
 
 ## Try it Now!
 
