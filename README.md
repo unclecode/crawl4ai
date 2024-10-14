@@ -124,7 +124,7 @@ async def main():
         result = await crawler.arun(
             url="https://www.nbcnews.com/business",
             js_code=js_code,
-            css_selector="article.tease-card",
+            css_selector=".wide-tease-item__description",
             bypass_cache=True
         )
         print(result.extracted_content)
