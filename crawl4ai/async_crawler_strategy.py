@@ -60,6 +60,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         self.browser = None
         self.hooks = {
             'on_browser_created': None,
+            'on_page_created': None,
             'on_user_agent_updated': None,
             'on_execution_started': None,
             'before_goto': None,
@@ -272,6 +273,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 )
                 await context.set_extra_http_headers(self.headers)
                 page = await context.new_page()
+                page = await self.execute_hook('on_page_created', page)
                 self.sessions[session_id] = (context, page, time.time())
         else:
             context = await self.browser.new_context(
@@ -280,6 +282,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             )
             await context.set_extra_http_headers(self.headers)
             page = await context.new_page()
+            page = await self.execute_hook('on_page_created', page)
 
         try:
             if self.verbose:
@@ -529,6 +532,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
     async def take_screenshot(self, url: str, wait_time = 1000) -> str:
         async with await self.browser.new_context(user_agent=self.user_agent) as context:
             page = await context.new_page()
+            page = await self.execute_hook('on_page_created', page)
             try:
                 await page.goto(url, wait_until="domcontentloaded", timeout=30000)
                 # Wait for a specified time (default is 1 second)
