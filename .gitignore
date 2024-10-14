@@ -198,6 +198,6 @@ test_env/
 **/.DS_Store
 **/.DS_Store
 
-git_changes.md
-git_changes.py
 todo.md
+git_changes.py
+git_changes.md
