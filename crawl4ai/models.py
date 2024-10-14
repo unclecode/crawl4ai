@@ -18,5 +18,5 @@ class CrawlResult(BaseModel):
     metadata: Optional[dict] = None
     error_message: Optional[str] = None
     session_id: Optional[str] = None
-    responser_headers: Optional[dict] = None
+    response_headers: Optional[dict] = None
     status_code: Optional[int] = None
