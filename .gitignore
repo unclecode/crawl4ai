@@ -197,3 +197,7 @@ tmp/
 test_env/
 **/.DS_Store
 **/.DS_Store
+
+git_changes.py
+git_changes.md
+todo.md
