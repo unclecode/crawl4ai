@@ -357,6 +357,28 @@ async def crawl_dynamic_content_pages_method_3():
         await crawler.crawler_strategy.kill_session(session_id)
         print(f"Successfully crawled {len(all_commits)} commits across 3 pages")
 
+async def crawl_custom_browser_type():
+    # Use Firefox
+    start = time.time()
+    async with AsyncWebCrawler(browser_type="firefox", verbose=True, headless = True) as crawler:
+        result = await crawler.arun(url="https://www.example.com", bypass_cache=True)
+        print(result.markdown[:500])
+        print("Time taken: ", time.time() - start)
+
+    # Use WebKit
+    start = time.time()
+    async with AsyncWebCrawler(browser_type="webkit", verbose=True, headless = True) as crawler:
+        result = await crawler.arun(url="https://www.example.com", bypass_cache=True)
+        print(result.markdown[:500])
+        print("Time taken: ", time.time() - start)
+
+    # Use Chromium (default)
+    start = time.time()
+    async with AsyncWebCrawler(verbose=True, headless = True) as crawler:
+        result = await crawler.arun(url="https://www.example.com", bypass_cache=True)
+        print(result.markdown[:500])
+        print("Time taken: ", time.time() - start)
+
 async def speed_comparison():
     # print("\n--- Speed Comparison ---")
     # print("Firecrawl (simulated):")
@@ -446,6 +468,9 @@ async def main():
     # await crawl_dynamic_content_pages_method_1()
     # await crawl_dynamic_content_pages_method_2()
     await crawl_dynamic_content_pages_method_3()
+    
+    await crawl_custom_browser_type()
+    
     await speed_comparison()
 
 

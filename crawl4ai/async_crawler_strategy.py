@@ -50,7 +50,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         self.user_agent = kwargs.get("user_agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
         self.proxy = kwargs.get("proxy")
         self.headless = kwargs.get("headless", True)
-        self.headers = {}
+        self.browser_type = kwargs.get("browser_type", "chromium")  # New parameter
+        self.headers = kwargs.get("headers", {})
         self.sessions = {}
         self.session_ttl = 1800 
         self.js_code = js_code
@@ -80,7 +81,6 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         if self.browser is None:
             browser_args = {
                 "headless": self.headless,
-                # "headless": False,
                 "args": [
                     "--disable-gpu",
                     "--disable-dev-shm-usage",
@@ -95,7 +95,14 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 browser_args["proxy"] = proxy_settings
                 
                 
-            self.browser = await self.playwright.chromium.launch(**browser_args)
+            # Select the appropriate browser based on the browser_type
+            if self.browser_type == "firefox":
+                self.browser = await self.playwright.firefox.launch(**browser_args)
+            elif self.browser_type == "webkit":
+                self.browser = await self.playwright.webkit.launch(**browser_args)
+            else:
+                self.browser = await self.playwright.chromium.launch(**browser_args)
+
             await self.execute_hook('on_browser_created', self.browser)
 
     async def close(self):
@@ -144,7 +151,6 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                             if current_time - last_used > self.session_ttl]
         for sid in expired_sessions:
             asyncio.create_task(self.kill_session(sid))
-            
             
     async def smart_wait(self, page: Page, wait_for: str, timeout: float = 30000):
         wait_for = wait_for.strip()
@@ -209,6 +215,48 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         except Exception as e:
             raise RuntimeError(f"Error in wait condition: {str(e)}")
 
+    async def process_iframes(self, page):
+        # Find all iframes
+        iframes = await page.query_selector_all('iframe')
+        
+        for i, iframe in enumerate(iframes):
+            try:
+                # Add a unique identifier to the iframe
+                await iframe.evaluate(f'(element) => element.id = "iframe-{i}"')
+                
+                # Get the frame associated with this iframe
+                frame = await iframe.content_frame()
+                
+                if frame:
+                    # Wait for the frame to load
+                    await frame.wait_for_load_state('load', timeout=30000)  # 30 seconds timeout
+                    
+                    # Extract the content of the iframe's body
+                    iframe_content = await frame.evaluate('() => document.body.innerHTML')
+                    
+                    # Generate a unique class name for this iframe
+                    class_name = f'extracted-iframe-content-{i}'
+                    
+                    # Replace the iframe with a div containing the extracted content
+                    _iframe = iframe_content.replace('`', '\\`')
+                    await page.evaluate(f"""
+                        () => {{
+                            const iframe = document.getElementById('iframe-{i}');
+                            const div = document.createElement('div');
+                            div.innerHTML = `{_iframe}`;
+                            div.className = '{class_name}';
+                            iframe.replaceWith(div);
+                        }}
+                    """)
+                else:
+                    print(f"Warning: Could not access content frame for iframe {i}")
+            except Exception as e:
+                print(f"Error processing iframe {i}: {str(e)}")
+
+        # Return the page object
+        return page
+    
+    
     async def crawl(self, url: str, **kwargs) -> AsyncCrawlResponse:
         response_headers = {}
         status_code = None
@@ -263,6 +311,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 status_code = 200
                 response_headers = {}
 
+
             await page.wait_for_selector('body')
             await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
 
@@ -305,11 +354,78 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             if kwargs.get("screenshot"):
                 screenshot_data = await self.take_screenshot(url)
             
+            
+            # New code to update image dimensions
+            update_image_dimensions_js = """
+            () => {
+                return new Promise((resolve) => {
+                    const filterImage = (img) => {
+                        // Filter out images that are too small
+                        if (img.width < 100 && img.height < 100) return false;
+                        
+                        // Filter out images that are not visible
+                        const rect = img.getBoundingClientRect();
+                        if (rect.width === 0 || rect.height === 0) return false;
+                        
+                        // Filter out images with certain class names (e.g., icons, thumbnails)
+                        if (img.classList.contains('icon') || img.classList.contains('thumbnail')) return false;
+                        
+                        // Filter out images with certain patterns in their src (e.g., placeholder images)
+                        if (img.src.includes('placeholder') || img.src.includes('icon')) return false;
+                        
+                        return true;
+                    };
+
+                    const images = Array.from(document.querySelectorAll('img')).filter(filterImage);
+                    let imagesLeft = images.length;
+                    
+                    if (imagesLeft === 0) {
+                        resolve();
+                        return;
+                    }
+
+                    const checkImage = (img) => {
+                        if (img.complete && img.naturalWidth !== 0) {
+                            img.setAttribute('width', img.naturalWidth);
+                            img.setAttribute('height', img.naturalHeight);
+                            imagesLeft--;
+                            if (imagesLeft === 0) resolve();
+                        }
+                    };
+
+                    images.forEach(img => {
+                        checkImage(img);
+                        if (!img.complete) {
+                            img.onload = () => {
+                                checkImage(img);
+                            };
+                            img.onerror = () => {
+                                imagesLeft--;
+                                if (imagesLeft === 0) resolve();
+                            };
+                        }
+                    });
+
+                    // Fallback timeout of 5 seconds
+                    setTimeout(() => resolve(), 5000);
+                });
+            }
+            """
+            await page.evaluate(update_image_dimensions_js)
+
+            # Wait a bit for any onload events to complete
+            await page.wait_for_timeout(100)
+
+            # Process iframes
+            if kwargs.get("process_iframes", False):
+                page = await self.process_iframes(page)
+            
             await self.execute_hook('before_retrieve_html', page)
             # Check if delay_before_return_html is set then wait for that time
             delay_before_return_html = kwargs.get("delay_before_return_html")
             if delay_before_return_html:
                 await asyncio.sleep(delay_before_return_html)
+                
             html = await page.content()
             await self.execute_hook('before_return_html', page, html)
 
@@ -397,7 +513,6 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             return AsyncCrawlResponse(html=html, response_headers=response_headers, status_code=status_code)
         except Error as e:
             raise Error(f"Failed to execute JavaScript or wait for condition in session {session_id}: {str(e)}")
-    
     
     async def crawl_many(self, urls: List[str], **kwargs) -> List[AsyncCrawlResponse]:
         semaphore_count = kwargs.get('semaphore_count', calculate_semaphore_count())
