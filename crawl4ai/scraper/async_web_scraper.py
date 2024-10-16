@@ -1,5 +1,3 @@
-import asyncio
-from typing import List, Dict
 from .scraper_strategy import ScraperStrategy
 from .models import ScraperResult, CrawlResult
 from ..async_webcrawler import AsyncWebCrawler
