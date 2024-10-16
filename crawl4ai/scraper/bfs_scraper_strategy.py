@@ -18,14 +18,14 @@ logging.basicConfig(level=logging.DEBUG)
 rate_limiter = AsyncLimiter(1, 1)  # 1 request per second
 
 class BFSScraperStrategy(ScraperStrategy):
-    def __init__(self, max_depth: int, filter_chain: FilterChain, url_scorer: URLScorer, max_concurrent: int = 5):
+    def __init__(self, max_depth: int, filter_chain: FilterChain, url_scorer: URLScorer, max_concurrent: int = 5, min_crawl_delay: int=1):
         self.max_depth = max_depth
         self.filter_chain = filter_chain
         self.url_scorer = url_scorer
         self.max_concurrent = max_concurrent
         # For Crawl Politeness
         self.last_crawl_time = defaultdict(float)
-        self.min_crawl_delay = 1  # 1 second delay between requests to the same domain
+        self.min_crawl_delay = min_crawl_delay  # 1 second delay between requests to the same domain
         # For Robots.txt Compliance
         self.robot_parsers = {}
 
