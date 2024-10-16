@@ -24,18 +24,17 @@ class BFSScraperStrategy(ScraperStrategy):
         self.filter_chain = filter_chain
         self.url_scorer = url_scorer
         self.max_concurrent = max_concurrent
-        # 9. Crawl Politeness
+        # For Crawl Politeness
         self.last_crawl_time = defaultdict(float)
         self.min_crawl_delay = 1  # 1 second delay between requests to the same domain
-        # 5. Robots.txt Compliance
+        # For Robots.txt Compliance
         self.robot_parsers = {}
-    
+
     # Robots.txt Parser
     def get_robot_parser(self, url: str) -> RobotFileParser:
         domain = urlparse(url)
         scheme = domain.scheme if domain.scheme else 'http'  # Default to 'http' if no scheme provided
         netloc = domain.netloc
-
         if netloc not in self.robot_parsers:
             rp = RobotFileParser()
             rp.set_url(f"{scheme}://{netloc}/robots.txt")
@@ -90,11 +89,6 @@ class BFSScraperStrategy(ScraperStrategy):
                 await self.add_to_retry_queue(url)
             return crawl_result
         
-        # Content Type Checking
-        # if 'text/html' not in crawl_result.response_header.get('Content-Type', ''):
-        #     logging.info(f"Skipping non-HTML content: {url}")
-        #     return crawl_result
-
         visited.add(url)
 
         # Process links
