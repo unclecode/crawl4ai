@@ -1,4 +1,4 @@
-PROMPT_EXTRACT_BLOCKS = """YHere is the URL of the webpage:
+PROMPT_EXTRACT_BLOCKS = """Here is the URL of the webpage:
 <url>{URL}</url>
 
 And here is the cleaned HTML content of that webpage:
@@ -79,7 +79,7 @@ To generate the JSON objects:
 2. For each block:
    a. Assign it an index based on its order in the content.
    b. Analyze the content and generate ONE semantic tag that describe what the block is about.
-   c. Extract the text content, EXACTLY SAME AS GIVE DATA, clean it up if needed, and store it as a list of strings in the "content" field.
+   c. Extract the text content, EXACTLY SAME AS THE GIVE DATA, clean it up if needed, and store it as a list of strings in the "content" field.
 
 3. Ensure that the order of the JSON objects matches the order of the blocks as they appear in the original HTML content.
 
