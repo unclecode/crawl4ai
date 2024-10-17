@@ -13,23 +13,7 @@ from pydantic import BaseModel
 import hashlib
 import json
 import uuid
-from playwright_stealth import StealthConfig, stealth_async
-
-stealth_config = StealthConfig(
-    webdriver=True,
-    chrome_app=True,
-    chrome_csi=True,
-    chrome_load_times=True,
-    chrome_runtime=True,
-    navigator_languages=True,
-    navigator_plugins=True,
-    navigator_permissions=True,
-    webgl_vendor=True,
-    outerdimensions=True,
-    navigator_hardware_concurrency=True,
-    media_codecs=True,
-)
-
+from playwright_stealth import stealth_async
 
 class AsyncCrawlResponse(BaseModel):
     html: str
@@ -341,12 +325,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 """)
             
             page = await context.new_page()
-            # await stealth_async(page) #, stealth_config)
 
-        # Add console message and error logging
-        page.on("console", lambda msg: print(f"Console: {msg.text}"))
-        page.on("pageerror", lambda exc: print(f"Page Error: {exc}"))
-        
         try:
             if self.verbose:
                 print(f"[LOG] 🕸️ Crawling {url} using AsyncPlaywrightCrawlerStrategy...")
@@ -372,11 +351,15 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             if not kwargs.get("js_only", False):
                 await self.execute_hook('before_goto', page)
                 
+                response = await page.goto("about:blank")
+                await stealth_async(page)
                 response = await page.goto(
                     url, wait_until="domcontentloaded", timeout=kwargs.get("page_timeout", 60000)
                 )
                 
+                # await stealth_async(page)
                 # response = await page.goto("about:blank")
+                # await stealth_async(page)
                 # await page.evaluate(f"window.location.href = '{url}'")
                 
                 await self.execute_hook('after_goto', page)

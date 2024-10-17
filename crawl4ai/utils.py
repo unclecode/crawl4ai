@@ -692,8 +692,8 @@ def get_content_of_website_optimized(url: str, html: str, word_count_threshold: 
     for img in imgs:
         src = img.get('src', '')
         if base64_pattern.match(src):
-            # Replace base64 data with empty string
             img['src'] = base64_pattern.sub('', src)
+
     cleaned_html = str(body).replace('\n\n', '\n').replace('  ', ' ')
     cleaned_html = sanitize_html(cleaned_html)
 

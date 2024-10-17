@@ -195,6 +195,7 @@ class AsyncWebCrawler:
                 image_description_min_word_threshold=kwargs.get(
                     "image_description_min_word_threshold", IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD
                 ),
+                **kwargs,
             )
             if verbose:
                 print(
