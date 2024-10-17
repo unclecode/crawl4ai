@@ -4,12 +4,12 @@ from ..async_webcrawler import AsyncWebCrawler
 from typing import Union, AsyncGenerator
 
 class AsyncWebScraper:
-    def __init__(self, crawler: AsyncWebCrawler, strategy: ScraperStrategy, batch_size: int = 10, concurrency_limit: int = 5):
+    def __init__(self, crawler: AsyncWebCrawler, strategy: ScraperStrategy):
         self.crawler = crawler
         self.strategy = strategy
 
-    async def ascrape(self, url: str, parallel_processing: bool = True, yield_results: bool = False) -> Union[AsyncGenerator[CrawlResult, None], ScraperResult]:
-        if yield_results:
+    async def ascrape(self, url: str, parallel_processing: bool = True, stream: bool = False) -> Union[AsyncGenerator[CrawlResult, None], ScraperResult]:
+        if stream:
             return self._ascrape_yielding(url, parallel_processing)
         else:
             return await self._ascrape_collecting(url, parallel_processing)
