@@ -91,11 +91,6 @@ class BFSScraperStrategy(ScraperStrategy):
         if not crawl_result.success:
             # Logging and Monitoring
             logging.error(f"Failed to crawl URL: {url}. Error: {crawl_result.error_message}")
-            # Error Categorization
-            if crawl_result.status_code == 404:
-                self.remove_from_future_crawls(url)
-            elif crawl_result.status_code == 503:
-                await self.add_to_retry_queue(url)
             return crawl_result
 
         # Process links
