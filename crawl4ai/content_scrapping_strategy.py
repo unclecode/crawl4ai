@@ -16,8 +16,6 @@ from .utils import (
     CustomHTML2Text
 )
 
-
-
 class ContentScrappingStrategy(ABC):
     @abstractmethod
     def scrap(self, url: str, html: str, **kwargs) -> Dict[str, Any]:
@@ -129,7 +127,7 @@ class WebScrappingStrategy(ContentScrappingStrategy):
                 image_size = 0 #int(fetch_image_file_size(img,base_url) or 0)
                 image_format = os.path.splitext(img.get('src',''))[1].lower()
                 # Remove . from format
-                image_format = image_format.strip('.')
+                image_format = image_format.strip('.').split('?')[0]
                 score = 0
                 if height_value:
                     if height_unit == 'px' and height_value > 150:
@@ -158,6 +156,7 @@ class WebScrappingStrategy(ContentScrappingStrategy):
                 return None
             return {
                 'src': img.get('src', ''),
+                'data-src': img.get('data-src', ''),
                 'alt': img.get('alt', ''),
                 'desc': find_closest_parent_with_useful_text(img),
                 'score': score,
@@ -170,10 +169,12 @@ class WebScrappingStrategy(ContentScrappingStrategy):
                     if isinstance(element, Comment):
                         element.extract()
                     return False
+                
+                # if element.name == 'img':
+                #     process_image(element, url, 0, 1)
+                #     return True
 
                 if element.name in ['script', 'style', 'link', 'meta', 'noscript']:
-                    if element.name == 'img':
-                        process_image(element, url, 0, 1)
                     element.decompose()
                     return False
 
@@ -273,11 +274,14 @@ class WebScrappingStrategy(ContentScrappingStrategy):
                 # Replace base64 data with empty string
                 img['src'] = base64_pattern.sub('', src)
         cleaned_html = str(body).replace('\n\n', '\n').replace('  ', ' ')
-        cleaned_html = sanitize_html(cleaned_html)
 
         h = CustomHTML2Text()
         h.ignore_links = True
-        markdown = h.handle(cleaned_html)
+        h.body_width = 0
+        try:
+            markdown = h.handle(cleaned_html)
+        except Exception as e:
+            markdown = h.handle(sanitize_html(cleaned_html))
         markdown = markdown.replace('    ```', '```')
 
         try:
@@ -286,6 +290,7 @@ class WebScrappingStrategy(ContentScrappingStrategy):
             print('Error extracting metadata:', str(e))
             meta = {}
 
+        cleaned_html = sanitize_html(cleaned_html)
         return {
             'markdown': markdown,
             'cleaned_html': cleaned_html,

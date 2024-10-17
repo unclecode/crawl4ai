@@ -29,14 +29,31 @@ class AsyncDatabaseManager:
                 )
             ''')
             await db.commit()
+        await self.update_db_schema()
 
-    async def aalter_db_add_screenshot(self, new_column: str = "media"):
+    async def update_db_schema(self):
+        async with aiosqlite.connect(self.db_path) as db:
+            # Check if the 'media' column exists
+            cursor = await db.execute("PRAGMA table_info(crawled_data)")
+            columns = await cursor.fetchall()
+            column_names = [column[1] for column in columns]
+            
+            if 'media' not in column_names:
+                await self.aalter_db_add_column('media')
+            
+            # Check for other missing columns and add them if necessary
+            for column in ['links', 'metadata', 'screenshot']:
+                if column not in column_names:
+                    await self.aalter_db_add_column(column)
+
+    async def aalter_db_add_column(self, new_column: str):
         try:
             async with aiosqlite.connect(self.db_path) as db:
                 await db.execute(f'ALTER TABLE crawled_data ADD COLUMN {new_column} TEXT DEFAULT ""')
                 await db.commit()
+            print(f"Added column '{new_column}' to the database.")
         except Exception as e:
-            print(f"Error altering database to add screenshot column: {e}")
+            print(f"Error altering database to add {new_column} column: {e}")
 
     async def aget_cached_url(self, url: str) -> Optional[Tuple[str, str, str, str, str, str, str, bool, str]]:
         try:

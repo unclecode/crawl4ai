@@ -23,17 +23,17 @@ class AsyncWebCrawler:
         self,
         crawler_strategy: Optional[AsyncCrawlerStrategy] = None,
         always_by_pass_cache: bool = False,
-        verbose: bool = False,
+        **kwargs,
     ):
         self.crawler_strategy = crawler_strategy or AsyncPlaywrightCrawlerStrategy(
-            verbose=verbose
+            **kwargs
         )
         self.always_by_pass_cache = always_by_pass_cache
         self.crawl4ai_folder = os.path.join(Path.home(), ".crawl4ai")
         os.makedirs(self.crawl4ai_folder, exist_ok=True)
         os.makedirs(f"{self.crawl4ai_folder}/cache", exist_ok=True)
         self.ready = False
-        self.verbose = verbose
+        self.verbose = kwargs.get("verbose", False)
 
     async def __aenter__(self):
         await self.crawler_strategy.__aenter__()
@@ -202,11 +202,11 @@ class AsyncWebCrawler:
                 )
 
             if result is None:
-                raise ValueError(f"Failed to extract content from the website: {url}")
+                raise ValueError(f"Process HTML, Failed to extract content from the website: {url}")
         except InvalidCSSSelectorError as e:
             raise ValueError(str(e))
         except Exception as e:
-            raise ValueError(f"Failed to extract content from the website: {url}, error: {str(e)}")
+            raise ValueError(f"Process HTML, Failed to extract content from the website: {url}, error: {str(e)}")
 
         cleaned_html = sanitize_input_encode(result.get("cleaned_html", ""))
         markdown = sanitize_input_encode(result.get("markdown", ""))

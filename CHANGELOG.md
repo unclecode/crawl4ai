@@ -1,5 +1,83 @@
 # Changelog
 
+## [v0.3.6] - 2024-10-12 
+
+### 1. Improved Crawling Control
+- **New Hook**: Added `before_retrieve_html` hook in `AsyncPlaywrightCrawlerStrategy`.
+- **Delayed HTML Retrieval**: Introduced `delay_before_return_html` parameter to allow waiting before retrieving HTML content.
+  - Useful for pages with delayed content loading.
+- **Flexible Timeout**: `smart_wait` function now uses `page_timeout` (default 60 seconds) instead of a fixed 30-second timeout.
+  - Provides better handling for slow-loading pages.
+- **How to use**: Set `page_timeout=your_desired_timeout` (in milliseconds) when calling `crawler.arun()`.
+
+### 2. Browser Type Selection
+- Added support for different browser types (Chromium, Firefox, WebKit).
+- Users can now specify the browser type when initializing AsyncWebCrawler.
+- **How to use**: Set `browser_type="firefox"` or `browser_type="webkit"` when initializing AsyncWebCrawler.
+
+### 3. Screenshot Capture
+- Added ability to capture screenshots during crawling.
+- Useful for debugging and content verification.
+- **How to use**: Set `screenshot=True` when calling `crawler.arun()`.
+
+### 4. Enhanced LLM Extraction Strategy
+- Added support for multiple LLM providers (OpenAI, Hugging Face, Ollama).
+- **Custom Arguments**: Added support for passing extra arguments to LLM providers via `extra_args` parameter.
+- **Custom Headers**: Users can now pass custom headers to the extraction strategy.
+- **How to use**: Specify the desired provider and custom arguments when using `LLMExtractionStrategy`.
+
+### 5. iframe Content Extraction
+- New feature to process and extract content from iframes.
+- **How to use**: Set `process_iframes=True` in the crawl method.
+
+### 6. Delayed Content Retrieval
+- Introduced `get_delayed_content` method in `AsyncCrawlResponse`.
+- Allows retrieval of content after a specified delay, useful for dynamically loaded content.
+- **How to use**: Access `result.get_delayed_content(delay_in_seconds)` after crawling.
+
+## Improvements and Optimizations
+
+### 1. AsyncWebCrawler Enhancements
+- **Flexible Initialization**: Now accepts arbitrary keyword arguments, passed directly to the crawler strategy.
+- Allows for more customized setups.
+
+### 2. Image Processing Optimization
+- Enhanced image handling in WebScrappingStrategy.
+- Added filtering for small, invisible, or irrelevant images.
+- Improved image scoring system for better content relevance.
+- Implemented JavaScript-based image dimension updating for more accurate representation.
+
+### 3. Database Schema Auto-updates
+- Automatic database schema updates ensure compatibility with the latest version.
+
+### 4. Enhanced Error Handling and Logging
+- Improved error messages and logging for easier debugging.
+
+### 5. Content Extraction Refinements
+- Refined HTML sanitization process.
+- Improved handling of base64 encoded images.
+- Enhanced Markdown conversion process.
+- Optimized content extraction algorithms.
+
+### 6. Utility Function Enhancements
+- `perform_completion_with_backoff` function now supports additional arguments for more customized API calls to LLM providers.
+
+## Bug Fixes
+- Fixed an issue where image tags were being prematurely removed during content extraction.
+
+## Examples and Documentation
+- Updated `quickstart_async.py` with examples of:
+  - Using custom headers in LLM extraction.
+  - Different LLM provider usage (OpenAI, Hugging Face, Ollama).
+  - Custom browser type usage.
+
+## Developer Notes
+- Refactored code for better maintainability, flexibility, and performance.
+- Enhanced type hinting throughout the codebase for improved development experience.
+- Expanded error handling for more robust operation.
+
+These updates significantly enhance the flexibility, accuracy, and robustness of crawl4ai, providing users with more control and options for their web crawling and content extraction tasks.
+
 ## [v0.3.5] - 2024-09-02
 
 Enhance AsyncWebCrawler with smart waiting and screenshot capabilities
