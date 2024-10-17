@@ -1,5 +1,52 @@
 # Changelog
 
+## [v0.3.7] - 2024-10-17
+
+### New Features
+1. **Enhanced Browser Stealth**: 
+   - Implemented `playwright_stealth` for improved bot detection avoidance.
+   - Added `StealthConfig` for fine-tuned control over stealth parameters.
+
+2. **User Simulation**:
+   - New `simulate_user` option to mimic human-like interactions (mouse movements, clicks, keyboard presses).
+
+3. **Navigator Override**:
+   - Added `override_navigator` option to modify navigator properties, further improving bot detection evasion.
+
+4. **Improved iframe Handling**:
+   - New `process_iframes` parameter to extract and integrate iframe content into the main page.
+
+5. **Flexible Browser Selection**:
+   - Support for choosing between Chromium, Firefox, and WebKit browsers.
+
+6. **Include Links in Markdown**:
+    - Added support for including links in Markdown content, by definin g a new flag `include_links_on_markdown` in `crawl` method.   
+
+### Improvements
+1. **Better Error Handling**:
+   - Enhanced error reporting in WebScrappingStrategy with detailed error messages and suggestions.
+   - Added console message and error logging for better debugging.
+
+2. **Image Processing Enhancements**:
+   - Improved image dimension updating and filtering logic.
+
+3. **Crawling Flexibility**:
+   - Added support for custom viewport sizes.
+   - Implemented delayed content retrieval with `delay_before_return_html` parameter.
+
+4. **Performance Optimization**:
+   - Adjusted default semaphore count for parallel crawling.
+
+### Bug Fixes
+- Fixed an issue where the HTML content could be empty after processing.
+
+### Examples
+- Added new example `crawl_with_user_simulation()` demonstrating the use of user simulation and navigator override features.
+
+### Developer Notes
+- Refactored code for better maintainability and readability.
+- Updated browser launch arguments for improved compatibility and performance.
+
 ## [v0.3.6] - 2024-10-12 
 
 ### 1. Improved Crawling Control

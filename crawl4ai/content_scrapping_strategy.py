@@ -33,6 +33,7 @@ class WebScrappingStrategy(ContentScrappingStrategy):
         return await asyncio.to_thread(self._get_content_of_website_optimized, url, html, **kwargs)
 
     def _get_content_of_website_optimized(self, url: str, html: str, word_count_threshold: int = MIN_WORD_THRESHOLD, css_selector: str = None, **kwargs) -> Dict[str, Any]:
+        success = True
         if not html:
             return None
 
@@ -273,10 +274,41 @@ class WebScrappingStrategy(ContentScrappingStrategy):
             if base64_pattern.match(src):
                 # Replace base64 data with empty string
                 img['src'] = base64_pattern.sub('', src)
+                
+        try:
+            str(body)
+        except Exception as e:
+            # Reset body to the original HTML
+            success = False
+            body = BeautifulSoup(html, 'html.parser')
+            
+            # Create a new div with a special ID
+            error_div = body.new_tag('div', id='crawl4ai_error_message')
+            error_div.string = '''
+            Crawl4AI Error: This page is not fully supported.
+            
+            Possible reasons:
+            1. The page may have restrictions that prevent crawling.
+            2. The page might not be fully loaded.
+            
+            Suggestions:
+            - Try calling the crawl function with these parameters:
+            simulate_user=True, override_navigator=True
+            - Set headless=False to visualize what's happening on the page.
+            
+            If the issue persists, please check the page's structure and any potential anti-crawling measures.
+            '''
+            
+            # Append the error div to the body
+            body.body.append(error_div)
+            
+            print(f"[LOG] 😧 Error: After processing the crawled HTML and removing irrelevant tags, nothing was left in the page. Check the markdown for further details.")
+
+
         cleaned_html = str(body).replace('\n\n', '\n').replace('  ', ' ')
 
         h = CustomHTML2Text()
-        h.ignore_links = True
+        h.ignore_links = not kwargs.get('include_links_on_markdown', False)
         h.body_width = 0
         try:
             markdown = h.handle(cleaned_html)
@@ -294,7 +326,7 @@ class WebScrappingStrategy(ContentScrappingStrategy):
         return {
             'markdown': markdown,
             'cleaned_html': cleaned_html,
-            'success': True,
+            'success': success,
             'media': media,
             'links': links,
             'metadata': meta
