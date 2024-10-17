@@ -202,5 +202,7 @@ todo.md
 git_changes.py
 git_changes.md
 pypi_build.sh
+git_issues.py
+git_issues.md
 
 .tests/
