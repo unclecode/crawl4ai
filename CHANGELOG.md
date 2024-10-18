@@ -1,5 +1,32 @@
 # Changelog
 
+## [v0.3.71] - 2024-10-18
+
+### Changes
+1. **Version Update**:
+   - Updated version number from 0.3.7 to 0.3.71.
+
+2. **Crawler Enhancements**:
+   - Added `sleep_on_close` option to AsyncPlaywrightCrawlerStrategy for delayed browser closure.
+   - Improved context creation with additional options:
+     - Enabled `accept_downloads` and `java_script_enabled`.
+     - Added a cookie to enable cookies by default.
+
+3. **Error Handling Improvements**:
+   - Enhanced error messages in AsyncWebCrawler's `arun` method.
+   - Updated error reporting format for better visibility and consistency.
+
+4. **Performance Optimization**:
+   - Commented out automatic page and context closure in `crawl` method to potentially improve performance in certain scenarios.
+
+### Documentation
+- Updated quickstart notebook:
+  - Changed installation command to use the released package instead of GitHub repository.
+  - Updated kernel display name.
+
+### Developer Notes
+- Minor code refactoring and cleanup.
+
 ## [v0.3.7] - 2024-10-17
 
 ### New Features
