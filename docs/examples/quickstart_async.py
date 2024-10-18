@@ -467,7 +467,7 @@ async def main():
     # LLM extraction examples
     await extract_structured_data_using_llm()
     await extract_structured_data_using_llm("huggingface/meta-llama/Meta-Llama-3.1-8B-Instruct", os.getenv("HUGGINGFACE_API_KEY"))
-    await extract_structured_data_using_llm("openai/gpt-4", os.getenv("OPENAI_API_KEY"))
+    await extract_structured_data_using_llm("openai/gpt-4o", os.getenv("OPENAI_API_KEY"))
     await extract_structured_data_using_llm("ollama/llama3.2")    
 
     # You always can pass custom headers to the extraction strategy
