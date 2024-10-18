@@ -133,8 +133,8 @@ class AsyncWebCrawler:
         except Exception as e:
             if not hasattr(e, "msg"):
                 e.msg = str(e)
-            print(f"[ERROR] 🚫 Failed to crawl {url}, error: {e.msg}")
-            return CrawlResult(url=url, html="", success=False, error_message=e.msg)
+            print(f"[ERROR] 🚫 arun(): Failed to crawl {url}, error: {e.msg}")
+            return CrawlResult(url=url, html="", markdown = f"[ERROR] 🚫 arun(): Failed to crawl {url}, error: {e.msg}", success=False, error_message=e.msg)
 
     async def arun_many(
         self,

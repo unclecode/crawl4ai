@@ -80,6 +80,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         self.verbose = kwargs.get("verbose", False)
         self.playwright = None
         self.browser = None
+        self.sleep_on_close = kwargs.get("sleep_on_close", False)
         self.hooks = {
             'on_browser_created': None,
             'on_user_agent_updated': None,
@@ -132,6 +133,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             await self.execute_hook('on_browser_created', self.browser)
 
     async def close(self):
+        if self.sleep_on_close:
+            await asyncio.sleep(500)
         if self.browser:
             await self.browser.close()
             self.browser = None
@@ -296,8 +299,11 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 context = await self.browser.new_context(
                     user_agent=self.user_agent,
                     viewport={"width": 1920, "height": 1080},
-                    proxy={"server": self.proxy} if self.proxy else None
+                    proxy={"server": self.proxy} if self.proxy else None,
+                    accept_downloads=True,
+                    java_script_enabled=True
                 )
+                await context.add_cookies([{"name": "cookiesEnabled", "value": "true", "url": url}])
                 await context.set_extra_http_headers(self.headers)
                 page = await context.new_page()
                 self.sessions[session_id] = (context, page, time.time())
@@ -419,8 +425,6 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 except Exception as e:
                     raise RuntimeError(f"Wait condition failed: {str(e)}")
 
-
-            
             # Update image dimensions
             update_image_dimensions_js = """
             () => {
@@ -531,11 +535,11 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             )
             return response
         except Error as e:
-            raise Error(f"Failed to crawl {url}: {str(e)}")
-        finally:
-            if not session_id:
-                await page.close()
-                await context.close()
+            raise Error(f"[ERROR] 🚫 crawl(): Failed to crawl {url}: {str(e)}")
+        # finally:
+        #     if not session_id:
+        #         await page.close()
+        #         await context.close()
 
     async def crawl_many(self, urls: List[str], **kwargs) -> List[AsyncCrawlResponse]:
         semaphore_count = kwargs.get('semaphore_count', 5)  # Adjust as needed
