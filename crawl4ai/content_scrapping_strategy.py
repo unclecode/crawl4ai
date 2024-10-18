@@ -293,7 +293,7 @@ class WebScrappingStrategy(ContentScrappingStrategy):
             
             Suggestions:
             - Try calling the crawl function with these parameters:
-            simulate_user=True, override_navigator=True
+            magic=True,
             - Set headless=False to visualize what's happening on the page.
             
             If the issue persists, please check the page's structure and any potential anti-crawling measures.

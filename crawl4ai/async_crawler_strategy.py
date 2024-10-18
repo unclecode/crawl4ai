@@ -309,7 +309,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             )
             await context.set_extra_http_headers(self.headers)
             
-            if kwargs.get("override_navigator", False):
+            if kwargs.get("override_navigator", False) or kwargs.get("simulate_user", False) or kwargs.get("magic", False):
                 # Inject scripts to override navigator properties
                 await context.add_init_script("""
                     // Pass the Permissions Test.
@@ -344,8 +344,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             # await stealth_async(page) #, stealth_config)
 
         # Add console message and error logging
-        page.on("console", lambda msg: print(f"Console: {msg.text}"))
-        page.on("pageerror", lambda exc: print(f"Page Error: {exc}"))
+        if kwargs.get("log_console", False):
+            page.on("console", lambda msg: print(f"Console: {msg.text}"))
+            page.on("pageerror", lambda exc: print(f"Page Error: {exc}"))
         
         try:
             if self.verbose:
@@ -403,7 +404,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 # Check for on execution event
                 await self.execute_hook('on_execution_started', page)
                 
-            if kwargs.get("simulate_user", False):
+            if kwargs.get("simulate_user", False) or kwargs.get("magic", False):
                 # Simulate user interactions
                 await page.mouse.move(100, 100)
                 await page.mouse.down()
