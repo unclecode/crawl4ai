@@ -1,5 +1,29 @@
 # Changelog
 
+## [v0.3.71] - 2024-10-19
+
+### Added
+- New chunking strategies:
+  - `OverlappingWindowChunking`: Allows for overlapping chunks of text, useful for maintaining context between chunks.
+  - Enhanced `SlidingWindowChunking`: Improved to handle edge cases and last chunks more effectively.
+
+### Changed
+- Updated `CHUNK_TOKEN_THRESHOLD` in config to 2048 tokens (2^11) for better compatibility with most LLM models.
+- Improved `AsyncPlaywrightCrawlerStrategy.close()` method to use a shorter sleep time (0.5 seconds instead of 500), significantly reducing wait time when closing the crawler.
+- Enhanced flexibility in `CosineStrategy`:
+  - Now uses a more generic `load_HF_embedding_model` function, allowing for easier swapping of embedding models.
+- Updated `JsonCssExtractionStrategy` and `JsonXPATHExtractionStrategy` for better JSON-based extraction.
+
+### Fixed
+- Addressed potential issues with the sliding window chunking strategy to ensure all text is properly chunked.
+
+### Developer Notes
+- Added more comprehensive docstrings to chunking strategies for better code documentation.
+- Removed hardcoded device setting in `CosineStrategy`, now using the automatically detected device.
+- Added a new example in `quickstart_async.py` for generating a knowledge graph from crawled content.
+
+These updates aim to provide more flexibility in text processing, improve performance, and enhance the overall capabilities of the crawl4ai library. The new chunking strategies, in particular, offer more options for handling large texts in various scenarios.
+
 ## [v0.3.71] - 2024-10-18
 
 ### Changes
