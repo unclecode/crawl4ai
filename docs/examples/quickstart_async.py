@@ -10,7 +10,7 @@ import time
 import json
 import os
 import re
-from typing import Dict
+from typing import Dict, List
 from bs4 import BeautifulSoup
 from pydantic import BaseModel, Field
 from crawl4ai import AsyncWebCrawler
@@ -455,6 +455,41 @@ async def speed_comparison():
     print("Despite these limitations, Crawl4AI still demonstrates faster performance.")
     print("If you run these tests in an environment with better network conditions,")
     print("you may observe an even more significant speed advantage for Crawl4AI.")
+
+
+async def generate_knowledge_graph():
+    class Entity(BaseModel):
+        name: str
+        description: str
+        
+    class Relationship(BaseModel):
+        entity1: Entity
+        entity2: Entity
+        description: str
+        relation_type: str
+
+    class KnowledgeGraph(BaseModel):
+        entities: List[Entity]
+        relationships: List[Relationship]
+
+    extraction_strategy = LLMExtractionStrategy(
+            provider='openai/gpt-4o-mini',
+            api_token=os.getenv('OPENAI_API_KEY'),
+            schema=KnowledgeGraph.model_json_schema(),
+            extraction_type="schema",
+            instruction="""Extract entities and relationships from the given text."""
+    )
+    async with AsyncWebCrawler() as crawler:
+        url = "https://paulgraham.com/love.html"
+        result = await crawler.arun(
+            url=url,
+            bypass_cache=True,
+            extraction_strategy=extraction_strategy,
+            # magic=True
+        )
+        # print(result.extracted_content)
+        with open(os.path.join(__location__, "kb.json"), "w") as f:
+            f.write(result.extracted_content)
 
 async def main():
     await simple_crawl()

@@ -134,7 +134,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
     async def close(self):
         if self.sleep_on_close:
-            await asyncio.sleep(500)
+            await asyncio.sleep(0.5)
         if self.browser:
             await self.browser.close()
             self.browser = None
