@@ -127,7 +127,11 @@ class WebScrappingStrategy(ContentScrappingStrategy):
                 image_width =  img.get('width')
                 width_value, width_unit = parse_dimension(image_width)
                 image_size = 0 #int(fetch_image_file_size(img,base_url) or 0)
-                image_format = os.path.splitext(img.get('src',''))[1].lower()
+                image_src = img.get('src','')
+                if "data:image/" in image_src:
+                    image_format = image_src.split(',')[0].split(';')[0].split('/')[1]
+                else:
+                    image_format = os.path.splitext(img.get('src',''))[1].lower()
                 # Remove . from format
                 image_format = image_format.strip('.').split('?')[0]
                 score = 0
