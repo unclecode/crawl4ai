@@ -396,6 +396,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 response_headers = {}
 
             await page.wait_for_selector('body')
+            
             await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
 
             js_code = kwargs.get("js_code", kwargs.get("js", self.js_code))
@@ -477,7 +478,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     });
 
                     // Fallback timeout of 5 seconds
-                    setTimeout(() => resolve(), 5000);
+                    // setTimeout(() => resolve(), 5000);
+                    resolve();
                 });
             }
             """

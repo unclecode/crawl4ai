@@ -68,7 +68,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
         """
         super().__init__() 
         self.provider = provider
-        self.api_token = api_token or PROVIDER_MODELS.get(provider, None) or os.getenv("OPENAI_API_KEY")
+        self.api_token = api_token or PROVIDER_MODELS.get(provider, "no-token") or os.getenv("OPENAI_API_KEY")
         self.instruction = instruction
         self.extract_type = extraction_type
         self.schema = schema

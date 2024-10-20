@@ -40,6 +40,7 @@ class WebScrappingStrategy(ContentScrappingStrategy):
         soup = BeautifulSoup(html, 'html.parser')
         body = soup.body
         
+        
         image_description_min_word_threshold = kwargs.get('image_description_min_word_threshold', IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD)
 
         for tag in kwargs.get('excluded_tags', []) or []:
@@ -150,6 +151,8 @@ class WebScrappingStrategy(ContentScrappingStrategy):
                     score+=1
                 return score
 
+            
+            
             if not is_valid_image(img, img.parent, img.parent.get('class', [])):
                 return None
             score = score_image_for_usefulness(img, url, index, total_images)
@@ -164,6 +167,19 @@ class WebScrappingStrategy(ContentScrappingStrategy):
                 'type': 'image'
             }
 
+        def remove_unwanted_attributes(element, important_attrs, keep_data_attributes=False):
+            attrs_to_remove = []
+            for attr in element.attrs:
+                if attr not in important_attrs:
+                    if keep_data_attributes:
+                        if not attr.startswith('data-'):
+                            attrs_to_remove.append(attr)
+                    else:
+                        attrs_to_remove.append(attr)
+            
+            for attr in attrs_to_remove:
+                del element[attr]
+        
         def process_element(element: element.PageElement) -> bool:
             try:
                 if isinstance(element, NavigableString):
@@ -190,8 +206,39 @@ class WebScrappingStrategy(ContentScrappingStrategy):
                     else:
                         links['internal'].append(link_data)
                     keep_element = True
+                    
+                    if kwargs.get('exclude_external_links', True):
+                        href_url_base = href.split('/')[2]
+                        if url_base not in href_url_base:
+                            element.decompose()
+                            return False
+                        
+                    # Check if we should esclude links to all major social media platforms
+                    if not kwargs.get('exclude_external_links', False) and kwargs.get('exclude_social_media_links', True):
+                        social_media_domains = SOCIAL_MEDIA_DOMAINS + kwargs.get('social_media_domains', [])
+                        social_media_domains = list(set(social_media_domains))
+                        if any(domain in href for domain in social_media_domains):
+                            element.decompose()
+                            return False
 
                 elif element.name == 'img':
+                    # Check flag if we should remove external images
+                    if kwargs.get('exclude_external_images', False):
+                        src = element.get('src', '')
+                        src_url_base = src.split('/')[2]
+                        url_base = url.split('/')[2]
+                        if url_base not in src_url_base:
+                            element.decompose()
+                            return False
+                        
+                    if not kwargs.get('exclude_external_images', False) and kwargs.get('exclude_social_media_links', True):
+                        src = element.get('src', '')
+                        src_url_base = src.split('/')[2]
+                        url_base = url.split('/')[2]
+                        if any(domain in src for domain in SOCIAL_MEDIA_DOMAINS):
+                            element.decompose()
+                            return False
+                    
                     return True  # Always keep image elements
 
                 elif element.name in ['video', 'audio']:
@@ -211,14 +258,17 @@ class WebScrappingStrategy(ContentScrappingStrategy):
                     })
                     return True  # Always keep video and audio elements
 
-                if element.name != 'pre':
-                    if element.name in ['b', 'i', 'u', 'span', 'del', 'ins', 'sub', 'sup', 'strong', 'em', 'code', 'kbd', 'var', 's', 'q', 'abbr', 'cite', 'dfn', 'time', 'small', 'mark']:
-                        if kwargs.get('only_text', False):
-                            element.replace_with(element.get_text())
-                        else:
-                            element.unwrap()
-                    elif element.name != 'img':
-                        element.attrs = {}
+                if element.name in ONLY_TEXT_ELIGIBLE_TAGS:
+                    if kwargs.get('only_text', False):
+                        element.replace_with(element.get_text())
+
+                remove_unwanted_attributes(element, IMPORTANT_ATTRS, kwargs.get('keep_data_attributes', False))
+                # for attr in element.attrs:
+                #     if attr not in IMPORTANT_ATTRS or (attr.startswith('data-') and not kwargs.get('keep_data_attributes', False)):
+                #         del element[attr]                            
+
+                # Print element name and attributes
+                print(element.name, element.attrs)
 
                 # Process children
                 for child in list(element.children):
@@ -254,7 +304,11 @@ class WebScrappingStrategy(ContentScrappingStrategy):
         process_element(body)
 
         # # Process images using ThreadPoolExecutor
+        
+        
+        
         imgs = body.find_all('img')
+        
         with ThreadPoolExecutor() as executor:
             image_results = list(executor.map(process_image, imgs, [url]*len(imgs), range(len(imgs)), [len(imgs)]*len(imgs)))
         media['images'] = [result for result in image_results if result is not None]
@@ -307,10 +361,9 @@ class WebScrappingStrategy(ContentScrappingStrategy):
 
         cleaned_html = str(body).replace('\n\n', '\n').replace('  ', ' ')
 
-        h = CustomHTML2Text()
-        h.ignore_links = not kwargs.get('include_links_on_markdown', False)
-        h.body_width = 0
         try:
+            h = CustomHTML2Text()
+            h.update_params(**kwargs.get('html2text', {}))            
             markdown = h.handle(cleaned_html)
         except Exception as e:
             markdown = h.handle(sanitize_html(cleaned_html))

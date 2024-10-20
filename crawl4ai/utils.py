@@ -1,13 +1,12 @@
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from bs4 import BeautifulSoup, Comment, element, Tag, NavigableString
-import html2text
 import json
 import html
 import re
 import os
 import platform
-from html2text import HTML2Text
+from .html2text import HTML2Text
 from .prompts import PROMPT_EXTRACT_BLOCKS
 from .config import *
 from pathlib import Path
@@ -182,9 +181,22 @@ def escape_json_string(s):
 class CustomHTML2Text(HTML2Text):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.ignore_links = True
         self.inside_pre = False
         self.inside_code = False
+        
+        self.skip_internal_links = False
+        self.single_line_break = False
+        self.mark_code = False
+        self.include_sup_sub = False
+        self.body_width = 0
+        self.ignore_mailto_links = True
+        self.ignore_links = False
+        self.escape_backslash = False
+        self.escape_dot = False
+        self.escape_plus = False
+        self.escape_dash = False
+        self.escape_snob = False
+
 
     def handle_tag(self, tag, attrs, start):
         if tag == 'pre':
@@ -194,6 +206,10 @@ class CustomHTML2Text(HTML2Text):
             else:
                 self.o('\n```')
                 self.inside_pre = False
+        elif tag in ["h1", "h2", "h3", "h4", "h5", "h6"]:
+            pass
+
+
         # elif tag == 'code' and not self.inside_pre:
         #     if start:
         #         if not self.inside_pre:

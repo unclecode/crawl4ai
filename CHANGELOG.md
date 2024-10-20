@@ -1,5 +1,30 @@
 # Changelog
 
+## [v0.3.72] - 2024-10-20
+
+### Added
+- Forked and integrated a customized version of the html2text library for more control over Markdown generation
+- New configuration options for controlling external content:
+  - Ability to exclude all external links
+  - Option to specify domains to exclude (default includes major social media platforms)
+  - Control over excluding external images
+
+### Changed
+- Improved Markdown generation process:
+  - Added fine-grained control over character escaping in Markdown output
+  - Enhanced handling of code blocks and pre-formatted text
+- Updated `AsyncPlaywrightCrawlerStrategy.close()` method to use a shorter sleep time (0.5 seconds instead of 500)
+- Enhanced flexibility in `CosineStrategy` with a more generic `load_HF_embedding_model` function
+
+### Improved
+- Optimized content scraping and processing for better efficiency
+- Enhanced error handling and logging in various components
+
+### Developer Notes
+- The customized html2text library is now located within the crawl4ai package
+- New configuration options are available in the `config.py` file for external content handling
+- The `WebScrappingStrategy` class has been updated to accommodate new external content exclusion options
+
 ## [v0.3.71] - 2024-10-19
 
 ### Added
