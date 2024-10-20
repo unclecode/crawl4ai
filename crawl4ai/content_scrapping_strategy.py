@@ -196,52 +196,65 @@ class WebScrappingStrategy(ContentScrappingStrategy):
                     return False
 
                 keep_element = False
+                
+                social_media_domains = SOCIAL_MEDIA_DOMAINS + kwargs.get('social_media_domains', [])
+                social_media_domains = list(set(social_media_domains))
 
-                if element.name == 'a' and element.get('href'):
-                    href = element['href']
-                    url_base = url.split('/')[2]
-                    link_data = {'href': href, 'text': element.get_text()}
-                    if href.startswith('http') and url_base not in href:
-                        links['external'].append(link_data)
-                    else:
-                        links['internal'].append(link_data)
-                    keep_element = True
-                    
-                    if kwargs.get('exclude_external_links', True):
-                        href_url_base = href.split('/')[2]
-                        if url_base not in href_url_base:
-                            element.decompose()
-                            return False
-                        
-                    # Check if we should esclude links to all major social media platforms
-                    if not kwargs.get('exclude_external_links', False) and kwargs.get('exclude_social_media_links', True):
-                        social_media_domains = SOCIAL_MEDIA_DOMAINS + kwargs.get('social_media_domains', [])
-                        social_media_domains = list(set(social_media_domains))
-                        if any(domain in href for domain in social_media_domains):
-                            element.decompose()
-                            return False
-
-                elif element.name == 'img':
-                    # Check flag if we should remove external images
-                    if kwargs.get('exclude_external_images', False):
-                        src = element.get('src', '')
-                        src_url_base = src.split('/')[2]
+                try:
+                    if element.name == 'a' and element.get('href'):
+                        href = element['href']
                         url_base = url.split('/')[2]
-                        if url_base not in src_url_base:
-                            element.decompose()
-                            return False
+                        link_data = {'href': href, 'text': element.get_text()}
+                        if href.startswith('http') and url_base not in href:
+                            links['external'].append(link_data)
+                        else:
+                            links['internal'].append(link_data)
+                        keep_element = True
                         
-                    if not kwargs.get('exclude_external_images', False) and kwargs.get('exclude_social_media_links', True):
-                        src = element.get('src', '')
-                        src_url_base = src.split('/')[2]
-                        url_base = url.split('/')[2]
-                        if any(domain in src for domain in SOCIAL_MEDIA_DOMAINS):
-                            element.decompose()
-                            return False
-                    
-                    return True  # Always keep image elements
+                        if kwargs.get('exclude_external_links', True):
+                            href_parts = href.split('/')
+                            href_url_base = href_parts[2] if len(href_parts) > 2 else href
+                            if url_base not in href_url_base:
+                                element.decompose()
+                                return False
+                            
+                        if not kwargs.get('exclude_external_links', False) and kwargs.get('exclude_social_media_links', True):
+                            if any(domain in href for domain in social_media_domains):
+                                element.decompose()
+                                return False
+                except Exception as e:
+                    raise "Error processing links"
 
-                elif element.name in ['video', 'audio']:
+                try:
+                    if element.name == 'img':
+                        # Check flag if we should remove external images
+                        if kwargs.get('exclude_external_images', False):
+                            src = element.get('src', '')
+                            src_url_base = src.split('/')[2]
+                            url_base = url.split('/')[2]
+                            if url_base not in src_url_base:
+                                element.decompose()
+                                return False
+                            
+                        if not kwargs.get('exclude_external_images', False) and kwargs.get('exclude_social_media_links', True):
+                            src = element.get('src', '')
+                            src_url_base = src.split('/')[2]
+                            url_base = url.split('/')[2]
+                            if any(domain in src for domain in social_media_domains):
+                                element.decompose()
+                                return False
+                        
+                        return True  # Always keep image elements
+                except Exception as e:
+                    raise "Error processing images"
+                
+                
+                # Check if flag to remove all forms is set
+                if kwargs.get('remove_forms', False) and element.name == 'form':
+                    element.decompose()
+                    return False
+                
+                if element.name in ['video', 'audio']:
                     media[f"{element.name}s"].append({
                         'src': element.get('src'),
                         'alt': element.get('alt'),
@@ -262,13 +275,11 @@ class WebScrappingStrategy(ContentScrappingStrategy):
                     if kwargs.get('only_text', False):
                         element.replace_with(element.get_text())
 
-                remove_unwanted_attributes(element, IMPORTANT_ATTRS, kwargs.get('keep_data_attributes', False))
-                # for attr in element.attrs:
-                #     if attr not in IMPORTANT_ATTRS or (attr.startswith('data-') and not kwargs.get('keep_data_attributes', False)):
-                #         del element[attr]                            
-
-                # Print element name and attributes
-                print(element.name, element.attrs)
+                try:
+                    remove_unwanted_attributes(element, IMPORTANT_ATTRS, kwargs.get('keep_data_attributes', False))
+                except Exception as e:
+                    print('Error removing unwanted attributes:', str(e))
+                
 
                 # Process children
                 for child in list(element.children):
@@ -304,9 +315,6 @@ class WebScrappingStrategy(ContentScrappingStrategy):
         process_element(body)
 
         # # Process images using ThreadPoolExecutor
-        
-        
-        
         imgs = body.find_all('img')
         
         with ThreadPoolExecutor() as executor:
