@@ -2,6 +2,9 @@
 
 ## [v0.3.72] - 2024-10-20
 
+### Fixed
+- Added support for parsing Base64 encoded images in WebScrappingStrategy
+
 ### Added
 - Forked and integrated a customized version of the html2text library for more control over Markdown generation
 - New configuration options for controlling external content:
