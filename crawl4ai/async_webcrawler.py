@@ -186,7 +186,8 @@ class AsyncWebCrawler:
         try:
             t1 = time.time()
             scrapping_strategy = WebScrappingStrategy()
-            result = await scrapping_strategy.ascrap(
+            # result = await scrapping_strategy.ascrap(
+            result = await scrapping_strategy.scrap(
                 url,
                 html,
                 word_count_threshold=word_count_threshold,
