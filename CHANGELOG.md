@@ -1,5 +1,39 @@
 # Changelog
 
+## [v0.3.72] - 2024-10-22
+
+### Added
+- New `ContentCleaningStrategy` class:
+  - Smart content extraction based on text density and element scoring
+  - Automatic removal of boilerplate content
+  - DOM tree analysis for better content identification
+  - Configurable thresholds for content detection
+- Advanced proxy support:
+  - Added `proxy_config` option for authenticated proxy connections
+  - Support for username/password in proxy configuration
+- New content output formats:
+  - `fit_markdown`: Optimized markdown output with main content focus
+  - `fit_html`: Clean HTML with only essential content
+
+### Enhanced
+- Image source detection:
+  - Support for multiple image source attributes (`src`, `data-src`, `srcset`, etc.)
+  - Automatic fallback through potential source attributes
+  - Smart handling of srcset attribute
+- External content handling:
+  - Made external link exclusion optional (disabled by default)
+  - Improved detection and handling of social media links
+  - Better control over external image filtering
+
+### Fixed
+- Image extraction reliability with multiple source attribute checks
+- External link and image handling logic for better accuracy
+
+### Developer Notes
+- The new `ContentCleaningStrategy` uses configurable thresholds for customization
+- Proxy configuration now supports more complex authentication scenarios
+- Content extraction process now provides both regular and optimized outputs
+
 ## [v0.3.72] - 2024-10-20
 
 ### Fixed
