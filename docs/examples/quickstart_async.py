@@ -10,6 +10,7 @@ import time
 import json
 import os
 import re
+from typing import Dict
 from bs4 import BeautifulSoup
 from pydantic import BaseModel, Field
 from crawl4ai import AsyncWebCrawler
@@ -17,6 +18,8 @@ from crawl4ai.extraction_strategy import (
     JsonCssExtractionStrategy,
     LLMExtractionStrategy,
 )
+
+__location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
 print("Crawl4AI: Advanced Web Crawling and Data Extraction")
 print("GitHub Repository: https://github.com/unclecode/crawl4ai")
@@ -30,7 +33,7 @@ async def simple_crawl():
         result = await crawler.arun(url="https://www.nbcnews.com/business")
         print(result.markdown[:500])  # Print first 500 characters
 
-async def js_and_css():
+async def simple_example_with_running_js_code():
     print("\n--- Executing JavaScript and Using CSS Selectors ---")
     # New code to handle the wait_for parameter
     wait_for = """() => {
@@ -47,8 +50,17 @@ async def js_and_css():
         result = await crawler.arun(
             url="https://www.nbcnews.com/business",
             js_code=js_code,
-            # css_selector="article.tease-card",
             # wait_for=wait_for,
+            bypass_cache=True,
+        )
+        print(result.markdown[:500])  # Print first 500 characters
+
+async def simple_example_with_css_selector():
+    print("\n--- Using CSS Selectors ---")
+    async with AsyncWebCrawler(verbose=True) as crawler:
+        result = await crawler.arun(
+            url="https://www.nbcnews.com/business",
+            css_selector=".wide-tease-item__description",
             bypass_cache=True,
         )
         print(result.markdown[:500])  # Print first 500 characters
@@ -66,6 +78,28 @@ async def use_proxy():
     #     )
     #     print(result.markdown[:500])  # Print first 500 characters
 
+async def capture_and_save_screenshot(url: str, output_path: str):
+    async with AsyncWebCrawler(verbose=True) as crawler:
+        result = await crawler.arun(
+            url=url,
+            screenshot=True,
+            bypass_cache=True
+        )
+        
+        if result.success and result.screenshot:
+            import base64
+            
+            # Decode the base64 screenshot data
+            screenshot_data = base64.b64decode(result.screenshot)
+            
+            # Save the screenshot as a JPEG file
+            with open(output_path, 'wb') as f:
+                f.write(screenshot_data)
+            
+            print(f"Screenshot saved successfully to {output_path}")
+        else:
+            print("Failed to capture screenshot")
+
 class OpenAIModelFee(BaseModel):
     model_name: str = Field(..., description="Name of the OpenAI model.")
     input_fee: str = Field(..., description="Fee for input token for the OpenAI model.")
@@ -73,27 +107,30 @@ class OpenAIModelFee(BaseModel):
         ..., description="Fee for output token for the OpenAI model."
     )
 
-async def extract_structured_data_using_llm():
-    print("\n--- Extracting Structured Data with OpenAI ---")
-    print(
-        "Note: Set your OpenAI API key as an environment variable to run this example."
-    )
-    if not os.getenv("OPENAI_API_KEY"):
-        print("OpenAI API key not found. Skipping this example.")
+async def extract_structured_data_using_llm(provider: str, api_token: str = None, extra_headers: Dict[str, str] = None):
+    print(f"\n--- Extracting Structured Data with {provider} ---")
+    
+    if api_token is None and provider != "ollama":
+        print(f"API token is required for {provider}. Skipping this example.")
         return
+
+    extra_args = {}
+    if extra_headers:
+        extra_args["extra_headers"] = extra_headers
 
     async with AsyncWebCrawler(verbose=True) as crawler:
         result = await crawler.arun(
             url="https://openai.com/api/pricing/",
             word_count_threshold=1,
             extraction_strategy=LLMExtractionStrategy(
-                provider="openai/gpt-4o",
-                api_token=os.getenv("OPENAI_API_KEY"),
+                provider=provider,
+                api_token=api_token,
                 schema=OpenAIModelFee.schema(),
                 extraction_type="schema",
                 instruction="""From the crawled content, extract all mentioned model names along with their fees for input and output tokens. 
                 Do not miss any models in the entire content. One extracted model JSON format should look like this: 
                 {"model_name": "GPT-4", "input_fee": "US$10.00 / 1M tokens", "output_fee": "US$30.00 / 1M tokens"}.""",
+                extra_args=extra_args
             ),
             bypass_cache=True,
         )
@@ -320,6 +357,28 @@ async def crawl_dynamic_content_pages_method_3():
         await crawler.crawler_strategy.kill_session(session_id)
         print(f"Successfully crawled {len(all_commits)} commits across 3 pages")
 
+async def crawl_custom_browser_type():
+    # Use Firefox
+    start = time.time()
+    async with AsyncWebCrawler(browser_type="firefox", verbose=True, headless = True) as crawler:
+        result = await crawler.arun(url="https://www.example.com", bypass_cache=True)
+        print(result.markdown[:500])
+        print("Time taken: ", time.time() - start)
+
+    # Use WebKit
+    start = time.time()
+    async with AsyncWebCrawler(browser_type="webkit", verbose=True, headless = True) as crawler:
+        result = await crawler.arun(url="https://www.example.com", bypass_cache=True)
+        print(result.markdown[:500])
+        print("Time taken: ", time.time() - start)
+
+    # Use Chromium (default)
+    start = time.time()
+    async with AsyncWebCrawler(verbose=True, headless = True) as crawler:
+        result = await crawler.arun(url="https://www.example.com", bypass_cache=True)
+        print(result.markdown[:500])
+        print("Time taken: ", time.time() - start)
+
 async def speed_comparison():
     # print("\n--- Speed Comparison ---")
     # print("Firecrawl (simulated):")
@@ -387,13 +446,31 @@ async def speed_comparison():
 
 async def main():
     await simple_crawl()
-    await js_and_css()
+    await simple_example_with_running_js_code()
+    await simple_example_with_css_selector()
     await use_proxy()
+    await capture_and_save_screenshot("https://www.example.com", os.path.join(__location__, "tmp/example_screenshot.jpg"))
     await extract_structured_data_using_css_extractor()
+
+    # LLM extraction examples
     await extract_structured_data_using_llm()
+    await extract_structured_data_using_llm("huggingface/meta-llama/Meta-Llama-3.1-8B-Instruct", os.getenv("HUGGINGFACE_API_KEY"))
+    await extract_structured_data_using_llm("openai/gpt-4", os.getenv("OPENAI_API_KEY"))
+    await extract_structured_data_using_llm("ollama/llama3.2")    
+
+    # You always can pass custom headers to the extraction strategy
+    custom_headers = {
+        "Authorization": "Bearer your-custom-token",
+        "X-Custom-Header": "Some-Value"
+    }
+    await extract_structured_data_using_llm(extra_headers=custom_headers)
+    
     # await crawl_dynamic_content_pages_method_1()
     # await crawl_dynamic_content_pages_method_2()
     await crawl_dynamic_content_pages_method_3()
+    
+    await crawl_custom_browser_type()
+    
     await speed_comparison()
 
 

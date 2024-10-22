@@ -197,3 +197,10 @@ tmp/
 test_env/
 **/.DS_Store
 **/.DS_Store
+
+todo.md
+git_changes.py
+git_changes.md
+pypi_build.sh
+
+.tests/
