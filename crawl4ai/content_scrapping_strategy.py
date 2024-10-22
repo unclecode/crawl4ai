@@ -7,6 +7,7 @@ from .config import *
 from bs4 import element, NavigableString, Comment
 from urllib.parse import urljoin
 from requests.exceptions import InvalidSchema
+from .content_cleaning_strategy import ContentCleaningStrategy
 
 from .utils import (
     sanitize_input_encode,
@@ -215,7 +216,7 @@ class WebScrappingStrategy(ContentScrappingStrategy):
                             links['internal'].append(link_data)
                         keep_element = True
                         
-                        if kwargs.get('exclude_external_links', True):
+                        if kwargs.get('exclude_external_links', False):
                             href_parts = href.split('/')
                             href_url_base = href_parts[2] if len(href_parts) > 2 else href
                             if url_base not in href_url_base:
@@ -231,9 +232,20 @@ class WebScrappingStrategy(ContentScrappingStrategy):
 
                 try:
                     if element.name == 'img':
+                        potential_sources = ['src', 'data-src', 'srcset' 'data-lazy-src', 'data-original']
+                        src = element.get('src', '')
+                        while not src and potential_sources:
+                            src = element.get(potential_sources.pop(0), '')
+                        if not src:
+                            element.decompose()
+                            return False
+                        
+                        # If it is srcset pick up the first image
+                        if 'srcset' in element.attrs:
+                            src = element.attrs['srcset'].split(',')[0].split(' ')[0]
+                            
                         # Check flag if we should remove external images
                         if kwargs.get('exclude_external_images', False):
-                            src = element.get('src', '')
                             src_url_base = src.split('/')[2]
                             url_base = url.split('/')[2]
                             if url_base not in src_url_base:
@@ -241,7 +253,6 @@ class WebScrappingStrategy(ContentScrappingStrategy):
                                 return False
                             
                         if not kwargs.get('exclude_external_images', False) and kwargs.get('exclude_social_media_links', True):
-                            src = element.get('src', '')
                             src_url_base = src.split('/')[2]
                             url_base = url.split('/')[2]
                             if any(domain in src for domain in social_media_domains):
@@ -386,10 +397,16 @@ class WebScrappingStrategy(ContentScrappingStrategy):
         except Exception as e:
             print('Error extracting metadata:', str(e))
             meta = {}
+            
+        cleaner = ContentCleaningStrategy()
+        fit_html = cleaner.clean(cleaned_html)
+        fit_markdown = h.handle(fit_html)
 
         cleaned_html = sanitize_html(cleaned_html)
         return {
             'markdown': markdown,
+            'fit_markdown': fit_markdown,
+            'fit_html': fit_html,
             'cleaned_html': cleaned_html,
             'success': success,
             'media': media,

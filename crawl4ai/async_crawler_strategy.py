@@ -71,6 +71,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             "(KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         )
         self.proxy = kwargs.get("proxy")
+        self.proxy_config = kwargs.get("proxy_config")
         self.headless = kwargs.get("headless", True)
         self.browser_type = kwargs.get("browser_type", "chromium")
         self.headers = kwargs.get("headers", {})
@@ -120,6 +121,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             # Add proxy settings if a proxy is specified
             if self.proxy:
                 proxy_settings = ProxySettings(server=self.proxy)
+                browser_args["proxy"] = proxy_settings
+            elif self.proxy_config:
+                proxy_settings = ProxySettings(server=self.proxy_config.get("server"), username=self.proxy_config.get("username"), password=self.proxy_config.get("password"))
                 browser_args["proxy"] = proxy_settings
                 
             # Select the appropriate browser based on the browser_type

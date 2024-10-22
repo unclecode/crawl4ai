@@ -212,6 +212,8 @@ class AsyncWebCrawler:
 
         cleaned_html = sanitize_input_encode(result.get("cleaned_html", ""))
         markdown = sanitize_input_encode(result.get("markdown", ""))
+        fit_markdown = sanitize_input_encode(result.get("fit_markdown", ""))
+        fit_html = sanitize_input_encode(result.get("fit_html", ""))
         media = result.get("media", [])
         links = result.get("links", [])
         metadata = result.get("metadata", {})
@@ -258,6 +260,8 @@ class AsyncWebCrawler:
             html=html,
             cleaned_html=format_html(cleaned_html),
             markdown=markdown,
+            fit_markdown=fit_markdown,
+            fit_html= fit_html,
             media=media,
             links=links,
             metadata=metadata,
