@@ -352,7 +352,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             # Check if kwargs has screenshot=True then take screenshot
             screenshot_data = None
             if kwargs.get("screenshot"):
-                screenshot_data = await self.take_screenshot(url)
+                screenshot_data = await self.take_screenshot(url, wait_time=kwargs.get("screenshot_wait_time", 1000))
             
             
             # New code to update image dimensions
