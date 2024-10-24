@@ -3,7 +3,7 @@
 from .async_webcrawler import AsyncWebCrawler
 from .models import CrawlResult
 
-__version__ = "0.3.71"
+__version__ = "0.3.72"
 
 __all__ = [
     "AsyncWebCrawler",
