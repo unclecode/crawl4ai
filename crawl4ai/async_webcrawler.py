@@ -23,13 +23,15 @@ class AsyncWebCrawler:
         self,
         crawler_strategy: Optional[AsyncCrawlerStrategy] = None,
         always_by_pass_cache: bool = False,
+        base_directory: str = str(Path.home()),
         **kwargs,
     ):
         self.crawler_strategy = crawler_strategy or AsyncPlaywrightCrawlerStrategy(
             **kwargs
         )
         self.always_by_pass_cache = always_by_pass_cache
-        self.crawl4ai_folder = os.path.join(Path.home(), ".crawl4ai")
+        # self.crawl4ai_folder = os.path.join(Path.home(), ".crawl4ai")
+        self.crawl4ai_folder = os.path.join(base_directory, ".crawl4ai")
         os.makedirs(self.crawl4ai_folder, exist_ok=True)
         os.makedirs(f"{self.crawl4ai_folder}/cache", exist_ok=True)
         self.ready = False
