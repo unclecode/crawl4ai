@@ -1,5 +1,52 @@
 # Changelog
 
+## [v0.3.73] - 2024-10-24
+
+### Added
+- Smart overlay removal system in AsyncPlaywrightCrawlerStrategy:
+  - Automatic removal of popups, modals, and cookie notices
+  - Detection and removal of fixed/sticky position elements
+  - Cleaning of empty block elements
+  - Configurable via `remove_overlay_elements` parameter
+- Enhanced screenshot capabilities:
+  - Added `screenshot_wait_for` parameter to control timing
+  - Improved screenshot handling with existing page context
+  - Better error handling with fallback error images
+- New URL normalization utilities:
+  - `normalize_url` function for consistent URL formatting
+  - `is_external_url` function for better link classification
+- Custom base directory support for cache storage:
+  - New `base_directory` parameter in AsyncWebCrawler
+  - Allows specifying alternative locations for `.crawl4ai` folder
+
+### Enhanced
+- Link handling improvements:
+  - Better duplicate link detection
+  - Enhanced internal/external link classification
+  - Improved handling of special URL protocols
+  - Support for anchor links and protocol-relative URLs
+- Configuration refinements:
+  - Streamlined social media domain list
+  - More focused external content filtering
+- LLM extraction strategy:
+  - Added support for separate API base URL via `api_base` parameter
+  - Better handling of base URLs in configuration
+
+### Fixed
+- Screenshot functionality:
+  - Resolved issues with screenshot timing and context
+  - Improved error handling and recovery
+- Link processing:
+  - Fixed URL normalization edge cases
+  - Better handling of invalid URLs
+  - Improved error messages for link processing failures
+
+### Developer Notes
+- The overlay removal system uses advanced JavaScript injection for better compatibility
+- URL normalization handles special cases like mailto:, tel:, and protocol-relative URLs
+- Screenshot system now reuses existing page context for better performance
+- Link processing maintains separate dictionaries for internal and external links to ensure uniqueness
+
 ## [v0.3.72] - 2024-10-22
 
 ### Added

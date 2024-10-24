@@ -14,7 +14,10 @@ from .utils import (
     sanitize_html,
     extract_metadata,
     InvalidCSSSelectorError,
-    CustomHTML2Text
+    CustomHTML2Text,
+    normalize_url,
+    is_external_url
+    
 )
 
 class ContentScrappingStrategy(ABC):
@@ -67,6 +70,8 @@ class WebScrappingStrategy(ContentScrappingStrategy):
 
         links = {'internal': [], 'external': []}
         media = {'images': [], 'videos': [], 'audios': []}
+        internal_links_dict = {}
+        external_links_dict = {}
 
         # Extract meaningful text for media files from closest parent
         def find_closest_parent_with_useful_text(tag):
@@ -205,30 +210,55 @@ class WebScrappingStrategy(ContentScrappingStrategy):
                 social_media_domains = SOCIAL_MEDIA_DOMAINS + kwargs.get('social_media_domains', [])
                 social_media_domains = list(set(social_media_domains))
 
+                
                 try:
                     if element.name == 'a' and element.get('href'):
-                        href = element['href']
+                        href = element.get('href', '').strip()
+                        if not href:  # Skip empty hrefs
+                            return False
+                            
                         url_base = url.split('/')[2]
-                        link_data = {'href': href, 'text': element.get_text()}
-                        if href.startswith('http') and url_base not in href:
-                            links['external'].append(link_data)
+                        
+                        # Normalize the URL
+                        try:
+                            normalized_href = normalize_url(href, url)
+                        except ValueError as e:
+                            # logging.warning(f"Invalid URL format: {href}, Error: {str(e)}")
+                            return False
+                            
+                        link_data = {
+                            'href': normalized_href,
+                            'text': element.get_text().strip(),
+                            'title': element.get('title', '').strip()
+                        }
+                        
+                        # Check for duplicates and add to appropriate dictionary
+                        is_external = is_external_url(normalized_href, url_base)
+                        if is_external:
+                            if normalized_href not in external_links_dict:
+                                external_links_dict[normalized_href] = link_data
                         else:
-                            links['internal'].append(link_data)
+                            if normalized_href not in internal_links_dict:
+                                internal_links_dict[normalized_href] = link_data
+                                
                         keep_element = True
                         
-                        if kwargs.get('exclude_external_links', False):
-                            href_parts = href.split('/')
-                            href_url_base = href_parts[2] if len(href_parts) > 2 else href
-                            if url_base not in href_url_base:
+                        # Handle external link exclusions
+                        if is_external:
+                            if kwargs.get('exclude_external_links', False):
                                 element.decompose()
                                 return False
-                            
-                        if not kwargs.get('exclude_external_links', False) and kwargs.get('exclude_social_media_links', True):
-                            if any(domain in href for domain in social_media_domains):
-                                element.decompose()
-                                return False
+                            elif kwargs.get('exclude_social_media_links', False):
+                                if any(domain in normalized_href.lower() for domain in social_media_domains):
+                                    element.decompose()
+                                    return False
+                            elif kwargs.get('exclude_domains', []):
+                                if any(domain in normalized_href.lower() for domain in kwargs.get('exclude_domains', [])):
+                                    element.decompose()
+                                    return False
+                                    
                 except Exception as e:
-                    raise "Error processing links"
+                    raise Exception(f"Error processing links: {str(e)}")
 
                 try:
                     if element.name == 'img':
@@ -252,10 +282,16 @@ class WebScrappingStrategy(ContentScrappingStrategy):
                                 element.decompose()
                                 return False
                             
-                        if not kwargs.get('exclude_external_images', False) and kwargs.get('exclude_social_media_links', True):
+                        if not kwargs.get('exclude_external_images', False) and kwargs.get('exclude_social_media_links', False):
                             src_url_base = src.split('/')[2]
                             url_base = url.split('/')[2]
                             if any(domain in src for domain in social_media_domains):
+                                element.decompose()
+                                return False
+                            
+                        # Handle exclude domains
+                        if kwargs.get('exclude_domains', []):
+                            if any(domain in src for domain in kwargs.get('exclude_domains', [])):
                                 element.decompose()
                                 return False
                         
@@ -328,6 +364,11 @@ class WebScrappingStrategy(ContentScrappingStrategy):
         # ]
         
         process_element(body)
+        
+        # Update the links dictionary with unique links
+        links['internal'] = list(internal_links_dict.values())
+        links['external'] = list(external_links_dict.values())
+
 
         # # Process images using ThreadPoolExecutor
         imgs = body.find_all('img')

@@ -37,16 +37,9 @@ SOCIAL_MEDIA_DOMAINS = [
                             'linkedin.com',
                             'instagram.com',
                             'pinterest.com',
-                            'youtube.com',
                             'tiktok.com',
                             'snapchat.com',
-                            'whatsapp.com',
-                            'messenger.com',
                             'reddit.com',
-                            'tumblr.com',
-                            'buffer.com',
-                            'xing.com',
-                            'flipboard.com',
                         ]
 
 # Threshold for the Image extraction - Range is 1 to 6

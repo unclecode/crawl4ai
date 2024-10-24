@@ -51,7 +51,7 @@ class AsyncCrawlerStrategy(ABC):
         pass
     
     @abstractmethod
-    async def take_screenshot(self, url: str) -> str:
+    async def take_screenshot(self, **kwargs) -> str:
         pass
     
     @abstractmethod
@@ -502,13 +502,21 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             if delay_before_return_html:
                 await asyncio.sleep(delay_before_return_html)
                 
+            # Check for remove_overlay_elements parameter
+            if kwargs.get("remove_overlay_elements", False):
+                await self.remove_overlay_elements(page)
+            
             html = await page.content()
             await self.execute_hook('before_return_html', page, html)
             
             # Check if kwargs has screenshot=True then take screenshot
             screenshot_data = None
             if kwargs.get("screenshot"):
-                screenshot_data = await self.take_screenshot(url)            
+                # Check we have screenshot_wait_for parameter, if we have simply wait for that time
+                screenshot_wait_for = kwargs.get("screenshot_wait_for")
+                if screenshot_wait_for:
+                    await asyncio.sleep(screenshot_wait_for)
+                screenshot_data = await self.take_screenshot(page)          
 
             if self.verbose:
                 print(f"[LOG] ✅ Crawled {url} successfully!")
@@ -559,28 +567,156 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         results = await asyncio.gather(*tasks, return_exceptions=True)
         return [result if not isinstance(result, Exception) else str(result) for result in results]
 
-    async def take_screenshot(self, url: str, wait_time=1000) -> str:
-        async with await self.browser.new_context(user_agent=self.user_agent) as context:
-            page = await context.new_page()
-            try:
-                await page.goto(url, wait_until="domcontentloaded", timeout=30000)
-                # Wait for a specified time (default is 1 second)
-                await page.wait_for_timeout(wait_time)
-                screenshot = await page.screenshot(full_page=True)
-                return base64.b64encode(screenshot).decode('utf-8')
-            except Exception as e:
-                error_message = f"Failed to take screenshot: {str(e)}"
-                print(error_message)
+    async def remove_overlay_elements(self, page: Page) -> None:
+        """
+        Removes popup overlays, modals, cookie notices, and other intrusive elements from the page.
+        
+        Args:
+            page (Page): The Playwright page instance
+        """
+        remove_overlays_js = """
+        async () => {
+            // Function to check if element is visible
+            const isVisible = (elem) => {
+                const style = window.getComputedStyle(elem);
+                return style.display !== 'none' && 
+                       style.visibility !== 'hidden' && 
+                       style.opacity !== '0';
+            };
 
-                # Generate an error image
-                img = Image.new('RGB', (800, 600), color='black')
-                draw = ImageDraw.Draw(img)
-                font = ImageFont.load_default()
-                draw.text((10, 10), error_message, fill=(255, 255, 255), font=font)
+            // Common selectors for popups and overlays
+            const commonSelectors = [
+                // Close buttons first
+                'button[class*="close" i]', 'button[class*="dismiss" i]', 
+                'button[aria-label*="close" i]', 'button[title*="close" i]',
+                'a[class*="close" i]', 'span[class*="close" i]',
                 
-                buffered = BytesIO()
-                img.save(buffered, format="JPEG")
-                return base64.b64encode(buffered.getvalue()).decode('utf-8')
-            finally:
-                await page.close()
+                // Cookie notices
+                '[class*="cookie-banner" i]', '[id*="cookie-banner" i]',
+                '[class*="cookie-consent" i]', '[id*="cookie-consent" i]',
+                
+                // Newsletter/subscription dialogs
+                '[class*="newsletter" i]', '[class*="subscribe" i]',
+                
+                // Generic popups/modals
+                '[class*="popup" i]', '[class*="modal" i]', 
+                '[class*="overlay" i]', '[class*="dialog" i]',
+                '[role="dialog"]', '[role="alertdialog"]'
+            ];
+
+            // Try to click close buttons first
+            for (const selector of commonSelectors.slice(0, 6)) {
+                const closeButtons = document.querySelectorAll(selector);
+                for (const button of closeButtons) {
+                    if (isVisible(button)) {
+                        try {
+                            button.click();
+                            await new Promise(resolve => setTimeout(resolve, 100));
+                        } catch (e) {
+                            console.log('Error clicking button:', e);
+                        }
+                    }
+                }
+            }
+
+            // Remove remaining overlay elements
+            const removeOverlays = () => {
+                // Find elements with high z-index
+                const allElements = document.querySelectorAll('*');
+                for (const elem of allElements) {
+                    const style = window.getComputedStyle(elem);
+                    const zIndex = parseInt(style.zIndex);
+                    const position = style.position;
+                    
+                    if (
+                        isVisible(elem) && 
+                        (zIndex > 999 || position === 'fixed' || position === 'absolute') &&
+                        (
+                            elem.offsetWidth > window.innerWidth * 0.5 ||
+                            elem.offsetHeight > window.innerHeight * 0.5 ||
+                            style.backgroundColor.includes('rgba') ||
+                            parseFloat(style.opacity) < 1
+                        )
+                    ) {
+                        elem.remove();
+                    }
+                }
+
+                // Remove elements matching common selectors
+                for (const selector of commonSelectors) {
+                    const elements = document.querySelectorAll(selector);
+                    elements.forEach(elem => {
+                        if (isVisible(elem)) {
+                            elem.remove();
+                        }
+                    });
+                }
+            };
+
+            // Remove overlay elements
+            removeOverlays();
+
+            // Remove any fixed/sticky position elements at the top/bottom
+            const removeFixedElements = () => {
+                const elements = document.querySelectorAll('*');
+                elements.forEach(elem => {
+                    const style = window.getComputedStyle(elem);
+                    if (
+                        (style.position === 'fixed' || style.position === 'sticky') &&
+                        isVisible(elem)
+                    ) {
+                        elem.remove();
+                    }
+                });
+            };
+
+            removeFixedElements();
+            
+            // Remove empty block elements as: div, p, span, etc.
+            const removeEmptyBlockElements = () => {
+                const blockElements = document.querySelectorAll('div, p, span, section, article, header, footer, aside, nav, main, ul, ol, li, dl, dt, dd, h1, h2, h3, h4, h5, h6');
+                blockElements.forEach(elem => {
+                    if (elem.innerText.trim() === '') {
+                        elem.remove();
+                    }
+                });
+            };
+
+            // Remove margin-right and padding-right from body (often added by modal scripts)
+            document.body.style.marginRight = '0px';
+            document.body.style.paddingRight = '0px';
+            document.body.style.overflow = 'auto';
+
+            // Wait a bit for any animations to complete
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        """
+        
+        try:
+            await page.evaluate(remove_overlays_js)
+            await page.wait_for_timeout(500)  # Wait for any animations to complete
+        except Exception as e:
+            if self.verbose:
+                print(f"Warning: Failed to remove overlay elements: {str(e)}")
+
+    async def take_screenshot(self, page: Page) -> str:
+        try:
+            # The page is already loaded, just take the screenshot
+            screenshot = await page.screenshot(full_page=True)
+            return base64.b64encode(screenshot).decode('utf-8')
+        except Exception as e:
+            error_message = f"Failed to take screenshot: {str(e)}"
+            print(error_message)
+
+            # Generate an error image
+            img = Image.new('RGB', (800, 600), color='black')
+            draw = ImageDraw.Draw(img)
+            font = ImageFont.load_default()
+            draw.text((10, 10), error_message, fill=(255, 255, 255), font=font)
+            
+            buffered = BytesIO()
+            img.save(buffered, format="JPEG")
+            return base64.b64encode(buffered.getvalue()).decode('utf-8')
+        finally:
+            await page.close()
 
