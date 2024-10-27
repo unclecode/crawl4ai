@@ -207,8 +207,8 @@ class WebScrappingStrategy(ContentScrappingStrategy):
 
                 keep_element = False
                 
-                social_media_domains = SOCIAL_MEDIA_DOMAINS + kwargs.get('social_media_domains', [])
-                social_media_domains = list(set(social_media_domains))
+                exclude_social_media_domains = SOCIAL_MEDIA_DOMAINS + kwargs.get('exclude_social_media_domains', [])
+                exclude_social_media_domains = list(set(exclude_social_media_domains))
 
                 
                 try:
@@ -249,7 +249,7 @@ class WebScrappingStrategy(ContentScrappingStrategy):
                                 element.decompose()
                                 return False
                             elif kwargs.get('exclude_social_media_links', False):
-                                if any(domain in normalized_href.lower() for domain in social_media_domains):
+                                if any(domain in normalized_href.lower() for domain in exclude_social_media_domains):
                                     element.decompose()
                                     return False
                             elif kwargs.get('exclude_domains', []):
@@ -285,7 +285,7 @@ class WebScrappingStrategy(ContentScrappingStrategy):
                         if not kwargs.get('exclude_external_images', False) and kwargs.get('exclude_social_media_links', False):
                             src_url_base = src.split('/')[2]
                             url_base = url.split('/')[2]
-                            if any(domain in src for domain in social_media_domains):
+                            if any(domain in src for domain in exclude_social_media_domains):
                                 element.decompose()
                                 return False
                             

@@ -8,16 +8,14 @@
 
 Crawl4AI simplifies asynchronous web crawling and data extraction, making it accessible for large language models (LLMs) and AI applications. 🆓🌐
 
-> Looking for the synchronous version? Check out [README.sync.md](./README.sync.md). You can also access the previous version in the branch [V0.2.76](https://github.com/unclecode/crawl4ai/blob/v0.2.76).
+## New in 0.3.72 ✨
 
-## New update 0.3.6
-- 🌐 Multi-browser support (Chromium, Firefox, WebKit)
-- 🖼️ Improved image processing with lazy-loading detection
-- 🔧 Custom page timeout parameter for better control over crawling behavior
-- 🕰️ Enhanced handling of delayed content loading
-- 🔑 Custom headers support for LLM interactions
-- 🖼️ iframe content extraction for comprehensive page analysis
-- ⏱️ Flexible timeout and delayed content retrieval options
+- 📄 Fit markdown generation for extracting main article content.
+- 🪄 Magic mode for comprehensive anti-bot detection bypass.
+- 🌐 Enhanced multi-browser support with seamless switching (Chromium, Firefox, WebKit)
+- 📚 New chunking strategies(Sliding window, Overlapping window, Flexible size control)
+- 💾 Improved caching system for better performance
+- ⚡ Optimized batch processing with automatic rate limiting
 
 ## Try it Now!
 
@@ -30,22 +28,28 @@ Crawl4AI simplifies asynchronous web crawling and data extraction, making it acc
 - 🆓 Completely free and open-source
 - 🚀 Blazing fast performance, outperforming many paid services
 - 🤖 LLM-friendly output formats (JSON, cleaned HTML, markdown)
+- 🌐 Multi-browser support (Chromium, Firefox, WebKit)
 - 🌍 Supports crawling multiple URLs simultaneously
 - 🎨 Extracts and returns all media tags (Images, Audio, and Video)
 - 🔗 Extracts all external and internal links
 - 📚 Extracts metadata from the page
-- 🔄 Custom hooks for authentication, headers, and page modifications before crawling
+- 🔄 Custom hooks for authentication, headers, and page modifications
 - 🕵️ User-agent customization
-- 🖼️ Takes screenshots of the page
+- 🖼️ Takes screenshots of pages with enhanced error handling
 - 📜 Executes multiple custom JavaScripts before crawling
 - 📊 Generates structured output without LLM using JsonCssExtractionStrategy
 - 📚 Various chunking strategies: topic-based, regex, sentence, and more
 - 🧠 Advanced extraction strategies: cosine clustering, LLM, and more
 - 🎯 CSS selector support for precise data extraction
 - 📝 Passes instructions/keywords to refine extraction
-- 🔒 Proxy support for enhanced privacy and access
-- 🔄 Session management for complex multi-page crawling scenarios
-- 🌐 Asynchronous architecture for improved performance and scalability
+- 🔒 Proxy support with authentication for enhanced access
+- 🔄 Session management for complex multi-page crawling
+- 🌐 Asynchronous architecture for improved performance
+- 🖼️ Improved image processing with lazy-loading detection
+- 🕰️ Enhanced handling of delayed content loading
+- 🔑 Custom headers support for LLM interactions
+- 🖼️ iframe content extraction for comprehensive analysis
+- ⏱️ Flexible timeout and delayed content retrieval options
 
 ## Installation 🛠️
 
