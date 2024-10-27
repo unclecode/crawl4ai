@@ -30,6 +30,7 @@ class AsyncWebCrawler:
             **kwargs
         )
         self.always_by_pass_cache = always_by_pass_cache
+        # self.crawl4ai_folder = os.path.join(Path.home(), ".crawl4ai")
         self.crawl4ai_folder = os.path.join(base_directory, ".crawl4ai")
         os.makedirs(self.crawl4ai_folder, exist_ok=True)
         os.makedirs(f"{self.crawl4ai_folder}/cache", exist_ok=True)
@@ -134,8 +135,8 @@ class AsyncWebCrawler:
         except Exception as e:
             if not hasattr(e, "msg"):
                 e.msg = str(e)
-            print(f"[ERROR] 🚫 Failed to crawl {url}, error: {e.msg}")
-            return CrawlResult(url=url, html="", success=False, error_message=e.msg)
+            print(f"[ERROR] 🚫 arun(): Failed to crawl {url}, error: {e.msg}")
+            return CrawlResult(url=url, html="", markdown = f"[ERROR] 🚫 arun(): Failed to crawl {url}, error: {e.msg}", success=False, error_message=e.msg)
 
     async def arun_many(
         self,
@@ -187,7 +188,8 @@ class AsyncWebCrawler:
         try:
             t1 = time.time()
             scrapping_strategy = WebScrappingStrategy()
-            result = await scrapping_strategy.ascrap(
+            # result = await scrapping_strategy.ascrap(
+            result = scrapping_strategy.scrap(
                 url,
                 html,
                 word_count_threshold=word_count_threshold,
@@ -196,6 +198,7 @@ class AsyncWebCrawler:
                 image_description_min_word_threshold=kwargs.get(
                     "image_description_min_word_threshold", IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD
                 ),
+                **kwargs,
             )
             if verbose:
                 print(
@@ -211,6 +214,8 @@ class AsyncWebCrawler:
 
         cleaned_html = sanitize_input_encode(result.get("cleaned_html", ""))
         markdown = sanitize_input_encode(result.get("markdown", ""))
+        fit_markdown = sanitize_input_encode(result.get("fit_markdown", ""))
+        fit_html = sanitize_input_encode(result.get("fit_html", ""))
         media = result.get("media", [])
         links = result.get("links", [])
         metadata = result.get("metadata", {})
@@ -257,6 +262,8 @@ class AsyncWebCrawler:
             html=html,
             cleaned_html=format_html(cleaned_html),
             markdown=markdown,
+            fit_markdown=fit_markdown,
+            fit_html= fit_html,
             media=media,
             links=links,
             metadata=metadata,

@@ -1,36 +1,60 @@
 site_name: Crawl4AI Documentation
-docs_dir: docs/md
+site_description: 🔥🕷️ Crawl4AI, Open-source LLM Friendly Web Crawler & Scrapper
+site_url: https://docs.crawl4ai.com
+repo_url: https://github.com/unclecode/crawl4ai
+repo_name: unclecode/crawl4ai
+docs_dir: docs/md_v2
+
 nav:
-  - Home: index.md
-  - First Steps:
-      - Introduction: introduction.md
-      - Installation: installation.md
-      - Quick Start: quickstart.md
-  - Examples:
-      - Intro: examples/index.md
-      - Structured Data Extraction: examples/json_css_extraction.md
-      - LLM Extraction: examples/llm_extraction.md
-      - JS Execution & CSS Filtering: examples/js_execution_css_filtering.md
-      - Hooks & Auth: examples/hooks_auth.md
-      - Summarization: examples/summarization.md
-      - Research Assistant: examples/research_assistant.md
-  - Full Details of Using Crawler:
-      - Crawl Request Parameters: full_details/crawl_request_parameters.md
-      - Crawl Result Class: full_details/crawl_result_class.md
-      - Session Based Crawling: full_details/session_based_crawling.md
-      - Advanced Features: full_details/advanced_features.md
-      - Advanced JsonCssExtraction: full_details/advanced_jsoncss_extraction.md
-      - Chunking Strategies: full_details/chunking_strategies.md
-      - Extraction Strategies: full_details/extraction_strategies.md
-  - Miscellaneous:
-      - Change Log: changelog.md
-      - Contact: contact.md
+  - Home: 'index.md'
+  - 'Installation': 'basic/installation.md'
+  - 'Quick Start': 'basic/quickstart.md'
+  
+  - Basic:
+    - 'Simple Crawling': 'basic/simple-crawling.md'
+    - 'Output Formats': 'basic/output-formats.md'
+    - 'Browser Configuration': 'basic/browser-config.md'
+    - 'Page Interaction': 'basic/page-interaction.md'
+    - 'Content Selection': 'basic/content-selection.md'
+
+  - Advanced:
+    - 'Content Processing': 'advanced/content-processing.md'
+    - 'Magic Mode': 'advanced/magic-mode.md'
+    - 'Hooks & Auth': 'advanced/hooks-auth.md'
+    - 'Proxy & Security': 'advanced/proxy-security.md'
+    - 'Session Management': 'advanced/session-management.md'
+    - 'Session Management (Advanced)': 'advanced/session-management-advanced.md'
+  
+  - Extraction:
+    - 'Overview': 'extraction/overview.md'
+    - 'LLM Strategy': 'extraction/llm.md'
+    - 'Json-CSS Extractor Basic': 'extraction/css.md'
+    - 'Json-CSS Extractor Advanced': 'extraction/css-advanced.md'
+    - 'Cosine Strategy': 'extraction/cosine.md'
+    - 'Chunking': 'extraction/chunking.md'
+
+  - API Reference:
+    - 'AsyncWebCrawler': 'api/async-webcrawler.md'
+    - 'AsyncWebCrawler.arun()': 'api/arun.md'
+    - 'CrawlResult': 'api/crawl-result.md'
+    - 'Strategies': 'api/strategies.md'
+
 
 theme:
   name: terminal
   palette: dark
 
-# Add the css/extra.css
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - admonition
+  - pymdownx.details
+  - attr_list
+  - tables
+
 extra_css:
   - assets/styles.css
   - assets/highlight.css

@@ -10,7 +10,7 @@ import time
 import json
 import os
 import re
-from typing import Dict
+from typing import Dict, List
 from bs4 import BeautifulSoup
 from pydantic import BaseModel, Field
 from crawl4ai import AsyncWebCrawler
@@ -379,6 +379,18 @@ async def crawl_custom_browser_type():
         print(result.markdown[:500])
         print("Time taken: ", time.time() - start)
 
+async def crawl_with_user_simultion():
+    async with AsyncWebCrawler(verbose=True, headless=True) as crawler:
+        url = "YOUR-URL-HERE"
+        result = await crawler.arun(
+            url=url,
+            bypass_cache=True,
+            simulate_user = True,# Causes a series of random mouse movements and clicks to simulate user interaction
+            override_navigator = True # Overrides the navigator object to make it look like a real user
+        )
+        
+        print(result.markdown)    
+
 async def speed_comparison():
     # print("\n--- Speed Comparison ---")
     # print("Firecrawl (simulated):")
@@ -444,6 +456,57 @@ async def speed_comparison():
     print("If you run these tests in an environment with better network conditions,")
     print("you may observe an even more significant speed advantage for Crawl4AI.")
 
+async def generate_knowledge_graph():
+    class Entity(BaseModel):
+        name: str
+        description: str
+        
+    class Relationship(BaseModel):
+        entity1: Entity
+        entity2: Entity
+        description: str
+        relation_type: str
+
+    class KnowledgeGraph(BaseModel):
+        entities: List[Entity]
+        relationships: List[Relationship]
+
+    extraction_strategy = LLMExtractionStrategy(
+            provider='openai/gpt-4o-mini', # Or any other provider, including Ollama and open source models
+            api_token=os.getenv('OPENAI_API_KEY'), # In case of Ollama just pass "no-token"
+            schema=KnowledgeGraph.model_json_schema(),
+            extraction_type="schema",
+            instruction="""Extract entities and relationships from the given text."""
+    )
+    async with AsyncWebCrawler() as crawler:
+        url = "https://paulgraham.com/love.html"
+        result = await crawler.arun(
+            url=url,
+            bypass_cache=True,
+            extraction_strategy=extraction_strategy,
+            # magic=True
+        )
+        # print(result.extracted_content)
+        with open(os.path.join(__location__, "kb.json"), "w") as f:
+            f.write(result.extracted_content)
+
+async def fit_markdown_remove_overlay():
+    async with AsyncWebCrawler(headless = False) as crawler:
+        url = "https://janineintheworld.com/places-to-visit-in-central-mexico"
+        result = await crawler.arun(
+            url=url,
+            bypass_cache=True,
+            word_count_threshold = 10,
+            remove_overlay_elements=True,
+            screenshot = True
+        )
+        # Save markdown to file
+        with open(os.path.join(__location__, "mexico_places.md"), "w") as f:
+            f.write(result.fit_markdown)
+
+    print("Done")
+
+
 async def main():
     await simple_crawl()
     await simple_example_with_running_js_code()
@@ -455,7 +518,7 @@ async def main():
     # LLM extraction examples
     await extract_structured_data_using_llm()
     await extract_structured_data_using_llm("huggingface/meta-llama/Meta-Llama-3.1-8B-Instruct", os.getenv("HUGGINGFACE_API_KEY"))
-    await extract_structured_data_using_llm("openai/gpt-4", os.getenv("OPENAI_API_KEY"))
+    await extract_structured_data_using_llm("openai/gpt-4o", os.getenv("OPENAI_API_KEY"))
     await extract_structured_data_using_llm("ollama/llama3.2")    
 
     # You always can pass custom headers to the extraction strategy

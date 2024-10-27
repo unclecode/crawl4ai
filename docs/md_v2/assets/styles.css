@@ -1,0 +1,153 @@
+@font-face {
+    font-family: "Monaco";
+    font-style: normal;
+    font-weight: normal;
+    src: local("Monaco"), url("Monaco.woff") format("woff");
+}
+
+:root {
+    --global-font-size: 16px;
+    --global-line-height: 1.5em;
+    --global-space: 10px;
+    --font-stack: Menlo, Monaco, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono,
+        Courier New, monospace, serif;
+    --font-stack: dm, Monaco, Courier New, monospace, serif;
+    --mono-font-stack: Menlo, Monaco, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono,
+        Courier New, monospace, serif;
+
+    --background-color: #151515; /* Dark background */
+    --font-color: #eaeaea; /* Light font color for contrast */
+    --invert-font-color: #151515; /* Dark color for inverted elements */
+    --primary-color: #1a95e0; /* Primary color can remain the same or be adjusted for better contrast */
+    --secondary-color: #727578; /* Secondary color for less important text */
+    --error-color: #ff5555; /* Bright color for errors */
+    --progress-bar-background: #444; /* Darker background for progress bar */
+    --progress-bar-fill: #1a95e0; /* Bright color for progress bar fill */
+    --code-bg-color: #1e1e1e; /* Darker background for code blocks */
+    --input-style: solid; /* Keeping input style solid */
+    --block-background-color: #202020; /* Darker background for block elements */
+    --global-font-color: #eaeaea; /* Light font color for global elements */
+
+    --background-color: #222225;
+
+    --background-color: #070708;
+    --page-width: 70em;
+    --font-color: #e8e9ed;
+    --invert-font-color: #222225;
+    --secondary-color: #a3abba;
+    --secondary-color: #d5cec0;
+    --tertiary-color: #a3abba;
+    --primary-color: #09b5a5; /* Updated to the brand color */
+    --primary-color: #50ffff; /* Updated to the brand color */
+    --error-color: #ff3c74;
+    --progress-bar-background: #3f3f44;
+    --progress-bar-fill: #09b5a5; /* Updated to the brand color */
+    --code-bg-color: #3f3f44;
+    --input-style: solid;
+    --display-h1-decoration: none;
+
+    --display-h1-decoration: none;
+}
+
+/* body {
+    background-color: var(--background-color);
+    color: var(--font-color);
+}
+
+a {
+    color: var(--primary-color);
+}
+
+a:hover {
+    background-color: var(--primary-color);
+    color: var(--invert-font-color);
+}
+
+blockquote::after {
+    color: #444; 
+}
+
+pre, code {
+    background-color: var(--code-bg-color);
+    color: var(--font-color);
+}
+
+.terminal-nav:first-child {
+    border-bottom: 1px dashed var(--secondary-color);
+} */
+
+.terminal-mkdocs-main-content {
+    line-height: var(--global-line-height);
+}
+
+strong,
+.highlight {
+    /* background: url(//s2.svgbox.net/pen-brushes.svg?ic=brush-1&color=50ffff); */
+    background-color: #50ffff33;
+}
+
+.terminal-card > header {
+    color: var(--font-color);
+    text-align: center;
+    background-color: var(--progress-bar-background);
+    padding: 0.3em 0.5em;
+}
+.btn.btn-sm {
+    color: var(--font-color);
+    padding: 0.2em 0.5em;
+    font-size: 0.8em;
+}
+
+.loading-message {
+    display: none;
+    margin-top: 20px;
+}
+
+.response-section {
+    display: none;
+    padding-top: 20px;
+}
+
+.tabs {
+    display: flex;
+    flex-direction: column;
+}
+.tab-list {
+    display: flex;
+    padding: 0;
+    margin: 0;
+    list-style-type: none;
+    border-bottom: 1px solid var(--font-color);
+}
+.tab-item {
+    cursor: pointer;
+    padding: 10px;
+    border: 1px solid var(--font-color);
+    margin-right: -1px;
+    border-bottom: none;
+}
+.tab-item:hover,
+.tab-item:focus,
+.tab-item:active {
+    background-color: var(--progress-bar-background);
+}
+.tab-content {
+    display: none;
+    border: 1px solid var(--font-color);
+    border-top: none;
+}
+.tab-content:first-of-type {
+    display: block;
+}
+
+.tab-content header {
+    padding: 0.5em;
+    display: flex; 
+    justify-content: end; 
+    align-items: center;
+    background-color: var(--progress-bar-background);
+}
+.tab-content pre {
+    margin: 0;
+    max-height: 300px; overflow: auto; border:none;
+}
