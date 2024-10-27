@@ -147,8 +147,8 @@ async def main():
             url="https://openai.com/api/pricing/",
             word_count_threshold=1,
             extraction_strategy=LLMExtractionStrategy(
-                provider="openai/gpt-4o",
-                api_token=os.getenv("OPENAI_API_KEY"),
+                provider="openai/gpt-4o", # Or use open source model like "ollama/nemotron"
+                api_token=os.getenv("OPENAI_API_KEY"), # Pass "no-token" if using Ollama
                 schema=OpenAIModelFee.schema(),
                 extraction_type="schema",
                 instruction="""From the crawled content, extract all mentioned model names along with their fees for input and output tokens. 
@@ -196,11 +196,11 @@ In modern web applications, content is often loaded dynamically without changing
 
 Here's what makes this approach powerful:
 
-1. **Session Preservation**: By using a `session_id`, we can maintain the state of our crawling session across multiple interactions with the page. This is crucial for navigating through dynamically loaded content.
+1.**Session Preservation**: By using a `session_id`, we can maintain the state of our crawling session across multiple interactions with the page. This is crucial for navigating through dynamically loaded content.
 
-2. **Asynchronous JavaScript Execution**: We can execute custom JavaScript to trigger content loading or navigation. In this example, we'll click a "Load More" button to fetch the next page of commits.
+2.**Asynchronous JavaScript Execution**: We can execute custom JavaScript to trigger content loading or navigation. In this example, we'll click a "Load More" button to fetch the next page of commits.
 
-3. **Dynamic Content Waiting**: The `wait_for` parameter allows us to specify a condition that must be met before considering the page load complete. This ensures we don't extract data before the new content is fully loaded.
+3.**Dynamic Content Waiting**: The `wait_for` parameter allows us to specify a condition that must be met before considering the page load complete. This ensures we don't extract data before the new content is fully loaded.
 
 Let's see how this works with a real-world example: crawling multiple pages of commits on a GitHub repository. The URL doesn't change as we load more commits, so we'll use these advanced techniques to navigate and extract data.
 
