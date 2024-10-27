@@ -1,7 +1,10 @@
 from setuptools import setup, find_packages
+from setuptools.command.install import install
 import os
 from pathlib import Path
 import shutil
+import subprocess
+import sys
 
 # Create the .crawl4ai folder in the user's home directory if it doesn't exist
 # If the folder already exists, remove the cache folder
@@ -15,18 +18,45 @@ crawl4ai_folder.mkdir(exist_ok=True)
 cache_folder.mkdir(exist_ok=True)
 
 # Read the requirements from requirements.txt
-with open("requirements.txt") as f:
+__location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
+with open(os.path.join(__location__, "requirements.txt")) as f:
     requirements = f.read().splitlines()
+    
+# Read version from __init__.py
+with open("crawl4ai/__init__.py") as f:
+    for line in f:
+        if line.startswith("__version__"):
+            version = line.split("=")[1].strip().strip('"')
+            break
 
 # Define the requirements for different environments
-default_requirements = [req for req in requirements if not req.startswith(("torch", "transformers", "onnxruntime", "nltk", "spacy", "tokenizers", "scikit-learn", "numpy"))]
-torch_requirements = [req for req in requirements if req.startswith(("torch", "nltk", "spacy", "scikit-learn", "numpy"))]
-transformer_requirements = [req for req in requirements if req.startswith(("transformers", "tokenizers", "onnxruntime"))]
+default_requirements = requirements
+torch_requirements = ["torch", "nltk", "spacy", "scikit-learn"]
+transformer_requirements = ["transformers", "tokenizers", "onnxruntime"]
+cosine_similarity_requirements = ["torch", "transformers", "nltk", "spacy"]
+sync_requirements = ["selenium"]
+
+def install_playwright():
+    print("Installing Playwright browsers...")
+    try:
+        subprocess.check_call([sys.executable, "-m", "playwright", "install"])
+        print("Playwright installation completed successfully.")
+    except subprocess.CalledProcessError as e:
+        print(f"Error during Playwright installation: {e}")
+        print("Please run 'python -m playwright install' manually after the installation.")
+    except Exception as e:
+        print(f"Unexpected error during Playwright installation: {e}")
+        print("Please run 'python -m playwright install' manually after the installation.")
+
+class PostInstallCommand(install):
+    def run(self):
+        install.run(self)
+        install_playwright()
 
 setup(
     name="Crawl4AI",
-    version="0.2.77",
-    description="🔥🕷️ Crawl4AI: Open-source LLM Friendly Web Crawler & Scrapper",
+    version=version,
+    description="🔥🕷️ Crawl4AI: Open-source LLM Friendly Web Crawler & scraper",
     long_description=open("README.md", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
     url="https://github.com/unclecode/crawl4ai",
@@ -34,11 +64,13 @@ setup(
     author_email="unclecode@kidocode.com",
     license="MIT",
     packages=find_packages(),
-    install_requires=default_requirements,
+    install_requires=default_requirements + ["playwright"],  # Add playwright to default requirements
     extras_require={
         "torch": torch_requirements,
         "transformer": transformer_requirements,
-        "all": requirements,
+        "cosine": cosine_similarity_requirements,
+        "sync": sync_requirements,
+        "all": default_requirements + torch_requirements + transformer_requirements + cosine_similarity_requirements + sync_requirements,
     },
     entry_points={
         'console_scripts': [
@@ -56,4 +88,7 @@ setup(
         "Programming Language :: Python :: 3.10",
     ],
     python_requires=">=3.7",
+    cmdclass={
+        'install': PostInstallCommand,
+    },
 )

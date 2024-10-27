@@ -82,6 +82,8 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
         print("[LOG] 🚀 Initializing LocalSeleniumCrawlerStrategy")
         self.options = Options()
         self.options.headless = True
+        if kwargs.get("proxy"):
+            self.options.add_argument("--proxy-server={}".format(kwargs.get("proxy")))
         if kwargs.get("user_agent"):
             self.options.add_argument("--user-agent=" + kwargs.get("user_agent"))
         else:
@@ -242,6 +244,7 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
                 driver.quit()
             
             # Execute JS code if provided
+            self.js_code = kwargs.get("js_code", self.js_code)
             if self.js_code and type(self.js_code) == str:
                 self.driver.execute_script(self.js_code)
                 # Optionally, wait for some condition after executing the JS code
@@ -254,6 +257,18 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
                     WebDriverWait(self.driver, 10).until(
                         lambda driver: driver.execute_script("return document.readyState") == "complete"
                     )
+            
+            # Optionally, wait for some condition after executing the JS code : Contributed by (https://github.com/jonymusky)
+            wait_for = kwargs.get('wait_for', False)
+            if wait_for:
+                if callable(wait_for):
+                    print("[LOG] 🔄 Waiting for condition...")
+                    WebDriverWait(self.driver, 20).until(wait_for)
+                else:
+                    print("[LOG] 🔄 Waiting for condition...")
+                    WebDriverWait(self.driver, 20).until(
+                        EC.presence_of_element_located((By.CSS_SELECTOR, wait_for))
+                    ) 
             
             if not can_not_be_done_headless:
                 html = sanitize_input_encode(self.driver.page_source)

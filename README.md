@@ -1,4 +1,4 @@
-# Crawl4AI v0.2.77 🕷️🤖
+# Crawl4AI (Async Version) 🕷️🤖
 
 [![GitHub Stars](https://img.shields.io/github/stars/unclecode/crawl4ai?style=social)](https://github.com/unclecode/crawl4ai/stargazers)
 [![GitHub Forks](https://img.shields.io/github/forks/unclecode/crawl4ai?style=social)](https://github.com/unclecode/crawl4ai/network/members)
@@ -6,189 +6,369 @@
 [![GitHub Pull Requests](https://img.shields.io/github/issues-pr/unclecode/crawl4ai)](https://github.com/unclecode/crawl4ai/pulls)
 [![License](https://img.shields.io/github/license/unclecode/crawl4ai)](https://github.com/unclecode/crawl4ai/blob/main/LICENSE)
 
-Crawl4AI simplifies web crawling and data extraction, making it accessible for large language models (LLMs) and AI applications. 🆓🌐
+Crawl4AI simplifies asynchronous web crawling and data extraction, making it accessible for large language models (LLMs) and AI applications. 🆓🌐
 
-#### [v0.2.77] - 2024-08-02
+## New in 0.3.72 ✨
 
-Major improvements in functionality, performance, and cross-platform compatibility! 🚀
+- 📄 Fit markdown generation for extracting main article content.
+- 🪄 Magic mode for comprehensive anti-bot detection bypass.
+- 🌐 Enhanced multi-browser support with seamless switching (Chromium, Firefox, WebKit)
+- 📚 New chunking strategies(Sliding window, Overlapping window, Flexible size control)
+- 💾 Improved caching system for better performance
+- ⚡ Optimized batch processing with automatic rate limiting
 
-- 🐳 **Docker enhancements**:
-  - Significantly improved Dockerfile for easy installation on Linux, Mac, and Windows.
-- 🌐 **Official Docker Hub image**:
-  - Launched our first official image on Docker Hub for streamlined deployment (unclecode/crawl4ai).
-- 🔧 **Selenium upgrade**:
-  - Removed dependency on ChromeDriver, now using Selenium's built-in capabilities for better compatibility.
-- 🖼️ **Image description**:
-  - Implemented ability to generate textual descriptions for extracted images from web pages.
-- ⚡ **Performance boost**:
-  - Various improvements to enhance overall speed and performance.
-  
 ## Try it Now!
 
-✨ Play around with this [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1sJPAmeLj5PMrg2VgOwMJ2ubGIcK0cJeX?usp=sharing)
+✨ Play around with this [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1REChY6fXQf-EaVYLv0eHEWvzlYxGm0pd?usp=sharing)
 
-✨ visit our [Documentation Website](https://crawl4ai.com/mkdocs/)
-
-✨ Check [Demo](https://crawl4ai.com/mkdocs/demo)
+✨ Visit our [Documentation Website](https://crawl4ai.com/mkdocs/)
 
 ## Features ✨
 
 - 🆓 Completely free and open-source
+- 🚀 Blazing fast performance, outperforming many paid services
 - 🤖 LLM-friendly output formats (JSON, cleaned HTML, markdown)
+- 🌐 Multi-browser support (Chromium, Firefox, WebKit)
 - 🌍 Supports crawling multiple URLs simultaneously
 - 🎨 Extracts and returns all media tags (Images, Audio, and Video)
 - 🔗 Extracts all external and internal links
 - 📚 Extracts metadata from the page
-- 🔄 Custom hooks for authentication, headers, and page modifications before crawling
+- 🔄 Custom hooks for authentication, headers, and page modifications
 - 🕵️ User-agent customization
-- 🖼️ Takes screenshots of the page
+- 🖼️ Takes screenshots of pages with enhanced error handling
 - 📜 Executes multiple custom JavaScripts before crawling
+- 📊 Generates structured output without LLM using JsonCssExtractionStrategy
 - 📚 Various chunking strategies: topic-based, regex, sentence, and more
 - 🧠 Advanced extraction strategies: cosine clustering, LLM, and more
-- 🎯 CSS selector support
+- 🎯 CSS selector support for precise data extraction
 - 📝 Passes instructions/keywords to refine extraction
+- 🔒 Proxy support with authentication for enhanced access
+- 🔄 Session management for complex multi-page crawling
+- 🌐 Asynchronous architecture for improved performance
+- 🖼️ Improved image processing with lazy-loading detection
+- 🕰️ Enhanced handling of delayed content loading
+- 🔑 Custom headers support for LLM interactions
+- 🖼️ iframe content extraction for comprehensive analysis
+- ⏱️ Flexible timeout and delayed content retrieval options
 
-# Crawl4AI
+## Installation 🛠️
 
-## 🌟 Shoutout to Contributors of v0.2.77!
-
-A big thank you to the amazing contributors who've made this release possible:
-
-- [@aravindkarnam](https://github.com/aravindkarnam) for the new image description feature
-- [@FractalMind](https://github.com/FractalMind) for our official Docker Hub image
-- [@ketonkss4](https://github.com/ketonkss4) for helping streamline our Selenium setup
-
-Your contributions are driving Crawl4AI forward! 🚀
-
-## Cool Examples 🚀
-
-### Quick Start
-
-```python
-from crawl4ai import WebCrawler
-
-# Create an instance of WebCrawler
-crawler = WebCrawler()
-
-# Warm up the crawler (load necessary models)
-crawler.warmup()
-
-# Run the crawler on a URL
-result = crawler.run(url="https://www.nbcnews.com/business")
-
-# Print the extracted content
-print(result.markdown)
-```
-
-## How to install 🛠 
+Crawl4AI offers flexible installation options to suit various use cases. You can install it as a Python package or use Docker.
 
 ### Using pip 🐍
+
+Choose the installation option that best fits your needs:
+
+#### Basic Installation
+
+For basic web crawling and scraping tasks:
+
 ```bash
-virtualenv venv
-source venv/bin/activate
-pip install "crawl4ai @ git+https://github.com/unclecode/crawl4ai.git"
+pip install crawl4ai
+```
+
+By default, this will install the asynchronous version of Crawl4AI, using Playwright for web crawling.
+
+👉 Note: When you install Crawl4AI, the setup script should automatically install and set up Playwright. However, if you encounter any Playwright-related errors, you can manually install it using one of these methods:
+
+1. Through the command line:
+   ```bash
+   playwright install
+   ```
+
+2. If the above doesn't work, try this more specific command:
+   ```bash
+   python -m playwright install chromium
+   ```
+
+This second method has proven to be more reliable in some cases.
+
+#### Installation with Synchronous Version
+
+If you need the synchronous version using Selenium:
+
+```bash
+pip install crawl4ai[sync]
+```
+
+#### Development Installation
+
+For contributors who plan to modify the source code:
+
+```bash
+git clone https://github.com/unclecode/crawl4ai.git
+cd crawl4ai
+pip install -e .
 ```
 
 ### Using Docker 🐳
 
-```bash
-# For Mac users (M1/M2)
-# docker build --platform linux/amd64 -t crawl4ai .
-docker build -t crawl4ai .
-docker run -d -p 8000:80 crawl4ai
-```
+We're in the process of creating Docker images and pushing them to Docker Hub. This will provide an easy way to run Crawl4AI in a containerized environment. Stay tuned for updates!
 
-### Using Docker Hub 🐳
+For more detailed installation instructions and options, please refer to our [Installation Guide](https://crawl4ai.com/mkdocs/installation).
 
-```bash
-docker pull unclecode/crawl4ai:latest
-docker run -d -p 8000:80 unclecode/crawl4ai:latest
-```
-
-
-## Speed-First Design 🚀
-
-Perhaps the most important design principle for this library is speed. We need to ensure it can handle many links and resources in parallel as quickly as possible. By combining this speed with fast LLMs like Groq, the results will be truly amazing.
+## Quick Start 🚀
 
 ```python
-import time
-from crawl4ai.web_crawler import WebCrawler
-crawler = WebCrawler()
-crawler.warmup()
+import asyncio
+from crawl4ai import AsyncWebCrawler
 
-start = time.time()
-url = r"https://www.nbcnews.com/business"
-result = crawler.run( url, word_count_threshold=10, bypass_cache=True)
-end = time.time()
-print(f"Time taken: {end - start}")
+async def main():
+    async with AsyncWebCrawler(verbose=True) as crawler:
+        result = await crawler.arun(url="https://www.nbcnews.com/business")
+        print(result.markdown)
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
-Let's take a look the calculated time for the above code snippet:
+## Advanced Usage 🔬
 
-```bash
-[LOG] 🚀 Crawling done, success: True, time taken: 1.3623387813568115 seconds
-[LOG] 🚀 Content extracted, success: True, time taken: 0.05715131759643555 seconds
-[LOG] 🚀 Extraction, time taken: 0.05750393867492676 seconds.
-Time taken: 1.439958095550537
+### Executing JavaScript and Using CSS Selectors
+
+```python
+import asyncio
+from crawl4ai import AsyncWebCrawler
+
+async def main():
+    async with AsyncWebCrawler(verbose=True) as crawler:
+        js_code = ["const loadMoreButton = Array.from(document.querySelectorAll('button')).find(button => button.textContent.includes('Load More')); loadMoreButton && loadMoreButton.click();"]
+        result = await crawler.arun(
+            url="https://www.nbcnews.com/business",
+            js_code=js_code,
+            css_selector=".wide-tease-item__description",
+            bypass_cache=True
+        )
+        print(result.extracted_content)
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
-Fetching the content from the page took 1.3623 seconds, and extracting the content took 0.0575 seconds. 🚀
 
-### Extract Structured Data from Web Pages 📊
+### Using a Proxy
 
-Crawl all OpenAI models and their fees from the official page.
+```python
+import asyncio
+from crawl4ai import AsyncWebCrawler
+
+async def main():
+    async with AsyncWebCrawler(verbose=True, proxy="http://127.0.0.1:7890") as crawler:
+        result = await crawler.arun(
+            url="https://www.nbcnews.com/business",
+            bypass_cache=True
+        )
+        print(result.markdown)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Extracting Structured Data without LLM
+
+The `JsonCssExtractionStrategy` allows for precise extraction of structured data from web pages using CSS selectors.
+
+```python
+import asyncio
+import json
+from crawl4ai import AsyncWebCrawler
+from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+
+async def extract_news_teasers():
+    schema = {
+        "name": "News Teaser Extractor",
+        "baseSelector": ".wide-tease-item__wrapper",
+        "fields": [
+            {
+                "name": "category",
+                "selector": ".unibrow span[data-testid='unibrow-text']",
+                "type": "text",
+            },
+            {
+                "name": "headline",
+                "selector": ".wide-tease-item__headline",
+                "type": "text",
+            },
+            {
+                "name": "summary",
+                "selector": ".wide-tease-item__description",
+                "type": "text",
+            },
+            {
+                "name": "time",
+                "selector": "[data-testid='wide-tease-date']",
+                "type": "text",
+            },
+            {
+                "name": "image",
+                "type": "nested",
+                "selector": "picture.teasePicture img",
+                "fields": [
+                    {"name": "src", "type": "attribute", "attribute": "src"},
+                    {"name": "alt", "type": "attribute", "attribute": "alt"},
+                ],
+            },
+            {
+                "name": "link",
+                "selector": "a[href]",
+                "type": "attribute",
+                "attribute": "href",
+            },
+        ],
+    }
+
+    extraction_strategy = JsonCssExtractionStrategy(schema, verbose=True)
+
+    async with AsyncWebCrawler(verbose=True) as crawler:
+        result = await crawler.arun(
+            url="https://www.nbcnews.com/business",
+            extraction_strategy=extraction_strategy,
+            bypass_cache=True,
+        )
+
+        assert result.success, "Failed to crawl the page"
+
+        news_teasers = json.loads(result.extracted_content)
+        print(f"Successfully extracted {len(news_teasers)} news teasers")
+        print(json.dumps(news_teasers[0], indent=2))
+
+if __name__ == "__main__":
+    asyncio.run(extract_news_teasers())
+```
+
+For more advanced usage examples, check out our [Examples](https://crawl4ai.com/mkdocs/full_details/advanced_jsoncss_extraction.md) section in the documentation.
+
+### Extracting Structured Data with OpenAI
 
 ```python
 import os
-from crawl4ai import WebCrawler
+import asyncio
+from crawl4ai import AsyncWebCrawler
 from crawl4ai.extraction_strategy import LLMExtractionStrategy
 from pydantic import BaseModel, Field
 
 class OpenAIModelFee(BaseModel):
     model_name: str = Field(..., description="Name of the OpenAI model.")
     input_fee: str = Field(..., description="Fee for input token for the OpenAI model.")
-    output_fee: str = Field(..., description="Fee for output token ßfor the OpenAI model.")
+    output_fee: str = Field(..., description="Fee for output token for the OpenAI model.")
 
-url = 'https://openai.com/api/pricing/'
-crawler = WebCrawler()
-crawler.warmup()
+async def main():
+    async with AsyncWebCrawler(verbose=True) as crawler:
+        result = await crawler.arun(
+            url='https://openai.com/api/pricing/',
+            word_count_threshold=1,
+            extraction_strategy=LLMExtractionStrategy(
+                provider="openai/gpt-4o", api_token=os.getenv('OPENAI_API_KEY'), 
+                schema=OpenAIModelFee.schema(),
+                extraction_type="schema",
+                instruction="""From the crawled content, extract all mentioned model names along with their fees for input and output tokens. 
+                Do not miss any models in the entire content. One extracted model JSON format should look like this: 
+                {"model_name": "GPT-4", "input_fee": "US$10.00 / 1M tokens", "output_fee": "US$30.00 / 1M tokens"}."""
+            ),            
+            bypass_cache=True,
+        )
+        print(result.extracted_content)
 
-result = crawler.run(
-        url=url,
-        word_count_threshold=1,
-        extraction_strategy= LLMExtractionStrategy(
-            provider= "openai/gpt-4o", api_token = os.getenv('OPENAI_API_KEY'), 
-            schema=OpenAIModelFee.schema(),
-            extraction_type="schema",
-            instruction="""From the crawled content, extract all mentioned model names along with their fees for input and output tokens. 
-            Do not miss any models in the entire content. One extracted model JSON format should look like this: 
-            {"model_name": "GPT-4", "input_fee": "US$10.00 / 1M tokens", "output_fee": "US$30.00 / 1M tokens"}."""
-        ),            
-        bypass_cache=True,
-    )
-
-print(result.extracted_content)
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
-### Execute JS, Filter Data with CSS Selector, and Clustering
+### Session Management and Dynamic Content Crawling
+
+Crawl4AI excels at handling complex scenarios, such as crawling multiple pages with dynamic content loaded via JavaScript. Here's an example of crawling GitHub commits across multiple pages:
 
 ```python
-from crawl4ai import WebCrawler
-from crawl4ai.chunking_strategy import CosineStrategy
+import asyncio
+import re
+from bs4 import BeautifulSoup
+from crawl4ai import AsyncWebCrawler
 
-js_code = ["const loadMoreButton = Array.from(document.querySelectorAll('button')).find(button => button.textContent.includes('Load More')); loadMoreButton && loadMoreButton.click();"]
+async def crawl_typescript_commits():
+    first_commit = ""
+    async def on_execution_started(page):
+        nonlocal first_commit 
+        try:
+            while True:
+                await page.wait_for_selector('li.Box-sc-g0xbh4-0 h4')
+                commit = await page.query_selector('li.Box-sc-g0xbh4-0 h4')
+                commit = await commit.evaluate('(element) => element.textContent')
+                commit = re.sub(r'\s+', '', commit)
+                if commit and commit != first_commit:
+                    first_commit = commit
+                    break
+                await asyncio.sleep(0.5)
+        except Exception as e:
+            print(f"Warning: New content didn't appear after JavaScript execution: {e}")
 
-crawler = WebCrawler()
-crawler.warmup()
+    async with AsyncWebCrawler(verbose=True) as crawler:
+        crawler.crawler_strategy.set_hook('on_execution_started', on_execution_started)
 
-result = crawler.run(
-    url="https://www.nbcnews.com/business",
-    js=js_code,
-    css_selector="p",
-    extraction_strategy=CosineStrategy(semantic_filter="technology")
-)
+        url = "https://github.com/microsoft/TypeScript/commits/main"
+        session_id = "typescript_commits_session"
+        all_commits = []
 
-print(result.extracted_content)
+        js_next_page = """
+        const button = document.querySelector('a[data-testid="pagination-next-button"]');
+        if (button) button.click();
+        """
+
+        for page in range(3):  # Crawl 3 pages
+            result = await crawler.arun(
+                url=url,
+                session_id=session_id,
+                css_selector="li.Box-sc-g0xbh4-0",
+                js=js_next_page if page > 0 else None,
+                bypass_cache=True,
+                js_only=page > 0
+            )
+
+            assert result.success, f"Failed to crawl page {page + 1}"
+
+            soup = BeautifulSoup(result.cleaned_html, 'html.parser')
+            commits = soup.select("li")
+            all_commits.extend(commits)
+
+            print(f"Page {page + 1}: Found {len(commits)} commits")
+
+        await crawler.crawler_strategy.kill_session(session_id)
+        print(f"Successfully crawled {len(all_commits)} commits across 3 pages")
+
+if __name__ == "__main__":
+    asyncio.run(crawl_typescript_commits())
 ```
+
+This example demonstrates Crawl4AI's ability to handle complex scenarios where content is loaded asynchronously. It crawls multiple pages of GitHub commits, executing JavaScript to load new content and using custom hooks to ensure data is loaded before proceeding.
+
+For more advanced usage examples, check out our [Examples](https://crawl4ai.com/mkdocs/full_details/session_based_crawling.md) section in the documentation.
+
+
+## Speed Comparison 🚀
+
+Crawl4AI is designed with speed as a primary focus. Our goal is to provide the fastest possible response with high-quality data extraction, minimizing abstractions between the data and the user.
+
+We've conducted a speed comparison between Crawl4AI and Firecrawl, a paid service. The results demonstrate Crawl4AI's superior performance:
+
+```
+Firecrawl:
+Time taken: 7.02 seconds
+Content length: 42074 characters
+Images found: 49
+
+Crawl4AI (simple crawl):
+Time taken: 1.60 seconds
+Content length: 18238 characters
+Images found: 49
+
+Crawl4AI (with JavaScript execution):
+Time taken: 4.64 seconds
+Content length: 40869 characters
+Images found: 89
+```
+
+As you can see, Crawl4AI outperforms Firecrawl significantly:
+- Simple crawl: Crawl4AI is over 4 times faster than Firecrawl.
+- With JavaScript execution: Even when executing JavaScript to load more content (doubling the number of images found), Crawl4AI is still faster than Firecrawl's simple crawl.
+
+You can find the full comparison code in our repository at `docs/examples/crawl4ai_vs_firecrawl.py`.
 
 ## Documentation 📚
 

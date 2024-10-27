@@ -72,55 +72,21 @@ def load_bert_base_uncased():
     return tokenizer, model
 
 @lru_cache()
-def load_bge_small_en_v1_5():
+def load_HF_embedding_model(model_name="BAAI/bge-small-en-v1.5") -> tuple:
+    """Load the Hugging Face model for embedding.
+    
+    Args:
+        model_name (str, optional): The model name to load. Defaults to "BAAI/bge-small-en-v1.5".
+        
+    Returns:
+        tuple: The tokenizer and model.
+    """
     from transformers import BertTokenizer, BertModel, AutoTokenizer, AutoModel
-    tokenizer = AutoTokenizer.from_pretrained('BAAI/bge-small-en-v1.5', resume_download=None)
-    model = AutoModel.from_pretrained('BAAI/bge-small-en-v1.5', resume_download=None)
+    tokenizer = AutoTokenizer.from_pretrained(model_name, resume_download=None)
+    model = AutoModel.from_pretrained(model_name, resume_download=None)
     model.eval()
     model, device = set_model_device(model)
     return tokenizer, model
-
-@lru_cache()
-def load_onnx_all_MiniLM_l6_v2():
-    from crawl4ai.onnx_embedding import DefaultEmbeddingModel
-
-    model_path = "models/onnx.tar.gz"
-    model_url = "https://unclecode-files.s3.us-west-2.amazonaws.com/onnx.tar.gz"
-    __location__ = os.path.realpath(
-        os.path.join(os.getcwd(), os.path.dirname(__file__)))
-    download_path = os.path.join(__location__, model_path)
-    onnx_dir = os.path.join(__location__, "models/onnx")
-    
-    # Create the models directory if it does not exist
-    os.makedirs(os.path.dirname(download_path), exist_ok=True)
-
-    # Download the tar.gz file if it does not exist
-    if not os.path.exists(download_path):
-        def download_with_progress(url, filename):
-            def reporthook(block_num, block_size, total_size):
-                downloaded = block_num * block_size
-                percentage = 100 * downloaded / total_size
-                if downloaded < total_size:
-                    print(f"\rDownloading: {percentage:.2f}% ({downloaded / (1024 * 1024):.2f} MB of {total_size / (1024 * 1024):.2f} MB)", end='')
-                else:
-                    print("\rDownload complete!")
-
-            urllib.request.urlretrieve(url, filename, reporthook)
-
-        download_with_progress(model_url, download_path)
-
-    # Extract the tar.gz file if the onnx directory does not exist
-    if not os.path.exists(onnx_dir):
-        with tarfile.open(download_path, "r:gz") as tar:
-            tar.extractall(path=os.path.join(__location__, "models"))
-        
-        # remove the tar.gz file
-        os.remove(download_path)
-    
-    
-    
-    model = DefaultEmbeddingModel()
-    return model
 
 @lru_cache()
 def load_text_classifier():
@@ -187,7 +153,6 @@ def load_nltk_punkt():
     except LookupError:
         nltk.download('punkt')
     return nltk.data.find('tokenizers/punkt')
-
 
 @lru_cache()
 def load_spacy_model():
