@@ -456,7 +456,6 @@ async def speed_comparison():
     print("If you run these tests in an environment with better network conditions,")
     print("you may observe an even more significant speed advantage for Crawl4AI.")
 
-
 async def generate_knowledge_graph():
     class Entity(BaseModel):
         name: str
@@ -473,8 +472,8 @@ async def generate_knowledge_graph():
         relationships: List[Relationship]
 
     extraction_strategy = LLMExtractionStrategy(
-            provider='openai/gpt-4o-mini',
-            api_token=os.getenv('OPENAI_API_KEY'),
+            provider='openai/gpt-4o-mini', # Or any other provider, including Ollama and open source models
+            api_token=os.getenv('OPENAI_API_KEY'), # In case of Ollama just pass "no-token"
             schema=KnowledgeGraph.model_json_schema(),
             extraction_type="schema",
             instruction="""Extract entities and relationships from the given text."""
@@ -490,6 +489,23 @@ async def generate_knowledge_graph():
         # print(result.extracted_content)
         with open(os.path.join(__location__, "kb.json"), "w") as f:
             f.write(result.extracted_content)
+
+async def fit_markdown_remove_overlay():
+    async with AsyncWebCrawler(headless = False) as crawler:
+        url = "https://janineintheworld.com/places-to-visit-in-central-mexico"
+        result = await crawler.arun(
+            url=url,
+            bypass_cache=True,
+            word_count_threshold = 10,
+            remove_overlay_elements=True,
+            screenshot = True
+        )
+        # Save markdown to file
+        with open(os.path.join(__location__, "mexico_places.md"), "w") as f:
+            f.write(result.fit_markdown)
+
+    print("Done")
+
 
 async def main():
     await simple_crawl()
