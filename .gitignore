@@ -206,3 +206,5 @@ git_issues.py
 git_issues.md
 
 .tests/
+
+.issues/
