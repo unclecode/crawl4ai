@@ -33,12 +33,29 @@ nav:
     - 'Cosine Strategy': 'extraction/cosine.md'
     - 'Chunking': 'extraction/chunking.md'
 
+  - Tutorial:
+    - 'Episode 1: Introduction to Crawl4AI and Basic Installation': 'tutorial/episode_01_Introduction_to_Crawl4AI_and_Basic_Installation.md'
+    - 'Episode 2: Overview of Advanced Features': 'tutorial/episode_02_Overview_of_Advanced_Features.md'
+    - 'Episode 3: Browser Configurations & Headless Crawling': 'tutorial/episode_03_Browser_Configurations_&_Headless_Crawling.md'
+    - 'Episode 4: Advanced Proxy and Security Settings': 'tutorial/episode_04_Advanced_Proxy_and_Security_Settings.md'
+    - 'Episode 5: JavaScript Execution and Dynamic Content Handling': 'tutorial/episode_05_JavaScript_Execution_and_Dynamic_Content_Handling.md'
+    - 'Episode 6: Magic Mode and Anti-Bot Protection': 'tutorial/episode_06_Magic_Mode_and_Anti-Bot_Protection.md'
+    - 'Episode 7: Content Cleaning and Fit Markdown': 'tutorial/episode_07_Content_Cleaning_and_Fit_Markdown.md'
+    - 'Episode 8: Media Handling: Images, Videos, and Audio': 'tutorial/episode_08_Media_Handling:_Images,_Videos,_and_Audio.md'
+    - 'Episode 9: Link Analysis and Smart Filtering': 'tutorial/episode_09_Link_Analysis_and_Smart_Filtering.md'
+    - 'Episode 10: Custom Headers, Identity, and User Simulation': 'tutorial/episode_10_Custom_Headers,_Identity,_and_User_Simulation.md'
+    - 'Episode 11.1: Extraction Strategies: JSON CSS': 'tutorial/episode_11_1_Extraction_Strategies:_JSON_CSS.md'
+    - 'Episode 11.2: Extraction Strategies: LLM': 'tutorial/episode_11_2_Extraction_Strategies:_LLM.md'
+    - 'Episode 11.3: Extraction Strategies: Cosine': 'tutorial/episode_11_3_Extraction_Strategies:_Cosine.md'
+    - 'Episode 12: Session-Based Crawling for Dynamic Websites': 'tutorial/episode_12_Session-Based_Crawling_for_Dynamic_Websites.md'
+    - 'Episode 13: Chunking Strategies for Large Text Processing': 'tutorial/episode_13_Chunking_Strategies_for_Large_Text_Processing.md'
+    - 'Episode 14: Hooks and Custom Workflow with AsyncWebCrawler': 'tutorial/episode_14_Hooks_and_Custom_Workflow_with_AsyncWebCrawler.md'
+
   - API Reference:
     - 'AsyncWebCrawler': 'api/async-webcrawler.md'
     - 'AsyncWebCrawler.arun()': 'api/arun.md'
     - 'CrawlResult': 'api/crawl-result.md'
     - 'Strategies': 'api/strategies.md'
-
 
 theme:
   name: terminal
