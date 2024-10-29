@@ -10,6 +10,12 @@
 
 Crawl4AI simplifies asynchronous web crawling and data extraction, making it accessible for large language models (LLMs) and AI applications. 🆓🌐
 
+## 🌟 Meet the Crawl4AI Assistant: Your Copilot for Crawling
+Use the [Crawl4AI GPT Assistant](https://tinyurl.com/crawl4ai-gpt) as your AI-powered copilot! With this assistant, you can:
+- 🧑‍💻 Generate code for complex crawling and extraction tasks
+- 💡 Get tailored support and examples
+- 📘 Learn Crawl4AI faster with step-by-step guidance
+
 ## New in 0.3.72 ✨
 
 - 📄 Fit markdown generation for extracting main article content.
@@ -18,6 +24,9 @@ Crawl4AI simplifies asynchronous web crawling and data extraction, making it acc
 - 📚 New chunking strategies(Sliding window, Overlapping window, Flexible size control)
 - 💾 Improved caching system for better performance
 - ⚡ Optimized batch processing with automatic rate limiting
+
+Try new features in this colab notebook: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1L6LJ3KlplhJdUy3Wcry6pstnwRpCJ3yB?usp=sharing)
+
 
 ## Try it Now!
 
