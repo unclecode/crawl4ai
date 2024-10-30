@@ -151,3 +151,10 @@ strong,
     margin: 0;
     max-height: 300px; overflow: auto; border:none;
 }
+
+ol li::before {
+    content: counters(item, ".") ". ";
+    counter-increment: item;
+    /* float: left; */
+    /* padding-right: 5px; */
+}
