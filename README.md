@@ -25,12 +25,9 @@ Use the [Crawl4AI GPT Assistant](https://tinyurl.com/crawl4ai-gpt) as your AI-po
 - 💾 Improved caching system for better performance
 - ⚡ Optimized batch processing with automatic rate limiting
 
-Try new features in this colab notebook: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1L6LJ3KlplhJdUy3Wcry6pstnwRpCJ3yB?usp=sharing)
-
-
 ## Try it Now!
 
-✨ Play around with this [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1REChY6fXQf-EaVYLv0eHEWvzlYxGm0pd?usp=sharing)
+✨ Play around with this [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1SgRPrByQLzjRfwoRNq1wSGE9nYY_EE8C?usp=sharing)
 
 ✨ Visit our [Documentation Website](https://crawl4ai.com/mkdocs/)
 
