@@ -11,11 +11,13 @@ Here’s a focused outline for the **JavaScript Execution and Dynamic Content Ha
 
 ### **JavaScript Execution & Dynamic Content Handling**
 
-1. **Why JavaScript Execution Matters**:
+1) **Why JavaScript Execution Matters**:
+
    - Many modern websites load content dynamically via JavaScript, requiring special handling to access all elements.
    - Crawl4AI can execute JavaScript on pages, enabling it to interact with elements like “load more” buttons, infinite scrolls, and content that appears only after certain actions.
 
-2. **Basic JavaScript Execution**:
+2) **Basic JavaScript Execution**:
+
    - Use `js_code` to execute JavaScript commands on a page:
      ```python
      # Scroll to bottom of the page
@@ -26,7 +28,8 @@ Here’s a focused outline for the **JavaScript Execution and Dynamic Content Ha
      ```
    - This command scrolls to the bottom, triggering any lazy-loaded or dynamically added content.
 
-3. **Multiple Commands & Simulating Clicks**:
+3) **Multiple Commands & Simulating Clicks**:
+
    - Combine multiple JavaScript commands to interact with elements like “load more” buttons:
      ```python
      js_commands = [
@@ -40,7 +43,8 @@ Here’s a focused outline for the **JavaScript Execution and Dynamic Content Ha
      ```
    - This script scrolls down and then clicks the “load more” button, useful for loading additional content blocks.
 
-4. **Waiting for Dynamic Content**:
+4) **Waiting for Dynamic Content**:
+
    - Use `wait_for` to ensure the page loads specific elements before proceeding:
      ```python
      result = await crawler.arun(
@@ -51,7 +55,8 @@ Here’s a focused outline for the **JavaScript Execution and Dynamic Content Ha
      ```
    - This example waits until elements with `.dynamic-content` are loaded, helping to capture content that appears after JavaScript actions.
 
-5. **Handling Complex Dynamic Content (e.g., Infinite Scroll)**:
+5) **Handling Complex Dynamic Content (e.g., Infinite Scroll)**:
+
    - Combine JavaScript execution with conditional waiting to handle infinite scrolls or paginated content:
      ```python
      result = await crawler.arun(
@@ -65,7 +70,8 @@ Here’s a focused outline for the **JavaScript Execution and Dynamic Content Ha
      ```
    - This example scrolls and clicks "load more" repeatedly, waiting each time for a specified number of items to load.
 
-6. **Complete Example: Dynamic Content Handling with Extraction**:
+6) **Complete Example: Dynamic Content Handling with Extraction**:
+
    - Full example demonstrating a dynamic load and content extraction in one process:
      ```python
      async with AsyncWebCrawler() as crawler:
@@ -81,7 +87,8 @@ Here’s a focused outline for the **JavaScript Execution and Dynamic Content Ha
          print(result.markdown[:500])  # Output the main content extracted
      ```
 
-7. **Wrap Up & Next Steps**:
+7) **Wrap Up & Next Steps**:
+
    - Recap how JavaScript execution allows access to dynamic content, enabling powerful interactions.
    - Tease the next video: **Content Cleaning and Fit Markdown** to show how Crawl4AI can extract only the most relevant content from complex pages.
 

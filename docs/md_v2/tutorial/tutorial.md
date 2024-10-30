@@ -9,17 +9,20 @@ Here's a condensed outline of the **Installation and Setup** video content:
 
 ---
 
-1. **Introduction to Crawl4AI**:
+1) **Introduction to Crawl4AI**:
+
    - Briefly explain that Crawl4AI is a powerful tool for web scraping, data extraction, and content processing, with customizable options for various needs.
 
-2. **Installation Overview**:
+2) **Installation Overview**:
+
    - **Basic Install**: Run `pip install crawl4ai` and `playwright install` (to set up browser dependencies).
    - **Optional Advanced Installs**:
      - `pip install crawl4ai[torch]` - Adds PyTorch for clustering.
      - `pip install crawl4ai[transformer]` - Adds support for LLM-based extraction.
      - `pip install crawl4ai[all]` - Installs all features for complete functionality.
 
-3. **Verifying the Installation**:
+3) **Verifying the Installation**:
+
    - Walk through a simple test script to confirm the setup:
       ```python
       import asyncio
@@ -34,12 +37,14 @@ Here's a condensed outline of the **Installation and Setup** video content:
       ```
    - Explain that this script initializes the crawler and runs it on a test URL, displaying part of the extracted content to verify functionality.
 
-4. **Important Tips**:
+4) **Important Tips**:
+
    - **Run** `playwright install` **after installation** to set up dependencies.
    - **For full performance** on text-related tasks, run `crawl4ai-download-models` after installing with `[torch]`, `[transformer]`, or `[all]` options.
    - If you encounter issues, refer to the documentation or GitHub issues.
 
-5. **Wrap Up**:
+5) **Wrap Up**:
+
    - Introduce the next topic in the series, which will cover Crawl4AI's browser configuration options (like choosing between `chromium`, `firefox`, and `webkit`).
 
 ---
@@ -57,10 +62,12 @@ Here's a condensed outline for an **Overview of Advanced Features** video coveri
 
 ### **Overview of Advanced Features**
 
-1. **Introduction to Advanced Features**:
+1) **Introduction to Advanced Features**:
+
    - Briefly introduce Crawl4AI’s advanced tools, which let users go beyond basic crawling to customize and fine-tune their scraping workflows.
 
-2. **Taking Screenshots**:
+2) **Taking Screenshots**:
+
    - Explain the screenshot capability for capturing page state and verifying content.
    - **Example**:
       ```python
@@ -68,7 +75,8 @@ Here's a condensed outline for an **Overview of Advanced Features** video coveri
       ```
    - Mention that screenshots are saved as a base64 string in `result`, allowing easy decoding and saving.
 
-3. **Media and Link Extraction**:
+3) **Media and Link Extraction**:
+
    - Demonstrate how to pull all media (images, videos) and links (internal and external) from a page for deeper analysis or content gathering.
    - **Example**:
       ```python
@@ -77,14 +85,16 @@ Here's a condensed outline for an **Overview of Advanced Features** video coveri
       print("Links:", result.links)
       ```
 
-4. **Custom User Agent**:
+4) **Custom User Agent**:
+
    - Show how to set a custom user agent to disguise the crawler or simulate specific devices/browsers.
    - **Example**:
       ```python
       result = await crawler.arun(url="https://www.example.com", user_agent="Mozilla/5.0 (compatible; MyCrawler/1.0)")
       ```
 
-5. **Custom Hooks for Enhanced Control**:
+5) **Custom Hooks for Enhanced Control**:
+
    - Briefly cover how to use hooks, which allow custom actions like setting headers or handling login during the crawl.
    - **Example**: Setting a custom header with `before_get_url` hook.
       ```python
@@ -92,7 +102,8 @@ Here's a condensed outline for an **Overview of Advanced Features** video coveri
           await page.set_extra_http_headers({"X-Test-Header": "test"})
       ```
 
-6. **CSS Selectors for Targeted Extraction**:
+6) **CSS Selectors for Targeted Extraction**:
+
    - Explain the use of CSS selectors to extract specific elements, ideal for structured data like articles or product details.
    - **Example**:
       ```python
@@ -100,14 +111,16 @@ Here's a condensed outline for an **Overview of Advanced Features** video coveri
       print("H2 Tags:", result.extracted_content)
       ```
 
-7. **Crawling Inside Iframes**:
+7) **Crawling Inside Iframes**:
+
    - Mention how enabling `process_iframes=True` allows extracting content within iframes, useful for sites with embedded content or ads.
    - **Example**:
       ```python
       result = await crawler.arun(url="https://www.example.com", process_iframes=True)
       ```
 
-8. **Wrap-Up**:
+8) **Wrap-Up**:
+
    - Summarize these advanced features and how they allow users to customize every part of their web scraping experience.
    - Tease upcoming videos where each feature will be explored in detail.
 
@@ -126,7 +139,8 @@ Here’s a streamlined outline for the **Browser Configurations & Headless Crawl
 
 ### **Browser Configurations & Headless Crawling**
 
-1. **Overview of Browser Options**:
+1) **Overview of Browser Options**:
+
    - Crawl4AI supports three browser engines:
      - **Chromium** (default) - Highly compatible.
      - **Firefox** - Great for specialized use cases.
@@ -143,7 +157,8 @@ Here’s a streamlined outline for the **Browser Configurations & Headless Crawl
       crawler = AsyncWebCrawler(browser_type="webkit")
       ```
 
-2. **Headless Mode**:
+2) **Headless Mode**:
+
    - Headless mode runs the browser without a visible GUI, making it faster and less resource-intensive.
    - To enable or disable:
       ```python
@@ -154,13 +169,15 @@ Here’s a streamlined outline for the **Browser Configurations & Headless Crawl
       crawler = AsyncWebCrawler(headless=False)
       ```
 
-3. **Verbose Logging**:
+3) **Verbose Logging**:
+
    - Use `verbose=True` to get detailed logs for each action, useful for debugging:
       ```python
       crawler = AsyncWebCrawler(verbose=True)
       ```
 
-4. **Running a Basic Crawl with Configuration**:
+4) **Running a Basic Crawl with Configuration**:
+
    - Example of a simple crawl with custom browser settings:
       ```python
       async with AsyncWebCrawler(browser_type="firefox", headless=True, verbose=True) as crawler:
@@ -169,7 +186,8 @@ Here’s a streamlined outline for the **Browser Configurations & Headless Crawl
       ```
    - This example uses Firefox in headless mode with logging enabled, demonstrating the flexibility of Crawl4AI’s setup.
 
-5. **Recap & Next Steps**:
+5) **Recap & Next Steps**:
+
    - Recap the power of selecting different browsers and running headless mode for speed and efficiency.
    - Tease the next video: **Proxy & Security Settings** for navigating blocked or restricted content and protecting IP identity.
 
@@ -188,11 +206,13 @@ Here’s a focused outline for the **Proxy and Security Settings** video:
 
 ### **Proxy & Security Settings**
 
-1. **Why Use Proxies in Web Crawling**:
+1) **Why Use Proxies in Web Crawling**:
+
    - Proxies are essential for bypassing IP-based restrictions, improving anonymity, and managing rate limits.
    - Crawl4AI supports simple proxies, authenticated proxies, and proxy rotation for robust web scraping.
 
-2. **Basic Proxy Setup**:
+2) **Basic Proxy Setup**:
+
    - **Using a Simple Proxy**:
      ```python
      # HTTP proxy
@@ -202,7 +222,8 @@ Here’s a focused outline for the **Proxy and Security Settings** video:
      crawler = AsyncWebCrawler(proxy="socks5://proxy.example.com:1080")
      ```
 
-3. **Authenticated Proxies**:
+3) **Authenticated Proxies**:
+
    - Use `proxy_config` for proxies requiring a username and password:
      ```python
      proxy_config = {
@@ -213,7 +234,8 @@ Here’s a focused outline for the **Proxy and Security Settings** video:
      crawler = AsyncWebCrawler(proxy_config=proxy_config)
      ```
 
-4. **Rotating Proxies**:
+4) **Rotating Proxies**:
+
    - Rotating proxies helps avoid IP bans by switching IP addresses for each request:
      ```python
      async def get_next_proxy():
@@ -228,7 +250,8 @@ Here’s a focused outline for the **Proxy and Security Settings** video:
      ```
    - This setup periodically switches the proxy for enhanced security and access.
 
-5. **Custom Headers for Additional Security**:
+5) **Custom Headers for Additional Security**:
+
    - Set custom headers to mask the crawler’s identity and avoid detection:
      ```python
      headers = {
@@ -240,7 +263,8 @@ Here’s a focused outline for the **Proxy and Security Settings** video:
      crawler = AsyncWebCrawler(headers=headers)
      ```
 
-6. **Combining Proxies with Magic Mode for Anti-Bot Protection**:
+6) **Combining Proxies with Magic Mode for Anti-Bot Protection**:
+
    - For sites with aggressive bot detection, combine `proxy` settings with `magic=True`:
      ```python
      async with AsyncWebCrawler(proxy="http://proxy.example.com:8080", headers={"Accept-Language": "en-US"}) as crawler:
@@ -251,7 +275,8 @@ Here’s a focused outline for the **Proxy and Security Settings** video:
      ```
    - **Magic Mode** automatically enables user simulation, random timing, and browser property masking.
 
-7. **Wrap Up & Next Steps**:
+7) **Wrap Up & Next Steps**:
+
    - Summarize the importance of proxies and anti-detection in accessing restricted content and avoiding bans.
    - Tease the next video: **JavaScript Execution and Handling Dynamic Content** for working with interactive and dynamically loaded pages.
 
@@ -270,11 +295,13 @@ Here’s a focused outline for the **JavaScript Execution and Dynamic Content Ha
 
 ### **JavaScript Execution & Dynamic Content Handling**
 
-1. **Why JavaScript Execution Matters**:
+1) **Why JavaScript Execution Matters**:
+
    - Many modern websites load content dynamically via JavaScript, requiring special handling to access all elements.
    - Crawl4AI can execute JavaScript on pages, enabling it to interact with elements like “load more” buttons, infinite scrolls, and content that appears only after certain actions.
 
-2. **Basic JavaScript Execution**:
+2) **Basic JavaScript Execution**:
+
    - Use `js_code` to execute JavaScript commands on a page:
      ```python
      # Scroll to bottom of the page
@@ -285,7 +312,8 @@ Here’s a focused outline for the **JavaScript Execution and Dynamic Content Ha
      ```
    - This command scrolls to the bottom, triggering any lazy-loaded or dynamically added content.
 
-3. **Multiple Commands & Simulating Clicks**:
+3) **Multiple Commands & Simulating Clicks**:
+
    - Combine multiple JavaScript commands to interact with elements like “load more” buttons:
      ```python
      js_commands = [
@@ -299,7 +327,8 @@ Here’s a focused outline for the **JavaScript Execution and Dynamic Content Ha
      ```
    - This script scrolls down and then clicks the “load more” button, useful for loading additional content blocks.
 
-4. **Waiting for Dynamic Content**:
+4) **Waiting for Dynamic Content**:
+
    - Use `wait_for` to ensure the page loads specific elements before proceeding:
      ```python
      result = await crawler.arun(
@@ -310,7 +339,8 @@ Here’s a focused outline for the **JavaScript Execution and Dynamic Content Ha
      ```
    - This example waits until elements with `.dynamic-content` are loaded, helping to capture content that appears after JavaScript actions.
 
-5. **Handling Complex Dynamic Content (e.g., Infinite Scroll)**:
+5) **Handling Complex Dynamic Content (e.g., Infinite Scroll)**:
+
    - Combine JavaScript execution with conditional waiting to handle infinite scrolls or paginated content:
      ```python
      result = await crawler.arun(
@@ -324,7 +354,8 @@ Here’s a focused outline for the **JavaScript Execution and Dynamic Content Ha
      ```
    - This example scrolls and clicks "load more" repeatedly, waiting each time for a specified number of items to load.
 
-6. **Complete Example: Dynamic Content Handling with Extraction**:
+6) **Complete Example: Dynamic Content Handling with Extraction**:
+
    - Full example demonstrating a dynamic load and content extraction in one process:
      ```python
      async with AsyncWebCrawler() as crawler:
@@ -340,7 +371,8 @@ Here’s a focused outline for the **JavaScript Execution and Dynamic Content Ha
          print(result.markdown[:500])  # Output the main content extracted
      ```
 
-7. **Wrap Up & Next Steps**:
+7) **Wrap Up & Next Steps**:
+
    - Recap how JavaScript execution allows access to dynamic content, enabling powerful interactions.
    - Tease the next video: **Content Cleaning and Fit Markdown** to show how Crawl4AI can extract only the most relevant content from complex pages.
 
@@ -359,11 +391,13 @@ Here’s a concise outline for the **Magic Mode and Anti-Bot Protection** video:
 
 ### **Magic Mode & Anti-Bot Protection**
 
-1. **Why Anti-Bot Protection is Important**:
+1) **Why Anti-Bot Protection is Important**:
+
    - Many websites use bot detection mechanisms to block automated scraping. Crawl4AI’s anti-detection features help avoid IP bans, CAPTCHAs, and access restrictions.
    - **Magic Mode** is a one-step solution to enable a range of anti-bot features without complex configuration.
 
-2. **Enabling Magic Mode**:
+2) **Enabling Magic Mode**:
+
    - Simply set `magic=True` to activate Crawl4AI’s full anti-bot suite:
      ```python
      result = await crawler.arun(
@@ -373,13 +407,15 @@ Here’s a concise outline for the **Magic Mode and Anti-Bot Protection** video:
      ```
    - This enables a blend of stealth techniques, including masking automation signals, randomizing timings, and simulating real user behavior.
 
-3. **What Magic Mode Does Behind the Scenes**:
+3) **What Magic Mode Does Behind the Scenes**:
+
    - **User Simulation**: Mimics human actions like mouse movements and scrolling.
    - **Navigator Overrides**: Hides signals that indicate an automated browser.
    - **Timing Randomization**: Adds random delays to simulate natural interaction patterns.
    - **Cookie Handling**: Accepts and manages cookies dynamically to avoid triggers from cookie pop-ups.
 
-4. **Manual Anti-Bot Options (If Not Using Magic Mode)**:
+4) **Manual Anti-Bot Options (If Not Using Magic Mode)**:
+
    - For granular control, you can configure individual settings without Magic Mode:
      ```python
      result = await crawler.arun(
@@ -390,7 +426,8 @@ Here’s a concise outline for the **Magic Mode and Anti-Bot Protection** video:
      ```
    - **Use Cases**: This approach allows more specific adjustments when certain anti-bot features are needed but others are not.
 
-5. **Combining Proxies with Magic Mode**:
+5) **Combining Proxies with Magic Mode**:
+
    - To avoid rate limits or IP blocks, combine Magic Mode with a proxy:
      ```python
      async with AsyncWebCrawler(
@@ -404,7 +441,8 @@ Here’s a concise outline for the **Magic Mode and Anti-Bot Protection** video:
      ```
    - This setup maximizes stealth by pairing anti-bot detection with IP obfuscation.
 
-6. **Example of Anti-Bot Protection in Action**:
+6) **Example of Anti-Bot Protection in Action**:
+
    - Full example with Magic Mode and proxies to scrape a protected page:
      ```python
      async with AsyncWebCrawler() as crawler:
@@ -418,7 +456,8 @@ Here’s a concise outline for the **Magic Mode and Anti-Bot Protection** video:
      ```
    - This example ensures seamless access to protected content by combining anti-detection and waiting for full content load.
 
-7. **Wrap Up & Next Steps**:
+7) **Wrap Up & Next Steps**:
+
    - Recap the power of Magic Mode and anti-bot features for handling restricted websites.
    - Tease the next video: **Content Cleaning and Fit Markdown** to show how to extract clean and focused content from a page.
 
@@ -437,11 +476,13 @@ Here’s a streamlined outline for the **Content Cleaning and Fit Markdown** vid
 
 ### **Content Cleaning & Fit Markdown**
 
-1. **Overview of Content Cleaning in Crawl4AI**:
+1) **Overview of Content Cleaning in Crawl4AI**:
+
    - Explain that web pages often include extra elements like ads, navigation bars, footers, and popups.
    - Crawl4AI’s content cleaning features help extract only the main content, reducing noise and enhancing readability.
 
-2. **Basic Content Cleaning Options**:
+2) **Basic Content Cleaning Options**:
+
    - **Removing Unwanted Elements**: Exclude specific HTML tags, like forms or navigation bars:
      ```python
      result = await crawler.arun(
@@ -453,7 +494,8 @@ Here’s a streamlined outline for the **Content Cleaning and Fit Markdown** vid
      ```
    - This example extracts content while excluding forms, navigation, and modal overlays, ensuring clean results.
 
-3. **Fit Markdown for Main Content Extraction**:
+3) **Fit Markdown for Main Content Extraction**:
+
    - **What is Fit Markdown**: Uses advanced analysis to identify the most relevant content (ideal for articles, blogs, and documentation).
    - **How it Works**: Analyzes content density, removes boilerplate elements, and maintains formatting for a clear output.
    - **Example**:
@@ -464,7 +506,8 @@ Here’s a streamlined outline for the **Content Cleaning and Fit Markdown** vid
      ```
    - Fit Markdown is especially helpful for long-form content like news articles or blog posts.
 
-4. **Comparing Fit Markdown with Regular Markdown**:
+4) **Comparing Fit Markdown with Regular Markdown**:
+
    - **Fit Markdown** returns the primary content without extraneous elements.
    - **Regular Markdown** includes all extracted text in markdown format.
    - Example to show the difference:
@@ -477,7 +520,8 @@ Here’s a streamlined outline for the **Content Cleaning and Fit Markdown** vid
      ```
    - This comparison shows the effectiveness of Fit Markdown in focusing on essential content.
 
-5. **Media and Metadata Handling with Content Cleaning**:
+5) **Media and Metadata Handling with Content Cleaning**:
+
    - **Media Extraction**: Crawl4AI captures images and videos with metadata like alt text, descriptions, and relevance scores:
      ```python
      for image in result.media["images"]:
@@ -485,7 +529,8 @@ Here’s a streamlined outline for the **Content Cleaning and Fit Markdown** vid
      ```
    - **Use Case**: Useful for saving only relevant images or videos from an article or content-heavy page.
 
-6. **Example of Clean Content Extraction in Action**:
+6) **Example of Clean Content Extraction in Action**:
+
    - Full example extracting cleaned content and Fit Markdown:
      ```python
      async with AsyncWebCrawler() as crawler:
@@ -499,7 +544,8 @@ Here’s a streamlined outline for the **Content Cleaning and Fit Markdown** vid
      ```
    - This example demonstrates content cleaning with settings for filtering noise and focusing on the core text.
 
-7. **Wrap Up & Next Steps**:
+7) **Wrap Up & Next Steps**:
+
    - Summarize the power of Crawl4AI’s content cleaning features and Fit Markdown for capturing clean, relevant content.
    - Tease the next video: **Link Analysis and Smart Filtering** to focus on analyzing and filtering links within crawled pages.
 
@@ -518,11 +564,13 @@ Here’s a clear and focused outline for the **Media Handling: Images, Videos, a
 
 ### **Media Handling: Images, Videos, and Audio**
 
-1. **Overview of Media Extraction in Crawl4AI**:
+1) **Overview of Media Extraction in Crawl4AI**:
+
    - Crawl4AI can detect and extract different types of media (images, videos, and audio) along with useful metadata.
    - This functionality is essential for gathering visual content from multimedia-heavy pages like e-commerce sites, news articles, and social media feeds.
 
-2. **Image Extraction and Metadata**:
+2) **Image Extraction and Metadata**:
+
    - Crawl4AI captures images with detailed metadata, including:
      - **Source URL**: The direct URL to the image.
      - **Alt Text**: Image description if available.
@@ -540,7 +588,8 @@ Here’s a clear and focused outline for the **Media Handling: Images, Videos, a
      ```
    - This example shows how to access each image’s metadata, making it easy to filter for the most relevant visuals.
 
-3. **Handling Lazy-Loaded Images**:
+3) **Handling Lazy-Loaded Images**:
+
    - Crawl4AI automatically supports lazy-loaded images, which are commonly used to optimize webpage loading.
    - **Example with Wait for Lazy-Loaded Content**:
      ```python
@@ -552,7 +601,8 @@ Here’s a clear and focused outline for the **Media Handling: Images, Videos, a
      ```
    - This setup waits for lazy-loaded images to appear, ensuring they are fully captured.
 
-4. **Video Extraction and Metadata**:
+4) **Video Extraction and Metadata**:
+
    - Crawl4AI captures video elements, including:
      - **Source URL**: The video’s direct URL.
      - **Type**: Format of the video (e.g., MP4).
@@ -568,7 +618,8 @@ Here’s a clear and focused outline for the **Media Handling: Images, Videos, a
      ```
    - This allows users to gather video content and relevant details for further processing or analysis.
 
-5. **Audio Extraction and Metadata**:
+5) **Audio Extraction and Metadata**:
+
    - Audio elements can also be extracted, with metadata like:
      - **Source URL**: The audio file’s direct URL.
      - **Type**: Format of the audio file (e.g., MP3).
@@ -582,14 +633,16 @@ Here’s a clear and focused outline for the **Media Handling: Images, Videos, a
      ```
    - Useful for sites with podcasts, sound bites, or other audio content.
 
-6. **Filtering Media by Relevance**:
+6) **Filtering Media by Relevance**:
+
    - Use metadata like relevance score to filter only the most useful media content:
      ```python
      relevant_images = [img for img in result.media["images"] if img['score'] > 5]
      ```
    - This is especially helpful for content-heavy pages where you only want media directly related to the main content.
 
-7. **Example: Full Media Extraction with Content Filtering**:
+7) **Example: Full Media Extraction with Content Filtering**:
+
    - Full example extracting images, videos, and audio along with filtering by relevance:
      ```python
      async with AsyncWebCrawler() as crawler:
@@ -606,7 +659,8 @@ Here’s a clear and focused outline for the **Media Handling: Images, Videos, a
      ```
    - This example shows how to capture and filter various media types, focusing on what’s most relevant.
 
-8. **Wrap Up & Next Steps**:
+8) **Wrap Up & Next Steps**:
+
    - Recap the comprehensive media extraction capabilities, emphasizing how metadata helps users focus on relevant content.
    - Tease the next video: **Link Analysis and Smart Filtering** to explore how Crawl4AI handles internal, external, and social media links for more focused data gathering.
 
@@ -625,11 +679,13 @@ Here’s a focused outline for the **Link Analysis and Smart Filtering** video:
 
 ### **Link Analysis & Smart Filtering**
 
-1. **Importance of Link Analysis in Web Crawling**:
+1) **Importance of Link Analysis in Web Crawling**:
+
    - Explain that web pages often contain numerous links, including internal links, external links, social media links, and ads.
    - Crawl4AI’s link analysis and filtering options help extract only relevant links, enabling more targeted and efficient crawls.
 
-2. **Automatic Link Classification**:
+2) **Automatic Link Classification**:
+
    - Crawl4AI categorizes links automatically into internal, external, and social media links.
    - **Example**:
      ```python
@@ -644,7 +700,8 @@ Here’s a focused outline for the **Link Analysis and Smart Filtering** video:
      print("External Links:", external_links[:3])
      ```
 
-3. **Filtering Out Unwanted Links**:
+3) **Filtering Out Unwanted Links**:
+
    - **Exclude External Links**: Remove all links pointing to external sites.
    - **Exclude Social Media Links**: Filter out social media domains like Facebook or Twitter.
    - **Example**:
@@ -656,7 +713,8 @@ Here’s a focused outline for the **Link Analysis and Smart Filtering** video:
      )
      ```
 
-4. **Custom Domain Filtering**:
+4) **Custom Domain Filtering**:
+
    - **Exclude Specific Domains**: Filter links from particular domains, e.g., ad sites.
    - **Custom Social Media Domains**: Add additional social media domains if needed.
    - **Example**:
@@ -668,7 +726,8 @@ Here’s a focused outline for the **Link Analysis and Smart Filtering** video:
      )
      ```
 
-5. **Accessing Link Context and Metadata**:
+5) **Accessing Link Context and Metadata**:
+
    - Crawl4AI provides additional metadata for each link, including its text, type (e.g., navigation or content), and surrounding context.
    - **Example**:
      ```python
@@ -677,7 +736,8 @@ Here’s a focused outline for the **Link Analysis and Smart Filtering** video:
      ```
    - **Use Case**: Helps users understand the relevance of links based on where they are placed on the page (e.g., navigation vs. article content).
 
-6. **Example of Comprehensive Link Filtering and Analysis**:
+6) **Example of Comprehensive Link Filtering and Analysis**:
+
    - Full example combining link filtering, metadata access, and contextual information:
      ```python
      async with AsyncWebCrawler() as crawler:
@@ -693,7 +753,8 @@ Here’s a focused outline for the **Link Analysis and Smart Filtering** video:
      ```
    - This example filters unnecessary links, keeping only internal and relevant links from the main content area.
 
-7. **Wrap Up & Next Steps**:
+7) **Wrap Up & Next Steps**:
+
    - Summarize the benefits of link filtering for efficient crawling and relevant content extraction.
    - Tease the next video: **Custom Headers, Identity Management, and User Simulation** to explain how to configure identity settings and simulate user behavior for stealthier crawls.
 
@@ -712,10 +773,12 @@ Here’s a concise outline for the **Custom Headers, Identity Management, and Us
 
 ### **Custom Headers, Identity Management, & User Simulation**
 
-1. **Why Customize Headers and Identity in Crawling**:
+1) **Why Customize Headers and Identity in Crawling**:
+
    - Websites often track request headers and browser properties to detect bots. Customizing headers and managing identity help make requests appear more human, improving access to restricted sites.
 
-2. **Setting Custom Headers**:
+2) **Setting Custom Headers**:
+
    - Customize HTTP headers to mimic genuine browser requests or meet site-specific requirements:
      ```python
      headers = {
@@ -727,7 +790,8 @@ Here’s a concise outline for the **Custom Headers, Identity Management, and Us
      ```
    - **Use Case**: Customize the `Accept-Language` header to simulate local user settings, or `Cache-Control` to bypass cache for fresh content.
 
-3. **Setting a Custom User Agent**:
+3) **Setting a Custom User Agent**:
+
    - Some websites block requests from common crawler user agents. Setting a custom user agent string helps bypass these restrictions:
      ```python
      crawler = AsyncWebCrawler(
@@ -736,7 +800,8 @@ Here’s a concise outline for the **Custom Headers, Identity Management, and Us
      ```
    - **Tip**: Use user-agent strings from popular browsers (e.g., Chrome, Firefox) to improve access and reduce detection risks.
 
-4. **User Simulation for Human-like Behavior**:
+4) **User Simulation for Human-like Behavior**:
+
    - Enable `simulate_user=True` to mimic natural user interactions, such as random timing and simulated mouse movements:
      ```python
      result = await crawler.arun(
@@ -746,7 +811,8 @@ Here’s a concise outline for the **Custom Headers, Identity Management, and Us
      ```
    - **Behavioral Effects**: Adds subtle variations in interactions, making the crawler harder to detect on bot-protected sites.
 
-5. **Navigator Overrides and Magic Mode for Full Identity Masking**:
+5) **Navigator Overrides and Magic Mode for Full Identity Masking**:
+
    - Use `override_navigator=True` to mask automation indicators like `navigator.webdriver`, which websites check to detect bots:
      ```python
      result = await crawler.arun(
@@ -765,7 +831,8 @@ Here’s a concise outline for the **Custom Headers, Identity Management, and Us
      ```
    - This setup includes all anti-detection techniques like navigator masking, random timing, and user simulation.
 
-6. **Example: Comprehensive Setup for Identity Management**:
+6) **Example: Comprehensive Setup for Identity Management**:
+
    - A full example combining custom headers, user-agent, and user simulation for a realistic browsing profile:
      ```python
      async with AsyncWebCrawler(
@@ -780,7 +847,8 @@ Here’s a concise outline for the **Custom Headers, Identity Management, and Us
      ```
    - This example enables detailed customization for evading detection and accessing protected pages smoothly.
 
-7. **Wrap Up & Next Steps**:
+7) **Wrap Up & Next Steps**:
+
    - Recap the value of headers, user-agent customization, and simulation in bypassing bot detection.
    - Tease the next video: **Extraction Strategies: JSON CSS, LLM, and Cosine** to dive into structured data extraction methods for high-quality content retrieval.
 

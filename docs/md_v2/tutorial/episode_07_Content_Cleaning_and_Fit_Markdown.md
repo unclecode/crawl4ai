@@ -11,11 +11,13 @@ Here’s a streamlined outline for the **Content Cleaning and Fit Markdown** vid
 
 ### **Content Cleaning & Fit Markdown**
 
-1. **Overview of Content Cleaning in Crawl4AI**:
+1) **Overview of Content Cleaning in Crawl4AI**:
+
    - Explain that web pages often include extra elements like ads, navigation bars, footers, and popups.
    - Crawl4AI’s content cleaning features help extract only the main content, reducing noise and enhancing readability.
 
-2. **Basic Content Cleaning Options**:
+2) **Basic Content Cleaning Options**:
+
    - **Removing Unwanted Elements**: Exclude specific HTML tags, like forms or navigation bars:
      ```python
      result = await crawler.arun(
@@ -27,7 +29,8 @@ Here’s a streamlined outline for the **Content Cleaning and Fit Markdown** vid
      ```
    - This example extracts content while excluding forms, navigation, and modal overlays, ensuring clean results.
 
-3. **Fit Markdown for Main Content Extraction**:
+3) **Fit Markdown for Main Content Extraction**:
+
    - **What is Fit Markdown**: Uses advanced analysis to identify the most relevant content (ideal for articles, blogs, and documentation).
    - **How it Works**: Analyzes content density, removes boilerplate elements, and maintains formatting for a clear output.
    - **Example**:
@@ -38,7 +41,8 @@ Here’s a streamlined outline for the **Content Cleaning and Fit Markdown** vid
      ```
    - Fit Markdown is especially helpful for long-form content like news articles or blog posts.
 
-4. **Comparing Fit Markdown with Regular Markdown**:
+4) **Comparing Fit Markdown with Regular Markdown**:
+
    - **Fit Markdown** returns the primary content without extraneous elements.
    - **Regular Markdown** includes all extracted text in markdown format.
    - Example to show the difference:
@@ -51,7 +55,8 @@ Here’s a streamlined outline for the **Content Cleaning and Fit Markdown** vid
      ```
    - This comparison shows the effectiveness of Fit Markdown in focusing on essential content.
 
-5. **Media and Metadata Handling with Content Cleaning**:
+5) **Media and Metadata Handling with Content Cleaning**:
+
    - **Media Extraction**: Crawl4AI captures images and videos with metadata like alt text, descriptions, and relevance scores:
      ```python
      for image in result.media["images"]:
@@ -59,7 +64,8 @@ Here’s a streamlined outline for the **Content Cleaning and Fit Markdown** vid
      ```
    - **Use Case**: Useful for saving only relevant images or videos from an article or content-heavy page.
 
-6. **Example of Clean Content Extraction in Action**:
+6) **Example of Clean Content Extraction in Action**:
+
    - Full example extracting cleaned content and Fit Markdown:
      ```python
      async with AsyncWebCrawler() as crawler:
@@ -73,7 +79,8 @@ Here’s a streamlined outline for the **Content Cleaning and Fit Markdown** vid
      ```
    - This example demonstrates content cleaning with settings for filtering noise and focusing on the core text.
 
-7. **Wrap Up & Next Steps**:
+7) **Wrap Up & Next Steps**:
+
    - Summarize the power of Crawl4AI’s content cleaning features and Fit Markdown for capturing clean, relevant content.
    - Tease the next video: **Link Analysis and Smart Filtering** to focus on analyzing and filtering links within crawled pages.
 
