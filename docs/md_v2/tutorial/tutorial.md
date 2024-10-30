@@ -771,9 +771,11 @@ Here’s a concise outline for the **Custom Headers, Identity Management, and Us
      async with AsyncWebCrawler(
          headers={"Accept-Language": "en-US", "Cache-Control": "no-cache"},
          user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0",
-         simulate_user=True
      ) as crawler:
-         result = await crawler.arun(url="https://example.com/secure-page")
+         result = await crawler.arun(
+            url="https://example.com/secure-page",
+            simulate_user=True
+        )
          print(result.markdown[:500])  # Display extracted content
      ```
    - This example enables detailed customization for evading detection and accessing protected pages smoothly.
@@ -1576,7 +1578,7 @@ Here’s a detailed outline for the **Hooks and Custom Workflow with AsyncWebCra
      async def log_browser_creation(browser):
          print("Browser instance created:", browser)
      
-     crawler.set_hook('on_browser_created', log_browser_creation)
+     crawler.crawler_strategy.set_hook('on_browser_created', log_browser_creation)
      ```
    - **Explanation**: This hook logs the browser creation event, useful for tracking when a new browser instance starts.
 
@@ -1591,7 +1593,7 @@ Here’s a detailed outline for the **Hooks and Custom Workflow with AsyncWebCra
      def update_user_agent(user_agent):
          print(f"User Agent Updated: {user_agent}")
      
-     crawler.set_hook('on_user_agent_updated', update_user_agent)
+     crawler.crawler_strategy.set_hook('on_user_agent_updated', update_user_agent)
      crawler.update_user_agent("Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X)")
      ```
    - **Explanation**: This hook provides a callback every time the user agent changes, helpful for debugging or dynamically altering user agent settings based on conditions.
@@ -1607,7 +1609,7 @@ Here’s a detailed outline for the **Hooks and Custom Workflow with AsyncWebCra
      async def log_execution_start(page):
          print("Execution started on page:", page.url)
      
-     crawler.set_hook('on_execution_started', log_execution_start)
+     crawler.crawler_strategy.set_hook('on_execution_started', log_execution_start)
      ```
    - **Explanation**: Logs the start of any major interaction on the page, ideal for cases where you want to monitor each interaction.
 
@@ -1624,7 +1626,7 @@ Here’s a detailed outline for the **Hooks and Custom Workflow with AsyncWebCra
          await page.set_extra_http_headers({"X-Custom-Header": "CustomValue"})
          print("Custom headers set before navigation")
      
-     crawler.set_hook('before_goto', modify_headers_before_goto)
+     crawler.crawler_strategy.set_hook('before_goto', modify_headers_before_goto)
      ```
    - **Explanation**: This hook allows injecting headers or altering settings based on the page’s needs, particularly useful for pages with custom requirements.
 
@@ -1640,7 +1642,7 @@ Here’s a detailed outline for the **Hooks and Custom Workflow with AsyncWebCra
          await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
          print("Scrolled to the bottom after navigation")
      
-     crawler.set_hook('after_goto', post_navigation_scroll)
+     crawler.crawler_strategy.set_hook('after_goto', post_navigation_scroll)
      ```
    - **Explanation**: This hook scrolls to the bottom of the page after loading, which can help load dynamically added content like infinite scroll elements.
 
@@ -1656,7 +1658,7 @@ Here’s a detailed outline for the **Hooks and Custom Workflow with AsyncWebCra
          await page.evaluate("document.querySelectorAll('.ad-banner').forEach(el => el.remove());")
          print("Advertisements removed before returning HTML")
      
-     crawler.set_hook('before_return_html', remove_advertisements)
+     crawler.crawler_strategy.set_hook('before_return_html', remove_advertisements)
      ```
    - **Explanation**: The hook removes ad banners from the HTML before it’s retrieved, ensuring a cleaner data extraction.
 
@@ -1672,7 +1674,7 @@ Here’s a detailed outline for the **Hooks and Custom Workflow with AsyncWebCra
          await page.wait_for_selector('.main-content')
          print("Main content loaded, ready to retrieve HTML")
      
-     crawler.set_hook('before_retrieve_html', wait_for_content_before_retrieve)
+     crawler.crawler_strategy.set_hook('before_retrieve_html', wait_for_content_before_retrieve)
      ```
    - **Explanation**: This hook waits for the main content to load before retrieving the HTML, ensuring that all essential content is captured.
 
@@ -1682,9 +1684,9 @@ Here’s a detailed outline for the **Hooks and Custom Workflow with AsyncWebCra
      - Each hook function can be asynchronous (useful for actions like waiting or retrieving async data).
    - **Example Setup**:
      ```python
-     crawler.set_hook('on_browser_created', log_browser_creation)
-     crawler.set_hook('before_goto', modify_headers_before_goto)
-     crawler.set_hook('after_goto', post_navigation_scroll)
+     crawler.crawler_strategy.set_hook('on_browser_created', log_browser_creation)
+     crawler.crawler_strategy.set_hook('before_goto', modify_headers_before_goto)
+     crawler.crawler_strategy.set_hook('after_goto', post_navigation_scroll)
      ```
 
 #### **5. Complete Example: Using Hooks for a Customized Crawl Workflow**
@@ -1694,10 +1696,10 @@ Here’s a detailed outline for the **Hooks and Custom Workflow with AsyncWebCra
      async def custom_crawl():
          async with AsyncWebCrawler() as crawler:
              # Set hooks for custom workflow
-             crawler.set_hook('on_browser_created', log_browser_creation)
-             crawler.set_hook('before_goto', modify_headers_before_goto)
-             crawler.set_hook('after_goto', post_navigation_scroll)
-             crawler.set_hook('before_return_html', remove_advertisements)
+             crawler.crawler_strategy.set_hook('on_browser_created', log_browser_creation)
+             crawler.crawler_strategy.set_hook('before_goto', modify_headers_before_goto)
+             crawler.crawler_strategy.set_hook('after_goto', post_navigation_scroll)
+             crawler.crawler_strategy.set_hook('before_return_html', remove_advertisements)
              
              # Perform the crawl
              url = "https://example.com"
