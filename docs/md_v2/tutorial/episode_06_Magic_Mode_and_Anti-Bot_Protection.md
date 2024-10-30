@@ -11,11 +11,13 @@ Here’s a concise outline for the **Magic Mode and Anti-Bot Protection** video:
 
 ### **Magic Mode & Anti-Bot Protection**
 
-1. **Why Anti-Bot Protection is Important**:
+1) **Why Anti-Bot Protection is Important**:
+
    - Many websites use bot detection mechanisms to block automated scraping. Crawl4AI’s anti-detection features help avoid IP bans, CAPTCHAs, and access restrictions.
    - **Magic Mode** is a one-step solution to enable a range of anti-bot features without complex configuration.
 
-2. **Enabling Magic Mode**:
+2) **Enabling Magic Mode**:
+
    - Simply set `magic=True` to activate Crawl4AI’s full anti-bot suite:
      ```python
      result = await crawler.arun(
@@ -25,13 +27,15 @@ Here’s a concise outline for the **Magic Mode and Anti-Bot Protection** video:
      ```
    - This enables a blend of stealth techniques, including masking automation signals, randomizing timings, and simulating real user behavior.
 
-3. **What Magic Mode Does Behind the Scenes**:
+3) **What Magic Mode Does Behind the Scenes**:
+
    - **User Simulation**: Mimics human actions like mouse movements and scrolling.
    - **Navigator Overrides**: Hides signals that indicate an automated browser.
    - **Timing Randomization**: Adds random delays to simulate natural interaction patterns.
    - **Cookie Handling**: Accepts and manages cookies dynamically to avoid triggers from cookie pop-ups.
 
-4. **Manual Anti-Bot Options (If Not Using Magic Mode)**:
+4) **Manual Anti-Bot Options (If Not Using Magic Mode)**:
+
    - For granular control, you can configure individual settings without Magic Mode:
      ```python
      result = await crawler.arun(
@@ -42,7 +46,8 @@ Here’s a concise outline for the **Magic Mode and Anti-Bot Protection** video:
      ```
    - **Use Cases**: This approach allows more specific adjustments when certain anti-bot features are needed but others are not.
 
-5. **Combining Proxies with Magic Mode**:
+5) **Combining Proxies with Magic Mode**:
+
    - To avoid rate limits or IP blocks, combine Magic Mode with a proxy:
      ```python
      async with AsyncWebCrawler(
@@ -56,7 +61,8 @@ Here’s a concise outline for the **Magic Mode and Anti-Bot Protection** video:
      ```
    - This setup maximizes stealth by pairing anti-bot detection with IP obfuscation.
 
-6. **Example of Anti-Bot Protection in Action**:
+6) **Example of Anti-Bot Protection in Action**:
+
    - Full example with Magic Mode and proxies to scrape a protected page:
      ```python
      async with AsyncWebCrawler() as crawler:
@@ -70,7 +76,8 @@ Here’s a concise outline for the **Magic Mode and Anti-Bot Protection** video:
      ```
    - This example ensures seamless access to protected content by combining anti-detection and waiting for full content load.
 
-7. **Wrap Up & Next Steps**:
+7) **Wrap Up & Next Steps**:
+
    - Recap the power of Magic Mode and anti-bot features for handling restricted websites.
    - Tease the next video: **Content Cleaning and Fit Markdown** to show how to extract clean and focused content from a page.
 

@@ -11,11 +11,11 @@ Here's a condensed outline for an **Overview of Advanced Features** video coveri
 
 ### **Overview of Advanced Features**
 
-1 **Introduction to Advanced Features**:
+1) **Introduction to Advanced Features**:
  
    - Briefly introduce Crawl4AI’s advanced tools, which let users go beyond basic crawling to customize and fine-tune their scraping workflows.
 
-2 **Taking Screenshots**:
+2) **Taking Screenshots**:
  
    - Explain the screenshot capability for capturing page state and verifying content.
    - **Example**:
@@ -24,7 +24,7 @@ Here's a condensed outline for an **Overview of Advanced Features** video coveri
       ```
    - Mention that screenshots are saved as a base64 string in `result`, allowing easy decoding and saving.
 
-3 **Media and Link Extraction**:
+3) **Media and Link Extraction**:
  
    - Demonstrate how to pull all media (images, videos) and links (internal and external) from a page for deeper analysis or content gathering.
    - **Example**:
@@ -34,7 +34,7 @@ Here's a condensed outline for an **Overview of Advanced Features** video coveri
       print("Links:", result.links)
       ```
 
-4 **Custom User Agent**:
+4) **Custom User Agent**:
  
    - Show how to set a custom user agent to disguise the crawler or simulate specific devices/browsers.
    - **Example**:
@@ -42,7 +42,7 @@ Here's a condensed outline for an **Overview of Advanced Features** video coveri
       result = await crawler.arun(url="https://www.example.com", user_agent="Mozilla/5.0 (compatible; MyCrawler/1.0)")
       ```
 
-5 **Custom Hooks for Enhanced Control**:
+5) **Custom Hooks for Enhanced Control**:
  
    - Briefly cover how to use hooks, which allow custom actions like setting headers or handling login during the crawl.
    - **Example**: Setting a custom header with `before_get_url` hook.
@@ -51,7 +51,7 @@ Here's a condensed outline for an **Overview of Advanced Features** video coveri
           await page.set_extra_http_headers({"X-Test-Header": "test"})
       ```
 
-6 **CSS Selectors for Targeted Extraction**:
+6) **CSS Selectors for Targeted Extraction**:
  
    - Explain the use of CSS selectors to extract specific elements, ideal for structured data like articles or product details.
    - **Example**:
@@ -60,7 +60,7 @@ Here's a condensed outline for an **Overview of Advanced Features** video coveri
       print("H2 Tags:", result.extracted_content)
       ```
 
-7 **Crawling Inside Iframes**:
+7) **Crawling Inside Iframes**:
  
    - Mention how enabling `process_iframes=True` allows extracting content within iframes, useful for sites with embedded content or ads.
    - **Example**:
@@ -68,7 +68,7 @@ Here's a condensed outline for an **Overview of Advanced Features** video coveri
       result = await crawler.arun(url="https://www.example.com", process_iframes=True)
       ```
 
-8 **Wrap-Up**:
+8) **Wrap-Up**:
  
    - Summarize these advanced features and how they allow users to customize every part of their web scraping experience.
    - Tease upcoming videos where each feature will be explored in detail.

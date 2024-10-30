@@ -11,11 +11,13 @@ Here’s a focused outline for the **Link Analysis and Smart Filtering** video:
 
 ### **Link Analysis & Smart Filtering**
 
-1. **Importance of Link Analysis in Web Crawling**:
+1) **Importance of Link Analysis in Web Crawling**:
+
    - Explain that web pages often contain numerous links, including internal links, external links, social media links, and ads.
    - Crawl4AI’s link analysis and filtering options help extract only relevant links, enabling more targeted and efficient crawls.
 
-2. **Automatic Link Classification**:
+2) **Automatic Link Classification**:
+
    - Crawl4AI categorizes links automatically into internal, external, and social media links.
    - **Example**:
      ```python
@@ -30,7 +32,8 @@ Here’s a focused outline for the **Link Analysis and Smart Filtering** video:
      print("External Links:", external_links[:3])
      ```
 
-3. **Filtering Out Unwanted Links**:
+3) **Filtering Out Unwanted Links**:
+
    - **Exclude External Links**: Remove all links pointing to external sites.
    - **Exclude Social Media Links**: Filter out social media domains like Facebook or Twitter.
    - **Example**:
@@ -42,7 +45,8 @@ Here’s a focused outline for the **Link Analysis and Smart Filtering** video:
      )
      ```
 
-4. **Custom Domain Filtering**:
+4) **Custom Domain Filtering**:
+
    - **Exclude Specific Domains**: Filter links from particular domains, e.g., ad sites.
    - **Custom Social Media Domains**: Add additional social media domains if needed.
    - **Example**:
@@ -54,7 +58,8 @@ Here’s a focused outline for the **Link Analysis and Smart Filtering** video:
      )
      ```
 
-5. **Accessing Link Context and Metadata**:
+5) **Accessing Link Context and Metadata**:
+
    - Crawl4AI provides additional metadata for each link, including its text, type (e.g., navigation or content), and surrounding context.
    - **Example**:
      ```python
@@ -63,7 +68,8 @@ Here’s a focused outline for the **Link Analysis and Smart Filtering** video:
      ```
    - **Use Case**: Helps users understand the relevance of links based on where they are placed on the page (e.g., navigation vs. article content).
 
-6. **Example of Comprehensive Link Filtering and Analysis**:
+6) **Example of Comprehensive Link Filtering and Analysis**:
+
    - Full example combining link filtering, metadata access, and contextual information:
      ```python
      async with AsyncWebCrawler() as crawler:
@@ -79,7 +85,8 @@ Here’s a focused outline for the **Link Analysis and Smart Filtering** video:
      ```
    - This example filters unnecessary links, keeping only internal and relevant links from the main content area.
 
-7. **Wrap Up & Next Steps**:
+7) **Wrap Up & Next Steps**:
+
    - Summarize the benefits of link filtering for efficient crawling and relevant content extraction.
    - Tease the next video: **Custom Headers, Identity Management, and User Simulation** to explain how to configure identity settings and simulate user behavior for stealthier crawls.
 

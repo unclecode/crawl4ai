@@ -11,11 +11,13 @@ Here’s a clear and focused outline for the **Media Handling: Images, Videos, a
 
 ### **Media Handling: Images, Videos, and Audio**
 
-1. **Overview of Media Extraction in Crawl4AI**:
+1) **Overview of Media Extraction in Crawl4AI**:
+
    - Crawl4AI can detect and extract different types of media (images, videos, and audio) along with useful metadata.
    - This functionality is essential for gathering visual content from multimedia-heavy pages like e-commerce sites, news articles, and social media feeds.
 
-2. **Image Extraction and Metadata**:
+2) **Image Extraction and Metadata**:
+
    - Crawl4AI captures images with detailed metadata, including:
      - **Source URL**: The direct URL to the image.
      - **Alt Text**: Image description if available.
@@ -33,7 +35,8 @@ Here’s a clear and focused outline for the **Media Handling: Images, Videos, a
      ```
    - This example shows how to access each image’s metadata, making it easy to filter for the most relevant visuals.
 
-3. **Handling Lazy-Loaded Images**:
+3) **Handling Lazy-Loaded Images**:
+
    - Crawl4AI automatically supports lazy-loaded images, which are commonly used to optimize webpage loading.
    - **Example with Wait for Lazy-Loaded Content**:
      ```python
@@ -45,7 +48,8 @@ Here’s a clear and focused outline for the **Media Handling: Images, Videos, a
      ```
    - This setup waits for lazy-loaded images to appear, ensuring they are fully captured.
 
-4. **Video Extraction and Metadata**:
+4) **Video Extraction and Metadata**:
+
    - Crawl4AI captures video elements, including:
      - **Source URL**: The video’s direct URL.
      - **Type**: Format of the video (e.g., MP4).
@@ -61,7 +65,8 @@ Here’s a clear and focused outline for the **Media Handling: Images, Videos, a
      ```
    - This allows users to gather video content and relevant details for further processing or analysis.
 
-5. **Audio Extraction and Metadata**:
+5) **Audio Extraction and Metadata**:
+
    - Audio elements can also be extracted, with metadata like:
      - **Source URL**: The audio file’s direct URL.
      - **Type**: Format of the audio file (e.g., MP3).
@@ -75,14 +80,16 @@ Here’s a clear and focused outline for the **Media Handling: Images, Videos, a
      ```
    - Useful for sites with podcasts, sound bites, or other audio content.
 
-6. **Filtering Media by Relevance**:
+6) **Filtering Media by Relevance**:
+
    - Use metadata like relevance score to filter only the most useful media content:
      ```python
      relevant_images = [img for img in result.media["images"] if img['score'] > 5]
      ```
    - This is especially helpful for content-heavy pages where you only want media directly related to the main content.
 
-7. **Example: Full Media Extraction with Content Filtering**:
+7) **Example: Full Media Extraction with Content Filtering**:
+
    - Full example extracting images, videos, and audio along with filtering by relevance:
      ```python
      async with AsyncWebCrawler() as crawler:
@@ -99,7 +106,8 @@ Here’s a clear and focused outline for the **Media Handling: Images, Videos, a
      ```
    - This example shows how to capture and filter various media types, focusing on what’s most relevant.
 
-8. **Wrap Up & Next Steps**:
+8) **Wrap Up & Next Steps**:
+
    - Recap the comprehensive media extraction capabilities, emphasizing how metadata helps users focus on relevant content.
    - Tease the next video: **Link Analysis and Smart Filtering** to explore how Crawl4AI handles internal, external, and social media links for more focused data gathering.
 
