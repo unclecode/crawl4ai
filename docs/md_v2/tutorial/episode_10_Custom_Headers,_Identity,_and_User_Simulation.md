@@ -11,10 +11,12 @@ Here’s a concise outline for the **Custom Headers, Identity Management, and Us
 
 ### **Custom Headers, Identity Management, & User Simulation**
 
-1. **Why Customize Headers and Identity in Crawling**:
+1) **Why Customize Headers and Identity in Crawling**:
+
    - Websites often track request headers and browser properties to detect bots. Customizing headers and managing identity help make requests appear more human, improving access to restricted sites.
 
-2. **Setting Custom Headers**:
+2) **Setting Custom Headers**:
+
    - Customize HTTP headers to mimic genuine browser requests or meet site-specific requirements:
      ```python
      headers = {
@@ -26,7 +28,8 @@ Here’s a concise outline for the **Custom Headers, Identity Management, and Us
      ```
    - **Use Case**: Customize the `Accept-Language` header to simulate local user settings, or `Cache-Control` to bypass cache for fresh content.
 
-3. **Setting a Custom User Agent**:
+3) **Setting a Custom User Agent**:
+
    - Some websites block requests from common crawler user agents. Setting a custom user agent string helps bypass these restrictions:
      ```python
      crawler = AsyncWebCrawler(
@@ -35,7 +38,8 @@ Here’s a concise outline for the **Custom Headers, Identity Management, and Us
      ```
    - **Tip**: Use user-agent strings from popular browsers (e.g., Chrome, Firefox) to improve access and reduce detection risks.
 
-4. **User Simulation for Human-like Behavior**:
+4) **User Simulation for Human-like Behavior**:
+
    - Enable `simulate_user=True` to mimic natural user interactions, such as random timing and simulated mouse movements:
      ```python
      result = await crawler.arun(
@@ -45,7 +49,8 @@ Here’s a concise outline for the **Custom Headers, Identity Management, and Us
      ```
    - **Behavioral Effects**: Adds subtle variations in interactions, making the crawler harder to detect on bot-protected sites.
 
-5. **Navigator Overrides and Magic Mode for Full Identity Masking**:
+5) **Navigator Overrides and Magic Mode for Full Identity Masking**:
+
    - Use `override_navigator=True` to mask automation indicators like `navigator.webdriver`, which websites check to detect bots:
      ```python
      result = await crawler.arun(
@@ -64,7 +69,8 @@ Here’s a concise outline for the **Custom Headers, Identity Management, and Us
      ```
    - This setup includes all anti-detection techniques like navigator masking, random timing, and user simulation.
 
-6. **Example: Comprehensive Setup for Identity Management**:
+6) **Example: Comprehensive Setup for Identity Management**:
+
    - A full example combining custom headers, user-agent, and user simulation for a realistic browsing profile:
      ```python
      async with AsyncWebCrawler(
@@ -77,7 +83,8 @@ Here’s a concise outline for the **Custom Headers, Identity Management, and Us
      ```
    - This example enables detailed customization for evading detection and accessing protected pages smoothly.
 
-7. **Wrap Up & Next Steps**:
+7) **Wrap Up & Next Steps**:
+
    - Recap the value of headers, user-agent customization, and simulation in bypassing bot detection.
    - Tease the next video: **Extraction Strategies: JSON CSS, LLM, and Cosine** to dive into structured data extraction methods for high-quality content retrieval.
 

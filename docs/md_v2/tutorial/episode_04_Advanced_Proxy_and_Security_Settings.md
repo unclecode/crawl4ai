@@ -11,11 +11,13 @@ Here’s a focused outline for the **Proxy and Security Settings** video:
 
 ### **Proxy & Security Settings**
 
-1. **Why Use Proxies in Web Crawling**:
+1) **Why Use Proxies in Web Crawling**:
+
    - Proxies are essential for bypassing IP-based restrictions, improving anonymity, and managing rate limits.
    - Crawl4AI supports simple proxies, authenticated proxies, and proxy rotation for robust web scraping.
 
-2. **Basic Proxy Setup**:
+2) **Basic Proxy Setup**:
+
    - **Using a Simple Proxy**:
      ```python
      # HTTP proxy
@@ -25,7 +27,8 @@ Here’s a focused outline for the **Proxy and Security Settings** video:
      crawler = AsyncWebCrawler(proxy="socks5://proxy.example.com:1080")
      ```
 
-3. **Authenticated Proxies**:
+3) **Authenticated Proxies**:
+
    - Use `proxy_config` for proxies requiring a username and password:
      ```python
      proxy_config = {
@@ -36,7 +39,8 @@ Here’s a focused outline for the **Proxy and Security Settings** video:
      crawler = AsyncWebCrawler(proxy_config=proxy_config)
      ```
 
-4. **Rotating Proxies**:
+4) **Rotating Proxies**:
+
    - Rotating proxies helps avoid IP bans by switching IP addresses for each request:
      ```python
      async def get_next_proxy():
@@ -51,7 +55,8 @@ Here’s a focused outline for the **Proxy and Security Settings** video:
      ```
    - This setup periodically switches the proxy for enhanced security and access.
 
-5. **Custom Headers for Additional Security**:
+5) **Custom Headers for Additional Security**:
+
    - Set custom headers to mask the crawler’s identity and avoid detection:
      ```python
      headers = {
@@ -63,7 +68,8 @@ Here’s a focused outline for the **Proxy and Security Settings** video:
      crawler = AsyncWebCrawler(headers=headers)
      ```
 
-6. **Combining Proxies with Magic Mode for Anti-Bot Protection**:
+6) **Combining Proxies with Magic Mode for Anti-Bot Protection**:
+
    - For sites with aggressive bot detection, combine `proxy` settings with `magic=True`:
      ```python
      async with AsyncWebCrawler(proxy="http://proxy.example.com:8080", headers={"Accept-Language": "en-US"}) as crawler:
@@ -74,7 +80,8 @@ Here’s a focused outline for the **Proxy and Security Settings** video:
      ```
    - **Magic Mode** automatically enables user simulation, random timing, and browser property masking.
 
-7. **Wrap Up & Next Steps**:
+7) **Wrap Up & Next Steps**:
+
    - Summarize the importance of proxies and anti-detection in accessing restricted content and avoiding bans.
    - Tease the next video: **JavaScript Execution and Handling Dynamic Content** for working with interactive and dynamically loaded pages.
 
