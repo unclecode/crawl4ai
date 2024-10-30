@@ -1,12 +1,21 @@
-# Crawl4AI (Async Version) 🕷️🤖
+# 🔥🕷️ Crawl4AI: LLM Friendly Web Crawler & Scrapper
+
+<a href="https://trendshift.io/repositories/11716" target="_blank"><img src="https://trendshift.io/api/badge/repositories/11716" alt="unclecode%2Fcrawl4ai | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 
 [![GitHub Stars](https://img.shields.io/github/stars/unclecode/crawl4ai?style=social)](https://github.com/unclecode/crawl4ai/stargazers)
+![PyPI - Downloads](https://img.shields.io/pypi/dm/Crawl4AI)
 [![GitHub Forks](https://img.shields.io/github/forks/unclecode/crawl4ai?style=social)](https://github.com/unclecode/crawl4ai/network/members)
 [![GitHub Issues](https://img.shields.io/github/issues/unclecode/crawl4ai)](https://github.com/unclecode/crawl4ai/issues)
 [![GitHub Pull Requests](https://img.shields.io/github/issues-pr/unclecode/crawl4ai)](https://github.com/unclecode/crawl4ai/pulls)
 [![License](https://img.shields.io/github/license/unclecode/crawl4ai)](https://github.com/unclecode/crawl4ai/blob/main/LICENSE)
 
 Crawl4AI simplifies asynchronous web crawling and data extraction, making it accessible for large language models (LLMs) and AI applications. 🆓🌐
+
+## 🌟 Meet the Crawl4AI Assistant: Your Copilot for Crawling
+Use the [Crawl4AI GPT Assistant](https://tinyurl.com/crawl4ai-gpt) as your AI-powered copilot! With this assistant, you can:
+- 🧑‍💻 Generate code for complex crawling and extraction tasks
+- 💡 Get tailored support and examples
+- 📘 Learn Crawl4AI faster with step-by-step guidance
 
 ## New in 0.3.72 ✨
 
@@ -19,7 +28,7 @@ Crawl4AI simplifies asynchronous web crawling and data extraction, making it acc
 
 ## Try it Now!
 
-✨ Play around with this [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1REChY6fXQf-EaVYLv0eHEWvzlYxGm0pd?usp=sharing)
+✨ Play around with this [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1SgRPrByQLzjRfwoRNq1wSGE9nYY_EE8C?usp=sharing)
 
 ✨ Visit our [Documentation Website](https://crawl4ai.com/mkdocs/)
 

@@ -383,10 +383,11 @@ async def crawl_with_user_simultion():
     async with AsyncWebCrawler(verbose=True, headless=True) as crawler:
         url = "YOUR-URL-HERE"
         result = await crawler.arun(
-            url=url,
+            url=url,            
             bypass_cache=True,
-            simulate_user = True,# Causes a series of random mouse movements and clicks to simulate user interaction
-            override_navigator = True # Overrides the navigator object to make it look like a real user
+            magic = True, # Automatically detects and removes overlays, popups, and other elements that block content
+            # simulate_user = True,# Causes a series of random mouse movements and clicks to simulate user interaction
+            # override_navigator = True # Overrides the navigator object to make it look like a real user
         )
         
         print(result.markdown)    

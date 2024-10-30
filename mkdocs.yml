@@ -38,6 +38,24 @@ nav:
     - 'AsyncWebCrawler.arun()': 'api/arun.md'
     - 'CrawlResult': 'api/crawl-result.md'
     - 'Strategies': 'api/strategies.md'
+    
+  - Tutorial:
+    - '1. Getting Started': 'tutorial/episode_01_Introduction_to_Crawl4AI_and_Basic_Installation.md'
+    - '2. Advanced Features': 'tutorial/episode_02_Overview_of_Advanced_Features.md'
+    - '3. Browser Setup': 'tutorial/episode_03_Browser_Configurations_&_Headless_Crawling.md'
+    - '4. Proxy Settings': 'tutorial/episode_04_Advanced_Proxy_and_Security_Settings.md'
+    - '5. Dynamic Content': 'tutorial/episode_05_JavaScript_Execution_and_Dynamic_Content_Handling.md'
+    - '6. Magic Mode': 'tutorial/episode_06_Magic_Mode_and_Anti-Bot_Protection.md'
+    - '7. Content Cleaning': 'tutorial/episode_07_Content_Cleaning_and_Fit_Markdown.md'
+    - '8. Media Handling': 'tutorial/episode_08_Media_Handling:_Images,_Videos,_and_Audio.md'
+    - '9. Link Analysis': 'tutorial/episode_09_Link_Analysis_and_Smart_Filtering.md'
+    - '10. User Simulation': 'tutorial/episode_10_Custom_Headers,_Identity,_and_User_Simulation.md'
+    - '11.1. JSON CSS': 'tutorial/episode_11_1_Extraction_Strategies:_JSON_CSS.md'
+    - '11.2. LLM Strategy': 'tutorial/episode_11_2_Extraction_Strategies:_LLM.md'
+    - '11.3. Cosine Strategy': 'tutorial/episode_11_3_Extraction_Strategies:_Cosine.md'
+    - '12. Session Crawling': 'tutorial/episode_12_Session-Based_Crawling_for_Dynamic_Websites.md'
+    - '13. Text Chunking': 'tutorial/episode_13_Chunking_Strategies_for_Large_Text_Processing.md'
+    - '14. Custom Workflows': 'tutorial/episode_14_Hooks_and_Custom_Workflow_with_AsyncWebCrawler.md'
 
 
 theme:
