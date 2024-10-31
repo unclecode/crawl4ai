@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500">
+    <!-- Background -->
+    <rect width="800" height="500" fill="#1a1a1a"/>
+    
+    <!-- Problem Boxes -->
+    <g transform="translate(50,50)">
+        <!-- Problem 1 Box -->
+        <rect x="0" y="0" width="300" height="150" rx="10" fill="#2d1a1a" stroke="#ff4444" stroke-width="2"/>
+        <text x="150" y="30" text-anchor="middle" font-family="Arial" font-weight="bold" font-size="16" fill="#ff6666">Problem 1: Data Ownership Crisis</text>
+        <text x="150" y="60" text-anchor="middle" font-family="Arial" font-size="12" fill="#e0e0e0">
+            <tspan x="150" dy="0">Scattered personal data</tspan>
+            <tspan x="150" dy="20">Inaccessible enterprise knowledge</tspan>
+            <tspan x="150" dy="20">No true data ownership</tspan>
+            <tspan x="150" dy="20">Tech giants control access</tspan>
+        </text>
+
+        <!-- Problem 2 Box -->
+        <rect x="0" y="200" width="300" height="150" rx="10" fill="#1a2d1a" stroke="#4caf50" stroke-width="2"/>
+        <text x="150" y="230" text-anchor="middle" font-family="Arial" font-weight="bold" font-size="16" fill="#81c784">Problem 2: AI Training Data Crisis</text>
+        <text x="150" y="260" text-anchor="middle" font-family="Arial" font-size="12" fill="#e0e0e0">
+            <tspan x="150" dy="0">Over-reliance on synthetic data</tspan>
+            <tspan x="150" dy="20">Limited genetic diversity</tspan>
+            <tspan x="150" dy="20">Shallow AI understanding</tspan>
+            <tspan x="150" dy="20">Data scarcity for researchers</tspan>
+        </text>
+    </g>
+
+    <!-- Arrows -->
+    <g transform="translate(400,125)">
+        <path d="M-20,0 L40,0" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
+        <path d="M-20,200 L40,200" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
+    </g>
+
+    <!-- Arrow Marker -->
+    <defs>
+        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#666"/>
+        </marker>
+    </defs>
+
+    <!-- Solution Boxes -->
+    <g transform="translate(450,50)">
+        <!-- Solution 1 Box -->
+        <rect x="0" y="0" width="300" height="150" rx="10" fill="#1a2d3d" stroke="#2196f3" stroke-width="2"/>
+        <text x="150" y="30" text-anchor="middle" font-family="Arial" font-weight="bold" font-size="16" fill="#64b5f6">Solution 1: Democratizing Ownership</text>
+        <text x="150" y="60" text-anchor="middle" font-family="Arial" font-size="12" fill="#e0e0e0">
+            <tspan x="150" dy="0">Open-source extraction tools</tspan>
+            <tspan x="150" dy="20">Data as structured assets</tspan>
+            <tspan x="150" dy="20">Personal AI assistants</tspan>
+            <tspan x="150" dy="20">Enterprise knowledge bases</tspan>
+        </text>
+
+        <!-- Solution 2 Box -->
+        <rect x="0" y="200" width="300" height="150" rx="10" fill="#2d2613" stroke="#ffa726" stroke-width="2"/>
+        <text x="150" y="230" text-anchor="middle" font-family="Arial" font-weight="bold" font-size="16" fill="#ffb74d">Solution 2: Authentic Data Access</text>
+        <text x="150" y="260" text-anchor="middle" font-family="Arial" font-size="12" fill="#e0e0e0">
+            <tspan x="150" dy="0">Data marketplace</tspan>
+            <tspan x="150" dy="20">Willing participation</tspan>
+            <tspan x="150" dy="20">High-quality training data</tspan>
+            <tspan x="150" dy="20">Path to distributed AGI</tspan>
+        </text>
+    </g>
+
+    <!-- Future Vision Box at Bottom -->
+    <g transform="translate(200,420)">
+        <rect x="0" y="0" width="400" height="60" rx="10" fill="#2d1a2d" stroke="#ba68c8" stroke-width="2"/>
+        <text x="200" y="35" text-anchor="middle" font-family="Arial" font-weight="bold" font-size="16" fill="#ce93d8">Economic Vision: Free Market of Data</text>
+    </g>
+</svg>
