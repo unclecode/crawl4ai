@@ -1,5 +1,7 @@
 # Mission
 
+![Mission Diagram](./docs/assets/pitch-dark.svg)
+
 ## The Two Critical Challenges in AI's Future
 
 ### 1. The Data Ownership Crisis
