@@ -409,6 +409,8 @@ Our open-source solution tackles both problems by democratizing data ownership t
 
 This democratization of data ownership is the crucial first step toward democratizing AI itself, ensuring its development reflects the full spectrum of human knowledge and experience. Through this approach, we're building a future where AI advancement is driven by authentic human data rather than synthetic alternatives.
 
+For a detailed exploration of our vision, challenges, and solutions, please see our [full mission statement](./MISSION.md).
+
 ![Mission Diagram](./docs/assets/pitch-dark.svg)
 
 ## Star History
