@@ -6,6 +6,7 @@ This commit introduces several key enhancements, including improved error handli
 ## [v0.3.73] - 2024-10-24
 
 ### Added
+- preserve_tags: Added support for preserving specific HTML tags during markdown conversion.
 - Smart overlay removal system in AsyncPlaywrightCrawlerStrategy:
   - Automatic removal of popups, modals, and cookie notices
   - Detection and removal of fixed/sticky position elements
