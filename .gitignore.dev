@@ -185,3 +185,5 @@ docs/.DS_Store
 test_env/
 **/.DS_Store
 **/.DS_Store
+
+crawl4ai/models
