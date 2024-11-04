@@ -16,7 +16,7 @@ from .utils import (
     InvalidCSSSelectorError,
     format_html
 )
-
+from ._version import __version__ as crawl4ai_version
 
 class AsyncWebCrawler:
     def __init__(
@@ -46,6 +46,8 @@ class AsyncWebCrawler:
         await self.crawler_strategy.__aexit__(exc_type, exc_val, exc_tb)
 
     async def awarmup(self):
+        # Print a message for crawl4ai and its version
+        print(f"[LOG] 🚀 Crawl4AI {crawl4ai_version}")
         if self.verbose:
             print("[LOG] 🌤️  Warming up the AsyncWebCrawler")
         # await async_db_manager.ainit_db()
