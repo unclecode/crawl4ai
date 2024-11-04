@@ -178,7 +178,7 @@ def escape_json_string(s):
     
     return s
 
-class CustomHTML2Text(HTML2Text):
+class CustomHTML2Text_v0(HTML2Text):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.inside_pre = False
@@ -981,6 +981,19 @@ def format_html(html_string):
     return soup.prettify()
 
 def normalize_url(href, base_url):
+    """Normalize URLs to ensure consistent format"""
+    from urllib.parse import urljoin, urlparse
+
+    # Parse base URL to get components
+    parsed_base = urlparse(base_url)
+    if not parsed_base.scheme or not parsed_base.netloc:
+        raise ValueError(f"Invalid base URL format: {base_url}")
+
+    # Use urljoin to handle all cases
+    normalized = urljoin(base_url, href.strip())
+    return normalized
+
+def normalize_url_tmp(href, base_url):
     """Normalize URLs to ensure consistent format"""
     # Extract protocol and domain from base URL
     try:

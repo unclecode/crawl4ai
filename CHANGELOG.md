@@ -1,5 +1,8 @@
 # Changelog
 
+## [2024-11-04 - 13:21:42] Comprehensive Update of Crawl4AI Features and Dependencies
+This commit introduces several key enhancements, including improved error handling and robust database operations in `async_database.py`, which now features a connection pool and retry logic for better reliability. Updates to the README.md provide clearer instructions and a better user experience with links to documentation sections. The `.gitignore` file has been refined to include additional directories, while the async web crawler now utilizes a managed browser for more efficient crawling. Furthermore, multiple dependency updates and introduction of the `CustomHTML2Text` class enhance text extraction capabilities.
+
 ## [v0.3.73] - 2024-10-24
 
 ### Added
