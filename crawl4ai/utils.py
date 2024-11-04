@@ -706,9 +706,12 @@ def get_content_of_website_optimized(url: str, html: str, word_count_threshold: 
     body = flatten_nested_elements(body)
     base64_pattern = re.compile(r'data:image/[^;]+;base64,([^"]+)')
     for img in imgs:
-        src = img.get('src', '')
-        if base64_pattern.match(src):
-            img['src'] = base64_pattern.sub('', src)
+        try:
+            src = img.get('src', '')
+            if base64_pattern.match(src):
+                img['src'] = base64_pattern.sub('', src)
+        except:
+            pass        
 
     cleaned_html = str(body).replace('\n\n', '\n').replace('  ', ' ')
     cleaned_html = sanitize_html(cleaned_html)
