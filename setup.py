@@ -23,7 +23,7 @@ with open(os.path.join(__location__, "requirements.txt")) as f:
     requirements = f.read().splitlines()
     
 # Read version from __init__.py
-with open("crawl4ai/__init__.py") as f:
+with open("crawl4ai/_version.py") as f:
     for line in f:
         if line.startswith("__version__"):
             version = line.split("=")[1].strip().strip('"')

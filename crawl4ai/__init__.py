@@ -2,8 +2,8 @@
 
 from .async_webcrawler import AsyncWebCrawler
 from .models import CrawlResult
-
-__version__ = "0.3.72"
+from ._version import __version__
+# __version__ = "0.3.73"
 
 __all__ = [
     "AsyncWebCrawler",
