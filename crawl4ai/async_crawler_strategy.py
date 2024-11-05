@@ -3,7 +3,8 @@ import base64
 import time
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, Any, List, Optional, Awaitable
-import os
+import os, sys, shutil
+import tempfile, subprocess
 from playwright.async_api import async_playwright, Page, Browser, Error
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
@@ -13,6 +14,7 @@ from pydantic import BaseModel
 import hashlib
 import json
 import uuid
+
 from playwright_stealth import StealthConfig, stealth_async
 
 stealth_config = StealthConfig(
@@ -30,6 +32,106 @@ stealth_config = StealthConfig(
     media_codecs=True,
 )
 
+
+class ManagedBrowser:
+    def __init__(self, browser_type: str = "chromium", user_data_dir: Optional[str] = None, headless: bool = False):
+        self.browser_type = browser_type
+        self.user_data_dir = user_data_dir
+        self.headless = headless
+        self.browser_process = None
+        self.temp_dir = None
+        self.debugging_port = 9222
+
+    async def start(self) -> str:
+        """
+        Starts the browser process and returns the CDP endpoint URL.
+        If user_data_dir is not provided, creates a temporary directory.
+        """
+        
+        # Create temp dir if needed
+        if not self.user_data_dir:
+            self.temp_dir = tempfile.mkdtemp(prefix="browser-profile-")
+            self.user_data_dir = self.temp_dir
+
+        # Get browser path and args based on OS and browser type
+        browser_path = self._get_browser_path()
+        args = self._get_browser_args()
+
+        # Start browser process
+        try:
+            self.browser_process = subprocess.Popen(
+                args,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            await asyncio.sleep(2)  # Give browser time to start
+            return f"http://localhost:{self.debugging_port}"
+        except Exception as e:
+            await self.cleanup()
+            raise Exception(f"Failed to start browser: {e}")
+
+    def _get_browser_path(self) -> str:
+        """Returns the browser executable path based on OS and browser type"""
+        if sys.platform == "darwin":  # macOS
+            paths = {
+                "chromium": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+                "firefox": "/Applications/Firefox.app/Contents/MacOS/firefox",
+                "webkit": "/Applications/Safari.app/Contents/MacOS/Safari"
+            }
+        elif sys.platform == "win32":  # Windows
+            paths = {
+                "chromium": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+                "firefox": "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
+                "webkit": None  # WebKit not supported on Windows
+            }
+        else:  # Linux
+            paths = {
+                "chromium": "google-chrome",
+                "firefox": "firefox",
+                "webkit": None  # WebKit not supported on Linux
+            }
+        
+        return paths.get(self.browser_type)
+
+    def _get_browser_args(self) -> List[str]:
+        """Returns browser-specific command line arguments"""
+        base_args = [self._get_browser_path()]
+        
+        if self.browser_type == "chromium":
+            args = [
+                f"--remote-debugging-port={self.debugging_port}",
+                f"--user-data-dir={self.user_data_dir}",
+            ]
+            if self.headless:
+                args.append("--headless=new")
+        elif self.browser_type == "firefox":
+            args = [
+                "--remote-debugging-port", str(self.debugging_port),
+                "--profile", self.user_data_dir,
+            ]
+            if self.headless:
+                args.append("--headless")
+        else:
+            raise NotImplementedError(f"Browser type {self.browser_type} not supported")
+            
+        return base_args + args
+
+    async def cleanup(self):
+        """Cleanup browser process and temporary directory"""
+        if self.browser_process:
+            try:
+                self.browser_process.terminate()
+                await asyncio.sleep(1)
+                if self.browser_process.poll() is None:
+                    self.browser_process.kill()
+            except Exception as e:
+                print(f"Error terminating browser: {e}")
+
+        if self.temp_dir and os.path.exists(self.temp_dir):
+            try:
+                shutil.rmtree(self.temp_dir)
+            except Exception as e:
+                print(f"Error removing temporary directory: {e}")
 
 class AsyncCrawlResponse(BaseModel):
     html: str
@@ -82,6 +184,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         self.playwright = None
         self.browser = None
         self.sleep_on_close = kwargs.get("sleep_on_close", False)
+        self.use_managed_browser = kwargs.get("use_managed_browser", False)
+        self.user_data_dir = kwargs.get("user_data_dir", None)
+        self.managed_browser = None
         self.hooks = {
             'on_browser_created': None,
             'on_user_agent_updated': None,
@@ -103,36 +208,46 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         if self.playwright is None:
             self.playwright = await async_playwright().start()
         if self.browser is None:
-            browser_args = {
-                "headless": self.headless,
-                "args": [
-                    "--disable-gpu",
-                    "--no-sandbox",
-                    "--disable-dev-shm-usage",
-                    "--disable-blink-features=AutomationControlled",
-                    "--disable-infobars",
-                    "--window-position=0,0",
-                    "--ignore-certificate-errors",
-                    "--ignore-certificate-errors-spki-list",
-                    # "--headless=new",  # Use the new headless mode
-                ]
-            }
-            
-            # Add proxy settings if a proxy is specified
-            if self.proxy:
-                proxy_settings = ProxySettings(server=self.proxy)
-                browser_args["proxy"] = proxy_settings
-            elif self.proxy_config:
-                proxy_settings = ProxySettings(server=self.proxy_config.get("server"), username=self.proxy_config.get("username"), password=self.proxy_config.get("password"))
-                browser_args["proxy"] = proxy_settings
-                
-            # Select the appropriate browser based on the browser_type
-            if self.browser_type == "firefox":
-                self.browser = await self.playwright.firefox.launch(**browser_args)
-            elif self.browser_type == "webkit":
-                self.browser = await self.playwright.webkit.launch(**browser_args)
+            if self.use_managed_browser:
+                # Use managed browser approach
+                self.managed_browser = ManagedBrowser(
+                    browser_type=self.browser_type,
+                    user_data_dir=self.user_data_dir,
+                    headless=self.headless
+                )
+                cdp_url = await self.managed_browser.start()
+                self.browser = await self.playwright.chromium.connect_over_cdp(cdp_url)
             else:
-                self.browser = await self.playwright.chromium.launch(**browser_args)
+                browser_args = {
+                    "headless": self.headless,
+                    "args": [
+                        "--disable-gpu",
+                        "--no-sandbox",
+                        "--disable-dev-shm-usage",
+                        "--disable-blink-features=AutomationControlled",
+                        "--disable-infobars",
+                        "--window-position=0,0",
+                        "--ignore-certificate-errors",
+                        "--ignore-certificate-errors-spki-list",
+                        # "--headless=new",  # Use the new headless mode
+                    ]
+                }
+                
+                # Add proxy settings if a proxy is specified
+                if self.proxy:
+                    proxy_settings = ProxySettings(server=self.proxy)
+                    browser_args["proxy"] = proxy_settings
+                elif self.proxy_config:
+                    proxy_settings = ProxySettings(server=self.proxy_config.get("server"), username=self.proxy_config.get("username"), password=self.proxy_config.get("password"))
+                    browser_args["proxy"] = proxy_settings
+                    
+                # Select the appropriate browser based on the browser_type
+                if self.browser_type == "firefox":
+                    self.browser = await self.playwright.firefox.launch(**browser_args)
+                elif self.browser_type == "webkit":
+                    self.browser = await self.playwright.webkit.launch(**browser_args)
+                else:
+                    self.browser = await self.playwright.chromium.launch(**browser_args)
 
             await self.execute_hook('on_browser_created', self.browser)
 
@@ -142,6 +257,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         if self.browser:
             await self.browser.close()
             self.browser = None
+        if self.managed_browser:
+            await self.managed_browser.cleanup()
+            self.managed_browser = None
         if self.playwright:
             await self.playwright.stop()
             self.playwright = None
@@ -399,7 +517,48 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 status_code = 200
                 response_headers = {}
 
-            await page.wait_for_selector('body')
+            # Replace the current wait_for_selector line with this more robust check:
+            try:
+                # First wait for body to exist, regardless of visibility
+                await page.wait_for_selector('body', state='attached', timeout=30000)
+                
+                # Then wait for it to become visible by checking CSS
+                await page.wait_for_function("""
+                    () => {
+                        const body = document.body;
+                        const style = window.getComputedStyle(body);
+                        return style.display !== 'none' && 
+                            style.visibility !== 'hidden' && 
+                            style.opacity !== '0';
+                    }
+                """, timeout=30000)
+                
+            except Error as e:
+                # If waiting fails, let's try to diagnose the issue
+                visibility_info = await page.evaluate("""
+                    () => {
+                        const body = document.body;
+                        const style = window.getComputedStyle(body);
+                        return {
+                            display: style.display,
+                            visibility: style.visibility,
+                            opacity: style.opacity,
+                            hasContent: body.innerHTML.length,
+                            classList: Array.from(body.classList)
+                        }
+                    }
+                """)
+                
+                if self.verbose:
+                    print(f"Body visibility debug info: {visibility_info}")
+                
+                # Even if body is hidden, we might still want to proceed
+                if kwargs.get('ignore_body_visibility', True):
+                    if self.verbose:
+                        print("Proceeding despite hidden body...")
+                    pass
+                else:
+                    raise Error(f"Body element is hidden: {visibility_info}")
             
             await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
 

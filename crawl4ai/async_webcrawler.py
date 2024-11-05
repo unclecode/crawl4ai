@@ -16,7 +16,7 @@ from .utils import (
     InvalidCSSSelectorError,
     format_html
 )
-
+from ._version import __version__ as crawl4ai_version
 
 class AsyncWebCrawler:
     def __init__(
@@ -46,9 +46,12 @@ class AsyncWebCrawler:
         await self.crawler_strategy.__aexit__(exc_type, exc_val, exc_tb)
 
     async def awarmup(self):
+        # Print a message for crawl4ai and its version
+        print(f"[LOG] 🚀 Crawl4AI {crawl4ai_version}")
         if self.verbose:
             print("[LOG] 🌤️  Warming up the AsyncWebCrawler")
-        await async_db_manager.ainit_db()
+        # await async_db_manager.ainit_db()
+        await async_db_manager.initialize()
         await self.arun(
             url="https://google.com/",
             word_count_threshold=5,
@@ -125,6 +128,7 @@ class AsyncWebCrawler:
                 verbose,
                 bool(cached),
                 async_response=async_response,
+                bypass_cache=bypass_cache,
                 **kwargs,
             )
             crawl_result.status_code = async_response.status_code if async_response else 200
@@ -167,7 +171,6 @@ class AsyncWebCrawler:
             for url in urls
         ]
         return await asyncio.gather(*tasks)
-
 
     async def aprocess_html(
         self,
@@ -243,7 +246,7 @@ class AsyncWebCrawler:
 
         screenshot = None if not screenshot else screenshot
 
-        if not is_cached:
+        if not is_cached or kwargs.get("bypass_cache", False) or self.always_by_pass_cache:
             await async_db_manager.acache_url(
                 url,
                 html,
@@ -274,10 +277,13 @@ class AsyncWebCrawler:
         )
 
     async def aclear_cache(self):
-        await async_db_manager.aclear_db()
+        # await async_db_manager.aclear_db()
+        await async_db_manager.cleanup()
 
     async def aflush_cache(self):
         await async_db_manager.aflush_db()
 
     async def aget_cache_size(self):
         return await async_db_manager.aget_total_count()
+
+
