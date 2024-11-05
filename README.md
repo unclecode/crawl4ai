@@ -116,53 +116,9 @@ pip install -e .
 
 ### Using Docker 🐳
 
-Crawl4AI is available as Docker images for easy deployment. You can either pull directly from Docker Hub (recommended) or build from the repository.
+We're in the process of creating Docker images and pushing them to Docker Hub. This will provide an easy way to run Crawl4AI in a containerized environment. Stay tuned for updates!
 
-#### Option 1: Docker Hub (Recommended)
-
-```bash
-# Pull and run from Docker Hub (choose one):
-docker pull unclecode/crawl4ai:basic    # Basic crawling features
-docker pull unclecode/crawl4ai:all      # Full installation (ML, LLM support)
-docker pull unclecode/crawl4ai:gpu      # GPU-enabled version
-
-# Run the container
-docker run -p 11235:11235 unclecode/crawl4ai:basic  # Replace 'basic' with your chosen version
-```
-
-#### Option 2: Build from Repository
-
-```bash
-# Clone the repository
-git clone https://github.com/unclecode/crawl4ai.git
-cd crawl4ai
-
-# Build the image
-docker build -t crawl4ai:local \
-  --build-arg INSTALL_TYPE=basic \  # Options: basic, all
-  .
-
-# Run your local build
-docker run -p 11235:11235 crawl4ai:local
-```
-
-Quick test (works for both options):
-```python
-import requests
-
-# Submit a crawl job
-response = requests.post(
-    "http://localhost:11235/crawl",
-    json={"urls": "https://example.com", "priority": 10}
-)
-task_id = response.json()["task_id"]
-
-# Get results
-result = requests.get(f"http://localhost:11235/task/{task_id}")
-```
-
-For advanced configuration, environment variables, and usage examples, see our [Docker Deployment Guide](https://crawl4ai.com/mkdocs/basic/docker-deployment/).
-
+For more detailed installation instructions and options, please refer to our [Installation Guide](https://crawl4ai.com/mkdocs/installation).
 
 ## Quick Start 🚀
 
@@ -395,8 +351,7 @@ if __name__ == "__main__":
 
 This example demonstrates Crawl4AI's ability to handle complex scenarios where content is loaded asynchronously. It crawls multiple pages of GitHub commits, executing JavaScript to load new content and using custom hooks to ensure data is loaded before proceeding.
 
-For more advanced usage examples, check out our [Examples](https://crawl4ai.com/mkdocs/tutorial/episode_12_Session-Based_Crawling_for_Dynamic_Websites/) section in the documentation.
-</details>
+For more advanced usage examples, check out our [Examples](https://crawl4ai.com/mkdocs/full_details/session_based_crawling.md) section in the documentation.
 
 
 ## Speed Comparison 🚀
