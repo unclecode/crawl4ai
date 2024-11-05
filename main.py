@@ -269,6 +269,7 @@ class CrawlerService:
                             css_selector=request.css_selector,
                             screenshot=request.screenshot,
                             magic=request.magic,
+                            **request.extra,
                         )
                     else:
                         results = await crawler.arun(
@@ -279,6 +280,7 @@ class CrawlerService:
                             css_selector=request.css_selector,
                             screenshot=request.screenshot,
                             magic=request.magic,
+                            **request.extra,
                         )
 
                     await self.crawler_pool.release(crawler)
@@ -343,4 +345,4 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=11235)

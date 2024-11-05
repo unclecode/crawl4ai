@@ -72,7 +72,7 @@ Our documentation is organized into several sections:
 ### Advanced Features
 - [Magic Mode](advanced/magic-mode.md)
 - [Session Management](advanced/session-management.md)
-- [Hooks & Authentication](advanced/hooks.md)
+- [Hooks & Authentication](advanced/hooks-auth.md)
 - [Proxy & Security](advanced/proxy-security.md)
 - [Content Processing](advanced/content-processing.md)
 

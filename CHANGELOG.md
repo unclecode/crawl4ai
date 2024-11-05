@@ -1,5 +1,97 @@
 # Changelog
 
+# CHANGELOG
+
+## [v0.3.73] - 2024-11-05
+
+### Major Features
+- **New Doctor Feature**
+  - Added comprehensive system diagnostics tool
+  - Available through package hub and CLI
+  - Provides automated troubleshooting and system health checks
+  - Includes detailed reporting of configuration issues
+
+- **Dockerized API Server**
+  - Released complete Docker implementation for API server
+  - Added comprehensive documentation for Docker deployment
+  - Implemented container communication protocols
+  - Added environment configuration guides
+
+- **Managed Browser Integration**
+  - Added support for user-controlled browser instances
+  - Implemented `ManagedBrowser` class for better browser lifecycle management
+  - Added ability to connect to existing Chrome DevTools Protocol (CDP) endpoints
+  - Introduced user data directory support for persistent browser profiles
+
+- **Enhanced HTML Processing**
+  - Added HTML tag preservation feature during markdown conversion
+  - Introduced configurable tag preservation system
+  - Improved pre-tag and code block handling
+  - Added support for nested preserved tags with attribute retention
+
+### Improvements
+- **Browser Handling**
+  - Added flag to ignore body visibility for problematic pages
+  - Improved browser process cleanup and management
+  - Enhanced temporary directory handling for browser profiles
+  - Added configurable browser launch arguments
+
+- **Database Management**
+  - Implemented connection pooling for better performance
+  - Added retry logic for database operations
+  - Improved error handling and logging
+  - Enhanced cleanup procedures for database connections
+
+- **Resource Management**
+  - Added memory and CPU monitoring
+  - Implemented dynamic task slot allocation based on system resources
+  - Added configurable cleanup intervals
+
+### Technical Improvements
+- **Code Structure**
+  - Moved version management to dedicated _version.py file
+  - Improved error handling throughout the codebase
+  - Enhanced logging system with better error reporting
+  - Reorganized core components for better maintainability
+
+### Bug Fixes
+- Fixed issues with browser process termination
+- Improved handling of connection timeouts
+- Enhanced error recovery in database operations
+- Fixed memory leaks in long-running processes
+
+### Dependencies
+- Updated Playwright to v1.47
+- Updated core dependencies with more flexible version constraints
+- Added new development dependencies for testing
+
+### Breaking Changes
+- Changed default browser handling behavior
+- Modified database connection management approach
+- Updated API response structure for better consistency
+
+## Migration Guide
+When upgrading to v0.3.73, be aware of the following changes:
+
+1. Docker Deployment:
+   - Review Docker documentation for new deployment options
+   - Update environment configurations as needed
+   - Check container communication settings
+
+2. If using custom browser management:
+   - Update browser initialization code to use new ManagedBrowser class
+   - Review browser cleanup procedures
+
+3. For database operations:
+   - Check custom database queries for compatibility with new connection pooling
+   - Update error handling to work with new retry logic
+
+4. Using the Doctor:
+   - Run doctor command for system diagnostics: `crawl4ai doctor`
+   - Review generated reports for potential issues
+   - Follow recommended fixes for any identified problems
+
+
 ## [2024-11-04 - 13:21:42] Comprehensive Update of Crawl4AI Features and Dependencies
 This commit introduces several key enhancements, including improved error handling and robust database operations in `async_database.py`, which now features a connection pool and retry logic for better reliability. Updates to the README.md provide clearer instructions and a better user experience with links to documentation sections. The `.gitignore` file has been refined to include additional directories, while the async web crawler now utilizes a managed browser for more efficient crawling. Furthermore, multiple dependency updates and introduction of the `CustomHTML2Text` class enhance text extraction capabilities.
 

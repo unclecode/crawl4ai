@@ -172,7 +172,6 @@ class AsyncWebCrawler:
         ]
         return await asyncio.gather(*tasks)
 
-
     async def aprocess_html(
         self,
         url: str,
@@ -286,3 +285,5 @@ class AsyncWebCrawler:
 
     async def aget_cache_size(self):
         return await async_db_manager.aget_total_count()
+
+

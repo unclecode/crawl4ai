@@ -8,6 +8,7 @@ docs_dir: docs/md_v2
 nav:
   - Home: 'index.md'
   - 'Installation': 'basic/installation.md'
+  - 'Docker Deplotment': 'basic/docker-deploymeny.md'
   - 'Quick Start': 'basic/quickstart.md'
   
   - Basic:
@@ -34,6 +35,7 @@ nav:
     - 'Chunking': 'extraction/chunking.md'
 
   - API Reference:
+    - 'Parameters Table': 'api/parameters.md'
     - 'AsyncWebCrawler': 'api/async-webcrawler.md'
     - 'AsyncWebCrawler.arun()': 'api/arun.md'
     - 'CrawlResult': 'api/crawl-result.md'
