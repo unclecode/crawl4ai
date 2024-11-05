@@ -995,25 +995,17 @@ def normalize_url(href, base_url):
     if any(href.lower().startswith(proto) for proto in special_protocols):
         return href.strip()
         
-    # Handle anchor links
-    if href.startswith('#'):
-        return f"{base_url}{href}"
-        
-    # Handle protocol-relative URLs
-    if href.startswith('//'):
-        return f"{protocol}{href}"
-        
-    # Handle root-relative URLs
-    if href.startswith('/'):
-        return f"{protocol}//{domain}{href}"
-        
-    # Handle relative URLs
-    if not href.startswith(('http://', 'https://')):
-        # Remove leading './' if present
-        href = href.lstrip('./')
-        return f"{protocol}//{domain}/{href}"
-        
-    return href.strip()
+    # Use urljoin to handle all relative path cases:
+    # - Absolute URLs (http://...)  
+    # - Relative paths (./path, ../path, path)
+    # - Root-relative paths (/path)
+    # - Fragment identifiers (#section)
+    try:
+        absolute_url = urljoin(base_url, href.strip())
+        return absolute_url
+    except:
+        # Return original href if URL joining fails
+        return href.strip()
 
 def is_external_url(url, base_domain):
     """Determine if a URL is external"""
