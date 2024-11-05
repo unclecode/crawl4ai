@@ -19,14 +19,13 @@ Use the [Crawl4AI GPT Assistant](https://tinyurl.com/crawl4ai-gpt) as your AI-po
 - 💡 Get tailored support and examples
 - 📘 Learn Crawl4AI faster with step-by-step guidance
 
-## New in 0.3.72 ✨
+## New in 0.3.73 ✨
 
-- 📄 Fit markdown generation for extracting main article content.
-- 🪄 Magic mode for comprehensive anti-bot detection bypass.
-- 🌐 Enhanced multi-browser support with seamless switching (Chromium, Firefox, WebKit)
-- 📚 New chunking strategies(Sliding window, Overlapping window, Flexible size control)
-- 💾 Improved caching system for better performance
-- ⚡ Optimized batch processing with automatic rate limiting
+- 🐳 Docker Ready: Full API server with seamless deployment & scaling
+- 🎯 Smart Browser: Managed browser integration with CDP support
+- 📝 Mockdown+: Enhanced tag preservation & content extraction
+- ⚡️ Parallel Power: Supercharged multi-URL crawling performance
+- 🌟 And many more exciting updates...
 
 ## Try it Now!
 
