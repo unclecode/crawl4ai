@@ -1,6 +1,16 @@
-import asyncio
+import asyncio, os
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware  
+from fastapi.templating import Jinja2Templates
+from fastapi.exceptions import RequestValidationError
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import FileResponse
+from fastapi.responses import RedirectResponse
+
 from pydantic import BaseModel, HttpUrl, Field
 from typing import Optional, List, Dict, Any, Union
 import psutil
@@ -19,6 +29,8 @@ from crawl4ai.extraction_strategy import (
     CosineStrategy,
     JsonCssExtractionStrategy,
 )
+
+__location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -295,6 +307,23 @@ class CrawlerService:
                 await asyncio.sleep(1)
 
 app = FastAPI(title="Crawl4AI API")
+
+# CORS configuration
+origins = ["*"]  # Allow all origins
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,  # List of origins that are allowed to make requests
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
+
+# Mount the pages directory as a static directory
+app.mount("/pages", StaticFiles(directory=__location__ + "/pages"), name="pages")
+app.mount("/mkdocs", StaticFiles(directory="site", html=True), name="mkdocs")
+site_templates = Jinja2Templates(directory=__location__ + "/site")
+templates = Jinja2Templates(directory=__location__ + "/pages")
+
 crawler_service = CrawlerService()
 
 @app.on_event("startup")
@@ -304,6 +333,11 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     await crawler_service.stop()
+
+@app.get("/")
+def read_root():
+    return RedirectResponse(url="/mkdocs")
+
 
 @app.post("/crawl")
 async def crawl(request: CrawlRequest) -> Dict[str, str]:
