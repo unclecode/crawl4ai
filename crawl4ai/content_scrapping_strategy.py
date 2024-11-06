@@ -93,8 +93,8 @@ class CustomHTML2Text(HTML2Text):
             else:
                 self.o('\n```')
                 self.inside_pre = False
-        elif tag in ["h1", "h2", "h3", "h4", "h5", "h6"]:
-            pass
+        # elif tag in ["h1", "h2", "h3", "h4", "h5", "h6"]:
+        #     pass
         else:
             super().handle_tag(tag, attrs, start)
 
