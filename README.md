@@ -22,7 +22,7 @@ Use the [Crawl4AI GPT Assistant](https://tinyurl.com/crawl4ai-gpt) as your AI-po
 ## New in 0.3.73 ✨
 
 - 🐳 Docker Ready: Full API server with seamless deployment & scaling
-- 🎯 Smart Browser: Managed browser integration with CDP support
+- 🎯 Browser Takeover: Use your own browser with cookies & history intact (CDP support)
 - 📝 Mockdown+: Enhanced tag preservation & content extraction
 - ⚡️ Parallel Power: Supercharged multi-URL crawling performance
 - 🌟 And many more exciting updates...
