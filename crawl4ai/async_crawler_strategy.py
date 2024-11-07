@@ -187,6 +187,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         self.use_managed_browser = kwargs.get("use_managed_browser", False)
         self.user_data_dir = kwargs.get("user_data_dir", None)
         self.managed_browser = None
+        self.default_context = None
         self.hooks = {
             'on_browser_created': None,
             'on_user_agent_updated': None,
@@ -217,6 +218,25 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 )
                 cdp_url = await self.managed_browser.start()
                 self.browser = await self.playwright.chromium.connect_over_cdp(cdp_url)
+                
+                # Get the default context that maintains the user profile
+                contexts = self.browser.contexts
+                if contexts:
+                    self.default_context = contexts[0]
+                else:
+                    # If no default context exists, create one
+                    self.default_context = await self.browser.new_context(
+                        viewport={"width": 1920, "height": 1080}
+                    )
+                
+                # Set up the default context
+                if self.default_context:
+                    await self.default_context.set_extra_http_headers(self.headers)
+                    
+                    if self.user_agent:
+                        await self.default_context.set_extra_http_headers({
+                            "User-Agent": self.user_agent
+                        })
             else:
                 browser_args = {
                     "headless": self.headless,
@@ -254,12 +274,20 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
     async def close(self):
         if self.sleep_on_close:
             await asyncio.sleep(0.5)
+            
+        # Close all active sessions
+        session_ids = list(self.sessions.keys())
+        for session_id in session_ids:
+            await self.kill_session(session_id)
+            
         if self.browser:
             await self.browser.close()
             self.browser = None
+            
         if self.managed_browser:
             await self.managed_browser.cleanup()
             self.managed_browser = None
+            
         if self.playwright:
             await self.playwright.stop()
             self.playwright = None
@@ -293,7 +321,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         if session_id in self.sessions:
             context, page, _ = self.sessions[session_id]
             await page.close()
-            await context.close()
+            if not self.use_managed_browser:
+                await context.close()
             del self.sessions[session_id]
 
     def _cleanup_expired_sessions(self):
@@ -415,61 +444,75 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         
         self._cleanup_expired_sessions()
         session_id = kwargs.get("session_id")
-        if session_id:
-            context, page, _ = self.sessions.get(session_id, (None, None, None))
-            if not context:
+        
+        # Handle page creation differently for managed browser
+        if self.use_managed_browser:
+            if session_id:
+                # Reuse existing session if available
+                context, page, _ = self.sessions.get(session_id, (None, None, None))
+                if not page:
+                    # Create new page in default context if session doesn't exist
+                    page = await self.default_context.new_page()
+                    self.sessions[session_id] = (self.default_context, page, time.time())
+            else:
+                # Create new page in default context for non-session requests
+                page = await self.default_context.new_page()
+        else:
+            if session_id:
+                context, page, _ = self.sessions.get(session_id, (None, None, None))
+                if not context:
+                    context = await self.browser.new_context(
+                        user_agent=self.user_agent,
+                        viewport={"width": 1920, "height": 1080},
+                        proxy={"server": self.proxy} if self.proxy else None,
+                        accept_downloads=True,
+                        java_script_enabled=True
+                    )
+                    await context.add_cookies([{"name": "cookiesEnabled", "value": "true", "url": url}])
+                    await context.set_extra_http_headers(self.headers)
+                    page = await context.new_page()
+                    self.sessions[session_id] = (context, page, time.time())
+            else:
                 context = await self.browser.new_context(
                     user_agent=self.user_agent,
                     viewport={"width": 1920, "height": 1080},
-                    proxy={"server": self.proxy} if self.proxy else None,
-                    accept_downloads=True,
-                    java_script_enabled=True
+                    proxy={"server": self.proxy} if self.proxy else None
                 )
-                await context.add_cookies([{"name": "cookiesEnabled", "value": "true", "url": url}])
                 await context.set_extra_http_headers(self.headers)
+                
+                if kwargs.get("override_navigator", False) or kwargs.get("simulate_user", False) or kwargs.get("magic", False):
+                    # Inject scripts to override navigator properties
+                    await context.add_init_script("""
+                        // Pass the Permissions Test.
+                        const originalQuery = window.navigator.permissions.query;
+                        window.navigator.permissions.query = (parameters) => (
+                            parameters.name === 'notifications' ?
+                                Promise.resolve({ state: Notification.permission }) :
+                                originalQuery(parameters)
+                        );
+                        Object.defineProperty(navigator, 'webdriver', {
+                            get: () => undefined
+                        });
+                        window.navigator.chrome = {
+                            runtime: {},
+                            // Add other properties if necessary
+                        };
+                        Object.defineProperty(navigator, 'plugins', {
+                            get: () => [1, 2, 3, 4, 5],
+                        });
+                        Object.defineProperty(navigator, 'languages', {
+                            get: () => ['en-US', 'en'],
+                        });
+                        Object.defineProperty(document, 'hidden', {
+                            get: () => false
+                        });
+                        Object.defineProperty(document, 'visibilityState', {
+                            get: () => 'visible'
+                        });
+                    """)
+                
                 page = await context.new_page()
-                self.sessions[session_id] = (context, page, time.time())
-        else:
-            context = await self.browser.new_context(
-                user_agent=self.user_agent,
-                viewport={"width": 1920, "height": 1080},
-                proxy={"server": self.proxy} if self.proxy else None
-            )
-            await context.set_extra_http_headers(self.headers)
-            
-            if kwargs.get("override_navigator", False) or kwargs.get("simulate_user", False) or kwargs.get("magic", False):
-                # Inject scripts to override navigator properties
-                await context.add_init_script("""
-                    // Pass the Permissions Test.
-                    const originalQuery = window.navigator.permissions.query;
-                    window.navigator.permissions.query = (parameters) => (
-                        parameters.name === 'notifications' ?
-                            Promise.resolve({ state: Notification.permission }) :
-                            originalQuery(parameters)
-                    );
-                    Object.defineProperty(navigator, 'webdriver', {
-                        get: () => undefined
-                    });
-                    window.navigator.chrome = {
-                        runtime: {},
-                        // Add other properties if necessary
-                    };
-                    Object.defineProperty(navigator, 'plugins', {
-                        get: () => [1, 2, 3, 4, 5],
-                    });
-                    Object.defineProperty(navigator, 'languages', {
-                        get: () => ['en-US', 'en'],
-                    });
-                    Object.defineProperty(document, 'hidden', {
-                        get: () => false
-                    });
-                    Object.defineProperty(document, 'visibilityState', {
-                        get: () => 'visible'
-                    });
-                """)
-            
-            page = await context.new_page()
-            # await stealth_async(page) #, stealth_config)
+                # await stealth_async(page) #, stealth_config)
 
         # Add console message and error logging
         if kwargs.get("log_console", False):
