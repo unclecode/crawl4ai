@@ -62,6 +62,7 @@ class CrawlRequest(BaseModel):
     css_selector: Optional[str] = None
     screenshot: bool = False
     magic: bool = False
+    extra: Optional[Dict[str, Any]] = {}
 
 @dataclass
 class TaskInfo:
@@ -251,7 +252,7 @@ class CrawlerService:
         while True:
             try:
                 available_slots = await self.resource_monitor.get_available_slots()
-                if available_slots <= 0:
+                if False and available_slots <= 0:
                     await asyncio.sleep(1)
                     continue
 
