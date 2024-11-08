@@ -76,6 +76,7 @@ class BFSScraperStrategy(ScraperStrategy):
         # Crawl control
         self.stats = CrawlStats(start_time=datetime.now())
         self._cancel_event = asyncio.Event()
+        self.process_external_links = False
         
         # Rate limiting and politeness
         self.rate_limiter = AsyncLimiter(1, 1)
@@ -84,7 +85,14 @@ class BFSScraperStrategy(ScraperStrategy):
         self.domain_queues: Dict[str, asyncio.Queue] = defaultdict(asyncio.Queue)
 
     async def can_process_url(self, url: str) -> bool:
-        """Check if URL can be processed based on robots.txt and filters"""
+        """Check if URL can be processed based on robots.txt and filters
+        This is our gatekeeper method that determines if a URL should be processed. It:
+            - Validates URL format using the validators library
+            - Checks robots.txt permissions for the domain
+            - Applies custom filters from the filter chain
+            - Updates statistics for blocked URLs
+            - Returns False early if any check fails
+        """
         if not validators.url(url):
             self.logger.warning(f"Invalid URL: {url}")
             return False
@@ -98,7 +106,13 @@ class BFSScraperStrategy(ScraperStrategy):
         return self.filter_chain.apply(url)
 
     async def _get_robot_parser(self, url: str) -> Optional[RobotFileParser]:
-        """Get or create robots.txt parser for domain"""
+        """Get or create robots.txt parser for domain.
+            This is our robots.txt manager that:
+                - Uses domain-level caching of robot parsers
+                - Creates and caches new parsers as needed
+                - Handles failed robots.txt fetches gracefully
+                - Returns None if robots.txt can't be fetched, allowing crawling to proceed        
+        """
         domain = urlparse(url).netloc
         if domain not in self.robot_parsers:
             parser = RobotFileParser()
@@ -136,7 +150,17 @@ class BFSScraperStrategy(ScraperStrategy):
         visited: Set[str],
         depths: Dict[str, int]
     ) -> Optional[CrawlResult]:
-        """Process a single URL and extract links"""
+        """Process a single URL and extract links.
+        This is our main URL processing workhorse that:
+            - Checks for cancellation
+            - Validates URLs through can_process_url
+            - Implements politeness delays per domain
+            - Applies rate limiting
+            - Handles crawling with retries
+            - Updates various statistics
+            - Processes extracted links
+            - Returns the crawl result or None on failure
+        """
         
         if self._cancel_event.is_set():
             return None
@@ -176,11 +200,24 @@ class BFSScraperStrategy(ScraperStrategy):
         visited: Set[str],
         depths: Dict[str, int]
     ):
-        """Process extracted links from crawl result"""
-        for link_type in ["internal", "external"]:
+        """Process extracted links from crawl result.
+        This is our link processor that:
+            Handles both internal and external links
+            Normalizes URLs (removes fragments)
+            Checks depth limits
+            Scores URLs for priority
+            Updates depth tracking
+            Adds valid URLs to the queue
+            Updates maximum depth statistics
+        """
+        links_ro_process = result.links["internal"]
+        if self.process_external_links:
+            links_ro_process += result.links["external"]
+        for link_type in links_ro_process:
             for link in result.links[link_type]:
-                url = urljoin(source_url, link['href'])
-                url = urlunparse(urlparse(url)._replace(fragment=""))
+                url = link['href']
+                # url = urljoin(source_url, link['href'])
+                # url = urlunparse(urlparse(url)._replace(fragment=""))
                 
                 if url not in visited and await self.can_process_url(url):
                     new_depth = depths[source_url] + 1
@@ -202,6 +239,15 @@ class BFSScraperStrategy(ScraperStrategy):
         """Implement BFS crawling strategy"""
         
         # Initialize crawl state
+        """
+        queue: A priority queue where items are tuples of (score, depth, url)
+            Score: Determines crawling priority (lower = higher priority)
+            Depth: Current distance from start_url
+            URL: The actual URL to crawl
+        visited: Keeps track of URLs we've already seen to avoid cycles
+        depths: Maps URLs to their depths from the start URL
+        pending_tasks: Tracks currently running crawl tasks        
+        """
         queue = asyncio.PriorityQueue()
         await queue.put((0, 0, start_url))
         visited: Set[str] = set()
@@ -210,8 +256,24 @@ class BFSScraperStrategy(ScraperStrategy):
         
         try:
             while (not queue.empty() or pending_tasks) and not self._cancel_event.is_set():
+                """
+                This sets up our main control loop which:
+                    - Continues while there are URLs to process (not queue.empty())
+                    - Or while there are tasks still running (pending_tasks)
+                    - Can be interrupted via cancellation (not self._cancel_event.is_set())
+                """
                 # Start new tasks up to max_concurrent
                 while not queue.empty() and len(pending_tasks) < self.max_concurrent:
+                    """
+                    This section manages task creation:
+                        Checks if we can start more tasks (under max_concurrent limit)
+                        Gets the next URL from the priority queue
+                        Marks URLs as visited immediately to prevent duplicates
+                        Updates current depth in stats
+                        Either:
+                            Creates a new async task (parallel mode)
+                            Processes URL directly (sequential mode)
+                    """
                     _, depth, url = await queue.get()
                     if url not in visited:
                         visited.add(url)
@@ -230,6 +292,13 @@ class BFSScraperStrategy(ScraperStrategy):
                                 yield result
 
                 # Process completed tasks
+                """
+                This section manages completed tasks:
+                    Waits for any task to complete using asyncio.wait
+                    Uses FIRST_COMPLETED to handle results as soon as they're ready
+                    Yields successful results to the caller
+                    Updates pending_tasks to remove completed ones
+                """
                 if pending_tasks:
                     done, pending_tasks = await asyncio.wait(
                         pending_tasks,
