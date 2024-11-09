@@ -432,6 +432,30 @@ You can find the full comparison code in our repository at `docs/examples/crawl4
 
 For detailed documentation, including installation instructions, advanced features, and API reference, visit our [Documentation Website](https://crawl4ai.com/mkdocs/).
 
+## Crawl4AI Roadmap 🗺️
+
+For detailed information on our development plans and upcoming features, check out our [Roadmap](https://github.com/unclecode/crawl4ai/blob/main/ROADMAP.md).
+
+### Advanced Crawling Systems 🔧
+- [x] 0. Graph Crawler: Smart website traversal using graph search algorithms for comprehensive nested page extraction
+- [ ] 1. Question-Based Crawler: Natural language driven web discovery and content extraction
+- [ ] 2. Knowledge-Optimal Crawler: Smart crawling that maximizes knowledge while minimizing data extraction
+- [ ] 3. Agentic Crawler: Autonomous system for complex multi-step crawling operations
+
+### Specialized Features 🛠️
+- [ ] 4. Automated Schema Generator: Convert natural language to extraction schemas
+- [ ] 5. Domain-Specific Scrapers: Pre-configured extractors for common platforms (academic, e-commerce)
+- [ ] 6. Web Embedding Index: Semantic search infrastructure for crawled content
+
+### Development Tools 🔨
+- [ ] 7. Interactive Playground: Web UI for testing, comparing strategies with AI assistance
+- [ ] 8. Performance Monitor: Real-time insights into crawler operations
+- [ ] 9. Cloud Integration: One-click deployment solutions across cloud providers
+
+### Community & Growth 🌱
+- [ ] 10. Sponsorship Program: Structured support system with tiered benefits
+- [ ] 11. Educational Content: "How to Crawl" video series and interactive tutorials
+
 ## Contributing 🤝
 
 We welcome contributions from the open-source community. Check out our [contribution guidelines](https://github.com/unclecode/crawl4ai/blob/main/CONTRIBUTING.md) for more information.
