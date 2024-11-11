@@ -178,6 +178,90 @@ def escape_json_string(s):
     
     return s
 
+class CustomHTML2Text(HTML2Text):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.inside_pre = False
+        self.inside_code = False
+        self.preserve_tags = set()  # Set of tags to preserve
+        self.current_preserved_tag = None
+        self.preserved_content = []
+        self.preserve_depth = 0
+        
+        # Configuration options
+        self.skip_internal_links = False
+        self.single_line_break = False
+        self.mark_code = False
+        self.include_sup_sub = False
+        self.body_width = 0
+        self.ignore_mailto_links = True
+        self.ignore_links = False
+        self.escape_backslash = False
+        self.escape_dot = False
+        self.escape_plus = False
+        self.escape_dash = False
+        self.escape_snob = False
+
+    def update_params(self, **kwargs):
+        """Update parameters and set preserved tags."""
+        for key, value in kwargs.items():
+            if key == 'preserve_tags':
+                self.preserve_tags = set(value)
+            else:
+                setattr(self, key, value)
+
+    def handle_tag(self, tag, attrs, start):
+        # Handle preserved tags
+        if tag in self.preserve_tags:
+            if start:
+                if self.preserve_depth == 0:
+                    self.current_preserved_tag = tag
+                    self.preserved_content = []
+                    # Format opening tag with attributes
+                    attr_str = ''.join(f' {k}="{v}"' for k, v in attrs.items() if v is not None)
+                    self.preserved_content.append(f'<{tag}{attr_str}>')
+                self.preserve_depth += 1
+                return
+            else:
+                self.preserve_depth -= 1
+                if self.preserve_depth == 0:
+                    self.preserved_content.append(f'</{tag}>')
+                    # Output the preserved HTML block with proper spacing
+                    preserved_html = ''.join(self.preserved_content)
+                    self.o('\n' + preserved_html + '\n')
+                    self.current_preserved_tag = None
+                return
+
+        # If we're inside a preserved tag, collect all content
+        if self.preserve_depth > 0:
+            if start:
+                # Format nested tags with attributes
+                attr_str = ''.join(f' {k}="{v}"' for k, v in attrs.items() if v is not None)
+                self.preserved_content.append(f'<{tag}{attr_str}>')
+            else:
+                self.preserved_content.append(f'</{tag}>')
+            return
+
+        # Handle pre tags
+        if tag == 'pre':
+            if start:
+                self.o('```\n')
+                self.inside_pre = True
+            else:
+                self.o('\n```')
+                self.inside_pre = False
+        # elif tag in ["h1", "h2", "h3", "h4", "h5", "h6"]:
+        #     pass
+        else:
+            super().handle_tag(tag, attrs, start)
+
+    def handle_data(self, data, entity_char=False):
+        """Override handle_data to capture content within preserved tags."""
+        if self.preserve_depth > 0:
+            self.preserved_content.append(data)
+            return
+        super().handle_data(data, entity_char)
+
 class CustomHTML2Text_v0(HTML2Text):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
