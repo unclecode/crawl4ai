@@ -241,24 +241,21 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                             "User-Agent": self.user_agent
                         })
             else:
-                # Base browser arguments
                 browser_args = {
                     "headless": self.headless,
                     "args": [
+                        "--disable-gpu",
                         "--no-sandbox",
                         "--disable-dev-shm-usage",
-                        "--no-first-run",
-                        "--no-default-browser-check",
+                        "--disable-blink-features=AutomationControlled",
                         "--disable-infobars",
                         "--window-position=0,0",
                         "--ignore-certificate-errors",
                         "--ignore-certificate-errors-spki-list",
+                        # "--disable-http2",
+                        # "--headless=new",  # Use the new headless mode
                     ]
                 }
-
-                # Add channel if specified (try Chrome first)
-                if self.chrome_channel:
-                    browser_args["channel"] = self.chrome_channel
                 
                 # Add extra args if provided
                 if self.extra_args:
@@ -269,43 +266,21 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     proxy_settings = ProxySettings(server=self.proxy)
                     browser_args["proxy"] = proxy_settings
                 elif self.proxy_config:
-                    proxy_settings = ProxySettings(
-                        server=self.proxy_config.get("server"),
-                        username=self.proxy_config.get("username"),
-                        password=self.proxy_config.get("password")
-                    )
+                    proxy_settings = ProxySettings(server=self.proxy_config.get("server"), username=self.proxy_config.get("username"), password=self.proxy_config.get("password"))
                     browser_args["proxy"] = proxy_settings
                     
-                try:
-                    # Select the appropriate browser based on the browser_type
-                    if self.browser_type == "firefox":
-                        self.browser = await self.playwright.firefox.launch(**browser_args)
-                    elif self.browser_type == "webkit":
-                        self.browser = await self.playwright.webkit.launch(**browser_args)
-                    else:
-                        if self.use_persistent_context and self.user_data_dir:
-                            self.browser = await self.playwright.chromium.launch_persistent_context(
-                                user_data_dir=self.user_data_dir,
-                                **browser_args
-                            )
-                            self.default_context = self.browser
-                        else:
-                            self.browser = await self.playwright.chromium.launch(**browser_args)
-
-                except Exception as e:
-                    # Fallback to chromium if Chrome channel fails
-                    if "chrome" in str(e) and browser_args.get("channel") == "chrome":
-                        browser_args["channel"] = "chromium"
-                        if self.use_persistent_context and self.user_data_dir:
-                            self.browser = await self.playwright.chromium.launch_persistent_context(
-                                user_data_dir=self.user_data_dir,
-                                **browser_args
-                            )
-                            self.default_context = self.browser
-                        else:
-                            self.browser = await self.playwright.chromium.launch(**browser_args)
-                    else:
-                        raise
+                # Select the appropriate browser based on the browser_type
+                if self.browser_type == "firefox":
+                    self.browser = await self.playwright.firefox.launch(**browser_args)
+                elif self.browser_type == "webkit":
+                    self.browser = await self.playwright.webkit.launch(**browser_args)
+                else:
+                    self.browser = await self.playwright.chromium.launch(**browser_args)
+                    
+                # Update the headless configuration
+                if self.headless:
+                    # Use the new headless mode explicitly
+                    browser_args["args"].append("--headless=new")
 
             await self.execute_hook('on_browser_created', self.browser)
 
@@ -499,35 +474,24 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             if session_id:
                 context, page, _ = self.sessions.get(session_id, (None, None, None))
                 if not context:
-                    if self.use_persistent_context and self.browser_type in ["chrome", "chromium"]:
-                        # In persistent context, browser is the context
-                        context = self.browser
-                        page = await context.new_page()
-                    else:
-                        # Normal context creation for non-persistent or non-Chrome browsers
-                        context = await self.browser.new_context(
-                            user_agent=self.user_agent,
-                            viewport={"width": 1920, "height": 1080},
-                            proxy={"server": self.proxy} if self.proxy else None,
-                            accept_downloads=True,
-                            java_script_enabled=True
-                        )
-                        await context.add_cookies([{"name": "cookiesEnabled", "value": "true", "url": url}])
-                        await context.set_extra_http_headers(self.headers)
-                        page = await context.new_page()
-                    self.sessions[session_id] = (context, page, time.time())
-            else:
-                if self.use_persistent_context and self.browser_type in ["chrome", "chromium"]:
-                    # In persistent context, browser is the context
-                    context = self.browser
-                else:
-                    # Normal context creation
                     context = await self.browser.new_context(
                         user_agent=self.user_agent,
                         viewport={"width": 1920, "height": 1080},
-                        proxy={"server": self.proxy} if self.proxy else None
+                        proxy={"server": self.proxy} if self.proxy else None,
+                        accept_downloads=True,
+                        java_script_enabled=True
                     )
+                    await context.add_cookies([{"name": "cookiesEnabled", "value": "true", "url": url}])
                     await context.set_extra_http_headers(self.headers)
+                    page = await context.new_page()
+                    self.sessions[session_id] = (context, page, time.time())
+            else:
+                context = await self.browser.new_context(
+                    user_agent=self.user_agent,
+                    viewport={"width": 1920, "height": 1080},
+                    proxy={"server": self.proxy} if self.proxy else None
+                )
+                await context.set_extra_http_headers(self.headers)
                 
                 if kwargs.get("override_navigator", False) or kwargs.get("simulate_user", False) or kwargs.get("magic", False):
                     # Inject scripts to override navigator properties
@@ -594,13 +558,36 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             if not kwargs.get("js_only", False):
                 await self.execute_hook('before_goto', page)
                 
-
-                response = await page.goto(
-                    url,
-                    # wait_until=kwargs.get("wait_until", ["domcontentloaded", "networkidle"]),
-                    wait_until=kwargs.get("wait_until", "domcontentloaded"),
-                    timeout=kwargs.get("page_timeout", 60000)
-                )
+                # response = await page.goto(
+                #     url, wait_until="domcontentloaded", timeout=kwargs.get("page_timeout", 60000)
+                # )
+                
+                # Add retry logic for HTTP2 errors
+                max_retries = kwargs.get("max_retries", 3)
+                current_try = 0
+                
+                while current_try < max_retries:
+                    try:
+                        response = await page.goto(
+                            url,
+                            # wait_until=kwargs.get("wait_until", ["domcontentloaded", "networkidle"]),
+                            wait_until=kwargs.get("wait_until", "networkidle"),
+                            timeout=kwargs.get("page_timeout", 60000)
+                        )
+                        break
+                    except Exception as e:
+                        current_try += 1
+                        if "ERR_HTTP2_PROTOCOL_ERROR" in str(e):
+                            if current_try < max_retries:
+                                # Add exponential backoff
+                                await asyncio.sleep(2 ** current_try)
+                                # Try with different protocol
+                                if 'args' not in kwargs:
+                                    kwargs['args'] = []
+                                kwargs['args'].extend(['--disable-http2'])
+                                continue
+                        if current_try == max_retries:
+                            raise
                 
                 # response = await page.goto("about:blank")
                 # await page.evaluate(f"window.location.href = '{url}'")

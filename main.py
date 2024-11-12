@@ -321,7 +321,12 @@ app.add_middleware(
 
 # Mount the pages directory as a static directory
 app.mount("/pages", StaticFiles(directory=__location__ + "/pages"), name="pages")
-app.mount("/mkdocs", StaticFiles(directory="site", html=True), name="mkdocs")
+
+# Check if site directory exists
+if os.path.exists(__location__ + "/site"):
+    # Mount the site directory as a static directory
+    app.mount("/mkdocs", StaticFiles(directory="site", html=True), name="mkdocs")
+
 site_templates = Jinja2Templates(directory=__location__ + "/site")
 templates = Jinja2Templates(directory=__location__ + "/pages")
 
@@ -337,7 +342,10 @@ async def shutdown_event():
 
 @app.get("/")
 def read_root():
-    return RedirectResponse(url="/mkdocs")
+    if os.path.exists(__location__ + "/site"):
+        return RedirectResponse(url="/mkdocs")
+    # Return a json response
+    return {"message": "Crawl4AI API service is running"}
 
 
 @app.post("/crawl")

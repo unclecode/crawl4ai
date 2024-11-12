@@ -8,4 +8,4 @@ playwright>=1.47,<1.48
 python-dotenv~=1.0
 requests~=2.26
 beautifulsoup4~=4.12
-playwright_stealth~=1.0
+tf-playwright-stealth~=1.0
