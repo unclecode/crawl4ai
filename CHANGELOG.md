@@ -1,6 +1,11 @@
 # Changelog
 
-# CHANGELOG
+## [v0.3.731] - 2024-11-13 Changelog for Issue 256 Fix
+- Fixed: Browser context unexpectedly closing in Docker environment during crawl operations.
+- Removed: __del__ method from AsyncPlaywrightCrawlerStrategy to prevent unreliable asynchronous cleanup, ensuring - browser context is closed explicitly within context managers.
+- Added: Monitoring for ManagedBrowser subprocess to detect and log unexpected terminations.
+- Updated: Dockerfile configurations to expose debugging port (9222) and allocate additional shared memory for improved browser stability.
+- Improved: Error handling and resource cleanup processes for browser lifecycle management within the Docker environment.
 
 ## [v0.3.73] - 2024-11-05
 
