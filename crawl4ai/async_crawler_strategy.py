@@ -84,7 +84,7 @@ class ManagedBrowser:
                 print(f"STDOUT: {stdout.decode()}")
                 print(f"STDERR: {stderr.decode()}")
                 await self.cleanup()
-    
+
     def _get_browser_path(self) -> str:
         """Returns the browser executable path based on OS and browser type"""
         if sys.platform == "darwin":  # macOS
@@ -493,6 +493,75 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         return page  
     
     async def crawl(self, url: str, **kwargs) -> AsyncCrawlResponse:
+        """
+        Crawls a given URL or processes raw HTML/local file content based on the URL prefix.
+
+        Args:
+            url (str): The URL to crawl. Supported prefixes:
+                - 'http://' or 'https://': Web URL to crawl.
+                - 'file://': Local file path to process.
+                - 'raw:': Raw HTML content to process.
+            **kwargs: Additional parameters:
+                - 'screenshot' (bool): Whether to take a screenshot.
+                - ... [other existing parameters]
+
+        Returns:
+            AsyncCrawlResponse: The response containing HTML, headers, status code, and optional screenshot.
+        """
+        response_headers = {}
+        status_code = 200  # Default to 200 for local/raw HTML
+        screenshot_requested = kwargs.get('screenshot', False)
+        screenshot_data = None
+
+        if url.startswith(('http://', 'https://')):
+            # Proceed with standard web crawling
+            return await self._crawl_web(url, **kwargs)
+
+        elif url.startswith('file://'):
+            # Process local file
+            local_file_path = url[7:]  # Remove 'file://' prefix
+            if not os.path.exists(local_file_path):
+                raise FileNotFoundError(f"Local file not found: {local_file_path}")
+            with open(local_file_path, 'r', encoding='utf-8') as f:
+                html = f.read()
+            if screenshot_requested:
+                screenshot_data = await self._generate_screenshot_from_html(html)
+            return AsyncCrawlResponse(
+                html=html,
+                response_headers=response_headers,
+                status_code=status_code,
+                screenshot=screenshot_data,
+                get_delayed_content=None
+            )
+
+        elif url.startswith('raw:'):
+            # Process raw HTML content
+            raw_html = url[4:]  # Remove 'raw:' prefix
+            html = raw_html
+            if screenshot_requested:
+                screenshot_data = await self._generate_screenshot_from_html(html)
+            return AsyncCrawlResponse(
+                html=html,
+                response_headers=response_headers,
+                status_code=status_code,
+                screenshot=screenshot_data,
+                get_delayed_content=None
+            )
+        else:
+            raise ValueError("URL must start with 'http://', 'https://', 'file://', or 'raw:'")
+
+
+    async def _crawl_web(self, url: str, **kwargs) -> AsyncCrawlResponse:
+        """
+        Existing web crawling logic remains unchanged.
+
+        Args:
+            url (str): The web URL to crawl.
+            **kwargs: Additional parameters.
+
+        Returns:
+            AsyncCrawlResponse: The response containing HTML, headers, status code, and optional screenshot.
+        """
         response_headers = {}
         status_code = None
         
@@ -792,7 +861,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
             if self.verbose:
                 print(f"[LOG] ✅ Crawled {url} successfully!")
-
+           
             if self.use_cached_html:
                 cache_file_path = os.path.join(
                     Path.home(), ".crawl4ai", "cache", hashlib.md5(url.encode()).hexdigest()
@@ -972,6 +1041,15 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 print(f"Warning: Failed to remove overlay elements: {str(e)}")
 
     async def take_screenshot(self, page: Page) -> str:
+        """
+        Takes a screenshot of the current page.
+        
+        Args:
+            page (Page): The Playwright page instance
+            
+        Returns:
+            str: Base64-encoded screenshot image
+        """
         try:
             # The page is already loaded, just take the screenshot
             screenshot = await page.screenshot(full_page=True)
@@ -991,4 +1069,36 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             return base64.b64encode(buffered.getvalue()).decode('utf-8')
         finally:
             await page.close()
+            
+    async def _generate_screenshot_from_html(self, html: str) -> Optional[str]:
+        """
+        Generates a screenshot from raw HTML content.
+
+        Args:
+            html (str): The HTML content to render and capture.
+
+        Returns:
+            Optional[str]: Base64-encoded screenshot image or an error image if failed.
+        """
+        try:
+            if not self.browser:
+                await self.start()
+            page = await self.browser.new_page()
+            await page.set_content(html, wait_until='networkidle')
+            screenshot = await page.screenshot(full_page=True)
+            await page.close()
+            return base64.b64encode(screenshot).decode('utf-8')
+        except Exception as e:
+            error_message = f"Failed to take screenshot: {str(e)}"
+            print(error_message)
+
+            # Generate an error image
+            img = Image.new('RGB', (800, 600), color='black')
+            draw = ImageDraw.Draw(img)
+            font = ImageFont.load_default()
+            draw.text((10, 10), error_message, fill=(255, 255, 255), font=font)
+
+            buffered = BytesIO()
+            img.save(buffered, format="JPEG")
+            return base64.b64encode(buffered.getvalue()).decode('utf-8')
 

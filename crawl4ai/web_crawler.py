@@ -10,7 +10,7 @@ from .extraction_strategy import *
 from .crawler_strategy import *
 from typing import List
 from concurrent.futures import ThreadPoolExecutor
-from .content_scrapping_strategy import WebScrappingStrategy
+from .content_scrapping_strategy import WebScrapingStrategy
 from .config import *
 import warnings
 import json
@@ -182,7 +182,7 @@ class WebCrawler:
             # Extract content from HTML
             try:
                 t1 = time.time()
-                scrapping_strategy = WebScrappingStrategy()
+                scrapping_strategy = WebScrapingStrategy()
                 extra_params = {k: v for k, v in kwargs.items() if k not in ["only_text", "image_description_min_word_threshold"]}
                 result = scrapping_strategy.scrap(
                     url,

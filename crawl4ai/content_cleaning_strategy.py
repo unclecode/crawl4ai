@@ -15,7 +15,7 @@ class ContentCleaningStrategy:
         self.link_density_threshold = 0.2
         self.max_dom_depth = 10  # To prevent excessive DOM traversal
 
-    def clean(self, clean_html: str) -> str:
+    def clean(self, clean_html: str, soup = None) -> str:
         """
         Main function that takes cleaned HTML and returns super cleaned HTML.
 
@@ -28,18 +28,20 @@ class ContentCleaningStrategy:
         try:
             if not clean_html or not isinstance(clean_html, str):
                 return ''
-            soup = BeautifulSoup(clean_html, 'html.parser')
+            if not soup:
+                # soup = BeautifulSoup(clean_html, 'html.parser')
+                soup = BeautifulSoup(clean_html, 'lxml')
             main_content = self.extract_main_content(soup)
             if main_content:
                 super_clean_element = self.clean_element(main_content)
-                return str(super_clean_element)
+                return super_clean_element.encode_contents().decode('utf-8')
             else:
                 return ''
         except Exception:
             # Handle exceptions silently or log them as needed
             return ''
 
-    def extract_main_content(self, soup: BeautifulSoup) -> Optional[Tag]:
+    def extract_main_content(self, soup) -> Optional[Tag]:
         """
         Identifies and extracts the main content element from the HTML.
 

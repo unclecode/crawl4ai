@@ -9,7 +9,7 @@ from .async_database import async_db_manager
 from .chunking_strategy import *
 from .extraction_strategy import *
 from .async_crawler_strategy import AsyncCrawlerStrategy, AsyncPlaywrightCrawlerStrategy, AsyncCrawlResponse
-from .content_scrapping_strategy import WebScrappingStrategy
+from .content_scrapping_strategy import WebScrapingStrategy
 from .config import MIN_WORD_THRESHOLD, IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD
 from .utils import (
     sanitize_input_encode,
@@ -47,17 +47,17 @@ class AsyncWebCrawler:
 
     async def awarmup(self):
         # Print a message for crawl4ai and its version
+        print(f"[LOG] 🚀 Crawl4AI {crawl4ai_version}")
         if self.verbose:
-            print(f"[LOG] 🚀 Crawl4AI {crawl4ai_version}")
             print("[LOG] 🌤️  Warming up the AsyncWebCrawler")
         # await async_db_manager.ainit_db()
         await async_db_manager.initialize()
-        # await self.arun(
-        #     url="https://google.com/",
-        #     word_count_threshold=5,
-        #     bypass_cache=False,
-        #     verbose=False,
-        # )
+        await self.arun(
+            url="https://google.com/",
+            word_count_threshold=5,
+            bypass_cache=False,
+            verbose=False,
+        )
         self.ready = True
         if self.verbose:
             print("[LOG] 🌞 AsyncWebCrawler is ready to crawl")
@@ -75,6 +75,19 @@ class AsyncWebCrawler:
         verbose=True,
         **kwargs,
     ) -> CrawlResult:
+        """
+        Runs the crawler for a single source: URL (web, local file, or raw HTML).
+
+        Args:
+            url (str): The URL to crawl. Supported prefixes:
+                - 'http://' or 'https://': Web URL to crawl.
+                - 'file://': Local file path to process.
+                - 'raw:': Raw HTML content to process.
+            ... [other existing parameters]
+
+        Returns:
+            CrawlResult: The result of the crawling and processing.
+        """
         try:
             extraction_strategy = extraction_strategy or NoExtractionStrategy()
             extraction_strategy.verbose = verbose
@@ -89,8 +102,13 @@ class AsyncWebCrawler:
             cached = None
             screenshot_data = None
             extracted_content = None
-            if not bypass_cache and not self.always_by_pass_cache:
+            
+            is_web_url = url.startswith(('http://', 'https://'))
+            if is_web_url and not bypass_cache and not self.always_by_pass_cache:
                 cached = await async_db_manager.aget_cached_url(url)
+                        
+            # if not bypass_cache and not self.always_by_pass_cache:
+            #     cached = await async_db_manager.aget_cached_url(url)
 
             if kwargs.get("warmup", True) and not self.ready:
                 return None
@@ -117,25 +135,32 @@ class AsyncWebCrawler:
                     )
 
             crawl_result = await self.aprocess_html(
-                url,
-                html,
-                extracted_content,
-                word_count_threshold,
-                extraction_strategy,
-                chunking_strategy,
-                css_selector,
-                screenshot_data,
-                verbose,
-                bool(cached),
+                url=url,
+                html=html,
+                extracted_content=extracted_content,
+                word_count_threshold=word_count_threshold,
+                extraction_strategy=extraction_strategy,
+                chunking_strategy=chunking_strategy,
+                css_selector=css_selector,
+                screenshot=screenshot_data,
+                verbose=verbose,
+                is_cached=bool(cached),
                 async_response=async_response,
                 bypass_cache=bypass_cache,
                 **kwargs,
             )
-            crawl_result.status_code = async_response.status_code if async_response else 200
-            crawl_result.response_headers = async_response.response_headers if async_response else {}
+            
+            if async_response:
+                crawl_result.status_code = async_response.status_code
+                crawl_result.response_headers = async_response.response_headers
+            else:
+                crawl_result.status_code = 200
+                crawl_result.response_headers = cached[10]
+
             crawl_result.success = bool(html)
             crawl_result.session_id = kwargs.get("session_id", None)
             return crawl_result
+        
         except Exception as e:
             if not hasattr(e, "msg"):
                 e.msg = str(e)
@@ -155,22 +180,40 @@ class AsyncWebCrawler:
         verbose=True,
         **kwargs,
     ) -> List[CrawlResult]:
-        tasks = [
-            self.arun(
-                url,
-                word_count_threshold,
-                extraction_strategy,
-                chunking_strategy,
-                bypass_cache,
-                css_selector,
-                screenshot,
-                user_agent,
-                verbose,
-                **kwargs
-            )
-            for url in urls
-        ]
-        return await asyncio.gather(*tasks)
+        """
+        Runs the crawler for multiple sources: URLs (web, local files, or raw HTML).
+
+        Args:
+            urls (List[str]): A list of URLs with supported prefixes:
+                - 'http://' or 'https://': Web URL to crawl.
+                - 'file://': Local file path to process.
+                - 'raw:': Raw HTML content to process.
+            ... [other existing parameters]
+
+        Returns:
+            List[CrawlResult]: The results of the crawling and processing.
+        """
+        semaphore_count = kwargs.get('semaphore_count', 5)  # Adjust as needed
+        semaphore = asyncio.Semaphore(semaphore_count)
+
+        async def crawl_with_semaphore(url):
+            async with semaphore:
+                return await self.arun(
+                    url,
+                    word_count_threshold=word_count_threshold,
+                    extraction_strategy=extraction_strategy,
+                    chunking_strategy=chunking_strategy,
+                    bypass_cache=bypass_cache,
+                    css_selector=css_selector,
+                    screenshot=screenshot,
+                    user_agent=user_agent,
+                    verbose=verbose,
+                    **kwargs,
+                )
+
+        tasks = [crawl_with_semaphore(url) for url in urls]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        return [result if not isinstance(result, Exception) else str(result) for result in results]
 
     async def aprocess_html(
         self,
@@ -184,13 +227,14 @@ class AsyncWebCrawler:
         screenshot: str,
         verbose: bool,
         is_cached: bool,
+        async_response: Optional[AsyncCrawlResponse],
         **kwargs,
     ) -> CrawlResult:
         t = time.time()
         # Extract content from HTML
         try:
             t1 = time.time()
-            scrapping_strategy = WebScrappingStrategy()
+            scrapping_strategy = WebScrapingStrategy()
             # result = await scrapping_strategy.ascrap(
             result = scrapping_strategy.scrap(
                 url,
@@ -245,6 +289,12 @@ class AsyncWebCrawler:
             )
 
         screenshot = None if not screenshot else screenshot
+        
+        response_headers = "{}"  # Default value
+        if async_response:
+            # Serialize response_headers dict to JSON string
+            response_headers = json.dumps(async_response.response_headers, ensure_ascii=False)
+
 
         if not is_cached or kwargs.get("bypass_cache", False) or self.always_by_pass_cache:
             await async_db_manager.acache_url(
@@ -258,6 +308,7 @@ class AsyncWebCrawler:
                 json.dumps(links),
                 json.dumps(metadata),
                 screenshot=screenshot,
+                response_headers=response_headers,
             )
 
         return CrawlResult(
