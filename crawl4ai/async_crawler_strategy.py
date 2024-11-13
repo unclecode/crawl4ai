@@ -64,12 +64,27 @@ class ManagedBrowser:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE
             )
+            # Monitor browser process output for errors
+            asyncio.create_task(self._monitor_browser_process())
             await asyncio.sleep(2)  # Give browser time to start
             return f"http://localhost:{self.debugging_port}"
         except Exception as e:
             await self.cleanup()
             raise Exception(f"Failed to start browser: {e}")
 
+    async def _monitor_browser_process(self):
+        """Monitor the browser process for unexpected termination."""
+        if self.browser_process:
+            stdout, stderr = await asyncio.gather(
+                asyncio.to_thread(self.browser_process.stdout.read),
+                asyncio.to_thread(self.browser_process.stderr.read)
+            )
+            if self.browser_process.poll() is not None:
+                print(f"Browser process terminated unexpectedly with code {self.browser_process.returncode}")
+                print(f"STDOUT: {stdout.decode()}")
+                print(f"STDERR: {stderr.decode()}")
+                await self.cleanup()
+    
     def _get_browser_path(self) -> str:
         """Returns the browser executable path based on OS and browser type"""
         if sys.platform == "darwin":  # macOS
@@ -330,9 +345,10 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             await self.playwright.stop()
             self.playwright = None
 
-    def __del__(self):
-        if self.browser or self.playwright:
-            asyncio.get_event_loop().run_until_complete(self.close())
+    # Issue #256: Remove __del__ method to avoid potential issues with async cleanup
+    # def __del__(self):
+    #     if self.browser or self.playwright:
+    #         asyncio.get_event_loop().run_until_complete(self.close())
 
     def set_hook(self, hook_type: str, hook: Callable):
         if hook_type in self.hooks:

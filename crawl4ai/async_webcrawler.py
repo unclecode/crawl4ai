@@ -47,17 +47,17 @@ class AsyncWebCrawler:
 
     async def awarmup(self):
         # Print a message for crawl4ai and its version
-        print(f"[LOG] 🚀 Crawl4AI {crawl4ai_version}")
         if self.verbose:
+            print(f"[LOG] 🚀 Crawl4AI {crawl4ai_version}")
             print("[LOG] 🌤️  Warming up the AsyncWebCrawler")
         # await async_db_manager.ainit_db()
         await async_db_manager.initialize()
-        await self.arun(
-            url="https://google.com/",
-            word_count_threshold=5,
-            bypass_cache=False,
-            verbose=False,
-        )
+        # await self.arun(
+        #     url="https://google.com/",
+        #     word_count_threshold=5,
+        #     bypass_cache=False,
+        #     verbose=False,
+        # )
         self.ready = True
         if self.verbose:
             print("[LOG] 🌞 AsyncWebCrawler is ready to crawl")

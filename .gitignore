@@ -199,6 +199,7 @@ test_env/
 **/.DS_Store
 
 todo.md
+todo_executor.md
 git_changes.py
 git_changes.md
 pypi_build.sh
