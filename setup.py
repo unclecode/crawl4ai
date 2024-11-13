@@ -8,7 +8,7 @@ import sys
 
 # Create the .crawl4ai folder in the user's home directory if it doesn't exist
 # If the folder already exists, remove the cache folder
-crawl4ai_folder = Path.home() / ".crawl4ai"
+crawl4ai_folder = os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home()) / ".crawl4ai"
 cache_folder = crawl4ai_folder / "cache"
 
 if cache_folder.exists():
