@@ -1,3 +1,4 @@
+import re  # Point 1: Pre-Compile Regular Expressions
 from abc import ABC, abstractmethod
 from typing import Dict, Any
 from bs4 import BeautifulSoup
@@ -105,7 +106,39 @@ class CustomHTML2Text(HTML2Text):
             return
         super().handle_data(data, entity_char)
 
-class ContentScrappingStrategy(ABC):
+# Pre-compile regular expressions for Open Graph and Twitter metadata
+OG_REGEX = re.compile(r'^og:')
+TWITTER_REGEX = re.compile(r'^twitter:')
+DIMENSION_REGEX = re.compile(r"(\d+)(\D*)")
+
+# Function to parse image height/width value and units
+def parse_dimension(dimension):
+    if dimension:
+        # match = re.match(r"(\d+)(\D*)", dimension)
+        match = DIMENSION_REGEX.match(dimension)
+        if match:
+            number = int(match.group(1))
+            unit = match.group(2) or 'px'  # Default unit is 'px' if not specified
+            return number, unit
+    return None, None
+
+# Fetch image file metadata to extract size and extension
+def fetch_image_file_size(img, base_url):
+    #If src is relative path construct full URL, if not it may be CDN URL
+    img_url = urljoin(base_url,img.get('src'))
+    try:
+        response = requests.head(img_url)
+        if response.status_code == 200:
+            return response.headers.get('Content-Length',None)
+        else:
+            print(f"Failed to retrieve file size for {img_url}")
+            return None
+    except InvalidSchema as e:
+        return None
+    finally:
+        return
+
+class ContentScrapingStrategy(ABC):
     @abstractmethod
     def scrap(self, url: str, html: str, **kwargs) -> Dict[str, Any]:
         pass
@@ -114,7 +147,7 @@ class ContentScrappingStrategy(ABC):
     async def ascrap(self, url: str, html: str, **kwargs) -> Dict[str, Any]:
         pass
 
-class WebScrappingStrategy(ContentScrappingStrategy):
+class WebScrapingStrategy(ContentScrapingStrategy):
     def scrap(self, url: str, html: str, **kwargs) -> Dict[str, Any]:
         return self._get_content_of_website_optimized(url, html, is_async=False, **kwargs)
 
@@ -126,8 +159,15 @@ class WebScrappingStrategy(ContentScrappingStrategy):
         if not html:
             return None
 
-        soup = BeautifulSoup(html, 'html.parser')
+        # soup = BeautifulSoup(html, 'html.parser')
+        soup = BeautifulSoup(html, 'lxml')
         body = soup.body
+        
+        try:
+            meta = extract_metadata("", soup)
+        except Exception as e:
+            print('Error extracting metadata:', str(e))
+            meta = {}
         
         
         image_description_min_word_threshold = kwargs.get('image_description_min_word_threshold', IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD)
@@ -187,31 +227,7 @@ class WebScrappingStrategy(ContentScrappingStrategy):
 
             #Score an image for it's usefulness
             def score_image_for_usefulness(img, base_url, index, images_count):
-                # Function to parse image height/width value and units
-                def parse_dimension(dimension):
-                    if dimension:
-                        match = re.match(r"(\d+)(\D*)", dimension)
-                        if match:
-                            number = int(match.group(1))
-                            unit = match.group(2) or 'px'  # Default unit is 'px' if not specified
-                            return number, unit
-                    return None, None
 
-                # Fetch image file metadata to extract size and extension
-                def fetch_image_file_size(img, base_url):
-                    #If src is relative path construct full URL, if not it may be CDN URL
-                    img_url = urljoin(base_url,img.get('src'))
-                    try:
-                        response = requests.head(img_url)
-                        if response.status_code == 200:
-                            return response.headers.get('Content-Length',None)
-                        else:
-                            print(f"Failed to retrieve file size for {img_url}")
-                            return None
-                    except InvalidSchema as e:
-                        return None
-                    finally:
-                        return
 
                 image_height = img.get('height')
                 height_value, height_unit = parse_dimension(image_height)
@@ -294,7 +310,6 @@ class WebScrappingStrategy(ContentScrappingStrategy):
                 
                 exclude_social_media_domains = SOCIAL_MEDIA_DOMAINS + kwargs.get('exclude_social_media_domains', [])
                 exclude_social_media_domains = list(set(exclude_social_media_domains))
-
                 
                 try:
                     if element.name == 'a' and element.get('href'):
@@ -439,15 +454,7 @@ class WebScrappingStrategy(ContentScrappingStrategy):
             except Exception as e:
                 print('Error processing element:', str(e))
                 return False
-
-        #process images by filtering and extracting contextual text from the page
-        # imgs = body.find_all('img')
-        # media['images'] = [
-        #     result for result in
-        #     (process_image(img, url, i, len(imgs)) for i, img in enumerate(imgs))
-        #     if result is not None
-        # ]
-        
+       
         process_element(body)
         
         # Update the links dictionary with unique links
@@ -478,8 +485,9 @@ class WebScrappingStrategy(ContentScrappingStrategy):
                 # Replace base64 data with empty string
                 img['src'] = base64_pattern.sub('', src)
                 
+        str_body = ""
         try:
-            str(body)
+            str_body = body.encode_contents().decode('utf-8')
         except Exception as e:
             # Reset body to the original HTML
             success = False
@@ -504,11 +512,12 @@ class WebScrappingStrategy(ContentScrappingStrategy):
             
             # Append the error div to the body
             body.body.append(error_div)
+            str_body = body.encode_contents().decode('utf-8')
             
             print(f"[LOG] 😧 Error: After processing the crawled HTML and removing irrelevant tags, nothing was left in the page. Check the markdown for further details.")
 
 
-        cleaned_html = str(body).replace('\n\n', '\n').replace('  ', ' ')
+        cleaned_html = str_body.replace('\n\n', '\n').replace('  ', ' ')
 
         try:
             h = CustomHTML2Text()
@@ -518,15 +527,14 @@ class WebScrappingStrategy(ContentScrappingStrategy):
             markdown = h.handle(sanitize_html(cleaned_html))
         markdown = markdown.replace('    ```', '```')
 
-        try:
-            meta = extract_metadata(html, soup)
-        except Exception as e:
-            print('Error extracting metadata:', str(e))
-            meta = {}
+        
             
-        cleaner = ContentCleaningStrategy()
-        fit_html = cleaner.clean(cleaned_html)
-        fit_markdown = h.handle(fit_html)
+        fit_markdown = "Set flag 'fit_markdown' to True to get cleaned HTML content."
+        fit_html = "Set flag 'fit_markdown' to True to get cleaned HTML content."
+        if kwargs.get('fit_markdown', False):
+            cleaner = ContentCleaningStrategy()
+            fit_html = cleaner.clean(cleaned_html)
+            fit_markdown = h.handle(fit_html)
 
         cleaned_html = sanitize_html(cleaned_html)
         return {

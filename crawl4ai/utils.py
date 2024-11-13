@@ -736,45 +736,53 @@ def get_content_of_website_optimized(url: str, html: str, word_count_threshold: 
         'metadata': meta
     }
 
-def extract_metadata(html, soup = None):
+def extract_metadata(html, soup=None):
     metadata = {}
     
-    if not html:
+    if not html and not soup:
+        return {}
+    
+    if not soup:
+        soup = BeautifulSoup(html, 'lxml')
+    
+    head = soup.head
+    if not head:
         return metadata
     
-    # Parse HTML content with BeautifulSoup
-    if not soup:
-        soup = BeautifulSoup(html, 'html.parser')
-
     # Title
-    title_tag = soup.find('title')
-    metadata['title'] = title_tag.string if title_tag else None
+    title_tag = head.find('title')
+    metadata['title'] = title_tag.string.strip() if title_tag and title_tag.string else None
 
     # Meta description
-    description_tag = soup.find('meta', attrs={'name': 'description'})
-    metadata['description'] = description_tag['content'] if description_tag else None
+    description_tag = head.find('meta', attrs={'name': 'description'})
+    metadata['description'] = description_tag.get('content', '').strip() if description_tag else None
 
     # Meta keywords
-    keywords_tag = soup.find('meta', attrs={'name': 'keywords'})
-    metadata['keywords'] = keywords_tag['content'] if keywords_tag else None
+    keywords_tag = head.find('meta', attrs={'name': 'keywords'})
+    metadata['keywords'] = keywords_tag.get('content', '').strip() if keywords_tag else None
 
     # Meta author
-    author_tag = soup.find('meta', attrs={'name': 'author'})
-    metadata['author'] = author_tag['content'] if author_tag else None
+    author_tag = head.find('meta', attrs={'name': 'author'})
+    metadata['author'] = author_tag.get('content', '').strip() if author_tag else None
 
     # Open Graph metadata
-    og_tags = soup.find_all('meta', attrs={'property': lambda value: value and value.startswith('og:')})
+    og_tags = head.find_all('meta', attrs={'property': re.compile(r'^og:')})
     for tag in og_tags:
-        property_name = tag['property']
-        metadata[property_name] = tag['content']
+        property_name = tag.get('property', '').strip()
+        content = tag.get('content', '').strip()
+        if property_name and content:
+            metadata[property_name] = content
 
     # Twitter Card metadata
-    twitter_tags = soup.find_all('meta', attrs={'name': lambda value: value and value.startswith('twitter:')})
+    twitter_tags = head.find_all('meta', attrs={'name': re.compile(r'^twitter:')})
     for tag in twitter_tags:
-        property_name = tag['name']
-        metadata[property_name] = tag['content']
-
+        property_name = tag.get('name', '').strip()
+        content = tag.get('content', '').strip()
+        if property_name and content:
+            metadata[property_name] = content
+    
     return metadata
+
 
 def extract_xml_tags(string):
     tags = re.findall(r'<(\w+)>', string)

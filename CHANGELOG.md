@@ -1,5 +1,30 @@
 # Changelog
 
+# Changelog - November 13, 2024
+
+### Added
+- Support for raw HTML and local file crawling via URL prefixes ('raw:', 'file://')
+- Browser process monitoring for managed browser instances
+- Screenshot capability for raw HTML and local file content
+- Response headers storage in cache database
+- New `fit_markdown` flag for optional markdown generation
+
+### Changed
+- Switched HTML parser from 'html.parser' to 'lxml' for ~4x performance improvement 
+- Optimized BeautifulSoup text conversion and element selection
+- Pre-compiled regular expressions for better performance
+- Improved metadata extraction efficiency
+- Response headers now stored alongside HTML in cache
+
+### Removed
+- `__del__` method from AsyncPlaywrightCrawlerStrategy to prevent async cleanup issues
+
+### Fixed 
+- Issue #256: Added support for crawling raw HTML content
+- Issue #253: Implemented file:// protocol handling
+- Missing response headers in cached results
+- Memory leaks from improper async cleanup
+
 ## [v0.3.731] - 2024-11-13 Changelog for Issue 256 Fix
 - Fixed: Browser context unexpectedly closing in Docker environment during crawl operations.
 - Removed: __del__ method from AsyncPlaywrightCrawlerStrategy to prevent unreliable asynchronous cleanup, ensuring - browser context is closed explicitly within context managers.
@@ -185,7 +210,7 @@ This commit introduces several key enhancements, including improved error handli
 ## [v0.3.72] - 2024-10-20
 
 ### Fixed
-- Added support for parsing Base64 encoded images in WebScrappingStrategy
+- Added support for parsing Base64 encoded images in WebScrapingStrategy
 
 ### Added
 - Forked and integrated a customized version of the html2text library for more control over Markdown generation
@@ -208,7 +233,7 @@ This commit introduces several key enhancements, including improved error handli
 ### Developer Notes
 - The customized html2text library is now located within the crawl4ai package
 - New configuration options are available in the `config.py` file for external content handling
-- The `WebScrappingStrategy` class has been updated to accommodate new external content exclusion options
+- The `WebScrapingStrategy` class has been updated to accommodate new external content exclusion options
 
 ## [v0.3.71] - 2024-10-19
 
@@ -285,7 +310,7 @@ These updates aim to provide more flexibility in text processing, improve perfor
 
 ### Improvements
 1. **Better Error Handling**:
-   - Enhanced error reporting in WebScrappingStrategy with detailed error messages and suggestions.
+   - Enhanced error reporting in WebScrapingStrategy with detailed error messages and suggestions.
    - Added console message and error logging for better debugging.
 
 2. **Image Processing Enhancements**:
@@ -350,7 +375,7 @@ These updates aim to provide more flexibility in text processing, improve perfor
 - Allows for more customized setups.
 
 ### 2. Image Processing Optimization
-- Enhanced image handling in WebScrappingStrategy.
+- Enhanced image handling in WebScrapingStrategy.
 - Added filtering for small, invisible, or irrelevant images.
 - Improved image scoring system for better content relevance.
 - Implemented JavaScript-based image dimension updating for more accurate representation.
