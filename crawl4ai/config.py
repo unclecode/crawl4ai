@@ -51,3 +51,5 @@ SOCIAL_MEDIA_DOMAINS = [
 # If image format is in jpg, png or webp
 # If image is in the first half of the total images extracted from the page
 IMAGE_SCORE_THRESHOLD = 2
+
+MAX_METRICS_HISTORY = 1000

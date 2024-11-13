@@ -10,6 +10,7 @@ from .extraction_strategy import *
 from .crawler_strategy import *
 from typing import List
 from concurrent.futures import ThreadPoolExecutor
+from .content_scrapping_strategy import WebScrappingStrategy
 from .config import *
 import warnings
 import json
@@ -181,7 +182,21 @@ class WebCrawler:
             # Extract content from HTML
             try:
                 t1 = time.time()
-                result = get_content_of_website_optimized(url, html, word_count_threshold, css_selector=css_selector, only_text=kwargs.get("only_text", False))
+                scrapping_strategy = WebScrappingStrategy()
+                extra_params = {k: v for k, v in kwargs.items() if k not in ["only_text", "image_description_min_word_threshold"]}
+                result = scrapping_strategy.scrap(
+                    url,
+                    html,
+                    word_count_threshold=word_count_threshold,
+                    css_selector=css_selector,
+                    only_text=kwargs.get("only_text", False),
+                    image_description_min_word_threshold=kwargs.get(
+                        "image_description_min_word_threshold", IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD
+                    ),
+                    **extra_params,
+                )
+                
+                # result = get_content_of_website_optimized(url, html, word_count_threshold, css_selector=css_selector, only_text=kwargs.get("only_text", False))
                 if verbose:
                     print(f"[LOG] 🚀 Content extracted for {url}, success: True, time taken: {time.time() - t1:.2f} seconds")
                 
