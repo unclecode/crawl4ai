@@ -104,6 +104,10 @@ class AsyncWebCrawler:
             extracted_content = None
             
             is_web_url = url.startswith(('http://', 'https://'))
+            is_local_file = url.startswith("file://")
+            is_raw_html = url.startswith("raw:")
+            _url = url if not is_raw_html else "Raw HTML"
+            
             if is_web_url and not bypass_cache and not self.always_by_pass_cache:
                 cached = await async_db_manager.aget_cached_url(url)
                         
@@ -131,7 +135,7 @@ class AsyncWebCrawler:
                 t2 = time.time()
                 if verbose:
                     print(
-                        f"[LOG] 🚀 Crawling done for {url}, success: {bool(html)}, time taken: {t2 - t1:.2f} seconds"
+                        f"[LOG] 🚀 Crawling done for {_url}, success: {bool(html)}, time taken: {t2 - t1:.2f} seconds"
                     )
 
             crawl_result = await self.aprocess_html(
@@ -147,6 +151,9 @@ class AsyncWebCrawler:
                 is_cached=bool(cached),
                 async_response=async_response,
                 bypass_cache=bypass_cache,
+                is_web_url = is_web_url,
+                is_local_file = is_local_file,
+                is_raw_html = is_raw_html,
                 **kwargs,
             )
             
@@ -164,8 +171,8 @@ class AsyncWebCrawler:
         except Exception as e:
             if not hasattr(e, "msg"):
                 e.msg = str(e)
-            print(f"[ERROR] 🚫 arun(): Failed to crawl {url}, error: {e.msg}")
-            return CrawlResult(url=url, html="", markdown = f"[ERROR] 🚫 arun(): Failed to crawl {url}, error: {e.msg}", success=False, error_message=e.msg)
+            print(f"[ERROR] 🚫 arun(): Failed to crawl {_url}, error: {e.msg}")
+            return CrawlResult(url=url, html="", markdown = f"[ERROR] 🚫 arun(): Failed to crawl {_url}, error: {e.msg}", success=False, error_message=e.msg)
 
     async def arun_many(
         self,
@@ -233,6 +240,7 @@ class AsyncWebCrawler:
         t = time.time()
         # Extract content from HTML
         try:
+            _url = url if not kwargs.get("is_raw_html", False) else "Raw HTML"
             t1 = time.time()
             scrapping_strategy = WebScrapingStrategy()
             # result = await scrapping_strategy.ascrap(
@@ -249,7 +257,7 @@ class AsyncWebCrawler:
             )
             if verbose:
                 print(
-                    f"[LOG] 🚀 Content extracted for {url}, success: True, time taken: {time.time() - t1:.2f} seconds"
+                    f"[LOG] 🚀 Content extracted for {_url}, success: True, time taken: {time.time() - t1:.2f} seconds"
                 )
 
             if result is None:
@@ -270,7 +278,7 @@ class AsyncWebCrawler:
         if extracted_content is None and extraction_strategy and chunking_strategy:
             if verbose:
                 print(
-                    f"[LOG] 🔥 Extracting semantic blocks for {url}, Strategy: {self.__class__.__name__}"
+                    f"[LOG] 🔥 Extracting semantic blocks for {_url}, Strategy: {self.__class__.__name__}"
                 )
 
             # Check if extraction strategy is type of JsonCssExtractionStrategy
@@ -285,7 +293,7 @@ class AsyncWebCrawler:
 
         if verbose:
             print(
-                f"[LOG] 🚀 Extraction done for {url}, time taken: {time.time() - t:.2f} seconds."
+                f"[LOG] 🚀 Extraction done for {_url}, time taken: {time.time() - t:.2f} seconds."
             )
 
         screenshot = None if not screenshot else screenshot
@@ -296,20 +304,21 @@ class AsyncWebCrawler:
             response_headers = json.dumps(async_response.response_headers, ensure_ascii=False)
 
 
-        if not is_cached or kwargs.get("bypass_cache", False) or self.always_by_pass_cache:
-            await async_db_manager.acache_url(
-                url,
-                html,
-                cleaned_html,
-                markdown,
-                extracted_content,
-                True,
-                json.dumps(media),
-                json.dumps(links),
-                json.dumps(metadata),
-                screenshot=screenshot,
-                response_headers=response_headers,
-            )
+        if not kwargs.get("is_raw_html", False):
+            if not is_cached or kwargs.get("bypass_cache", False) or self.always_by_pass_cache:
+                await async_db_manager.acache_url(
+                    url,
+                    html,
+                    cleaned_html,
+                    markdown,
+                    extracted_content,
+                    True,
+                    json.dumps(media),
+                    json.dumps(links),
+                    json.dumps(metadata),
+                    screenshot=screenshot,
+                    response_headers=response_headers,
+                )
 
         return CrawlResult(
             url=url,
