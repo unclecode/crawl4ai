@@ -1,5 +1,12 @@
 # Changelog
 
+# [0.3.74] November 14, 2024
+
+- In this commit, the library is updated to process file downloads. Users can now specify a download folder and trigger the download process via JavaScript or other means, with all files being saved. The list of downloaded files will also be added to the crowd result object.
+- Another thing this commit introduces is the concept of the Relevance Content Filter. This is an improvement over Fit Markdown. This class of strategies aims to extract the main content from a given page - the part that really matters and is useful to be processed. One strategy has been created using the BM25 algorithm, which finds chunks of text from the web page relevant to its title, descriptions, and keywords, or supports a given user query and matches them. The result is then returned to the main engine to be converted to Markdown. Plans include adding approaches using language models as well.
+- The cache database was updated to hold information about response headers and downloaded files.
+
+
 # Changelog - November 13, 2024
 
 ### Added
