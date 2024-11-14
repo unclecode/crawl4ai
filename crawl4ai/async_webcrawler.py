@@ -160,12 +160,35 @@ class AsyncWebCrawler:
             if async_response:
                 crawl_result.status_code = async_response.status_code
                 crawl_result.response_headers = async_response.response_headers
+                crawl_result.downloaded_files = async_response.downloaded_files
             else:
                 crawl_result.status_code = 200
                 crawl_result.response_headers = cached[10]
+                # crawl_result.downloaded_files = cached[11]
 
             crawl_result.success = bool(html)
             crawl_result.session_id = kwargs.get("session_id", None)
+
+
+            if not is_raw_html:
+                if not bool(cached) or kwargs.get("bypass_cache", False) or self.always_by_pass_cache:
+                    await async_db_manager.acache_url(
+                        url = url,
+                        html = html,
+                        cleaned_html = crawl_result.cleaned_html,
+                        markdown = crawl_result.markdown,
+                        extracted_content = extracted_content,
+                        success = True,
+                        media = json.dumps(crawl_result.media),
+                        links = json.dumps(crawl_result.links),
+                        metadata = json.dumps(crawl_result.metadata),
+                        screenshot=screenshot,
+                        response_headers=json.dumps(crawl_result.response_headers),
+                        downloaded_files=json.dumps(crawl_result.downloaded_files),
+                        
+                    )
+
+
             return crawl_result
         
         except Exception as e:
@@ -233,8 +256,6 @@ class AsyncWebCrawler:
         css_selector: str,
         screenshot: str,
         verbose: bool,
-        is_cached: bool,
-        async_response: Optional[AsyncCrawlResponse],
         **kwargs,
     ) -> CrawlResult:
         t = time.time()
@@ -298,28 +319,6 @@ class AsyncWebCrawler:
 
         screenshot = None if not screenshot else screenshot
         
-        response_headers = "{}"  # Default value
-        if async_response:
-            # Serialize response_headers dict to JSON string
-            response_headers = json.dumps(async_response.response_headers, ensure_ascii=False)
-
-
-        if not kwargs.get("is_raw_html", False):
-            if not is_cached or kwargs.get("bypass_cache", False) or self.always_by_pass_cache:
-                await async_db_manager.acache_url(
-                    url,
-                    html,
-                    cleaned_html,
-                    markdown,
-                    extracted_content,
-                    True,
-                    json.dumps(media),
-                    json.dumps(links),
-                    json.dumps(metadata),
-                    screenshot=screenshot,
-                    response_headers=response_headers,
-                )
-
         return CrawlResult(
             url=url,
             html=html,

@@ -91,7 +91,8 @@ class AsyncDatabaseManager:
                     links TEXT DEFAULT "{}",
                     metadata TEXT DEFAULT "{}",
                     screenshot TEXT DEFAULT "",
-                    response_headers TEXT DEFAULT "{}"  -- New column added
+                    response_headers TEXT DEFAULT "{}",
+                    downloaded_files TEXT DEFAULT "{}"  -- New column added
                 )
             ''')
         
@@ -108,7 +109,7 @@ class AsyncDatabaseManager:
         column_names = await self.execute_with_retry(_check_columns)
         
         # List of new columns to add
-        new_columns = ['media', 'links', 'metadata', 'screenshot', 'response_headers']
+        new_columns = ['media', 'links', 'metadata', 'screenshot', 'response_headers', 'downloaded_files']
         
         for column in new_columns:
             if column not in column_names:
@@ -130,7 +131,7 @@ class AsyncDatabaseManager:
         async def _get(db):
             async with db.execute(
                 '''
-                SELECT url, html, cleaned_html, markdown, extracted_content, success, media, links, metadata, screenshot, response_headers
+                SELECT url, html, cleaned_html, markdown, extracted_content, success, media, links, metadata, screenshot, response_headers, downloaded_files
                 FROM crawled_data WHERE url = ?
                 ''',
                 (url,)
@@ -149,7 +150,8 @@ class AsyncDatabaseManager:
                         json.loads(row[7] or '{}'),  # links
                         json.loads(row[8] or '{}'),  # metadata
                         row[9],  # screenshot
-                        json.loads(row[10] or '{}')  # response_headers
+                        json.loads(row[10] or '{}'),  # response_headers
+                        json.loads(row[11] or '[]')  # downloaded_files
                     )
                 return None
 
@@ -171,15 +173,16 @@ class AsyncDatabaseManager:
         links: str = "{}",
         metadata: str = "{}",
         screenshot: str = "",
-        response_headers: str = "{}"  # New parameter added
+        response_headers: str = "{}",
+        downloaded_files: str = "[]"
     ):
         """Cache URL data with retry logic"""
         async def _cache(db):
             await db.execute('''
                 INSERT INTO crawled_data (
-                    url, html, cleaned_html, markdown, extracted_content, success, media, links, metadata, screenshot, response_headers
+                    url, html, cleaned_html, markdown, extracted_content, success, media, links, metadata, screenshot, response_headers, downloaded_files
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(url) DO UPDATE SET
                     html = excluded.html,
                     cleaned_html = excluded.cleaned_html,
@@ -190,8 +193,9 @@ class AsyncDatabaseManager:
                     links = excluded.links,    
                     metadata = excluded.metadata,      
                     screenshot = excluded.screenshot,
-                    response_headers = excluded.response_headers  -- Update response_headers
-            ''', (url, html, cleaned_html, markdown, extracted_content, success, media, links, metadata, screenshot, response_headers))
+                    response_headers = excluded.response_headers,  -- Update response_headers
+                    downloaded_files = excluded.downloaded_files
+            ''', (url, html, cleaned_html, markdown, extracted_content, success, media, links, metadata, screenshot, response_headers, downloaded_files))
 
         try:
             await self.execute_with_retry(_cache)

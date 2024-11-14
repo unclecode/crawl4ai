@@ -14,6 +14,7 @@ from pydantic import BaseModel
 import hashlib
 import json
 import uuid
+from .models import AsyncCrawlResponse
 
 from playwright_stealth import StealthConfig, stealth_async
 
@@ -148,15 +149,6 @@ class ManagedBrowser:
             except Exception as e:
                 print(f"Error removing temporary directory: {e}")
 
-class AsyncCrawlResponse(BaseModel):
-    html: str
-    response_headers: Dict[str, str]
-    status_code: int
-    screenshot: Optional[str] = None
-    get_delayed_content: Optional[Callable[[Optional[float]], Awaitable[str]]] = None
-
-    class Config:
-        arbitrary_types_allowed = True
 
 class AsyncCrawlerStrategy(ABC):
     @abstractmethod
@@ -215,6 +207,13 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             'before_retrieve_html': None
         }
         self.extra_args = kwargs.get("extra_args", [])
+        self.accept_downloads = kwargs.get("accept_downloads", False)
+        self.downloads_path = kwargs.get("downloads_path")
+        self._downloaded_files = []  # Track downloaded files for current crawl
+        if self.accept_downloads and not self.downloads_path:
+            self.downloads_path = os.path.join(os.getcwd(), "downloads")
+            os.makedirs(self.downloads_path, exist_ok=True)        
+        
 
     async def __aenter__(self):
         await self.start()
@@ -250,7 +249,12 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 # Set up the default context
                 if self.default_context:
                     await self.default_context.set_extra_http_headers(self.headers)
-                    
+                    if self.accept_downloads:
+                        await self.default_context.set_default_timeout(60000)
+                        await self.default_context.set_default_navigation_timeout(60000)
+                        self.default_context._impl_obj._options["accept_downloads"] = True
+                        self.default_context._impl_obj._options["downloads_path"] = self.downloads_path
+                        
                     if self.user_agent:
                         await self.default_context.set_extra_http_headers({
                             "User-Agent": self.user_agent
@@ -301,12 +305,14 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         if self.use_persistent_context and self.user_data_dir:
                             self.browser = await self.playwright.chromium.launch_persistent_context(
                                 user_data_dir=self.user_data_dir,
+                                accept_downloads=self.accept_downloads,
+                                downloads_path=self.downloads_path if self.accept_downloads else None,                                
                                 **browser_args
                             )
                             self.default_context = self.browser
                         else:
                             self.browser = await self.playwright.chromium.launch(**browser_args)
-
+                                
                 except Exception as e:
                     # Fallback to chromium if Chrome channel fails
                     if "chrome" in str(e) and browser_args.get("channel") == "chrome":
@@ -565,6 +571,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         response_headers = {}
         status_code = None
         
+        # Reset downloaded files list for new crawl
+        self._downloaded_files = []
+        
         self._cleanup_expired_sessions()
         session_id = kwargs.get("session_id")
         
@@ -592,10 +601,11 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         # Normal context creation for non-persistent or non-Chrome browsers
                         context = await self.browser.new_context(
                             user_agent=self.user_agent,
-                            viewport={"width": 1920, "height": 1080},
+                            viewport={"width": 1200, "height": 800},
                             proxy={"server": self.proxy} if self.proxy else None,
-                            accept_downloads=True,
-                            java_script_enabled=True
+                            java_script_enabled=True,
+                            accept_downloads=self.accept_downloads,
+                            downloads_path=self.downloads_path if self.accept_downloads else None
                         )
                         await context.add_cookies([{"name": "cookiesEnabled", "value": "true", "url": url}])
                         await context.set_extra_http_headers(self.headers)
@@ -655,6 +665,10 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             page.on("pageerror", lambda exc: print(f"Page Error: {exc}"))
         
         try:
+            # Set up download handling if enabled
+            if self.accept_downloads:
+                page.on("download", lambda download: asyncio.create_task(self._handle_download(download)))
+
             if self.verbose:
                 print(f"[LOG] 🕸️ Crawling {url} using AsyncPlaywrightCrawlerStrategy...")
 
@@ -886,7 +900,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 response_headers=response_headers, 
                 status_code=status_code,
                 screenshot=screenshot_data,
-                get_delayed_content=get_delayed_content
+                get_delayed_content=get_delayed_content,
+                downloaded_files=self._downloaded_files if self._downloaded_files else None
             )
             return response
         except Error as e:
@@ -896,6 +911,24 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         #         await page.close()
         #         await context.close()
 
+    async def _handle_download(self, download):
+        """Handle file downloads."""
+        try:
+            suggested_filename = download.suggested_filename
+            download_path = os.path.join(self.downloads_path, suggested_filename)
+            
+            if self.verbose:
+                print(f"[LOG] 📥 Downloading {suggested_filename} to {download_path}")
+                
+            await download.save_as(download_path)
+            self._downloaded_files.append(download_path)
+            
+            if self.verbose:
+                print(f"[LOG] ✅ Downloaded {suggested_filename} successfully")
+        except Exception as e:
+            if self.verbose:
+                print(f"[ERROR] Failed to handle download: {str(e)}")
+    
     async def crawl_many(self, urls: List[str], **kwargs) -> List[AsyncCrawlResponse]:
         semaphore_count = kwargs.get('semaphore_count', 5)  # Adjust as needed
         semaphore = asyncio.Semaphore(semaphore_count)

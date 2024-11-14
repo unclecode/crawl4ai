@@ -1054,3 +1054,58 @@ def is_external_url(url, base_domain):
         return False
         
     return False
+
+def clean_tokens(tokens: list[str]) -> list[str]:
+    # Set of tokens to remove
+    noise = {'ccp', 'up', '↑', '▲', '⬆️', 'a', 'an', 'at', 'by', 'in', 'of', 'on', 'to', 'the'}
+
+    STOP_WORDS = {
+        'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 
+        'has', 'he', 'in', 'is', 'it', 'its', 'of', 'on', 'that', 'the', 
+        'to', 'was', 'were', 'will', 'with',
+        
+        # Pronouns
+        'i', 'you', 'he', 'she', 'it', 'we', 'they',
+        'me', 'him', 'her', 'us', 'them',
+        'my', 'your', 'his', 'her', 'its', 'our', 'their',
+        'mine', 'yours', 'hers', 'ours', 'theirs',
+        'myself', 'yourself', 'himself', 'herself', 'itself', 'ourselves', 'themselves',
+        
+        # Common verbs
+        'am', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+        'have', 'has', 'had', 'having', 'do', 'does', 'did', 'doing',
+        
+        # Prepositions
+        'about', 'above', 'across', 'after', 'against', 'along', 'among', 'around',
+        'at', 'before', 'behind', 'below', 'beneath', 'beside', 'between', 'beyond',
+        'by', 'down', 'during', 'except', 'for', 'from', 'in', 'inside', 'into',
+        'near', 'of', 'off', 'on', 'out', 'outside', 'over', 'past', 'through',
+        'to', 'toward', 'under', 'underneath', 'until', 'up', 'upon', 'with', 'within',
+        
+        # Conjunctions
+        'and', 'but', 'or', 'nor', 'for', 'yet', 'so',
+        'although', 'because', 'since', 'unless',
+        
+        # Articles
+        'a', 'an', 'the',
+        
+        # Other common words
+        'this', 'that', 'these', 'those',
+        'what', 'which', 'who', 'whom', 'whose',
+        'when', 'where', 'why', 'how',
+        'all', 'any', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such',
+        'can', 'cannot', "can't", 'could', "couldn't",
+        'may', 'might', 'must', "mustn't",
+        'shall', 'should', "shouldn't",
+        'will', "won't", 'would', "wouldn't",
+        'not', "n't", 'no', 'nor', 'none'
+    }   
+   
+    # Single comprehension, more efficient than multiple passes
+    return [token for token in tokens 
+            if len(token) > 2 
+            and token not in noise 
+            and token not in STOP_WORDS
+            and not token.startswith('↑')
+            and not token.startswith('▲')
+            and not token.startswith('⬆')]
