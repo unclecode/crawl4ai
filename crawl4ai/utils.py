@@ -1,13 +1,12 @@
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from bs4 import BeautifulSoup, Comment, element, Tag, NavigableString
-import html2text
 import json
 import html
 import re
 import os
 import platform
-from html2text import HTML2Text
+from .html2text import HTML2Text
 from .prompts import PROMPT_EXTRACT_BLOCKS
 from .config import *
 from pathlib import Path
@@ -61,7 +60,7 @@ def get_system_memory():
         raise OSError("Unsupported operating system")
 
 def get_home_folder():
-    home_folder = os.path.join(Path.home(), ".crawl4ai")
+    home_folder = os.path.join(os.getenv("CRAWL4_AI_BASE_DIRECTORY", os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home())), ".crawl4ai")
     os.makedirs(home_folder, exist_ok=True)
     os.makedirs(f"{home_folder}/cache", exist_ok=True)
     os.makedirs(f"{home_folder}/models", exist_ok=True)
@@ -179,12 +178,25 @@ def escape_json_string(s):
     
     return s
 
-class CustomHTML2Text(HTML2Text):
+class CustomHTML2Text_v0(HTML2Text):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.ignore_links = True
         self.inside_pre = False
         self.inside_code = False
+        
+        self.skip_internal_links = False
+        self.single_line_break = False
+        self.mark_code = False
+        self.include_sup_sub = False
+        self.body_width = 0
+        self.ignore_mailto_links = True
+        self.ignore_links = False
+        self.escape_backslash = False
+        self.escape_dot = False
+        self.escape_plus = False
+        self.escape_dash = False
+        self.escape_snob = False
+
 
     def handle_tag(self, tag, attrs, start):
         if tag == 'pre':
@@ -194,6 +206,10 @@ class CustomHTML2Text(HTML2Text):
             else:
                 self.o('\n```')
                 self.inside_pre = False
+        elif tag in ["h1", "h2", "h3", "h4", "h5", "h6"]:
+            pass
+
+
         # elif tag == 'code' and not self.inside_pre:
         #     if start:
         #         if not self.inside_pre:
@@ -690,10 +706,13 @@ def get_content_of_website_optimized(url: str, html: str, word_count_threshold: 
     body = flatten_nested_elements(body)
     base64_pattern = re.compile(r'data:image/[^;]+;base64,([^"]+)')
     for img in imgs:
-        src = img.get('src', '')
-        if base64_pattern.match(src):
-            # Replace base64 data with empty string
-            img['src'] = base64_pattern.sub('', src)
+        try:
+            src = img.get('src', '')
+            if base64_pattern.match(src):
+                img['src'] = base64_pattern.sub('', src)
+        except:
+            pass        
+
     cleaned_html = str(body).replace('\n\n', '\n').replace('  ', ' ')
     cleaned_html = sanitize_html(cleaned_html)
 
@@ -964,4 +983,66 @@ def format_html(html_string):
     soup = BeautifulSoup(html_string, 'html.parser')
     return soup.prettify()
 
+def normalize_url(href, base_url):
+    """Normalize URLs to ensure consistent format"""
+    from urllib.parse import urljoin, urlparse
 
+    # Parse base URL to get components
+    parsed_base = urlparse(base_url)
+    if not parsed_base.scheme or not parsed_base.netloc:
+        raise ValueError(f"Invalid base URL format: {base_url}")
+
+    # Use urljoin to handle all cases
+    normalized = urljoin(base_url, href.strip())
+    return normalized
+
+def normalize_url_tmp(href, base_url):
+    """Normalize URLs to ensure consistent format"""
+    # Extract protocol and domain from base URL
+    try:
+        base_parts = base_url.split('/')
+        protocol = base_parts[0]
+        domain = base_parts[2]
+    except IndexError:
+        raise ValueError(f"Invalid base URL format: {base_url}")
+    
+    # Handle special protocols
+    special_protocols = {'mailto:', 'tel:', 'ftp:', 'file:', 'data:', 'javascript:'}
+    if any(href.lower().startswith(proto) for proto in special_protocols):
+        return href.strip()
+        
+    # Handle anchor links
+    if href.startswith('#'):
+        return f"{base_url}{href}"
+        
+    # Handle protocol-relative URLs
+    if href.startswith('//'):
+        return f"{protocol}{href}"
+        
+    # Handle root-relative URLs
+    if href.startswith('/'):
+        return f"{protocol}//{domain}{href}"
+        
+    # Handle relative URLs
+    if not href.startswith(('http://', 'https://')):
+        # Remove leading './' if present
+        href = href.lstrip('./')
+        return f"{protocol}//{domain}/{href}"
+        
+    return href.strip()
+
+def is_external_url(url, base_domain):
+    """Determine if a URL is external"""
+    special_protocols = {'mailto:', 'tel:', 'ftp:', 'file:', 'data:', 'javascript:'}
+    if any(url.lower().startswith(proto) for proto in special_protocols):
+        return True
+        
+    try:
+        # Handle URLs with protocol
+        if url.startswith(('http://', 'https://')):
+            url_domain = url.split('/')[2]
+            return base_domain.lower() not in url_domain.lower()
+    except IndexError:
+        return False
+        
+    return False

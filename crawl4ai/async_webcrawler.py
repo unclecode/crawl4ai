@@ -16,20 +16,22 @@ from .utils import (
     InvalidCSSSelectorError,
     format_html
 )
-
+from ._version import __version__ as crawl4ai_version
 
 class AsyncWebCrawler:
     def __init__(
         self,
         crawler_strategy: Optional[AsyncCrawlerStrategy] = None,
         always_by_pass_cache: bool = False,
+        base_directory: str = str(os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home())),
         **kwargs,
     ):
         self.crawler_strategy = crawler_strategy or AsyncPlaywrightCrawlerStrategy(
             **kwargs
         )
         self.always_by_pass_cache = always_by_pass_cache
-        self.crawl4ai_folder = os.path.join(Path.home(), ".crawl4ai")
+        # self.crawl4ai_folder = os.path.join(os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home()), ".crawl4ai")
+        self.crawl4ai_folder = os.path.join(base_directory, ".crawl4ai")
         os.makedirs(self.crawl4ai_folder, exist_ok=True)
         os.makedirs(f"{self.crawl4ai_folder}/cache", exist_ok=True)
         self.ready = False
@@ -44,9 +46,12 @@ class AsyncWebCrawler:
         await self.crawler_strategy.__aexit__(exc_type, exc_val, exc_tb)
 
     async def awarmup(self):
+        # Print a message for crawl4ai and its version
+        print(f"[LOG] 🚀 Crawl4AI {crawl4ai_version}")
         if self.verbose:
             print("[LOG] 🌤️  Warming up the AsyncWebCrawler")
-        await async_db_manager.ainit_db()
+        # await async_db_manager.ainit_db()
+        await async_db_manager.initialize()
         await self.arun(
             url="https://google.com/",
             word_count_threshold=5,
@@ -123,6 +128,7 @@ class AsyncWebCrawler:
                 verbose,
                 bool(cached),
                 async_response=async_response,
+                bypass_cache=bypass_cache,
                 **kwargs,
             )
             crawl_result.status_code = async_response.status_code if async_response else 200
@@ -133,8 +139,8 @@ class AsyncWebCrawler:
         except Exception as e:
             if not hasattr(e, "msg"):
                 e.msg = str(e)
-            print(f"[ERROR] 🚫 Failed to crawl {url}, error: {e.msg}")
-            return CrawlResult(url=url, html="", success=False, error_message=e.msg)
+            print(f"[ERROR] 🚫 arun(): Failed to crawl {url}, error: {e.msg}")
+            return CrawlResult(url=url, html="", markdown = f"[ERROR] 🚫 arun(): Failed to crawl {url}, error: {e.msg}", success=False, error_message=e.msg)
 
     async def arun_many(
         self,
@@ -166,7 +172,6 @@ class AsyncWebCrawler:
         ]
         return await asyncio.gather(*tasks)
 
-
     async def aprocess_html(
         self,
         url: str,
@@ -186,7 +191,8 @@ class AsyncWebCrawler:
         try:
             t1 = time.time()
             scrapping_strategy = WebScrappingStrategy()
-            result = await scrapping_strategy.ascrap(
+            # result = await scrapping_strategy.ascrap(
+            result = scrapping_strategy.scrap(
                 url,
                 html,
                 word_count_threshold=word_count_threshold,
@@ -195,6 +201,7 @@ class AsyncWebCrawler:
                 image_description_min_word_threshold=kwargs.get(
                     "image_description_min_word_threshold", IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD
                 ),
+                **kwargs,
             )
             if verbose:
                 print(
@@ -210,6 +217,8 @@ class AsyncWebCrawler:
 
         cleaned_html = sanitize_input_encode(result.get("cleaned_html", ""))
         markdown = sanitize_input_encode(result.get("markdown", ""))
+        fit_markdown = sanitize_input_encode(result.get("fit_markdown", ""))
+        fit_html = sanitize_input_encode(result.get("fit_html", ""))
         media = result.get("media", [])
         links = result.get("links", [])
         metadata = result.get("metadata", {})
@@ -237,7 +246,7 @@ class AsyncWebCrawler:
 
         screenshot = None if not screenshot else screenshot
 
-        if not is_cached:
+        if not is_cached or kwargs.get("bypass_cache", False) or self.always_by_pass_cache:
             await async_db_manager.acache_url(
                 url,
                 html,
@@ -256,6 +265,8 @@ class AsyncWebCrawler:
             html=html,
             cleaned_html=format_html(cleaned_html),
             markdown=markdown,
+            fit_markdown=fit_markdown,
+            fit_html= fit_html,
             media=media,
             links=links,
             metadata=metadata,
@@ -266,10 +277,13 @@ class AsyncWebCrawler:
         )
 
     async def aclear_cache(self):
-        await async_db_manager.aclear_db()
+        # await async_db_manager.aclear_db()
+        await async_db_manager.cleanup()
 
     async def aflush_cache(self):
         await async_db_manager.aflush_db()
 
     async def aget_cache_size(self):
         return await async_db_manager.aget_total_count()
+
+

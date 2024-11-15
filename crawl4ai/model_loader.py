@@ -56,7 +56,7 @@ def set_model_device(model):
 
 @lru_cache()
 def get_home_folder():
-    home_folder = os.path.join(Path.home(), ".crawl4ai")
+    home_folder = os.path.join(os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home()), ".crawl4ai")
     os.makedirs(home_folder, exist_ok=True)
     os.makedirs(f"{home_folder}/cache", exist_ok=True)
     os.makedirs(f"{home_folder}/models", exist_ok=True)
@@ -72,10 +72,18 @@ def load_bert_base_uncased():
     return tokenizer, model
 
 @lru_cache()
-def load_bge_small_en_v1_5():
+def load_HF_embedding_model(model_name="BAAI/bge-small-en-v1.5") -> tuple:
+    """Load the Hugging Face model for embedding.
+    
+    Args:
+        model_name (str, optional): The model name to load. Defaults to "BAAI/bge-small-en-v1.5".
+        
+    Returns:
+        tuple: The tokenizer and model.
+    """
     from transformers import BertTokenizer, BertModel, AutoTokenizer, AutoModel
-    tokenizer = AutoTokenizer.from_pretrained('BAAI/bge-small-en-v1.5', resume_download=None)
-    model = AutoModel.from_pretrained('BAAI/bge-small-en-v1.5', resume_download=None)
+    tokenizer = AutoTokenizer.from_pretrained(model_name, resume_download=None)
+    model = AutoModel.from_pretrained(model_name, resume_download=None)
     model.eval()
     model, device = set_model_device(model)
     return tokenizer, model

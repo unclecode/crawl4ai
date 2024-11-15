@@ -8,7 +8,7 @@ import sys
 
 # Create the .crawl4ai folder in the user's home directory if it doesn't exist
 # If the folder already exists, remove the cache folder
-crawl4ai_folder = Path.home() / ".crawl4ai"
+crawl4ai_folder = os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home()) / ".crawl4ai"
 cache_folder = crawl4ai_folder / "cache"
 
 if cache_folder.exists():
@@ -23,7 +23,7 @@ with open(os.path.join(__location__, "requirements.txt")) as f:
     requirements = f.read().splitlines()
     
 # Read version from __init__.py
-with open("crawl4ai/__init__.py") as f:
+with open("crawl4ai/_version.py") as f:
     for line in f:
         if line.startswith("__version__"):
             version = line.split("=")[1].strip().strip('"')
@@ -31,9 +31,11 @@ with open("crawl4ai/__init__.py") as f:
 
 # Define the requirements for different environments
 default_requirements = requirements
-torch_requirements = ["torch", "nltk", "spacy", "scikit-learn"]
-transformer_requirements = ["transformers", "tokenizers", "onnxruntime"]
-cosine_similarity_requirements = ["torch", "transformers", "nltk", "spacy"]
+# torch_requirements = ["torch", "nltk", "spacy", "scikit-learn"]
+# transformer_requirements = ["transformers", "tokenizers", "onnxruntime"]
+torch_requirements = ["torch", "nltk",  "scikit-learn"]
+transformer_requirements = ["transformers", "tokenizers"]
+cosine_similarity_requirements = ["torch", "transformers", "nltk" ]
 sync_requirements = ["selenium"]
 
 def install_playwright():

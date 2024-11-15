@@ -1,6 +1,9 @@
-# Crawl4AI (Async Version) 🕷️🤖
+# 🔥🕷️ Crawl4AI: LLM Friendly Web Crawler & Scraper
+
+<a href="https://trendshift.io/repositories/11716" target="_blank"><img src="https://trendshift.io/api/badge/repositories/11716" alt="unclecode%2Fcrawl4ai | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 
 [![GitHub Stars](https://img.shields.io/github/stars/unclecode/crawl4ai?style=social)](https://github.com/unclecode/crawl4ai/stargazers)
+![PyPI - Downloads](https://img.shields.io/pypi/dm/Crawl4AI)
 [![GitHub Forks](https://img.shields.io/github/forks/unclecode/crawl4ai?style=social)](https://github.com/unclecode/crawl4ai/network/members)
 [![GitHub Issues](https://img.shields.io/github/issues/unclecode/crawl4ai)](https://github.com/unclecode/crawl4ai/issues)
 [![GitHub Pull Requests](https://img.shields.io/github/issues-pr/unclecode/crawl4ai)](https://github.com/unclecode/crawl4ai/pulls)
@@ -8,20 +11,25 @@
 
 Crawl4AI simplifies asynchronous web crawling and data extraction, making it accessible for large language models (LLMs) and AI applications. 🆓🌐
 
-> Looking for the synchronous version? Check out [README.sync.md](./README.sync.md). You can also access the previous version in the branch [V0.2.76](https://github.com/unclecode/crawl4ai/blob/v0.2.76).
+## 🌟 Meet the Crawl4AI Assistant: Your Copilot for Crawling
 
-## New update 0.3.6
-- 🌐 Multi-browser support (Chromium, Firefox, WebKit)
-- 🖼️ Improved image processing with lazy-loading detection
-- 🔧 Custom page timeout parameter for better control over crawling behavior
-- 🕰️ Enhanced handling of delayed content loading
-- 🔑 Custom headers support for LLM interactions
-- 🖼️ iframe content extraction for comprehensive page analysis
-- ⏱️ Flexible timeout and delayed content retrieval options
+Use the [Crawl4AI GPT Assistant](https://tinyurl.com/crawl4ai-gpt) as your AI-powered copilot! With this assistant, you can:
+
+- 🧑‍💻 Generate code for complex crawling and extraction tasks
+- 💡 Get tailored support and examples
+- 📘 Learn Crawl4AI faster with step-by-step guidance
+
+## New in 0.3.73 ✨
+
+- 🐳 Docker Ready: Full API server with seamless deployment & scaling
+- 🎯 Browser Takeover: Use your own browser with cookies & history intact (CDP support)
+- 📝 Mockdown+: Enhanced tag preservation & content extraction
+- ⚡️ Parallel Power: Supercharged multi-URL crawling performance
+- 🌟 And many more exciting updates...
 
 ## Try it Now!
 
-✨ Play around with this [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1REChY6fXQf-EaVYLv0eHEWvzlYxGm0pd?usp=sharing)
+✨ Play around with this [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1SgRPrByQLzjRfwoRNq1wSGE9nYY_EE8C?usp=sharing)
 
 ✨ Visit our [Documentation Website](https://crawl4ai.com/mkdocs/)
 
@@ -30,22 +38,28 @@ Crawl4AI simplifies asynchronous web crawling and data extraction, making it acc
 - 🆓 Completely free and open-source
 - 🚀 Blazing fast performance, outperforming many paid services
 - 🤖 LLM-friendly output formats (JSON, cleaned HTML, markdown)
+- 🌐 Multi-browser support (Chromium, Firefox, WebKit)
 - 🌍 Supports crawling multiple URLs simultaneously
 - 🎨 Extracts and returns all media tags (Images, Audio, and Video)
 - 🔗 Extracts all external and internal links
 - 📚 Extracts metadata from the page
-- 🔄 Custom hooks for authentication, headers, and page modifications before crawling
+- 🔄 Custom hooks for authentication, headers, and page modifications
 - 🕵️ User-agent customization
-- 🖼️ Takes screenshots of the page
+- 🖼️ Takes screenshots of pages with enhanced error handling
 - 📜 Executes multiple custom JavaScripts before crawling
 - 📊 Generates structured output without LLM using JsonCssExtractionStrategy
 - 📚 Various chunking strategies: topic-based, regex, sentence, and more
 - 🧠 Advanced extraction strategies: cosine clustering, LLM, and more
 - 🎯 CSS selector support for precise data extraction
 - 📝 Passes instructions/keywords to refine extraction
-- 🔒 Proxy support for enhanced privacy and access
-- 🔄 Session management for complex multi-page crawling scenarios
-- 🌐 Asynchronous architecture for improved performance and scalability
+- 🔒 Proxy support with authentication for enhanced access
+- 🔄 Session management for complex multi-page crawling
+- 🌐 Asynchronous architecture for improved performance
+- 🖼️ Improved image processing with lazy-loading detection
+- 🕰️ Enhanced handling of delayed content loading
+- 🔑 Custom headers support for LLM interactions
+- 🖼️ iframe content extraction for comprehensive analysis
+- ⏱️ Flexible timeout and delayed content retrieval options
 
 ## Installation 🛠️
 
@@ -68,11 +82,13 @@ By default, this will install the asynchronous version of Crawl4AI, using Playwr
 👉 Note: When you install Crawl4AI, the setup script should automatically install and set up Playwright. However, if you encounter any Playwright-related errors, you can manually install it using one of these methods:
 
 1. Through the command line:
+
    ```bash
    playwright install
    ```
 
 2. If the above doesn't work, try this more specific command:
+
    ```bash
    python -m playwright install chromium
    ```
@@ -99,9 +115,53 @@ pip install -e .
 
 ### Using Docker 🐳
 
-We're in the process of creating Docker images and pushing them to Docker Hub. This will provide an easy way to run Crawl4AI in a containerized environment. Stay tuned for updates!
+Crawl4AI is available as Docker images for easy deployment. You can either pull directly from Docker Hub (recommended) or build from the repository.
 
-For more detailed installation instructions and options, please refer to our [Installation Guide](https://crawl4ai.com/mkdocs/installation).
+#### Option 1: Docker Hub (Recommended)
+
+```bash
+# Pull and run from Docker Hub (choose one):
+docker pull unclecode/crawl4ai:basic    # Basic crawling features
+docker pull unclecode/crawl4ai:all      # Full installation (ML, LLM support)
+docker pull unclecode/crawl4ai:gpu      # GPU-enabled version
+
+# Run the container
+docker run -p 11235:11235 unclecode/crawl4ai:basic  # Replace 'basic' with your chosen version
+```
+
+#### Option 2: Build from Repository
+
+```bash
+# Clone the repository
+git clone https://github.com/unclecode/crawl4ai.git
+cd crawl4ai
+
+# Build the image
+docker build -t crawl4ai:local \
+  --build-arg INSTALL_TYPE=basic \  # Options: basic, all
+  .
+
+# Run your local build
+docker run -p 11235:11235 crawl4ai:local
+```
+
+Quick test (works for both options):
+```python
+import requests
+
+# Submit a crawl job
+response = requests.post(
+    "http://localhost:11235/crawl",
+    json={"urls": "https://example.com", "priority": 10}
+)
+task_id = response.json()["task_id"]
+
+# Get results
+result = requests.get(f"http://localhost:11235/task/{task_id}")
+```
+
+For advanced configuration, environment variables, and usage examples, see our [Docker Deployment Guide](https://crawl4ai.com/mkdocs/basic/docker-deployment/).
+
 
 ## Quick Start 🚀
 
@@ -231,7 +291,7 @@ if __name__ == "__main__":
     asyncio.run(extract_news_teasers())
 ```
 
-For more advanced usage examples, check out our [Examples](https://crawl4ai.com/mkdocs/full_details/advanced_jsoncss_extraction.md) section in the documentation.
+For more advanced usage examples, check out our [Examples](https://crawl4ai.com/mkdocs/extraction/css-advanced/) section in the documentation.
 
 ### Extracting Structured Data with OpenAI
 
@@ -334,7 +394,8 @@ if __name__ == "__main__":
 
 This example demonstrates Crawl4AI's ability to handle complex scenarios where content is loaded asynchronously. It crawls multiple pages of GitHub commits, executing JavaScript to load new content and using custom hooks to ensure data is loaded before proceeding.
 
-For more advanced usage examples, check out our [Examples](https://crawl4ai.com/mkdocs/full_details/session_based_crawling.md) section in the documentation.
+For more advanced usage examples, check out our [Examples](https://crawl4ai.com/mkdocs/tutorial/episode_12_Session-Based_Crawling_for_Dynamic_Websites/) section in the documentation.
+</details>
 
 
 ## Speed Comparison 🚀
@@ -343,7 +404,7 @@ Crawl4AI is designed with speed as a primary focus. Our goal is to provide the f
 
 We've conducted a speed comparison between Crawl4AI and Firecrawl, a paid service. The results demonstrate Crawl4AI's superior performance:
 
-```
+```bash
 Firecrawl:
 Time taken: 7.02 seconds
 Content length: 42074 characters
@@ -361,6 +422,7 @@ Images found: 89
 ```
 
 As you can see, Crawl4AI outperforms Firecrawl significantly:
+
 - Simple crawl: Crawl4AI is over 4 times faster than Firecrawl.
 - With JavaScript execution: Even when executing JavaScript to load more content (doubling the number of images found), Crawl4AI is still faster than Firecrawl's simple crawl.
 
@@ -369,6 +431,30 @@ You can find the full comparison code in our repository at `docs/examples/crawl4
 ## Documentation 📚
 
 For detailed documentation, including installation instructions, advanced features, and API reference, visit our [Documentation Website](https://crawl4ai.com/mkdocs/).
+
+## Crawl4AI Roadmap 🗺️
+
+For detailed information on our development plans and upcoming features, check out our [Roadmap](https://github.com/unclecode/crawl4ai/blob/main/ROADMAP.md).
+
+### Advanced Crawling Systems 🔧
+- [x] 0. Graph Crawler: Smart website traversal using graph search algorithms for comprehensive nested page extraction
+- [ ] 1. Question-Based Crawler: Natural language driven web discovery and content extraction
+- [ ] 2. Knowledge-Optimal Crawler: Smart crawling that maximizes knowledge while minimizing data extraction
+- [ ] 3. Agentic Crawler: Autonomous system for complex multi-step crawling operations
+
+### Specialized Features 🛠️
+- [ ] 4. Automated Schema Generator: Convert natural language to extraction schemas
+- [ ] 5. Domain-Specific Scrapers: Pre-configured extractors for common platforms (academic, e-commerce)
+- [ ] 6. Web Embedding Index: Semantic search infrastructure for crawled content
+
+### Development Tools 🔨
+- [ ] 7. Interactive Playground: Web UI for testing, comparing strategies with AI assistance
+- [ ] 8. Performance Monitor: Real-time insights into crawler operations
+- [ ] 9. Cloud Integration: One-click deployment solutions across cloud providers
+
+### Community & Growth 🌱
+- [ ] 10. Sponsorship Program: Structured support system with tiered benefits
+- [ ] 11. Educational Content: "How to Crawl" video series and interactive tutorials
 
 ## Contributing 🤝
 
@@ -387,6 +473,34 @@ For questions, suggestions, or feedback, feel free to reach out:
 - Website: [crawl4ai.com](https://crawl4ai.com)
 
 Happy Crawling! 🕸️🚀
+
+
+# Mission
+
+Our mission is to unlock the untapped potential of personal and enterprise data in the digital age. In today's world, individuals and organizations generate vast amounts of valuable digital footprints, yet this data remains largely uncapitalized as a true asset. 
+
+Our open-source solution empowers developers and innovators to build tools for data extraction and structuring, laying the foundation for a new era of data ownership. By transforming personal and enterprise data into structured, tradeable assets, we're creating opportunities for individuals to capitalize on their digital footprints and for organizations to unlock the value of their collective knowledge.
+
+This democratization of data represents the first step toward a shared data economy, where willing participation in data sharing drives AI advancement while ensuring the benefits flow back to data creators. Through this approach, we're building a future where AI development is powered by authentic human knowledge rather than synthetic alternatives.
+
+![Mission Diagram](./docs/assets/pitch-dark.svg)
+
+For a detailed exploration of our vision, opportunities, and pathway forward, please see our [full mission statement](./MISSION.md).
+
+## Key Opportunities
+
+- **Data Capitalization**: Transform digital footprints into valuable assets that can appear on personal and enterprise balance sheets
+- **Authentic Data**: Unlock the vast reservoir of real human insights and knowledge for AI advancement
+- **Shared Economy**: Create new value streams where data creators directly benefit from their contributions
+
+## Development Pathway
+
+1. **Open-Source Foundation**: Building transparent, community-driven data extraction tools
+2. **Data Capitalization Platform**: Creating tools to structure and value digital assets
+3. **Shared Data Marketplace**: Establishing an economic platform for ethical data exchange
+
+For a detailed exploration of our vision, challenges, and solutions, please see our [full mission statement](./MISSION.md).
+
 
 ## Star History
 

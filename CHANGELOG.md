@@ -1,5 +1,308 @@
 # Changelog
 
+# CHANGELOG
+
+## [v0.3.73] - 2024-11-05
+
+### Major Features
+- **New Doctor Feature**
+  - Added comprehensive system diagnostics tool
+  - Available through package hub and CLI
+  - Provides automated troubleshooting and system health checks
+  - Includes detailed reporting of configuration issues
+
+- **Dockerized API Server**
+  - Released complete Docker implementation for API server
+  - Added comprehensive documentation for Docker deployment
+  - Implemented container communication protocols
+  - Added environment configuration guides
+
+- **Managed Browser Integration**
+  - Added support for user-controlled browser instances
+  - Implemented `ManagedBrowser` class for better browser lifecycle management
+  - Added ability to connect to existing Chrome DevTools Protocol (CDP) endpoints
+  - Introduced user data directory support for persistent browser profiles
+
+- **Enhanced HTML Processing**
+  - Added HTML tag preservation feature during markdown conversion
+  - Introduced configurable tag preservation system
+  - Improved pre-tag and code block handling
+  - Added support for nested preserved tags with attribute retention
+
+### Improvements
+- **Browser Handling**
+  - Added flag to ignore body visibility for problematic pages
+  - Improved browser process cleanup and management
+  - Enhanced temporary directory handling for browser profiles
+  - Added configurable browser launch arguments
+
+- **Database Management**
+  - Implemented connection pooling for better performance
+  - Added retry logic for database operations
+  - Improved error handling and logging
+  - Enhanced cleanup procedures for database connections
+
+- **Resource Management**
+  - Added memory and CPU monitoring
+  - Implemented dynamic task slot allocation based on system resources
+  - Added configurable cleanup intervals
+
+### Technical Improvements
+- **Code Structure**
+  - Moved version management to dedicated _version.py file
+  - Improved error handling throughout the codebase
+  - Enhanced logging system with better error reporting
+  - Reorganized core components for better maintainability
+
+### Bug Fixes
+- Fixed issues with browser process termination
+- Improved handling of connection timeouts
+- Enhanced error recovery in database operations
+- Fixed memory leaks in long-running processes
+
+### Dependencies
+- Updated Playwright to v1.47
+- Updated core dependencies with more flexible version constraints
+- Added new development dependencies for testing
+
+### Breaking Changes
+- Changed default browser handling behavior
+- Modified database connection management approach
+- Updated API response structure for better consistency
+
+## Migration Guide
+When upgrading to v0.3.73, be aware of the following changes:
+
+1. Docker Deployment:
+   - Review Docker documentation for new deployment options
+   - Update environment configurations as needed
+   - Check container communication settings
+
+2. If using custom browser management:
+   - Update browser initialization code to use new ManagedBrowser class
+   - Review browser cleanup procedures
+
+3. For database operations:
+   - Check custom database queries for compatibility with new connection pooling
+   - Update error handling to work with new retry logic
+
+4. Using the Doctor:
+   - Run doctor command for system diagnostics: `crawl4ai doctor`
+   - Review generated reports for potential issues
+   - Follow recommended fixes for any identified problems
+
+
+## [2024-11-04 - 13:21:42] Comprehensive Update of Crawl4AI Features and Dependencies
+This commit introduces several key enhancements, including improved error handling and robust database operations in `async_database.py`, which now features a connection pool and retry logic for better reliability. Updates to the README.md provide clearer instructions and a better user experience with links to documentation sections. The `.gitignore` file has been refined to include additional directories, while the async web crawler now utilizes a managed browser for more efficient crawling. Furthermore, multiple dependency updates and introduction of the `CustomHTML2Text` class enhance text extraction capabilities.
+
+## [v0.3.73] - 2024-10-24
+
+### Added
+- preserve_tags: Added support for preserving specific HTML tags during markdown conversion.
+- Smart overlay removal system in AsyncPlaywrightCrawlerStrategy:
+  - Automatic removal of popups, modals, and cookie notices
+  - Detection and removal of fixed/sticky position elements
+  - Cleaning of empty block elements
+  - Configurable via `remove_overlay_elements` parameter
+- Enhanced screenshot capabilities:
+  - Added `screenshot_wait_for` parameter to control timing
+  - Improved screenshot handling with existing page context
+  - Better error handling with fallback error images
+- New URL normalization utilities:
+  - `normalize_url` function for consistent URL formatting
+  - `is_external_url` function for better link classification
+- Custom base directory support for cache storage:
+  - New `base_directory` parameter in AsyncWebCrawler
+  - Allows specifying alternative locations for `.crawl4ai` folder
+
+### Enhanced
+- Link handling improvements:
+  - Better duplicate link detection
+  - Enhanced internal/external link classification
+  - Improved handling of special URL protocols
+  - Support for anchor links and protocol-relative URLs
+- Configuration refinements:
+  - Streamlined social media domain list
+  - More focused external content filtering
+- LLM extraction strategy:
+  - Added support for separate API base URL via `api_base` parameter
+  - Better handling of base URLs in configuration
+
+### Fixed
+- Screenshot functionality:
+  - Resolved issues with screenshot timing and context
+  - Improved error handling and recovery
+- Link processing:
+  - Fixed URL normalization edge cases
+  - Better handling of invalid URLs
+  - Improved error messages for link processing failures
+
+### Developer Notes
+- The overlay removal system uses advanced JavaScript injection for better compatibility
+- URL normalization handles special cases like mailto:, tel:, and protocol-relative URLs
+- Screenshot system now reuses existing page context for better performance
+- Link processing maintains separate dictionaries for internal and external links to ensure uniqueness
+
+## [v0.3.72] - 2024-10-22
+
+### Added
+- New `ContentCleaningStrategy` class:
+  - Smart content extraction based on text density and element scoring
+  - Automatic removal of boilerplate content
+  - DOM tree analysis for better content identification
+  - Configurable thresholds for content detection
+- Advanced proxy support:
+  - Added `proxy_config` option for authenticated proxy connections
+  - Support for username/password in proxy configuration
+- New content output formats:
+  - `fit_markdown`: Optimized markdown output with main content focus
+  - `fit_html`: Clean HTML with only essential content
+
+### Enhanced
+- Image source detection:
+  - Support for multiple image source attributes (`src`, `data-src`, `srcset`, etc.)
+  - Automatic fallback through potential source attributes
+  - Smart handling of srcset attribute
+- External content handling:
+  - Made external link exclusion optional (disabled by default)
+  - Improved detection and handling of social media links
+  - Better control over external image filtering
+
+### Fixed
+- Image extraction reliability with multiple source attribute checks
+- External link and image handling logic for better accuracy
+
+### Developer Notes
+- The new `ContentCleaningStrategy` uses configurable thresholds for customization
+- Proxy configuration now supports more complex authentication scenarios
+- Content extraction process now provides both regular and optimized outputs
+
+## [v0.3.72] - 2024-10-20
+
+### Fixed
+- Added support for parsing Base64 encoded images in WebScrappingStrategy
+
+### Added
+- Forked and integrated a customized version of the html2text library for more control over Markdown generation
+- New configuration options for controlling external content:
+  - Ability to exclude all external links
+  - Option to specify domains to exclude (default includes major social media platforms)
+  - Control over excluding external images
+
+### Changed
+- Improved Markdown generation process:
+  - Added fine-grained control over character escaping in Markdown output
+  - Enhanced handling of code blocks and pre-formatted text
+- Updated `AsyncPlaywrightCrawlerStrategy.close()` method to use a shorter sleep time (0.5 seconds instead of 500)
+- Enhanced flexibility in `CosineStrategy` with a more generic `load_HF_embedding_model` function
+
+### Improved
+- Optimized content scraping and processing for better efficiency
+- Enhanced error handling and logging in various components
+
+### Developer Notes
+- The customized html2text library is now located within the crawl4ai package
+- New configuration options are available in the `config.py` file for external content handling
+- The `WebScrappingStrategy` class has been updated to accommodate new external content exclusion options
+
+## [v0.3.71] - 2024-10-19
+
+### Added
+- New chunking strategies:
+  - `OverlappingWindowChunking`: Allows for overlapping chunks of text, useful for maintaining context between chunks.
+  - Enhanced `SlidingWindowChunking`: Improved to handle edge cases and last chunks more effectively.
+
+### Changed
+- Updated `CHUNK_TOKEN_THRESHOLD` in config to 2048 tokens (2^11) for better compatibility with most LLM models.
+- Improved `AsyncPlaywrightCrawlerStrategy.close()` method to use a shorter sleep time (0.5 seconds instead of 500), significantly reducing wait time when closing the crawler.
+- Enhanced flexibility in `CosineStrategy`:
+  - Now uses a more generic `load_HF_embedding_model` function, allowing for easier swapping of embedding models.
+- Updated `JsonCssExtractionStrategy` and `JsonXPATHExtractionStrategy` for better JSON-based extraction.
+
+### Fixed
+- Addressed potential issues with the sliding window chunking strategy to ensure all text is properly chunked.
+
+### Developer Notes
+- Added more comprehensive docstrings to chunking strategies for better code documentation.
+- Removed hardcoded device setting in `CosineStrategy`, now using the automatically detected device.
+- Added a new example in `quickstart_async.py` for generating a knowledge graph from crawled content.
+
+These updates aim to provide more flexibility in text processing, improve performance, and enhance the overall capabilities of the crawl4ai library. The new chunking strategies, in particular, offer more options for handling large texts in various scenarios.
+
+## [v0.3.71] - 2024-10-18
+
+### Changes
+1. **Version Update**:
+   - Updated version number from 0.3.7 to 0.3.71.
+
+2. **Crawler Enhancements**:
+   - Added `sleep_on_close` option to AsyncPlaywrightCrawlerStrategy for delayed browser closure.
+   - Improved context creation with additional options:
+     - Enabled `accept_downloads` and `java_script_enabled`.
+     - Added a cookie to enable cookies by default.
+
+3. **Error Handling Improvements**:
+   - Enhanced error messages in AsyncWebCrawler's `arun` method.
+   - Updated error reporting format for better visibility and consistency.
+
+4. **Performance Optimization**:
+   - Commented out automatic page and context closure in `crawl` method to potentially improve performance in certain scenarios.
+
+### Documentation
+- Updated quickstart notebook:
+  - Changed installation command to use the released package instead of GitHub repository.
+  - Updated kernel display name.
+
+### Developer Notes
+- Minor code refactoring and cleanup.
+
+## [v0.3.7] - 2024-10-17
+
+### New Features
+1. **Enhanced Browser Stealth**: 
+   - Implemented `playwright_stealth` for improved bot detection avoidance.
+   - Added `StealthConfig` for fine-tuned control over stealth parameters.
+
+2. **User Simulation**:
+   - New `simulate_user` option to mimic human-like interactions (mouse movements, clicks, keyboard presses).
+
+3. **Navigator Override**:
+   - Added `override_navigator` option to modify navigator properties, further improving bot detection evasion.
+
+4. **Improved iframe Handling**:
+   - New `process_iframes` parameter to extract and integrate iframe content into the main page.
+
+5. **Flexible Browser Selection**:
+   - Support for choosing between Chromium, Firefox, and WebKit browsers.
+
+6. **Include Links in Markdown**:
+    - Added support for including links in Markdown content, by definin g a new flag `include_links_on_markdown` in `crawl` method.   
+
+### Improvements
+1. **Better Error Handling**:
+   - Enhanced error reporting in WebScrappingStrategy with detailed error messages and suggestions.
+   - Added console message and error logging for better debugging.
+
+2. **Image Processing Enhancements**:
+   - Improved image dimension updating and filtering logic.
+
+3. **Crawling Flexibility**:
+   - Added support for custom viewport sizes.
+   - Implemented delayed content retrieval with `delay_before_return_html` parameter.
+
+4. **Performance Optimization**:
+   - Adjusted default semaphore count for parallel crawling.
+
+### Bug Fixes
+- Fixed an issue where the HTML content could be empty after processing.
+
+### Examples
+- Added new example `crawl_with_user_simulation()` demonstrating the use of user simulation and navigator override features.
+
+### Developer Notes
+- Refactored code for better maintainability and readability.
+- Updated browser launch arguments for improved compatibility and performance.
+
 ## [v0.3.6] - 2024-10-12 
 
 ### 1. Improved Crawling Control
