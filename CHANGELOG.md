@@ -1,5 +1,35 @@
 # Changelog
 
+
+## Version 0.3.74, Major Changes
+
+1. **File Download Processing** (Nov 14, 2024)
+   - Added capability for users to specify download folders
+   - Implemented file download tracking in crowd result object
+   - Created new file: `tests/async/test_async_doanloader.py`
+
+2. **Content Filtering Improvements** (Nov 14, 2024)
+   - Introduced Relevance Content Filter as an improvement over Fit Markdown
+   - Implemented BM25 algorithm for content relevance matching
+   - Added new file: `crawl4ai/content_filter_strategy.py`
+   - Removed deprecated: `crawl4ai/content_cleaning_strategy.py`
+
+3. **Local File and Raw HTML Support** (Nov 13, 2024)
+   - Added support for processing local files
+   - Implemented raw HTML input handling in AsyncWebCrawler
+   - Enhanced `crawl4ai/async_webcrawler.py` with significant performance improvements
+
+4. **Browser Management Enhancements** (Nov 12, 2024)
+   - Implemented new async crawler strategy using Playwright
+   - Introduced ManagedBrowser for better browser session handling
+   - Added support for persistent browser sessions
+   - Updated from playwright_stealth to tf-playwright-stealth
+
+5. **API Server Component**
+   - Added CORS support
+   - Implemented static file serving
+   - Enhanced root redirect functionality
+
 # [0.3.74] November 14, 2024
 
 - In this commit, the library is updated to process file downloads. Users can now specify a download folder and trigger the download process via JavaScript or other means, with all files being saved. The list of downloaded files will also be added to the crowd result object.
