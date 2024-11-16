@@ -107,12 +107,18 @@ RUN if [ "$INSTALL_TYPE" = "all" ] ; then \
         pip install -e "." ; \
     fi
 
+    # Install MkDocs and required plugins
+RUN pip install --no-cache-dir \
+    mkdocs \
+    mkdocs-material \
+    mkdocs-terminal \
+    pymdown-extensions
+
+# Build MkDocs documentation
+RUN mkdocs build
+
 # Install Playwright and browsers
 RUN playwright install
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
 
 # Expose port
 EXPOSE 8000 11235 9222 8080
