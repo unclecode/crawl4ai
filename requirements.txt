@@ -9,3 +9,4 @@ python-dotenv~=1.0
 requests~=2.26
 beautifulsoup4~=4.12
 tf-playwright-stealth~=1.0
+xxhash~=3.4

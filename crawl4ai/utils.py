@@ -14,6 +14,9 @@ from typing import Dict, Any
 from urllib.parse import urljoin
 import requests
 from requests.exceptions import InvalidSchema
+import hashlib
+from typing import Optional, Tuple, Dict, Any
+import xxhash
 
 class InvalidCSSSelectorError(Exception):
     pass
@@ -1109,3 +1112,27 @@ def clean_tokens(tokens: list[str]) -> list[str]:
             and not token.startswith('↑')
             and not token.startswith('▲')
             and not token.startswith('⬆')]
+
+
+def generate_content_hash(content: str) -> str:
+    """Generate a unique hash for content"""
+    return xxhash.xxh64(content.encode()).hexdigest()
+    # return hashlib.sha256(content.encode()).hexdigest()
+
+def ensure_content_dirs(base_path: str) -> Dict[str, str]:
+    """Create content directories if they don't exist"""
+    dirs = {
+        'html': 'html_content',
+        'cleaned': 'cleaned_html',
+        'markdown': 'markdown_content', 
+        'extracted': 'extracted_content',
+        'screenshots': 'screenshots'
+    }
+    
+    content_paths = {}
+    for key, dirname in dirs.items():
+        path = os.path.join(base_path, dirname)
+        os.makedirs(path, exist_ok=True)
+        content_paths[key] = path
+        
+    return content_paths
