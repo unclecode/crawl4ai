@@ -6,7 +6,7 @@ region: nyc
 services:
 - dockerfile_path: Dockerfile
   github:
-    branch: main
+    branch: 0.3.74
     deploy_on_push: true
     repo: unclecode/crawl4ai 
   health_check:
