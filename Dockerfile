@@ -79,7 +79,6 @@ COPY . .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Install required library for FastAPI
-RUN pip install .
 RUN pip install fastapi uvicorn psutil
 
 # Install ML dependencies first for better layer caching
@@ -97,15 +96,15 @@ RUN if [ "$INSTALL_TYPE" = "all" ] ; then \
 
 # Install the package
 RUN if [ "$INSTALL_TYPE" = "all" ] ; then \
-        pip install -e ".[all]" && \
+        pip install ".[all]" && \
         python -m crawl4ai.model_loader ; \
     elif [ "$INSTALL_TYPE" = "torch" ] ; then \
-        pip install -e ".[torch]" ; \
+        pip install ".[torch]" ; \
     elif [ "$INSTALL_TYPE" = "transformer" ] ; then \
-        pip install -e ".[transformer]" && \
+        pip install ".[transformer]" && \
         python -m crawl4ai.model_loader ; \
     else \
-        pip install -e "." ; \
+        pip install "." ; \
     fi
 
     # Install MkDocs and required plugins
