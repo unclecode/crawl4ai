@@ -33,6 +33,13 @@ class Crawl4AiTester:
                 return status
                 
             time.sleep(2)
+            
+    def submit_sync(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
+        response = requests.post(f"{self.base_url}/crawl_sync", json=request_data, timeout=60)
+        if response.status_code == 408:
+            raise TimeoutError("Task did not complete within server timeout")
+        response.raise_for_status()
+        return response.json()
 
 def test_docker_deployment(version="basic"):
     tester = Crawl4AiTester()
@@ -54,6 +61,7 @@ def test_docker_deployment(version="basic"):
     
     # Test cases based on version
     test_basic_crawl(tester)
+    test_basic_crawl_sync(tester)
     
     # if version in ["full", "transformer"]:
     #     test_cosine_extraction(tester)
@@ -78,6 +86,19 @@ def test_basic_crawl(tester: Crawl4AiTester):
     assert result["result"]["success"]
     assert len(result["result"]["markdown"]) > 0
 
+def test_basic_crawl_sync(tester: Crawl4AiTester):
+    print("\n=== Testing Basic Crawl (Sync) ===")
+    request = {
+        "urls": "https://www.nbcnews.com/business",
+        "priority": 10
+    }
+    
+    result = tester.submit_sync(request)
+    print(f"Basic crawl result length: {len(result['result']['markdown'])}")
+    assert result['status'] == 'completed'
+    assert result['result']['success']
+    assert len(result['result']['markdown']) > 0
+    
 def test_js_execution(tester: Crawl4AiTester):
     print("\n=== Testing JS Execution ===")
     request = {

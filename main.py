@@ -375,6 +375,30 @@ async def get_task_status(task_id: str):
 
     return response
 
+@app.post("/crawl_sync")
+async def crawl_sync(request: CrawlRequest) -> Dict[str, Any]:
+    task_id = await crawler_service.submit_task(request)
+    
+    # Wait up to 60 seconds for task completion
+    for _ in range(60):
+        task_info = crawler_service.task_manager.get_task(task_id)
+        if not task_info:
+            raise HTTPException(status_code=404, detail="Task not found")
+            
+        if task_info.status == TaskStatus.COMPLETED:
+            # Return same format as /task/{task_id} endpoint
+            if isinstance(task_info.result, list):
+                return {"status": task_info.status, "results": [result.dict() for result in task_info.result]}
+            return {"status": task_info.status, "result": task_info.result.dict()}
+            
+        if task_info.status == TaskStatus.FAILED:
+            raise HTTPException(status_code=500, detail=task_info.error)
+            
+        await asyncio.sleep(1)
+    
+    # If we get here, task didn't complete within timeout
+    raise HTTPException(status_code=408, detail="Task timed out")
+
 @app.get("/health")
 async def health_check():
     available_slots = await crawler_service.resource_monitor.get_available_slots()
