@@ -3,12 +3,12 @@ spec:
   services:
     - name: crawl4ai
       git:
-        branch: main
+        branch: 0.3.74
         repo_clone_url: https://github.com/unclecode/crawl4ai.git
       dockerfile_path: Dockerfile
       http_port: 11235
       instance_count: 1
-      instance_size_slug: professional-xs # 4GB RAM, 2 vCPUs
+      instance_size_slug: basic-xs # 4GB RAM, 2 vCPUs
       health_check:
         http_path: /health
       envs:
