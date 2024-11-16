@@ -1,71 +1,112 @@
-# Docker Deployment
+# Docker Deployment 🐳
 
 Crawl4AI provides official Docker images for easy deployment and scalability. This guide covers installation, configuration, and usage of Crawl4AI in Docker environments.
 
-## Quick Start 🚀
+## Docker Compose Setup 🐳
 
-Pull and run the basic version:
+### Basic Usage
 
-```bash
-docker pull unclecode/crawl4ai:basic
-docker run -p 11235:11235 unclecode/crawl4ai:basic
+Create a `docker-compose.yml`:
+```yaml
+version: '3.8'
+
+services:
+  crawl4ai:
+    image: unclecode/crawl4ai:all
+    ports:
+      - "11235:11235"
+    volumes:
+      - /dev/shm:/dev/shm
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+    restart: unless-stopped
 ```
 
-Test the deployment:
+Run with:
+```bash
+docker-compose up -d
+```
+
+### Secure Mode with API Token
+
+To enable API authentication, simply set the `CRAWL4AI_API_TOKEN`:
+```bash
+CRAWL4AI_API_TOKEN=your-secret-token docker-compose up -d
+```
+
+### Using Environment Variables
+
+Create a `.env` file for your API tokens:
+```env
+# Crawl4AI API Security (optional)
+CRAWL4AI_API_TOKEN=your-secret-token
+
+# LLM Provider API Keys
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+GOOGLE_API_KEY=...
+GEMINI_API_KEY=...
+OLLAMA_API_KEY=...
+
+# Additional Configuration
+MAX_CONCURRENT_TASKS=5
+```
+
+Docker Compose will automatically load variables from the `.env` file. No additional configuration needed!
+
+### Testing with API Token
+
 ```python
 import requests
 
-# Test health endpoint
-health = requests.get("http://localhost:11235/health")
-print("Health check:", health.json())
+# Initialize headers with token if using secure mode
+headers = {}
+if api_token := os.getenv('CRAWL4AI_API_TOKEN'):
+    headers['Authorization'] = f'Bearer {api_token}'
 
-# Test basic crawl
+# Test crawl with authentication
 response = requests.post(
     "http://localhost:11235/crawl",
+    headers=headers,
     json={
         "urls": "https://www.nbcnews.com/business",
         "priority": 10
     }
 )
 task_id = response.json()["task_id"]
-print("Task ID:", task_id)
 ```
 
-## Available Images 🏷️
+### Security Best Practices 🔒
 
-- `unclecode/crawl4ai:basic` - Basic web crawling capabilities
-- `unclecode/crawl4ai:all` - Full installation with all features
-- `unclecode/crawl4ai:gpu` - GPU-enabled version for ML features
-
-## Configuration Options 🔧
-
-### Environment Variables
-
-```bash
-docker run -p 11235:11235 \
-    -e MAX_CONCURRENT_TASKS=5 \
-    -e OPENAI_API_KEY=your_key \
-    unclecode/crawl4ai:all
+- Add `.env` to your `.gitignore`
+- Use different API tokens for development and production
+- Rotate API tokens periodically
+- Use secure methods to pass tokens in production environments
 ```
 
-### Volume Mounting
+This addition to your documentation:
+1. Shows how to use Docker Compose
+2. Explains both secure and non-secure modes
+3. Demonstrates environment variable configuration
+4. Provides example code for authenticated requests
+5. Includes security best practices
 
-Mount a directory for persistent data:
-```bash
-docker run -p 11235:11235 \
-    -v $(pwd)/data:/app/data \
-    unclecode/crawl4ai:all
-```
 
-### Resource Limits
 
-Control container resources:
-```bash
-docker run -p 11235:11235 \
-    --memory=4g \
-    --cpus=2 \
-    unclecode/crawl4ai:all
-```
+
+
+
+
+
+
+
+
+
+
+
+
 
 ## Usage Examples 📝
 
