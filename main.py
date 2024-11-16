@@ -10,6 +10,8 @@ from fastapi.exceptions import RequestValidationError
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import FileResponse
 from fastapi.responses import RedirectResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import Depends, Security
 
 from pydantic import BaseModel, HttpUrl, Field
 from typing import Optional, List, Dict, Any, Union
@@ -322,6 +324,21 @@ app.add_middleware(
 # Mount the pages directory as a static directory
 app.mount("/pages", StaticFiles(directory=__location__ + "/pages"), name="pages")
 
+# API token security
+security = HTTPBearer()
+CRAWL4AI_API_TOKEN = os.getenv("CRAWL4AI_API_TOKEN")
+
+async def verify_token(credentials: HTTPAuthorizationCredentials = Security(security)):
+    if not CRAWL4AI_API_TOKEN:
+        return credentials  # No token verification if CRAWL4AI_API_TOKEN is not set
+    if credentials.credentials != CRAWL4AI_API_TOKEN:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    return credentials
+
+# Helper function to conditionally apply security
+def secure_endpoint():
+    return Depends(verify_token) if CRAWL4AI_API_TOKEN else None
+
 # Check if site directory exists
 if os.path.exists(__location__ + "/site"):
     # Mount the site directory as a static directory
@@ -348,12 +365,12 @@ def read_root():
     return {"message": "Crawl4AI API service is running"}
 
 
-@app.post("/crawl")
+@app.post("/crawl", dependencies=[Depends(verify_token)])
 async def crawl(request: CrawlRequest) -> Dict[str, str]:
     task_id = await crawler_service.submit_task(request)
     return {"task_id": task_id}
 
-@app.get("/task/{task_id}")
+@app.get("/task/{task_id}", dependencies=[Depends(verify_token)])
 async def get_task_status(task_id: str):
     task_info = crawler_service.task_manager.get_task(task_id)
     if not task_info:
@@ -375,7 +392,7 @@ async def get_task_status(task_id: str):
 
     return response
 
-@app.post("/crawl_sync")
+@app.post("/crawl_sync", dependencies=[Depends(verify_token)])
 async def crawl_sync(request: CrawlRequest) -> Dict[str, Any]:
     task_id = await crawler_service.submit_task(request)
     

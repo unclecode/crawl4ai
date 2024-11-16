@@ -12,7 +12,7 @@ ARG ENABLE_GPU=false
 
 # Platform-specific labels
 LABEL maintainer="unclecode"
-LABEL description="Crawl4AI - Advanced Web Crawler with AI capabilities"
+LABEL description="🔥🕷️ Crawl4AI: Open-source LLM Friendly Web Crawler & scraper"
 LABEL version="1.0"
 
 # Environment setup
@@ -79,6 +79,7 @@ COPY . .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Install required library for FastAPI
+RUN pip install .
 RUN pip install fastapi uvicorn psutil
 
 # Install ML dependencies first for better layer caching
