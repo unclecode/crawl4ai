@@ -13,7 +13,7 @@ services:
     http_path: /health
   http_port: 11235
   instance_count: 1
-  instance_size_slug: basic-xs
+  instance_size_slug: professional-xs
   name: web
   routes:
   - path: /
