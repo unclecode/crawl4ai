@@ -1,12 +1,115 @@
-# Docker Deployment 🐳
+# Docker Deployment
 
 Crawl4AI provides official Docker images for easy deployment and scalability. This guide covers installation, configuration, and usage of Crawl4AI in Docker environments.
 
-## Docker Compose Setup 🐳
+## Quick Start 🚀
 
-### Basic Usage
+Pull and run the basic version:
+
+```bash
+# Basic run without security
+docker pull unclecode/crawl4ai:basic
+docker run -p 11235:11235 unclecode/crawl4ai:basic
+
+# Run with API security enabled
+docker run -p 11235:11235 -e CRAWL4AI_API_TOKEN=your_secret_token unclecode/crawl4ai:basic
+```
+
+## API Security 🔒
+
+### Understanding CRAWL4AI_API_TOKEN
+
+The `CRAWL4AI_API_TOKEN` provides optional security for your Crawl4AI instance:
+
+- If `CRAWL4AI_API_TOKEN` is set: All API endpoints (except `/health`) require authentication
+- If `CRAWL4AI_API_TOKEN` is not set: The API is publicly accessible
+
+```bash
+# Secured Instance
+docker run -p 11235:11235 -e CRAWL4AI_API_TOKEN=your_secret_token unclecode/crawl4ai:all
+
+# Unsecured Instance
+docker run -p 11235:11235 unclecode/crawl4ai:all
+```
+
+### Making API Calls
+
+For secured instances, include the token in all requests:
+
+```python
+import requests
+
+# Setup headers if token is being used
+api_token = "your_secret_token"  # Same token set in CRAWL4AI_API_TOKEN
+headers = {"Authorization": f"Bearer {api_token}"} if api_token else {}
+
+# Making authenticated requests
+response = requests.post(
+    "http://localhost:11235/crawl",
+    headers=headers,
+    json={
+        "urls": "https://example.com",
+        "priority": 10
+    }
+)
+
+# Checking task status
+task_id = response.json()["task_id"]
+status = requests.get(
+    f"http://localhost:11235/task/{task_id}",
+    headers=headers
+)
+```
+
+### Using with Docker Compose
+
+In your `docker-compose.yml`:
+```yaml
+services:
+  crawl4ai:
+    image: unclecode/crawl4ai:all
+    environment:
+      - CRAWL4AI_API_TOKEN=${CRAWL4AI_API_TOKEN:-}  # Optional
+    # ... other configuration
+```
+
+Then either:
+1. Set in `.env` file:
+```env
+CRAWL4AI_API_TOKEN=your_secret_token
+```
+
+2. Or set via command line:
+```bash
+CRAWL4AI_API_TOKEN=your_secret_token docker-compose up
+```
+
+> **Security Note**: If you enable the API token, make sure to keep it secure and never commit it to version control. The token will be required for all API endpoints except the health check endpoint (`/health`).
+
+## Configuration Options 🔧
+
+### Environment Variables
+
+You can configure the service using environment variables:
+
+```bash
+# Basic configuration
+docker run -p 11235:11235 \
+    -e MAX_CONCURRENT_TASKS=5 \
+    unclecode/crawl4ai:all
+
+# With security and LLM support
+docker run -p 11235:11235 \
+    -e CRAWL4AI_API_TOKEN=your_secret_token \
+    -e OPENAI_API_KEY=sk-... \
+    -e ANTHROPIC_API_KEY=sk-ant-... \
+    unclecode/crawl4ai:all
+```
+
+### Using Docker Compose (Recommended) 🐳
 
 Create a `docker-compose.yml`:
+
 ```yaml
 version: '3.8'
 
@@ -15,83 +118,110 @@ services:
     image: unclecode/crawl4ai:all
     ports:
       - "11235:11235"
+    environment:
+      - CRAWL4AI_API_TOKEN=${CRAWL4AI_API_TOKEN:-}  # Optional API security
+      - MAX_CONCURRENT_TASKS=5
+      # LLM Provider Keys
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
     volumes:
       - /dev/shm:/dev/shm
     deploy:
       resources:
         limits:
           memory: 4G
-    restart: unless-stopped
+        reservations:
+          memory: 1G
 ```
 
-Run with:
+You can run it in two ways:
+
+1. Using environment variables directly:
 ```bash
-docker-compose up -d
+CRAWL4AI_API_TOKEN=secret123 OPENAI_API_KEY=sk-... docker-compose up
 ```
 
-### Secure Mode with API Token
-
-To enable API authentication, simply set the `CRAWL4AI_API_TOKEN`:
-```bash
-CRAWL4AI_API_TOKEN=your-secret-token docker-compose up -d
-```
-
-### Using Environment Variables
-
-Create a `.env` file for your API tokens:
+2. Using a `.env` file (recommended):
+Create a `.env` file in the same directory:
 ```env
-# Crawl4AI API Security (optional)
-CRAWL4AI_API_TOKEN=your-secret-token
+# API Security (optional)
+CRAWL4AI_API_TOKEN=your_secret_token
 
-# LLM Provider API Keys
+# LLM Provider Keys
 OPENAI_API_KEY=sk-...
 ANTHROPIC_API_KEY=sk-ant-...
-GOOGLE_API_KEY=...
-GEMINI_API_KEY=...
-OLLAMA_API_KEY=...
 
-# Additional Configuration
+# Other Configuration
 MAX_CONCURRENT_TASKS=5
 ```
 
-Docker Compose will automatically load variables from the `.env` file. No additional configuration needed!
+Then simply run:
+```bash
+docker-compose up
+```
 
-### Testing with API Token
+### Testing the Deployment 🧪
 
 ```python
 import requests
 
-# Initialize headers with token if using secure mode
-headers = {}
-if api_token := os.getenv('CRAWL4AI_API_TOKEN'):
-    headers['Authorization'] = f'Bearer {api_token}'
+# For unsecured instances
+def test_unsecured():
+    # Health check
+    health = requests.get("http://localhost:11235/health")
+    print("Health check:", health.json())
 
-# Test crawl with authentication
-response = requests.post(
-    "http://localhost:11235/crawl",
-    headers=headers,
-    json={
-        "urls": "https://www.nbcnews.com/business",
-        "priority": 10
+    # Basic crawl
+    response = requests.post(
+        "http://localhost:11235/crawl",
+        json={
+            "urls": "https://www.nbcnews.com/business",
+            "priority": 10
+        }
+    )
+    task_id = response.json()["task_id"]
+    print("Task ID:", task_id)
+
+# For secured instances
+def test_secured(api_token):
+    headers = {"Authorization": f"Bearer {api_token}"}
+    
+    # Basic crawl with authentication
+    response = requests.post(
+        "http://localhost:11235/crawl",
+        headers=headers,
+        json={
+            "urls": "https://www.nbcnews.com/business",
+            "priority": 10
+        }
+    )
+    task_id = response.json()["task_id"]
+    print("Task ID:", task_id)
+```
+
+### LLM Extraction Example 🤖
+
+When you've configured your LLM provider keys (via environment variables or `.env`), you can use LLM extraction:
+
+```python
+request = {
+    "urls": "https://example.com",
+    "extraction_config": {
+        "type": "llm",
+        "params": {
+            "provider": "openai/gpt-4",
+            "instruction": "Extract main topics from the page"
+        }
     }
-)
-task_id = response.json()["task_id"]
+}
+
+# Make the request (add headers if using API security)
+response = requests.post("http://localhost:11235/crawl", json=request)
 ```
 
-### Security Best Practices 🔒
+> **Note**: Remember to add `.env` to your `.gitignore` to keep your API keys secure!
 
-- Add `.env` to your `.gitignore`
-- Use different API tokens for development and production
-- Rotate API tokens periodically
-- Use secure methods to pass tokens in production environments
-```
 
-This addition to your documentation:
-1. Shows how to use Docker Compose
-2. Explains both secure and non-secure modes
-3. Demonstrates environment variable configuration
-4. Provides example code for authenticated requests
-5. Includes security best practices
 
 
 
