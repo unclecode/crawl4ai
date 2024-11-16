@@ -65,6 +65,7 @@ class CrawlRequest(BaseModel):
     screenshot: bool = False
     magic: bool = False
     extra: Optional[Dict[str, Any]] = {}
+    session_id: Optional[str] = None
 
 @dataclass
 class TaskInfo:
@@ -284,6 +285,7 @@ class CrawlerService:
                             css_selector=request.css_selector,
                             screenshot=request.screenshot,
                             magic=request.magic,
+                            session_id=request.session_id,
                             **request.extra,
                         )
                     else:
@@ -295,6 +297,7 @@ class CrawlerService:
                             css_selector=request.css_selector,
                             screenshot=request.screenshot,
                             magic=request.magic,
+                            session_id=request.session_id,
                             **request.extra,
                         )
 

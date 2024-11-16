@@ -15,6 +15,8 @@ class Crawl4AiTester:
     def submit_and_wait(self, request_data: Dict[str, Any], timeout: int = 300) -> Dict[str, Any]:
         # Submit crawl job
         response = requests.post(f"{self.base_url}/crawl", json=request_data, headers=self.headers)
+        if response.status_code == 403:
+            raise Exception("API token is invalid or missing")
         task_id = response.json()["task_id"]
         print(f"Task ID: {task_id}")
         
@@ -45,8 +47,9 @@ class Crawl4AiTester:
 
 def test_docker_deployment(version="basic"):
     tester = Crawl4AiTester(
-        # base_url="http://localhost:11235" 
-        base_url="https://crawl4ai-sby74.ondigitalocean.app" 
+        base_url="http://localhost:11235" ,
+        # base_url="https://crawl4ai-sby74.ondigitalocean.app",
+        api_token="test"
     )
     print(f"Testing Crawl4AI Docker {version} version")
     
@@ -83,7 +86,8 @@ def test_basic_crawl(tester: Crawl4AiTester):
     print("\n=== Testing Basic Crawl ===")
     request = {
         "urls": "https://www.nbcnews.com/business",
-        "priority": 10
+        "priority": 10, 
+        "session_id": "test"
     }
     
     result = tester.submit_and_wait(request)
@@ -95,7 +99,8 @@ def test_basic_crawl_sync(tester: Crawl4AiTester):
     print("\n=== Testing Basic Crawl (Sync) ===")
     request = {
         "urls": "https://www.nbcnews.com/business",
-        "priority": 10
+        "priority": 10,
+        "session_id": "test"
     }
     
     result = tester.submit_sync(request)

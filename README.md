@@ -113,6 +113,21 @@ cd crawl4ai
 pip install -e .
 ```
 
+## One-Click Deployment 🚀
+
+Deploy your own instance of Crawl4AI with one click:
+
+[![DigitalOcean Referral Badge](https://web-platforms.sfo2.cdn.digitaloceanspaces.com/WWW/Badge%203.svg)](https://www.digitalocean.com/?repo=https://github.com/unclecode/crawl4ai/tree/0.3.74&refcode=a0780f1bdb3d&utm_campaign=Referral_Invite&utm_medium=Referral_Program&utm_source=badge)
+
+
+> 💡 **Recommended specs**: 4GB RAM minimum. Select "professional-xs" or higher when deploying for stable operation.
+
+The deploy will:
+- Set up a Docker container with Crawl4AI
+- Configure Playwright and all dependencies
+- Start the FastAPI server on port 11235
+- Set up health checks and auto-deployment
+
 ### Using Docker 🐳
 
 Crawl4AI is available as Docker images for easy deployment. You can either pull directly from Docker Hub (recommended) or build from the repository.
