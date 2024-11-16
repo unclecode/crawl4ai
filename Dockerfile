@@ -123,10 +123,5 @@ RUN playwright install
 # Expose port
 EXPOSE 8000 11235 9222 8080
 
-# Optional: Increase shared memory size to prevent browser crashes
-# when loading heavy pages
-RUN mkdir /dev/shm
-VOLUME /dev/shm
-
 # Start the FastAPI server
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "11235"]
