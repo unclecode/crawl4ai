@@ -8,7 +8,7 @@ spec:
       dockerfile_path: Dockerfile
       http_port: 11235
       instance_count: 1
-      instance_size_slug: basic-xs
+      instance_size_slug: professional-xs # 4GB RAM, 2 vCPUs
       health_check:
         http_path: /health
       envs:
@@ -20,3 +20,6 @@ spec:
           value: "false"
       routes:
         - path: /
+  alerts:
+    - rule: MEM_UTILIZATION
+      value: 90  # Alert at 90% memory usage
