@@ -1,12 +1,7 @@
-import os
 import re
-import time
 from bs4 import BeautifulSoup, Tag
 from typing import List, Tuple, Dict
 from rank_bm25 import BM25Okapi
-import nltk
-from time import perf_counter
-from html5lib import parse, treebuilders
 from time import perf_counter
 from collections import deque
 from bs4 import BeautifulSoup, NavigableString, Tag

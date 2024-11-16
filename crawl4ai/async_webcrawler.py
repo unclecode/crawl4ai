@@ -16,7 +16,7 @@ from .utils import (
     InvalidCSSSelectorError,
     format_html
 )
-from ._version import __version__ as crawl4ai_version
+from .__version__ import __version__ as crawl4ai_version
 
 class AsyncWebCrawler:
     def __init__(
