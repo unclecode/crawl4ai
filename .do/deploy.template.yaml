@@ -1,0 +1,22 @@
+spec:
+  name: crawl4ai
+  services:
+    - name: crawl4ai
+      git:
+        branch: main
+        repo_clone_url: https://github.com/unclecode/crawl4ai.git
+      dockerfile_path: Dockerfile
+      http_port: 11235
+      instance_count: 1
+      instance_size_slug: basic-xs
+      health_check:
+        http_path: /health
+      envs:
+        - key: INSTALL_TYPE
+          value: "basic"
+        - key: PYTHON_VERSION  
+          value: "3.10"
+        - key: ENABLE_GPU
+          value: "false"
+      routes:
+        - path: /
