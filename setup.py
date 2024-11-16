@@ -28,7 +28,7 @@ __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file
 with open(os.path.join(__location__, "requirements.txt")) as f:
     requirements = f.read().splitlines()
     
-with open("crawl4ai/_version.py") as f:
+with open("crawl4ai/__version__.py") as f:
     for line in f:
         if line.startswith("__version__"):
             version = line.split("=")[1].strip().strip('"')
