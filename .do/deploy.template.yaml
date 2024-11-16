@@ -20,11 +20,3 @@ spec:
           value: "false"
       routes:
         - path: /
-  alerts:
-    - rule: MEM_UTILIZATION
-      value: 90
-      window: 300        # Changed from "5m" to 300 (5 minutes in seconds)
-      operator: GREATER_THAN
-      disabled: false
-    - rule: DEPLOYMENT_FAILED
-    - rule: DOMAIN_FAILED
