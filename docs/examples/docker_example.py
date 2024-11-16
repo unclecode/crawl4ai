@@ -7,12 +7,14 @@ import os
 from typing import Dict, Any
 
 class Crawl4AiTester:
-    def __init__(self, base_url: str = "http://localhost:11235"):
+    def __init__(self, base_url: str = "http://localhost:11235", api_token: str = None):
         self.base_url = base_url
+        self.api_token = api_token or os.getenv('CRAWL4AI_API_TOKEN')  # Check environment variable as fallback
+        self.headers = {'Authorization': f'Bearer {self.api_token}'} if self.api_token else {}
         
     def submit_and_wait(self, request_data: Dict[str, Any], timeout: int = 300) -> Dict[str, Any]:
         # Submit crawl job
-        response = requests.post(f"{self.base_url}/crawl", json=request_data)
+        response = requests.post(f"{self.base_url}/crawl", json=request_data, headers=self.headers)
         task_id = response.json()["task_id"]
         print(f"Task ID: {task_id}")
         
@@ -22,7 +24,7 @@ class Crawl4AiTester:
             if time.time() - start_time > timeout:
                 raise TimeoutError(f"Task {task_id} did not complete within {timeout} seconds")
                 
-            result = requests.get(f"{self.base_url}/task/{task_id}")
+            result = requests.get(f"{self.base_url}/task/{task_id}", headers=self.headers)
             status = result.json()
             
             if status["status"] == "failed":
@@ -35,14 +37,17 @@ class Crawl4AiTester:
             time.sleep(2)
             
     def submit_sync(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
-        response = requests.post(f"{self.base_url}/crawl_sync", json=request_data, timeout=60)
+        response = requests.post(f"{self.base_url}/crawl_sync", json=request_data, headers=self.headers, timeout=60)
         if response.status_code == 408:
             raise TimeoutError("Task did not complete within server timeout")
         response.raise_for_status()
         return response.json()
 
 def test_docker_deployment(version="basic"):
-    tester = Crawl4AiTester()
+    tester = Crawl4AiTester(
+        # base_url="http://localhost:11235" 
+        base_url="https://crawl4ai-sby74.ondigitalocean.app" 
+    )
     print(f"Testing Crawl4AI Docker {version} version")
     
     # Health check with timeout and retry
