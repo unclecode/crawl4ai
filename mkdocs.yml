@@ -17,6 +17,7 @@ nav:
     - 'Browser Configuration': 'basic/browser-config.md'
     - 'Page Interaction': 'basic/page-interaction.md'
     - 'Content Selection': 'basic/content-selection.md'
+    - 'Cache Modes': 'basic/cache-modes.md'
 
   - Advanced:
     - 'Content Processing': 'advanced/content-processing.md'
