@@ -1,2 +1,2 @@
 # crawl4ai/_version.py
-__version__ = "0.3.731"
+__version__ = "0.3.74"

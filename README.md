@@ -13,17 +13,15 @@ Crawl4AI simplifies asynchronous web crawling and data extraction, making it acc
 
 ## New in 0.3.74 ✨
 
-- 🚀 **Blazing Fast Scraping:**  The scraping process is now significantly faster, often completing in under 100 milliseconds (excluding web fetch time)!
-- 📥 **Download Mastery:** Control downloads, specify folders, and track files within the `CrawlResult` object.
-- 🔎 **Relevance Filtering:** Extract the most important content with the new `RelevanceContentFilter` and BM25 algorithm.  Control filtering with the `fit_markdown` flag.
+- 🚀 **Blazing Fast Scraping:** The scraping process is now significantly faster, often completing in under 100 milliseconds (excluding web fetch time)!
+- 📥 **Download Manager:** Integrated file crawling and downloading capabilities, with full control over file management and tracking within the `CrawlResult` object.
+- 🔎 **Markdown Filter:** Enhanced content extraction using BM25 algorithm to create cleaner markdown with only relevant webpage content.
 - 🗂️ **Local & Raw HTML:** Crawl local files (`file://`) and raw HTML strings (`raw:`) directly.
-- 🤖 **Browser Boss:** Manage browser sessions with persistent contexts, process monitoring, and tf-playwright-stealth integration.  Configure using `use_managed_browser`, `user_data_dir`, and `use_persistent_context` parameters.
+- 🤖 **Browser Control:** Use your own browser setup for crawling, with persistent contexts and stealth integration to bypass anti-bot measures.
 - ☁️ **API & Cache Boost:** CORS support, static file serving, and a new filesystem-based cache for blazing-fast performance. Fine-tune caching with the `CacheMode` enum (ENABLED, DISABLED, READ_ONLY, WRITE_ONLY, BYPASS) and the `always_bypass_cache` parameter.
-- 🔒 **API Security:** Protect your API server with token-based authentication using the `CRAWL4AI_API_TOKEN` environment variable.
-- 🔄 **Synchronous & Direct Crawling:** Get immediate results with `/crawl_sync` or bypass the task queue with `/crawl_direct`.
-- 🛠️ **Database Migration:**  A new `crawl4ai-migrate` command ensures smooth upgrades and data integrity between versions.
-- 🐛 **Squashed Bugs:**  Fixed browser context issues in Docker, memory leaks, enhanced error handling, and improved HTML parsing.
-
+- 🐳 **API Gateway:** Run Crawl4AI as a local or cloud API service, enabling cross-platform usage through a containerized server with secure token authentication via `CRAWL4AI_API_TOKEN`.
+- 🛠️ **Database Improvements:** Enhanced database system for handling larger content sets with improved caching and faster performance.
+- 🐛 **Squashed Bugs:** Fixed browser context issues in Docker, memory leaks, enhanced error handling, and improved HTML parsing.
 
 ## Try it Now!
 

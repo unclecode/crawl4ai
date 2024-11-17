@@ -605,7 +605,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                             proxy={"server": self.proxy} if self.proxy else None,
                             java_script_enabled=True,
                             accept_downloads=self.accept_downloads,
-                            downloads_path=self.downloads_path if self.accept_downloads else None
+                            # downloads_path=self.downloads_path if self.accept_downloads else None
                         )
                         await context.add_cookies([{"name": "cookiesEnabled", "value": "true", "url": url}])
                         await context.set_extra_http_headers(self.headers)
@@ -905,7 +905,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             )
             return response
         except Error as e:
-            raise Error(f"[ERROR] 🚫 crawl(): Failed to crawl {url}: {str(e)}")
+            raise Error(f"async_crawler_strategy.py:_crawleb(): {str(e)}")
         # finally:
         #     if not session_id:
         #         await page.close()
