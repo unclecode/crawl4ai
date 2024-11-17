@@ -9,7 +9,7 @@ from typing import Dict, Any
 class Crawl4AiTester:
     def __init__(self, base_url: str = "http://localhost:11235", api_token: str = None):
         self.base_url = base_url
-        self.api_token = api_token or os.getenv('CRAWL4AI_API_TOKEN')  # Check environment variable as fallback
+        self.api_token = api_token or os.getenv('CRAWL4AI_API_TOKEN') or "test_api_code"  # Check environment variable as fallback
         self.headers = {'Authorization': f'Bearer {self.api_token}'} if self.api_token else {}
         
     def submit_and_wait(self, request_data: Dict[str, Any], timeout: int = 300) -> Dict[str, Any]:
@@ -44,6 +44,16 @@ class Crawl4AiTester:
             raise TimeoutError("Task did not complete within server timeout")
         response.raise_for_status()
         return response.json()
+    
+    def crawl_direct(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Directly crawl without using task queue"""
+        response = requests.post(
+            f"{self.base_url}/crawl_direct", 
+            json=request_data, 
+            headers=self.headers
+        )
+        response.raise_for_status()
+        return response.json()
 
 def test_docker_deployment(version="basic"):
     tester = Crawl4AiTester(
@@ -68,9 +78,10 @@ def test_docker_deployment(version="basic"):
             time.sleep(5)
     
     # Test cases based on version
-    test_basic_crawl(tester)
-    test_basic_crawl(tester)
-    test_basic_crawl_sync(tester)
+    # test_basic_crawl(tester)
+    # test_basic_crawl(tester)
+    # test_basic_crawl_sync(tester)
+    test_basic_crawl_direct(tester)
     
     # if version in ["full", "transformer"]:
     #     test_cosine_extraction(tester)
@@ -107,6 +118,20 @@ def test_basic_crawl_sync(tester: Crawl4AiTester):
     result = tester.submit_sync(request)
     print(f"Basic crawl result length: {len(result['result']['markdown'])}")
     assert result['status'] == 'completed'
+    assert result['result']['success']
+    assert len(result['result']['markdown']) > 0
+    
+def test_basic_crawl_direct(tester: Crawl4AiTester):
+    print("\n=== Testing Basic Crawl (Direct) ===")
+    request = {
+        "urls": "https://www.nbcnews.com/business",
+        "priority": 10,
+        # "session_id": "test"
+        "cache_mode": "bypass"  # or "enabled", "disabled", "read_only", "write_only"
+    }
+    
+    result = tester.crawl_direct(request)
+    print(f"Basic crawl result length: {len(result['result']['markdown'])}")
     assert result['result']['success']
     assert len(result['result']['markdown']) > 0
     

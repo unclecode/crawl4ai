@@ -25,7 +25,7 @@ import logging
 from enum import Enum
 from dataclasses import dataclass
 import json
-from crawl4ai import AsyncWebCrawler, CrawlResult
+from crawl4ai import AsyncWebCrawler, CrawlResult, CacheMode
 from crawl4ai.extraction_strategy import (
     LLMExtractionStrategy,
     CosineStrategy,
@@ -66,6 +66,7 @@ class CrawlRequest(BaseModel):
     magic: bool = False
     extra: Optional[Dict[str, Any]] = {}
     session_id: Optional[str] = None
+    cache_mode: Optional[CacheMode] = None
 
 @dataclass
 class TaskInfo:
@@ -329,7 +330,7 @@ app.mount("/pages", StaticFiles(directory=__location__ + "/pages"), name="pages"
 
 # API token security
 security = HTTPBearer()
-CRAWL4AI_API_TOKEN = os.getenv("CRAWL4AI_API_TOKEN")
+CRAWL4AI_API_TOKEN = os.getenv("CRAWL4AI_API_TOKEN") or "test_api_code"
 
 async def verify_token(credentials: HTTPAuthorizationCredentials = Security(security)):
     if not CRAWL4AI_API_TOKEN:
@@ -419,6 +420,47 @@ async def crawl_sync(request: CrawlRequest) -> Dict[str, Any]:
     # If we get here, task didn't complete within timeout
     raise HTTPException(status_code=408, detail="Task timed out")
 
+@app.post("/crawl_direct", dependencies=[Depends(verify_token)])
+async def crawl_direct(request: CrawlRequest) -> Dict[str, Any]:
+    try:
+        crawler = await crawler_service.crawler_pool.acquire(**request.crawler_params)
+        extraction_strategy = crawler_service._create_extraction_strategy(request.extraction_config)
+        
+        try:
+            if isinstance(request.urls, list):
+                results = await crawler.arun_many(
+                    urls=[str(url) for url in request.urls],
+                    extraction_strategy=extraction_strategy,
+                    js_code=request.js_code,
+                    wait_for=request.wait_for,
+                    css_selector=request.css_selector,
+                    screenshot=request.screenshot,
+                    magic=request.magic,
+                    cache_mode=request.cache_mode,
+                    session_id=request.session_id,
+                    **request.extra,
+                )
+                return {"results": [result.dict() for result in results]}
+            else:
+                result = await crawler.arun(
+                    url=str(request.urls),
+                    extraction_strategy=extraction_strategy,
+                    js_code=request.js_code,
+                    wait_for=request.wait_for,
+                    css_selector=request.css_selector,
+                    screenshot=request.screenshot,
+                    magic=request.magic,
+                    cache_mode=request.cache_mode,
+                    session_id=request.session_id,
+                    **request.extra,
+                )
+                return {"result": result.dict()}
+        finally:
+            await crawler_service.crawler_pool.release(crawler)
+    except Exception as e:
+        logger.error(f"Error in direct crawl: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
 @app.get("/health")
 async def health_check():
     available_slots = await crawler_service.resource_monitor.get_available_slots()
