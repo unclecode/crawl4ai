@@ -70,7 +70,7 @@ class PostInstallCommand(install):
     def run(self):
         install.run(self)
         install_playwright()
-        run_migration()
+        # run_migration()
 
 setup(
     name="Crawl4AI",
