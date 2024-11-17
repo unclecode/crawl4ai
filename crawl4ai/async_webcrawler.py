@@ -10,14 +10,14 @@ import asyncio
 from .models import CrawlResult
 from .async_database import async_db_manager
 from .chunking_strategy import *
+from .content_filter_strategy import *
 from .extraction_strategy import *
 from .async_crawler_strategy import AsyncCrawlerStrategy, AsyncPlaywrightCrawlerStrategy, AsyncCrawlResponse
 from .cache_context import CacheMode, CacheContext, _legacy_to_cache_mode
 from .content_scrapping_strategy import WebScrapingStrategy
 from .config import (
     MIN_WORD_THRESHOLD, 
-    IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
-    SHOW_DEPRECATION_WARNINGS  # New import
+    IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD
 )
 from .utils import (
     sanitize_input_encode,
@@ -49,7 +49,7 @@ class AsyncWebCrawler:
         )
     
     To disable deprecation warnings:
-        Set SHOW_DEPRECATION_WARNINGS = False in config.py
+        Pass warning=False to suppress the warning.
     """
 
     def __init__(
@@ -85,11 +85,11 @@ class AsyncWebCrawler:
         
         # Handle deprecated parameter
         if always_by_pass_cache is not None:
-            if SHOW_DEPRECATION_WARNINGS:
+            if kwargs.get("warning", True):
                 warnings.warn(
                     "'always_by_pass_cache' is deprecated and will be removed in version X.X.X. "
                     "Use 'always_bypass_cache' instead. "
-                    "Set SHOW_DEPRECATION_WARNINGS=False in config.py to suppress this warning.",
+                    "Pass warning=False to suppress this warning.",
                     DeprecationWarning,
                     stacklevel=2
                 )
@@ -126,6 +126,7 @@ class AsyncWebCrawler:
         word_count_threshold=MIN_WORD_THRESHOLD,
         extraction_strategy: ExtractionStrategy = None,
         chunking_strategy: ChunkingStrategy = RegexChunking(),
+        content_filter: RelevantContentFilter = None,
         cache_mode: Optional[CacheMode] = None,
         # Deprecated parameters
         bypass_cache: bool = False,
@@ -172,7 +173,7 @@ class AsyncWebCrawler:
         try:
             # Handle deprecated parameters
             if any([bypass_cache, disable_cache, no_cache_read, no_cache_write]):
-                if SHOW_DEPRECATION_WARNINGS:
+                if kwargs.get("warning", True):
                     warnings.warn(
                         "Cache control boolean flags are deprecated and will be removed in version X.X.X. "
                         "Use 'cache_mode' parameter instead. Examples:\n"
@@ -180,7 +181,7 @@ class AsyncWebCrawler:
                         "- For disable_cache=True, use cache_mode=CacheMode.DISABLED\n"
                         "- For no_cache_read=True, use cache_mode=CacheMode.WRITE_ONLY\n"
                         "- For no_cache_write=True, use cache_mode=CacheMode.READ_ONLY\n"
-                        "Set SHOW_DEPRECATION_WARNINGS=False in config.py to suppress this warning.",
+                        "Pass warning=False to suppress this warning.",
                         DeprecationWarning,
                         stacklevel=2
                     )
@@ -257,6 +258,7 @@ class AsyncWebCrawler:
                 word_count_threshold=word_count_threshold,
                 extraction_strategy=extraction_strategy,
                 chunking_strategy=chunking_strategy,
+                content_filter=content_filter,
                 css_selector=css_selector,
                 screenshot=screenshot_data,
                 verbose=verbose,
@@ -308,6 +310,7 @@ class AsyncWebCrawler:
         word_count_threshold=MIN_WORD_THRESHOLD,
         extraction_strategy: ExtractionStrategy = None,
         chunking_strategy: ChunkingStrategy = RegexChunking(),
+        content_filter: RelevantContentFilter = None,
         cache_mode: Optional[CacheMode] = None,
         # Deprecated parameters
         bypass_cache: bool = False,
@@ -335,14 +338,15 @@ class AsyncWebCrawler:
         Returns:
             List[CrawlResult]: Results for each URL
         """
-        if bypass_cache and SHOW_DEPRECATION_WARNINGS:
-            warnings.warn(
-                "'bypass_cache' is deprecated and will be removed in version X.X.X. "
-                "Use 'cache_mode=CacheMode.BYPASS' instead. "
-                "Set SHOW_DEPRECATION_WARNINGS=False in config.py to suppress this warning.",
-                DeprecationWarning,
-                stacklevel=2
-            )
+        if bypass_cache:
+            if kwargs.get("warning", True):
+                warnings.warn(
+                    "'bypass_cache' is deprecated and will be removed in version X.X.X. "
+                    "Use 'cache_mode=CacheMode.BYPASS' instead. "
+                    "Pass warning=False to suppress this warning.",
+                    DeprecationWarning,
+                    stacklevel=2
+                )
             if cache_mode is None:
                 cache_mode = CacheMode.BYPASS
 
@@ -356,6 +360,7 @@ class AsyncWebCrawler:
                     word_count_threshold=word_count_threshold,
                     extraction_strategy=extraction_strategy,
                     chunking_strategy=chunking_strategy,
+                    content_filter=content_filter,
                     cache_mode=cache_mode,
                     css_selector=css_selector,
                     screenshot=screenshot,
@@ -377,6 +382,7 @@ class AsyncWebCrawler:
         word_count_threshold: int,
         extraction_strategy: ExtractionStrategy,
         chunking_strategy: ChunkingStrategy,
+        content_filter: RelevantContentFilter,
         css_selector: str,
         screenshot: str,
         verbose: bool,
@@ -397,6 +403,7 @@ class AsyncWebCrawler:
                 image_description_min_word_threshold=kwargs.get(
                     "image_description_min_word_threshold", IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD
                 ),
+                content_filter = content_filter,
                 **kwargs,
             )
 

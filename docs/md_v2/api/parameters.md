@@ -33,3 +33,4 @@
 | async_webcrawler.py | session_id | `kwargs.get("session_id", None)` | AsyncWebCrawler | Session identifier for browser reuse |
 | async_webcrawler.py | only_text | `kwargs.get("only_text", False)` | AsyncWebCrawler | Extract only text content |
 | async_webcrawler.py | bypass_cache | `kwargs.get("bypass_cache", False)` | AsyncWebCrawler | Skip cache and force fresh crawl |
+| async_webcrawler.py | cache_mode | `kwargs.get("cache_mode", CacheMode.ENABLE)` | AsyncWebCrawler | Cache handling mode for request |

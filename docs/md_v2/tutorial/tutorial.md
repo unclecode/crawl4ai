@@ -26,7 +26,7 @@ Here's a condensed outline of the **Installation and Setup** video content:
    - Walk through a simple test script to confirm the setup:
       ```python
       import asyncio
-      from crawl4ai import AsyncWebCrawler
+      from crawl4ai import AsyncWebCrawler, CacheMode
       
       async def main():
           async with AsyncWebCrawler(verbose=True) as crawler:
@@ -1093,7 +1093,7 @@ Here’s a comprehensive outline for the **LLM Extraction Strategy** video, cove
                      extraction_type="schema",
                      instruction="Extract model names and fees for input and output tokens from the page."
                  ),
-                 bypass_cache=True
+                 cache_mode=CacheMode.BYPASS
              )
              print(result.extracted_content)
      ```
@@ -1139,7 +1139,7 @@ Here’s a comprehensive outline for the **LLM Extraction Strategy** video, cove
              result = await crawler.arun(
                  url="https://example.com/some-article",
                  extraction_strategy=extraction_strategy,
-                 bypass_cache=True
+                 cache_mode=CacheMode.BYPASS
              )
              print(result.extracted_content)
      ```
@@ -1248,7 +1248,7 @@ Here’s a structured outline for the **Cosine Similarity Strategy** video, cove
              result = await crawler.arun(
                  url=url,
                  extraction_strategy=extraction_strategy,
-                 bypass_cache=True
+                 cache_mode=CacheMode.BYPASS
              )
              print(result.extracted_content)
      ```
@@ -1296,7 +1296,7 @@ Here’s a structured outline for the **Cosine Similarity Strategy** video, cove
              result = await crawler.arun(
                  url=url,
                  extraction_strategy=extraction_strategy,
-                 bypass_cache=True
+                 cache_mode=CacheMode.BYPASS
              )
              print(result.extracted_content)
      ```

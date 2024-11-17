@@ -52,7 +52,7 @@ Here’s a comprehensive outline for the **LLM Extraction Strategy** video, cove
                      extraction_type="schema",
                      instruction="Extract model names and fees for input and output tokens from the page."
                  ),
-                 bypass_cache=True
+                 cache_mode=CacheMode.BYPASS
              )
              print(result.extracted_content)
      ```
@@ -98,7 +98,7 @@ Here’s a comprehensive outline for the **LLM Extraction Strategy** video, cove
              result = await crawler.arun(
                  url="https://example.com/some-article",
                  extraction_strategy=extraction_strategy,
-                 bypass_cache=True
+                 cache_mode=CacheMode.BYPASS
              )
              print(result.extracted_content)
      ```

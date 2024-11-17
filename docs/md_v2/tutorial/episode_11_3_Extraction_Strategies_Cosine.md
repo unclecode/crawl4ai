@@ -55,7 +55,7 @@ Here’s a structured outline for the **Cosine Similarity Strategy** video, cove
              result = await crawler.arun(
                  url=url,
                  extraction_strategy=extraction_strategy,
-                 bypass_cache=True
+                 cache_mode=CacheMode.BYPASS
              )
              print(result.extracted_content)
      ```
@@ -103,7 +103,7 @@ Here’s a structured outline for the **Cosine Similarity Strategy** video, cove
              result = await crawler.arun(
                  url=url,
                  extraction_strategy=extraction_strategy,
-                 bypass_cache=True
+                 cache_mode=CacheMode.BYPASS
              )
              print(result.extracted_content)
      ```

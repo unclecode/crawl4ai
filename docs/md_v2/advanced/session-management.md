@@ -75,7 +75,7 @@ async def crawl_dynamic_content():
                 js_code=js_next_page if page > 0 else None,
                 wait_for=wait_for if page > 0 else None,
                 js_only=page > 0,
-                bypass_cache=True
+                cache_mode=CacheMode.BYPASS
             )
 
             if result.success:

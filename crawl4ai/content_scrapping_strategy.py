@@ -532,14 +532,13 @@ class WebScrapingStrategy(ContentScrapingStrategy):
             
         fit_markdown = "Set flag 'fit_markdown' to True to get cleaned HTML content."
         fit_html = "Set flag 'fit_markdown' to True to get cleaned HTML content."
-        if kwargs.get('fit_markdown', False):
-            # cleaner = ContentCleaningStrategy()
-            # fit_html = cleaner.clean(cleaned_html)
-            # fit_markdown = h.handle(fit_html)
-            content_filter = BM25ContentFilter(
-                user_query= kwargs.get('fit_markdown_user_query', None),
-                bm25_threshold= kwargs.get('fit_markdown_bm25_threshold', 1.0)
-            )
+        if kwargs.get('content_filter', None) or kwargs.get('fit_markdown', False):
+            content_filter = kwargs.get('content_filter', None)
+            if not content_filter:
+                content_filter = BM25ContentFilter(
+                    user_query= kwargs.get('fit_markdown_user_query', None),
+                    bm25_threshold= kwargs.get('fit_markdown_bm25_threshold', 1.0)
+                )
             fit_html = content_filter.filter_content(html)
             fit_html = '\n'.join('<div>{}</div>'.format(s) for s in fit_html)
             fit_markdown = h.handle(fit_html)

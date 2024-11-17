@@ -30,7 +30,7 @@ Let's start with a basic example of session-based crawling:
 
 ```python
 import asyncio
-from crawl4ai import AsyncWebCrawler
+from crawl4ai import AsyncWebCrawler, CacheMode
 
 async def basic_session_crawl():
     async with AsyncWebCrawler(verbose=True) as crawler:
@@ -43,7 +43,7 @@ async def basic_session_crawl():
                 session_id=session_id,
                 js_code="document.querySelector('.load-more-button').click();" if page > 0 else None,
                 css_selector=".content-item",
-                bypass_cache=True
+                cache_mode=CacheMode.BYPASS
             )
             
             print(f"Page {page + 1}: Found {result.extracted_content.count('.content-item')} items")
@@ -102,7 +102,7 @@ async def advanced_session_crawl_with_hooks():
                 session_id=session_id,
                 css_selector="li.commit-item",
                 js_code=js_next_page if page > 0 else None,
-                bypass_cache=True,
+                cache_mode=CacheMode.BYPASS,
                 js_only=page > 0
             )
 
@@ -174,7 +174,7 @@ async def integrated_js_and_wait_crawl():
                 extraction_strategy=extraction_strategy,
                 js_code=js_next_page_and_wait if page > 0 else None,
                 js_only=page > 0,
-                bypass_cache=True
+                cache_mode=CacheMode.BYPASS
             )
 
             commits = json.loads(result.extracted_content)
@@ -241,7 +241,7 @@ async def wait_for_parameter_crawl():
                 js_code=js_next_page if page > 0 else None,
                 wait_for=wait_for if page > 0 else None,
                 js_only=page > 0,
-                bypass_cache=True
+                cache_mode=CacheMode.BYPASS
             )
 
             commits = json.loads(result.extracted_content)
