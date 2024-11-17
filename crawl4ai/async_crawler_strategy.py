@@ -669,8 +669,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             if self.accept_downloads:
                 page.on("download", lambda download: asyncio.create_task(self._handle_download(download)))
 
-            if self.verbose:
-                print(f"[LOG] 🕸️ Crawling {url} using AsyncPlaywrightCrawlerStrategy...")
+            # if self.verbose:
+            #     print(f"[LOG] 🕸️ Crawling {url} using AsyncPlaywrightCrawlerStrategy...")
 
             if self.use_cached_html:
                 cache_file_path = os.path.join(
@@ -873,8 +873,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     await asyncio.sleep(screenshot_wait_for)
                 screenshot_data = await self.take_screenshot(page)          
 
-            if self.verbose:
-                print(f"[LOG] ✅ Crawled {url} successfully!")
+            # if self.verbose:
+            #     print(f"[LOG] ✅ Crawled {url} successfully!")
            
             if self.use_cached_html:
                 cache_file_path = os.path.join(
