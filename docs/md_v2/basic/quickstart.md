@@ -8,7 +8,7 @@ First, let's import the necessary modules and create an instance of `AsyncWebCra
 
 ```python
 import asyncio
-from crawl4ai import AsyncWebCrawler
+from crawl4ai import AsyncWebCrawler, CasheMode
 
 async def main():
     async with AsyncWebCrawler(verbose=True) as crawler:
@@ -42,7 +42,7 @@ async def capture_and_save_screenshot(url: str, output_path: str):
         result = await crawler.arun(
             url=url,
             screenshot=True,
-            bypass_cache=True
+            cache_mode=CacheMode.BYPASS
         )
         
         if result.success and result.screenshot:
@@ -62,15 +62,15 @@ Crawl4AI supports multiple browser engines. Here's how to use different browsers
 ```python
 # Use Firefox
 async with AsyncWebCrawler(browser_type="firefox", verbose=True, headless=True) as crawler:
-    result = await crawler.arun(url="https://www.example.com", bypass_cache=True)
+    result = await crawler.arun(url="https://www.example.com", cache_mode=CacheMode.BYPASS)
 
 # Use WebKit
 async with AsyncWebCrawler(browser_type="webkit", verbose=True, headless=True) as crawler:
-    result = await crawler.arun(url="https://www.example.com", bypass_cache=True)
+    result = await crawler.arun(url="https://www.example.com", cache_mode=CacheMode.BYPASS)
 
 # Use Chromium (default)
 async with AsyncWebCrawler(verbose=True, headless=True) as crawler:
-    result = await crawler.arun(url="https://www.example.com", bypass_cache=True)
+    result = await crawler.arun(url="https://www.example.com", cache_mode=CacheMode.BYPASS)
 ```
 
 ### User Simulation 🎭
@@ -81,7 +81,7 @@ Simulate real user behavior to avoid detection:
 async with AsyncWebCrawler(verbose=True, headless=True) as crawler:
     result = await crawler.arun(
         url="YOUR-URL-HERE",
-        bypass_cache=True,
+        cache_mode=CacheMode.BYPASS,
         simulate_user=True,  # Causes random mouse movements and clicks
         override_navigator=True  # Makes the browser appear more like a real user
     )
@@ -99,7 +99,7 @@ async def main():
         print(f"First crawl result: {result1.markdown[:100]}...")
 
         # Force to crawl again
-        result2 = await crawler.arun(url="https://www.nbcnews.com/business", bypass_cache=True)
+        result2 = await crawler.arun(url="https://www.nbcnews.com/business", cache_mode=CacheMode.BYPASS)
         print(f"Second crawl result: {result2.markdown[:100]}...")
 
 asyncio.run(main())
@@ -189,7 +189,7 @@ extraction_strategy = LLMExtractionStrategy(
 async with AsyncWebCrawler() as crawler:
     result = await crawler.arun(
         url="https://paulgraham.com/love.html",
-        bypass_cache=True,
+        cache_mode=CacheMode.BYPASS,
         extraction_strategy=extraction_strategy
     )
 ```
@@ -239,7 +239,7 @@ async def crawl_dynamic_content():
                 js_code=js_next_page if page > 0 else None,
                 wait_for=wait_for if page > 0 else None,
                 js_only=page > 0,
-                bypass_cache=True,
+                cache_mode=CacheMode.BYPASS,
                 headless=False,
             )
 
@@ -254,7 +254,7 @@ Remove overlay elements and fit content appropriately:
 async with AsyncWebCrawler(headless=False) as crawler:
     result = await crawler.arun(
         url="your-url-here",
-        bypass_cache=True,
+        cache_mode=CacheMode.BYPASS,
         word_count_threshold=10,
         remove_overlay_elements=True,
         screenshot=True
@@ -282,7 +282,7 @@ async with AsyncWebCrawler() as crawler:
     result = await crawler.arun(
         url="https://www.nbcnews.com/business",
         word_count_threshold=0,
-        bypass_cache=True,
+        cache_mode=CacheMode.BYPASS,
         verbose=False,
     )
     end = time.time()

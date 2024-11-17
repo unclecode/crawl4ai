@@ -11,21 +11,19 @@
 
 Crawl4AI simplifies asynchronous web crawling and data extraction, making it accessible for large language models (LLMs) and AI applications. 🆓🌐
 
-## 🌟 Meet the Crawl4AI Assistant: Your Copilot for Crawling
+## New in 0.3.74 ✨
 
-Use the [Crawl4AI GPT Assistant](https://tinyurl.com/crawl4ai-gpt) as your AI-powered copilot! With this assistant, you can:
+- 🚀 **Blazing Fast Scraping:**  The scraping process is now significantly faster, often completing in under 100 milliseconds (excluding web fetch time)!
+- 📥 **Download Mastery:** Control downloads, specify folders, and track files within the `CrawlResult` object.
+- 🔎 **Relevance Filtering:** Extract the most important content with the new `RelevanceContentFilter` and BM25 algorithm.  Control filtering with the `fit_markdown` flag.
+- 🗂️ **Local & Raw HTML:** Crawl local files (`file://`) and raw HTML strings (`raw:`) directly.
+- 🤖 **Browser Boss:** Manage browser sessions with persistent contexts, process monitoring, and tf-playwright-stealth integration.  Configure using `use_managed_browser`, `user_data_dir`, and `use_persistent_context` parameters.
+- ☁️ **API & Cache Boost:** CORS support, static file serving, and a new filesystem-based cache for blazing-fast performance. Fine-tune caching with the `CacheMode` enum (ENABLED, DISABLED, READ_ONLY, WRITE_ONLY, BYPASS) and the `always_bypass_cache` parameter.
+- 🔒 **API Security:** Protect your API server with token-based authentication using the `CRAWL4AI_API_TOKEN` environment variable.
+- 🔄 **Synchronous & Direct Crawling:** Get immediate results with `/crawl_sync` or bypass the task queue with `/crawl_direct`.
+- 🛠️ **Database Migration:**  A new `crawl4ai-migrate` command ensures smooth upgrades and data integrity between versions.
+- 🐛 **Squashed Bugs:**  Fixed browser context issues in Docker, memory leaks, enhanced error handling, and improved HTML parsing.
 
-- 🧑‍💻 Generate code for complex crawling and extraction tasks
-- 💡 Get tailored support and examples
-- 📘 Learn Crawl4AI faster with step-by-step guidance
-
-## New in 0.3.73 ✨
-
-- 🐳 Docker Ready: Full API server with seamless deployment & scaling
-- 🎯 Browser Takeover: Use your own browser with cookies & history intact (CDP support)
-- 📝 Mockdown+: Enhanced tag preservation & content extraction
-- ⚡️ Parallel Power: Supercharged multi-URL crawling performance
-- 🌟 And many more exciting updates...
 
 ## Try it Now!
 

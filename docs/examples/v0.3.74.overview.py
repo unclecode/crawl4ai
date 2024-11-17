@@ -56,7 +56,7 @@ async def content_filtering_example():
         
         result = await crawler.arun(
             url="https://openai.com/blog",
-            extraction_strategy=content_filter
+            content_filter=content_filter
         )
         
         print(f"Filtered content: {result.extracted_content}")

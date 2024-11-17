@@ -8,8 +8,23 @@ The following parameters can be passed to the `arun()` method. They are organize
 await crawler.arun(
     url="https://example.com",   # Required: URL to crawl
     verbose=True,               # Enable detailed logging
-    bypass_cache=False,         # Skip cache for this request
+    cache_mode=CacheMode.ENABLED,  # Control cache behavior
     warmup=True                # Whether to run warmup check
+)
+```
+
+## Cache Control
+
+```python
+from crawl4ai import CacheMode
+
+await crawler.arun(
+    cache_mode=CacheMode.ENABLED,    # Normal caching (read/write)
+    # Other cache modes:
+    # cache_mode=CacheMode.DISABLED   # No caching at all
+    # cache_mode=CacheMode.READ_ONLY  # Only read from cache
+    # cache_mode=CacheMode.WRITE_ONLY # Only write to cache
+    # cache_mode=CacheMode.BYPASS     # Skip cache for this operation
 )
 ```
 
@@ -162,14 +177,13 @@ await crawler.arun(
 
 ## Parameter Interactions and Notes
 
-1. **Magic Mode Combinations**
+1. **Cache and Performance Setup**
    ```python
-   # Full anti-detection setup
+   # Optimal caching for repeated crawls
    await crawler.arun(
-       magic=True,
-       headless=False,
-       simulate_user=True,
-       override_navigator=True
+       cache_mode=CacheMode.ENABLED,
+       word_count_threshold=10,
+       process_iframes=False
    )
    ```
 
@@ -179,7 +193,8 @@ await crawler.arun(
    await crawler.arun(
        js_code="window.scrollTo(0, document.body.scrollHeight);",
        wait_for="css:.lazy-content",
-       delay_before_return_html=2.0
+       delay_before_return_html=2.0,
+       cache_mode=CacheMode.WRITE_ONLY  # Cache results after dynamic load
    )
    ```
 
@@ -192,7 +207,8 @@ await crawler.arun(
        extraction_strategy=my_strategy,
        chunking_strategy=my_chunking,
        process_iframes=True,
-       remove_overlay_elements=True
+       remove_overlay_elements=True,
+       cache_mode=CacheMode.ENABLED
    )
    ```
 
@@ -201,7 +217,7 @@ await crawler.arun(
 1. **Performance Optimization**
    ```python
    await crawler.arun(
-       bypass_cache=False,           # Use cache when possible
+       cache_mode=CacheMode.ENABLED,  # Use full caching
        word_count_threshold=10,      # Filter out noise
        process_iframes=False         # Skip iframes if not needed
    )
@@ -212,7 +228,8 @@ await crawler.arun(
    await crawler.arun(
        magic=True,                   # Enable anti-detection
        delay_before_return_html=1.0, # Wait for dynamic content
-       page_timeout=60000           # Longer timeout for slow pages
+       page_timeout=60000,          # Longer timeout for slow pages
+       cache_mode=CacheMode.WRITE_ONLY  # Cache results after successful crawl
    )
    ```
 
@@ -221,6 +238,7 @@ await crawler.arun(
    await crawler.arun(
        remove_overlay_elements=True,  # Remove popups
        excluded_tags=['nav', 'aside'],# Remove unnecessary elements
-       keep_data_attributes=False     # Remove data attributes
+       keep_data_attributes=False,    # Remove data attributes
+       cache_mode=CacheMode.ENABLED   # Use cache for faster processing
    )
    ```
