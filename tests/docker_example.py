@@ -47,9 +47,9 @@ class Crawl4AiTester:
 
 def test_docker_deployment(version="basic"):
     tester = Crawl4AiTester(
-        base_url="http://localhost:11235" ,
-        # base_url="https://api.crawl4ai.com" # just for example
-        # api_token="test" # just for example
+        # base_url="http://localhost:11235" ,
+        base_url="https://crawl4ai-sby74.ondigitalocean.app",
+        api_token="test"
     )
     print(f"Testing Crawl4AI Docker {version} version")
     
