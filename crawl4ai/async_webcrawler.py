@@ -63,7 +63,7 @@ class AsyncWebCrawler:
         crawler_strategy: Optional[AsyncCrawlerStrategy] = None,
         always_bypass_cache: bool = False,
         always_by_pass_cache: Optional[bool] = None,  # Deprecated parameter
-        base_directory: str = str(Path.home()),
+        base_directory: str = str(os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home())),
         **kwargs,
     ):
         """
@@ -74,19 +74,7 @@ class AsyncWebCrawler:
             always_bypass_cache: Whether to always bypass cache (new parameter)
             always_by_pass_cache: Deprecated, use always_bypass_cache instead
             base_directory: Base directory for storing cache
-        """
-        # init()
-        # self.log_width = 10  # Width of "[COMPLETE]" 
-        # self.tag_format = lambda tag: f"[{tag}]".ljust(self.log_width, ".")
-        # self.log_icons = {
-        #     'INIT': '→',      # Alternative: '▶' or '►'
-        #     'READY': '✓',     # Alternative: '√'
-        #     'FETCH': '↓',     # Alternative: '▼'
-        #     'SCRAPE': '◆',    # Alternative: '♦'
-        #     'EXTRACT': '■',    # Alternative: '□'
-        #     'COMPLETE': '●',   # Alternative: '○'
-        #     'ERROR': '×' 
-        # }        
+        """  
         self.verbose = kwargs.get("verbose", False)
         self.logger = AsyncLogger(
             log_file=os.path.join(base_directory, ".crawl4ai", "crawler.log"),

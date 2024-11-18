@@ -17,10 +17,9 @@ from .async_logger import AsyncLogger
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-base_directory = Path.home()
-DB_PATH = os.path.join(Path.home(), ".crawl4ai")
+base_directory = DB_PATH = os.path.join(os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home()), ".crawl4ai")
 os.makedirs(DB_PATH, exist_ok=True)
-DB_PATH = os.path.join(DB_PATH, "crawl4ai.db")
+DB_PATH = os.path.join(base_directory, "crawl4ai.db")
 
 class AsyncDatabaseManager:
     def __init__(self, pool_size: int = 10, max_retries: int = 3):
