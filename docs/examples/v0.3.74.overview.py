@@ -1,9 +1,16 @@
+import os, sys
+# append the parent directory to the sys.path
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(parent_dir)
+parent_parent_dir = os.path.dirname(parent_dir)
+sys.path.append(parent_parent_dir)
+__location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
+__data__ = os.path.join(__location__, "__data")
 import asyncio
-import os
 from pathlib import Path
 import aiohttp
 import json
-from crawl4ai import AsyncWebCrawler
+from crawl4ai import AsyncWebCrawler, CacheMode
 from crawl4ai.content_filter_strategy import BM25ContentFilter
 
 # 1. File Download Processing Example
@@ -32,7 +39,8 @@ async def download_example():
                 console.log('No .exe download link found');
             }
             """,
-            wait_for=5  # Wait 5 seconds to ensure download starts
+            delay_before_return_html=1,  # Wait 5 seconds to ensure download starts
+            cache_mode=CacheMode.BYPASS
         )
         
         if result.downloaded_files:
@@ -50,22 +58,32 @@ async def content_filtering_example():
     async with AsyncWebCrawler(verbose=True) as crawler:
         # Create filter with custom query for OpenAI's blog
         content_filter = BM25ContentFilter(
-            user_query="AI language models research innovation",
+            # user_query="Investment and fundraising",
+            # user_query="Robotic",
             bm25_threshold=1.0
         )
         
         result = await crawler.arun(
-            url="https://openai.com/blog",
-            content_filter=content_filter
+            url="https://techcrunch.com/",
+            content_filter=content_filter,
+            cache_mode=CacheMode.BYPASS
         )
         
-        print(f"Filtered content: {result.extracted_content}")
+        print(f"Filtered content: {len(result.fit_markdown)}")
+        print(f"Filtered content: {result.fit_markdown}")
+        
+        # Save html 
+        with open(os.path.join(__data__, "techcrunch.html"), "w") as f:
+            f.write(result.fit_html)
+        
+        with open(os.path.join(__data__, "filtered_content.md"), "w") as f:
+            f.write(result.fit_markdown)
 
 # 3. Local File and Raw HTML Processing Example
 async def local_and_raw_html_example():
     """Example of processing local files and raw HTML"""
     # Create a sample HTML file
-    sample_file = "sample.html"
+    sample_file = os.path.join(__data__, "sample.html")
     with open(sample_file, "w") as f:
         f.write("""
         <html><body>
@@ -112,21 +130,18 @@ async def browser_management_example():
         headless=False,
         verbose=True
     ) as crawler:
+
+        result = await crawler.arun(
+            url="https://crawl4ai.com",
+            # session_id="persistent_session_1",
+            cache_mode=CacheMode.BYPASS
+        )        
         # Use GitHub as an example - it's a good test for browser management
         # because it requires proper browser handling
         result = await crawler.arun(
             url="https://github.com/trending",
-            session_id="persistent_session_1",
-            js_code="""
-            // Custom JavaScript to execute on GitHub's trending page
-            const repos = document.querySelectorAll('article.Box-row');
-            const data = Array.from(repos).map(repo => ({
-                name: repo.querySelector('h2')?.textContent?.trim(),
-                description: repo.querySelector('p')?.textContent?.trim(),
-                language: repo.querySelector('[itemprop="programmingLanguage"]')?.textContent?.trim()
-            }));
-            console.log('Trending repositories:', JSON.stringify(data, null, 2));
-            """
+            # session_id="persistent_session_1",
+            cache_mode=CacheMode.BYPASS
         )
         
         print("\nBrowser session result:", result.success)
@@ -136,6 +151,8 @@ async def browser_management_example():
 # 5. API Usage Example
 async def api_example():
     """Example of using the new API endpoints"""
+    api_token = os.getenv('CRAWL4AI_API_TOKEN') or "test_api_code"
+    headers = {'Authorization': f'Bearer {api_token}'}    
     async with aiohttp.ClientSession() as session:
         # Submit crawl job
         crawl_request = {
@@ -143,52 +160,78 @@ async def api_example():
             "extraction_config": {
                 "type": "json_css",
                 "params": {
-                    "selectors": {
-                        "titles": ".title a",
-                        "scores": ".score",
-                        "comments": ".comment-tree"
+                    "schema": {
+                        "name": "Hacker News Articles",
+                        "baseSelector": ".athing",
+                        "fields": [
+                            {
+                                "name": "title",
+                                "selector": ".title a",
+                                "type": "text"
+                            },
+                            {
+                                "name": "score",
+                                "selector": ".score",
+                                "type": "text"
+                            },
+                            {
+                                "name": "url",
+                                "selector": ".title a",
+                                "type": "attribute",
+                                "attribute": "href"
+                            }
+                        ]
                     }
                 }
             },
             "crawler_params": {
                 "headless": True,
-                "use_managed_browser": True
+                # "use_managed_browser": True
             },
-            "screenshot": True,
-            "magic": True
+            "cache_mode": "bypass",
+            # "screenshot": True,
+            # "magic": True
         }
         
         async with session.post(
             "http://localhost:11235/crawl",
-            json=crawl_request
+            json=crawl_request,
+            headers=headers
         ) as response:
             task_data = await response.json()
             task_id = task_data["task_id"]
             
             # Check task status
-            async with session.get(
-                f"http://localhost:11235/task/{task_id}"
-            ) as status_response:
-                result = await status_response.json()
-                print(f"Task result: {result}")
+            while True:
+                async with session.get(
+                    f"http://localhost:11235/task/{task_id}",
+                    headers=headers
+                ) as status_response:
+                    result = await status_response.json()
+                    print(f"Task result: {result}")
+                    
+                    if result["status"] == "completed":
+                        break
+                    else:
+                        await asyncio.sleep(1)
 
 # Main execution
 async def main():
-    print("Running Crawl4AI feature examples...")
+    # print("Running Crawl4AI feature examples...")
     
-    print("\n1. Running Download Example:")
+    # print("\n1. Running Download Example:")
     await download_example()
     
-    print("\n2. Running Content Filtering Example:")
+    # print("\n2. Running Content Filtering Example:")
     await content_filtering_example()
     
-    print("\n3. Running Local and Raw HTML Example:")
+    # print("\n3. Running Local and Raw HTML Example:")
     await local_and_raw_html_example()
     
-    print("\n4. Running Browser Management Example:")
+    # print("\n4. Running Browser Management Example:")
     await browser_management_example()
     
-    print("\n5. Running API Example:")
+    # print("\n5. Running API Example:")
     await api_example()
 
 if __name__ == "__main__":

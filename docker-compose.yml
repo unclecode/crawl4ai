@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   crawl4ai:
     build:
@@ -9,15 +7,46 @@ services:
         PYTHON_VERSION: 3.10
         INSTALL_TYPE: all
         ENABLE_GPU: false
+    profiles: ["local"]
     ports:
-      - "11235:11235"  # FastAPI server
-      - "8000:8000"    # Alternative port
-      - "9222:9222"    # Browser debugging
-      - "8080:8080"    # Additional port
+      - "11235:11235"
+      - "8000:8000"
+      - "9222:9222"
+      - "8080:8080"
     environment:
-      - CRAWL4AI_API_TOKEN=${CRAWL4AI_API_TOKEN:-}  # Optional API token
+      - CRAWL4AI_API_TOKEN=${CRAWL4AI_API_TOKEN:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY:-}
     volumes:
-      - /dev/shm:/dev/shm  # Shared memory for browser operations
+      - /dev/shm:/dev/shm
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 1G
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11235/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  crawl4ai-hub:
+    image: unclecode/crawl4ai:basic
+    profiles: ["hub"]
+    ports:
+      - "11235:11235"
+      - "8000:8000"
+      - "9222:9222"
+      - "8080:8080"
+    environment:
+      - CRAWL4AI_API_TOKEN=${CRAWL4AI_API_TOKEN:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY:-}
+    volumes:
+      - /dev/shm:/dev/shm
     deploy:
       resources:
         limits:

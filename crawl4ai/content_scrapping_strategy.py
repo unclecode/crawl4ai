@@ -149,6 +149,15 @@ class ContentScrapingStrategy(ABC):
         pass
 
 class WebScrapingStrategy(ContentScrapingStrategy):
+    def __init__(self, logger=None):
+        self.logger = logger
+
+    def _log(self, level, message, tag="SCRAPE", **kwargs):
+        """Helper method to safely use logger."""
+        if self.logger:
+            log_method = getattr(self.logger, level)
+            log_method(message=message, tag=tag, **kwargs)
+                
     def scrap(self, url: str, html: str, **kwargs) -> Dict[str, Any]:
         return self._get_content_of_website_optimized(url, html, is_async=False, **kwargs)
 
@@ -167,7 +176,12 @@ class WebScrapingStrategy(ContentScrapingStrategy):
         try:
             meta = extract_metadata("", soup)
         except Exception as e:
-            print('Error extracting metadata:', str(e))
+            self._log('error', 
+                message="Error extracting metadata: {error}",
+                tag="SCRAPE",
+                params={"error": str(e)}
+            )            
+            # print('Error extracting metadata:', str(e))
             meta = {}
         
         
@@ -430,9 +444,12 @@ class WebScrapingStrategy(ContentScrapingStrategy):
                 try:
                     remove_unwanted_attributes(element, IMPORTANT_ATTRS, kwargs.get('keep_data_attributes', False))
                 except Exception as e:
-                    print('Error removing unwanted attributes:', str(e))
-                
-
+                    # print('Error removing unwanted attributes:', str(e))
+                    self._log('error',
+                        message="Error removing unwanted attributes: {error}",
+                        tag="SCRAPE",
+                        params={"error": str(e)}
+                    )
                 # Process children
                 for child in list(element.children):
                     if isinstance(child, NavigableString) and not isinstance(child, Comment):
@@ -453,7 +470,12 @@ class WebScrapingStrategy(ContentScrapingStrategy):
 
                 return keep_element
             except Exception as e:
-                print('Error processing element:', str(e))
+                # print('Error processing element:', str(e))
+                self._log('error',
+                    message="Error processing element: {error}",
+                    tag="SCRAPE",
+                    params={"error": str(e)}
+                )                
                 return False
        
         process_element(body)
@@ -516,7 +538,10 @@ class WebScrapingStrategy(ContentScrapingStrategy):
             str_body = body.encode_contents().decode('utf-8')
             
             print(f"[LOG] 😧 Error: After processing the crawled HTML and removing irrelevant tags, nothing was left in the page. Check the markdown for further details.")
-
+            self._log('error',
+                message="After processing the crawled HTML and removing irrelevant tags, nothing was left in the page. Check the markdown for further details.",
+                tag="SCRAPE"
+            )
 
         cleaned_html = str_body.replace('\n\n', '\n').replace('  ', ' ')
 
@@ -525,6 +550,13 @@ class WebScrapingStrategy(ContentScrapingStrategy):
             h.update_params(**kwargs.get('html2text', {}))            
             markdown = h.handle(cleaned_html)
         except Exception as e:
+            if not h:
+                h = CustomHTML2Text()
+            self._log('error',
+                message="Error converting HTML to markdown: {error}",
+                tag="SCRAPE",
+                params={"error": str(e)}
+            )
             markdown = h.handle(sanitize_html(cleaned_html))
         markdown = markdown.replace('    ```', '```')
 

@@ -15,6 +15,94 @@ docker run -p 11235:11235 unclecode/crawl4ai:basic
 docker run -p 11235:11235 -e CRAWL4AI_API_TOKEN=your_secret_token unclecode/crawl4ai:basic
 ```
 
+## Running with Docker Compose 🐳
+
+### Use Docker Compose (From Local Dockerfile or Docker Hub)
+
+Crawl4AI provides flexibility to use Docker Compose for managing your containerized services. You can either build the image locally from the provided `Dockerfile` or use the pre-built image from Docker Hub.
+
+### **Option 1: Using Docker Compose to Build Locally**
+If you want to build the image locally, use the provided `docker-compose.local.yml` file.
+
+```bash
+docker-compose -f docker-compose.local.yml up -d
+```
+
+This will:
+1. Build the Docker image from the provided `Dockerfile`.
+2. Start the container and expose it on `http://localhost:11235`.
+
+---
+
+### **Option 2: Using Docker Compose with Pre-Built Image from Hub**
+If you prefer using the pre-built image on Docker Hub, use the `docker-compose.hub.yml` file.
+
+```bash
+docker-compose -f docker-compose.hub.yml up -d
+```
+
+This will:
+1. Pull the pre-built image `unclecode/crawl4ai:basic` (or `all`, depending on your configuration).
+2. Start the container and expose it on `http://localhost:11235`.
+
+---
+
+### **Stopping the Running Services**
+
+To stop the services started via Docker Compose, you can use:
+
+```bash
+docker-compose -f docker-compose.local.yml down
+# OR
+docker-compose -f docker-compose.hub.yml down
+```
+
+If the containers don’t stop and the application is still running, check the running containers:
+
+```bash
+docker ps
+```
+
+Find the `CONTAINER ID` of the running service and stop it forcefully:
+
+```bash
+docker stop <CONTAINER_ID>
+```
+
+---
+
+### **Debugging with Docker Compose**
+
+- **Check Logs**: To view the container logs:
+  ```bash
+  docker-compose -f docker-compose.local.yml logs -f
+  ```
+
+- **Remove Orphaned Containers**: If the service is still running unexpectedly:
+  ```bash
+  docker-compose -f docker-compose.local.yml down --remove-orphans
+  ```
+
+- **Manually Remove Network**: If the network is still in use:
+  ```bash
+  docker network ls
+  docker network rm crawl4ai_default
+  ```
+
+---
+
+### Why Use Docker Compose?
+
+Docker Compose is the recommended way to deploy Crawl4AI because:
+1. It simplifies multi-container setups.
+2. Allows you to define environment variables, resources, and ports in a single file.
+3. Makes it easier to switch between local development and production-ready images.
+
+For example, your `docker-compose.yml` could include API keys, token settings, and memory limits, making deployment quick and consistent.
+
+
+
+
 ## API Security 🔒
 
 ### Understanding CRAWL4AI_API_TOKEN

@@ -15,6 +15,7 @@ from .extraction_strategy import *
 from .async_crawler_strategy import AsyncCrawlerStrategy, AsyncPlaywrightCrawlerStrategy, AsyncCrawlResponse
 from .cache_context import CacheMode, CacheContext, _legacy_to_cache_mode
 from .content_scrapping_strategy import WebScrapingStrategy
+from .async_logger import AsyncLogger
 
 from .config import (
     MIN_WORD_THRESHOLD, 
@@ -74,19 +75,29 @@ class AsyncWebCrawler:
             always_by_pass_cache: Deprecated, use always_bypass_cache instead
             base_directory: Base directory for storing cache
         """
-        init()
-        self.log_width = 10  # Width of "[COMPLETE]" 
-        self.tag_format = lambda tag: f"[{tag}]".ljust(self.log_width, ".")
-        self.log_icons = {
-            'INIT': '→',      # Alternative: '▶' or '►'
-            'READY': '✓',     # Alternative: '√'
-            'FETCH': '↓',     # Alternative: '▼'
-            'SCRAPE': '◆',    # Alternative: '♦'
-            'EXTRACT': '■',    # Alternative: '□'
-            'COMPLETE': '●',   # Alternative: '○'
-            'ERROR': '×' 
-        }        
-        self.crawler_strategy = crawler_strategy or AsyncPlaywrightCrawlerStrategy(**kwargs)
+        # init()
+        # self.log_width = 10  # Width of "[COMPLETE]" 
+        # self.tag_format = lambda tag: f"[{tag}]".ljust(self.log_width, ".")
+        # self.log_icons = {
+        #     'INIT': '→',      # Alternative: '▶' or '►'
+        #     'READY': '✓',     # Alternative: '√'
+        #     'FETCH': '↓',     # Alternative: '▼'
+        #     'SCRAPE': '◆',    # Alternative: '♦'
+        #     'EXTRACT': '■',    # Alternative: '□'
+        #     'COMPLETE': '●',   # Alternative: '○'
+        #     'ERROR': '×' 
+        # }        
+        self.verbose = kwargs.get("verbose", False)
+        self.logger = AsyncLogger(
+            log_file=os.path.join(base_directory, ".crawl4ai", "crawler.log"),
+            verbose=self.verbose,
+            tag_width=10
+        )
+        
+        self.crawler_strategy = crawler_strategy or AsyncPlaywrightCrawlerStrategy(
+            logger = self.logger,
+            **kwargs
+        )
         
         # Handle deprecated parameter
         if always_by_pass_cache is not None:
@@ -118,12 +129,13 @@ class AsyncWebCrawler:
 
     async def awarmup(self):
         """Initialize the crawler with warm-up sequence."""
-        if self.verbose:
-            print(f"{Fore.CYAN}{self.tag_format('INIT')} {self.log_icons['INIT']} Crawl4AI {crawl4ai_version}{Style.RESET_ALL}")
-            print(f"{Fore.CYAN}{self.tag_format('INIT')} {self.log_icons['INIT']} Warming up AsyncWebCrawler{Style.RESET_ALL}")
+        self.logger.info(f"Crawl4AI {crawl4ai_version}", tag="INIT")
+        # if self.verbose:
+        #     print(f"{Fore.CYAN}{self.tag_format('INIT')} {self.log_icons['INIT']} Crawl4AI {crawl4ai_version}{Style.RESET_ALL}")
+        #     print(f"{Fore.CYAN}{self.tag_format('INIT')} {self.log_icons['INIT']} Warming up AsyncWebCrawler{Style.RESET_ALL}")
         self.ready = True
-        if self.verbose:
-            print(f"{Fore.GREEN}{self.tag_format('READY')} {self.log_icons['READY']} AsyncWebCrawler initialized{Style.RESET_ALL}")
+        # if self.verbose:
+        #     print(f"{Fore.GREEN}{self.tag_format('READY')} {self.log_icons['READY']} AsyncWebCrawler initialized{Style.RESET_ALL}")
 
     async def arun(
         self,
@@ -234,8 +246,14 @@ class AsyncWebCrawler:
                     screenshot_data = cached_result.screenshot
                     if not screenshot_data:
                         cached_result = None
-                if verbose:
-                    print(f"{Fore.BLUE}{self.tag_format('FETCH')} {self.log_icons['FETCH']} Cache hit for {cache_context.display_url} | Status: {Fore.GREEN if bool(html) else Fore.RED}{bool(html)}{Style.RESET_ALL} | Time: {time.perf_counter() - start_time:.2f}s")
+                # if verbose:
+                #     print(f"{Fore.BLUE}{self.tag_format('FETCH')} {self.log_icons['FETCH']} Cache hit for {cache_context.display_url} | Status: {Fore.GREEN if bool(html) else Fore.RED}{bool(html)}{Style.RESET_ALL} | Time: {time.perf_counter() - start_time:.2f}s")
+                self.logger.url_status(
+                        url=cache_context.display_url,
+                        success=bool(html),
+                        timing=time.perf_counter() - start_time,
+                        tag="FETCH"
+                    )                    
 
 
             # Fetch fresh content if needed
@@ -252,8 +270,14 @@ class AsyncWebCrawler:
                 html = sanitize_input_encode(async_response.html)
                 screenshot_data = async_response.screenshot
                 t2 = time.perf_counter()
-                if verbose:
-                    print(f"{Fore.BLUE}{self.tag_format('FETCH')} {self.log_icons['FETCH']} Live fetch for {cache_context.display_url}... | Status: {Fore.GREEN if bool(html) else Fore.RED}{bool(html)}{Style.RESET_ALL} | Time: {t2 - t1:.2f}s")
+                self.logger.url_status(
+                    url=cache_context.display_url,
+                    success=bool(html),
+                    timing=t2 - t1,
+                    tag="FETCH"
+                )
+                # if verbose:
+                #     print(f"{Fore.BLUE}{self.tag_format('FETCH')} {self.log_icons['FETCH']} Live fetch for {cache_context.display_url}... | Status: {Fore.GREEN if bool(html) else Fore.RED}{bool(html)}{Style.RESET_ALL} | Time: {t2 - t1:.2f}s")
 
             # Process the HTML content
             crawl_result = await self.aprocess_html(
@@ -287,9 +311,21 @@ class AsyncWebCrawler:
             crawl_result.success = bool(html)
             crawl_result.session_id = kwargs.get("session_id", None)
 
-            if verbose:
-                print(f"{Fore.GREEN}{self.tag_format('COMPLETE')} {self.log_icons['COMPLETE']} {cache_context.display_url[:URL_LOG_SHORTEN_LENGTH]}... | Status: {Fore.GREEN if crawl_result.success else Fore.RED}{crawl_result.success} | {Fore.YELLOW}Total: {time.perf_counter() - start_time:.2f}s{Style.RESET_ALL}")
-
+            # if verbose:
+            #     print(f"{Fore.GREEN}{self.tag_format('COMPLETE')} {self.log_icons['COMPLETE']} {cache_context.display_url[:URL_LOG_SHORTEN_LENGTH]}... | Status: {Fore.GREEN if crawl_result.success else Fore.RED}{crawl_result.success} | {Fore.YELLOW}Total: {time.perf_counter() - start_time:.2f}s{Style.RESET_ALL}")
+            self.logger.success(
+                    message="{url:.50}... | Status: {status} | Total: {timing}",
+                    tag="COMPLETE",
+                    params={
+                        "url": cache_context.display_url,
+                        "status": crawl_result.success,
+                        "timing": f"{time.perf_counter() - start_time:.2f}s"
+                    },
+                    colors={
+                        "status": Fore.GREEN if crawl_result.success else Fore.RED,
+                        "timing": Fore.YELLOW
+                    }
+                )
 
             # Update cache if appropriate
             if cache_context.should_write() and not bool(cached_result):
@@ -300,7 +336,12 @@ class AsyncWebCrawler:
         except Exception as e:
             if not hasattr(e, "msg"):
                 e.msg = str(e)
-            print(f"{Fore.RED}{self.tag_format('ERROR')} {self.log_icons['ERROR']} Failed to crawl {cache_context.display_url[:URL_LOG_SHORTEN_LENGTH]}... | {e.msg}{Style.RESET_ALL}")
+            # print(f"{Fore.RED}{self.tag_format('ERROR')} {self.log_icons['ERROR']} Failed to crawl {cache_context.display_url[:URL_LOG_SHORTEN_LENGTH]}... | {e.msg}{Style.RESET_ALL}")
+            self.logger.error_status(
+                url=cache_context.display_url,
+                error=e.msg,
+                tag="ERROR"
+            )            
             return CrawlResult(
                 url=url, 
                 html="", 
@@ -362,7 +403,12 @@ class AsyncWebCrawler:
             domain = urlparse(url).netloc
             current_time = time.time()
             
-            print(f"{Fore.LIGHTBLACK_EX}{self.tag_format('PARALLEL')} Started task for {url[:50]}...{Style.RESET_ALL}")
+            # print(f"{Fore.LIGHTBLACK_EX}{self.tag_format('PARALLEL')} Started task for {url[:50]}...{Style.RESET_ALL}")
+            self.logger.debug(
+                message="Started task for {url:.50}...",
+                tag="PARALLEL",
+                params={"url": url}
+            )            
             
             # Get delay settings from kwargs or use defaults
             mean_delay = kwargs.get('mean_delay', 0.1)  # 0.5 seconds default mean delay
@@ -394,12 +440,26 @@ class AsyncWebCrawler:
                 )
 
         # Print start message
-        print(f"{Fore.CYAN}{self.tag_format('INIT')} {self.log_icons['INIT']} Starting concurrent crawling for {len(urls)} URLs...{Style.RESET_ALL}")
+        # print(f"{Fore.CYAN}{self.tag_format('INIT')} {self.log_icons['INIT']} Starting concurrent crawling for {len(urls)} URLs...{Style.RESET_ALL}")
+        self.logger.info(
+            message="Starting concurrent crawling for {count} URLs...",
+            tag="INIT",
+            params={"count": len(urls)}
+        )        
         start_time = time.perf_counter()
         tasks = [crawl_with_semaphore(url) for url in urls]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         end_time = time.perf_counter()
-        print(f"{Fore.YELLOW}{self.tag_format('COMPLETE')} {self.log_icons['COMPLETE']} Concurrent crawling completed for {len(urls)} URLs | Total time: {end_time - start_time:.2f}s{Style.RESET_ALL}")
+        # print(f"{Fore.YELLOW}{self.tag_format('COMPLETE')} {self.log_icons['COMPLETE']} Concurrent crawling completed for {len(urls)} URLs | Total time: {end_time - start_time:.2f}s{Style.RESET_ALL}")
+        self.logger.success(
+            message="Concurrent crawling completed for {count} URLs | " + Fore.YELLOW + " Total time: {timing}" + Style.RESET_ALL,
+            tag="COMPLETE",
+            params={
+                "count": len(urls),
+                "timing": f"{end_time - start_time:.2f}s"
+            },
+            colors={"timing": Fore.YELLOW}
+        )        
         return [result if not isinstance(result, Exception) else str(result) for result in results]
 
 
@@ -451,9 +511,16 @@ class AsyncWebCrawler:
         links = result.get("links", [])
         metadata = result.get("metadata", {})
         
-        if verbose:
-            print(f"{Fore.MAGENTA}{self.tag_format('SCRAPE')} {self.log_icons['SCRAPE']} Processed {_url[:URL_LOG_SHORTEN_LENGTH]}...{Style.RESET_ALL} | Time: {int((time.perf_counter() - t1) * 1000)}ms")
-
+        # if verbose:
+        #     print(f"{Fore.MAGENTA}{self.tag_format('SCRAPE')} {self.log_icons['SCRAPE']} Processed {_url[:URL_LOG_SHORTEN_LENGTH]}...{Style.RESET_ALL} | Time: {int((time.perf_counter() - t1) * 1000)}ms")
+        self.logger.info(
+            message="Processed {url:.50}... | Time: {timing}ms",
+            tag="SCRAPE",
+            params={
+                "url": _url,
+                "timing": int((time.perf_counter() - t1) * 1000)
+            }
+        )
 
 
         if extracted_content is None and extraction_strategy and chunking_strategy and not isinstance(extraction_strategy, NoExtractionStrategy):
@@ -467,8 +534,17 @@ class AsyncWebCrawler:
                 sections = chunking_strategy.chunk(markdown)
                 extracted_content = extraction_strategy.run(url, sections)
                 extracted_content = json.dumps(extracted_content, indent=4, default=str, ensure_ascii=False)
-            if verbose:
-                print(f"{Fore.YELLOW}{self.tag_format('EXTRACT')} {self.log_icons['EXTRACT']} Completed for {_url[:URL_LOG_SHORTEN_LENGTH]}...{Style.RESET_ALL} | Time: {time.perf_counter() - t1:.2f}s{Style.RESET_ALL}")
+            # if verbose:
+                # print(f"{Fore.YELLOW}{self.tag_format('EXTRACT')} {self.log_icons['EXTRACT']} Completed for {_url[:URL_LOG_SHORTEN_LENGTH]}...{Style.RESET_ALL} | Time: {time.perf_counter() - t1:.2f}s{Style.RESET_ALL}")
+            self.logger.info(
+                message="Completed for {url:.50}... | Time: {timing}s",
+                tag="EXTRACT",
+                params={
+                    "url": _url,
+                    "timing": time.perf_counter() - t1
+                }
+            )
+        
 
                 
 

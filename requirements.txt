@@ -13,3 +13,4 @@ xxhash~=3.4
 rank-bm25~=0.2
 aiofiles~=24.0
 colorama~=0.4
+snowballstemmer~=2.2

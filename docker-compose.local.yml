@@ -1,0 +1,33 @@
+services:
+  crawl4ai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PYTHON_VERSION: 3.10
+        INSTALL_TYPE: all
+        ENABLE_GPU: false
+    ports:
+      - "11235:11235"  # FastAPI server
+      - "8000:8000"    # Alternative port
+      - "9222:9222"    # Browser debugging
+      - "8080:8080"    # Additional port
+    environment:
+      - CRAWL4AI_API_TOKEN=${CRAWL4AI_API_TOKEN:-}  # Optional API token
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}          # Optional OpenAI API key
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY:-}          # Optional Claude API key
+    volumes:
+      - /dev/shm:/dev/shm  # Shared memory for browser operations
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 1G
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11235/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

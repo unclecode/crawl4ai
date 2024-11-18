@@ -26,6 +26,7 @@ from enum import Enum
 from dataclasses import dataclass
 import json
 from crawl4ai import AsyncWebCrawler, CrawlResult, CacheMode
+from crawl4ai.config import MIN_WORD_THRESHOLD
 from crawl4ai.extraction_strategy import (
     LLMExtractionStrategy,
     CosineStrategy,
@@ -53,12 +54,20 @@ class ExtractionConfig(BaseModel):
     type: CrawlerType
     params: Dict[str, Any] = {}
 
+class ChunkingStrategy(BaseModel):
+    type: str
+    params: Dict[str, Any] = {}
+
+class ContentFilter(BaseModel):
+    type: str = "bm25"
+    params: Dict[str, Any] = {}
+
 class CrawlRequest(BaseModel):
     urls: Union[HttpUrl, List[HttpUrl]]
+    word_count_threshold: int = MIN_WORD_THRESHOLD
     extraction_config: Optional[ExtractionConfig] = None
-    crawler_params: Dict[str, Any] = {}
-    priority: int = Field(default=5, ge=1, le=10)
-    ttl: Optional[int] = 3600
+    chunking_strategy: Optional[ChunkingStrategy] = None
+    content_filter: Optional[ContentFilter] = None
     js_code: Optional[List[str]] = None
     wait_for: Optional[str] = None
     css_selector: Optional[str] = None
@@ -66,7 +75,10 @@ class CrawlRequest(BaseModel):
     magic: bool = False
     extra: Optional[Dict[str, Any]] = {}
     session_id: Optional[str] = None
-    cache_mode: Optional[CacheMode] = None
+    cache_mode: Optional[CacheMode] = CacheMode.ENABLED
+    priority: int = Field(default=5, ge=1, le=10)
+    ttl: Optional[int] = 3600    
+    crawler_params: Dict[str, Any] = {}
 
 @dataclass
 class TaskInfo:
@@ -280,6 +292,7 @@ class CrawlerService:
                     if isinstance(request.urls, list):
                         results = await crawler.arun_many(
                             urls=[str(url) for url in request.urls],
+                            word_count_threshold=MIN_WORD_THRESHOLD,
                             extraction_strategy=extraction_strategy,
                             js_code=request.js_code,
                             wait_for=request.wait_for,
@@ -287,6 +300,7 @@ class CrawlerService:
                             screenshot=request.screenshot,
                             magic=request.magic,
                             session_id=request.session_id,
+                            cache_mode=request.cache_mode,
                             **request.extra,
                         )
                     else:
@@ -299,6 +313,7 @@ class CrawlerService:
                             screenshot=request.screenshot,
                             magic=request.magic,
                             session_id=request.session_id,
+                            cache_mode=request.cache_mode,
                             **request.extra,
                         )
 
