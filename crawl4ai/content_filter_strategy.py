@@ -8,6 +8,10 @@ from bs4 import BeautifulSoup, NavigableString, Tag
 from .utils import clean_tokens
 from abc import ABC, abstractmethod
 
+from snowballstemmer import stemmer
+
+# from nltk.stem import PorterStemmer
+# ps = PorterStemmer()
 class RelevantContentFilter(ABC):
     def __init__(self, user_query: str = None):
         self.user_query = user_query
@@ -252,7 +256,7 @@ class RelevantContentFilter(ABC):
             return str(tag)  # Fallback to original if anything fails
 
 class BM25ContentFilter(RelevantContentFilter):
-    def __init__(self, user_query: str = None, bm25_threshold: float = 1.0):
+    def __init__(self, user_query: str = None, bm25_threshold: float = 1.0, language: str = 'english'):
         super().__init__(user_query=user_query)
         self.bm25_threshold = bm25_threshold
         self.priority_tags = {
@@ -268,6 +272,7 @@ class BM25ContentFilter(RelevantContentFilter):
             'pre': 1.5,
             'th': 1.5,  # Table headers
         }
+        self.stemmer = stemmer(language)
 
     def filter_content(self, html: str) -> List[str]:
         """Implements content filtering using BM25 algorithm with priority tag handling"""
@@ -282,58 +287,42 @@ class BM25ContentFilter(RelevantContentFilter):
         if not candidates:
             return []
 
-        # Split into priority and regular candidates
-        priority_candidates = []
-        regular_candidates = []
+        # Tokenize corpus
+        # tokenized_corpus = [chunk.lower().split() for _, chunk, _, _ in candidates]
+        # tokenized_query = query.lower().split()
+                
+        # tokenized_corpus = [[ps.stem(word) for word in chunk.lower().split()] 
+        #                 for _, chunk, _, _ in candidates]
+        # tokenized_query = [ps.stem(word) for word in query.lower().split()]        
         
-        for index, chunk, tag_type, tag in candidates:
-            if tag.name in self.priority_tags:
-                priority_candidates.append((index, chunk, tag_type, tag))
-            else:
-                regular_candidates.append((index, chunk, tag_type, tag))
+        tokenized_corpus = [[self.stemmer.stemWord(word) for word in chunk.lower().split()] 
+                   for _, chunk, _, _ in candidates]
+        tokenized_query = [self.stemmer.stemWord(word) for word in query.lower().split()]
 
-        # Process regular content with BM25
-        tokenized_corpus = [chunk.lower().split() for _, chunk, _, _ in regular_candidates]
-        tokenized_query = query.lower().split()
-        
         # Clean from stop words and noise
         tokenized_corpus = [clean_tokens(tokens) for tokens in tokenized_corpus]
         tokenized_query = clean_tokens(tokenized_query)
-        
+
         bm25 = BM25Okapi(tokenized_corpus)
         scores = bm25.get_scores(tokenized_query)
 
-        # Score and boost regular candidates
-        scored_candidates = [
-            (score * self.priority_tags.get(tag.name, 1.0), index, chunk, tag_type, tag)
-            for score, (index, chunk, tag_type, tag) in zip(scores, regular_candidates)
+        # Adjust scores with tag weights
+        adjusted_candidates = []
+        for score, (index, chunk, tag_type, tag) in zip(scores, candidates):
+            tag_weight = self.priority_tags.get(tag.name, 1.0)
+            adjusted_score = score * tag_weight
+            adjusted_candidates.append((adjusted_score, index, chunk, tag))
+
+        # Filter candidates by threshold
+        selected_candidates = [
+            (index, chunk, tag) for adjusted_score, index, chunk, tag in adjusted_candidates
+            if adjusted_score >= self.bm25_threshold
         ]
-        scored_candidates.sort(key=lambda x: x[0], reverse=True)
-
-        # Process scored candidates
-        selected_tags = set()
-        selected_candidates = []
-
-        # First add all priority candidates
-        for index, chunk, tag_type, tag in priority_candidates:
-            tag_id = id(tag)
-            if tag_id not in selected_tags:
-                selected_candidates.append((index, chunk, tag))
-                selected_tags.add(tag_id)
-
-        # Then add scored regular candidates that meet threshold
-        for score, index, chunk, tag_type, tag in scored_candidates:
-            if score < self.bm25_threshold:
-                continue
-            tag_id = id(tag)
-            if tag_id not in selected_tags:
-                selected_candidates.append((index, chunk, tag))
-                selected_tags.add(tag_id)
 
         if not selected_candidates:
             return []
 
-        # Sort by original document order
+        # Sort selected candidates by original document order
         selected_candidates.sort(key=lambda x: x[0])
-        return [self.clean_element(tag) for _, _, tag in selected_candidates]
 
+        return [self.clean_element(tag) for _, _, tag in selected_candidates]

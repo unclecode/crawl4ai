@@ -62,11 +62,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libatspi2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# GPU support if enabled
-RUN if [ "$ENABLE_GPU" = "true" ] ; then \
-    apt-get update && apt-get install -y --no-install-recommends \
-    nvidia-cuda-toolkit \
-    && rm -rf /var/lib/apt/lists/* ; \
+# GPU support if enabled and architecture is supported
+RUN if [ "$ENABLE_GPU" = "true" ] && [ "$(dpkg --print-architecture)" != "arm64" ] ; then \
+        apt-get update && apt-get install -y --no-install-recommends \
+        nvidia-cuda-toolkit \
+        && rm -rf /var/lib/apt/lists/* ; \
+    else \
+        echo "Skipping NVIDIA CUDA Toolkit installation (unsupported architecture or GPU disabled)"; \
     fi
 
 # Create and set working directory

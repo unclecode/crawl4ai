@@ -35,13 +35,15 @@ stealth_config = StealthConfig(
 
 
 class ManagedBrowser:
-    def __init__(self, browser_type: str = "chromium", user_data_dir: Optional[str] = None, headless: bool = False):
+    def __init__(self, browser_type: str = "chromium", user_data_dir: Optional[str] = None, headless: bool = False, logger = None):
         self.browser_type = browser_type
         self.user_data_dir = user_data_dir
         self.headless = headless
         self.browser_process = None
         self.temp_dir = None
         self.debugging_port = 9222
+        self.logger = logger
+        self.shutting_down = False
 
     async def start(self) -> str:
         """
@@ -76,15 +78,38 @@ class ManagedBrowser:
     async def _monitor_browser_process(self):
         """Monitor the browser process for unexpected termination."""
         if self.browser_process:
-            stdout, stderr = await asyncio.gather(
-                asyncio.to_thread(self.browser_process.stdout.read),
-                asyncio.to_thread(self.browser_process.stderr.read)
-            )
-            if self.browser_process.poll() is not None:
-                print(f"Browser process terminated unexpectedly with code {self.browser_process.returncode}")
-                print(f"STDOUT: {stdout.decode()}")
-                print(f"STDERR: {stderr.decode()}")
-                await self.cleanup()
+            try:
+                stdout, stderr = await asyncio.gather(
+                    asyncio.to_thread(self.browser_process.stdout.read),
+                    asyncio.to_thread(self.browser_process.stderr.read)
+                )
+                
+                # Check shutting_down flag BEFORE logging anything
+                if self.browser_process.poll() is not None:
+                    if not self.shutting_down:
+                        self.logger.error(
+                            message="Browser process terminated unexpectedly | Code: {code} | STDOUT: {stdout} | STDERR: {stderr}",
+                            tag="ERROR",
+                            params={
+                                "code": self.browser_process.returncode,
+                                "stdout": stdout.decode(),
+                                "stderr": stderr.decode()
+                            }
+                        )                
+                        await self.cleanup()
+                    else:
+                        self.logger.info(
+                            message="Browser process terminated normally | Code: {code}",
+                            tag="INFO",
+                            params={"code": self.browser_process.returncode}
+                        )
+            except Exception as e:
+                if not self.shutting_down:
+                    self.logger.error(
+                        message="Error monitoring browser process: {error}",
+                        tag="ERROR",
+                        params={"error": str(e)}
+                    )
 
     def _get_browser_path(self) -> str:
         """Returns the browser executable path based on OS and browser type"""
@@ -134,20 +159,39 @@ class ManagedBrowser:
 
     async def cleanup(self):
         """Cleanup browser process and temporary directory"""
+        # Set shutting_down flag BEFORE any termination actions
+        self.shutting_down = True
+        
         if self.browser_process:
             try:
                 self.browser_process.terminate()
-                await asyncio.sleep(1)
+                # Wait for process to end gracefully
+                for _ in range(10):  # 10 attempts, 100ms each
+                    if self.browser_process.poll() is not None:
+                        break
+                    await asyncio.sleep(0.1)
+                
+                # Force kill if still running
                 if self.browser_process.poll() is None:
                     self.browser_process.kill()
+                    await asyncio.sleep(0.1)  # Brief wait for kill to take effect
+                    
             except Exception as e:
-                print(f"Error terminating browser: {e}")
+                self.logger.error(
+                    message="Error terminating browser: {error}",
+                    tag="ERROR",
+                    params={"error": str(e)}
+                )
 
         if self.temp_dir and os.path.exists(self.temp_dir):
             try:
                 shutil.rmtree(self.temp_dir)
             except Exception as e:
-                print(f"Error removing temporary directory: {e}")
+                self.logger.error(
+                    message="Error removing temporary directory: {error}",
+                    tag="ERROR",
+                    params={"error": str(e)}
+                )
 
 
 class AsyncCrawlerStrategy(ABC):
@@ -172,7 +216,8 @@ class AsyncCrawlerStrategy(ABC):
         pass
 
 class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
-    def __init__(self, use_cached_html=False, js_code=None, **kwargs):
+    def __init__(self, use_cached_html=False, js_code=None, logger = None, **kwargs):
+        self.logger = logger
         self.use_cached_html = use_cached_html
         self.user_agent = kwargs.get(
             "user_agent",
@@ -231,7 +276,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 self.managed_browser = ManagedBrowser(
                     browser_type=self.browser_type,
                     user_data_dir=self.user_data_dir,
-                    headless=self.headless
+                    headless=self.headless,
+                    logger=self.logger
                 )
                 cdp_url = await self.managed_browser.start()
                 self.browser = await self.playwright.chromium.connect_over_cdp(cdp_url)
@@ -282,6 +328,10 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 # Add extra args if provided
                 if self.extra_args:
                     browser_args["args"].extend(self.extra_args)
+                    
+                # Add downloads path if downloads are enabled
+                if self.accept_downloads:
+                    browser_args["downloads_path"] = self.downloads_path
                 
                 # Add proxy settings if a proxy is specified
                 if self.proxy:
@@ -344,6 +394,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             self.browser = None
             
         if self.managed_browser:
+            await asyncio.sleep(0.5)
             await self.managed_browser.cleanup()
             self.managed_browser = None
             
@@ -491,9 +542,19 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         }}
                     """)
                 else:
-                    print(f"Warning: Could not access content frame for iframe {i}")
+                    # print(f"Warning: Could not access content frame for iframe {i}")
+                    self.logger.warning(
+                        message="Could not access content frame for iframe {index}",
+                        tag="SCRAPE",
+                        params={"index": i}
+                    )                    
             except Exception as e:
-                print(f"Error processing iframe {i}: {str(e)}")
+                self.logger.error(
+                    message="Error processing iframe {index}: {error}",
+                    tag="ERROR",
+                    params={"index": i, "error": str(e)}
+                )                
+                # print(f"Error processing iframe {i}: {str(e)}")
 
         # Return the page object
         return page  
@@ -620,7 +681,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     context = await self.browser.new_context(
                         user_agent=self.user_agent,
                         viewport={"width": 1920, "height": 1080},
-                        proxy={"server": self.proxy} if self.proxy else None
+                        proxy={"server": self.proxy} if self.proxy else None,
+                        accept_downloads=self.accept_downloads,
                     )
                     await context.set_extra_http_headers(self.headers)
                 
@@ -917,17 +979,31 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             suggested_filename = download.suggested_filename
             download_path = os.path.join(self.downloads_path, suggested_filename)
             
-            if self.verbose:
-                print(f"[LOG] 📥 Downloading {suggested_filename} to {download_path}")
+            self.logger.info(
+                message="Downloading {filename} to {path}",
+                tag="FETCH",
+                params={"filename": suggested_filename, "path": download_path}
+            )
                 
+            start_time = time.perf_counter()
             await download.save_as(download_path)
+            end_time = time.perf_counter()
             self._downloaded_files.append(download_path)
-            
-            if self.verbose:
-                print(f"[LOG] ✅ Downloaded {suggested_filename} successfully")
+
+            self.logger.success(
+                message="Downloaded {filename} successfully",
+                tag="COMPLETE",
+                params={"filename": suggested_filename, "path": download_path, "duration": f"{end_time - start_time:.2f}s"}
+            )            
         except Exception as e:
-            if self.verbose:
-                print(f"[ERROR] Failed to handle download: {str(e)}")
+            self.logger.error(
+                message="Failed to handle download: {error}",
+                tag="ERROR",
+                params={"error": str(e)}
+            )
+            
+            # if self.verbose:
+            #     print(f"[ERROR] Failed to handle download: {str(e)}")
     
     async def crawl_many(self, urls: List[str], **kwargs) -> List[AsyncCrawlResponse]:
         semaphore_count = kwargs.get('semaphore_count', 5)  # Adjust as needed
@@ -1070,8 +1146,13 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             await page.evaluate(remove_overlays_js)
             await page.wait_for_timeout(500)  # Wait for any animations to complete
         except Exception as e:
-            if self.verbose:
-                print(f"Warning: Failed to remove overlay elements: {str(e)}")
+            self.logger.warning(
+                message="Failed to remove overlay elements: {error}",
+                tag="SCRAPE",
+                params={"error": str(e)}
+            )            
+            # if self.verbose:
+            #     print(f"Warning: Failed to remove overlay elements: {str(e)}")
 
     async def take_screenshot(self, page: Page) -> str:
         """
@@ -1089,7 +1170,12 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             return base64.b64encode(screenshot).decode('utf-8')
         except Exception as e:
             error_message = f"Failed to take screenshot: {str(e)}"
-            print(error_message)
+            self.logger.error(
+                message="Screenshot failed: {error}",
+                tag="ERROR",
+                params={"error": error_message}
+            )
+            
 
             # Generate an error image
             img = Image.new('RGB', (800, 600), color='black')
@@ -1123,7 +1209,12 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             return base64.b64encode(screenshot).decode('utf-8')
         except Exception as e:
             error_message = f"Failed to take screenshot: {str(e)}"
-            print(error_message)
+            # print(error_message)
+            self.logger.error(
+                message="Screenshot failed: {error}",
+                tag="ERROR",
+                params={"error": error_message}
+            )            
 
             # Generate an error image
             img = Image.new('RGB', (800, 600), color='black')

@@ -20,11 +20,11 @@ class VersionManager:
             
     def update_version(self):
         """Update the version file to current library version"""
-        self.version_file.write_text(__version__)
+        self.version_file.write_text(__version__.__version__)
         
     def needs_update(self):
         """Check if database needs update based on version"""
         installed = self.get_installed_version()
-        current = version.parse(__version__)
+        current = version.parse(__version__.__version__)
         return installed is None or installed < current
 
