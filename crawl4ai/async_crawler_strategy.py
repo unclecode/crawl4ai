@@ -525,7 +525,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
             if self.use_cached_html:
                 cache_file_path = os.path.join(
-                    Path.home(), ".crawl4ai", "cache", hashlib.md5(url.encode()).hexdigest()
+                    os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home()), ".crawl4ai", "cache", hashlib.md5(url.encode()).hexdigest()
                 )
                 if os.path.exists(cache_file_path):
                     html = ""
@@ -725,7 +725,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
             if self.use_cached_html:
                 cache_file_path = os.path.join(
-                    Path.home(), ".crawl4ai", "cache", hashlib.md5(url.encode()).hexdigest()
+                    os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home()), ".crawl4ai", "cache", hashlib.md5(url.encode()).hexdigest()
                 )
                 with open(cache_file_path, "w", encoding="utf-8") as f:
                     f.write(html)

@@ -13,7 +13,7 @@ AsyncWebCrawler(
     
     # Cache Settings
     always_by_pass_cache: bool = False,     # Always bypass cache
-    base_directory: str = str(Path.home()), # Base directory for cache
+    base_directory: str = str(os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home())), # Base directory for cache
     
     # Network Settings
     proxy: str = None,                      # Simple proxy URL
