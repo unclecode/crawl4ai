@@ -209,3 +209,5 @@ git_issues.md
 .issues/
 .docs/
 .issues/
+.gitboss/
+todo_executor.md
