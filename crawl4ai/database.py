@@ -3,7 +3,7 @@ from pathlib import Path
 import sqlite3
 from typing import Optional, Tuple
 
-DB_PATH = os.path.join(Path.home(), ".crawl4ai")
+DB_PATH = os.path.join(os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home()), ".crawl4ai")
 os.makedirs(DB_PATH, exist_ok=True)
 DB_PATH = os.path.join(DB_PATH, "crawl4ai.db")
 

@@ -132,7 +132,7 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
 
         # chromedriver_autoinstaller.install()
         # import chromedriver_autoinstaller
-        # crawl4ai_folder = os.path.join(Path.home(), ".crawl4ai")
+        # crawl4ai_folder = os.path.join(os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home()), ".crawl4ai")
         # driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=self.options)
         # chromedriver_path = chromedriver_autoinstaller.install()
         # chromedriver_path = chromedriver_autoinstaller.utils.download_chromedriver()
@@ -205,7 +205,7 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
         url_hash = hashlib.md5(url.encode()).hexdigest()
         
         if self.use_cached_html:
-            cache_file_path = os.path.join(Path.home(), ".crawl4ai", "cache", url_hash)
+            cache_file_path = os.path.join(os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home()), ".crawl4ai", "cache", url_hash)
             if os.path.exists(cache_file_path):
                 with open(cache_file_path, "r") as f:
                     return sanitize_input_encode(f.read())
@@ -275,7 +275,7 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
             self.driver = self.execute_hook('before_return_html', self.driver, html)
             
             # Store in cache
-            cache_file_path = os.path.join(Path.home(), ".crawl4ai", "cache", url_hash)
+            cache_file_path = os.path.join(os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home()), ".crawl4ai", "cache", url_hash)
             with open(cache_file_path, "w", encoding="utf-8") as f:
                 f.write(html)
                 
