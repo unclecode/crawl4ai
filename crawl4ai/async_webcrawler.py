@@ -197,8 +197,8 @@ class AsyncWebCrawler:
                 html,
                 word_count_threshold=word_count_threshold,
                 css_selector=css_selector,
-                only_text=kwargs.get("only_text", False),
-                image_description_min_word_threshold=kwargs.get(
+                only_text=kwargs.pop("only_text", False),
+                image_description_min_word_threshold=kwargs.pop(
                     "image_description_min_word_threshold", IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD
                 ),
                 **kwargs,
