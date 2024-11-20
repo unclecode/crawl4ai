@@ -283,7 +283,7 @@ class LocalSeleniumCrawlerStrategy(CrawlerStrategy):
                 print(f"[LOG] ✅ Crawled {url} successfully!")
             
             return html
-        except InvalidArgumentException:
+        except InvalidArgumentException as e:
             if not hasattr(e, 'msg'):
                 e.msg = sanitize_input_encode(str(e))
             raise InvalidArgumentException(f"Failed to crawl {url}: {e.msg}")
