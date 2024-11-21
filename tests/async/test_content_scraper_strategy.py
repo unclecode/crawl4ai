@@ -13,8 +13,8 @@ parent_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__f
 sys.path.append(parent_dir)
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
-from crawl4ai.content_scrapping_strategy import WebScrapingStrategy
-from crawl4ai.content_scrapping_strategy import WebScrapingStrategy as WebScrapingStrategyCurrent
+from crawl4ai.content_scraping_strategy import WebScrapingStrategy
+from crawl4ai.content_scraping_strategy import WebScrapingStrategy as WebScrapingStrategyCurrent
 # from crawl4ai.content_scrapping_strategy_current import WebScrapingStrategy as WebScrapingStrategyCurrent
 
 @dataclass
