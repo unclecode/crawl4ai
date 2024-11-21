@@ -1,6 +1,6 @@
 import re  # Point 1: Pre-Compile Regular Expressions
 from abc import ABC, abstractmethod
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor
 import asyncio, requests, re, os
@@ -10,102 +10,18 @@ from urllib.parse import urljoin
 from requests.exceptions import InvalidSchema
 # from .content_cleaning_strategy import ContentCleaningStrategy
 from .content_filter_strategy import RelevantContentFilter, BM25ContentFilter
-
+from .markdown_generation_strategy import MarkdownGenerationStrategy, DefaultMarkdownGenerationStrategy
+from .models import MarkdownGenerationResult
 from .utils import (
     sanitize_input_encode,
     sanitize_html,
     extract_metadata,
     InvalidCSSSelectorError,
-    # CustomHTML2Text,
+    CustomHTML2Text,
     normalize_url,
     is_external_url
     
 )
-
-from .html2text import HTML2Text
-class CustomHTML2Text(HTML2Text):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.inside_pre = False
-        self.inside_code = False
-        self.preserve_tags = set()  # Set of tags to preserve
-        self.current_preserved_tag = None
-        self.preserved_content = []
-        self.preserve_depth = 0
-        
-        # Configuration options
-        self.skip_internal_links = False
-        self.single_line_break = False
-        self.mark_code = False
-        self.include_sup_sub = False
-        self.body_width = 0
-        self.ignore_mailto_links = True
-        self.ignore_links = False
-        self.escape_backslash = False
-        self.escape_dot = False
-        self.escape_plus = False
-        self.escape_dash = False
-        self.escape_snob = False
-
-    def update_params(self, **kwargs):
-        """Update parameters and set preserved tags."""
-        for key, value in kwargs.items():
-            if key == 'preserve_tags':
-                self.preserve_tags = set(value)
-            else:
-                setattr(self, key, value)
-
-    def handle_tag(self, tag, attrs, start):
-        # Handle preserved tags
-        if tag in self.preserve_tags:
-            if start:
-                if self.preserve_depth == 0:
-                    self.current_preserved_tag = tag
-                    self.preserved_content = []
-                    # Format opening tag with attributes
-                    attr_str = ''.join(f' {k}="{v}"' for k, v in attrs.items() if v is not None)
-                    self.preserved_content.append(f'<{tag}{attr_str}>')
-                self.preserve_depth += 1
-                return
-            else:
-                self.preserve_depth -= 1
-                if self.preserve_depth == 0:
-                    self.preserved_content.append(f'</{tag}>')
-                    # Output the preserved HTML block with proper spacing
-                    preserved_html = ''.join(self.preserved_content)
-                    self.o('\n' + preserved_html + '\n')
-                    self.current_preserved_tag = None
-                return
-
-        # If we're inside a preserved tag, collect all content
-        if self.preserve_depth > 0:
-            if start:
-                # Format nested tags with attributes
-                attr_str = ''.join(f' {k}="{v}"' for k, v in attrs.items() if v is not None)
-                self.preserved_content.append(f'<{tag}{attr_str}>')
-            else:
-                self.preserved_content.append(f'</{tag}>')
-            return
-
-        # Handle pre tags
-        if tag == 'pre':
-            if start:
-                self.o('```\n')
-                self.inside_pre = True
-            else:
-                self.o('\n```')
-                self.inside_pre = False
-        # elif tag in ["h1", "h2", "h3", "h4", "h5", "h6"]:
-        #     pass
-        else:
-            super().handle_tag(tag, attrs, start)
-
-    def handle_data(self, data, entity_char=False):
-        """Override handle_data to capture content within preserved tags."""
-        if self.preserve_depth > 0:
-            self.preserved_content.append(data)
-            return
-        super().handle_data(data, entity_char)
 
 # Pre-compile regular expressions for Open Graph and Twitter metadata
 OG_REGEX = re.compile(r'^og:')
@@ -163,6 +79,98 @@ class WebScrapingStrategy(ContentScrapingStrategy):
 
     async def ascrap(self, url: str, html: str, **kwargs) -> Dict[str, Any]:
         return await asyncio.to_thread(self._get_content_of_website_optimized, url, html, **kwargs)
+
+
+    def _generate_markdown_content(self, 
+                                 cleaned_html: str,
+                                 html: str,
+                                 url: str,
+                                 success: bool,
+                                 **kwargs) -> Dict[str, Any]:
+        """Generate markdown content using either new strategy or legacy method.
+        
+        Args:
+            cleaned_html: Sanitized HTML content
+            html: Original HTML content
+            url: Base URL of the page
+            success: Whether scraping was successful
+            **kwargs: Additional options including:
+                - markdown_generator: Optional[MarkdownGenerationStrategy]
+                - html2text: Dict[str, Any] options for HTML2Text
+                - content_filter: Optional[RelevantContentFilter]
+                - fit_markdown: bool
+                - fit_markdown_user_query: Optional[str]
+                - fit_markdown_bm25_threshold: float
+        
+        Returns:
+            Dict containing markdown content in various formats
+        """
+        markdown_generator: Optional[MarkdownGenerationStrategy] = kwargs.get('markdown_generator', DefaultMarkdownGenerationStrategy())
+        
+        if markdown_generator:
+            try:
+                markdown_result = markdown_generator.generate_markdown(
+                    cleaned_html=cleaned_html,
+                    base_url=url,
+                    html2text_options=kwargs.get('html2text', {}),
+                    content_filter=kwargs.get('content_filter', None)
+                )
+                
+                markdown_v2 = MarkdownGenerationResult(
+                    raw_markdown=markdown_result.raw_markdown,
+                    markdown_with_citations=markdown_result.markdown_with_citations,
+                    references_markdown=markdown_result.references_markdown,
+                    fit_markdown=markdown_result.fit_markdown
+                )
+
+                return {
+                    'markdown': markdown_result.raw_markdown,  
+                    'fit_markdown': markdown_result.fit_markdown or "Set flag 'fit_markdown' to True to get cleaned HTML content.",
+                    'fit_html': kwargs.get('content_filter', None).filter_content(html) if kwargs.get('content_filter') else "Set flag 'fit_markdown' to True to get cleaned HTML content.",
+                    'markdown_v2': markdown_v2
+                }
+            except Exception as e:
+                self._log('error',
+                    message="Error using new markdown generation strategy: {error}",
+                    tag="SCRAPE",
+                    params={"error": str(e)}
+                )
+                markdown_generator = None
+
+        # Legacy method
+        h = CustomHTML2Text()
+        h.update_params(**kwargs.get('html2text', {}))            
+        markdown = h.handle(cleaned_html)
+        markdown = markdown.replace('    ```', '```')
+        
+        fit_markdown = "Set flag 'fit_markdown' to True to get cleaned HTML content."
+        fit_html = "Set flag 'fit_markdown' to True to get cleaned HTML content."
+        
+        if kwargs.get('content_filter', None) or kwargs.get('fit_markdown', False):
+            content_filter = kwargs.get('content_filter', None)
+            if not content_filter:
+                content_filter = BM25ContentFilter(
+                    user_query=kwargs.get('fit_markdown_user_query', None),
+                    bm25_threshold=kwargs.get('fit_markdown_bm25_threshold', 1.0)
+                )
+            fit_html = content_filter.filter_content(html)
+            fit_html = '\n'.join('<div>{}</div>'.format(s) for s in fit_html)
+            fit_markdown = h.handle(fit_html)
+
+        markdown_v2 = MarkdownGenerationResult(
+            raw_markdown=markdown,
+            markdown_with_citations=markdown,
+            references_markdown=markdown,
+            fit_markdown=fit_markdown
+        )
+        
+        return {
+            'markdown': markdown,
+            'fit_markdown': fit_markdown,
+            'fit_html': fit_html,
+            'markdown_v2' : markdown_v2
+        }
+
 
     def _get_content_of_website_optimized(self, url: str, html: str, word_count_threshold: int = MIN_WORD_THRESHOLD, css_selector: str = None, **kwargs) -> Dict[str, Any]:
         success = True
@@ -242,8 +250,6 @@ class WebScrapingStrategy(ContentScrapingStrategy):
 
             #Score an image for it's usefulness
             def score_image_for_usefulness(img, base_url, index, images_count):
-
-
                 image_height = img.get('height')
                 height_value, height_unit = parse_dimension(image_height)
                 image_width =  img.get('width')
@@ -282,7 +288,7 @@ class WebScrapingStrategy(ContentScrapingStrategy):
             if not is_valid_image(img, img.parent, img.parent.get('class', [])):
                 return None
             score = score_image_for_usefulness(img, url, index, total_images)
-            if score <= IMAGE_SCORE_THRESHOLD:
+            if score <= kwargs.get('image_score_threshold', IMAGE_SCORE_THRESHOLD):
                 return None
             return {
                 'src': img.get('src', ''),
@@ -545,41 +551,16 @@ class WebScrapingStrategy(ContentScrapingStrategy):
 
         cleaned_html = str_body.replace('\n\n', '\n').replace('  ', ' ')
 
-        try:
-            h = CustomHTML2Text()
-            h.update_params(**kwargs.get('html2text', {}))            
-            markdown = h.handle(cleaned_html)
-        except Exception as e:
-            if not h:
-                h = CustomHTML2Text()
-            self._log('error',
-                message="Error converting HTML to markdown: {error}",
-                tag="SCRAPE",
-                params={"error": str(e)}
-            )
-            markdown = h.handle(sanitize_html(cleaned_html))
-        markdown = markdown.replace('    ```', '```')
-
+        markdown_content = self._generate_markdown_content(
+            cleaned_html=cleaned_html,
+            html=html,
+            url=url,
+            success=success,
+            **kwargs
+        )
         
-            
-        fit_markdown = "Set flag 'fit_markdown' to True to get cleaned HTML content."
-        fit_html = "Set flag 'fit_markdown' to True to get cleaned HTML content."
-        if kwargs.get('content_filter', None) or kwargs.get('fit_markdown', False):
-            content_filter = kwargs.get('content_filter', None)
-            if not content_filter:
-                content_filter = BM25ContentFilter(
-                    user_query= kwargs.get('fit_markdown_user_query', None),
-                    bm25_threshold= kwargs.get('fit_markdown_bm25_threshold', 1.0)
-                )
-            fit_html = content_filter.filter_content(html)
-            fit_html = '\n'.join('<div>{}</div>'.format(s) for s in fit_html)
-            fit_markdown = h.handle(fit_html)
-
-        cleaned_html = sanitize_html(cleaned_html)
         return {
-            'markdown': markdown,
-            'fit_markdown': fit_markdown,
-            'fit_html': fit_html,
+            **markdown_content,
             'cleaned_html': cleaned_html,
             'success': success,
             'media': media,

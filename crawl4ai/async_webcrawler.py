@@ -7,14 +7,14 @@ from pathlib import Path
 from typing import Optional, List, Union
 import json
 import asyncio
-from .models import CrawlResult
+from .models import CrawlResult, MarkdownGenerationResult
 from .async_database import async_db_manager
 from .chunking_strategy import *
 from .content_filter_strategy import *
 from .extraction_strategy import *
 from .async_crawler_strategy import AsyncCrawlerStrategy, AsyncPlaywrightCrawlerStrategy, AsyncCrawlResponse
 from .cache_context import CacheMode, CacheContext, _legacy_to_cache_mode
-from .content_scrapping_strategy import WebScrapingStrategy
+from .content_scraping_strategy import WebScrapingStrategy
 from .async_logger import AsyncLogger
 
 from .config import (
@@ -476,7 +476,7 @@ class AsyncWebCrawler:
                 html,
                 word_count_threshold=word_count_threshold,
                 css_selector=css_selector,
-                only_text=kwargs.get("only_text", False),
+                only_text=kwargs.pop("only_text", False),
                 image_description_min_word_threshold=kwargs.get(
                     "image_description_min_word_threshold", IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD
                 ),
@@ -491,6 +491,8 @@ class AsyncWebCrawler:
         except Exception as e:
             raise ValueError(f"Process HTML, Failed to extract content from the website: {url}, error: {str(e)}")
 
+        markdown_v2: MarkdownGenerationResult = result.get("markdown_v2", None)
+        
         cleaned_html = sanitize_input_encode(result.get("cleaned_html", ""))
         markdown = sanitize_input_encode(result.get("markdown", ""))
         fit_markdown = sanitize_input_encode(result.get("fit_markdown", ""))
@@ -542,6 +544,7 @@ class AsyncWebCrawler:
             url=url,
             html=html,
             cleaned_html=format_html(cleaned_html),
+            markdown_v2=markdown_v2,
             markdown=markdown,
             fit_markdown=fit_markdown,
             fit_html= fit_html,

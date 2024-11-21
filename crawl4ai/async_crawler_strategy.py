@@ -229,6 +229,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         self.headless = kwargs.get("headless", True)
         self.browser_type = kwargs.get("browser_type", "chromium")
         self.headers = kwargs.get("headers", {})
+        self.cookies = kwargs.get("cookies", [])
         self.sessions = {}
         self.session_ttl = 1800 
         self.js_code = js_code
@@ -295,6 +296,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 # Set up the default context
                 if self.default_context:
                     await self.default_context.set_extra_http_headers(self.headers)
+                    if self.cookies:
+                        await self.default_context.add_cookies(self.cookies)                    
                     if self.accept_downloads:
                         await self.default_context.set_default_timeout(60000)
                         await self.default_context.set_default_navigation_timeout(60000)
@@ -669,6 +672,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                             # downloads_path=self.downloads_path if self.accept_downloads else None
                         )
                         await context.add_cookies([{"name": "cookiesEnabled", "value": "true", "url": url}])
+                        if self.cookies:
+                            await context.add_cookies(self.cookies)
                         await context.set_extra_http_headers(self.headers)
                         page = await context.new_page()
                     self.sessions[session_id] = (context, page, time.time())
@@ -684,6 +689,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         proxy={"server": self.proxy} if self.proxy else None,
                         accept_downloads=self.accept_downloads,
                     )
+                    if self.cookies:
+                            await context.add_cookies(self.cookies)
                     await context.set_extra_http_headers(self.headers)
                 
                 if kwargs.get("override_navigator", False) or kwargs.get("simulate_user", False) or kwargs.get("magic", False):
@@ -828,7 +835,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     for js in js_code:
                         await page.evaluate(js)
                 
-                await page.wait_for_load_state('networkidle')
+                # await page.wait_for_timeout(100)
+                
                 # Check for on execution event
                 await self.execute_hook('on_execution_started', page)
                 
@@ -846,6 +854,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     await self.smart_wait(page, wait_for, timeout=kwargs.get("page_timeout", 60000))
                 except Exception as e:
                     raise RuntimeError(f"Wait condition failed: {str(e)}")
+            
+            # if not wait_for and js_code:
+            #     await page.wait_for_load_state('networkidle', timeout=5000)
 
             # Update image dimensions
             update_image_dimensions_js = """

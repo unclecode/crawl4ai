@@ -1,11 +1,17 @@
 from pydantic import BaseModel, HttpUrl
-from typing import List, Dict, Optional, Callable, Awaitable
+from typing import List, Dict, Optional, Callable, Awaitable, Union
 
 
 
 class UrlModel(BaseModel):
     url: HttpUrl
     forced: bool = False
+
+class MarkdownGenerationResult(BaseModel):
+    raw_markdown: str
+    markdown_with_citations: str
+    references_markdown: str
+    fit_markdown: Optional[str] = None
 
 class CrawlResult(BaseModel):
     url: str
@@ -16,7 +22,8 @@ class CrawlResult(BaseModel):
     links: Dict[str, List[Dict]] = {}
     downloaded_files: Optional[List[str]] = None
     screenshot: Optional[str] = None
-    markdown: Optional[str] = None
+    markdown: Optional[Union[str, MarkdownGenerationResult]] = None
+    markdown_v2: Optional[MarkdownGenerationResult] = None
     fit_markdown: Optional[str] = None
     fit_html: Optional[str] = None
     extracted_content: Optional[str] = None
@@ -36,3 +43,5 @@ class AsyncCrawlResponse(BaseModel):
 
     class Config:
         arbitrary_types_allowed = True
+
+
