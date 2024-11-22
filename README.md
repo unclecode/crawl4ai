@@ -13,8 +13,10 @@ Crawl4AI simplifies asynchronous web crawling and data extraction, making it acc
 
 ## New in 0.3.74 ✨
 
-- 🚀 **Blazing Fast Scraping:** The scraping process is now significantly faster, often completing in under 100 milliseconds (excluding web fetch time)!
+- 🚀 **Blazing Fast Scraping:** The scraping process is now significantly faster!
 - 📥 **Download Manager:** Integrated file crawling and downloading capabilities, with full control over file management and tracking within the `CrawlResult` object.
+- 📝 **Markdown Generation Strategy:** Flexible markdown generation system supporting custom strategies for different use cases and output formats.
+- 🔗 **LLM-Friendly Citations:** Automatic conversion of links into numbered citations with organized reference lists, making content more digestible for large language models.
 - 🔎 **Markdown Filter:** Enhanced content extraction using BM25 algorithm to create cleaner markdown with only relevant webpage content.
 - 🗂️ **Local & Raw HTML:** Crawl local files (`file://`) and raw HTML strings (`raw:`) directly.
 - 🤖 **Browser Control:** Use your own browser setup for crawling, with persistent contexts and stealth integration to bypass anti-bot measures.

@@ -19,9 +19,9 @@ from .utils import (
     InvalidCSSSelectorError,
     CustomHTML2Text,
     normalize_url,
-    is_external_url
-    
+    is_external_url    
 )
+from .tools import profile_and_time
 
 # Pre-compile regular expressions for Open Graph and Twitter metadata
 OG_REGEX = re.compile(r'^og:')
@@ -234,7 +234,26 @@ class WebScrapingStrategy(ContentScrapingStrategy):
                             return text_content
                 return None
 
-        def process_image(img, url, index, total_images):
+        def process_image_old(img, url, index, total_images):
+            def parse_srcset(srcset_str):
+                """Parse srcset attribute into list of image URLs with their sizes."""
+                if not srcset_str:
+                    return []
+                
+                sources = []
+                # Split on http/https and filter empty strings
+                urls = [f"http{part}" for part in srcset_str.split("http") if part]
+                
+                for url in urls:
+                    # Remove trailing comma and whitespace, then split to get width
+                    url = url.strip().rstrip(',')
+                    parts = url.rsplit(' ', 1)
+                    img_url = parts[0].strip()
+                    width = parts[1].rstrip('w') if len(parts) > 1 else None
+                    sources.append({'url': img_url, 'width': width})
+                
+                return sources          
+            
             #Check if an image has valid display and inside undesired html elements
             def is_valid_image(img, parent, parent_classes):
                 style = img.get('style', '')
@@ -283,14 +302,14 @@ class WebScrapingStrategy(ContentScrapingStrategy):
                     score+=1
                 return score
 
-            
-            
             if not is_valid_image(img, img.parent, img.parent.get('class', [])):
                 return None
+                
             score = score_image_for_usefulness(img, url, index, total_images)
             if score <= kwargs.get('image_score_threshold', IMAGE_SCORE_THRESHOLD):
                 return None
-            return {
+
+            base_result = {
                 'src': img.get('src', ''),
                 'data-src': img.get('data-src', ''),
                 'alt': img.get('alt', ''),
@@ -298,6 +317,109 @@ class WebScrapingStrategy(ContentScrapingStrategy):
                 'score': score,
                 'type': 'image'
             }
+
+            sources = []
+            srcset = img.get('srcset', '')
+            if srcset:
+                sources = parse_srcset(srcset)
+                if sources:
+                    return [dict(base_result, src=source['url'], width=source['width']) 
+                        for source in sources]
+
+            return [base_result]  # Always return a list
+
+        def process_image(img, url, index, total_images):
+            parse_srcset = lambda s: [{'url': u.strip().split()[0], 'width': u.strip().split()[-1].rstrip('w') 
+                          if ' ' in u else None} 
+                         for u in [f"http{p}" for p in s.split("http") if p]]
+            
+            # Constants for checks
+            classes_to_check = frozenset(['button', 'icon', 'logo'])
+            tags_to_check = frozenset(['button', 'input'])
+            
+            # Pre-fetch commonly used attributes
+            style = img.get('style', '')
+            alt = img.get('alt', '')
+            src = img.get('src', '')
+            data_src = img.get('data-src', '')
+            width = img.get('width')
+            height = img.get('height')
+            parent = img.parent
+            parent_classes = parent.get('class', [])
+
+            # Quick validation checks
+            if ('display:none' in style or
+                parent.name in tags_to_check or
+                any(c in cls for c in parent_classes for cls in classes_to_check) or
+                any(c in src for c in classes_to_check) or
+                any(c in alt for c in classes_to_check)):
+                return None
+
+            # Quick score calculation
+            score = 0
+            if width and width.isdigit():
+                width_val = int(width)
+                score += 1 if width_val > 150 else 0
+            if height and height.isdigit():
+                height_val = int(height)
+                score += 1 if height_val > 150 else 0
+            if alt:
+                score += 1
+            score += index/total_images < 0.5
+            
+            image_format = ''
+            if "data:image/" in src:
+                image_format = src.split(',')[0].split(';')[0].split('/')[1].split(';')[0]
+            else:
+                image_format = os.path.splitext(src)[1].lower().strip('.').split('?')[0]
+            
+            if image_format in ('jpg', 'png', 'webp', 'avif'):
+                score += 1
+
+            if score <= kwargs.get('image_score_threshold', IMAGE_SCORE_THRESHOLD):
+                return None
+
+            # Use set for deduplication
+            unique_urls = set()
+            image_variants = []
+            
+            # Base image info template
+            base_info = {
+                'alt': alt,
+                'desc': find_closest_parent_with_useful_text(img),
+                'score': score,
+                'type': 'image'
+            }
+
+            # Inline function for adding variants
+            def add_variant(src, width=None):
+                if src and not src.startswith('data:') and src not in unique_urls:
+                    unique_urls.add(src)
+                    image_variants.append({**base_info, 'src': src, 'width': width})
+
+            # Process all sources
+            add_variant(src)
+            add_variant(data_src)
+            
+            # Handle srcset and data-srcset in one pass
+            for attr in ('srcset', 'data-srcset'):
+                if value := img.get(attr):
+                    for source in parse_srcset(value):
+                        add_variant(source['url'], source['width'])
+
+            # Quick picture element check
+            if picture := img.find_parent('picture'):
+                for source in picture.find_all('source'):
+                    if srcset := source.get('srcset'):
+                        for src in parse_srcset(srcset):
+                            add_variant(src['url'], src['width'])
+
+            # Framework-specific attributes in one pass
+            for attr, value in img.attrs.items():
+                if attr.startswith('data-') and ('src' in attr or 'srcset' in attr) and 'http' in value:
+                    add_variant(value)
+
+            return image_variants if image_variants else None
 
         def remove_unwanted_attributes(element, important_attrs, keep_data_attributes=False):
             attrs_to_remove = []
@@ -490,13 +612,16 @@ class WebScrapingStrategy(ContentScrapingStrategy):
         links['internal'] = list(internal_links_dict.values())
         links['external'] = list(external_links_dict.values())
 
-
         # # Process images using ThreadPoolExecutor
         imgs = body.find_all('img')
         
-        with ThreadPoolExecutor() as executor:
-            image_results = list(executor.map(process_image, imgs, [url]*len(imgs), range(len(imgs)), [len(imgs)]*len(imgs)))
-        media['images'] = [result for result in image_results if result is not None]
+        # For test we use for loop instead of thread
+        media['images'] = [
+            img for result in (process_image(img, url, i, len(imgs)) 
+                            for i, img in enumerate(imgs))
+            if result is not None
+            for img in result
+        ]
 
         def flatten_nested_elements(node):
             if isinstance(node, NavigableString):
