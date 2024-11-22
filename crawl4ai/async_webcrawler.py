@@ -477,7 +477,7 @@ class AsyncWebCrawler:
                 word_count_threshold=word_count_threshold,
                 css_selector=css_selector,
                 only_text=kwargs.pop("only_text", False),
-                image_description_min_word_threshold=kwargs.get(
+                image_description_min_word_threshold=kwargs.pop(
                     "image_description_min_word_threshold", IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD
                 ),
                 content_filter = content_filter,
