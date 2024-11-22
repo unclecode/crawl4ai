@@ -71,12 +71,12 @@ async def use_proxy():
         "Note: Replace 'http://your-proxy-url:port' with a working proxy to run this example."
     )
     # Uncomment and modify the following lines to use a proxy
-    # async with AsyncWebCrawler(verbose=True, proxy="http://your-proxy-url:port") as crawler:
-    #     result = await crawler.arun(
-    #         url="https://www.nbcnews.com/business",
-    #         bypass_cache=True
-    #     )
-    #     print(result.markdown[:500])  # Print first 500 characters
+    async with AsyncWebCrawler(verbose=True, proxy="http://your-proxy-url:port") as crawler:
+        result = await crawler.arun(
+            url="https://www.nbcnews.com/business",
+            bypass_cache=True
+        )
+        print(result.markdown[:500])  # Print first 500 characters
 
 async def capture_and_save_screenshot(url: str, output_path: str):
     async with AsyncWebCrawler(verbose=True) as crawler:

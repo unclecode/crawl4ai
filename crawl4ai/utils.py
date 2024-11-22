@@ -14,6 +14,97 @@ from typing import Dict, Any
 from urllib.parse import urljoin
 import requests
 from requests.exceptions import InvalidSchema
+import hashlib
+from typing import Optional, Tuple, Dict, Any
+import xxhash
+
+
+from .html2text import HTML2Text
+class CustomHTML2Text(HTML2Text):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.inside_pre = False
+        self.inside_code = False
+        self.preserve_tags = set()  # Set of tags to preserve
+        self.current_preserved_tag = None
+        self.preserved_content = []
+        self.preserve_depth = 0
+        
+        # Configuration options
+        self.skip_internal_links = False
+        self.single_line_break = False
+        self.mark_code = False
+        self.include_sup_sub = False
+        self.body_width = 0
+        self.ignore_mailto_links = True
+        self.ignore_links = False
+        self.escape_backslash = False
+        self.escape_dot = False
+        self.escape_plus = False
+        self.escape_dash = False
+        self.escape_snob = False
+
+    def update_params(self, **kwargs):
+        """Update parameters and set preserved tags."""
+        for key, value in kwargs.items():
+            if key == 'preserve_tags':
+                self.preserve_tags = set(value)
+            else:
+                setattr(self, key, value)
+
+    def handle_tag(self, tag, attrs, start):
+        # Handle preserved tags
+        if tag in self.preserve_tags:
+            if start:
+                if self.preserve_depth == 0:
+                    self.current_preserved_tag = tag
+                    self.preserved_content = []
+                    # Format opening tag with attributes
+                    attr_str = ''.join(f' {k}="{v}"' for k, v in attrs.items() if v is not None)
+                    self.preserved_content.append(f'<{tag}{attr_str}>')
+                self.preserve_depth += 1
+                return
+            else:
+                self.preserve_depth -= 1
+                if self.preserve_depth == 0:
+                    self.preserved_content.append(f'</{tag}>')
+                    # Output the preserved HTML block with proper spacing
+                    preserved_html = ''.join(self.preserved_content)
+                    self.o('\n' + preserved_html + '\n')
+                    self.current_preserved_tag = None
+                return
+
+        # If we're inside a preserved tag, collect all content
+        if self.preserve_depth > 0:
+            if start:
+                # Format nested tags with attributes
+                attr_str = ''.join(f' {k}="{v}"' for k, v in attrs.items() if v is not None)
+                self.preserved_content.append(f'<{tag}{attr_str}>')
+            else:
+                self.preserved_content.append(f'</{tag}>')
+            return
+
+        # Handle pre tags
+        if tag == 'pre':
+            if start:
+                self.o('```\n')
+                self.inside_pre = True
+            else:
+                self.o('\n```')
+                self.inside_pre = False
+        # elif tag in ["h1", "h2", "h3", "h4", "h5", "h6"]:
+        #     pass
+        else:
+            super().handle_tag(tag, attrs, start)
+
+    def handle_data(self, data, entity_char=False):
+        """Override handle_data to capture content within preserved tags."""
+        if self.preserve_depth > 0:
+            self.preserved_content.append(data)
+            return
+        super().handle_data(data, entity_char)
+
+
 
 class InvalidCSSSelectorError(Exception):
     pass
@@ -736,45 +827,53 @@ def get_content_of_website_optimized(url: str, html: str, word_count_threshold: 
         'metadata': meta
     }
 
-def extract_metadata(html, soup = None):
+def extract_metadata(html, soup=None):
     metadata = {}
     
-    if not html:
+    if not html and not soup:
+        return {}
+    
+    if not soup:
+        soup = BeautifulSoup(html, 'lxml')
+    
+    head = soup.head
+    if not head:
         return metadata
     
-    # Parse HTML content with BeautifulSoup
-    if not soup:
-        soup = BeautifulSoup(html, 'html.parser')
-
     # Title
-    title_tag = soup.find('title')
-    metadata['title'] = title_tag.string if title_tag else None
+    title_tag = head.find('title')
+    metadata['title'] = title_tag.string.strip() if title_tag and title_tag.string else None
 
     # Meta description
-    description_tag = soup.find('meta', attrs={'name': 'description'})
-    metadata['description'] = description_tag['content'] if description_tag else None
+    description_tag = head.find('meta', attrs={'name': 'description'})
+    metadata['description'] = description_tag.get('content', '').strip() if description_tag else None
 
     # Meta keywords
-    keywords_tag = soup.find('meta', attrs={'name': 'keywords'})
-    metadata['keywords'] = keywords_tag['content'] if keywords_tag else None
+    keywords_tag = head.find('meta', attrs={'name': 'keywords'})
+    metadata['keywords'] = keywords_tag.get('content', '').strip() if keywords_tag else None
 
     # Meta author
-    author_tag = soup.find('meta', attrs={'name': 'author'})
-    metadata['author'] = author_tag['content'] if author_tag else None
+    author_tag = head.find('meta', attrs={'name': 'author'})
+    metadata['author'] = author_tag.get('content', '').strip() if author_tag else None
 
     # Open Graph metadata
-    og_tags = soup.find_all('meta', attrs={'property': lambda value: value and value.startswith('og:')})
+    og_tags = head.find_all('meta', attrs={'property': re.compile(r'^og:')})
     for tag in og_tags:
-        property_name = tag['property']
-        metadata[property_name] = tag['content']
+        property_name = tag.get('property', '').strip()
+        content = tag.get('content', '').strip()
+        if property_name and content:
+            metadata[property_name] = content
 
     # Twitter Card metadata
-    twitter_tags = soup.find_all('meta', attrs={'name': lambda value: value and value.startswith('twitter:')})
+    twitter_tags = head.find_all('meta', attrs={'name': re.compile(r'^twitter:')})
     for tag in twitter_tags:
-        property_name = tag['name']
-        metadata[property_name] = tag['content']
-
+        property_name = tag.get('name', '').strip()
+        content = tag.get('content', '').strip()
+        if property_name and content:
+            metadata[property_name] = content
+    
     return metadata
+
 
 def extract_xml_tags(string):
     tags = re.findall(r'<(\w+)>', string)
@@ -1046,3 +1145,82 @@ def is_external_url(url, base_domain):
         return False
         
     return False
+
+def clean_tokens(tokens: list[str]) -> list[str]:
+    # Set of tokens to remove
+    noise = {'ccp', 'up', '↑', '▲', '⬆️', 'a', 'an', 'at', 'by', 'in', 'of', 'on', 'to', 'the'}
+
+    STOP_WORDS = {
+        'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 
+        'has', 'he', 'in', 'is', 'it', 'its', 'of', 'on', 'that', 'the', 
+        'to', 'was', 'were', 'will', 'with',
+        
+        # Pronouns
+        'i', 'you', 'he', 'she', 'it', 'we', 'they',
+        'me', 'him', 'her', 'us', 'them',
+        'my', 'your', 'his', 'her', 'its', 'our', 'their',
+        'mine', 'yours', 'hers', 'ours', 'theirs',
+        'myself', 'yourself', 'himself', 'herself', 'itself', 'ourselves', 'themselves',
+        
+        # Common verbs
+        'am', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+        'have', 'has', 'had', 'having', 'do', 'does', 'did', 'doing',
+        
+        # Prepositions
+        'about', 'above', 'across', 'after', 'against', 'along', 'among', 'around',
+        'at', 'before', 'behind', 'below', 'beneath', 'beside', 'between', 'beyond',
+        'by', 'down', 'during', 'except', 'for', 'from', 'in', 'inside', 'into',
+        'near', 'of', 'off', 'on', 'out', 'outside', 'over', 'past', 'through',
+        'to', 'toward', 'under', 'underneath', 'until', 'up', 'upon', 'with', 'within',
+        
+        # Conjunctions
+        'and', 'but', 'or', 'nor', 'for', 'yet', 'so',
+        'although', 'because', 'since', 'unless',
+        
+        # Articles
+        'a', 'an', 'the',
+        
+        # Other common words
+        'this', 'that', 'these', 'those',
+        'what', 'which', 'who', 'whom', 'whose',
+        'when', 'where', 'why', 'how',
+        'all', 'any', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such',
+        'can', 'cannot', "can't", 'could', "couldn't",
+        'may', 'might', 'must', "mustn't",
+        'shall', 'should', "shouldn't",
+        'will', "won't", 'would', "wouldn't",
+        'not', "n't", 'no', 'nor', 'none'
+    }   
+   
+    # Single comprehension, more efficient than multiple passes
+    return [token for token in tokens 
+            if len(token) > 2 
+            and token not in noise 
+            and token not in STOP_WORDS
+            and not token.startswith('↑')
+            and not token.startswith('▲')
+            and not token.startswith('⬆')]
+
+
+def generate_content_hash(content: str) -> str:
+    """Generate a unique hash for content"""
+    return xxhash.xxh64(content.encode()).hexdigest()
+    # return hashlib.sha256(content.encode()).hexdigest()
+
+def ensure_content_dirs(base_path: str) -> Dict[str, str]:
+    """Create content directories if they don't exist"""
+    dirs = {
+        'html': 'html_content',
+        'cleaned': 'cleaned_html',
+        'markdown': 'markdown_content', 
+        'extracted': 'extracted_content',
+        'screenshots': 'screenshots'
+    }
+    
+    content_paths = {}
+    for key, dirname in dirs.items():
+        path = os.path.join(base_path, dirname)
+        os.makedirs(path, exist_ok=True)
+        content_paths[key] = path
+        
+    return content_paths

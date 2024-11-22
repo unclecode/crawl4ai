@@ -20,6 +20,7 @@ class CrawlResult(BaseModel):
     fit_html: Optional[str] = None          # Most relevant HTML content
     markdown: Optional[str] = None          # HTML converted to markdown
     fit_markdown: Optional[str] = None      # Most relevant markdown content
+    downloaded_files: Optional[List[str]] = None  # Downloaded files
     
     # Extracted Data
     extracted_content: Optional[str] = None  # Content from extraction strategy

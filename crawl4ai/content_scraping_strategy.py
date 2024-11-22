@@ -1,5 +1,6 @@
+import re  # Point 1: Pre-Compile Regular Expressions
 from abc import ABC, abstractmethod
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor
 import asyncio, requests, re, os
@@ -7,105 +8,54 @@ from .config import *
 from bs4 import element, NavigableString, Comment
 from urllib.parse import urljoin
 from requests.exceptions import InvalidSchema
-from .content_cleaning_strategy import ContentCleaningStrategy
-
+# from .content_cleaning_strategy import ContentCleaningStrategy
+from .content_filter_strategy import RelevantContentFilter, BM25ContentFilter
+from .markdown_generation_strategy import MarkdownGenerationStrategy, DefaultMarkdownGenerationStrategy
+from .models import MarkdownGenerationResult
 from .utils import (
     sanitize_input_encode,
     sanitize_html,
     extract_metadata,
     InvalidCSSSelectorError,
-    # CustomHTML2Text,
+    CustomHTML2Text,
     normalize_url,
-    is_external_url
-    
+    is_external_url    
 )
+from .tools import profile_and_time
 
-from .html2text import HTML2Text
-class CustomHTML2Text(HTML2Text):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.inside_pre = False
-        self.inside_code = False
-        self.preserve_tags = set()  # Set of tags to preserve
-        self.current_preserved_tag = None
-        self.preserved_content = []
-        self.preserve_depth = 0
-        
-        # Configuration options
-        self.skip_internal_links = False
-        self.single_line_break = False
-        self.mark_code = False
-        self.include_sup_sub = False
-        self.body_width = 0
-        self.ignore_mailto_links = True
-        self.ignore_links = False
-        self.escape_backslash = False
-        self.escape_dot = False
-        self.escape_plus = False
-        self.escape_dash = False
-        self.escape_snob = False
+# Pre-compile regular expressions for Open Graph and Twitter metadata
+OG_REGEX = re.compile(r'^og:')
+TWITTER_REGEX = re.compile(r'^twitter:')
+DIMENSION_REGEX = re.compile(r"(\d+)(\D*)")
 
-    def update_params(self, **kwargs):
-        """Update parameters and set preserved tags."""
-        for key, value in kwargs.items():
-            if key == 'preserve_tags':
-                self.preserve_tags = set(value)
-            else:
-                setattr(self, key, value)
+# Function to parse image height/width value and units
+def parse_dimension(dimension):
+    if dimension:
+        # match = re.match(r"(\d+)(\D*)", dimension)
+        match = DIMENSION_REGEX.match(dimension)
+        if match:
+            number = int(match.group(1))
+            unit = match.group(2) or 'px'  # Default unit is 'px' if not specified
+            return number, unit
+    return None, None
 
-    def handle_tag(self, tag, attrs, start):
-        # Handle preserved tags
-        if tag in self.preserve_tags:
-            if start:
-                if self.preserve_depth == 0:
-                    self.current_preserved_tag = tag
-                    self.preserved_content = []
-                    # Format opening tag with attributes
-                    attr_str = ''.join(f' {k}="{v}"' for k, v in attrs.items() if v is not None)
-                    self.preserved_content.append(f'<{tag}{attr_str}>')
-                self.preserve_depth += 1
-                return
-            else:
-                self.preserve_depth -= 1
-                if self.preserve_depth == 0:
-                    self.preserved_content.append(f'</{tag}>')
-                    # Output the preserved HTML block with proper spacing
-                    preserved_html = ''.join(self.preserved_content)
-                    self.o('\n' + preserved_html + '\n')
-                    self.current_preserved_tag = None
-                return
-
-        # If we're inside a preserved tag, collect all content
-        if self.preserve_depth > 0:
-            if start:
-                # Format nested tags with attributes
-                attr_str = ''.join(f' {k}="{v}"' for k, v in attrs.items() if v is not None)
-                self.preserved_content.append(f'<{tag}{attr_str}>')
-            else:
-                self.preserved_content.append(f'</{tag}>')
-            return
-
-        # Handle pre tags
-        if tag == 'pre':
-            if start:
-                self.o('```\n')
-                self.inside_pre = True
-            else:
-                self.o('\n```')
-                self.inside_pre = False
-        # elif tag in ["h1", "h2", "h3", "h4", "h5", "h6"]:
-        #     pass
+# Fetch image file metadata to extract size and extension
+def fetch_image_file_size(img, base_url):
+    #If src is relative path construct full URL, if not it may be CDN URL
+    img_url = urljoin(base_url,img.get('src'))
+    try:
+        response = requests.head(img_url)
+        if response.status_code == 200:
+            return response.headers.get('Content-Length',None)
         else:
-            super().handle_tag(tag, attrs, start)
+            print(f"Failed to retrieve file size for {img_url}")
+            return None
+    except InvalidSchema as e:
+        return None
+    finally:
+        return
 
-    def handle_data(self, data, entity_char=False):
-        """Override handle_data to capture content within preserved tags."""
-        if self.preserve_depth > 0:
-            self.preserved_content.append(data)
-            return
-        super().handle_data(data, entity_char)
-
-class ContentScrappingStrategy(ABC):
+class ContentScrapingStrategy(ABC):
     @abstractmethod
     def scrap(self, url: str, html: str, **kwargs) -> Dict[str, Any]:
         pass
@@ -114,20 +64,126 @@ class ContentScrappingStrategy(ABC):
     async def ascrap(self, url: str, html: str, **kwargs) -> Dict[str, Any]:
         pass
 
-class WebScrappingStrategy(ContentScrappingStrategy):
+class WebScrapingStrategy(ContentScrapingStrategy):
+    def __init__(self, logger=None):
+        self.logger = logger
+
+    def _log(self, level, message, tag="SCRAPE", **kwargs):
+        """Helper method to safely use logger."""
+        if self.logger:
+            log_method = getattr(self.logger, level)
+            log_method(message=message, tag=tag, **kwargs)
+                
     def scrap(self, url: str, html: str, **kwargs) -> Dict[str, Any]:
         return self._get_content_of_website_optimized(url, html, is_async=False, **kwargs)
 
     async def ascrap(self, url: str, html: str, **kwargs) -> Dict[str, Any]:
         return await asyncio.to_thread(self._get_content_of_website_optimized, url, html, **kwargs)
 
+
+    def _generate_markdown_content(self, 
+                                 cleaned_html: str,
+                                 html: str,
+                                 url: str,
+                                 success: bool,
+                                 **kwargs) -> Dict[str, Any]:
+        """Generate markdown content using either new strategy or legacy method.
+        
+        Args:
+            cleaned_html: Sanitized HTML content
+            html: Original HTML content
+            url: Base URL of the page
+            success: Whether scraping was successful
+            **kwargs: Additional options including:
+                - markdown_generator: Optional[MarkdownGenerationStrategy]
+                - html2text: Dict[str, Any] options for HTML2Text
+                - content_filter: Optional[RelevantContentFilter]
+                - fit_markdown: bool
+                - fit_markdown_user_query: Optional[str]
+                - fit_markdown_bm25_threshold: float
+        
+        Returns:
+            Dict containing markdown content in various formats
+        """
+        markdown_generator: Optional[MarkdownGenerationStrategy] = kwargs.get('markdown_generator', DefaultMarkdownGenerationStrategy())
+        
+        if markdown_generator:
+            try:
+                markdown_result: MarkdownGenerationResult = markdown_generator.generate_markdown(
+                    cleaned_html=cleaned_html,
+                    base_url=url,
+                    html2text_options=kwargs.get('html2text', {}),
+                    content_filter=kwargs.get('content_filter', None)
+                )
+                
+                return {
+                    'markdown': markdown_result.raw_markdown,  
+                    'fit_markdown': markdown_result.fit_markdown or "Set flag 'fit_markdown' to True to get cleaned HTML content.",
+                    'fit_html': markdown_result.fit_html or "Set flag 'fit_markdown' to True to get cleaned HTML content.",
+                    'markdown_v2': markdown_result
+                }
+            except Exception as e:
+                self._log('error',
+                    message="Error using new markdown generation strategy: {error}",
+                    tag="SCRAPE",
+                    params={"error": str(e)}
+                )
+                markdown_generator = None
+
+        # Legacy method
+        h = CustomHTML2Text()
+        h.update_params(**kwargs.get('html2text', {}))            
+        markdown = h.handle(cleaned_html)
+        markdown = markdown.replace('    ```', '```')
+        
+        fit_markdown = "Set flag 'fit_markdown' to True to get cleaned HTML content."
+        fit_html = "Set flag 'fit_markdown' to True to get cleaned HTML content."
+        
+        if kwargs.get('content_filter', None) or kwargs.get('fit_markdown', False):
+            content_filter = kwargs.get('content_filter', None)
+            if not content_filter:
+                content_filter = BM25ContentFilter(
+                    user_query=kwargs.get('fit_markdown_user_query', None),
+                    bm25_threshold=kwargs.get('fit_markdown_bm25_threshold', 1.0)
+                )
+            fit_html = content_filter.filter_content(html)
+            fit_html = '\n'.join('<div>{}</div>'.format(s) for s in fit_html)
+            fit_markdown = h.handle(fit_html)
+
+        markdown_v2 = MarkdownGenerationResult(
+            raw_markdown=markdown,
+            markdown_with_citations=markdown,
+            references_markdown=markdown,
+            fit_markdown=fit_markdown
+        )
+        
+        return {
+            'markdown': markdown,
+            'fit_markdown': fit_markdown,
+            'fit_html': fit_html,
+            'markdown_v2' : markdown_v2
+        }
+
+
     def _get_content_of_website_optimized(self, url: str, html: str, word_count_threshold: int = MIN_WORD_THRESHOLD, css_selector: str = None, **kwargs) -> Dict[str, Any]:
         success = True
         if not html:
             return None
 
-        soup = BeautifulSoup(html, 'html.parser')
+        # soup = BeautifulSoup(html, 'html.parser')
+        soup = BeautifulSoup(html, 'lxml')
         body = soup.body
+        
+        try:
+            meta = extract_metadata("", soup)
+        except Exception as e:
+            self._log('error', 
+                message="Error extracting metadata: {error}",
+                tag="SCRAPE",
+                params={"error": str(e)}
+            )            
+            # print('Error extracting metadata:', str(e))
+            meta = {}
         
         
         image_description_min_word_threshold = kwargs.get('image_description_min_word_threshold', IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD)
@@ -171,7 +227,26 @@ class WebScrappingStrategy(ContentScrappingStrategy):
                             return text_content
                 return None
 
-        def process_image(img, url, index, total_images):
+        def process_image_old(img, url, index, total_images):
+            def parse_srcset(srcset_str):
+                """Parse srcset attribute into list of image URLs with their sizes."""
+                if not srcset_str:
+                    return []
+                
+                sources = []
+                # Split on http/https and filter empty strings
+                urls = [f"http{part}" for part in srcset_str.split("http") if part]
+                
+                for url in urls:
+                    # Remove trailing comma and whitespace, then split to get width
+                    url = url.strip().rstrip(',')
+                    parts = url.rsplit(' ', 1)
+                    img_url = parts[0].strip()
+                    width = parts[1].rstrip('w') if len(parts) > 1 else None
+                    sources.append({'url': img_url, 'width': width})
+                
+                return sources          
+            
             #Check if an image has valid display and inside undesired html elements
             def is_valid_image(img, parent, parent_classes):
                 style = img.get('style', '')
@@ -187,32 +262,6 @@ class WebScrappingStrategy(ContentScrappingStrategy):
 
             #Score an image for it's usefulness
             def score_image_for_usefulness(img, base_url, index, images_count):
-                # Function to parse image height/width value and units
-                def parse_dimension(dimension):
-                    if dimension:
-                        match = re.match(r"(\d+)(\D*)", dimension)
-                        if match:
-                            number = int(match.group(1))
-                            unit = match.group(2) or 'px'  # Default unit is 'px' if not specified
-                            return number, unit
-                    return None, None
-
-                # Fetch image file metadata to extract size and extension
-                def fetch_image_file_size(img, base_url):
-                    #If src is relative path construct full URL, if not it may be CDN URL
-                    img_url = urljoin(base_url,img.get('src'))
-                    try:
-                        response = requests.head(img_url)
-                        if response.status_code == 200:
-                            return response.headers.get('Content-Length',None)
-                        else:
-                            print(f"Failed to retrieve file size for {img_url}")
-                            return None
-                    except InvalidSchema as e:
-                        return None
-                    finally:
-                        return
-
                 image_height = img.get('height')
                 height_value, height_unit = parse_dimension(image_height)
                 image_width =  img.get('width')
@@ -246,14 +295,14 @@ class WebScrappingStrategy(ContentScrappingStrategy):
                     score+=1
                 return score
 
-            
-            
             if not is_valid_image(img, img.parent, img.parent.get('class', [])):
                 return None
+                
             score = score_image_for_usefulness(img, url, index, total_images)
-            if score <= IMAGE_SCORE_THRESHOLD:
+            if score <= kwargs.get('image_score_threshold', IMAGE_SCORE_THRESHOLD):
                 return None
-            return {
+
+            base_result = {
                 'src': img.get('src', ''),
                 'data-src': img.get('data-src', ''),
                 'alt': img.get('alt', ''),
@@ -261,6 +310,109 @@ class WebScrappingStrategy(ContentScrappingStrategy):
                 'score': score,
                 'type': 'image'
             }
+
+            sources = []
+            srcset = img.get('srcset', '')
+            if srcset:
+                sources = parse_srcset(srcset)
+                if sources:
+                    return [dict(base_result, src=source['url'], width=source['width']) 
+                        for source in sources]
+
+            return [base_result]  # Always return a list
+
+        def process_image(img, url, index, total_images):
+            parse_srcset = lambda s: [{'url': u.strip().split()[0], 'width': u.strip().split()[-1].rstrip('w') 
+                          if ' ' in u else None} 
+                         for u in [f"http{p}" for p in s.split("http") if p]]
+            
+            # Constants for checks
+            classes_to_check = frozenset(['button', 'icon', 'logo'])
+            tags_to_check = frozenset(['button', 'input'])
+            
+            # Pre-fetch commonly used attributes
+            style = img.get('style', '')
+            alt = img.get('alt', '')
+            src = img.get('src', '')
+            data_src = img.get('data-src', '')
+            width = img.get('width')
+            height = img.get('height')
+            parent = img.parent
+            parent_classes = parent.get('class', [])
+
+            # Quick validation checks
+            if ('display:none' in style or
+                parent.name in tags_to_check or
+                any(c in cls for c in parent_classes for cls in classes_to_check) or
+                any(c in src for c in classes_to_check) or
+                any(c in alt for c in classes_to_check)):
+                return None
+
+            # Quick score calculation
+            score = 0
+            if width and width.isdigit():
+                width_val = int(width)
+                score += 1 if width_val > 150 else 0
+            if height and height.isdigit():
+                height_val = int(height)
+                score += 1 if height_val > 150 else 0
+            if alt:
+                score += 1
+            score += index/total_images < 0.5
+            
+            image_format = ''
+            if "data:image/" in src:
+                image_format = src.split(',')[0].split(';')[0].split('/')[1].split(';')[0]
+            else:
+                image_format = os.path.splitext(src)[1].lower().strip('.').split('?')[0]
+            
+            if image_format in ('jpg', 'png', 'webp', 'avif'):
+                score += 1
+
+            if score <= kwargs.get('image_score_threshold', IMAGE_SCORE_THRESHOLD):
+                return None
+
+            # Use set for deduplication
+            unique_urls = set()
+            image_variants = []
+            
+            # Base image info template
+            base_info = {
+                'alt': alt,
+                'desc': find_closest_parent_with_useful_text(img),
+                'score': score,
+                'type': 'image'
+            }
+
+            # Inline function for adding variants
+            def add_variant(src, width=None):
+                if src and not src.startswith('data:') and src not in unique_urls:
+                    unique_urls.add(src)
+                    image_variants.append({**base_info, 'src': src, 'width': width})
+
+            # Process all sources
+            add_variant(src)
+            add_variant(data_src)
+            
+            # Handle srcset and data-srcset in one pass
+            for attr in ('srcset', 'data-srcset'):
+                if value := img.get(attr):
+                    for source in parse_srcset(value):
+                        add_variant(source['url'], source['width'])
+
+            # Quick picture element check
+            if picture := img.find_parent('picture'):
+                for source in picture.find_all('source'):
+                    if srcset := source.get('srcset'):
+                        for src in parse_srcset(srcset):
+                            add_variant(src['url'], src['width'])
+
+            # Framework-specific attributes in one pass
+            for attr, value in img.attrs.items():
+                if attr.startswith('data-') and ('src' in attr or 'srcset' in attr) and 'http' in value:
+                    add_variant(value)
+
+            return image_variants if image_variants else None
 
         def remove_unwanted_attributes(element, important_attrs, keep_data_attributes=False):
             attrs_to_remove = []
@@ -294,7 +446,6 @@ class WebScrappingStrategy(ContentScrappingStrategy):
                 
                 exclude_social_media_domains = SOCIAL_MEDIA_DOMAINS + kwargs.get('exclude_social_media_domains', [])
                 exclude_social_media_domains = list(set(exclude_social_media_domains))
-
                 
                 try:
                     if element.name == 'a' and element.get('href'):
@@ -414,9 +565,12 @@ class WebScrappingStrategy(ContentScrappingStrategy):
                 try:
                     remove_unwanted_attributes(element, IMPORTANT_ATTRS, kwargs.get('keep_data_attributes', False))
                 except Exception as e:
-                    print('Error removing unwanted attributes:', str(e))
-                
-
+                    # print('Error removing unwanted attributes:', str(e))
+                    self._log('error',
+                        message="Error removing unwanted attributes: {error}",
+                        tag="SCRAPE",
+                        params={"error": str(e)}
+                    )
                 # Process children
                 for child in list(element.children):
                     if isinstance(child, NavigableString) and not isinstance(child, Comment):
@@ -437,30 +591,30 @@ class WebScrappingStrategy(ContentScrappingStrategy):
 
                 return keep_element
             except Exception as e:
-                print('Error processing element:', str(e))
+                # print('Error processing element:', str(e))
+                self._log('error',
+                    message="Error processing element: {error}",
+                    tag="SCRAPE",
+                    params={"error": str(e)}
+                )                
                 return False
-
-        #process images by filtering and extracting contextual text from the page
-        # imgs = body.find_all('img')
-        # media['images'] = [
-        #     result for result in
-        #     (process_image(img, url, i, len(imgs)) for i, img in enumerate(imgs))
-        #     if result is not None
-        # ]
-        
+       
         process_element(body)
         
         # Update the links dictionary with unique links
         links['internal'] = list(internal_links_dict.values())
         links['external'] = list(external_links_dict.values())
 
-
         # # Process images using ThreadPoolExecutor
         imgs = body.find_all('img')
         
-        with ThreadPoolExecutor() as executor:
-            image_results = list(executor.map(process_image, imgs, [url]*len(imgs), range(len(imgs)), [len(imgs)]*len(imgs)))
-        media['images'] = [result for result in image_results if result is not None]
+        # For test we use for loop instead of thread
+        media['images'] = [
+            img for result in (process_image(img, url, i, len(imgs)) 
+                            for i, img in enumerate(imgs))
+            if result is not None
+            for img in result
+        ]
 
         def flatten_nested_elements(node):
             if isinstance(node, NavigableString):
@@ -478,8 +632,9 @@ class WebScrappingStrategy(ContentScrappingStrategy):
                 # Replace base64 data with empty string
                 img['src'] = base64_pattern.sub('', src)
                 
+        str_body = ""
         try:
-            str(body)
+            str_body = body.encode_contents().decode('utf-8')
         except Exception as e:
             # Reset body to the original HTML
             success = False
@@ -504,35 +659,26 @@ class WebScrappingStrategy(ContentScrappingStrategy):
             
             # Append the error div to the body
             body.body.append(error_div)
+            str_body = body.encode_contents().decode('utf-8')
             
             print(f"[LOG] 😧 Error: After processing the crawled HTML and removing irrelevant tags, nothing was left in the page. Check the markdown for further details.")
+            self._log('error',
+                message="After processing the crawled HTML and removing irrelevant tags, nothing was left in the page. Check the markdown for further details.",
+                tag="SCRAPE"
+            )
 
+        cleaned_html = str_body.replace('\n\n', '\n').replace('  ', ' ')
 
-        cleaned_html = str(body).replace('\n\n', '\n').replace('  ', ' ')
-
-        try:
-            h = CustomHTML2Text()
-            h.update_params(**kwargs.get('html2text', {}))            
-            markdown = h.handle(cleaned_html)
-        except Exception as e:
-            markdown = h.handle(sanitize_html(cleaned_html))
-        markdown = markdown.replace('    ```', '```')
-
-        try:
-            meta = extract_metadata(html, soup)
-        except Exception as e:
-            print('Error extracting metadata:', str(e))
-            meta = {}
-            
-        cleaner = ContentCleaningStrategy()
-        fit_html = cleaner.clean(cleaned_html)
-        fit_markdown = h.handle(fit_html)
-
-        cleaned_html = sanitize_html(cleaned_html)
+        markdown_content = self._generate_markdown_content(
+            cleaned_html=cleaned_html,
+            html=html,
+            url=url,
+            success=success,
+            **kwargs
+        )
+        
         return {
-            'markdown': markdown,
-            'fit_markdown': fit_markdown,
-            'fit_html': fit_html,
+            **markdown_content,
             'cleaned_html': cleaned_html,
             'success': success,
             'media': media,
