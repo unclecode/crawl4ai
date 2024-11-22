@@ -13,18 +13,19 @@ Crawl4AI simplifies asynchronous web crawling and data extraction, making it acc
 
 ## New in 0.3.74 ✨
 
-🚀 **Blazing Fast Scraping**: Significantly improved scraping speed.  
-📥 **Download Manager**: Integrated file crawling, downloading, and tracking within `CrawlResult`.  
-📝 **Markdown Strategy**: Flexible system for custom markdown generation and formats.  
-🔗 **LLM-Friendly Citations**: Auto-converts links to numbered citations with reference lists.  
-🔎 **Markdown Filter**: BM25-based content extraction for cleaner, relevant markdown.  
-🖼️ **Image Extraction**: Supports `srcset`, `picture`, and responsive image formats.  
-🗂️ **Local/Raw HTML**: Crawl `file://` paths and raw HTML (`raw:`) directly.  
-🤖 **Browser Control**: Custom browser setups with stealth integration to bypass bots.  
-☁️ **API & Cache Boost**: CORS, static serving, and enhanced filesystem-based caching.  
-🐳 **API Gateway**: Run as an API service with secure token authentication.  
-🛠️ **Database Upgrades**: Optimized for larger content sets with faster caching.  
-🐛 **Bug Fixes**: Resolved browser context issues, memory leaks, and improved error handling.
+- 🚀 **Blazing Fast Scraping**: Significantly improved scraping speed.  
+- 📥 **Download Manager**: Integrated file crawling, downloading, and tracking within `CrawlResult`.  
+- 📝 **Markdown Strategy**: Flexible system for custom markdown generation and formats.  
+- 🔗 **LLM-Friendly Citations**: Auto-converts links to numbered citations with reference lists.  
+- 🔎 **Markdown Filter**: BM25-based content extraction for cleaner, relevant markdown.  
+- 🖼️ **Image Extraction**: Supports `srcset`, `picture`, and responsive image formats.  
+- 🗂️ **Local/Raw HTML**: Crawl `file://` paths and raw HTML (`raw:`) directly.  
+- 🤖 **Browser Control**: Custom browser setups with stealth integration to bypass bots.  
+- ☁️ **API & Cache Boost**: CORS, static serving, and enhanced filesystem-based caching.  
+- 🐳 **API Gateway**: Run as an API service with secure token authentication.  
+- 🛠️ **Database Upgrades**: Optimized for larger content sets with faster caching.  
+- 🐛 **Bug Fixes**: Resolved browser context issues, memory leaks, and improved error handling.
+
 
 ## Try it Now!
 
