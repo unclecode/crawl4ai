@@ -18,6 +18,7 @@ Crawl4AI simplifies asynchronous web crawling and data extraction, making it acc
 - 📝 **Markdown Generation Strategy:** Flexible markdown generation system supporting custom strategies for different use cases and output formats.
 - 🔗 **LLM-Friendly Citations:** Automatic conversion of links into numbered citations with organized reference lists, making content more digestible for large language models.
 - 🔎 **Markdown Filter:** Enhanced content extraction using BM25 algorithm to create cleaner markdown with only relevant webpage content.
+- 🖼️ **Enhanced Image Extraction:** Supports srcset, picture elements, and responsive images. 
 - 🗂️ **Local & Raw HTML:** Crawl local files (`file://`) and raw HTML strings (`raw:`) directly.
 - 🤖 **Browser Control:** Use your own browser setup for crawling, with persistent contexts and stealth integration to bypass anti-bot measures.
 - ☁️ **API & Cache Boost:** CORS support, static file serving, and a new filesystem-based cache for blazing-fast performance. Fine-tune caching with the `CacheMode` enum (ENABLED, DISABLED, READ_ONLY, WRITE_ONLY, BYPASS) and the `always_bypass_cache` parameter.
