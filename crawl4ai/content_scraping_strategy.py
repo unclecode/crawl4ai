@@ -109,25 +109,18 @@ class WebScrapingStrategy(ContentScrapingStrategy):
         
         if markdown_generator:
             try:
-                markdown_result = markdown_generator.generate_markdown(
+                markdown_result: MarkdownGenerationResult = markdown_generator.generate_markdown(
                     cleaned_html=cleaned_html,
                     base_url=url,
                     html2text_options=kwargs.get('html2text', {}),
                     content_filter=kwargs.get('content_filter', None)
                 )
                 
-                markdown_v2 = MarkdownGenerationResult(
-                    raw_markdown=markdown_result.raw_markdown,
-                    markdown_with_citations=markdown_result.markdown_with_citations,
-                    references_markdown=markdown_result.references_markdown,
-                    fit_markdown=markdown_result.fit_markdown
-                )
-
                 return {
                     'markdown': markdown_result.raw_markdown,  
                     'fit_markdown': markdown_result.fit_markdown or "Set flag 'fit_markdown' to True to get cleaned HTML content.",
-                    'fit_html': kwargs.get('content_filter', None).filter_content(html) if kwargs.get('content_filter') else "Set flag 'fit_markdown' to True to get cleaned HTML content.",
-                    'markdown_v2': markdown_v2
+                    'fit_html': markdown_result.fit_html or "Set flag 'fit_markdown' to True to get cleaned HTML content.",
+                    'markdown_v2': markdown_result
                 }
             except Exception as e:
                 self._log('error',
