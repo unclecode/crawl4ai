@@ -13,18 +13,18 @@ Crawl4AI simplifies asynchronous web crawling and data extraction, making it acc
 
 ## New in 0.3.74 ✨
 
-- 🚀 **Blazing Fast Scraping:** The scraping process is now significantly faster!
-- 📥 **Download Manager:** Integrated file crawling and downloading capabilities, with full control over file management and tracking within the `CrawlResult` object.
-- 📝 **Markdown Generation Strategy:** Flexible markdown generation system supporting custom strategies for different use cases and output formats.
-- 🔗 **LLM-Friendly Citations:** Automatic conversion of links into numbered citations with organized reference lists, making content more digestible for large language models.
-- 🔎 **Markdown Filter:** Enhanced content extraction using BM25 algorithm to create cleaner markdown with only relevant webpage content.
-- 🖼️ **Enhanced Image Extraction:** Supports srcset, picture elements, and responsive images. 
-- 🗂️ **Local & Raw HTML:** Crawl local files (`file://`) and raw HTML strings (`raw:`) directly.
-- 🤖 **Browser Control:** Use your own browser setup for crawling, with persistent contexts and stealth integration to bypass anti-bot measures.
-- ☁️ **API & Cache Boost:** CORS support, static file serving, and a new filesystem-based cache for blazing-fast performance. Fine-tune caching with the `CacheMode` enum (ENABLED, DISABLED, READ_ONLY, WRITE_ONLY, BYPASS) and the `always_bypass_cache` parameter.
-- 🐳 **API Gateway:** Run Crawl4AI as a local or cloud API service, enabling cross-platform usage through a containerized server with secure token authentication via `CRAWL4AI_API_TOKEN`.
-- 🛠️ **Database Improvements:** Enhanced database system for handling larger content sets with improved caching and faster performance.
-- 🐛 **Squashed Bugs:** Fixed browser context issues in Docker, memory leaks, enhanced error handling, and improved HTML parsing.
+🚀 **Blazing Fast Scraping**: Significantly improved scraping speed.  
+📥 **Download Manager**: Integrated file crawling, downloading, and tracking within `CrawlResult`.  
+📝 **Markdown Strategy**: Flexible system for custom markdown generation and formats.  
+🔗 **LLM-Friendly Citations**: Auto-converts links to numbered citations with reference lists.  
+🔎 **Markdown Filter**: BM25-based content extraction for cleaner, relevant markdown.  
+🖼️ **Image Extraction**: Supports `srcset`, `picture`, and responsive image formats.  
+🗂️ **Local/Raw HTML**: Crawl `file://` paths and raw HTML (`raw:`) directly.  
+🤖 **Browser Control**: Custom browser setups with stealth integration to bypass bots.  
+☁️ **API & Cache Boost**: CORS, static serving, and enhanced filesystem-based caching.  
+🐳 **API Gateway**: Run as an API service with secure token authentication.  
+🛠️ **Database Upgrades**: Optimized for larger content sets with faster caching.  
+🐛 **Bug Fixes**: Resolved browser context issues, memory leaks, and improved error handling.
 
 ## Try it Now!
 
