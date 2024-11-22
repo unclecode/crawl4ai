@@ -11,21 +11,21 @@
 
 Crawl4AI simplifies asynchronous web crawling and data extraction, making it accessible for large language models (LLMs) and AI applications. 🆓🌐
 
-## 🌟 Meet the Crawl4AI Assistant: Your Copilot for Crawling
+## New in 0.3.74 ✨
 
-Use the [Crawl4AI GPT Assistant](https://tinyurl.com/crawl4ai-gpt) as your AI-powered copilot! With this assistant, you can:
+- 🚀 **Blazing Fast Scraping**: Significantly improved scraping speed.  
+- 📥 **Download Manager**: Integrated file crawling, downloading, and tracking within `CrawlResult`.  
+- 📝 **Markdown Strategy**: Flexible system for custom markdown generation and formats.  
+- 🔗 **LLM-Friendly Citations**: Auto-converts links to numbered citations with reference lists.  
+- 🔎 **Markdown Filter**: BM25-based content extraction for cleaner, relevant markdown.  
+- 🖼️ **Image Extraction**: Supports `srcset`, `picture`, and responsive image formats.  
+- 🗂️ **Local/Raw HTML**: Crawl `file://` paths and raw HTML (`raw:`) directly.  
+- 🤖 **Browser Control**: Custom browser setups with stealth integration to bypass bots.  
+- ☁️ **API & Cache Boost**: CORS, static serving, and enhanced filesystem-based caching.  
+- 🐳 **API Gateway**: Run as an API service with secure token authentication.  
+- 🛠️ **Database Upgrades**: Optimized for larger content sets with faster caching.  
+- 🐛 **Bug Fixes**: Resolved browser context issues, memory leaks, and improved error handling.
 
-- 🧑‍💻 Generate code for complex crawling and extraction tasks
-- 💡 Get tailored support and examples
-- 📘 Learn Crawl4AI faster with step-by-step guidance
-
-## New in 0.3.73 ✨
-
-- 🐳 Docker Ready: Full API server with seamless deployment & scaling
-- 🎯 Browser Takeover: Use your own browser with cookies & history intact (CDP support)
-- 📝 Mockdown+: Enhanced tag preservation & content extraction
-- ⚡️ Parallel Power: Supercharged multi-URL crawling performance
-- 🌟 And many more exciting updates...
 
 ## Try it Now!
 
@@ -113,6 +113,20 @@ cd crawl4ai
 pip install -e .
 ```
 
+## One-Click Deployment 🚀
+
+Deploy your own instance of Crawl4AI with one click:
+
+[![DigitalOcean Referral Badge](https://web-platforms.sfo2.cdn.digitaloceanspaces.com/WWW/Badge%203.svg)](https://www.digitalocean.com/?repo=https://github.com/unclecode/crawl4ai/tree/0.3.74&refcode=a0780f1bdb3d&utm_campaign=Referral_Invite&utm_medium=Referral_Program&utm_source=badge)
+
+> 💡 **Recommended specs**: 4GB RAM minimum. Select "professional-xs" or higher when deploying for stable operation.
+
+The deploy will:
+- Set up a Docker container with Crawl4AI
+- Configure Playwright and all dependencies
+- Start the FastAPI server on port 11235
+- Set up health checks and auto-deployment
+
 ### Using Docker 🐳
 
 Crawl4AI is available as Docker images for easy deployment. You can either pull directly from Docker Hub (recommended) or build from the repository.
@@ -127,6 +141,9 @@ docker pull unclecode/crawl4ai:gpu      # GPU-enabled version
 
 # Run the container
 docker run -p 11235:11235 unclecode/crawl4ai:basic  # Replace 'basic' with your chosen version
+
+# In case to allocate more shared memory for the container
+docker run --shm-size=2gb -p 11235:11235 unclecode/crawl4ai:basic
 ```
 
 #### Option 2: Build from Repository

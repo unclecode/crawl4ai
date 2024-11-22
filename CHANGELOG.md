@@ -1,6 +1,255 @@
 # Changelog
 
-# CHANGELOG
+## [0.3.74] November 17, 2024
+
+This changelog details the updates and changes introduced in Crawl4AI version 0.3.74. It's designed to inform developers about new features, modifications to existing components, removals, and other important information.
+
+### 1. File Download Processing
+
+- Users can now specify download folders using the `downloads_path` parameter in the `AsyncWebCrawler` constructor or the `arun` method. If not specified, downloads are saved to a "downloads" folder within the `.crawl4ai` directory.
+- File download tracking is integrated into the `CrawlResult` object.  Successfully downloaded files are listed in the `downloaded_files` attribute, providing their paths.
+- Added `accept_downloads` parameter to the crawler strategies (defaults to `False`). If set to True you can add JS code and `wait_for` parameter for file download.
+
+**Example:**
+
+```python
+import asyncio
+import os
+from pathlib import Path
+from crawl4ai import AsyncWebCrawler
+
+async def download_example():
+    downloads_path = os.path.join(Path.home(), ".crawl4ai", "downloads")
+    os.makedirs(downloads_path, exist_ok=True)
+
+    async with AsyncWebCrawler(
+        accept_downloads=True, 
+        downloads_path=downloads_path, 
+        verbose=True
+    ) as crawler:
+        result = await crawler.arun(
+            url="https://www.python.org/downloads/",
+            js_code="""
+                const downloadLink = document.querySelector('a[href$=".exe"]');
+                if (downloadLink) { downloadLink.click(); }
+            """,
+            wait_for=5 # To ensure download has started
+        )
+
+        if result.downloaded_files:
+            print("Downloaded files:")
+            for file in result.downloaded_files:
+                print(f"- {file}")
+
+asyncio.run(download_example())
+
+```
+
+### 2. Refined Content Filtering
+
+- Introduced the `RelevanceContentFilter` strategy (and its implementation `BM25ContentFilter`) for extracting relevant content from web pages, replacing Fit Markdown and other content cleaning strategy. This new strategy leverages the BM25 algorithm to identify chunks of text relevant to the page's title, description, keywords, or a user-provided query.
+- The `fit_markdown` flag in the content scraper is used to filter content based on title, meta description, and keywords.
+
+**Example:**
+
+```python
+from crawl4ai import AsyncWebCrawler
+from crawl4ai.content_filter_strategy import BM25ContentFilter
+
+async def filter_content(url, query):
+    async with AsyncWebCrawler() as crawler:
+        content_filter = BM25ContentFilter(user_query=query)
+        result = await crawler.arun(url=url, extraction_strategy=content_filter, fit_markdown=True)
+        print(result.extracted_content)  # Or result.fit_markdown for the markdown version
+        print(result.fit_html) # Or result.fit_html to show HTML with only the filtered content
+
+asyncio.run(filter_content("https://en.wikipedia.org/wiki/Apple", "fruit nutrition health"))
+```
+
+### 3. Raw HTML and Local File Support
+
+- Added support for crawling local files and raw HTML content directly.
+- Use the `file://` prefix for local file paths.
+- Use the `raw:` prefix for raw HTML strings.
+
+**Example:**
+
+```python
+async def crawl_local_or_raw(crawler, content, content_type):
+    prefix = "file://" if content_type == "local" else "raw:"
+    url = f"{prefix}{content}"
+    result = await crawler.arun(url=url)
+    if result.success:
+        print(f"Markdown Content from {content_type.title()} Source:")
+        print(result.markdown)
+
+# Example usage with local file and raw HTML
+async def main():
+    async with AsyncWebCrawler() as crawler:
+        # Local File
+        await crawl_local_or_raw(
+            crawler, os.path.abspath('tests/async/sample_wikipedia.html'), "local"
+        )
+        # Raw HTML
+        await crawl_raw_html(crawler, "<h1>Raw Test</h1><p>This is raw HTML.</p>")
+        
+
+asyncio.run(main())
+```
+
+### 4. Browser Management
+
+- New asynchronous crawler strategy implemented using Playwright.
+- `ManagedBrowser` class introduced for improved browser session handling, offering features like persistent browser sessions between requests (using  `session_id`  parameter) and browser process monitoring.
+- Updated to tf-playwright-stealth for enhanced stealth capabilities.
+- Added `use_managed_browser`, `use_persistent_context`, and `chrome_channel` parameters to AsyncPlaywrightCrawlerStrategy.
+
+
+**Example:**
+```python
+async def browser_management_demo():
+    user_data_dir = os.path.join(Path.home(), ".crawl4ai", "user-data-dir")
+    os.makedirs(user_data_dir, exist_ok=True)  # Ensure directory exists
+    async with AsyncWebCrawler(
+        use_managed_browser=True,
+        user_data_dir=user_data_dir,
+        use_persistent_context=True,
+        verbose=True
+    ) as crawler:
+        result1 = await crawler.arun(
+            url="https://example.com", session_id="my_session"
+        )
+        result2 = await crawler.arun(
+            url="https://example.com/anotherpage", session_id="my_session"
+        )
+
+asyncio.run(browser_management_demo())
+```
+
+
+### 5. API Server & Cache Improvements
+
+- Added CORS support to API server.
+- Implemented static file serving.
+- Enhanced root redirect functionality.
+- Cache database updated to store response headers and downloaded files information. It utilizes a file system approach to manage large content efficiently.
+- New, more efficient caching database built using xxhash and file system approach.
+- Introduced `CacheMode` enum (`ENABLED`, `DISABLED`, `READ_ONLY`, `WRITE_ONLY`, `BYPASS`) and `always_bypass_cache` parameter in AsyncWebCrawler for fine-grained cache control. This replaces `bypass_cache`, `no_cache_read`, `no_cache_write`, and `always_by_pass_cache`.
+
+
+### 🗑️ Removals
+
+- Removed deprecated: `crawl4ai/content_cleaning_strategy.py`.
+- Removed internal class ContentCleaningStrategy
+- Removed legacy cache control flags:  `bypass_cache`,  `disable_cache`,  `no_cache_read`,  `no_cache_write`, and `always_by_pass_cache`.  These have been superseded by  `cache_mode`.
+
+
+### ⚙️ Other Changes
+
+- Moved version file to `crawl4ai/__version__.py`.
+- Added `crawl4ai/cache_context.py`.
+- Added `crawl4ai/version_manager.py`.
+- Added `crawl4ai/migrations.py`.
+- Added `crawl4ai-migrate` entry point.
+- Added config `NEED_MIGRATION` and `SHOW_DEPRECATION_WARNINGS`.
+- API server now requires an API token for authentication, configurable with the `CRAWL4AI_API_TOKEN` environment variable.  This enhances API security.
+- Added synchronous crawl endpoint `/crawl_sync` for immediate result retrieval, and direct crawl endpoint `/crawl_direct` bypassing the task queue.
+
+
+### ⚠️ Deprecation Notices
+
+- The synchronous version of `WebCrawler` is being phased out.  While still available via `crawl4ai[sync]`, it will eventually be removed. Transition to `AsyncWebCrawler` is strongly recommended. Boolean cache control flags in `arun` are also deprecated, migrate to using the `cache_mode` parameter.  See examples in the "New Features" section above for correct usage.
+
+
+### 🐛 Bug Fixes
+
+- Resolved issue with browser context closing unexpectedly in Docker. This significantly improves stability, particularly within containerized environments. 
+- Fixed memory leaks associated with incorrect asynchronous cleanup by removing the `__del__` method and ensuring the browser context is closed explicitly using context managers.
+- Improved error handling in `WebScrapingStrategy`. More detailed error messages and suggestions for debugging will minimize frustration when running into unexpected issues.
+- Fixed issue with incorrect text parsing in specific HTML structures.
+
+
+### Example of migrating to the new CacheMode:
+
+**Old way:**
+
+```python
+crawler = AsyncWebCrawler(always_by_pass_cache=True)
+result = await crawler.arun(url="https://example.com", bypass_cache=True)
+```
+
+**New way:**
+
+```python
+from crawl4ai import CacheMode
+
+crawler = AsyncWebCrawler(always_bypass_cache=True)
+result = await crawler.arun(url="https://example.com", cache_mode=CacheMode.BYPASS)
+```
+
+
+## [0.3.74] - November 13, 2024
+
+1. **File Download Processing** (Nov 14, 2024)
+   - Added capability for users to specify download folders
+   - Implemented file download tracking in crowd result object
+   - Created new file: `tests/async/test_async_doanloader.py`
+
+2. **Content Filtering Improvements** (Nov 14, 2024)
+   - Introduced Relevance Content Filter as an improvement over Fit Markdown
+   - Implemented BM25 algorithm for content relevance matching
+   - Added new file: `crawl4ai/content_filter_strategy.py`
+   - Removed deprecated: `crawl4ai/content_cleaning_strategy.py`
+
+3. **Local File and Raw HTML Support** (Nov 13, 2024)
+   - Added support for processing local files
+   - Implemented raw HTML input handling in AsyncWebCrawler
+   - Enhanced `crawl4ai/async_webcrawler.py` with significant performance improvements
+
+4. **Browser Management Enhancements** (Nov 12, 2024)
+   - Implemented new async crawler strategy using Playwright
+   - Introduced ManagedBrowser for better browser session handling
+   - Added support for persistent browser sessions
+   - Updated from playwright_stealth to tf-playwright-stealth
+
+5. **API Server Component**
+   - Added CORS support
+   - Implemented static file serving
+   - Enhanced root redirect functionality
+
+
+
+## [0.3.731] - November 13, 2024
+
+### Added
+- Support for raw HTML and local file crawling via URL prefixes ('raw:', 'file://')
+- Browser process monitoring for managed browser instances
+- Screenshot capability for raw HTML and local file content
+- Response headers storage in cache database
+- New `fit_markdown` flag for optional markdown generation
+
+### Changed
+- Switched HTML parser from 'html.parser' to 'lxml' for ~4x performance improvement 
+- Optimized BeautifulSoup text conversion and element selection
+- Pre-compiled regular expressions for better performance
+- Improved metadata extraction efficiency
+- Response headers now stored alongside HTML in cache
+
+### Removed
+- `__del__` method from AsyncPlaywrightCrawlerStrategy to prevent async cleanup issues
+
+### Fixed 
+- Issue #256: Added support for crawling raw HTML content
+- Issue #253: Implemented file:// protocol handling
+- Missing response headers in cached results
+- Memory leaks from improper async cleanup
+
+## [v0.3.731] - 2024-11-13 Changelog for Issue 256 Fix
+- Fixed: Browser context unexpectedly closing in Docker environment during crawl operations.
+- Removed: __del__ method from AsyncPlaywrightCrawlerStrategy to prevent unreliable asynchronous cleanup, ensuring - browser context is closed explicitly within context managers.
+- Added: Monitoring for ManagedBrowser subprocess to detect and log unexpected terminations.
+- Updated: Dockerfile configurations to expose debugging port (9222) and allocate additional shared memory for improved browser stability.
+- Improved: Error handling and resource cleanup processes for browser lifecycle management within the Docker environment.
 
 ## [v0.3.73] - 2024-11-05
 
@@ -70,7 +319,7 @@
 - Modified database connection management approach
 - Updated API response structure for better consistency
 
-## Migration Guide
+### Migration Guide
 When upgrading to v0.3.73, be aware of the following changes:
 
 1. Docker Deployment:
@@ -92,7 +341,7 @@ When upgrading to v0.3.73, be aware of the following changes:
    - Follow recommended fixes for any identified problems
 
 
-## [2024-11-04 - 13:21:42] Comprehensive Update of Crawl4AI Features and Dependencies
+## [v0.3.73] - 2024-11-04
 This commit introduces several key enhancements, including improved error handling and robust database operations in `async_database.py`, which now features a connection pool and retry logic for better reliability. Updates to the README.md provide clearer instructions and a better user experience with links to documentation sections. The `.gitignore` file has been refined to include additional directories, while the async web crawler now utilizes a managed browser for more efficient crawling. Furthermore, multiple dependency updates and introduction of the `CustomHTML2Text` class enhance text extraction capabilities.
 
 ## [v0.3.73] - 2024-10-24
@@ -180,7 +429,7 @@ This commit introduces several key enhancements, including improved error handli
 ## [v0.3.72] - 2024-10-20
 
 ### Fixed
-- Added support for parsing Base64 encoded images in WebScrappingStrategy
+- Added support for parsing Base64 encoded images in WebScrapingStrategy
 
 ### Added
 - Forked and integrated a customized version of the html2text library for more control over Markdown generation
@@ -203,7 +452,7 @@ This commit introduces several key enhancements, including improved error handli
 ### Developer Notes
 - The customized html2text library is now located within the crawl4ai package
 - New configuration options are available in the `config.py` file for external content handling
-- The `WebScrappingStrategy` class has been updated to accommodate new external content exclusion options
+- The `WebScrapingStrategy` class has been updated to accommodate new external content exclusion options
 
 ## [v0.3.71] - 2024-10-19
 
@@ -280,7 +529,7 @@ These updates aim to provide more flexibility in text processing, improve perfor
 
 ### Improvements
 1. **Better Error Handling**:
-   - Enhanced error reporting in WebScrappingStrategy with detailed error messages and suggestions.
+   - Enhanced error reporting in WebScrapingStrategy with detailed error messages and suggestions.
    - Added console message and error logging for better debugging.
 
 2. **Image Processing Enhancements**:
@@ -338,43 +587,43 @@ These updates aim to provide more flexibility in text processing, improve perfor
 - Allows retrieval of content after a specified delay, useful for dynamically loaded content.
 - **How to use**: Access `result.get_delayed_content(delay_in_seconds)` after crawling.
 
-## Improvements and Optimizations
+### Improvements and Optimizations
 
-### 1. AsyncWebCrawler Enhancements
+#### 1. AsyncWebCrawler Enhancements
 - **Flexible Initialization**: Now accepts arbitrary keyword arguments, passed directly to the crawler strategy.
 - Allows for more customized setups.
 
-### 2. Image Processing Optimization
-- Enhanced image handling in WebScrappingStrategy.
+#### 2. Image Processing Optimization
+- Enhanced image handling in WebScrapingStrategy.
 - Added filtering for small, invisible, or irrelevant images.
 - Improved image scoring system for better content relevance.
 - Implemented JavaScript-based image dimension updating for more accurate representation.
 
-### 3. Database Schema Auto-updates
+#### 3. Database Schema Auto-updates
 - Automatic database schema updates ensure compatibility with the latest version.
 
-### 4. Enhanced Error Handling and Logging
+#### 4. Enhanced Error Handling and Logging
 - Improved error messages and logging for easier debugging.
 
-### 5. Content Extraction Refinements
+#### 5. Content Extraction Refinements
 - Refined HTML sanitization process.
 - Improved handling of base64 encoded images.
 - Enhanced Markdown conversion process.
 - Optimized content extraction algorithms.
 
-### 6. Utility Function Enhancements
+#### 6. Utility Function Enhancements
 - `perform_completion_with_backoff` function now supports additional arguments for more customized API calls to LLM providers.
 
-## Bug Fixes
+### Bug Fixes
 - Fixed an issue where image tags were being prematurely removed during content extraction.
 
-## Examples and Documentation
+### Examples and Documentation
 - Updated `quickstart_async.py` with examples of:
   - Using custom headers in LLM extraction.
   - Different LLM provider usage (OpenAI, Hugging Face, Ollama).
   - Custom browser type usage.
 
-## Developer Notes
+### Developer Notes
 - Refactored code for better maintainability, flexibility, and performance.
 - Enhanced type hinting throughout the codebase for improved development experience.
 - Expanded error handling for more robust operation.
