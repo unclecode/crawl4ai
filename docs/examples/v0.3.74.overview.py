@@ -52,34 +52,7 @@ async def download_example():
         else:
             print("\nNo files were downloaded")
 
-# 2. Content Filtering with BM25 Example
-async def content_filtering_example():
-    """Example of using the new BM25 content filtering"""
-    async with AsyncWebCrawler(verbose=True) as crawler:
-        # Create filter with custom query for OpenAI's blog
-        content_filter = BM25ContentFilter(
-            # user_query="Investment and fundraising",
-            # user_query="Robotic",
-            bm25_threshold=1.0
-        )
-        
-        result = await crawler.arun(
-            url="https://techcrunch.com/",
-            content_filter=content_filter,
-            cache_mode=CacheMode.BYPASS
-        )
-        
-        print(f"Filtered content: {len(result.fit_markdown)}")
-        print(f"Filtered content: {result.fit_markdown}")
-        
-        # Save html 
-        with open(os.path.join(__data__, "techcrunch.html"), "w") as f:
-            f.write(result.fit_html)
-        
-        with open(os.path.join(__data__, "filtered_content.md"), "w") as f:
-            f.write(result.fit_markdown)
-
-# 3. Local File and Raw HTML Processing Example
+# 2. Local File and Raw HTML Processing Example
 async def local_and_raw_html_example():
     """Example of processing local files and raw HTML"""
     # Create a sample HTML file
@@ -114,6 +87,68 @@ async def local_and_raw_html_example():
         
         print("Local file content:", local_result.markdown)
         print("\nRaw HTML content:", raw_result.markdown)
+
+# 3. Enhanced Markdown Generation Example
+async def markdown_generation_example():
+    """Example of enhanced markdown generation with citations and LLM-friendly features"""
+    async with AsyncWebCrawler(verbose=True) as crawler:
+        # Create a content filter (optional)
+        content_filter = BM25ContentFilter(
+            # user_query="History and cultivation",
+            bm25_threshold=1.0
+        )
+        
+        result = await crawler.arun(
+            url="https://en.wikipedia.org/wiki/Apple",
+            css_selector="main div#bodyContent",
+            content_filter=content_filter,
+            cache_mode=CacheMode.BYPASS
+        )
+        
+        from crawl4ai import AsyncWebCrawler
+        from crawl4ai.content_filter_strategy import BM25ContentFilter
+        
+        result = await crawler.arun(
+            url="https://en.wikipedia.org/wiki/Apple",
+            css_selector="main div#bodyContent",
+            content_filter=BM25ContentFilter()
+        )
+        print(result.markdown_v2.fit_markdown)
+        
+        print("\nMarkdown Generation Results:")
+        print(f"1. Original markdown length: {len(result.markdown)}")
+        print(f"2. New markdown versions (markdown_v2):")
+        print(f"   - Raw markdown length: {len(result.markdown_v2.raw_markdown)}")
+        print(f"   - Citations markdown length: {len(result.markdown_v2.markdown_with_citations)}")
+        print(f"   - References section length: {len(result.markdown_v2.references_markdown)}")
+        if result.markdown_v2.fit_markdown:
+            print(f"   - Filtered markdown length: {len(result.markdown_v2.fit_markdown)}")
+        
+        # Save examples to files
+        output_dir = os.path.join(__data__, "markdown_examples")
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Save different versions
+        with open(os.path.join(output_dir, "1_raw_markdown.md"), "w") as f:
+            f.write(result.markdown_v2.raw_markdown)
+            
+        with open(os.path.join(output_dir, "2_citations_markdown.md"), "w") as f:
+            f.write(result.markdown_v2.markdown_with_citations)
+            
+        with open(os.path.join(output_dir, "3_references.md"), "w") as f:
+            f.write(result.markdown_v2.references_markdown)
+            
+        if result.markdown_v2.fit_markdown:
+            with open(os.path.join(output_dir, "4_filtered_markdown.md"), "w") as f:
+                f.write(result.markdown_v2.fit_markdown)
+                
+        print(f"\nMarkdown examples saved to: {output_dir}")
+        
+        # Show a sample of citations and references
+        print("\nSample of markdown with citations:")
+        print(result.markdown_v2.markdown_with_citations[:500] + "...\n")
+        print("Sample of references:")
+        print('\n'.join(result.markdown_v2.references_markdown.split('\n')[:10]) + "...")
 
 # 4. Browser Management Example
 async def browser_management_example():
@@ -208,9 +243,13 @@ async def api_example():
                     headers=headers
                 ) as status_response:
                     result = await status_response.json()
-                    print(f"Task result: {result}")
+                    print(f"Task status: {result['status']}")
                     
                     if result["status"] == "completed":
+                        print("Task completed!")
+                        print("Results:")
+                        news = json.loads(result["results"][0]['extracted_content'])
+                        print(json.dumps(news[:4], indent=2))
                         break
                     else:
                         await asyncio.sleep(1)
@@ -220,15 +259,15 @@ async def main():
     # print("Running Crawl4AI feature examples...")
     
     # print("\n1. Running Download Example:")
-    await download_example()
+    # await download_example()
     
-    # print("\n2. Running Content Filtering Example:")
-    await content_filtering_example()
+    # print("\n2. Running Markdown Generation Example:")
+    # await markdown_generation_example()
     
-    # print("\n3. Running Local and Raw HTML Example:")
-    await local_and_raw_html_example()
+    # # print("\n3. Running Local and Raw HTML Example:")
+    # await local_and_raw_html_example()
     
-    # print("\n4. Running Browser Management Example:")
+    # # print("\n4. Running Browser Management Example:")
     await browser_management_example()
     
     # print("\n5. Running API Example:")
