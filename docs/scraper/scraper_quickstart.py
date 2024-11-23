@@ -7,6 +7,7 @@ from crawl4ai.scraper import (
     ContentTypeFilter
 )
 from crawl4ai.async_webcrawler import AsyncWebCrawler
+import re
 
 async def basic_scraper_example():
     """
@@ -18,7 +19,7 @@ async def basic_scraper_example():
     # Create a simple filter chain
     filter_chain = FilterChain([
         # Only crawl pages within the blog section
-        URLPatternFilter("*/blog/*"),
+        # URLPatternFilter("*/tutorial/*"),
         # Only process HTML pages
         ContentTypeFilter(["text/html"])
     ])
@@ -32,20 +33,19 @@ async def basic_scraper_example():
     )
 
     # Create the crawler and scraper
-    crawler = AsyncWebCrawler()
-    scraper = AsyncWebScraper(crawler, strategy)
-
-    # Start scraping
-    try:
-        result = await scraper.ascrape("https://example.com/blog/")
-        
-        # Process results
-        print(f"Crawled {len(result.crawled_urls)} pages:")
-        for url, data in result.extracted_data.items():
-            print(f"- {url}: {len(data.html)} bytes")
+    async with AsyncWebCrawler(verbose=True) as crawler:
+        scraper = AsyncWebScraper(crawler, strategy)
+        # Start scraping
+        try:
+            result = await scraper.ascrape("https://crawl4ai.com/mkdocs")
             
-    except Exception as e:
-        print(f"Error during scraping: {e}")
+            # Process results
+            print(f"Crawled {len(result.crawled_urls)} pages:")
+            for url, data in result.extracted_data.items():
+                print(f"- {url}: {len(data.html)} bytes")
+            
+        except Exception as e:
+            print(f"Error during scraping: {e}")
 
 # advanced_scraper_example.py
 import logging
@@ -180,5 +180,5 @@ if __name__ == "__main__":
     print("Running basic scraper example...")
     asyncio.run(basic_scraper_example())
     
-    print("\nRunning advanced scraper example...")
-    asyncio.run(advanced_scraper_example())
+    # print("\nRunning advanced scraper example...")
+    # asyncio.run(advanced_scraper_example())

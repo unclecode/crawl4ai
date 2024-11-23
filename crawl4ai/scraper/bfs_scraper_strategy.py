@@ -192,22 +192,26 @@ class BFSScraperStrategy(ScraperStrategy):
         links_ro_process = result.links["internal"]
         if self.process_external_links:
             links_ro_process += result.links["external"]
-        for link_type in links_ro_process:
-            for link in result.links[link_type]:
-                url = link['href']
-                # url = urljoin(source_url, link['href'])
-                # url = urlunparse(urlparse(url)._replace(fragment=""))
-                
-                if url not in visited and await self.can_process_url(url):
-                    new_depth = depths[source_url] + 1
-                    if new_depth <= self.max_depth:
+        for link in links_ro_process:
+            url = link['href']
+            # url = urljoin(source_url, link['href'])
+            # url = urlunparse(urlparse(url)._replace(fragment=""))
+            
+            if url not in visited and await self.can_process_url(url):
+                new_depth = depths[source_url] + 1
+                if new_depth <= self.max_depth:
+                    if self.url_scorer:
                         score = self.url_scorer.score(url)
-                        await queue.put((score, new_depth, url))
-                        depths[url] = new_depth
-                        self.stats.total_depth_reached = max(
-                            self.stats.total_depth_reached, 
-                            new_depth
-                        )
+                    else:
+                        # When no url_scorer is provided all urls will have same score of 0.
+                        # Therefore will be process in FIFO order as per URL depth
+                        score = 0
+                    await queue.put((score, new_depth, url))
+                    depths[url] = new_depth
+                    self.stats.total_depth_reached = max(
+                        self.stats.total_depth_reached, 
+                        new_depth
+                    )
 
     async def ascrape(
         self,
