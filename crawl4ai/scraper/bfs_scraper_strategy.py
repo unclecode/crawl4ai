@@ -146,7 +146,7 @@ class BFSScraperStrategy(ScraperStrategy):
         if self._cancel_event.is_set():
             return None
             
-        if not await self.can_process_url(url):
+        if depth!=0 and not await self.can_process_url(url):
             self.stats.urls_skipped += 1
             return None
 
