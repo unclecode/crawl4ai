@@ -16,6 +16,7 @@ from .models import ScraperResult, CrawlResult
 from .filters import FilterChain
 from .scorers import URLScorer
 from ..async_webcrawler import AsyncWebCrawler
+from .scraper_strategy import ScraperStrategy
 
 @dataclass
 class CrawlStats:
@@ -27,30 +28,6 @@ class CrawlStats:
     total_depth_reached: int = 0
     current_depth: int = 0
     robots_blocked: int = 0
-
-class ScraperStrategy(ABC):
-    """Base class for scraping strategies"""
-    
-    @abstractmethod
-    async def ascrape(
-        self, 
-        url: str, 
-        crawler: AsyncWebCrawler, 
-        parallel_processing: bool = True,
-        stream: bool = False
-    ) -> Union[AsyncGenerator[CrawlResult, None], ScraperResult]:
-        """Abstract method for scraping implementation"""
-        pass
-
-    @abstractmethod
-    async def can_process_url(self, url: str) -> bool:
-        """Check if URL can be processed based on strategy rules"""
-        pass
-
-    @abstractmethod
-    async def shutdown(self):
-        """Clean up resources used by the strategy"""
-        pass
 
 class BFSScraperStrategy(ScraperStrategy):
     """Breadth-First Search scraping strategy with politeness controls"""
@@ -135,11 +112,15 @@ class BFSScraperStrategy(ScraperStrategy):
     ) -> CrawlResult:
         """Crawl URL with retry logic"""
         try:
-            async with asyncio.timeout(self.timeout):
-                return await crawler.arun(url)
+            return await asyncio.wait_for(crawler.arun(url), timeout=self.timeout)
         except asyncio.TimeoutError:
             self.logger.error(f"Timeout crawling {url}")
             raise
+        except Exception as e:
+            # Catch any other exceptions that may cause retries
+            self.logger.error(f"Error crawling {url}: {e}")
+            raise
+
 
     async def process_url(
         self,
@@ -181,15 +162,13 @@ class BFSScraperStrategy(ScraperStrategy):
             async with self.rate_limiter:
                 result = await self._crawl_with_retry(crawler, url)
                 self.stats.urls_processed += 1
+                 # Process links
+                await self._process_links(result, url, depth, queue, visited, depths)
+                return result
         except Exception as e:
             self.logger.error(f"Error crawling {url}: {e}")
             self.stats.urls_failed += 1
             return None
-
-        # Process links
-        await self._process_links(result, url, depth, queue, visited, depths)
-        
-        return result
 
     async def _process_links(
         self,
