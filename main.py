@@ -10,6 +10,8 @@ from fastapi.exceptions import RequestValidationError
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import FileResponse
 from fastapi.responses import RedirectResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import Depends, Security
 
 from pydantic import BaseModel, HttpUrl, Field
 from typing import Optional, List, Dict, Any, Union
@@ -23,7 +25,8 @@ import logging
 from enum import Enum
 from dataclasses import dataclass
 import json
-from crawl4ai import AsyncWebCrawler, CrawlResult
+from crawl4ai import AsyncWebCrawler, CrawlResult, CacheMode
+from crawl4ai.config import MIN_WORD_THRESHOLD
 from crawl4ai.extraction_strategy import (
     LLMExtractionStrategy,
     CosineStrategy,
@@ -51,18 +54,31 @@ class ExtractionConfig(BaseModel):
     type: CrawlerType
     params: Dict[str, Any] = {}
 
+class ChunkingStrategy(BaseModel):
+    type: str
+    params: Dict[str, Any] = {}
+
+class ContentFilter(BaseModel):
+    type: str = "bm25"
+    params: Dict[str, Any] = {}
+
 class CrawlRequest(BaseModel):
     urls: Union[HttpUrl, List[HttpUrl]]
+    word_count_threshold: int = MIN_WORD_THRESHOLD
     extraction_config: Optional[ExtractionConfig] = None
-    crawler_params: Dict[str, Any] = {}
-    priority: int = Field(default=5, ge=1, le=10)
-    ttl: Optional[int] = 3600
+    chunking_strategy: Optional[ChunkingStrategy] = None
+    content_filter: Optional[ContentFilter] = None
     js_code: Optional[List[str]] = None
     wait_for: Optional[str] = None
     css_selector: Optional[str] = None
     screenshot: bool = False
     magic: bool = False
     extra: Optional[Dict[str, Any]] = {}
+    session_id: Optional[str] = None
+    cache_mode: Optional[CacheMode] = CacheMode.ENABLED
+    priority: int = Field(default=5, ge=1, le=10)
+    ttl: Optional[int] = 3600    
+    crawler_params: Dict[str, Any] = {}
 
 @dataclass
 class TaskInfo:
@@ -276,12 +292,15 @@ class CrawlerService:
                     if isinstance(request.urls, list):
                         results = await crawler.arun_many(
                             urls=[str(url) for url in request.urls],
+                            word_count_threshold=MIN_WORD_THRESHOLD,
                             extraction_strategy=extraction_strategy,
                             js_code=request.js_code,
                             wait_for=request.wait_for,
                             css_selector=request.css_selector,
                             screenshot=request.screenshot,
                             magic=request.magic,
+                            session_id=request.session_id,
+                            cache_mode=request.cache_mode,
                             **request.extra,
                         )
                     else:
@@ -293,6 +312,8 @@ class CrawlerService:
                             css_selector=request.css_selector,
                             screenshot=request.screenshot,
                             magic=request.magic,
+                            session_id=request.session_id,
+                            cache_mode=request.cache_mode,
                             **request.extra,
                         )
 
@@ -321,7 +342,27 @@ app.add_middleware(
 
 # Mount the pages directory as a static directory
 app.mount("/pages", StaticFiles(directory=__location__ + "/pages"), name="pages")
-app.mount("/mkdocs", StaticFiles(directory="site", html=True), name="mkdocs")
+
+# API token security
+security = HTTPBearer()
+CRAWL4AI_API_TOKEN = os.getenv("CRAWL4AI_API_TOKEN") or "test_api_code"
+
+async def verify_token(credentials: HTTPAuthorizationCredentials = Security(security)):
+    if not CRAWL4AI_API_TOKEN:
+        return credentials  # No token verification if CRAWL4AI_API_TOKEN is not set
+    if credentials.credentials != CRAWL4AI_API_TOKEN:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    return credentials
+
+# Helper function to conditionally apply security
+def secure_endpoint():
+    return Depends(verify_token) if CRAWL4AI_API_TOKEN else None
+
+# Check if site directory exists
+if os.path.exists(__location__ + "/site"):
+    # Mount the site directory as a static directory
+    app.mount("/mkdocs", StaticFiles(directory="site", html=True), name="mkdocs")
+
 site_templates = Jinja2Templates(directory=__location__ + "/site")
 templates = Jinja2Templates(directory=__location__ + "/pages")
 
@@ -337,15 +378,18 @@ async def shutdown_event():
 
 @app.get("/")
 def read_root():
-    return RedirectResponse(url="/mkdocs")
+    if os.path.exists(__location__ + "/site"):
+        return RedirectResponse(url="/mkdocs")
+    # Return a json response
+    return {"message": "Crawl4AI API service is running"}
 
 
-@app.post("/crawl")
+@app.post("/crawl", dependencies=[Depends(verify_token)])
 async def crawl(request: CrawlRequest) -> Dict[str, str]:
     task_id = await crawler_service.submit_task(request)
     return {"task_id": task_id}
 
-@app.get("/task/{task_id}")
+@app.get("/task/{task_id}", dependencies=[Depends(verify_token)])
 async def get_task_status(task_id: str):
     task_info = crawler_service.task_manager.get_task(task_id)
     if not task_info:
@@ -367,6 +411,71 @@ async def get_task_status(task_id: str):
 
     return response
 
+@app.post("/crawl_sync", dependencies=[Depends(verify_token)])
+async def crawl_sync(request: CrawlRequest) -> Dict[str, Any]:
+    task_id = await crawler_service.submit_task(request)
+    
+    # Wait up to 60 seconds for task completion
+    for _ in range(60):
+        task_info = crawler_service.task_manager.get_task(task_id)
+        if not task_info:
+            raise HTTPException(status_code=404, detail="Task not found")
+            
+        if task_info.status == TaskStatus.COMPLETED:
+            # Return same format as /task/{task_id} endpoint
+            if isinstance(task_info.result, list):
+                return {"status": task_info.status, "results": [result.dict() for result in task_info.result]}
+            return {"status": task_info.status, "result": task_info.result.dict()}
+            
+        if task_info.status == TaskStatus.FAILED:
+            raise HTTPException(status_code=500, detail=task_info.error)
+            
+        await asyncio.sleep(1)
+    
+    # If we get here, task didn't complete within timeout
+    raise HTTPException(status_code=408, detail="Task timed out")
+
+@app.post("/crawl_direct", dependencies=[Depends(verify_token)])
+async def crawl_direct(request: CrawlRequest) -> Dict[str, Any]:
+    try:
+        crawler = await crawler_service.crawler_pool.acquire(**request.crawler_params)
+        extraction_strategy = crawler_service._create_extraction_strategy(request.extraction_config)
+        
+        try:
+            if isinstance(request.urls, list):
+                results = await crawler.arun_many(
+                    urls=[str(url) for url in request.urls],
+                    extraction_strategy=extraction_strategy,
+                    js_code=request.js_code,
+                    wait_for=request.wait_for,
+                    css_selector=request.css_selector,
+                    screenshot=request.screenshot,
+                    magic=request.magic,
+                    cache_mode=request.cache_mode,
+                    session_id=request.session_id,
+                    **request.extra,
+                )
+                return {"results": [result.dict() for result in results]}
+            else:
+                result = await crawler.arun(
+                    url=str(request.urls),
+                    extraction_strategy=extraction_strategy,
+                    js_code=request.js_code,
+                    wait_for=request.wait_for,
+                    css_selector=request.css_selector,
+                    screenshot=request.screenshot,
+                    magic=request.magic,
+                    cache_mode=request.cache_mode,
+                    session_id=request.session_id,
+                    **request.extra,
+                )
+                return {"result": result.dict()}
+        finally:
+            await crawler_service.crawler_pool.release(crawler)
+    except Exception as e:
+        logger.error(f"Error in direct crawl: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
 @app.get("/health")
 async def health_check():
     available_slots = await crawler_service.resource_monitor.get_available_slots()
