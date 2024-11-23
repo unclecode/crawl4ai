@@ -101,7 +101,7 @@ class DefaultMarkdownGenerationStrategy(MarkdownGenerationStrategy):
             markdown_with_citations=markdown_with_citations,
             references_markdown=references_markdown,
             fit_markdown=fit_markdown,
-            fit_html=filtered_html
+            fit_html=filtered_html or None
         )
 
 def fast_urljoin(base: str, url: str) -> str:
