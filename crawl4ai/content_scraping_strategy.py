@@ -228,24 +228,7 @@ class WebScrapingStrategy(ContentScrapingStrategy):
                 return None
 
         def process_image_old(img, url, index, total_images):
-            def parse_srcset(srcset_str):
-                """Parse srcset attribute into list of image URLs with their sizes."""
-                if not srcset_str:
-                    return []
-                
-                sources = []
-                # Split on http/https and filter empty strings
-                urls = [f"http{part}" for part in srcset_str.split("http") if part]
-                
-                for url in urls:
-                    # Remove trailing comma and whitespace, then split to get width
-                    url = url.strip().rstrip(',')
-                    parts = url.rsplit(' ', 1)
-                    img_url = parts[0].strip()
-                    width = parts[1].rstrip('w') if len(parts) > 1 else None
-                    sources.append({'url': img_url, 'width': width})
-                
-                return sources          
+                   
             
             #Check if an image has valid display and inside undesired html elements
             def is_valid_image(img, parent, parent_classes):
@@ -376,12 +359,16 @@ class WebScrapingStrategy(ContentScrapingStrategy):
             unique_urls = set()
             image_variants = []
             
+            # Generate a unique group ID for this set of variants
+            group_id = index 
+            
             # Base image info template
             base_info = {
                 'alt': alt,
                 'desc': find_closest_parent_with_useful_text(img),
                 'score': score,
-                'type': 'image'
+                'type': 'image',
+                'group_id': group_id # Group ID for this set of variants
             }
 
             # Inline function for adding variants
