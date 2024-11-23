@@ -9,7 +9,7 @@ from bs4 import element, NavigableString, Comment
 from urllib.parse import urljoin
 from requests.exceptions import InvalidSchema
 # from .content_cleaning_strategy import ContentCleaningStrategy
-from .content_filter_strategy import RelevantContentFilter, BM25ContentFilter
+from .content_filter_strategy import RelevantContentFilter, BM25ContentFilter#, HeuristicContentFilter
 from .markdown_generation_strategy import MarkdownGenerationStrategy, DefaultMarkdownGenerationStrategy
 from .models import MarkdownGenerationResult
 from .utils import (
@@ -129,6 +129,12 @@ class WebScrapingStrategy(ContentScrapingStrategy):
                     params={"error": str(e)}
                 )
                 markdown_generator = None
+                return {
+                    'markdown': f"Error using new markdown generation strategy: {str(e)}",
+                    'fit_markdown': "Set flag 'fit_markdown' to True to get cleaned HTML content.",
+                    'fit_html': "Set flag 'fit_markdown' to True to get cleaned HTML content.",
+                    'markdown_v2': None                    
+                }
 
         # Legacy method
         h = CustomHTML2Text()
