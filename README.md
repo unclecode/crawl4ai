@@ -142,6 +142,9 @@ docker pull unclecode/crawl4ai:gpu      # GPU-enabled version
 # Run the container
 docker run -p 11235:11235 unclecode/crawl4ai:basic  # Replace 'basic' with your chosen version
 
+# In case you want to set platform to arm64
+docker run --platform linux/arm64 -p 11235:11235 unclecode/crawl4ai:basic
+
 # In case to allocate more shared memory for the container
 docker run --shm-size=2gb -p 11235:11235 unclecode/crawl4ai:basic
 ```
@@ -156,6 +159,12 @@ cd crawl4ai
 # Build the image
 docker build -t crawl4ai:local \
   --build-arg INSTALL_TYPE=basic \  # Options: basic, all
+  .
+
+# In case you want to set platform to arm64
+docker build -t crawl4ai:local \
+  --build-arg INSTALL_TYPE=basic \  # Options: basic, all
+  --platform linux/arm64 \
   .
 
 # Run your local build
