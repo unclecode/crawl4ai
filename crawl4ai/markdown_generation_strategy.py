@@ -84,6 +84,8 @@ class DefaultMarkdownGenerationStrategy(MarkdownGenerationStrategy):
         raw_markdown = raw_markdown.replace('    ```', '```')
 
         # Convert links to citations
+        markdown_with_citations: str = ""
+        references_markdown: str = ""
         if citations:
             markdown_with_citations, references_markdown = self.convert_links_to_citations(
                 raw_markdown, base_url
@@ -91,9 +93,9 @@ class DefaultMarkdownGenerationStrategy(MarkdownGenerationStrategy):
 
         # Generate fit markdown if content filter is provided
         fit_markdown: Optional[str] = None
+        filtered_html: Optional[str] = None
         if content_filter:
-            filtered_html = content_filter.filter_content(cleaned_html)
-            filtered_html = '\n'.join('<div>{}</div>'.format(s) for s in filtered_html)
+            filtered_html = '\n'.join('<div>{}</div>'.format(s) for s in content_filter.filter_content(cleaned_html))
             fit_markdown = h.handle(filtered_html)
 
         return MarkdownGenerationResult(
@@ -101,7 +103,7 @@ class DefaultMarkdownGenerationStrategy(MarkdownGenerationStrategy):
             markdown_with_citations=markdown_with_citations,
             references_markdown=references_markdown,
             fit_markdown=fit_markdown,
-            fit_html=filtered_html
+            fit_html=filtered_html,
         )
 
 def fast_urljoin(base: str, url: str) -> str:
