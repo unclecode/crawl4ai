@@ -264,7 +264,8 @@ class BFSScraperStrategy(ScraperStrategy):
                         self.stats.current_depth = depth
                         
                         if parallel_processing:
-                            task = asyncio.create_task(
+                            loop = asyncio.get_event_loop()
+                            task = loop.create_task(
                                 self.process_url(url, depth, crawler, queue, visited, depths)
                             )
                             pending_tasks.add(task)

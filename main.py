@@ -125,7 +125,8 @@ class TaskManager:
         self.cleanup_task = None
 
     async def start(self):
-        self.cleanup_task = asyncio.create_task(self._cleanup_loop())
+        loop = asyncio.get_event_loop()
+        self.cleanup_task = loop.create_task(self._cleanup_loop())
 
     async def stop(self):
         if self.cleanup_task:
@@ -231,7 +232,8 @@ class CrawlerService:
 
     async def start(self):
         await self.task_manager.start()
-        self._processing_task = asyncio.create_task(self._process_queue())
+        loop = asyncio.get_event_loop()
+        self._processing_task = loop.create_task(self._process_queue())
 
     async def stop(self):
         if self._processing_task:
