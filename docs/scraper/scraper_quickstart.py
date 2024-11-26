@@ -19,7 +19,7 @@ async def basic_scraper_example():
     # Create a simple filter chain
     filter_chain = FilterChain([
         # Only crawl pages within the blog section
-        # URLPatternFilter("*/tutorial/*"),
+        URLPatternFilter("*/tutorial/*"),
         # Only process HTML pages
         ContentTypeFilter(["text/html"])
     ])
@@ -29,7 +29,8 @@ async def basic_scraper_example():
         max_depth=2,  # Only go 2 levels deep
         filter_chain=filter_chain,
         url_scorer=None,  # Use default scoring
-        max_concurrent=3  # Limit concurrent requests
+        max_concurrent=3,  # Limit concurrent requests
+        process_external_links=True
     )
 
     # Create the crawler and scraper
@@ -79,8 +80,8 @@ async def advanced_scraper_example():
     filter_chain = FilterChain([
         # Domain control
         DomainFilter(
-            allowed_domains=["example.com", "blog.example.com"],
-            blocked_domains=["ads.example.com", "tracker.example.com"]
+            allowed_domains=["techcrunch.com"],
+            blocked_domains=["login.techcrunch.com","legal.yahoo.com"]
         ),
         # URL patterns
         URLPatternFilter([
@@ -114,7 +115,7 @@ async def advanced_scraper_example():
 
     # Initialize strategy with advanced configuration
     strategy = BFSScraperStrategy(
-        max_depth=4,
+        max_depth=2,
         filter_chain=filter_chain,
         url_scorer=scorer,
         max_concurrent=5,
@@ -122,63 +123,61 @@ async def advanced_scraper_example():
     )
 
     # Create crawler and scraper
-    crawler = AsyncWebCrawler()
-    scraper = AsyncWebScraper(crawler, strategy)
+    async with AsyncWebCrawler(verbose=True) as crawler:
+        scraper = AsyncWebScraper(crawler, strategy)
 
-    # Track statistics
-    stats = {
-        'processed': 0,
-        'errors': 0,
-        'total_size': 0
-    }
+        # Track statistics
+        stats = {
+            'processed': 0,
+            'errors': 0,
+            'total_size': 0
+        }
 
-    try:
-        # Use streaming mode
-        async for result in scraper.ascrape("https://example.com/news/", stream=True):
-            stats['processed'] += 1
-            
-            if result.success:
-                stats['total_size'] += len(result.html)
-                logger.info(f"Processed: {result.url}")
+        try:
+            # Use streaming mode
+            result_generator = await scraper.ascrape("https://techcrunch.com", parallel_processing=True, stream=True)
+            async for result in result_generator:
+                stats['processed'] += 1
                 
-                # Print scoring information
-                for scorer_name, score in result.scores.items():
-                    logger.debug(f"{scorer_name}: {score:.2f}")
-            else:
-                stats['errors'] += 1
-                logger.error(f"Failed to process {result.url}: {result.error_message}")
+                if result.success:
+                    stats['total_size'] += len(result.html)
+                    logger.info(f"Processed: {result.url}")
+                else:
+                    stats['errors'] += 1
+                    logger.error(f"Failed to process {result.url}: {result.error_message}")
 
-            # Log progress regularly
-            if stats['processed'] % 10 == 0:
-                logger.info(f"Progress: {stats['processed']} URLs processed")
+                # Log progress regularly
+                if stats['processed'] % 10 == 0:
+                    logger.info(f"Progress: {stats['processed']} URLs processed")
 
-    except Exception as e:
-        logger.error(f"Scraping error: {e}")
-    
-    finally:
-        # Print final statistics
-        logger.info("Scraping completed:")
-        logger.info(f"- URLs processed: {stats['processed']}")
-        logger.info(f"- Errors: {stats['errors']}")
-        logger.info(f"- Total content size: {stats['total_size'] / 1024:.2f} KB")
+        except Exception as e:
+            logger.error(f"Scraping error: {e}")
         
-        # Print filter statistics
-        for filter_ in filter_chain.filters:
-            logger.info(f"{filter_.name} stats:")
-            logger.info(f"- Passed: {filter_.stats.passed_urls}")
-            logger.info(f"- Rejected: {filter_.stats.rejected_urls}")
-        
-        # Print scorer statistics
-        logger.info("Scoring statistics:")
-        logger.info(f"- Average score: {scorer.stats.average_score:.2f}")
-        logger.info(f"- Score range: {scorer.stats.min_score:.2f} - {scorer.stats.max_score:.2f}")
+        finally:
+            # Print final statistics
+            logger.info("Scraping completed:")
+            logger.info(f"- URLs processed: {stats['processed']}")
+            logger.info(f"- Errors: {stats['errors']}")
+            logger.info(f"- Total content size: {stats['total_size'] / 1024:.2f} KB")
+            
+            # Print filter statistics
+            for filter_ in filter_chain.filters:
+                logger.info(f"{filter_.name} stats:")
+                logger.info(f"- Passed: {filter_.stats.passed_urls}")
+                logger.info(f"- Rejected: {filter_.stats.rejected_urls}")
+            
+            # Print scorer statistics
+            logger.info("Scoring statistics:")
+            logger.info(f"- Average score: {scorer.stats.average_score:.2f}")
+            logger.info(f"- Score range: {scorer.stats.min_score:.2f} - {scorer.stats.max_score:.2f}")
 
 if __name__ == "__main__":
     import asyncio
     
     # Run basic example
-    print("Running basic scraper example...")
-    asyncio.run(basic_scraper_example())
-    
-    # print("\nRunning advanced scraper example...")
-    # asyncio.run(advanced_scraper_example())
+    # print("Running basic scraper example...")
+    # asyncio.run(basic_scraper_example())
+
+    # Run advanced example
+    print("\nRunning advanced scraper example...")
+    asyncio.run(advanced_scraper_example())
