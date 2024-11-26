@@ -68,8 +68,7 @@ class ManagedBrowser:
                 stderr=subprocess.PIPE
             )
             # Monitor browser process output for errors
-            loop = asyncio.get_event_loop()
-            loop.create_task(self._monitor_browser_process())
+            asyncio.create_task(self._monitor_browser_process())
             await asyncio.sleep(2)  # Give browser time to start
             return f"http://localhost:{self.debugging_port}"
         except Exception as e:
