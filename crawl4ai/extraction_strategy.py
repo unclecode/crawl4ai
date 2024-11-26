@@ -68,7 +68,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
         """
         super().__init__() 
         self.provider = provider
-        self.api_token = api_token or PROVIDER_MODELS.get(provider, None) or os.getenv("OPENAI_API_KEY")
+        self.api_token = api_token or PROVIDER_MODELS.get(provider, "no-token") or os.getenv("OPENAI_API_KEY")
         self.instruction = instruction
         self.extract_type = extraction_type
         self.schema = schema
@@ -80,6 +80,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
         self.word_token_rate = kwargs.get("word_token_rate", WORD_TOKEN_RATE)
         self.apply_chunking = kwargs.get("apply_chunking", True)
         self.base_url = kwargs.get("base_url", None)
+        self.api_base = kwargs.get("api_base", kwargs.get("base_url", None))
         self.extra_args = kwargs.get("extra_args", {})
         if not self.apply_chunking:
             self.chunk_token_threshold = 1e9
@@ -116,7 +117,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
             self.provider, 
             prompt_with_variables, 
             self.api_token, 
-            base_url=self.base_url,
+            base_url=self.api_base or self.base_url,
             extra_args = self.extra_args
             ) # , json_response=self.extract_type == "schema")
         try:
@@ -234,11 +235,12 @@ class CosineStrategy(ExtractionStrategy):
         """
         Initialize the strategy with clustering parameters.
 
-        :param semantic_filter: A keyword filter for document filtering.
-        :param word_count_threshold: Minimum number of words per cluster.
-        :param max_dist: The maximum cophenetic distance on the dendrogram to form clusters.
-        :param linkage_method: The linkage method for hierarchical clustering.
-        :param top_k: Number of top categories to extract.
+        Args:
+            semantic_filter (str): A keyword filter for document filtering.
+            word_count_threshold (int): Minimum number of words per cluster.
+            max_dist (float): The maximum cophenetic distance on the dendrogram to form clusters.
+            linkage_method (str): The linkage method for hierarchical clustering.
+            top_k (int): Number of top categories to extract.
         """
         super().__init__()
         
@@ -257,8 +259,8 @@ class CosineStrategy(ExtractionStrategy):
         self.get_embedding_method = "direct"
         
         self.device = get_device()
-        import torch
-        self.device = torch.device('cpu')
+        # import torch
+        # self.device = torch.device('cpu')
         
         self.default_batch_size = calculate_batch_size(self.device)
 
@@ -271,7 +273,7 @@ class CosineStrategy(ExtractionStrategy):
         #     self.get_embedding_method = "direct"
         # else:
 
-        self.tokenizer, self.model = load_bge_small_en_v1_5()
+        self.tokenizer, self.model = load_HF_embedding_model(model_name)
         self.model.to(self.device)
         self.model.eval()  
         
@@ -738,7 +740,6 @@ class JsonCssExtractionStrategy(ExtractionStrategy):
         combined_html = self.DEL.join(sections)
         return self.extract(url, combined_html, **kwargs)
     
-
 class JsonXPATHExtractionStrategy(ExtractionStrategy):
     def __init__(self, schema: Dict[str, Any], **kwargs):
         super().__init__(**kwargs)

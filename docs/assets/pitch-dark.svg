@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500">
+    <!-- Background -->
+    <rect width="800" height="500" fill="#1a1a1a"/>
+    
+    <!-- Opportunities Section -->
+    <g transform="translate(50,50)">
+        <!-- Opportunity 1 Box -->
+        <rect x="0" y="0" width="300" height="150" rx="10" fill="#1a2d3d" stroke="#64b5f6" stroke-width="2"/>
+        <text x="150" y="30" text-anchor="middle" font-family="Arial" font-weight="bold" font-size="16" fill="#64b5f6">Data Capitalization Opportunity</text>
+        <text x="150" y="60" text-anchor="middle" font-family="Arial" font-size="12" fill="#e0e0e0">
+            <tspan x="150" dy="0">Transform digital footprints into assets</tspan>
+            <tspan x="150" dy="20">Personal data as capital</tspan>
+            <tspan x="150" dy="20">Enterprise knowledge valuation</tspan>
+            <tspan x="150" dy="20">New form of wealth creation</tspan>
+        </text>
+
+        <!-- Opportunity 2 Box -->
+        <rect x="0" y="200" width="300" height="150" rx="10" fill="#1a2d1a" stroke="#81c784" stroke-width="2"/>
+        <text x="150" y="230" text-anchor="middle" font-family="Arial" font-weight="bold" font-size="16" fill="#81c784">Authentic Data Potential</text>
+        <text x="150" y="260" text-anchor="middle" font-family="Arial" font-size="12" fill="#e0e0e0">
+            <tspan x="150" dy="0">Vast reservoir of real insights</tspan>
+            <tspan x="150" dy="20">Enhanced AI development</tspan>
+            <tspan x="150" dy="20">Diverse human knowledge</tspan>
+            <tspan x="150" dy="20">Willing participation model</tspan>
+        </text>
+    </g>
+
+    <!-- Development Pathway -->
+    <g transform="translate(450,50)">
+        <!-- Step 1 Box -->
+        <rect x="0" y="0" width="300" height="100" rx="10" fill="#2d1a2d" stroke="#ce93d8" stroke-width="2"/>
+        <text x="150" y="35" text-anchor="middle" font-family="Arial" font-weight="bold" font-size="16" fill="#ce93d8">1. Open-Source Foundation</text>
+        <text x="150" y="65" text-anchor="middle" font-family="Arial" font-size="12" fill="#e0e0e0">Data extraction engine &amp; community development</text>
+
+        <!-- Step 2 Box -->
+        <rect x="0" y="125" width="300" height="100" rx="10" fill="#2d1a2d" stroke="#ce93d8" stroke-width="2"/>
+        <text x="150" y="160" text-anchor="middle" font-family="Arial" font-weight="bold" font-size="16" fill="#ce93d8">2. Data Capitalization Platform</text>
+        <text x="150" y="190" text-anchor="middle" font-family="Arial" font-size="12" fill="#e0e0e0">Tools to structure &amp; value digital assets</text>
+
+        <!-- Step 3 Box -->
+        <rect x="0" y="250" width="300" height="100" rx="10" fill="#2d1a2d" stroke="#ce93d8" stroke-width="2"/>
+        <text x="150" y="285" text-anchor="middle" font-family="Arial" font-weight="bold" font-size="16" fill="#ce93d8">3. Shared Data Marketplace</text>
+        <text x="150" y="315" text-anchor="middle" font-family="Arial" font-size="12" fill="#e0e0e0">Economic platform for data exchange</text>
+    </g>
+
+    <!-- Connecting Arrows -->
+    <g transform="translate(400,125)">
+        <path d="M-20,0 L40,0" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
+        <path d="M-20,200 L40,200" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
+    </g>
+
+    <!-- Arrow Marker -->
+    <defs>
+        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#666"/>
+        </marker>
+    </defs>
+
+    <!-- Vision Box at Bottom -->
+    <g transform="translate(200,420)">
+        <rect x="0" y="0" width="400" height="60" rx="10" fill="#2d2613" stroke="#ffd54f" stroke-width="2"/>
+        <text x="200" y="35" text-anchor="middle" font-family="Arial" font-weight="bold" font-size="16" fill="#ffd54f">Economic Vision: Shared Data Economy</text>
+    </g>
+</svg>
