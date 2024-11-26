@@ -198,7 +198,7 @@ class BFSScraperStrategy(ScraperStrategy):
             links_to_process += result.links["external"]
         for link in links_to_process:
             url = link['href']
-            if url not in visited and await self.can_process_url(url,depth):
+            if url not in visited:
                 new_depth = depths[source_url] + 1
                 if new_depth <= self.max_depth:
                     if self.url_scorer:
