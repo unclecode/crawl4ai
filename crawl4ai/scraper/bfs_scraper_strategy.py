@@ -61,7 +61,7 @@ class BFSScraperStrategy(ScraperStrategy):
         self.robot_parsers: Dict[str, RobotFileParser] = {}
         self.domain_queues: Dict[str, asyncio.Queue] = defaultdict(asyncio.Queue)
 
-    async def can_process_url(self, url: str) -> bool:
+    async def can_process_url(self, url: str, depth: int) -> bool:
         """Check if URL can be processed based on robots.txt and filters
         This is our gatekeeper method that determines if a URL should be processed. It:
             - Validates URL format using the validators library
@@ -80,7 +80,11 @@ class BFSScraperStrategy(ScraperStrategy):
             self.logger.info(f"Blocked by robots.txt: {url}")
             return False
 
-        return self.filter_chain.apply(url)
+        # Apply the filter chain it's not start page
+        if depth != 0 and not self.filter_chain.apply(url):
+            return False
+
+        return True
 
     async def _get_robot_parser(self, url: str) -> Optional[RobotFileParser]:
         """Get or create robots.txt parser for domain.
@@ -146,7 +150,7 @@ class BFSScraperStrategy(ScraperStrategy):
         if self._cancel_event.is_set():
             return None
             
-        if depth!=0 and not await self.can_process_url(url):
+        if not await self.can_process_url(url, depth):
             self.stats.urls_skipped += 1
             return None
 
@@ -194,7 +198,7 @@ class BFSScraperStrategy(ScraperStrategy):
             links_to_process += result.links["external"]
         for link in links_to_process:
             url = link['href']
-            if url not in visited and await self.can_process_url(url):
+            if url not in visited and await self.can_process_url(url,depth):
                 new_depth = depths[source_url] + 1
                 if new_depth <= self.max_depth:
                     if self.url_scorer:
