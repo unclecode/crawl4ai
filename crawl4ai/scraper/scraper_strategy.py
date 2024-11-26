@@ -32,7 +32,7 @@ class ScraperStrategy(ABC):
         pass
 
     @abstractmethod
-    async def can_process_url(self, url: str) -> bool:
+    async def can_process_url(self, url: str, depth: int) -> bool:
         """Check if URL can be processed based on strategy rules"""
         pass
 
