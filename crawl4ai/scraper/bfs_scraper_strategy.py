@@ -1,10 +1,9 @@
-from abc import ABC, abstractmethod
-from typing import Union, AsyncGenerator, Optional, Dict, Set
+from typing import AsyncGenerator, Optional, Dict, Set
 from dataclasses import dataclass
 from datetime import datetime
 import asyncio
 import logging
-from urllib.parse import urljoin, urlparse, urlunparse
+from urllib.parse import urlparse
 from urllib.robotparser import RobotFileParser
 import validators
 import time
@@ -12,7 +11,7 @@ from aiolimiter import AsyncLimiter
 from tenacity import retry, stop_after_attempt, wait_exponential
 from collections import defaultdict
 
-from .models import ScraperResult, CrawlResult
+from .models import CrawlResult
 from .filters import FilterChain
 from .scorers import URLScorer
 from ..async_webcrawler import AsyncWebCrawler
@@ -37,6 +36,7 @@ class BFSScraperStrategy(ScraperStrategy):
         max_depth: int,
         filter_chain: FilterChain,
         url_scorer: URLScorer,
+        process_external_links: bool = False,
         max_concurrent: int = 5,
         min_crawl_delay: int = 1,
         timeout: int = 30,
@@ -53,7 +53,7 @@ class BFSScraperStrategy(ScraperStrategy):
         # Crawl control
         self.stats = CrawlStats(start_time=datetime.now())
         self._cancel_event = asyncio.Event()
-        self.process_external_links = False
+        self.process_external_links = process_external_links
         
         # Rate limiting and politeness
         self.rate_limiter = AsyncLimiter(1, 1)
@@ -189,14 +189,11 @@ class BFSScraperStrategy(ScraperStrategy):
             Adds valid URLs to the queue
             Updates maximum depth statistics
         """
-        links_ro_process = result.links["internal"]
+        links_to_process = result.links["internal"]
         if self.process_external_links:
-            links_ro_process += result.links["external"]
-        for link in links_ro_process:
+            links_to_process += result.links["external"]
+        for link in links_to_process:
             url = link['href']
-            # url = urljoin(source_url, link['href'])
-            # url = urlunparse(urlparse(url)._replace(fragment=""))
-            
             if url not in visited and await self.can_process_url(url):
                 new_depth = depths[source_url] + 1
                 if new_depth <= self.max_depth:
