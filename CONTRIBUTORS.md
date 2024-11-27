@@ -10,6 +10,7 @@ We would like to thank the following people for their contributions to Crawl4AI:
 
 ## Community Contributors
 
+- [aadityakanjolia4](https://github.com/aadityakanjolia4) - Fixing 'CustomHTML2Text' is not defined bug in the code.
 - [FractalMind](https://github.com/FractalMind) - Created the first official Docker Hub image and fixed Dockerfile errors
 - [ketonkss4](https://github.com/ketonkss4) - Identified Selenium's new capabilities, helping reduce dependencies
 - [jonymusky](https://github.com/jonymusky) - Javascript execution documentation, and wait_for
