@@ -4,8 +4,8 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        PYTHON_VERSION: 3.10
-        INSTALL_TYPE: all
+        PYTHON_VERSION: "3.10"
+        INSTALL_TYPE: ${INSTALL_TYPE:-basic}
         ENABLE_GPU: false
     profiles: ["local"]
     ports:
