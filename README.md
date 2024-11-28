@@ -13,13 +13,11 @@ Crawl4AI simplifies asynchronous web crawling and data extraction, making it acc
 
 ## New in 0.3.743 ✨  
 
-🚀 **Improved ManagedBrowser Configuration**: Dynamic host and port support for more flexible browser management.  
-📝 **Enhanced Markdown Generation**: New generator class for better formatting and customization.  
-⚡ **Fast HTML Formatting**: Significantly optimized HTML formatting in the web crawler.  
-🛠️ **Utility & Sanitization Upgrades**: Improved sanitization and expanded utility functions for streamlined workflows.  
-👥 **Acknowledgments**: Added contributor details and pull request acknowledgments for better transparency.  
-📖 **Documentation Updates**: Clearer usage scenarios and updated guidance for better user onboarding.  
-🧪 **Test Adjustments**: Refined tests to align with recent class name changes.  
+- 🚀 **Improved ManagedBrowser Configuration**: Dynamic host and port support for more flexible browser management.  
+- 📝 **Enhanced Markdown Generation**: New generator class for better formatting and customization.  
+- ⚡ **Fast HTML Formatting**: Significantly optimized HTML formatting in the web crawler.  
+- 🛠️ **Utility & Sanitization Upgrades**: Improved sanitization and expanded utility functions for streamlined workflows.  
+- 👥 **Acknowledgments**: Added contributor details and pull request acknowledgments for better transparency.  
 
 
 ## Try it Now!
