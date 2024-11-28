@@ -29,94 +29,86 @@ Crawl4AI simplifies asynchronous web crawling and data extraction, making it acc
 ## Features ✨
 
 <details open>
-<summary>🚀 <strong>Performance & Scalability</strong></summary>
+<summary>📝 <strong>Markdown Generation</strong></summary>
 
-- ⚡ **Blazing Fast Scraping**: Outperforms many paid services with cutting-edge optimization.
-- 🔄 **Asynchronous Architecture**: Enhanced performance for complex multi-page crawling.
-- ⚡ **Dynamic HTML Formatting**: New, fast HTML formatting for streamlined workflows.
-- 🗂️ **Large Dataset Optimization**: Improved caching for handling massive content sets.
-
+- 🧹 **Clean Markdown**: Generates clean, structured Markdown with accurate formatting.
+- 🎯 **Fit Markdown**: Heuristic-based filtering to remove noise and irrelevant parts for AI-friendly processing.
+- 🔗 **Citations and References**: Converts page links into a numbered reference list with clean citations.
+- 🛠️ **Custom Strategies**: Users can create their own Markdown generation strategies tailored to specific needs.
+- 📚 **BM25 Algorithm**: Employs BM25-based filtering for extracting core information and removing irrelevant content. 
 </details>
 
 <details open>
-<summary>🔎 <strong>Extraction Capabilities</strong></summary>
+<summary>📊 <strong>Structured Data Extraction</strong></summary>
 
-- 🖼️ **Comprehensive Media Support**: Extracts images, audio, video, and responsive image formats like `srcset` and `picture`.
-- 📚 **Advanced Content Chunking**: Topic-based, regex, sentence-level, and cosine clustering strategies.
-- 🎯 **Precise Data Extraction**: Supports CSS selectors and keyword-based refinements.
-- 🔗 **All-Inclusive Link Crawling**: Extracts internal and external links.
-- 📝 **Markdown Generation**: Enhanced markdown generator class for custom, clean, LLM-friendly outputs.
-- 🏷️ **Metadata Extraction**: Fetches metadata directly from pages.
+- 🤖 **LLM-Driven Extraction**: Supports all LLMs (open-source and proprietary) for structured data extraction.
+- 🧱 **Chunking Strategies**: Implements chunking (topic-based, regex, sentence-level) for targeted content processing.
+- 🌌 **Cosine Similarity**: Find relevant content chunks based on user queries for semantic extraction.
+- 🔎 **CSS-Based Extraction**: Fast schema-based data extraction using XPath and CSS selectors.
+- 🔧 **Schema Definition**: Define custom schemas for extracting structured JSON from repetitive patterns.
 
 </details>
 
 <details open>
 <summary>🌐 <strong>Browser Integration</strong></summary>
 
-- 🌍 **Multi-Browser Support**: Works with Chromium, Firefox, and WebKit.
-- 🖥️ **ManagedBrowser with Dynamic Config**: Flexible host/port control for tailored setups.
-- ⚙️ **Custom Browser Hooks**: Authentication, headers, and page modifications.
-- 🕶️ **Stealth Mode**: Bypasses bot detection with advanced techniques.
-- 📸 **Screenshots & JavaScript Execution**: Takes screenshots and executes custom JavaScript before crawling.
+- 🖥️ **Managed Browser**: Use user-owned browsers with full control, avoiding bot detection.
+- 🔄 **Remote Browser Control**: Connect to Chrome Developer Tools Protocol for remote, large-scale data extraction.
+- 🔒 **Session Management**: Preserve browser states and reuse them for multi-step crawling.
+- 🧩 **Proxy Support**: Seamlessly connect to proxies with authentication for secure access.
+- ⚙️ **Full Browser Control**: Modify headers, cookies, user agents, and more for tailored crawling setups.
+- 🌍 **Multi-Browser Support**: Compatible with Chromium, Firefox, and WebKit.
 
 </details>
 
 <details open>
-<summary>📁 <strong>Input/Output Flexibility</strong></summary>
+<summary>🔎 <strong>Crawling & Scraping</strong></summary>
 
-- 📂 **Local & Raw HTML Crawling**: Directly processes `file://` paths and raw HTML.
-- 🌐 **Custom Headers for LLM**: Tailored headers for enhanced AI interactions.
-- 🛠️ **Structured Output Options**: Supports JSON, cleaned HTML, and markdown outputs.
+- 🖼️ **Media Support**: Extract images, audio, videos, and responsive image formats like `srcset` and `picture`.
+- 🚀 **Dynamic Crawling**: Execute JS and wait for async or sync for dynamic content extraction.
+- 📸 **Screenshots**: Capture page screenshots during crawling for debugging or analysis.
+- 📂 **Raw Data Crawling**: Directly process raw HTML (`raw:`) or local files (`file://`).
+- 🔗 **Comprehensive Link Extraction**: Extracts internal, external links, and embedded iframe content.
+- 🛠️ **Customizable Hooks**: Define hooks at every step to customize crawling behavior.
+- 💾 **Caching**: Cache data for improved speed and to avoid redundant fetches.
+- 📄 **Metadata Extraction**: Retrieve structured metadata from web pages.
+- 📡 **IFrame Content Extraction**: Seamless extraction from embedded iframe content.
 
 </details>
 
 <details open>
-<summary>🔧 <strong>Utility & Debugging</strong></summary>
+<summary>🚀 <strong>Deployment</strong></summary>
 
+- 🐳 **Dockerized Setup**: Optimized Docker image with API server for easy deployment.
+- 🔄 **API Gateway**: One-click deployment with secure token authentication for API-based workflows.
+- 🌐 **Scalable Architecture**: Designed for mass-scale production and optimized server performance.
+- ⚙️ **DigitalOcean Deployment**: Ready-to-deploy configurations for DigitalOcean and similar platforms.
+
+</details>
+
+<details>
+<summary>🎯 <strong>Additional Features</strong></summary>
+
+- 🕶️ **Stealth Mode**: Avoid bot detection by mimicking real users.
+- 🏷️ **Tag-Based Content Extraction**: Refine crawling based on custom tags, headers, or metadata.
+- 🔗 **Link Analysis**: Extract and analyze all links for detailed data exploration.
 - 🛡️ **Error Handling**: Robust error management for seamless execution.
-- 🔐 **Session Management**: Handles complex, multi-page interactions.
-- 🧹 **Utility Functions**: Enhanced sanitization and flexible extraction helpers.
-- 🕰️ **Delayed Content Loading**: Improved handling of lazy-loading and dynamic content.
+- 🔐 **CORS & Static Serving**: Supports filesystem-based caching and cross-origin requests.
+- 📖 **Clear Documentation**: Simplified and updated guides for onboarding and advanced usage.
+- 🙌 **Community Recognition**: Acknowledges contributors and pull requests for transparency.
 
 </details>
-
-<details open>
-<summary>🔐 <strong>Security & Accessibility</strong></summary>
-
-- 🕵️ **Proxy Support**: Enables authenticated access for restricted pages.
-- 🚪 **API Gateway**: Deploy as an API service with secure token authentication.
-- 🌐 **CORS & Static Serving**: Enhanced support for filesystem-based caching and cross-origin requests.
-
-</details>
-
-<details open>
-<summary>🌟 <strong>Community & Documentation</strong></summary>
-
-- 🙌 **Contributor Acknowledgments**: Recognition for pull requests and contributions.
-- 📖 **Clear Documentation**: Simplified and updated for better onboarding and usage.
-
-</details>
-
-<details open>
-<summary>🎯 <strong>Cutting-Edge Features</strong></summary>
-
-- 🛠️ **BM25-Based Markdown Filtering**: Extracts cleaner, context-relevant markdown.
-- 📚 **LLM-Friendly Citations**: Auto-converts links to numbered citations with reference lists.
-- 📡 **IFrame Content Extraction**: Comprehensive analysis for embedded content.
-- 🕰️ **Flexible Content Retrieval**: Combines timing-based strategies for reliable extractions.
-
-</details>
-
 
 ## Installation 🛠️
 
 Crawl4AI offers flexible installation options to suit various use cases. You can install it as a Python package or use Docker.
 
-### Using pip 🐍
+<details open>
+<summary>🐍 <strong>Using pip</strong></summary>
 
 Choose the installation option that best fits your needs:
 
-#### Basic Installation
+### Basic Installation
 
 For basic web crawling and scraping tasks:
 
@@ -126,7 +118,7 @@ pip install crawl4ai
 
 By default, this will install the asynchronous version of Crawl4AI, using Playwright for web crawling.
 
-👉 Note: When you install Crawl4AI, the setup script should automatically install and set up Playwright. However, if you encounter any Playwright-related errors, you can manually install it using one of these methods:
+👉 **Note**: When you install Crawl4AI, the setup script should automatically install and set up Playwright. However, if you encounter any Playwright-related errors, you can manually install it using one of these methods:
 
 1. Through the command line:
 
@@ -142,15 +134,19 @@ By default, this will install the asynchronous version of Crawl4AI, using Playwr
 
 This second method has proven to be more reliable in some cases.
 
-#### Installation with Synchronous Version
+---
 
-If you need the synchronous version using Selenium:
+### Installation with Synchronous Version
+
+The sync version is deprecated and will be removed in future versions. If you need the synchronous version using Selenium:
 
 ```bash
 pip install crawl4ai[sync]
 ```
 
-#### Development Installation
+---
+
+### Development Installation
 
 For contributors who plan to modify the source code:
 
@@ -159,7 +155,9 @@ git clone https://github.com/unclecode/crawl4ai.git
 cd crawl4ai
 pip install -e .                    # Basic installation in editable mode
 ```
+
 Install optional features:
+
 ```bash
 pip install -e ".[torch]"           # With PyTorch features
 pip install -e ".[transformer]"     # With Transformer features
@@ -168,7 +166,10 @@ pip install -e ".[sync]"            # With synchronous crawling (Selenium)
 pip install -e ".[all]"             # Install all optional features
 ```
 
-## One-Click Deployment 🚀
+</details>
+
+<details open>
+<summary>🚀 <strong>One-Click Deployment</strong></summary>
 
 Deploy your own instance of Crawl4AI with one click:
 
@@ -179,14 +180,19 @@ Deploy your own instance of Crawl4AI with one click:
 The deploy will:
 - Set up a Docker container with Crawl4AI
 - Configure Playwright and all dependencies
-- Start the FastAPI server on port 11235
+- Start the FastAPI server on port `11235`
 - Set up health checks and auto-deployment
 
-### Using Docker 🐳
+</details>
+
+<details open>
+<summary>🐳 <strong>Using Docker</strong></summary>
 
 Crawl4AI is available as Docker images for easy deployment. You can either pull directly from Docker Hub (recommended) or build from the repository.
 
-#### Option 1: Docker Hub (Recommended)
+---
+
+### Option 1: Docker Hub (Recommended)
 
 ```bash
 # Pull and run from Docker Hub (choose one):
@@ -204,7 +210,9 @@ docker run --platform linux/arm64 -p 11235:11235 unclecode/crawl4ai:basic
 docker run --shm-size=2gb -p 11235:11235 unclecode/crawl4ai:basic
 ```
 
-#### Option 2: Build from Repository
+---
+
+### Option 2: Build from Repository
 
 ```bash
 # Clone the repository
@@ -226,7 +234,12 @@ docker build -t crawl4ai:local \
 docker run -p 11235:11235 crawl4ai:local
 ```
 
-Quick test (works for both options):
+---
+
+### Quick Test
+
+Run a quick test (works for both Docker options):
+
 ```python
 import requests
 
@@ -243,143 +256,149 @@ result = requests.get(f"http://localhost:11235/task/{task_id}")
 
 For advanced configuration, environment variables, and usage examples, see our [Docker Deployment Guide](https://crawl4ai.com/mkdocs/basic/docker-deployment/).
 
+</details>
+
 
 ## Quick Start 🚀
 
 ```python
 import asyncio
-from crawl4ai import AsyncWebCrawler
+from crawl4ai import AsyncWebCrawler, CacheMode
 
 async def main():
     async with AsyncWebCrawler(verbose=True) as crawler:
         result = await crawler.arun(url="https://www.nbcnews.com/business")
-        print(result.markdown)
+        print(result.markdown_v2.raw_markdown) # Soone will be change to result.markdown
 
 if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-## Advanced Usage 🔬
+## Advanced Usage Examples 🔬
 
-### Executing JavaScript and Using CSS Selectors
+You can check the project structure in the directory [https://github.com/unclecode/crawl4ai/docs/examples](docs/examples). Over there, you can find a variety of examples; here, some popular examples are shared.
+
+<details open>
+<summary>🖥️ <strong>Heuristic Markdown Generation with Clean and Fit Markdown</strong></summary>
 
 ```python
 import asyncio
-from crawl4ai import AsyncWebCrawler
+from crawl4ai import AsyncWebCrawler, CacheMode
+from crawl4ai.content_filter_strategy import BM25ContentFilter
+from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
 async def main():
-    async with AsyncWebCrawler(verbose=True) as crawler:
-        js_code = ["const loadMoreButton = Array.from(document.querySelectorAll('button')).find(button => button.textContent.includes('Load More')); loadMoreButton && loadMoreButton.click();"]
+    async with AsyncWebCrawler(
+        headless=True,  
+        verbose=True,
+    ) as crawler:
         result = await crawler.arun(
-            url="https://www.nbcnews.com/business",
-            js_code=js_code,
-            css_selector=".wide-tease-item__description",
-            bypass_cache=True
+            url="https://docs.micronaut.io/4.7.6/guide/",
+            cache_mode=CacheMode.ENABLED,
+            markdown_generator=DefaultMarkdownGenerator(
+                content_filter=BM25ContentFilter(user_query=None, bm25_threshold=1.0)
+            ),
         )
-        print(result.extracted_content)
+        print(len(result.markdown))
+        print(len(result.fit_markdown))
+        print(len(result.markdown_v2.fit_markdown))
 
 if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-### Using a Proxy
+</details>
+
+<details open>
+<summary>🖥️ <strong>Structured Data Extraction and Executing JavaScript</strong></summary>
 
 ```python
 import asyncio
-from crawl4ai import AsyncWebCrawler
-
-async def main():
-    async with AsyncWebCrawler(verbose=True, proxy="http://127.0.0.1:7890") as crawler:
-        result = await crawler.arun(
-            url="https://www.nbcnews.com/business",
-            bypass_cache=True
-        )
-        print(result.markdown)
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
-
-### Extracting Structured Data without LLM
-
-The `JsonCssExtractionStrategy` allows for precise extraction of structured data from web pages using CSS selectors.
-
-```python
-import asyncio
-import json
-from crawl4ai import AsyncWebCrawler
+from crawl4ai import AsyncWebCrawler, CacheMode
 from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+import json
 
-async def extract_news_teasers():
+async def main():
     schema = {
-        "name": "News Teaser Extractor",
-        "baseSelector": ".wide-tease-item__wrapper",
-        "fields": [
-            {
-                "name": "category",
-                "selector": ".unibrow span[data-testid='unibrow-text']",
-                "type": "text",
-            },
-            {
-                "name": "headline",
-                "selector": ".wide-tease-item__headline",
-                "type": "text",
-            },
-            {
-                "name": "summary",
-                "selector": ".wide-tease-item__description",
-                "type": "text",
-            },
-            {
-                "name": "time",
-                "selector": "[data-testid='wide-tease-date']",
-                "type": "text",
-            },
-            {
-                "name": "image",
-                "type": "nested",
-                "selector": "picture.teasePicture img",
-                "fields": [
-                    {"name": "src", "type": "attribute", "attribute": "src"},
-                    {"name": "alt", "type": "attribute", "attribute": "alt"},
-                ],
-            },
-            {
-                "name": "link",
-                "selector": "a[href]",
-                "type": "attribute",
-                "attribute": "href",
-            },
-        ],
-    }
+    "name": "KidoCode Courses",
+    "baseSelector": "section.charge-methodology .w-tab-content > div",
+    "fields": [
+        {
+            "name": "section_title",
+            "selector": "h3.heading-50",
+            "type": "text",
+        },
+        {
+            "name": "section_description",
+            "selector": ".charge-content",
+            "type": "text",
+        },
+        {
+            "name": "course_name",
+            "selector": ".text-block-93",
+            "type": "text",
+        },
+        {
+            "name": "course_description",
+            "selector": ".course-content-text",
+            "type": "text",
+        },
+        {
+            "name": "course_icon",
+            "selector": ".image-92",
+            "type": "attribute",
+            "attribute": "src"
+        }
+    ]
+}
 
     extraction_strategy = JsonCssExtractionStrategy(schema, verbose=True)
 
-    async with AsyncWebCrawler(verbose=True) as crawler:
+    async with AsyncWebCrawler(
+        headless=False,
+        verbose=True
+    ) as crawler:
+        
+        # Create the JavaScript that handles clicking multiple times
+        js_click_tabs = """
+        (async () => {
+            const tabs = document.querySelectorAll("section.charge-methodology .tabs-menu-3 > div");
+            
+            for(let tab of tabs) {
+                // scroll to the tab
+                tab.scrollIntoView();
+                tab.click();
+                // Wait for content to load and animations to complete
+                await new Promise(r => setTimeout(r, 500));
+            }
+        })();
+        """     
+
         result = await crawler.arun(
-            url="https://www.nbcnews.com/business",
-            extraction_strategy=extraction_strategy,
-            bypass_cache=True,
+            url="https://www.kidocode.com/degrees/technology",
+            extraction_strategy=JsonCssExtractionStrategy(schema, verbose=True),
+            js_code=[js_click_tabs],
+            cache_mode=CacheMode.BYPASS
         )
 
-        assert result.success, "Failed to crawl the page"
+        companies = json.loads(result.extracted_content)
+        print(f"Successfully extracted {len(companies)} companies")
+        print(json.dumps(companies[0], indent=2))
 
-        news_teasers = json.loads(result.extracted_content)
-        print(f"Successfully extracted {len(news_teasers)} news teasers")
-        print(json.dumps(news_teasers[0], indent=2))
 
 if __name__ == "__main__":
-    asyncio.run(extract_news_teasers())
+    asyncio.run(main())
 ```
 
-For more advanced usage examples, check out our [Examples](https://crawl4ai.com/mkdocs/extraction/css-advanced/) section in the documentation.
+</details>
 
-### Extracting Structured Data with OpenAI
+<details open>
+<summary>🤖 <strong>Extracting Structured Data with LLMs</strong></summary>
 
 ```python
 import os
 import asyncio
-from crawl4ai import AsyncWebCrawler
+from crawl4ai import AsyncWebCrawler, CacheMode
 from crawl4ai.extraction_strategy import LLMExtractionStrategy
 from pydantic import BaseModel, Field
 
@@ -394,6 +413,8 @@ async def main():
             url='https://openai.com/api/pricing/',
             word_count_threshold=1,
             extraction_strategy=LLMExtractionStrategy(
+                # Here you can use any provider that Litellm library supports, for instance: ollama/qwen2
+                # provider="ollama/qwen2", api_token="no-token", 
                 provider="openai/gpt-4o", api_token=os.getenv('OPENAI_API_KEY'), 
                 schema=OpenAIModelFee.schema(),
                 extraction_type="schema",
@@ -401,7 +422,7 @@ async def main():
                 Do not miss any models in the entire content. One extracted model JSON format should look like this: 
                 {"model_name": "GPT-4", "input_fee": "US$10.00 / 1M tokens", "output_fee": "US$30.00 / 1M tokens"}."""
             ),            
-            bypass_cache=True,
+            cache_mode=CacheMode.BYPASS,
         )
         print(result.extracted_content)
 
@@ -409,105 +430,86 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-### Session Management and Dynamic Content Crawling
+</details>
 
-Crawl4AI excels at handling complex scenarios, such as crawling multiple pages with dynamic content loaded via JavaScript. Here's an example of crawling GitHub commits across multiple pages:
+<details open>
+<summary>🤖 <strong>Using You own Browswer with Custome User Profile</strong></summary>
 
 ```python
-import asyncio
-import re
-from bs4 import BeautifulSoup
+import os, sys
+from pathlib import Path
+import asyncio, time
 from crawl4ai import AsyncWebCrawler
 
-async def crawl_typescript_commits():
-    first_commit = ""
-    async def on_execution_started(page):
-        nonlocal first_commit 
-        try:
-            while True:
-                await page.wait_for_selector('li.Box-sc-g0xbh4-0 h4')
-                commit = await page.query_selector('li.Box-sc-g0xbh4-0 h4')
-                commit = await commit.evaluate('(element) => element.textContent')
-                commit = re.sub(r'\s+', '', commit)
-                if commit and commit != first_commit:
-                    first_commit = commit
-                    break
-                await asyncio.sleep(0.5)
-        except Exception as e:
-            print(f"Warning: New content didn't appear after JavaScript execution: {e}")
+async def test_news_crawl():
+    # Create a persistent user data directory
+    user_data_dir = os.path.join(Path.home(), ".crawl4ai", "browser_profile")
+    os.makedirs(user_data_dir, exist_ok=True)
 
-    async with AsyncWebCrawler(verbose=True) as crawler:
-        crawler.crawler_strategy.set_hook('on_execution_started', on_execution_started)
-
-        url = "https://github.com/microsoft/TypeScript/commits/main"
-        session_id = "typescript_commits_session"
-        all_commits = []
-
-        js_next_page = """
-        const button = document.querySelector('a[data-testid="pagination-next-button"]');
-        if (button) button.click();
-        """
-
-        for page in range(3):  # Crawl 3 pages
-            result = await crawler.arun(
-                url=url,
-                session_id=session_id,
-                css_selector="li.Box-sc-g0xbh4-0",
-                js=js_next_page if page > 0 else None,
-                bypass_cache=True,
-                js_only=page > 0
-            )
-
-            assert result.success, f"Failed to crawl page {page + 1}"
-
-            soup = BeautifulSoup(result.cleaned_html, 'html.parser')
-            commits = soup.select("li")
-            all_commits.extend(commits)
-
-            print(f"Page {page + 1}: Found {len(commits)} commits")
-
-        await crawler.crawler_strategy.kill_session(session_id)
-        print(f"Successfully crawled {len(all_commits)} commits across 3 pages")
-
-if __name__ == "__main__":
-    asyncio.run(crawl_typescript_commits())
+    async with AsyncWebCrawler(
+        verbose=True,
+        headless=True,
+        user_data_dir=user_data_dir,
+        use_persistent_context=True,
+        headers={
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
+            "Accept-Encoding": "gzip, deflate, br",
+            "DNT": "1",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Sec-Fetch-User": "?1",
+            "Cache-Control": "max-age=0",
+        }
+    ) as crawler:
+        url = "ADDRESS_OF_A_CHALLENGING_WEBSITE"
+        
+        result = await crawler.arun(
+            url,
+            cache_mode=CacheMode.BYPASS,
+            magic=True,
+        )
+        
+        print(f"Successfully crawled {url}")
+        print(f"Content length: {len(result.markdown)}")
 ```
 
-This example demonstrates Crawl4AI's ability to handle complex scenarios where content is loaded asynchronously. It crawls multiple pages of GitHub commits, executing JavaScript to load new content and using custom hooks to ensure data is loaded before proceeding.
-
-For more advanced usage examples, check out our [Examples](https://crawl4ai.com/mkdocs/tutorial/episode_12_Session-Based_Crawling_for_Dynamic_Websites/) section in the documentation.
 </details>
 
 
 ## Speed Comparison 🚀
+A test was conducted on **[NBC News - Business Section](https://www.nbcnews.com/business)** to compare Crawl4AI and Firecrawl, highlighting Crawl4AI's speed, efficiency, and advanced features.
 
-Crawl4AI is designed with speed as a primary focus. Our goal is to provide the fastest possible response with high-quality data extraction, minimizing abstractions between the data and the user.
+---
 
-We've conducted a speed comparison between Crawl4AI and Firecrawl, a paid service. The results demonstrate Crawl4AI's superior performance:
+#### Results Summary  
 
-```bash
-Firecrawl:
-Time taken: 7.02 seconds
-Content length: 42074 characters
-Images found: 49
+| **Method**                     | **Time Taken** | **Markdown Length** | **Fit Markdown** | **Images Found** |
+|--------------------------------|----------------|----------------------|-------------------|------------------|
+| **Firecrawl**                  | 6.04 seconds   | 38,382 characters    | -                 | 52               |
+| **Crawl4AI (Simple Crawl)**    | 1.06 seconds   | 42,027 characters    | -                 | 52               |
+| **Crawl4AI (Markdown Plus)**   | 1.30 seconds   | 54,342 characters    | 11,119 characters | 52               |
+| **Crawl4AI (JavaScript)**      | 1.56 seconds   | 75,869 characters    | 13,406 characters | 92               |
 
-Crawl4AI (simple crawl):
-Time taken: 1.60 seconds
-Content length: 18238 characters
-Images found: 49
+---
 
-Crawl4AI (with JavaScript execution):
-Time taken: 4.64 seconds
-Content length: 40869 characters
-Images found: 89
-```
+#### Key Takeaways  
 
-As you can see, Crawl4AI outperforms Firecrawl significantly:
+1. **Superior Speed**: Crawl4AI processes even advanced crawls up to **6x faster** than Firecrawl, with times as low as **1.06 seconds**.  
+2. **Rich Content Extraction**: Crawl4AI consistently captures more comprehensive content, producing a **Markdown Plus** output of **54,342 characters**, compared to Firecrawl's **38,382 characters**.  
+3. **AI-Optimized Output**: With **Fit Markdown**, Crawl4AI removes noise to produce concise, AI-friendly outputs (**11,119–13,406 characters**) tailored for LLM workflows.  
+4. **Dynamic Content Handling**: Using JavaScript execution, Crawl4AI extracted **92 images** and enriched content dynamically loaded via “Load More” buttons—unmatched by Firecrawl.  
 
-- Simple crawl: Crawl4AI is over 4 times faster than Firecrawl.
-- With JavaScript execution: Even when executing JavaScript to load more content (doubling the number of images found), Crawl4AI is still faster than Firecrawl's simple crawl.
+---
 
-You can find the full comparison code in our repository at `docs/examples/crawl4ai_vs_firecrawl.py`.
+#### Conclusion  
+
+Crawl4AI outshines Firecrawl in speed, completeness, and flexibility. Its advanced features, including **Markdown Plus**, **Fit Markdown**, and **dynamic content handling**, make it the ideal choice for AI-ready web crawling. Whether you're targeting rich structured data or handling complex dynamic websites, Crawl4AI delivers unmatched performance and precision.
+
+You can find the full comparison code in our repository at [docs/examples/quickstart_async.py](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/quickstart_async.py).
 
 ## Documentation 📚
 
