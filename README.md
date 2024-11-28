@@ -40,7 +40,7 @@ Crawl4AI simplifies asynchronous web crawling and data extraction, making it acc
 
 </details>
 
-<details>
+<details open>
 <summary>🔎 <strong>Extraction Capabilities</strong></summary>
 
 - 🖼️ **Comprehensive Media Support**: Extracts images, audio, video, and responsive image formats like `srcset` and `picture`.
@@ -52,7 +52,7 @@ Crawl4AI simplifies asynchronous web crawling and data extraction, making it acc
 
 </details>
 
-<details>
+<details open>
 <summary>🌐 <strong>Browser Integration</strong></summary>
 
 - 🌍 **Multi-Browser Support**: Works with Chromium, Firefox, and WebKit.
@@ -63,7 +63,7 @@ Crawl4AI simplifies asynchronous web crawling and data extraction, making it acc
 
 </details>
 
-<details>
+<details open>
 <summary>📁 <strong>Input/Output Flexibility</strong></summary>
 
 - 📂 **Local & Raw HTML Crawling**: Directly processes `file://` paths and raw HTML.
@@ -72,7 +72,7 @@ Crawl4AI simplifies asynchronous web crawling and data extraction, making it acc
 
 </details>
 
-<details>
+<details open>
 <summary>🔧 <strong>Utility & Debugging</strong></summary>
 
 - 🛡️ **Error Handling**: Robust error management for seamless execution.
@@ -82,7 +82,7 @@ Crawl4AI simplifies asynchronous web crawling and data extraction, making it acc
 
 </details>
 
-<details>
+<details open>
 <summary>🔐 <strong>Security & Accessibility</strong></summary>
 
 - 🕵️ **Proxy Support**: Enables authenticated access for restricted pages.
@@ -91,7 +91,7 @@ Crawl4AI simplifies asynchronous web crawling and data extraction, making it acc
 
 </details>
 
-<details>
+<details open>
 <summary>🌟 <strong>Community & Documentation</strong></summary>
 
 - 🙌 **Contributor Acknowledgments**: Recognition for pull requests and contributions.
@@ -99,7 +99,7 @@ Crawl4AI simplifies asynchronous web crawling and data extraction, making it acc
 
 </details>
 
-<details>
+<details open>
 <summary>🎯 <strong>Cutting-Edge Features</strong></summary>
 
 - 🛠️ **BM25-Based Markdown Filtering**: Extracts cleaner, context-relevant markdown.
