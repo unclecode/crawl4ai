@@ -1,5 +1,53 @@
 # Changelog
 
+## [0.3.743] November 27, 2024
+
+Enhance features and documentation
+- Updated version to 0.3.743
+- Improved ManagedBrowser configuration with dynamic host/port
+- Implemented fast HTML formatting in web crawler
+- Enhanced markdown generation with a new generator class
+- Improved sanitization and utility functions
+- Added contributor details and pull request acknowledgments
+- Updated documentation for clearer usage scenarios
+- Adjusted tests to reflect class name changes
+
+### CONTRIBUTORS.md
+Added new contributors and pull request details.
+Updated community contributions and acknowledged pull requests.
+
+### crawl4ai/__version__.py
+Version update.
+Bumped version to 0.3.743.
+
+### crawl4ai/async_crawler_strategy.py
+Improved ManagedBrowser configuration.
+Enhanced browser initialization with configurable host and debugging port; improved hook execution.
+
+### crawl4ai/async_webcrawler.py
+Optimized HTML processing.
+Implemented 'fast_format_html' for optimized HTML formatting; applied it when 'prettiify' is enabled.
+
+### crawl4ai/content_scraping_strategy.py
+Enhanced markdown generation strategy.
+Updated to use DefaultMarkdownGenerator and improved markdown generation with filters option.
+
+### crawl4ai/markdown_generation_strategy.py
+Refactored markdown generation class.
+Renamed DefaultMarkdownGenerationStrategy to DefaultMarkdownGenerator; added content filter handling.
+
+### crawl4ai/utils.py
+Enhanced utility functions.
+Improved input sanitization and enhanced HTML formatting method.
+
+### docs/md_v2/advanced/hooks-auth.md
+Improved documentation for hooks.
+Updated code examples to include cookies in crawler strategy initialization.
+
+### tests/async/test_markdown_genertor.py
+Refactored tests to match class renaming.
+Updated tests to use renamed DefaultMarkdownGenerator class.
+
 ## [0.3.74] November 17, 2024
 
 This changelog details the updates and changes introduced in Crawl4AI version 0.3.74. It's designed to inform developers about new features, modifications to existing components, removals, and other important information.
