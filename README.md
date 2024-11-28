@@ -1,5 +1,7 @@
 # 🔥🕷️ Crawl4AI: LLM Friendly Web Crawler & Scraper
 
+[✨ Check out what's new in the latest update!](#new-in-03743)
+
 <a href="https://trendshift.io/repositories/11716" target="_blank"><img src="https://trendshift.io/api/badge/repositories/11716" alt="unclecode%2Fcrawl4ai | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 
 [![GitHub Stars](https://img.shields.io/github/stars/unclecode/crawl4ai?style=social)](https://github.com/unclecode/crawl4ai/stargazers)
@@ -9,26 +11,47 @@
 [![GitHub Pull Requests](https://img.shields.io/github/issues-pr/unclecode/crawl4ai)](https://github.com/unclecode/crawl4ai/pulls)
 [![License](https://img.shields.io/github/license/unclecode/crawl4ai)](https://github.com/unclecode/crawl4ai/blob/main/LICENSE)
 
-Crawl4AI simplifies asynchronous web crawling and data extraction, making it accessible for large language models (LLMs) and AI applications. 🆓🌐
+## 🔥 Crawl4AI: Crawl Smarter, Faster, Freely. For AI.  
 
-## New in 0.3.743 ✨  
+Crawl4AI is the #1 trending GitHub repository, actively maintained by a vibrant community. It delivers blazing-fast, AI-ready web crawling tailored for LLMs, AI agents, and data pipelines. Open source, flexible, and built for real-time performance, Crawl4AI empowers developers with unmatched speed, precision, and deployment ease.  
 
-- 🚀 **Improved ManagedBrowser Configuration**: Dynamic host and port support for more flexible browser management.  
-- 📝 **Enhanced Markdown Generation**: New generator class for better formatting and customization.  
-- ⚡ **Fast HTML Formatting**: Significantly optimized HTML formatting in the web crawler.  
-- 🛠️ **Utility & Sanitization Upgrades**: Improved sanitization and expanded utility functions for streamlined workflows.  
-- 👥 **Acknowledgments**: Added contributor details and pull request acknowledgments for better transparency.  
+[✨ Check out what's new in the latest update!](#new-in-03743)
+
+## 🧐 Why Crawl4AI?
+
+1. **Built for LLMs**: Creates **smart, concise Markdown** optimized for applications like Retrieval-Augmented Generation (RAG) and fine-tuning.  
+2. **Lightning Fast**: Delivers results **6x faster** than competitors with real-time, cost-efficient performance.  
+3. **Flexible Browser Control**: Offers session management, proxies, and custom hooks for precise, seamless data access.  
+4. **Heuristic Intelligence**: Leverages **advanced algorithms** to extract data efficiently, reducing reliance on costly language models.  
+5. **Open Source & Deployable**: 100% open-source with no API keys or registration required-ready for **Docker and cloud integration**.  
+6. **Thriving Community**: Actively maintained by a vibrant developer community and the **#1 trending GitHub repository** across all languages.
 
 
-## Try it Now!
+## 🚀 Quick Start 
 
-✨ Play around with this [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1SgRPrByQLzjRfwoRNq1wSGE9nYY_EE8C?usp=sharing)
+1. Install Crawl4AI:
+```bash
+pip install crawl4ai
+```
 
-✨ Visit our [Documentation Website](https://crawl4ai.com/mkdocs/)
+2. Run a simple web crawl:
+```python
+import asyncio
+from crawl4ai import AsyncWebCrawler, CacheMode
 
-## Features ✨
+async def main():
+    async with AsyncWebCrawler(verbose=True) as crawler:
+        result = await crawler.arun(url="https://www.nbcnews.com/business")
+        # Soone will be change to result.markdown
+        print(result.markdown_v2.raw_markdown) 
 
-<details open>
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## ✨ Features 
+
+<details>
 <summary>📝 <strong>Markdown Generation</strong></summary>
 
 - 🧹 **Clean Markdown**: Generates clean, structured Markdown with accurate formatting.
@@ -38,7 +61,7 @@ Crawl4AI simplifies asynchronous web crawling and data extraction, making it acc
 - 📚 **BM25 Algorithm**: Employs BM25-based filtering for extracting core information and removing irrelevant content. 
 </details>
 
-<details open>
+<details>
 <summary>📊 <strong>Structured Data Extraction</strong></summary>
 
 - 🤖 **LLM-Driven Extraction**: Supports all LLMs (open-source and proprietary) for structured data extraction.
@@ -49,7 +72,7 @@ Crawl4AI simplifies asynchronous web crawling and data extraction, making it acc
 
 </details>
 
-<details open>
+<details>
 <summary>🌐 <strong>Browser Integration</strong></summary>
 
 - 🖥️ **Managed Browser**: Use user-owned browsers with full control, avoiding bot detection.
@@ -61,7 +84,7 @@ Crawl4AI simplifies asynchronous web crawling and data extraction, making it acc
 
 </details>
 
-<details open>
+<details>
 <summary>🔎 <strong>Crawling & Scraping</strong></summary>
 
 - 🖼️ **Media Support**: Extract images, audio, videos, and responsive image formats like `srcset` and `picture`.
@@ -76,7 +99,7 @@ Crawl4AI simplifies asynchronous web crawling and data extraction, making it acc
 
 </details>
 
-<details open>
+<details>
 <summary>🚀 <strong>Deployment</strong></summary>
 
 - 🐳 **Dockerized Setup**: Optimized Docker image with API server for easy deployment.
@@ -99,7 +122,54 @@ Crawl4AI simplifies asynchronous web crawling and data extraction, making it acc
 
 </details>
 
-## Installation 🛠️
+
+
+## Try it Now!
+
+✨ Play around with this [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1SgRPrByQLzjRfwoRNq1wSGE9nYY_EE8C?usp=sharing)
+
+✨ Visit our [Documentation Website](https://crawl4ai.com/mkdocs/)
+
+
+## 🚀 Speed Comparison
+
+A test was conducted on **[NBC News - Business Section](https://www.nbcnews.com/business)** to compare Crawl4AI and Firecrawl, highlighting Crawl4AI's speed, efficiency, and advanced features.
+
+<details open>
+<summary>📊 <strong>Results Summary</strong></summary>
+
+#### Results Summary  
+
+| **Method**                     | **Time Taken** | **Markdown Length** | **Fit Markdown** | **Images Found** |
+|--------------------------------|----------------|----------------------|-------------------|------------------|
+| **Firecrawl**                  | 6.04 seconds   | 38,382 characters    | -                 | 52               |
+| **Crawl4AI (Simple Crawl)**    | 1.06 seconds   | 42,027 characters    | -                 | 52               |
+| **Crawl4AI (Markdown Plus)**   | 1.30 seconds   | 54,342 characters    | 11,119 characters | 52               |
+| **Crawl4AI (JavaScript)**      | 1.56 seconds   | 75,869 characters    | 13,406 characters | 92               |
+
+</details>
+
+<details open>
+<summary>⚡ <strong>Key Takeaways</strong></summary>
+
+1. **Superior Speed**: Crawl4AI processes even advanced crawls up to **6x faster** than Firecrawl, with times as low as **1.06 seconds**.  
+2. **Rich Content Extraction**: Crawl4AI consistently captures more comprehensive content, producing a **Markdown Plus** output of **54,342 characters**, compared to Firecrawl's **38,382 characters**.  
+3. **AI-Optimized Output**: With **Fit Markdown**, Crawl4AI removes noise to produce concise, AI-friendly outputs (**11,119–13,406 characters**) tailored for LLM workflows.  
+4. **Dynamic Content Handling**: Using JavaScript execution, Crawl4AI extracted **92 images** and enriched content dynamically loaded via “Load More” buttons—unmatched by Firecrawl.  
+
+</details>
+
+<details open>
+<summary>🏁 <strong>Conclusion</strong></summary>
+
+Crawl4AI outshines Firecrawl in speed, completeness, and flexibility. Its advanced features, including **Markdown Plus**, **Fit Markdown**, and **dynamic content handling**, make it the ideal choice for AI-ready web crawling. Whether you're targeting rich structured data or handling complex dynamic websites, Crawl4AI delivers unmatched performance and precision.
+
+You can find the full comparison code in our repository at [docs/examples/quickstart_async.py](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/quickstart_async.py).
+
+</details>
+
+
+## 🛠️ Installation 🛠️
 
 Crawl4AI offers flexible installation options to suit various use cases. You can install it as a Python package or use Docker.
 
@@ -259,27 +329,14 @@ For advanced configuration, environment variables, and usage examples, see our [
 </details>
 
 
-## Quick Start 🚀
 
-```python
-import asyncio
-from crawl4ai import AsyncWebCrawler, CacheMode
 
-async def main():
-    async with AsyncWebCrawler(verbose=True) as crawler:
-        result = await crawler.arun(url="https://www.nbcnews.com/business")
-        print(result.markdown_v2.raw_markdown) # Soone will be change to result.markdown
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
-
-## Advanced Usage Examples 🔬
+## 🔬 Advanced Usage Examples 🔬
 
 You can check the project structure in the directory [https://github.com/unclecode/crawl4ai/docs/examples](docs/examples). Over there, you can find a variety of examples; here, some popular examples are shared.
 
 <details open>
-<summary>🖥️ <strong>Heuristic Markdown Generation with Clean and Fit Markdown</strong></summary>
+<summary>📝 <strong>Heuristic Markdown Generation with Clean and Fit Markdown</strong></summary>
 
 ```python
 import asyncio
@@ -310,7 +367,7 @@ if __name__ == "__main__":
 </details>
 
 <details open>
-<summary>🖥️ <strong>Structured Data Extraction and Executing JavaScript</strong></summary>
+<summary>🖥️ <strong>Executing JavaScript & Extract Structured Data without LLMs</strong></summary>
 
 ```python
 import asyncio
@@ -393,7 +450,7 @@ if __name__ == "__main__":
 </details>
 
 <details open>
-<summary>🤖 <strong>Extracting Structured Data with LLMs</strong></summary>
+<summary>📚 <strong>Extracting Structured Data with LLMs</strong></summary>
 
 ```python
 import os
@@ -480,74 +537,43 @@ async def test_news_crawl():
 </details>
 
 
-## Speed Comparison 🚀
-A test was conducted on **[NBC News - Business Section](https://www.nbcnews.com/business)** to compare Crawl4AI and Firecrawl, highlighting Crawl4AI's speed, efficiency, and advanced features.
+## ✨ New in 0.3.743   
 
----
+- 🚀 **Improved ManagedBrowser Configuration**: Dynamic host and port support for more flexible browser management.  
+- 📝 **Enhanced Markdown Generation**: New generator class for better formatting and customization.  
+- ⚡ **Fast HTML Formatting**: Significantly optimized HTML formatting in the web crawler.  
+- 🛠️ **Utility & Sanitization Upgrades**: Improved sanitization and expanded utility functions for streamlined workflows.  
+- 👥 **Acknowledgments**: Added contributor details and pull request acknowledgments for better transparency.  
 
-#### Results Summary  
 
-| **Method**                     | **Time Taken** | **Markdown Length** | **Fit Markdown** | **Images Found** |
-|--------------------------------|----------------|----------------------|-------------------|------------------|
-| **Firecrawl**                  | 6.04 seconds   | 38,382 characters    | -                 | 52               |
-| **Crawl4AI (Simple Crawl)**    | 1.06 seconds   | 42,027 characters    | -                 | 52               |
-| **Crawl4AI (Markdown Plus)**   | 1.30 seconds   | 54,342 characters    | 11,119 characters | 52               |
-| **Crawl4AI (JavaScript)**      | 1.56 seconds   | 75,869 characters    | 13,406 characters | 92               |
-
----
-
-#### Key Takeaways  
-
-1. **Superior Speed**: Crawl4AI processes even advanced crawls up to **6x faster** than Firecrawl, with times as low as **1.06 seconds**.  
-2. **Rich Content Extraction**: Crawl4AI consistently captures more comprehensive content, producing a **Markdown Plus** output of **54,342 characters**, compared to Firecrawl's **38,382 characters**.  
-3. **AI-Optimized Output**: With **Fit Markdown**, Crawl4AI removes noise to produce concise, AI-friendly outputs (**11,119–13,406 characters**) tailored for LLM workflows.  
-4. **Dynamic Content Handling**: Using JavaScript execution, Crawl4AI extracted **92 images** and enriched content dynamically loaded via “Load More” buttons—unmatched by Firecrawl.  
-
----
-
-#### Conclusion  
-
-Crawl4AI outshines Firecrawl in speed, completeness, and flexibility. Its advanced features, including **Markdown Plus**, **Fit Markdown**, and **dynamic content handling**, make it the ideal choice for AI-ready web crawling. Whether you're targeting rich structured data or handling complex dynamic websites, Crawl4AI delivers unmatched performance and precision.
-
-You can find the full comparison code in our repository at [docs/examples/quickstart_async.py](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/quickstart_async.py).
-
-## Documentation 📚
+## 📖 Documentation & Roadmap 
 
 For detailed documentation, including installation instructions, advanced features, and API reference, visit our [Documentation Website](https://crawl4ai.com/mkdocs/).
 
-## Crawl4AI Roadmap 🗺️
+Moreover to check our development plans and upcoming features, check out our [Roadmap](https://github.com/unclecode/crawl4ai/blob/main/ROADMAP.md).
 
-For detailed information on our development plans and upcoming features, check out our [Roadmap](https://github.com/unclecode/crawl4ai/blob/main/ROADMAP.md).
-
-### Advanced Crawling Systems 🔧
 - [x] 0. Graph Crawler: Smart website traversal using graph search algorithms for comprehensive nested page extraction
 - [ ] 1. Question-Based Crawler: Natural language driven web discovery and content extraction
 - [ ] 2. Knowledge-Optimal Crawler: Smart crawling that maximizes knowledge while minimizing data extraction
 - [ ] 3. Agentic Crawler: Autonomous system for complex multi-step crawling operations
-
-### Specialized Features 🛠️
 - [ ] 4. Automated Schema Generator: Convert natural language to extraction schemas
 - [ ] 5. Domain-Specific Scrapers: Pre-configured extractors for common platforms (academic, e-commerce)
 - [ ] 6. Web Embedding Index: Semantic search infrastructure for crawled content
-
-### Development Tools 🔨
 - [ ] 7. Interactive Playground: Web UI for testing, comparing strategies with AI assistance
 - [ ] 8. Performance Monitor: Real-time insights into crawler operations
 - [ ] 9. Cloud Integration: One-click deployment solutions across cloud providers
-
-### Community & Growth 🌱
 - [ ] 10. Sponsorship Program: Structured support system with tiered benefits
 - [ ] 11. Educational Content: "How to Crawl" video series and interactive tutorials
 
-## Contributing 🤝
+## 🤝 Contributing 
 
 We welcome contributions from the open-source community. Check out our [contribution guidelines](https://github.com/unclecode/crawl4ai/blob/main/CONTRIBUTING.md) for more information.
 
-## License 📄
+## 📄 License 
 
 Crawl4AI is released under the [Apache 2.0 License](https://github.com/unclecode/crawl4ai/blob/main/LICENSE).
 
-## Contact 📧
+## 📧 Contact 
 
 For questions, suggestions, or feedback, feel free to reach out:
 
@@ -558,7 +584,7 @@ For questions, suggestions, or feedback, feel free to reach out:
 Happy Crawling! 🕸️🚀
 
 
-# Mission
+## 🗾 Mission
 
 Our mission is to unlock the untapped potential of personal and enterprise data in the digital age. In today's world, individuals and organizations generate vast amounts of valuable digital footprints, yet this data remains largely uncapitalized as a true asset. 
 
@@ -570,13 +596,13 @@ This democratization of data represents the first step toward a shared data econ
 
 For a detailed exploration of our vision, opportunities, and pathway forward, please see our [full mission statement](./MISSION.md).
 
-## Key Opportunities
+### Key Opportunities
 
 - **Data Capitalization**: Transform digital footprints into valuable assets that can appear on personal and enterprise balance sheets
 - **Authentic Data**: Unlock the vast reservoir of real human insights and knowledge for AI advancement
 - **Shared Economy**: Create new value streams where data creators directly benefit from their contributions
 
-## Development Pathway
+### Development Pathway
 
 1. **Open-Source Foundation**: Building transparent, community-driven data extraction tools
 2. **Data Capitalization Platform**: Creating tools to structure and value digital assets
