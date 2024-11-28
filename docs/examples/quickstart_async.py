@@ -534,31 +534,31 @@ async def fit_markdown_remove_overlay():
 
 
 async def main():
-    # await simple_crawl()
-    # await simple_example_with_running_js_code()
-    # await simple_example_with_css_selector()
-    # await use_proxy()
-    # await capture_and_save_screenshot("https://www.example.com", os.path.join(__location__, "tmp/example_screenshot.jpg"))
-    # await extract_structured_data_using_css_extractor()
+    await simple_crawl()
+    await simple_example_with_running_js_code()
+    await simple_example_with_css_selector()
+    await use_proxy()
+    await capture_and_save_screenshot("https://www.example.com", os.path.join(__location__, "tmp/example_screenshot.jpg"))
+    await extract_structured_data_using_css_extractor()
 
-    # # LLM extraction examples
+    # LLM extraction examples
     # await extract_structured_data_using_llm()
     # await extract_structured_data_using_llm("huggingface/meta-llama/Meta-Llama-3.1-8B-Instruct", os.getenv("HUGGINGFACE_API_KEY"))
-    # await extract_structured_data_using_llm("openai/gpt-4o", os.getenv("OPENAI_API_KEY"))
     # await extract_structured_data_using_llm("ollama/llama3.2")    
+    await extract_structured_data_using_llm("openai/gpt-4o", os.getenv("OPENAI_API_KEY"))
 
-    # # You always can pass custom headers to the extraction strategy
-    # custom_headers = {
-    #     "Authorization": "Bearer your-custom-token",
-    #     "X-Custom-Header": "Some-Value"
-    # }
-    # await extract_structured_data_using_llm(extra_headers=custom_headers)
+    # You always can pass custom headers to the extraction strategy
+    custom_headers = {
+        "Authorization": "Bearer your-custom-token",
+        "X-Custom-Header": "Some-Value"
+    }
+    await extract_structured_data_using_llm(extra_headers=custom_headers)
     
-    # # await crawl_dynamic_content_pages_method_1()
-    # # await crawl_dynamic_content_pages_method_2()
-    # await crawl_dynamic_content_pages_method_3()
+    # await crawl_dynamic_content_pages_method_1()
+    # await crawl_dynamic_content_pages_method_2()
+    await crawl_dynamic_content_pages_method_3()
     
-    # await crawl_custom_browser_type()
+    await crawl_custom_browser_type()
     
     await speed_comparison()
 
