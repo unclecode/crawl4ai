@@ -26,8 +26,10 @@ from .utils import (
     sanitize_input_encode,
     InvalidCSSSelectorError,
     format_html,
-    fast_format_html
+    fast_format_html,
+    create_box_message
 )
+
 from urllib.parse import urlparse
 import random
 from .__version__ import __version__ as crawl4ai_version
@@ -326,15 +328,15 @@ class AsyncWebCrawler:
             if not hasattr(e, "msg"):
                 e.msg = str(e)
             # print(f"{Fore.RED}{self.tag_format('ERROR')} {self.log_icons['ERROR']} Failed to crawl {cache_context.display_url[:URL_LOG_SHORTEN_LENGTH]}... | {e.msg}{Style.RESET_ALL}")
+            
             self.logger.error_status(
                 url=cache_context.display_url,
-                error=e.msg,
+                error=create_box_message(e.msg, type = "error"),
                 tag="ERROR"
             )            
             return CrawlResult(
                 url=url, 
                 html="", 
-                markdown=f"[ERROR] 🚫 arun(): Failed to crawl {cache_context.display_url}, error: {e.msg}", 
                 success=False, 
                 error_message=e.msg
             )

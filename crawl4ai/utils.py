@@ -17,7 +17,8 @@ from requests.exceptions import InvalidSchema
 import hashlib
 from typing import Optional, Tuple, Dict, Any
 import xxhash
-
+from colorama import Fore, Style, init
+import textwrap
 
 from .html2text import HTML2Text
 class CustomHTML2Text(HTML2Text):
@@ -103,11 +104,66 @@ class CustomHTML2Text(HTML2Text):
             self.preserved_content.append(data)
             return
         super().handle_data(data, entity_char)
-
-
-
 class InvalidCSSSelectorError(Exception):
     pass
+
+
+def create_box_message(
+   message: str, 
+   type: str = "info", 
+   width: int = 80, 
+   add_newlines: bool = True,
+   double_line: bool = False
+) -> str:
+   init()
+   
+   # Define border and text colors for different types
+   styles = {
+       "warning": (Fore.YELLOW, Fore.LIGHTYELLOW_EX, "⚠"),
+       "info": (Fore.BLUE, Fore.LIGHTBLUE_EX, "ℹ"), 
+       "success": (Fore.GREEN, Fore.LIGHTGREEN_EX, "✓"),
+       "error": (Fore.RED, Fore.LIGHTRED_EX, "×"),
+   }
+   
+   border_color, text_color, prefix = styles.get(type.lower(), styles["info"])
+   
+   # Define box characters based on line style
+   box_chars = {
+       "single": ("─", "│", "┌", "┐", "└", "┘"),
+       "double": ("═", "║", "╔", "╗", "╚", "╝")
+   }
+   line_style = "double" if double_line else "single"
+   h_line, v_line, tl, tr, bl, br = box_chars[line_style]
+   
+   # Process lines with lighter text color
+   formatted_lines = []
+   raw_lines = message.split('\n')
+   
+   if raw_lines:
+       first_line = f"{prefix} {raw_lines[0].strip()}"
+       wrapped_first = textwrap.fill(first_line, width=width-4)
+       formatted_lines.extend(wrapped_first.split('\n'))
+       
+       for line in raw_lines[1:]:
+           if line.strip():
+               wrapped = textwrap.fill(f"  {line.strip()}", width=width-4)
+               formatted_lines.extend(wrapped.split('\n'))
+           else:
+               formatted_lines.append("")
+   
+   # Create the box with colored borders and lighter text
+   horizontal_line = h_line * (width - 1)
+   box = [
+       f"{border_color}{tl}{horizontal_line}{tr}",
+       *[f"{border_color}{v_line}{text_color} {line:<{width-2}}{border_color}{v_line}" for line in formatted_lines],
+       f"{border_color}{bl}{horizontal_line}{br}{Style.RESET_ALL}"
+   ]
+   
+   result = "\n".join(box)
+   if add_newlines:
+       result = f"\n{result}\n"
+   
+   return result
 
 def calculate_semaphore_count():
     cpu_count = os.cpu_count()

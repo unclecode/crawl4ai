@@ -15,7 +15,7 @@ import hashlib
 import json
 import uuid
 from .models import AsyncCrawlResponse
-
+from .utils import create_box_message
 from playwright_stealth import StealthConfig, stealth_async
 
 stealth_config = StealthConfig(
@@ -321,10 +321,10 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         "--disable-infobars",
                         "--window-position=0,0",
                         "--ignore-certificate-errors",
-                        "--ignore-certificate-errors-spki-list",
+                        "--ignore-certificate-errors-spki-list"
                     ]
                 }
-
+                
                 # Add channel if specified (try Chrome first)
                 if self.chrome_channel:
                     browser_args["channel"] = self.chrome_channel
@@ -765,12 +765,15 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 await self.execute_hook('before_goto', page, context = context)
                 
 
-                response = await page.goto(
-                    url,
-                    # wait_until=kwargs.get("wait_until", ["domcontentloaded", "networkidle"]),
-                    wait_until=kwargs.get("wait_until", "domcontentloaded"),
-                    timeout=kwargs.get("page_timeout", 60000)
-                )
+                try:
+                    response = await page.goto(
+                        url,
+                        # wait_until=kwargs.get("wait_until", ["domcontentloaded", "networkidle"]),
+                        wait_until=kwargs.get("wait_until", "domcontentloaded"),
+                        timeout=kwargs.get("page_timeout", 60000),
+                    )
+                except Error as e:
+                    raise RuntimeError(f"Failed on navigating ACS-GOTO :\n{str(e)}")
                 
                 # response = await page.goto("about:blank")
                 # await page.evaluate(f"window.location.href = '{url}'")
