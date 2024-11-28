@@ -11,20 +11,15 @@
 
 Crawl4AI simplifies asynchronous web crawling and data extraction, making it accessible for large language models (LLMs) and AI applications. 🆓🌐
 
-## New in 0.3.74 ✨
+## New in 0.3.743 ✨  
 
-- 🚀 **Blazing Fast Scraping**: Significantly improved scraping speed.  
-- 📥 **Download Manager**: Integrated file crawling, downloading, and tracking within `CrawlResult`.  
-- 📝 **Markdown Strategy**: Flexible system for custom markdown generation and formats.  
-- 🔗 **LLM-Friendly Citations**: Auto-converts links to numbered citations with reference lists.  
-- 🔎 **Markdown Filter**: BM25-based content extraction for cleaner, relevant markdown.  
-- 🖼️ **Image Extraction**: Supports `srcset`, `picture`, and responsive image formats.  
-- 🗂️ **Local/Raw HTML**: Crawl `file://` paths and raw HTML (`raw:`) directly.  
-- 🤖 **Browser Control**: Custom browser setups with stealth integration to bypass bots.  
-- ☁️ **API & Cache Boost**: CORS, static serving, and enhanced filesystem-based caching.  
-- 🐳 **API Gateway**: Run as an API service with secure token authentication.  
-- 🛠️ **Database Upgrades**: Optimized for larger content sets with faster caching.  
-- 🐛 **Bug Fixes**: Resolved browser context issues, memory leaks, and improved error handling.
+🚀 **Improved ManagedBrowser Configuration**: Dynamic host and port support for more flexible browser management.  
+📝 **Enhanced Markdown Generation**: New generator class for better formatting and customization.  
+⚡ **Fast HTML Formatting**: Significantly optimized HTML formatting in the web crawler.  
+🛠️ **Utility & Sanitization Upgrades**: Improved sanitization and expanded utility functions for streamlined workflows.  
+👥 **Acknowledgments**: Added contributor details and pull request acknowledgments for better transparency.  
+📖 **Documentation Updates**: Clearer usage scenarios and updated guidance for better user onboarding.  
+🧪 **Test Adjustments**: Refined tests to align with recent class name changes.  
 
 
 ## Try it Now!
@@ -35,31 +30,85 @@ Crawl4AI simplifies asynchronous web crawling and data extraction, making it acc
 
 ## Features ✨
 
-- 🆓 Completely free and open-source
-- 🚀 Blazing fast performance, outperforming many paid services
-- 🤖 LLM-friendly output formats (JSON, cleaned HTML, markdown)
-- 🌐 Multi-browser support (Chromium, Firefox, WebKit)
-- 🌍 Supports crawling multiple URLs simultaneously
-- 🎨 Extracts and returns all media tags (Images, Audio, and Video)
-- 🔗 Extracts all external and internal links
-- 📚 Extracts metadata from the page
-- 🔄 Custom hooks for authentication, headers, and page modifications
-- 🕵️ User-agent customization
-- 🖼️ Takes screenshots of pages with enhanced error handling
-- 📜 Executes multiple custom JavaScripts before crawling
-- 📊 Generates structured output without LLM using JsonCssExtractionStrategy
-- 📚 Various chunking strategies: topic-based, regex, sentence, and more
-- 🧠 Advanced extraction strategies: cosine clustering, LLM, and more
-- 🎯 CSS selector support for precise data extraction
-- 📝 Passes instructions/keywords to refine extraction
-- 🔒 Proxy support with authentication for enhanced access
-- 🔄 Session management for complex multi-page crawling
-- 🌐 Asynchronous architecture for improved performance
-- 🖼️ Improved image processing with lazy-loading detection
-- 🕰️ Enhanced handling of delayed content loading
-- 🔑 Custom headers support for LLM interactions
-- 🖼️ iframe content extraction for comprehensive analysis
-- ⏱️ Flexible timeout and delayed content retrieval options
+<details open>
+<summary>🚀 <strong>Performance & Scalability</strong></summary>
+
+- ⚡ **Blazing Fast Scraping**: Outperforms many paid services with cutting-edge optimization.
+- 🔄 **Asynchronous Architecture**: Enhanced performance for complex multi-page crawling.
+- ⚡ **Dynamic HTML Formatting**: New, fast HTML formatting for streamlined workflows.
+- 🗂️ **Large Dataset Optimization**: Improved caching for handling massive content sets.
+
+</details>
+
+<details>
+<summary>🔎 <strong>Extraction Capabilities</strong></summary>
+
+- 🖼️ **Comprehensive Media Support**: Extracts images, audio, video, and responsive image formats like `srcset` and `picture`.
+- 📚 **Advanced Content Chunking**: Topic-based, regex, sentence-level, and cosine clustering strategies.
+- 🎯 **Precise Data Extraction**: Supports CSS selectors and keyword-based refinements.
+- 🔗 **All-Inclusive Link Crawling**: Extracts internal and external links.
+- 📝 **Markdown Generation**: Enhanced markdown generator class for custom, clean, LLM-friendly outputs.
+- 🏷️ **Metadata Extraction**: Fetches metadata directly from pages.
+
+</details>
+
+<details>
+<summary>🌐 <strong>Browser Integration</strong></summary>
+
+- 🌍 **Multi-Browser Support**: Works with Chromium, Firefox, and WebKit.
+- 🖥️ **ManagedBrowser with Dynamic Config**: Flexible host/port control for tailored setups.
+- ⚙️ **Custom Browser Hooks**: Authentication, headers, and page modifications.
+- 🕶️ **Stealth Mode**: Bypasses bot detection with advanced techniques.
+- 📸 **Screenshots & JavaScript Execution**: Takes screenshots and executes custom JavaScript before crawling.
+
+</details>
+
+<details>
+<summary>📁 <strong>Input/Output Flexibility</strong></summary>
+
+- 📂 **Local & Raw HTML Crawling**: Directly processes `file://` paths and raw HTML.
+- 🌐 **Custom Headers for LLM**: Tailored headers for enhanced AI interactions.
+- 🛠️ **Structured Output Options**: Supports JSON, cleaned HTML, and markdown outputs.
+
+</details>
+
+<details>
+<summary>🔧 <strong>Utility & Debugging</strong></summary>
+
+- 🛡️ **Error Handling**: Robust error management for seamless execution.
+- 🔐 **Session Management**: Handles complex, multi-page interactions.
+- 🧹 **Utility Functions**: Enhanced sanitization and flexible extraction helpers.
+- 🕰️ **Delayed Content Loading**: Improved handling of lazy-loading and dynamic content.
+
+</details>
+
+<details>
+<summary>🔐 <strong>Security & Accessibility</strong></summary>
+
+- 🕵️ **Proxy Support**: Enables authenticated access for restricted pages.
+- 🚪 **API Gateway**: Deploy as an API service with secure token authentication.
+- 🌐 **CORS & Static Serving**: Enhanced support for filesystem-based caching and cross-origin requests.
+
+</details>
+
+<details>
+<summary>🌟 <strong>Community & Documentation</strong></summary>
+
+- 🙌 **Contributor Acknowledgments**: Recognition for pull requests and contributions.
+- 📖 **Clear Documentation**: Simplified and updated for better onboarding and usage.
+
+</details>
+
+<details>
+<summary>🎯 <strong>Cutting-Edge Features</strong></summary>
+
+- 🛠️ **BM25-Based Markdown Filtering**: Extracts cleaner, context-relevant markdown.
+- 📚 **LLM-Friendly Citations**: Auto-converts links to numbered citations with reference lists.
+- 📡 **IFrame Content Extraction**: Comprehensive analysis for embedded content.
+- 🕰️ **Flexible Content Retrieval**: Combines timing-based strategies for reliable extractions.
+
+</details>
+
 
 ## Installation 🛠️
 
