@@ -10,10 +10,18 @@ We would like to thank the following people for their contributions to Crawl4AI:
 
 ## Community Contributors
 
+- [aadityakanjolia4](https://github.com/aadityakanjolia4) - Fix for `CustomHTML2Text` is not defined.
 - [FractalMind](https://github.com/FractalMind) - Created the first official Docker Hub image and fixed Dockerfile errors
 - [ketonkss4](https://github.com/ketonkss4) - Identified Selenium's new capabilities, helping reduce dependencies
 - [jonymusky](https://github.com/jonymusky) - Javascript execution documentation, and wait_for
 - [datehoer](https://github.com/datehoer) - Add browser prxy support
+
+## Pull Requests
+
+- [nelzomal](https://github.com/nelzomal) - Enhance development installation instructions [#286](https://github.com/unclecode/crawl4ai/pull/286)
+- [HamzaFarhan](https://github.com/HamzaFarhan) - Handled the cases where markdown_with_citations, references_markdown, and filtered_html might not be defined [#293](https://github.com/unclecode/crawl4ai/pull/293)
+- [NanmiCoder](https://github.com/NanmiCoder) - fix: crawler strategy exception handling and fixes [#271](https://github.com/unclecode/crawl4ai/pull/271)
+
 
 ## Other Contributors
 

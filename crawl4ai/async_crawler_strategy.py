@@ -35,13 +35,14 @@ stealth_config = StealthConfig(
 
 
 class ManagedBrowser:
-    def __init__(self, browser_type: str = "chromium", user_data_dir: Optional[str] = None, headless: bool = False, logger = None):
+    def __init__(self, browser_type: str = "chromium", user_data_dir: Optional[str] = None, headless: bool = False, logger = None, host: str = "localhost", debugging_port: int = 9222):
         self.browser_type = browser_type
         self.user_data_dir = user_data_dir
         self.headless = headless
         self.browser_process = None
         self.temp_dir = None
-        self.debugging_port = 9222
+        self.debugging_port = debugging_port
+        self.host = host
         self.logger = logger
         self.shutting_down = False
 
@@ -70,7 +71,7 @@ class ManagedBrowser:
             # Monitor browser process output for errors
             asyncio.create_task(self._monitor_browser_process())
             await asyncio.sleep(2)  # Give browser time to start
-            return f"http://localhost:{self.debugging_port}"
+            return f"http://{self.host}:{self.debugging_port}"
         except Exception as e:
             await self.cleanup()
             raise Exception(f"Failed to start browser: {e}")
@@ -416,13 +417,13 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         else:
             raise ValueError(f"Invalid hook type: {hook_type}")
 
-    async def execute_hook(self, hook_type: str, *args):
+    async def execute_hook(self, hook_type: str, *args, **kwargs):
         hook = self.hooks.get(hook_type)
         if hook:
             if asyncio.iscoroutinefunction(hook):
-                return await hook(*args)
+                return await hook(*args, **kwargs)
             else:
-                return hook(*args)
+                return hook(*args, **kwargs)
         return args[0] if args else None
 
     def update_user_agent(self, user_agent: str):
@@ -642,6 +643,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         session_id = kwargs.get("session_id")
         
         # Handle page creation differently for managed browser
+        context = None
         if self.use_managed_browser:
             if session_id:
                 # Reuse existing session if available
@@ -760,7 +762,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     return response
 
             if not kwargs.get("js_only", False):
-                await self.execute_hook('before_goto', page)
+                await self.execute_hook('before_goto', page, context = context)
                 
 
                 response = await page.goto(
@@ -773,7 +775,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 # response = await page.goto("about:blank")
                 # await page.evaluate(f"window.location.href = '{url}'")
                 
-                await self.execute_hook('after_goto', page)
+                await self.execute_hook('after_goto', page, context = context)
                 
                 # Get status code and headers
                 status_code = response.status
@@ -838,7 +840,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 # await page.wait_for_timeout(100)
                 
                 # Check for on execution event
-                await self.execute_hook('on_execution_started', page)
+                await self.execute_hook('on_execution_started', page, context = context)
                 
             if kwargs.get("simulate_user", False) or kwargs.get("magic", False):
                 # Simulate user interactions
@@ -924,7 +926,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             if kwargs.get("process_iframes", False):
                 page = await self.process_iframes(page)
             
-            await self.execute_hook('before_retrieve_html', page)
+            await self.execute_hook('before_retrieve_html', page, context = context)
             # Check if delay_before_return_html is set then wait for that time
             delay_before_return_html = kwargs.get("delay_before_return_html")
             if delay_before_return_html:
@@ -935,7 +937,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 await self.remove_overlay_elements(page)
             
             html = await page.content()
-            await self.execute_hook('before_return_html', page, html)
+            await self.execute_hook('before_return_html', page, html, context = context)
             
             # Check if kwargs has screenshot=True then take screenshot
             screenshot_data = None

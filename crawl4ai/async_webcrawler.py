@@ -25,7 +25,8 @@ from .config import (
 from .utils import (
     sanitize_input_encode,
     InvalidCSSSelectorError,
-    format_html
+    format_html,
+    fast_format_html
 )
 from urllib.parse import urlparse
 import random
@@ -534,16 +535,17 @@ class AsyncWebCrawler:
                     "timing": time.perf_counter() - t1
                 }
             )
-        
-
-                
 
         screenshot = None if not screenshot else screenshot
+        
+        
+        if kwargs.get("prettiify", False):
+            cleaned_html = fast_format_html(cleaned_html)
         
         return CrawlResult(
             url=url,
             html=html,
-            cleaned_html=format_html(cleaned_html),
+            cleaned_html=cleaned_html,
             markdown_v2=markdown_v2,
             markdown=markdown,
             fit_markdown=fit_markdown,

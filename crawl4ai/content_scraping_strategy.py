@@ -10,7 +10,7 @@ from urllib.parse import urljoin
 from requests.exceptions import InvalidSchema
 # from .content_cleaning_strategy import ContentCleaningStrategy
 from .content_filter_strategy import RelevantContentFilter, BM25ContentFilter#, HeuristicContentFilter
-from .markdown_generation_strategy import MarkdownGenerationStrategy, DefaultMarkdownGenerationStrategy
+from .markdown_generation_strategy import MarkdownGenerationStrategy, DefaultMarkdownGenerator
 from .models import MarkdownGenerationResult
 from .utils import (
     sanitize_input_encode,
@@ -105,21 +105,28 @@ class WebScrapingStrategy(ContentScrapingStrategy):
         Returns:
             Dict containing markdown content in various formats
         """
-        markdown_generator: Optional[MarkdownGenerationStrategy] = kwargs.get('markdown_generator', DefaultMarkdownGenerationStrategy())
+        markdown_generator: Optional[MarkdownGenerationStrategy] = kwargs.get('markdown_generator', DefaultMarkdownGenerator())
         
         if markdown_generator:
             try:
+                if kwargs.get('fit_markdown', False) and not markdown_generator.content_filter:
+                        markdown_generator.content_filter = BM25ContentFilter(
+                            user_query=kwargs.get('fit_markdown_user_query', None),
+                            bm25_threshold=kwargs.get('fit_markdown_bm25_threshold', 1.0)
+                        )
+                
                 markdown_result: MarkdownGenerationResult = markdown_generator.generate_markdown(
                     cleaned_html=cleaned_html,
                     base_url=url,
-                    html2text_options=kwargs.get('html2text', {}),
-                    content_filter=kwargs.get('content_filter', None)
+                    html2text_options=kwargs.get('html2text', {})
                 )
+                
+                help_message = """"""
                 
                 return {
                     'markdown': markdown_result.raw_markdown,  
-                    'fit_markdown': markdown_result.fit_markdown or "Set flag 'fit_markdown' to True to get cleaned HTML content.",
-                    'fit_html': markdown_result.fit_html or "Set flag 'fit_markdown' to True to get cleaned HTML content.",
+                    'fit_markdown': markdown_result.fit_markdown,
+                    'fit_html': markdown_result.fit_html, 
                     'markdown_v2': markdown_result
                 }
             except Exception as e:
