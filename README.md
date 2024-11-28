@@ -1,6 +1,4 @@
-# 🔥🕷️ Crawl4AI: LLM Friendly Web Crawler & Scraper
-
-[✨ Check out what's new in the latest update!](#new-in-03743)
+# 🔥🕷️ Crawl4AI: Crawl Smarter, Faster, Freely. For AI.
 
 <a href="https://trendshift.io/repositories/11716" target="_blank"><img src="https://trendshift.io/api/badge/repositories/11716" alt="unclecode%2Fcrawl4ai | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 
@@ -11,11 +9,9 @@
 [![GitHub Pull Requests](https://img.shields.io/github/issues-pr/unclecode/crawl4ai)](https://github.com/unclecode/crawl4ai/pulls)
 [![License](https://img.shields.io/github/license/unclecode/crawl4ai)](https://github.com/unclecode/crawl4ai/blob/main/LICENSE)
 
-## 🔥 Crawl4AI: Crawl Smarter, Faster, Freely. For AI.  
-
 Crawl4AI is the #1 trending GitHub repository, actively maintained by a vibrant community. It delivers blazing-fast, AI-ready web crawling tailored for LLMs, AI agents, and data pipelines. Open source, flexible, and built for real-time performance, Crawl4AI empowers developers with unmatched speed, precision, and deployment ease.  
 
-[✨ Check out what's new in the latest update!](#new-in-03743)
+[✨ Check out what's new in the latest update!](#recent-updates)  
 
 ## 🧐 Why Crawl4AI?
 
@@ -537,7 +533,7 @@ async def test_news_crawl():
 </details>
 
 
-## ✨ New in 0.3.743   
+## ✨ Recent Updates   
 
 - 🚀 **Improved ManagedBrowser Configuration**: Dynamic host and port support for more flexible browser management.  
 - 📝 **Enhanced Markdown Generation**: New generator class for better formatting and customization.  
