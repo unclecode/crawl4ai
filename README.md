@@ -545,6 +545,9 @@ For detailed documentation, including installation instructions, advanced featur
 
 Moreover to check our development plans and upcoming features, check out our [Roadmap](https://github.com/unclecode/crawl4ai/blob/main/ROADMAP.md).
 
+<details>
+<summary>📈 <strong>Development TODOs</strong></summary>
+
 - [x] 0. Graph Crawler: Smart website traversal using graph search algorithms for comprehensive nested page extraction
 - [ ] 1. Question-Based Crawler: Natural language driven web discovery and content extraction
 - [ ] 2. Knowledge-Optimal Crawler: Smart crawling that maximizes knowledge while minimizing data extraction
@@ -557,6 +560,8 @@ Moreover to check our development plans and upcoming features, check out our [Ro
 - [ ] 9. Cloud Integration: One-click deployment solutions across cloud providers
 - [ ] 10. Sponsorship Program: Structured support system with tiered benefits
 - [ ] 11. Educational Content: "How to Crawl" video series and interactive tutorials
+
+</details>
 
 ## 🤝 Contributing 
 
@@ -576,32 +581,32 @@ For questions, suggestions, or feedback, feel free to reach out:
 
 Happy Crawling! 🕸️🚀
 
-
 ## 🗾 Mission
 
-Our mission is to unlock the untapped potential of personal and enterprise data in the digital age. In today's world, individuals and organizations generate vast amounts of valuable digital footprints, yet this data remains largely uncapitalized as a true asset. 
+Our mission is to unlock the value of personal and enterprise data by transforming digital footprints into structured, tradeable assets. Crawl4AI empowers individuals and organizations with open-source tools to extract and structure data, fostering a shared data economy.  
 
-Our open-source solution empowers developers and innovators to build tools for data extraction and structuring, laying the foundation for a new era of data ownership. By transforming personal and enterprise data into structured, tradeable assets, we're creating opportunities for individuals to capitalize on their digital footprints and for organizations to unlock the value of their collective knowledge.
+We envision a future where AI is powered by real human knowledge, ensuring data creators directly benefit from their contributions. By democratizing data and enabling ethical sharing, we are laying the foundation for authentic AI advancement.
 
-This democratization of data represents the first step toward a shared data economy, where willing participation in data sharing drives AI advancement while ensuring the benefits flow back to data creators. Through this approach, we're building a future where AI development is powered by authentic human knowledge rather than synthetic alternatives.
+<details>
+<summary>🔑 <strong>Key Opportunities</strong></summary>
+ 
+- **Data Capitalization**: Transform digital footprints into measurable, valuable assets.  
+- **Authentic AI Data**: Provide AI systems with real human insights.  
+- **Shared Economy**: Create a fair data marketplace that benefits data creators.  
 
-![Mission Diagram](./docs/assets/pitch-dark.svg)
+</details>
 
-For a detailed exploration of our vision, opportunities, and pathway forward, please see our [full mission statement](./MISSION.md).
+<details>
+<summary>🚀 <strong>Development Pathway</strong></summary>
 
-### Key Opportunities
+1. **Open-Source Tools**: Community-driven platforms for transparent data extraction.  
+2. **Digital Asset Structuring**: Tools to organize and value digital knowledge.  
+3. **Ethical Data Marketplace**: A secure, fair platform for exchanging structured data.  
 
-- **Data Capitalization**: Transform digital footprints into valuable assets that can appear on personal and enterprise balance sheets
-- **Authentic Data**: Unlock the vast reservoir of real human insights and knowledge for AI advancement
-- **Shared Economy**: Create new value streams where data creators directly benefit from their contributions
+For more details, see our [full mission statement](./MISSION.md).
+</details>
 
-### Development Pathway
 
-1. **Open-Source Foundation**: Building transparent, community-driven data extraction tools
-2. **Data Capitalization Platform**: Creating tools to structure and value digital assets
-3. **Shared Data Marketplace**: Establishing an economic platform for ethical data exchange
-
-For a detailed exploration of our vision, challenges, and solutions, please see our [full mission statement](./MISSION.md).
 
 
 ## Star History
