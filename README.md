@@ -15,13 +15,12 @@ Crawl4AI is the #1 trending GitHub repository, actively maintained by a vibrant 
 
 ## 🧐 Why Crawl4AI?
 
-1. **Built for LLMs**: Creates **smart, concise Markdown** optimized for applications like Retrieval-Augmented Generation (RAG) and fine-tuning.  
-2. **Lightning Fast**: Delivers results **6x faster** than competitors with real-time, cost-efficient performance.  
-3. **Flexible Browser Control**: Offers session management, proxies, and custom hooks for precise, seamless data access.  
-4. **Heuristic Intelligence**: Leverages **advanced algorithms** to extract data efficiently, reducing reliance on costly language models.  
-5. **Open Source & Deployable**: 100% open-source with no API keys or registration required-ready for **Docker and cloud integration**.  
-6. **Thriving Community**: Actively maintained by a vibrant developer community and the **#1 trending GitHub repository** across all languages.
-
+1. **Built for LLMs**: Creates smart, concise Markdown optimized for RAG and fine-tuning applications.  
+2. **Lightning Fast**: Delivers results 6x faster with real-time, cost-efficient performance.  
+3. **Flexible Browser Control**: Offers session management, proxies, and custom hooks for seamless data access.  
+4. **Heuristic Intelligence**: Uses advanced algorithms for efficient extraction, reducing reliance on costly models.  
+5. **Open Source & Deployable**: Fully open-source with no API keys—ready for Docker and cloud integration.  
+6. **Thriving Community**: Actively maintained by a vibrant community and the #1 trending GitHub repository.
 
 ## 🚀 Quick Start 
 
@@ -145,7 +144,7 @@ A test was conducted on **[NBC News - Business Section](https://www.nbcnews.com/
 
 </details>
 
-<details open>
+<details>
 <summary>⚡ <strong>Key Takeaways</strong></summary>
 
 1. **Superior Speed**: Crawl4AI processes even advanced crawls up to **6x faster** than Firecrawl, with times as low as **1.06 seconds**.  
@@ -155,7 +154,7 @@ A test was conducted on **[NBC News - Business Section](https://www.nbcnews.com/
 
 </details>
 
-<details open>
+<details>
 <summary>🏁 <strong>Conclusion</strong></summary>
 
 Crawl4AI outshines Firecrawl in speed, completeness, and flexibility. Its advanced features, including **Markdown Plus**, **Fit Markdown**, and **dynamic content handling**, make it the ideal choice for AI-ready web crawling. Whether you're targeting rich structured data or handling complex dynamic websites, Crawl4AI delivers unmatched performance and precision.
@@ -169,7 +168,7 @@ You can find the full comparison code in our repository at [docs/examples/quicks
 
 Crawl4AI offers flexible installation options to suit various use cases. You can install it as a Python package or use Docker.
 
-<details open>
+<details>
 <summary>🐍 <strong>Using pip</strong></summary>
 
 Choose the installation option that best fits your needs:
@@ -234,7 +233,7 @@ pip install -e ".[all]"             # Install all optional features
 
 </details>
 
-<details open>
+<details>
 <summary>🚀 <strong>One-Click Deployment</strong></summary>
 
 Deploy your own instance of Crawl4AI with one click:
@@ -251,7 +250,7 @@ The deploy will:
 
 </details>
 
-<details open>
+<details>
 <summary>🐳 <strong>Using Docker</strong></summary>
 
 Crawl4AI is available as Docker images for easy deployment. You can either pull directly from Docker Hub (recommended) or build from the repository.
@@ -325,13 +324,11 @@ For advanced configuration, environment variables, and usage examples, see our [
 </details>
 
 
-
-
 ## 🔬 Advanced Usage Examples 🔬
 
 You can check the project structure in the directory [https://github.com/unclecode/crawl4ai/docs/examples](docs/examples). Over there, you can find a variety of examples; here, some popular examples are shared.
 
-<details open>
+<details>
 <summary>📝 <strong>Heuristic Markdown Generation with Clean and Fit Markdown</strong></summary>
 
 ```python
@@ -362,7 +359,7 @@ if __name__ == "__main__":
 
 </details>
 
-<details open>
+<details>
 <summary>🖥️ <strong>Executing JavaScript & Extract Structured Data without LLMs</strong></summary>
 
 ```python
@@ -445,7 +442,7 @@ if __name__ == "__main__":
 
 </details>
 
-<details open>
+<details>
 <summary>📚 <strong>Extracting Structured Data with LLMs</strong></summary>
 
 ```python
@@ -485,7 +482,7 @@ if __name__ == "__main__":
 
 </details>
 
-<details open>
+<details>
 <summary>🤖 <strong>Using You own Browswer with Custome User Profile</strong></summary>
 
 ```python
