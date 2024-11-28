@@ -96,6 +96,7 @@ class DefaultMarkdownGenerator(MarkdownGenerationStrategy):
             )
 
         # Generate fit markdown if content filter is provided
+<<<<<<< HEAD
         fit_markdown: Optional[str] = ""
         filtered_html: Optional[str] = ""
         if content_filter or self.content_filter:
@@ -103,13 +104,15 @@ class DefaultMarkdownGenerator(MarkdownGenerationStrategy):
             filtered_html = content_filter.filter_content(cleaned_html)
             filtered_html = '\n'.join('<div>{}</div>'.format(s) for s in filtered_html)
             fit_markdown = h.handle(filtered_html)
+>>>>>>> origin/main
+            fit_markdown = h.handle(filtered_html)
 
         return MarkdownGenerationResult(
             raw_markdown=raw_markdown,
             markdown_with_citations=markdown_with_citations,
             references_markdown=references_markdown,
             fit_markdown=fit_markdown,
-            fit_html=filtered_html
+            fit_html=filtered_html,
         )
 
 def fast_urljoin(base: str, url: str) -> str:
