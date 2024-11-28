@@ -214,3 +214,4 @@ git_issues.md
 todo_executor.md
 protect-all-except-feature.sh
 manage-collab.sh
+publish.sh
