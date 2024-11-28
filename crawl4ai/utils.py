@@ -233,12 +233,17 @@ def sanitize_html(html):
 def sanitize_input_encode(text: str) -> str:
     """Sanitize input to handle potential encoding issues."""
     try:
-        # Attempt to encode and decode as UTF-8 to handle potential encoding issues
-        return text.encode('utf-8', errors='ignore').decode('utf-8')
-    except UnicodeEncodeError as e:
-        print(f"Warning: Encoding issue detected. Some characters may be lost. Error: {e}")
-        # Fall back to ASCII if UTF-8 fails
-        return text.encode('ascii', errors='ignore').decode('ascii')
+        try:
+            if not text:
+                return ''
+            # Attempt to encode and decode as UTF-8 to handle potential encoding issues
+            return text.encode('utf-8', errors='ignore').decode('utf-8')
+        except UnicodeEncodeError as e:
+            print(f"Warning: Encoding issue detected. Some characters may be lost. Error: {e}")
+            # Fall back to ASCII if UTF-8 fails
+            return text.encode('ascii', errors='ignore').decode('ascii')
+    except Exception as e:
+        raise ValueError(f"Error sanitizing input: {str(e)}") from e
 
 def escape_json_string(s):
     """
@@ -1079,8 +1084,53 @@ def wrap_text(draw, text, font, max_width):
     return '\n'.join(lines)
 
 def format_html(html_string):
-    soup = BeautifulSoup(html_string, 'html.parser')
+    soup = BeautifulSoup(html_string, 'lxml.parser')
     return soup.prettify()
+
+def fast_format_html(html_string):
+    """
+    A fast HTML formatter that uses string operations instead of parsing.
+    
+    Args:
+        html_string (str): The HTML string to format
+        
+    Returns:
+        str: The formatted HTML string
+    """
+    # Initialize variables
+    indent = 0
+    indent_str = "  "  # Two spaces for indentation
+    formatted = []
+    in_content = False
+    
+    # Split by < and > to separate tags and content
+    parts = html_string.replace('>', '>\n').replace('<', '\n<').split('\n')
+    
+    for part in parts:
+        if not part.strip():
+            continue
+            
+        # Handle closing tags
+        if part.startswith('</'):
+            indent -= 1
+            formatted.append(indent_str * indent + part)
+            
+        # Handle self-closing tags
+        elif part.startswith('<') and part.endswith('/>'):
+            formatted.append(indent_str * indent + part)
+            
+        # Handle opening tags
+        elif part.startswith('<'):
+            formatted.append(indent_str * indent + part)
+            indent += 1
+            
+        # Handle content between tags
+        else:
+            content = part.strip()
+            if content:
+                formatted.append(indent_str * indent + content)
+    
+    return '\n'.join(formatted)
 
 def normalize_url(href, base_url):
     """Normalize URLs to ensure consistent format"""

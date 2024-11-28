@@ -11,6 +11,8 @@ LINK_PATTERN = re.compile(r'!?\[([^\]]+)\]\(([^)]+?)(?:\s+"([^"]*)")?\)')
 
 class MarkdownGenerationStrategy(ABC):
     """Abstract base class for markdown generation strategies."""
+    def __init__(self, content_filter: Optional[RelevantContentFilter] = None):
+        self.content_filter = content_filter
     
     @abstractmethod
     def generate_markdown(self, 
@@ -23,8 +25,10 @@ class MarkdownGenerationStrategy(ABC):
         """Generate markdown from cleaned HTML."""
         pass
 
-class DefaultMarkdownGenerationStrategy(MarkdownGenerationStrategy):
+class DefaultMarkdownGenerator(MarkdownGenerationStrategy):
     """Default implementation of markdown generation strategy."""
+    def __init__(self, content_filter: Optional[RelevantContentFilter] = None):
+        super().__init__(content_filter)
     
     def convert_links_to_citations(self, markdown: str, base_url: str = "") -> Tuple[str, str]:
         link_map = {}
@@ -84,14 +88,18 @@ class DefaultMarkdownGenerationStrategy(MarkdownGenerationStrategy):
         raw_markdown = raw_markdown.replace('    ```', '```')
 
         # Convert links to citations
+        markdown_with_citations: str = ""
+        references_markdown: str = ""
         if citations:
             markdown_with_citations, references_markdown = self.convert_links_to_citations(
                 raw_markdown, base_url
             )
 
         # Generate fit markdown if content filter is provided
-        fit_markdown: Optional[str] = None
-        if content_filter:
+        fit_markdown: Optional[str] = ""
+        filtered_html: Optional[str] = ""
+        if content_filter or self.content_filter:
+            content_filter = content_filter or self.content_filter
             filtered_html = content_filter.filter_content(cleaned_html)
             filtered_html = '\n'.join('<div>{}</div>'.format(s) for s in filtered_html)
             fit_markdown = h.handle(filtered_html)

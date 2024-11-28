@@ -18,7 +18,7 @@ Let's see how we can customize the AsyncWebCrawler using hooks! In this example,
 import asyncio
 from crawl4ai import AsyncWebCrawler
 from crawl4ai.async_crawler_strategy import AsyncPlaywrightCrawlerStrategy
-from playwright.async_api import Page, Browser
+from playwright.async_api import Page, Browser, BrowserContext
 
 async def on_browser_created(browser: Browser):
     print("[HOOK] on_browser_created")
@@ -71,7 +71,11 @@ from crawl4ai.async_crawler_strategy import AsyncPlaywrightCrawlerStrategy
 async def main():
     print("\n🔗 Using Crawler Hooks: Let's see how we can customize the AsyncWebCrawler using hooks!")
     
-    crawler_strategy = AsyncPlaywrightCrawlerStrategy(verbose=True)
+    initial_cookies = [
+        {"name": "sessionId", "value": "abc123", "domain": ".example.com"},
+        {"name": "userId", "value": "12345", "domain": ".example.com"}
+    ]
+    crawler_strategy = AsyncPlaywrightCrawlerStrategy(verbose=True, cookies=initial_cookies)
     crawler_strategy.set_hook('on_browser_created', on_browser_created)
     crawler_strategy.set_hook('before_goto', before_goto)
     crawler_strategy.set_hook('after_goto', after_goto)
