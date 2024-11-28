@@ -9,7 +9,8 @@ import asyncio
 
 # Create the .crawl4ai folder in the user's home directory if it doesn't exist
 # If the folder already exists, remove the cache folder
-crawl4ai_folder = Path(os.getenv("CRAWL4_AI_BASE_DIRECTORY")) or Path.home()
+base_dir = os.getenv("CRAWL4_AI_BASE_DIRECTORY")
+crawl4ai_folder = Path(base_dir) if base_dir else Path.home()
 crawl4ai_folder = crawl4ai_folder / ".crawl4ai"
 cache_folder = crawl4ai_folder / "cache"
 content_folders = [
