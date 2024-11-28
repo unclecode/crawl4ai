@@ -125,34 +125,6 @@ if __name__ == "__main__":
 
 ✨ Visit our [Documentation Website](https://crawl4ai.com/mkdocs/)
 
-## Features ✨
-
-- 🆓 Completely free and open-source
-- 🚀 Blazing fast performance, outperforming many paid services
-- 🤖 LLM-friendly output formats (JSON, cleaned HTML, markdown)
-- 🌐 Multi-browser support (Chromium, Firefox, WebKit)
-- 🌍 Supports crawling multiple URLs simultaneously
-- 🎨 Extracts and returns all media tags (Images, Audio, and Video)
-- 🔗 Extracts all external and internal links
-- 📚 Extracts metadata from the page
-- 🔄 Custom hooks for authentication, headers, and page modifications
-- 🕵️ User-agent customization
-- 🖼️ Takes screenshots of pages with enhanced error handling
-- 📜 Executes multiple custom JavaScripts before crawling
-- 📊 Generates structured output without LLM using JsonCssExtractionStrategy
-- 📚 Various chunking strategies: topic-based, regex, sentence, and more
-- 🧠 Advanced extraction strategies: cosine clustering, LLM, and more
-- 🎯 CSS selector support for precise data extraction
-- 📝 Passes instructions/keywords to refine extraction
-- 🔒 Proxy support with authentication for enhanced access
-- 🔄 Session management for complex multi-page crawling
-- 🌐 Asynchronous architecture for improved performance
-- 🖼️ Improved image processing with lazy-loading detection
-- 🕰️ Enhanced handling of delayed content loading
-- 🔑 Custom headers support for LLM interactions
-- 🖼️ iframe content extraction for comprehensive analysis
-- ⏱️ Flexible timeout and delayed content retrieval options
-
 ## Installation 🛠️
 
 Crawl4AI offers flexible installation options to suit various use cases. You can install it as a Python package or use Docker.
