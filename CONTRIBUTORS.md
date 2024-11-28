@@ -21,6 +21,7 @@ We would like to thank the following people for their contributions to Crawl4AI:
 - [nelzomal](https://github.com/nelzomal) - Enhance development installation instructions [#286](https://github.com/unclecode/crawl4ai/pull/286)
 - [HamzaFarhan](https://github.com/HamzaFarhan) - Handled the cases where markdown_with_citations, references_markdown, and filtered_html might not be defined [#293](https://github.com/unclecode/crawl4ai/pull/293)
 - [NanmiCoder](https://github.com/NanmiCoder) - fix: crawler strategy exception handling and fixes [#271](https://github.com/unclecode/crawl4ai/pull/271)
+- [paulokuong](https://github.com/paulokuong) - fix: RAWL4_AI_BASE_DIRECTORY should be Path object instead of string [#298](https://github.com/unclecode/crawl4ai/pull/298)
 
 
 ## Other Contributors
