@@ -32,7 +32,7 @@ print("Website: https://crawl4ai.com")
 async def simple_crawl():
     print("\n--- Basic Usage ---")
     async with AsyncWebCrawler(verbose=True) as crawler:
-        result = await crawler.arun(url="https://www.nbcnews.com/business")
+        result = await crawler.arun(url="https://www.nbcnews.com/business", cache_mode= CacheMode.BYPASS)
         print(result.markdown[:500])  # Print first 500 characters
 
 async def simple_example_with_running_js_code():
@@ -76,16 +76,17 @@ async def use_proxy():
     async with AsyncWebCrawler(verbose=True, proxy="http://your-proxy-url:port") as crawler:
         result = await crawler.arun(
             url="https://www.nbcnews.com/business",
-            bypass_cache=True
+            cache_mode= CacheMode.BYPASS
         )
-        print(result.markdown[:500])  # Print first 500 characters
+        if result.success:
+            print(result.markdown[:500])  # Print first 500 characters
 
 async def capture_and_save_screenshot(url: str, output_path: str):
     async with AsyncWebCrawler(verbose=True) as crawler:
         result = await crawler.arun(
             url=url,
             screenshot=True,
-            bypass_cache=True
+            cache_mode= CacheMode.BYPASS
         )
         
         if result.success and result.screenshot:
@@ -141,41 +142,68 @@ async def extract_structured_data_using_llm(provider: str, api_token: str = None
 async def extract_structured_data_using_css_extractor():
     print("\n--- Using JsonCssExtractionStrategy for Fast Structured Output ---")
     schema = {
-        "name": "Coinbase Crypto Prices",
-        "baseSelector": ".cds-tableRow-t45thuk",
-        "fields": [
-            {
-                "name": "crypto",
-                "selector": "td:nth-child(1) h2",
-                "type": "text",
-            },
-            {
-                "name": "symbol",
-                "selector": "td:nth-child(1) p",
-                "type": "text",
-            },
-            {
-                "name": "price",
-                "selector": "td:nth-child(2)",
-                "type": "text",
+    "name": "KidoCode Courses",
+    "baseSelector": "section.charge-methodology .w-tab-content > div",
+    "fields": [
+        {
+            "name": "section_title",
+            "selector": "h3.heading-50",
+            "type": "text",
+        },
+        {
+            "name": "section_description",
+            "selector": ".charge-content",
+            "type": "text",
+        },
+        {
+            "name": "course_name",
+            "selector": ".text-block-93",
+            "type": "text",
+        },
+        {
+            "name": "course_description",
+            "selector": ".course-content-text",
+            "type": "text",
+        },
+        {
+            "name": "course_icon",
+            "selector": ".image-92",
+            "type": "attribute",
+            "attribute": "src"
+        }
+    ]
+}
+
+    async with AsyncWebCrawler(
+        headless=True,
+        verbose=True
+    ) as crawler:
+        
+        # Create the JavaScript that handles clicking multiple times
+        js_click_tabs = """
+        (async () => {
+            const tabs = document.querySelectorAll("section.charge-methodology .tabs-menu-3 > div");
+            
+            for(let tab of tabs) {
+                // scroll to the tab
+                tab.scrollIntoView();
+                tab.click();
+                // Wait for content to load and animations to complete
+                await new Promise(r => setTimeout(r, 500));
             }
-        ],
-    }
+        })();
+        """     
 
-    extraction_strategy = JsonCssExtractionStrategy(schema, verbose=True)
-
-    async with AsyncWebCrawler(verbose=True) as crawler:
         result = await crawler.arun(
-            url="https://www.coinbase.com/explore",
-            extraction_strategy=extraction_strategy,
-            cache_mode=CacheMode.BYPASS,
+            url="https://www.kidocode.com/degrees/technology",
+            extraction_strategy=JsonCssExtractionStrategy(schema, verbose=True),
+            js_code=[js_click_tabs],
+            cache_mode=CacheMode.BYPASS
         )
 
-        assert result.success, "Failed to crawl the page"
-
-        news_teasers = json.loads(result.extracted_content)
-        print(f"Successfully extracted {len(news_teasers)} news teasers")
-        print(json.dumps(news_teasers[0], indent=2))
+        companies = json.loads(result.extracted_content)
+        print(f"Successfully extracted {len(companies)} companies")
+        print(json.dumps(companies[0], indent=2))
 
 # Advanced Session-Based Crawling with Dynamic Content 🔄
 async def crawl_dynamic_content_pages_method_1():
@@ -363,21 +391,21 @@ async def crawl_custom_browser_type():
     # Use Firefox
     start = time.time()
     async with AsyncWebCrawler(browser_type="firefox", verbose=True, headless = True) as crawler:
-        result = await crawler.arun(url="https://www.example.com", bypass_cache=True)
+        result = await crawler.arun(url="https://www.example.com", cache_mode= CacheMode.BYPASS)
         print(result.markdown[:500])
         print("Time taken: ", time.time() - start)
 
     # Use WebKit
     start = time.time()
     async with AsyncWebCrawler(browser_type="webkit", verbose=True, headless = True) as crawler:
-        result = await crawler.arun(url="https://www.example.com", bypass_cache=True)
+        result = await crawler.arun(url="https://www.example.com", cache_mode= CacheMode.BYPASS)
         print(result.markdown[:500])
         print("Time taken: ", time.time() - start)
 
     # Use Chromium (default)
     start = time.time()
     async with AsyncWebCrawler(verbose=True, headless = True) as crawler:
-        result = await crawler.arun(url="https://www.example.com", bypass_cache=True)
+        result = await crawler.arun(url="https://www.example.com", cache_mode= CacheMode.BYPASS)
         print(result.markdown[:500])
         print("Time taken: ", time.time() - start)
 
@@ -534,29 +562,29 @@ async def fit_markdown_remove_overlay():
 
 
 async def main():
-    await simple_crawl()
-    await simple_example_with_running_js_code()
-    await simple_example_with_css_selector()
-    await use_proxy()
-    await capture_and_save_screenshot("https://www.example.com", os.path.join(__location__, "tmp/example_screenshot.jpg"))
-    await extract_structured_data_using_css_extractor()
+    # await simple_crawl()
+    # await simple_example_with_running_js_code()
+    # await simple_example_with_css_selector()
+    # await use_proxy()
+    # await capture_and_save_screenshot("https://www.example.com", os.path.join(__location__, "tmp/example_screenshot.jpg"))
+    # await extract_structured_data_using_css_extractor()
 
     # LLM extraction examples
     # await extract_structured_data_using_llm()
     # await extract_structured_data_using_llm("huggingface/meta-llama/Meta-Llama-3.1-8B-Instruct", os.getenv("HUGGINGFACE_API_KEY"))
     # await extract_structured_data_using_llm("ollama/llama3.2")    
-    await extract_structured_data_using_llm("openai/gpt-4o", os.getenv("OPENAI_API_KEY"))
+    # await extract_structured_data_using_llm("openai/gpt-4o", os.getenv("OPENAI_API_KEY"))
 
     # You always can pass custom headers to the extraction strategy
-    custom_headers = {
-        "Authorization": "Bearer your-custom-token",
-        "X-Custom-Header": "Some-Value"
-    }
-    await extract_structured_data_using_llm(extra_headers=custom_headers)
+    # custom_headers = {
+    #     "Authorization": "Bearer your-custom-token",
+    #     "X-Custom-Header": "Some-Value"
+    # }
+    # await extract_structured_data_using_llm(extra_headers=custom_headers)
     
     # await crawl_dynamic_content_pages_method_1()
     # await crawl_dynamic_content_pages_method_2()
-    await crawl_dynamic_content_pages_method_3()
+    # await crawl_dynamic_content_pages_method_3()
     
     await crawl_custom_browser_type()
     
