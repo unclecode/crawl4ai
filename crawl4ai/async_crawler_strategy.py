@@ -920,6 +920,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 });
             }
             """
+            await page.wait_for_load_state()
             await page.evaluate(update_image_dimensions_js)
 
             # Wait a bit for any onload events to complete
