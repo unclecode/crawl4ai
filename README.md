@@ -265,7 +265,7 @@ Test the installation:
 curl http://localhost:11235/health
 ```
 
-### For Raspberry Pi (32-bit) (Experimental)
+### For Raspberry Pi (32-bit) (coming soon):
 ```bash
 # Pull and run basic version (recommended for Raspberry Pi)
 docker pull unclecode/crawl4ai:basic-armv7
