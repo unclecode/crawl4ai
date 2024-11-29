@@ -9,9 +9,13 @@ import aiofiles
 import shutil
 import time
 from datetime import datetime
+from .async_logger import AsyncLogger, LogLevel
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Initialize logger
+logger = AsyncLogger(log_level=LogLevel.DEBUG, verbose=True)
+
+# logging.basicConfig(level=logging.INFO)
+# logger = logging.getLogger(__name__)
 
 class DatabaseMigration:
     def __init__(self, db_path: str):
@@ -55,7 +59,8 @@ class DatabaseMigration:
 
     async def migrate_database(self):
         """Migrate existing database to file-based storage"""
-        logger.info("Starting database migration...")
+        # logger.info("Starting database migration...")
+        logger.info("Starting database migration...", tag="INIT")
         
         try:
             async with aiosqlite.connect(self.db_path) as db:
@@ -91,19 +96,25 @@ class DatabaseMigration:
                     
                     migrated_count += 1
                     if migrated_count % 100 == 0:
-                        logger.info(f"Migrated {migrated_count} records...")
+                        logger.info(f"Migrated {migrated_count} records...", tag="INIT")
+                        
 
                 await db.commit()
-                logger.info(f"Migration completed. {migrated_count} records processed.")
+                logger.success(f"Migration completed. {migrated_count} records processed.", tag="COMPLETE")
 
         except Exception as e:
-            logger.error(f"Migration failed: {e}")
-            raise
+            # logger.error(f"Migration failed: {e}")
+            logger.error(
+                message="Migration failed: {error}",
+                tag="ERROR",
+                params={"error": str(e)}
+            )
+            raise e
 
 async def backup_database(db_path: str) -> str:
     """Create backup of existing database"""
     if not os.path.exists(db_path):
-        logger.info("No existing database found. Skipping backup.")
+        logger.info("No existing database found. Skipping backup.", tag="INIT")
         return None
         
     # Create backup with timestamp
@@ -116,11 +127,16 @@ async def backup_database(db_path: str) -> str:
         
         # Create backup
         shutil.copy2(db_path, backup_path)
-        logger.info(f"Database backup created at: {backup_path}")
+        logger.info(f"Database backup created at: {backup_path}", tag="COMPLETE")
         return backup_path
     except Exception as e:
-        logger.error(f"Backup failed: {e}")
-        raise
+        # logger.error(f"Backup failed: {e}")
+        logger.error(
+                message="Migration failed: {error}",
+                tag="ERROR",
+                params={"error": str(e)}
+            )
+        raise e
     
 async def run_migration(db_path: Optional[str] = None):
     """Run database migration"""
@@ -128,7 +144,7 @@ async def run_migration(db_path: Optional[str] = None):
         db_path = os.path.join(Path.home(), ".crawl4ai", "crawl4ai.db")
     
     if not os.path.exists(db_path):
-        logger.info("No existing database found. Skipping migration.")
+        logger.info("No existing database found. Skipping migration.", tag="INIT")
         return
         
     # Create backup first
