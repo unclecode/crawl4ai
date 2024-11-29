@@ -920,7 +920,11 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 });
             }
             """
-            await page.evaluate(update_image_dimensions_js)
+            try:
+                await page.wait_for_load_state()
+                await page.evaluate(update_image_dimensions_js)
+            except Exception as e:
+                raise RuntimeError(f"Error updating image dimensions ACS-UPDATE_IMAGE_DIMENSIONS_JS: {str(e)}")
 
             # Wait a bit for any onload events to complete
             await page.wait_for_timeout(100)
