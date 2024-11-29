@@ -1,5 +1,64 @@
 # Changelog
 
+## [0.3.746] November 29, 2024
+
+### Major Features
+1. Enhanced Docker Support (Nov 29, 2024)
+   - Improved GPU support in Docker images.
+   - Dockerfile refactored for better platform-specific installations.
+   - Introduced new Docker commands for different platforms:
+     - `basic-amd64`, `all-amd64`, `gpu-amd64` for AMD64.
+     - `basic-arm64`, `all-arm64`, `gpu-arm64` for ARM64.
+
+### Infrastructure & Documentation
+- Enhanced README.md to improve user guidance and installation instructions.
+- Added installation instructions for Playwright setup in README.
+- Created and updated examples in `docs/examples/quickstart_async.py` to be more useful and user-friendly.
+- Updated `requirements.txt` with a new `pydantic` dependency.
+- Bumped version number in `crawl4ai/__version__.py` to 0.3.746.
+
+### Breaking Changes
+- Streamlined application structure:
+  - Removed static pages and related code from `main.py` which might affect existing deployments relying on static content.
+
+### Development Updates
+- Developed `post_install` method in `crawl4ai/install.py` to streamline post-installation setup tasks.
+- Refined migration processes in `crawl4ai/migrations.py` with enhanced logging for better error visibility.
+- Updated `docker-compose.yml` to support local and hub services for different architectures, enhancing build and deploy capabilities.
+- Refactored example test cases in `docs/examples/docker_example.py` to facilitate comprehensive testing.
+
+### README.md
+Updated README with new docker commands and setup instructions.
+Enhanced installation instructions and guidance.
+
+### crawl4ai/install.py
+Added post-install script functionality.
+Introduced `post_install` method for automation of post-installation tasks.
+
+### crawl4ai/migrations.py
+Improved migration logging.
+Refined migration processes and added better logging.
+
+### docker-compose.yml
+Refactored docker-compose for better service management.
+Updated to define services for different platforms and versions.
+
+### requirements.txt
+Updated dependencies.
+Added `pydantic` to requirements file.
+
+### crawler/__version__.py
+Updated version number.
+Bumped version number to 0.3.746.
+
+### docs/examples/quickstart_async.py
+Enhanced example scripts.
+Uncommented example usage in async guide for user functionality.
+
+### main.py
+Refactored code to improve maintainability.
+Streamlined app structure by removing static pages code.
+
 ## [0.3.743] November 27, 2024
 
 Enhance features and documentation
