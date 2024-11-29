@@ -1,11 +1,8 @@
 from setuptools import setup, find_packages
-from setuptools.command.install import install
 import os
 from pathlib import Path
 import shutil
-import subprocess
-import sys
-import asyncio
+
 
 # Create the .crawl4ai folder in the user's home directory if it doesn't exist
 # If the folder already exists, remove the cache folder
@@ -49,46 +46,6 @@ transformer_requirements = ["transformers", "tokenizers"]
 cosine_similarity_requirements = ["torch", "transformers", "nltk"]
 sync_requirements = ["selenium"]
 
-
-def install_playwright():
-    print("Installing Playwright browsers...")
-    try:
-        subprocess.check_call([sys.executable, "-m", "playwright", "install"])
-        print("Playwright installation completed successfully.")
-    except subprocess.CalledProcessError as e:
-        print(f"Error during Playwright installation: {e}")
-        print(
-            "Please run 'python -m playwright install' manually after the installation."
-        )
-    except Exception as e:
-        print(f"Unexpected error during Playwright installation: {e}")
-        print(
-            "Please run 'python -m playwright install' manually after the installation."
-        )
-
-
-def run_migration():
-    """Initialize database during installation"""
-    try:
-        print("Starting database initialization...")
-        from crawl4ai.async_database import async_db_manager
-
-        asyncio.run(async_db_manager.initialize())
-        print("Database initialization completed successfully.")
-    except ImportError:
-        print("Warning: Database module not found. Will initialize on first use.")
-    except Exception as e:
-        print(f"Warning: Database initialization failed: {e}")
-        print("Database will be initialized on first use")
-
-
-class PostInstallCommand(install):
-    def run(self):
-        install.run(self)
-        install_playwright()
-        # run_migration()
-
-
 setup(
     name="Crawl4AI",
     version=version,
@@ -116,7 +73,8 @@ setup(
     entry_points={
         "console_scripts": [
             "crawl4ai-download-models=crawl4ai.model_loader:main",
-            "crawl4ai-migrate=crawl4ai.migrations:main",  # Added migration command
+            "crawl4ai-migrate=crawl4ai.migrations:main",  
+            'crawl4ai-setup=crawl4ai.install:post_install', 
         ],
     },
     classifiers=[
@@ -130,7 +88,4 @@ setup(
         "Programming Language :: Python :: 3.10",
     ],
     python_requires=">=3.7",
-    cmdclass={
-        "install": PostInstallCommand,
-    },
 )

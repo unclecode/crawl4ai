@@ -1,5 +1,4 @@
 aiosqlite~=0.20
-html2text~=2024.2
 lxml~=5.3
 litellm>=1.53.1
 numpy>=1.26.0,<3
@@ -14,3 +13,4 @@ rank-bm25~=0.2
 aiofiles>=24.1.0
 colorama~=0.4
 snowballstemmer~=2.2
+pydantic>=2.10
