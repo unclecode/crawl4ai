@@ -9,7 +9,7 @@ from bs4 import element, NavigableString, Comment
 from urllib.parse import urljoin
 from requests.exceptions import InvalidSchema
 # from .content_cleaning_strategy import ContentCleaningStrategy
-from .content_filter_strategy import RelevantContentFilter, BM25ContentFilter#, HeuristicContentFilter
+from .content_filter_strategy import RelevantContentFilter, BM25ContentFilter, PruningContentFilter
 from .markdown_generation_strategy import MarkdownGenerationStrategy, DefaultMarkdownGenerator
 from .models import MarkdownGenerationResult
 from .utils import (
@@ -110,10 +110,15 @@ class WebScrapingStrategy(ContentScrapingStrategy):
         if markdown_generator:
             try:
                 if kwargs.get('fit_markdown', False) and not markdown_generator.content_filter:
-                        markdown_generator.content_filter = BM25ContentFilter(
-                            user_query=kwargs.get('fit_markdown_user_query', None),
-                            bm25_threshold=kwargs.get('fit_markdown_bm25_threshold', 1.0)
+                        markdown_generator.content_filter = PruningContentFilter(
+                            threshold_type=kwargs.get('fit_markdown_treshold_type', 'fixed'),
+                            threshold=kwargs.get('fit_markdown_treshold', 0.48),
+                            min_word_threshold=kwargs.get('fit_markdown_min_word_threshold', ),
                         )
+                        # markdown_generator.content_filter = BM25ContentFilter(
+                        #     user_query=kwargs.get('fit_markdown_user_query', None),
+                        #     bm25_threshold=kwargs.get('fit_markdown_bm25_threshold', 1.0)
+                        # )
                 
                 markdown_result: MarkdownGenerationResult = markdown_generator.generate_markdown(
                     cleaned_html=cleaned_html,

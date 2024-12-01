@@ -15,7 +15,7 @@ from bs4 import BeautifulSoup
 from pydantic import BaseModel, Field
 from crawl4ai import AsyncWebCrawler, CacheMode
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
-from crawl4ai.content_filter_strategy import BM25ContentFilter
+from crawl4ai.content_filter_strategy import BM25ContentFilter, PruningContentFilter
 from crawl4ai.extraction_strategy import (
     JsonCssExtractionStrategy,
     LLMExtractionStrategy,
@@ -466,7 +466,8 @@ async def speed_comparison():
             url="https://www.nbcnews.com/business",
             word_count_threshold=0,
             markdown_generator=DefaultMarkdownGenerator(
-                content_filter=BM25ContentFilter(user_query=None, bm25_threshold=1.0)
+                content_filter = PruningContentFilter(threshold=0.48, threshold_type="fixed", min_word_threshold=0)
+                # content_filter=BM25ContentFilter(user_query=None, bm25_threshold=1.0)
             ),
             cache_mode=CacheMode.BYPASS,
             verbose=False,
@@ -489,7 +490,8 @@ async def speed_comparison():
             word_count_threshold=0,
             cache_mode=CacheMode.BYPASS,
             markdown_generator=DefaultMarkdownGenerator(
-                content_filter=BM25ContentFilter(user_query=None, bm25_threshold=1.0)
+                content_filter = PruningContentFilter(threshold=0.48, threshold_type="fixed", min_word_threshold=0)
+                # content_filter=BM25ContentFilter(user_query=None, bm25_threshold=1.0)
             ),
             verbose=False,
         )
