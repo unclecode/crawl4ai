@@ -422,7 +422,7 @@ You can check the project structure in the directory [https://github.com/uncleco
 ```python
 import asyncio
 from crawl4ai import AsyncWebCrawler, CacheMode
-from crawl4ai.content_filter_strategy import BM25ContentFilter
+from crawl4ai.content_filter_strategy import PruningContentFilter, BM25ContentFilter
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
 async def main():
@@ -434,8 +434,11 @@ async def main():
             url="https://docs.micronaut.io/4.7.6/guide/",
             cache_mode=CacheMode.ENABLED,
             markdown_generator=DefaultMarkdownGenerator(
-                content_filter=BM25ContentFilter(user_query=None, bm25_threshold=1.0)
+                content_filter=PruningContentFilter(threshold=0.48, threshold_type="fixed", min_word_threshold=0)
             ),
+            # markdown_generator=DefaultMarkdownGenerator(
+            #     content_filter=BM25ContentFilter(user_query="WHEN_WE_FOCUS_BASED_ON_A_USER_QUERY", bm25_threshold=1.0)
+            # ),
         )
         print(len(result.markdown))
         print(len(result.fit_markdown))
