@@ -468,7 +468,7 @@ class PruningContentFilter(RelevantContentFilter):
             'link_text_len': link_text_len
         }
 
-        score = self._compute_composite_score(metrics)
+        score = self._compute_composite_score(metrics, text_len, tag_len, link_text_len)
 
         if self.threshold_type == 'fixed':
             should_remove = score < self.threshold
