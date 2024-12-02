@@ -472,7 +472,9 @@ class AsyncWebCrawler:
         try:
             _url = url if not kwargs.get("is_raw_html", False) else "Raw HTML"
             t1 = time.perf_counter()
-            scrapping_strategy = WebScrapingStrategy()
+            scrapping_strategy = WebScrapingStrategy(
+                logger=self.logger,
+            )
             # result = await scrapping_strategy.ascrap(
             result = scrapping_strategy.scrap(
                 url,
