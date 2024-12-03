@@ -8,6 +8,7 @@ from .user_agent_generator import UserAgentGenerator
 from .extraction_strategy import ExtractionStrategy
 from .chunking_strategy import ChunkingStrategy
 from .markdown_generation_strategy import MarkdownGenerationStrategy
+from .data_persistence_strategy import DataPersistenceStrategy, SkipDataPersistenceStrategy
 
 class BrowserConfig:
     """
@@ -188,6 +189,7 @@ class CrawlerRunConfig:
                                                           Default: None (NoExtractionStrategy is used if None).
         chunking_strategy (ChunkingStrategy): Strategy to chunk content before extraction.
                                               Default: RegexChunking().
+        data_persistence_strategy (DataPersistenceStrategy): Strategy for storing the results. Defaults to SkipDataPersistenceStrategy.
         content_filter (RelevantContentFilter or None): Optional filter to prune irrelevant content.
                                                         Default: None.
         cache_mode (CacheMode or None): Defines how caching is handled.
@@ -268,11 +270,12 @@ class CrawlerRunConfig:
     def __init__(
         self,
         word_count_threshold: int =  MIN_WORD_THRESHOLD ,
-        extraction_strategy : ExtractionStrategy=None,  # Will default to NoExtractionStrategy if None
-        chunking_strategy : ChunkingStrategy= None,    # Will default to RegexChunking if None
+        extraction_strategy : ExtractionStrategy = None,  # Will default to NoExtractionStrategy if None
+        chunking_strategy : ChunkingStrategy = None,    # Will default to RegexChunking if None
+        data_persistence_strategy: DataPersistenceStrategy = SkipDataPersistenceStrategy(),
         markdown_generator : MarkdownGenerationStrategy = None,
-        content_filter=None,
-        cache_mode=None,
+        content_filter = None,
+        cache_mode = None,
         session_id: str = None,
         bypass_cache: bool = False,
         disable_cache: bool = False,
@@ -285,7 +288,7 @@ class CrawlerRunConfig:
         only_text: bool = False,
         image_description_min_word_threshold: int = IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
         prettiify: bool = False,
-        js_code=None,
+        js_code = None,
         wait_for: str = None,
         js_only: bool = False,
         wait_until: str = "domcontentloaded",
@@ -311,6 +314,7 @@ class CrawlerRunConfig:
         self.word_count_threshold = word_count_threshold
         self.extraction_strategy = extraction_strategy
         self.chunking_strategy = chunking_strategy
+        self.data_persistence_strategy = data_persistence_strategy
         self.markdown_generator = markdown_generator
         self.content_filter = content_filter
         self.cache_mode = cache_mode
@@ -354,7 +358,9 @@ class CrawlerRunConfig:
             raise ValueError("extraction_strategy must be an instance of ExtractionStrategy")
         if self.chunking_strategy is not None and not isinstance(self.chunking_strategy, ChunkingStrategy):
             raise ValueError("chunking_strategy must be an instance of ChunkingStrategy")
-
+        if self.data_persistence_strategy is not None and not isinstance(data_persistence_strategy, DataPersistenceStrategy):
+            raise ValueError("data_persistence_strategy must be an instance of DataPersistenceStrategy")
+            
         # Set default chunking strategy if None
         if self.chunking_strategy is None:
             from .chunking_strategy import RegexChunking
@@ -367,6 +373,7 @@ class CrawlerRunConfig:
             word_count_threshold=kwargs.get("word_count_threshold", 200),
             extraction_strategy=kwargs.get("extraction_strategy"),
             chunking_strategy=kwargs.get("chunking_strategy"),
+            data_persistence_strategy=kwargs.get("data_persistence_strategy"),
             markdown_generator=kwargs.get("markdown_generator"),
             content_filter=kwargs.get("content_filter"),
             cache_mode=kwargs.get("cache_mode"),

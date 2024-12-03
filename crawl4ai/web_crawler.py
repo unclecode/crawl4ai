@@ -11,6 +11,7 @@ from .crawler_strategy import *
 from typing import List
 from concurrent.futures import ThreadPoolExecutor
 from .content_scraping_strategy import WebScrapingStrategy
+from .data_persistence_strategy import DataPersistenceStrategy, SkipDataPersistenceStrategy
 from .config import *
 import warnings
 import json
@@ -109,6 +110,7 @@ class WebCrawler:
             word_count_threshold=MIN_WORD_THRESHOLD,
             extraction_strategy: ExtractionStrategy = None,
             chunking_strategy: ChunkingStrategy = RegexChunking(),
+            data_persistence_strategy: DataPersistenceStrategy = SkipDataPersistenceStrategy(),
             bypass_cache: bool = False,
             css_selector: str = None,
             screenshot: bool = False,
@@ -123,7 +125,9 @@ class WebCrawler:
                     raise ValueError("Unsupported extraction strategy")
                 if not isinstance(chunking_strategy, ChunkingStrategy):
                     raise ValueError("Unsupported chunking strategy")
-                
+                if not isinstance(data_persistence_strategy, DataPersistenceStrategy):
+                    raise ValueError("Unsupported data persistence strategy")
+
                 word_count_threshold = max(word_count_threshold, MIN_WORD_THRESHOLD)
 
                 cached = None
@@ -157,6 +161,10 @@ class WebCrawler:
                 
                 crawl_result = self.process_html(url, html, extracted_content, word_count_threshold, extraction_strategy, chunking_strategy, css_selector, screenshot_data, verbose, bool(cached), **kwargs)
                 crawl_result.success = bool(html)
+
+                if data_persistence_strategy:
+                    crawl_result.storage_metadata = data_persistence_strategy.save(crawl_result)
+
                 return crawl_result
             except Exception as e:
                 if not hasattr(e, "msg"):
