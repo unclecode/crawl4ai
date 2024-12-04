@@ -8,7 +8,7 @@ docs_dir: docs/md_v2
 nav:
   - Home: 'index.md'
   - 'Installation': 'basic/installation.md'
-  - 'Docker Deplotment': 'basic/docker-deploymeny.md'
+  - 'Docker Deployment': 'basic/docker-deploymeny.md'
   - 'Quick Start': 'basic/quickstart.md'
   
   - Basic:
