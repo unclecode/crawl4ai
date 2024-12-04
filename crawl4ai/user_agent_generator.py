@@ -236,6 +236,7 @@ class UserAgentGenerator:
 # Example usage:
 if __name__ == "__main__":
     generator = UserAgentGenerator()
+    print(generator.generate())
     
     print("\nSingle browser (Chrome):")
     print(generator.generate(num_browsers=1, browser_type='chrome'))

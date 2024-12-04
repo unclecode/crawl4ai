@@ -547,19 +547,50 @@ async def generate_knowledge_graph():
             f.write(result.extracted_content)
 
 async def fit_markdown_remove_overlay():
-    async with AsyncWebCrawler(headless = False) as crawler:
-        url = "https://janineintheworld.com/places-to-visit-in-central-mexico"
+    async with AsyncWebCrawler(
+            headless=True,  # Set to False to see what is happening
+            verbose=True,
+            user_agent_mode="random",
+            user_agent_generator_config={
+                "device_type": "mobile",
+                "os_type": "android"
+            },
+    ) as crawler:
         result = await crawler.arun(
-            url=url,
+            url='https://www.kidocode.com/degrees/technology',
             cache_mode=CacheMode.BYPASS,
-            word_count_threshold = 10,
-            remove_overlay_elements=True,
-            screenshot = True
+            markdown_generator=DefaultMarkdownGenerator(
+                content_filter=PruningContentFilter(threshold=0.48, threshold_type="fixed", min_word_threshold=0),
+                options={
+                    "ignore_links": True
+                }
+            ),
+            # markdown_generator=DefaultMarkdownGenerator(
+            #     content_filter=BM25ContentFilter(user_query=None, bm25_threshold=1.0),
+            #     options={
+            #         "ignore_links": True
+            #     }
+            # ),
         )
-        # Save markdown to file
-        with open(os.path.join(__location__, "mexico_places.md"), "w") as f:
-            f.write(result.fit_markdown)
-
+        
+        if result.success:
+            print(len(result.markdown_v2.raw_markdown))
+            print(len(result.markdown_v2.markdown_with_citations))
+            print(len(result.markdown_v2.fit_markdown))
+            
+            # Save clean html
+            with open(os.path.join(__location__, "output/cleaned_html.html"), "w") as f:
+                f.write(result.cleaned_html)
+            
+            with open(os.path.join(__location__, "output/output_raw_markdown.md"), "w") as f:
+                f.write(result.markdown_v2.raw_markdown)
+                
+            with open(os.path.join(__location__, "output/output_markdown_with_citations.md"), "w") as f:
+                f.write(result.markdown_v2.markdown_with_citations) 
+                
+            with open(os.path.join(__location__, "output/output_fit_markdown.md"), "w") as f:   
+                f.write(result.markdown_v2.fit_markdown)
+        
     print("Done")
 
 
