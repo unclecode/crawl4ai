@@ -1,5 +1,55 @@
 # Changelog
 
+## [0.3.75] December 1, 2024
+
+### PruningContentFilter
+
+#### 1. Introduced PruningContentFilter (Dec 01, 2024) (Dec 01, 2024)
+A new content filtering strategy that removes less relevant nodes based on metrics like text and link density.
+
+**Affected Files:**
+- `crawl4ai/content_filter_strategy.py`: Enhancement of content filtering capabilities.
+```diff
+Implemented effective pruning algorithm with comprehensive scoring.
+```
+- `README.md`: Improved documentation regarding new features.
+```diff
+Updated to include usage and explanation for the PruningContentFilter.
+```
+- `docs/md_v2/basic/content_filtering.md`: Expanded documentation for users.
+```diff
+Added detailed section explaining the PruningContentFilter.
+```
+
+#### 2. Added Unit Tests for PruningContentFilter (Dec 01, 2024) (Dec 01, 2024)
+Comprehensive tests added to ensure correct functionality of PruningContentFilter
+
+**Affected Files:**
+- `tests/async/test_content_filter_prune.py`: Increased test coverage for content filtering strategies.
+```diff
+Created test cases for various scenarios using the PruningContentFilter.
+```
+
+### Development Updates
+
+#### 3. Enhanced BM25ContentFilter tests (Dec 01, 2024) (Dec 01, 2024)
+Extended testing to cover additional edge cases and performance metrics.
+
+**Affected Files:**
+- `tests/async/test_content_filter_bm25.py`: Improved reliability and performance assurance.
+```diff
+Added tests for new extraction scenarios including malformed HTML.
+```
+
+### Infrastructure & Documentation
+
+#### 4. Updated Examples (Dec 01, 2024) (Dec 01, 2024)
+Altered examples in documentation to promote the use of PruningContentFilter alongside existing strategies.
+
+**Affected Files:**
+- `docs/examples/quickstart_async.py`: Enhanced usability and clarity for new users.
+- Revised example to illustrate usage of PruningContentFilter.
+
 ## [0.3.746] November 29, 2024
 
 ### Major Features

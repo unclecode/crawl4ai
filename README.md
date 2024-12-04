@@ -11,7 +11,10 @@
 
 Crawl4AI is the #1 trending GitHub repository, actively maintained by a vibrant community. It delivers blazing-fast, AI-ready web crawling tailored for LLMs, AI agents, and data pipelines. Open source, flexible, and built for real-time performance, Crawl4AI empowers developers with unmatched speed, precision, and deployment ease.  
 
-[✨ Check out latest update v0.3.745](#-recent-updates)
+
+🎉 **Version 0.4.0 is out!** Introducing our experimental PruningContentFilter - a powerful new algorithm for smarter Markdown generation. Test it out and [share your feedback](https://github.com/unclecode/crawl4ai/issues)! [Read the release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/md_v2/blog/releases/0.4.0.md)
+
+[✨ Check out latest update v0.4.0](#-recent-updates)
 
 ## 🧐 Why Crawl4AI?
 
@@ -422,7 +425,7 @@ You can check the project structure in the directory [https://github.com/uncleco
 ```python
 import asyncio
 from crawl4ai import AsyncWebCrawler, CacheMode
-from crawl4ai.content_filter_strategy import BM25ContentFilter
+from crawl4ai.content_filter_strategy import PruningContentFilter, BM25ContentFilter
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
 async def main():
@@ -434,8 +437,11 @@ async def main():
             url="https://docs.micronaut.io/4.7.6/guide/",
             cache_mode=CacheMode.ENABLED,
             markdown_generator=DefaultMarkdownGenerator(
-                content_filter=BM25ContentFilter(user_query=None, bm25_threshold=1.0)
+                content_filter=PruningContentFilter(threshold=0.48, threshold_type="fixed", min_word_threshold=0)
             ),
+            # markdown_generator=DefaultMarkdownGenerator(
+            #     content_filter=BM25ContentFilter(user_query="WHEN_WE_FOCUS_BASED_ON_A_USER_QUERY", bm25_threshold=1.0)
+            # ),
         )
         print(len(result.markdown))
         print(len(result.fit_markdown))
@@ -620,18 +626,21 @@ async def test_news_crawl():
 
 ## ✨ Recent Updates   
 
-- 🚀 **Improved ManagedBrowser Configuration**: Dynamic host and port support for more flexible browser management.  
-- 📝 **Enhanced Markdown Generation**: New generator class for better formatting and customization.  
-- ⚡ **Fast HTML Formatting**: Significantly optimized HTML formatting in the web crawler.  
-- 🛠️ **Utility & Sanitization Upgrades**: Improved sanitization and expanded utility functions for streamlined workflows.  
-- 👥 **Acknowledgments**: Added contributor details and pull request acknowledgments for better transparency.  
+- 🔬 **PruningContentFilter**: New unsupervised filtering strategy for intelligent content extraction based on text density and relevance scoring.
+- 🧵 **Enhanced Thread Safety**: Improved multi-threaded environment handling with better locks and parallel processing support.
+- 🤖 **Smart User-Agent Generation**: Advanced user-agent generator with customization options and randomization capabilities.
+- 📝 **New Blog Launch**: Stay updated with our detailed release notes and technical deep dives at [crawl4ai.com/blog](https://crawl4ai.com/blog).
+- 🧪 **Expanded Test Coverage**: Comprehensive test suite for both PruningContentFilter and BM25ContentFilter with edge case handling.
 
+Read the full details of this release in our [0.4.0 Release Notes](https://github.com/unclecode/crawl4ai/blob/main/docs/md_v2/blog/releases/0.4.0.md).
 
 ## 📖 Documentation & Roadmap 
 
-For detailed documentation, including installation instructions, advanced features, and API reference, visit our [Documentation Website](https://crawl4ai.com/mkdocs/).
+> 🚨 **Documentation Update Alert**: We're undertaking a major documentation overhaul next week to reflect recent updates and improvements. Stay tuned for a more comprehensive and up-to-date guide!
 
-Moreover to check our development plans and upcoming features, check out our [Roadmap](https://github.com/unclecode/crawl4ai/blob/main/ROADMAP.md).
+For current documentation, including installation instructions, advanced features, and API reference, visit our [Documentation Website](https://crawl4ai.com/mkdocs/).
+
+To check our development plans and upcoming features, visit our [Roadmap](https://github.com/unclecode/crawl4ai/blob/main/ROADMAP.md).
 
 <details>
 <summary>📈 <strong>Development TODOs</strong></summary>

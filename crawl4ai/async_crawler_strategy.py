@@ -6,6 +6,7 @@ from typing import Callable, Dict, Any, List, Optional, Awaitable
 import os, sys, shutil
 import tempfile, subprocess
 from playwright.async_api import async_playwright, Page, Browser, Error
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 from pathlib import Path
@@ -16,6 +17,7 @@ import json
 import uuid
 from .models import AsyncCrawlResponse
 from .utils import create_box_message
+from .user_agent_generator import UserAgentGenerator
 from playwright_stealth import StealthConfig, stealth_async
 
 stealth_config = StealthConfig(
@@ -222,14 +224,21 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         self.use_cached_html = use_cached_html
         self.user_agent = kwargs.get(
             "user_agent",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-            "(KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            # "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.5845.187 Safari/604.1 Edg/117.0.2045.47"
+            "Mozilla/5.0 (Linux; Android 11; SM-G973F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36"
         )
+        user_agenr_generator = UserAgentGenerator()
+        if kwargs.get("user_agent_mode") == "random":
+            self.user_agent = user_agenr_generator.generate(
+                 **kwargs.get("user_agent_generator_config", {})
+            )
         self.proxy = kwargs.get("proxy")
         self.proxy_config = kwargs.get("proxy_config")
         self.headless = kwargs.get("headless", True)
         self.browser_type = kwargs.get("browser_type", "chromium")
         self.headers = kwargs.get("headers", {})
+        self.browser_hint = user_agenr_generator.generate_client_hints(self.user_agent)
+        self.headers.setdefault("sec-ch-ua", self.browser_hint)
         self.cookies = kwargs.get("cookies", [])
         self.sessions = {}
         self.session_ttl = 1800 
@@ -307,7 +316,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         
                     if self.user_agent:
                         await self.default_context.set_extra_http_headers({
-                            "User-Agent": self.user_agent
+                            "User-Agent": self.user_agent,
+                            "sec-ch-ua": self.browser_hint,
+                            # **self.headers
                         })
             else:
                 # Base browser arguments
@@ -321,7 +332,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         "--disable-infobars",
                         "--window-position=0,0",
                         "--ignore-certificate-errors",
-                        "--ignore-certificate-errors-spki-list"
+                        "--ignore-certificate-errors-spki-list",
+                        "--disable-blink-features=AutomationControlled",
+                        
                     ]
                 }
                 
@@ -642,6 +655,15 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         self._cleanup_expired_sessions()
         session_id = kwargs.get("session_id")
         
+        # Check if in kwargs we have user_agent that will override the default user_agent
+        user_agent = kwargs.get("user_agent", self.user_agent)
+        
+        # Generate random user agent if magic mode is enabled and user_agent_mode is not random
+        if kwargs.get("user_agent_mode") != "random" and kwargs.get("magic", False):
+            user_agent = UserAgentGenerator().generate(
+                **kwargs.get("user_agent_generator_config", {})
+            )
+        
         # Handle page creation differently for managed browser
         context = None
         if self.use_managed_browser:
@@ -666,7 +688,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     else:
                         # Normal context creation for non-persistent or non-Chrome browsers
                         context = await self.browser.new_context(
-                            user_agent=self.user_agent,
+                            user_agent=user_agent,
                             viewport={"width": 1200, "height": 800},
                             proxy={"server": self.proxy} if self.proxy else None,
                             java_script_enabled=True,
@@ -686,10 +708,11 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 else:
                     # Normal context creation
                     context = await self.browser.new_context(
-                        user_agent=self.user_agent,
+                        user_agent=user_agent,
                         viewport={"width": 1920, "height": 1080},
                         proxy={"server": self.proxy} if self.proxy else None,
                         accept_downloads=self.accept_downloads,
+                        ignore_https_errors=True  # Add this line
                     )
                     if self.cookies:
                             await context.add_cookies(self.cookies)
@@ -920,7 +943,24 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 });
             }
             """
-            await page.evaluate(update_image_dimensions_js)
+            
+            try:
+                try:
+                    await page.wait_for_load_state(
+                        # state="load",
+                        state="domcontentloaded",
+                        timeout=5
+                    )
+                except PlaywrightTimeoutError:
+                    pass
+                await page.evaluate(update_image_dimensions_js)
+            except Exception as e:
+                self.logger.error(
+                    message="Error updating image dimensions ACS-UPDATE_IMAGE_DIMENSIONS_JS: {error}",
+                    tag="ERROR",
+                    params={"error": str(e)}
+                )
+                # raise RuntimeError(f"Error updating image dimensions ACS-UPDATE_IMAGE_DIMENSIONS_JS: {str(e)}")
 
             # Wait a bit for any onload events to complete
             await page.wait_for_timeout(100)
