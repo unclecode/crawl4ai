@@ -6,6 +6,7 @@ from typing import Callable, Dict, Any, List, Optional, Awaitable
 import os, sys, shutil
 import tempfile, subprocess
 from playwright.async_api import async_playwright, Page, Browser, Error
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 from pathlib import Path
@@ -223,6 +224,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         self.use_cached_html = use_cached_html
         self.user_agent = kwargs.get(
             "user_agent",
+            # "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.5845.187 Safari/604.1 Edg/117.0.2045.47"
             "Mozilla/5.0 (Linux; Android 11; SM-G973F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36"
         )
         user_agenr_generator = UserAgentGenerator()
@@ -941,11 +943,24 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 });
             }
             """
+            
             try:
-                await page.wait_for_load_state()
+                try:
+                    await page.wait_for_load_state(
+                        # state="load",
+                        state="domcontentloaded",
+                        timeout=5
+                    )
+                except PlaywrightTimeoutError:
+                    pass
                 await page.evaluate(update_image_dimensions_js)
             except Exception as e:
-                raise RuntimeError(f"Error updating image dimensions ACS-UPDATE_IMAGE_DIMENSIONS_JS: {str(e)}")
+                self.logger.error(
+                    message="Error updating image dimensions ACS-UPDATE_IMAGE_DIMENSIONS_JS: {error}",
+                    tag="ERROR",
+                    params={"error": str(e)}
+                )
+                # raise RuntimeError(f"Error updating image dimensions ACS-UPDATE_IMAGE_DIMENSIONS_JS: {str(e)}")
 
             # Wait a bit for any onload events to complete
             await page.wait_for_timeout(100)
