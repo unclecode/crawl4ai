@@ -1,13 +1,14 @@
 # __init__.py
 
-from .async_webcrawler import AsyncWebCrawler
+from .async_webcrawler import AsyncWebCrawler, CacheMode
+
 from .models import CrawlResult
-from ._version import __version__
-# __version__ = "0.3.73"
+from .__version__ import __version__
 
 __all__ = [
     "AsyncWebCrawler",
     "CrawlResult",
+    "CacheMode",
 ]
 
 def is_sync_version_installed():
@@ -26,5 +27,5 @@ if is_sync_version_installed():
         print("Warning: Failed to import WebCrawler even though selenium is installed. This might be due to other missing dependencies.")
 else:
     WebCrawler = None
-    import warnings
-    print("Warning: Synchronous WebCrawler is not available. Install crawl4ai[sync] for synchronous support. However, please note that the synchronous version will be deprecated soon.")
+    # import warnings
+    # print("Warning: Synchronous WebCrawler is not available. Install crawl4ai[sync] for synchronous support. However, please note that the synchronous version will be deprecated soon.")

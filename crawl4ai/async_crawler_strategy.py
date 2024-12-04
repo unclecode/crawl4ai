@@ -6,6 +6,7 @@ from typing import Callable, Dict, Any, List, Optional, Awaitable
 import os, sys, shutil
 import tempfile, subprocess
 from playwright.async_api import async_playwright, Page, Browser, Error
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 from pathlib import Path
@@ -14,7 +15,9 @@ from pydantic import BaseModel
 import hashlib
 import json
 import uuid
-
+from .models import AsyncCrawlResponse
+from .utils import create_box_message
+from .user_agent_generator import UserAgentGenerator
 from playwright_stealth import StealthConfig, stealth_async
 
 stealth_config = StealthConfig(
@@ -34,13 +37,16 @@ stealth_config = StealthConfig(
 
 
 class ManagedBrowser:
-    def __init__(self, browser_type: str = "chromium", user_data_dir: Optional[str] = None, headless: bool = False):
+    def __init__(self, browser_type: str = "chromium", user_data_dir: Optional[str] = None, headless: bool = False, logger = None, host: str = "localhost", debugging_port: int = 9222):
         self.browser_type = browser_type
         self.user_data_dir = user_data_dir
         self.headless = headless
         self.browser_process = None
         self.temp_dir = None
-        self.debugging_port = 9222
+        self.debugging_port = debugging_port
+        self.host = host
+        self.logger = logger
+        self.shutting_down = False
 
     async def start(self) -> str:
         """
@@ -64,11 +70,49 @@ class ManagedBrowser:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE
             )
+            # Monitor browser process output for errors
+            asyncio.create_task(self._monitor_browser_process())
             await asyncio.sleep(2)  # Give browser time to start
-            return f"http://localhost:{self.debugging_port}"
+            return f"http://{self.host}:{self.debugging_port}"
         except Exception as e:
             await self.cleanup()
             raise Exception(f"Failed to start browser: {e}")
+
+    async def _monitor_browser_process(self):
+        """Monitor the browser process for unexpected termination."""
+        if self.browser_process:
+            try:
+                stdout, stderr = await asyncio.gather(
+                    asyncio.to_thread(self.browser_process.stdout.read),
+                    asyncio.to_thread(self.browser_process.stderr.read)
+                )
+                
+                # Check shutting_down flag BEFORE logging anything
+                if self.browser_process.poll() is not None:
+                    if not self.shutting_down:
+                        self.logger.error(
+                            message="Browser process terminated unexpectedly | Code: {code} | STDOUT: {stdout} | STDERR: {stderr}",
+                            tag="ERROR",
+                            params={
+                                "code": self.browser_process.returncode,
+                                "stdout": stdout.decode(),
+                                "stderr": stderr.decode()
+                            }
+                        )                
+                        await self.cleanup()
+                    else:
+                        self.logger.info(
+                            message="Browser process terminated normally | Code: {code}",
+                            tag="INFO",
+                            params={"code": self.browser_process.returncode}
+                        )
+            except Exception as e:
+                if not self.shutting_down:
+                    self.logger.error(
+                        message="Error monitoring browser process: {error}",
+                        tag="ERROR",
+                        params={"error": str(e)}
+                    )
 
     def _get_browser_path(self) -> str:
         """Returns the browser executable path based on OS and browser type"""
@@ -118,30 +162,40 @@ class ManagedBrowser:
 
     async def cleanup(self):
         """Cleanup browser process and temporary directory"""
+        # Set shutting_down flag BEFORE any termination actions
+        self.shutting_down = True
+        
         if self.browser_process:
             try:
                 self.browser_process.terminate()
-                await asyncio.sleep(1)
+                # Wait for process to end gracefully
+                for _ in range(10):  # 10 attempts, 100ms each
+                    if self.browser_process.poll() is not None:
+                        break
+                    await asyncio.sleep(0.1)
+                
+                # Force kill if still running
                 if self.browser_process.poll() is None:
                     self.browser_process.kill()
+                    await asyncio.sleep(0.1)  # Brief wait for kill to take effect
+                    
             except Exception as e:
-                print(f"Error terminating browser: {e}")
+                self.logger.error(
+                    message="Error terminating browser: {error}",
+                    tag="ERROR",
+                    params={"error": str(e)}
+                )
 
         if self.temp_dir and os.path.exists(self.temp_dir):
             try:
                 shutil.rmtree(self.temp_dir)
             except Exception as e:
-                print(f"Error removing temporary directory: {e}")
+                self.logger.error(
+                    message="Error removing temporary directory: {error}",
+                    tag="ERROR",
+                    params={"error": str(e)}
+                )
 
-class AsyncCrawlResponse(BaseModel):
-    html: str
-    response_headers: Dict[str, str]
-    status_code: int
-    screenshot: Optional[str] = None
-    get_delayed_content: Optional[Callable[[Optional[float]], Awaitable[str]]] = None
-
-    class Config:
-        arbitrary_types_allowed = True
 
 class AsyncCrawlerStrategy(ABC):
     @abstractmethod
@@ -165,18 +219,27 @@ class AsyncCrawlerStrategy(ABC):
         pass
 
 class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
-    def __init__(self, use_cached_html=False, js_code=None, **kwargs):
+    def __init__(self, use_cached_html=False, js_code=None, logger = None, **kwargs):
+        self.logger = logger
         self.use_cached_html = use_cached_html
         self.user_agent = kwargs.get(
             "user_agent",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-            "(KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            # "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.5845.187 Safari/604.1 Edg/117.0.2045.47"
+            "Mozilla/5.0 (Linux; Android 11; SM-G973F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36"
         )
+        user_agenr_generator = UserAgentGenerator()
+        if kwargs.get("user_agent_mode") == "random":
+            self.user_agent = user_agenr_generator.generate(
+                 **kwargs.get("user_agent_generator_config", {})
+            )
         self.proxy = kwargs.get("proxy")
         self.proxy_config = kwargs.get("proxy_config")
         self.headless = kwargs.get("headless", True)
         self.browser_type = kwargs.get("browser_type", "chromium")
         self.headers = kwargs.get("headers", {})
+        self.browser_hint = user_agenr_generator.generate_client_hints(self.user_agent)
+        self.headers.setdefault("sec-ch-ua", self.browser_hint)
+        self.cookies = kwargs.get("cookies", [])
         self.sessions = {}
         self.session_ttl = 1800 
         self.js_code = js_code
@@ -186,7 +249,10 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         self.sleep_on_close = kwargs.get("sleep_on_close", False)
         self.use_managed_browser = kwargs.get("use_managed_browser", False)
         self.user_data_dir = kwargs.get("user_data_dir", None)
+        self.use_persistent_context = kwargs.get("use_persistent_context", False)
+        self.chrome_channel = kwargs.get("chrome_channel", "chrome")
         self.managed_browser = None
+        self.default_context = None
         self.hooks = {
             'on_browser_created': None,
             'on_user_agent_updated': None,
@@ -196,6 +262,14 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             'before_return_html': None,
             'before_retrieve_html': None
         }
+        self.extra_args = kwargs.get("extra_args", [])
+        self.accept_downloads = kwargs.get("accept_downloads", False)
+        self.downloads_path = kwargs.get("downloads_path")
+        self._downloaded_files = []  # Track downloaded files for current crawl
+        if self.accept_downloads and not self.downloads_path:
+            self.downloads_path = os.path.join(os.getcwd(), "downloads")
+            os.makedirs(self.downloads_path, exist_ok=True)        
+        
 
     async def __aenter__(self):
         await self.start()
@@ -213,60 +287,142 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 self.managed_browser = ManagedBrowser(
                     browser_type=self.browser_type,
                     user_data_dir=self.user_data_dir,
-                    headless=self.headless
+                    headless=self.headless,
+                    logger=self.logger
                 )
                 cdp_url = await self.managed_browser.start()
                 self.browser = await self.playwright.chromium.connect_over_cdp(cdp_url)
+                
+                # Get the default context that maintains the user profile
+                contexts = self.browser.contexts
+                if contexts:
+                    self.default_context = contexts[0]
+                else:
+                    # If no default context exists, create one
+                    self.default_context = await self.browser.new_context(
+                        viewport={"width": 1920, "height": 1080}
+                    )
+                
+                # Set up the default context
+                if self.default_context:
+                    await self.default_context.set_extra_http_headers(self.headers)
+                    if self.cookies:
+                        await self.default_context.add_cookies(self.cookies)                    
+                    if self.accept_downloads:
+                        await self.default_context.set_default_timeout(60000)
+                        await self.default_context.set_default_navigation_timeout(60000)
+                        self.default_context._impl_obj._options["accept_downloads"] = True
+                        self.default_context._impl_obj._options["downloads_path"] = self.downloads_path
+                        
+                    if self.user_agent:
+                        await self.default_context.set_extra_http_headers({
+                            "User-Agent": self.user_agent,
+                            "sec-ch-ua": self.browser_hint,
+                            # **self.headers
+                        })
             else:
+                # Base browser arguments
                 browser_args = {
                     "headless": self.headless,
                     "args": [
-                        "--disable-gpu",
                         "--no-sandbox",
                         "--disable-dev-shm-usage",
-                        "--disable-blink-features=AutomationControlled",
+                        "--no-first-run",
+                        "--no-default-browser-check",
                         "--disable-infobars",
                         "--window-position=0,0",
                         "--ignore-certificate-errors",
                         "--ignore-certificate-errors-spki-list",
-                        # "--headless=new",  # Use the new headless mode
+                        "--disable-blink-features=AutomationControlled",
+                        
                     ]
                 }
+                
+                # Add channel if specified (try Chrome first)
+                if self.chrome_channel:
+                    browser_args["channel"] = self.chrome_channel
+                
+                # Add extra args if provided
+                if self.extra_args:
+                    browser_args["args"].extend(self.extra_args)
+                    
+                # Add downloads path if downloads are enabled
+                if self.accept_downloads:
+                    browser_args["downloads_path"] = self.downloads_path
                 
                 # Add proxy settings if a proxy is specified
                 if self.proxy:
                     proxy_settings = ProxySettings(server=self.proxy)
                     browser_args["proxy"] = proxy_settings
                 elif self.proxy_config:
-                    proxy_settings = ProxySettings(server=self.proxy_config.get("server"), username=self.proxy_config.get("username"), password=self.proxy_config.get("password"))
+                    proxy_settings = ProxySettings(
+                        server=self.proxy_config.get("server"),
+                        username=self.proxy_config.get("username"),
+                        password=self.proxy_config.get("password")
+                    )
                     browser_args["proxy"] = proxy_settings
                     
-                # Select the appropriate browser based on the browser_type
-                if self.browser_type == "firefox":
-                    self.browser = await self.playwright.firefox.launch(**browser_args)
-                elif self.browser_type == "webkit":
-                    self.browser = await self.playwright.webkit.launch(**browser_args)
-                else:
-                    self.browser = await self.playwright.chromium.launch(**browser_args)
+                try:
+                    # Select the appropriate browser based on the browser_type
+                    if self.browser_type == "firefox":
+                        self.browser = await self.playwright.firefox.launch(**browser_args)
+                    elif self.browser_type == "webkit":
+                        self.browser = await self.playwright.webkit.launch(**browser_args)
+                    else:
+                        if self.use_persistent_context and self.user_data_dir:
+                            self.browser = await self.playwright.chromium.launch_persistent_context(
+                                user_data_dir=self.user_data_dir,
+                                accept_downloads=self.accept_downloads,
+                                downloads_path=self.downloads_path if self.accept_downloads else None,                                
+                                **browser_args
+                            )
+                            self.default_context = self.browser
+                        else:
+                            self.browser = await self.playwright.chromium.launch(**browser_args)
+                                
+                except Exception as e:
+                    # Fallback to chromium if Chrome channel fails
+                    if "chrome" in str(e) and browser_args.get("channel") == "chrome":
+                        browser_args["channel"] = "chromium"
+                        if self.use_persistent_context and self.user_data_dir:
+                            self.browser = await self.playwright.chromium.launch_persistent_context(
+                                user_data_dir=self.user_data_dir,
+                                **browser_args
+                            )
+                            self.default_context = self.browser
+                        else:
+                            self.browser = await self.playwright.chromium.launch(**browser_args)
+                    else:
+                        raise
 
             await self.execute_hook('on_browser_created', self.browser)
 
     async def close(self):
         if self.sleep_on_close:
             await asyncio.sleep(0.5)
+            
+        # Close all active sessions
+        session_ids = list(self.sessions.keys())
+        for session_id in session_ids:
+            await self.kill_session(session_id)
+            
         if self.browser:
             await self.browser.close()
             self.browser = None
+            
         if self.managed_browser:
+            await asyncio.sleep(0.5)
             await self.managed_browser.cleanup()
             self.managed_browser = None
+            
         if self.playwright:
             await self.playwright.stop()
             self.playwright = None
 
-    def __del__(self):
-        if self.browser or self.playwright:
-            asyncio.get_event_loop().run_until_complete(self.close())
+    # Issue #256: Remove __del__ method to avoid potential issues with async cleanup
+    # def __del__(self):
+    #     if self.browser or self.playwright:
+    #         asyncio.get_event_loop().run_until_complete(self.close())
 
     def set_hook(self, hook_type: str, hook: Callable):
         if hook_type in self.hooks:
@@ -274,13 +430,13 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         else:
             raise ValueError(f"Invalid hook type: {hook_type}")
 
-    async def execute_hook(self, hook_type: str, *args):
+    async def execute_hook(self, hook_type: str, *args, **kwargs):
         hook = self.hooks.get(hook_type)
         if hook:
             if asyncio.iscoroutinefunction(hook):
-                return await hook(*args)
+                return await hook(*args, **kwargs)
             else:
-                return hook(*args)
+                return hook(*args, **kwargs)
         return args[0] if args else None
 
     def update_user_agent(self, user_agent: str):
@@ -293,7 +449,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         if session_id in self.sessions:
             context, page, _ = self.sessions[session_id]
             await page.close()
-            await context.close()
+            if not self.use_managed_browser:
+                await context.close()
             del self.sessions[session_id]
 
     def _cleanup_expired_sessions(self):
@@ -402,74 +559,199 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         }}
                     """)
                 else:
-                    print(f"Warning: Could not access content frame for iframe {i}")
+                    # print(f"Warning: Could not access content frame for iframe {i}")
+                    self.logger.warning(
+                        message="Could not access content frame for iframe {index}",
+                        tag="SCRAPE",
+                        params={"index": i}
+                    )                    
             except Exception as e:
-                print(f"Error processing iframe {i}: {str(e)}")
+                self.logger.error(
+                    message="Error processing iframe {index}: {error}",
+                    tag="ERROR",
+                    params={"index": i, "error": str(e)}
+                )                
+                # print(f"Error processing iframe {i}: {str(e)}")
 
         # Return the page object
         return page  
     
     async def crawl(self, url: str, **kwargs) -> AsyncCrawlResponse:
+        """
+        Crawls a given URL or processes raw HTML/local file content based on the URL prefix.
+
+        Args:
+            url (str): The URL to crawl. Supported prefixes:
+                - 'http://' or 'https://': Web URL to crawl.
+                - 'file://': Local file path to process.
+                - 'raw:': Raw HTML content to process.
+            **kwargs: Additional parameters:
+                - 'screenshot' (bool): Whether to take a screenshot.
+                - ... [other existing parameters]
+
+        Returns:
+            AsyncCrawlResponse: The response containing HTML, headers, status code, and optional screenshot.
+        """
+        response_headers = {}
+        status_code = 200  # Default to 200 for local/raw HTML
+        screenshot_requested = kwargs.get('screenshot', False)
+        screenshot_data = None
+
+        if url.startswith(('http://', 'https://')):
+            # Proceed with standard web crawling
+            return await self._crawl_web(url, **kwargs)
+
+        elif url.startswith('file://'):
+            # Process local file
+            local_file_path = url[7:]  # Remove 'file://' prefix
+            if not os.path.exists(local_file_path):
+                raise FileNotFoundError(f"Local file not found: {local_file_path}")
+            with open(local_file_path, 'r', encoding='utf-8') as f:
+                html = f.read()
+            if screenshot_requested:
+                screenshot_data = await self._generate_screenshot_from_html(html)
+            return AsyncCrawlResponse(
+                html=html,
+                response_headers=response_headers,
+                status_code=status_code,
+                screenshot=screenshot_data,
+                get_delayed_content=None
+            )
+
+        elif url.startswith('raw:'):
+            # Process raw HTML content
+            raw_html = url[4:]  # Remove 'raw:' prefix
+            html = raw_html
+            if screenshot_requested:
+                screenshot_data = await self._generate_screenshot_from_html(html)
+            return AsyncCrawlResponse(
+                html=html,
+                response_headers=response_headers,
+                status_code=status_code,
+                screenshot=screenshot_data,
+                get_delayed_content=None
+            )
+        else:
+            raise ValueError("URL must start with 'http://', 'https://', 'file://', or 'raw:'")
+
+
+    async def _crawl_web(self, url: str, **kwargs) -> AsyncCrawlResponse:
+        """
+        Existing web crawling logic remains unchanged.
+
+        Args:
+            url (str): The web URL to crawl.
+            **kwargs: Additional parameters.
+
+        Returns:
+            AsyncCrawlResponse: The response containing HTML, headers, status code, and optional screenshot.
+        """
         response_headers = {}
         status_code = None
         
+        # Reset downloaded files list for new crawl
+        self._downloaded_files = []
+        
         self._cleanup_expired_sessions()
         session_id = kwargs.get("session_id")
-        if session_id:
-            context, page, _ = self.sessions.get(session_id, (None, None, None))
-            if not context:
-                context = await self.browser.new_context(
-                    user_agent=self.user_agent,
-                    viewport={"width": 1920, "height": 1080},
-                    proxy={"server": self.proxy} if self.proxy else None,
-                    accept_downloads=True,
-                    java_script_enabled=True
-                )
-                await context.add_cookies([{"name": "cookiesEnabled", "value": "true", "url": url}])
-                await context.set_extra_http_headers(self.headers)
-                page = await context.new_page()
-                self.sessions[session_id] = (context, page, time.time())
-        else:
-            context = await self.browser.new_context(
-                user_agent=self.user_agent,
-                viewport={"width": 1920, "height": 1080},
-                proxy={"server": self.proxy} if self.proxy else None
+        
+        # Check if in kwargs we have user_agent that will override the default user_agent
+        user_agent = kwargs.get("user_agent", self.user_agent)
+        
+        # Generate random user agent if magic mode is enabled and user_agent_mode is not random
+        if kwargs.get("user_agent_mode") != "random" and kwargs.get("magic", False):
+            user_agent = UserAgentGenerator().generate(
+                **kwargs.get("user_agent_generator_config", {})
             )
-            await context.set_extra_http_headers(self.headers)
-            
-            if kwargs.get("override_navigator", False) or kwargs.get("simulate_user", False) or kwargs.get("magic", False):
-                # Inject scripts to override navigator properties
-                await context.add_init_script("""
-                    // Pass the Permissions Test.
-                    const originalQuery = window.navigator.permissions.query;
-                    window.navigator.permissions.query = (parameters) => (
-                        parameters.name === 'notifications' ?
-                            Promise.resolve({ state: Notification.permission }) :
-                            originalQuery(parameters)
-                    );
-                    Object.defineProperty(navigator, 'webdriver', {
-                        get: () => undefined
-                    });
-                    window.navigator.chrome = {
-                        runtime: {},
-                        // Add other properties if necessary
-                    };
-                    Object.defineProperty(navigator, 'plugins', {
-                        get: () => [1, 2, 3, 4, 5],
-                    });
-                    Object.defineProperty(navigator, 'languages', {
-                        get: () => ['en-US', 'en'],
-                    });
-                    Object.defineProperty(document, 'hidden', {
-                        get: () => false
-                    });
-                    Object.defineProperty(document, 'visibilityState', {
-                        get: () => 'visible'
-                    });
-                """)
-            
-            page = await context.new_page()
-            # await stealth_async(page) #, stealth_config)
+        
+        # Handle page creation differently for managed browser
+        context = None
+        if self.use_managed_browser:
+            if session_id:
+                # Reuse existing session if available
+                context, page, _ = self.sessions.get(session_id, (None, None, None))
+                if not page:
+                    # Create new page in default context if session doesn't exist
+                    page = await self.default_context.new_page()
+                    self.sessions[session_id] = (self.default_context, page, time.time())
+            else:
+                # Create new page in default context for non-session requests
+                page = await self.default_context.new_page()
+        else:
+            if session_id:
+                context, page, _ = self.sessions.get(session_id, (None, None, None))
+                if not context:
+                    if self.use_persistent_context and self.browser_type in ["chrome", "chromium"]:
+                        # In persistent context, browser is the context
+                        context = self.browser
+                        page = await context.new_page()
+                    else:
+                        # Normal context creation for non-persistent or non-Chrome browsers
+                        context = await self.browser.new_context(
+                            user_agent=user_agent,
+                            viewport={"width": 1200, "height": 800},
+                            proxy={"server": self.proxy} if self.proxy else None,
+                            java_script_enabled=True,
+                            accept_downloads=self.accept_downloads,
+                            # downloads_path=self.downloads_path if self.accept_downloads else None
+                        )
+                        await context.add_cookies([{"name": "cookiesEnabled", "value": "true", "url": url}])
+                        if self.cookies:
+                            await context.add_cookies(self.cookies)
+                        await context.set_extra_http_headers(self.headers)
+                        page = await context.new_page()
+                    self.sessions[session_id] = (context, page, time.time())
+            else:
+                if self.use_persistent_context and self.browser_type in ["chrome", "chromium"]:
+                    # In persistent context, browser is the context
+                    context = self.browser
+                else:
+                    # Normal context creation
+                    context = await self.browser.new_context(
+                        user_agent=user_agent,
+                        viewport={"width": 1920, "height": 1080},
+                        proxy={"server": self.proxy} if self.proxy else None,
+                        accept_downloads=self.accept_downloads,
+                        ignore_https_errors=True  # Add this line
+                    )
+                    if self.cookies:
+                            await context.add_cookies(self.cookies)
+                    await context.set_extra_http_headers(self.headers)
+                
+                if kwargs.get("override_navigator", False) or kwargs.get("simulate_user", False) or kwargs.get("magic", False):
+                    # Inject scripts to override navigator properties
+                    await context.add_init_script("""
+                        // Pass the Permissions Test.
+                        const originalQuery = window.navigator.permissions.query;
+                        window.navigator.permissions.query = (parameters) => (
+                            parameters.name === 'notifications' ?
+                                Promise.resolve({ state: Notification.permission }) :
+                                originalQuery(parameters)
+                        );
+                        Object.defineProperty(navigator, 'webdriver', {
+                            get: () => undefined
+                        });
+                        window.navigator.chrome = {
+                            runtime: {},
+                            // Add other properties if necessary
+                        };
+                        Object.defineProperty(navigator, 'plugins', {
+                            get: () => [1, 2, 3, 4, 5],
+                        });
+                        Object.defineProperty(navigator, 'languages', {
+                            get: () => ['en-US', 'en'],
+                        });
+                        Object.defineProperty(document, 'hidden', {
+                            get: () => false
+                        });
+                        Object.defineProperty(document, 'visibilityState', {
+                            get: () => 'visible'
+                        });
+                    """)
+                
+                page = await context.new_page()
+                if kwargs.get("magic", False):
+                    await stealth_async(page, stealth_config)
 
         # Add console message and error logging
         if kwargs.get("log_console", False):
@@ -477,12 +759,16 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             page.on("pageerror", lambda exc: print(f"Page Error: {exc}"))
         
         try:
-            if self.verbose:
-                print(f"[LOG] 🕸️ Crawling {url} using AsyncPlaywrightCrawlerStrategy...")
+            # Set up download handling if enabled
+            if self.accept_downloads:
+                page.on("download", lambda download: asyncio.create_task(self._handle_download(download)))
+
+            # if self.verbose:
+            #     print(f"[LOG] 🕸️ Crawling {url} using AsyncPlaywrightCrawlerStrategy...")
 
             if self.use_cached_html:
                 cache_file_path = os.path.join(
-                    Path.home(), ".crawl4ai", "cache", hashlib.md5(url.encode()).hexdigest()
+                    os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home()), ".crawl4ai", "cache", hashlib.md5(url.encode()).hexdigest()
                 )
                 if os.path.exists(cache_file_path):
                     html = ""
@@ -499,16 +785,23 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     return response
 
             if not kwargs.get("js_only", False):
-                await self.execute_hook('before_goto', page)
+                await self.execute_hook('before_goto', page, context = context)
                 
-                response = await page.goto(
-                    url, wait_until="domcontentloaded", timeout=kwargs.get("page_timeout", 60000)
-                )
+
+                try:
+                    response = await page.goto(
+                        url,
+                        # wait_until=kwargs.get("wait_until", ["domcontentloaded", "networkidle"]),
+                        wait_until=kwargs.get("wait_until", "domcontentloaded"),
+                        timeout=kwargs.get("page_timeout", 60000),
+                    )
+                except Error as e:
+                    raise RuntimeError(f"Failed on navigating ACS-GOTO :\n{str(e)}")
                 
                 # response = await page.goto("about:blank")
                 # await page.evaluate(f"window.location.href = '{url}'")
                 
-                await self.execute_hook('after_goto', page)
+                await self.execute_hook('after_goto', page, context = context)
                 
                 # Get status code and headers
                 status_code = response.status
@@ -570,9 +863,10 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     for js in js_code:
                         await page.evaluate(js)
                 
-                await page.wait_for_load_state('networkidle')
+                # await page.wait_for_timeout(100)
+                
                 # Check for on execution event
-                await self.execute_hook('on_execution_started', page)
+                await self.execute_hook('on_execution_started', page, context = context)
                 
             if kwargs.get("simulate_user", False) or kwargs.get("magic", False):
                 # Simulate user interactions
@@ -588,6 +882,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     await self.smart_wait(page, wait_for, timeout=kwargs.get("page_timeout", 60000))
                 except Exception as e:
                     raise RuntimeError(f"Wait condition failed: {str(e)}")
+            
+            # if not wait_for and js_code:
+            #     await page.wait_for_load_state('networkidle', timeout=5000)
 
             # Update image dimensions
             update_image_dimensions_js = """
@@ -646,7 +943,24 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 });
             }
             """
-            await page.evaluate(update_image_dimensions_js)
+            
+            try:
+                try:
+                    await page.wait_for_load_state(
+                        # state="load",
+                        state="domcontentloaded",
+                        timeout=5
+                    )
+                except PlaywrightTimeoutError:
+                    pass
+                await page.evaluate(update_image_dimensions_js)
+            except Exception as e:
+                self.logger.error(
+                    message="Error updating image dimensions ACS-UPDATE_IMAGE_DIMENSIONS_JS: {error}",
+                    tag="ERROR",
+                    params={"error": str(e)}
+                )
+                # raise RuntimeError(f"Error updating image dimensions ACS-UPDATE_IMAGE_DIMENSIONS_JS: {str(e)}")
 
             # Wait a bit for any onload events to complete
             await page.wait_for_timeout(100)
@@ -655,7 +969,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             if kwargs.get("process_iframes", False):
                 page = await self.process_iframes(page)
             
-            await self.execute_hook('before_retrieve_html', page)
+            await self.execute_hook('before_retrieve_html', page, context = context)
             # Check if delay_before_return_html is set then wait for that time
             delay_before_return_html = kwargs.get("delay_before_return_html")
             if delay_before_return_html:
@@ -666,7 +980,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 await self.remove_overlay_elements(page)
             
             html = await page.content()
-            await self.execute_hook('before_return_html', page, html)
+            await self.execute_hook('before_return_html', page, html, context = context)
             
             # Check if kwargs has screenshot=True then take screenshot
             screenshot_data = None
@@ -677,12 +991,12 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     await asyncio.sleep(screenshot_wait_for)
                 screenshot_data = await self.take_screenshot(page)          
 
-            if self.verbose:
-                print(f"[LOG] ✅ Crawled {url} successfully!")
-
+            # if self.verbose:
+            #     print(f"[LOG] ✅ Crawled {url} successfully!")
+           
             if self.use_cached_html:
                 cache_file_path = os.path.join(
-                    Path.home(), ".crawl4ai", "cache", hashlib.md5(url.encode()).hexdigest()
+                    os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home()), ".crawl4ai", "cache", hashlib.md5(url.encode()).hexdigest()
                 )
                 with open(cache_file_path, "w", encoding="utf-8") as f:
                     f.write(html)
@@ -704,16 +1018,49 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 response_headers=response_headers, 
                 status_code=status_code,
                 screenshot=screenshot_data,
-                get_delayed_content=get_delayed_content
+                get_delayed_content=get_delayed_content,
+                downloaded_files=self._downloaded_files if self._downloaded_files else None
             )
             return response
         except Error as e:
-            raise Error(f"[ERROR] 🚫 crawl(): Failed to crawl {url}: {str(e)}")
+            raise Error(f"async_crawler_strategy.py:_crawleb(): {str(e)}")
         # finally:
         #     if not session_id:
         #         await page.close()
         #         await context.close()
 
+    async def _handle_download(self, download):
+        """Handle file downloads."""
+        try:
+            suggested_filename = download.suggested_filename
+            download_path = os.path.join(self.downloads_path, suggested_filename)
+            
+            self.logger.info(
+                message="Downloading {filename} to {path}",
+                tag="FETCH",
+                params={"filename": suggested_filename, "path": download_path}
+            )
+                
+            start_time = time.perf_counter()
+            await download.save_as(download_path)
+            end_time = time.perf_counter()
+            self._downloaded_files.append(download_path)
+
+            self.logger.success(
+                message="Downloaded {filename} successfully",
+                tag="COMPLETE",
+                params={"filename": suggested_filename, "path": download_path, "duration": f"{end_time - start_time:.2f}s"}
+            )            
+        except Exception as e:
+            self.logger.error(
+                message="Failed to handle download: {error}",
+                tag="ERROR",
+                params={"error": str(e)}
+            )
+            
+            # if self.verbose:
+            #     print(f"[ERROR] Failed to handle download: {str(e)}")
+    
     async def crawl_many(self, urls: List[str], **kwargs) -> List[AsyncCrawlResponse]:
         semaphore_count = kwargs.get('semaphore_count', 5)  # Adjust as needed
         semaphore = asyncio.Semaphore(semaphore_count)
@@ -855,17 +1202,36 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             await page.evaluate(remove_overlays_js)
             await page.wait_for_timeout(500)  # Wait for any animations to complete
         except Exception as e:
-            if self.verbose:
-                print(f"Warning: Failed to remove overlay elements: {str(e)}")
+            self.logger.warning(
+                message="Failed to remove overlay elements: {error}",
+                tag="SCRAPE",
+                params={"error": str(e)}
+            )            
+            # if self.verbose:
+            #     print(f"Warning: Failed to remove overlay elements: {str(e)}")
 
     async def take_screenshot(self, page: Page) -> str:
+        """
+        Takes a screenshot of the current page.
+        
+        Args:
+            page (Page): The Playwright page instance
+            
+        Returns:
+            str: Base64-encoded screenshot image
+        """
         try:
             # The page is already loaded, just take the screenshot
             screenshot = await page.screenshot(full_page=True)
             return base64.b64encode(screenshot).decode('utf-8')
         except Exception as e:
             error_message = f"Failed to take screenshot: {str(e)}"
-            print(error_message)
+            self.logger.error(
+                message="Screenshot failed: {error}",
+                tag="ERROR",
+                params={"error": error_message}
+            )
+            
 
             # Generate an error image
             img = Image.new('RGB', (800, 600), color='black')
@@ -878,4 +1244,41 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             return base64.b64encode(buffered.getvalue()).decode('utf-8')
         finally:
             await page.close()
+            
+    async def _generate_screenshot_from_html(self, html: str) -> Optional[str]:
+        """
+        Generates a screenshot from raw HTML content.
+
+        Args:
+            html (str): The HTML content to render and capture.
+
+        Returns:
+            Optional[str]: Base64-encoded screenshot image or an error image if failed.
+        """
+        try:
+            if not self.browser:
+                await self.start()
+            page = await self.browser.new_page()
+            await page.set_content(html, wait_until='networkidle')
+            screenshot = await page.screenshot(full_page=True)
+            await page.close()
+            return base64.b64encode(screenshot).decode('utf-8')
+        except Exception as e:
+            error_message = f"Failed to take screenshot: {str(e)}"
+            # print(error_message)
+            self.logger.error(
+                message="Screenshot failed: {error}",
+                tag="ERROR",
+                params={"error": error_message}
+            )            
+
+            # Generate an error image
+            img = Image.new('RGB', (800, 600), color='black')
+            draw = ImageDraw.Draw(img)
+            font = ImageFont.load_default()
+            draw.text((10, 10), error_message, fill=(255, 255, 255), font=font)
+
+            buffered = BytesIO()
+            img.save(buffered, format="JPEG")
+            return base64.b64encode(buffered.getvalue()).decode('utf-8')
 

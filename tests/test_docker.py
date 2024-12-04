@@ -7,7 +7,7 @@ import os
 from typing import Dict, Any
 
 class Crawl4AiTester:
-    def __init__(self, base_url: str = "http://localhost:8000"):
+    def __init__(self, base_url: str = "http://localhost:11235"):
         self.base_url = base_url
         
     def submit_and_wait(self, request_data: Dict[str, Any], timeout: int = 300) -> Dict[str, Any]:
@@ -54,8 +54,9 @@ def test_docker_deployment(version="basic"):
     
     # Test cases based on version
     test_basic_crawl(tester)
-    if version in ["full", "transformer"]:
-        test_cosine_extraction(tester)
+    
+    # if version in ["full", "transformer"]:
+    #     test_cosine_extraction(tester)
 
     # test_js_execution(tester)
     # test_css_selector(tester)

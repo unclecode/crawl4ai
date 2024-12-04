@@ -1,6 +1,9 @@
 # syntax=docker/dockerfile:1.4
 
-# Build arguments
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+
+# Other build arguments
 ARG PYTHON_VERSION=3.10
 
 # Base stage with system dependencies
@@ -12,7 +15,7 @@ ARG ENABLE_GPU=false
 
 # Platform-specific labels
 LABEL maintainer="unclecode"
-LABEL description="Crawl4AI - Advanced Web Crawler with AI capabilities"
+LABEL description="🔥🕷️ Crawl4AI: Open-source LLM Friendly Web Crawler & scraper"
 LABEL version="1.0"
 
 # Environment setup
@@ -62,12 +65,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libatspi2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# GPU support if enabled
-RUN if [ "$ENABLE_GPU" = "true" ] ; then \
+# GPU support if enabled and architecture is supported
+RUN if [ "$ENABLE_GPU" = "true" ] && [ "$TARGETPLATFORM" = "linux/amd64" ] ; then \
     apt-get update && apt-get install -y --no-install-recommends \
     nvidia-cuda-toolkit \
     && rm -rf /var/lib/apt/lists/* ; \
-    fi
+else \
+    echo "Skipping NVIDIA CUDA Toolkit installation (unsupported platform or GPU disabled)"; \
+fi
 
 # Create and set working directory
 WORKDIR /app
@@ -96,26 +101,36 @@ RUN if [ "$INSTALL_TYPE" = "all" ] ; then \
 
 # Install the package
 RUN if [ "$INSTALL_TYPE" = "all" ] ; then \
-        pip install -e ".[all]" && \
+        pip install ".[all]" && \
         python -m crawl4ai.model_loader ; \
     elif [ "$INSTALL_TYPE" = "torch" ] ; then \
-        pip install -e ".[torch]" ; \
+        pip install ".[torch]" ; \
     elif [ "$INSTALL_TYPE" = "transformer" ] ; then \
-        pip install -e ".[transformer]" && \
+        pip install ".[transformer]" && \
         python -m crawl4ai.model_loader ; \
     else \
-        pip install -e "." ; \
+        pip install "." ; \
     fi
 
-# Install Playwright and browsers
-RUN playwright install
+    # Install MkDocs and required plugins
+RUN pip install --no-cache-dir \
+    mkdocs \
+    mkdocs-material \
+    mkdocs-terminal \
+    pymdown-extensions
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+# Build MkDocs documentation
+RUN mkdocs build
+
+# Install Playwright and browsers
+RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
+    playwright install chromium; \
+    elif [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
+    playwright install chromium; \
+    fi
 
 # Expose port
-EXPOSE 8000
+EXPOSE 8000 11235 9222 8080
 
 # Start the FastAPI server
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "11235"]

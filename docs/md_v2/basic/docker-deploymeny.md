@@ -7,65 +7,324 @@ Crawl4AI provides official Docker images for easy deployment and scalability. Th
 Pull and run the basic version:
 
 ```bash
+# Basic run without security
 docker pull unclecode/crawl4ai:basic
 docker run -p 11235:11235 unclecode/crawl4ai:basic
+
+# Run with API security enabled
+docker run -p 11235:11235 -e CRAWL4AI_API_TOKEN=your_secret_token unclecode/crawl4ai:basic
 ```
 
-Test the deployment:
+## Running with Docker Compose 🐳
+
+### Use Docker Compose (From Local Dockerfile or Docker Hub)
+
+Crawl4AI provides flexibility to use Docker Compose for managing your containerized services. You can either build the image locally from the provided `Dockerfile` or use the pre-built image from Docker Hub.
+
+### **Option 1: Using Docker Compose to Build Locally**
+If you want to build the image locally, use the provided `docker-compose.local.yml` file.
+
+```bash
+docker-compose -f docker-compose.local.yml up -d
+```
+
+This will:
+1. Build the Docker image from the provided `Dockerfile`.
+2. Start the container and expose it on `http://localhost:11235`.
+
+---
+
+### **Option 2: Using Docker Compose with Pre-Built Image from Hub**
+If you prefer using the pre-built image on Docker Hub, use the `docker-compose.hub.yml` file.
+
+```bash
+docker-compose -f docker-compose.hub.yml up -d
+```
+
+This will:
+1. Pull the pre-built image `unclecode/crawl4ai:basic` (or `all`, depending on your configuration).
+2. Start the container and expose it on `http://localhost:11235`.
+
+---
+
+### **Stopping the Running Services**
+
+To stop the services started via Docker Compose, you can use:
+
+```bash
+docker-compose -f docker-compose.local.yml down
+# OR
+docker-compose -f docker-compose.hub.yml down
+```
+
+If the containers don’t stop and the application is still running, check the running containers:
+
+```bash
+docker ps
+```
+
+Find the `CONTAINER ID` of the running service and stop it forcefully:
+
+```bash
+docker stop <CONTAINER_ID>
+```
+
+---
+
+### **Debugging with Docker Compose**
+
+- **Check Logs**: To view the container logs:
+  ```bash
+  docker-compose -f docker-compose.local.yml logs -f
+  ```
+
+- **Remove Orphaned Containers**: If the service is still running unexpectedly:
+  ```bash
+  docker-compose -f docker-compose.local.yml down --remove-orphans
+  ```
+
+- **Manually Remove Network**: If the network is still in use:
+  ```bash
+  docker network ls
+  docker network rm crawl4ai_default
+  ```
+
+---
+
+### Why Use Docker Compose?
+
+Docker Compose is the recommended way to deploy Crawl4AI because:
+1. It simplifies multi-container setups.
+2. Allows you to define environment variables, resources, and ports in a single file.
+3. Makes it easier to switch between local development and production-ready images.
+
+For example, your `docker-compose.yml` could include API keys, token settings, and memory limits, making deployment quick and consistent.
+
+
+
+
+## API Security 🔒
+
+### Understanding CRAWL4AI_API_TOKEN
+
+The `CRAWL4AI_API_TOKEN` provides optional security for your Crawl4AI instance:
+
+- If `CRAWL4AI_API_TOKEN` is set: All API endpoints (except `/health`) require authentication
+- If `CRAWL4AI_API_TOKEN` is not set: The API is publicly accessible
+
+```bash
+# Secured Instance
+docker run -p 11235:11235 -e CRAWL4AI_API_TOKEN=your_secret_token unclecode/crawl4ai:all
+
+# Unsecured Instance
+docker run -p 11235:11235 unclecode/crawl4ai:all
+```
+
+### Making API Calls
+
+For secured instances, include the token in all requests:
+
 ```python
 import requests
 
-# Test health endpoint
-health = requests.get("http://localhost:11235/health")
-print("Health check:", health.json())
+# Setup headers if token is being used
+api_token = "your_secret_token"  # Same token set in CRAWL4AI_API_TOKEN
+headers = {"Authorization": f"Bearer {api_token}"} if api_token else {}
 
-# Test basic crawl
+# Making authenticated requests
 response = requests.post(
     "http://localhost:11235/crawl",
+    headers=headers,
     json={
-        "urls": "https://www.nbcnews.com/business",
+        "urls": "https://example.com",
         "priority": 10
     }
 )
+
+# Checking task status
 task_id = response.json()["task_id"]
-print("Task ID:", task_id)
+status = requests.get(
+    f"http://localhost:11235/task/{task_id}",
+    headers=headers
+)
 ```
 
-## Available Images 🏷️
+### Using with Docker Compose
 
-- `unclecode/crawl4ai:basic` - Basic web crawling capabilities
-- `unclecode/crawl4ai:all` - Full installation with all features
-- `unclecode/crawl4ai:gpu` - GPU-enabled version for ML features
+In your `docker-compose.yml`:
+```yaml
+services:
+  crawl4ai:
+    image: unclecode/crawl4ai:all
+    environment:
+      - CRAWL4AI_API_TOKEN=${CRAWL4AI_API_TOKEN:-}  # Optional
+    # ... other configuration
+```
+
+Then either:
+1. Set in `.env` file:
+```env
+CRAWL4AI_API_TOKEN=your_secret_token
+```
+
+2. Or set via command line:
+```bash
+CRAWL4AI_API_TOKEN=your_secret_token docker-compose up
+```
+
+> **Security Note**: If you enable the API token, make sure to keep it secure and never commit it to version control. The token will be required for all API endpoints except the health check endpoint (`/health`).
 
 ## Configuration Options 🔧
 
 ### Environment Variables
 
+You can configure the service using environment variables:
+
 ```bash
+# Basic configuration
 docker run -p 11235:11235 \
     -e MAX_CONCURRENT_TASKS=5 \
-    -e OPENAI_API_KEY=your_key \
     unclecode/crawl4ai:all
-```
 
-### Volume Mounting
-
-Mount a directory for persistent data:
-```bash
+# With security and LLM support
 docker run -p 11235:11235 \
-    -v $(pwd)/data:/app/data \
+    -e CRAWL4AI_API_TOKEN=your_secret_token \
+    -e OPENAI_API_KEY=sk-... \
+    -e ANTHROPIC_API_KEY=sk-ant-... \
     unclecode/crawl4ai:all
 ```
 
-### Resource Limits
+### Using Docker Compose (Recommended) 🐳
 
-Control container resources:
+Create a `docker-compose.yml`:
+
+```yaml
+version: '3.8'
+
+services:
+  crawl4ai:
+    image: unclecode/crawl4ai:all
+    ports:
+      - "11235:11235"
+    environment:
+      - CRAWL4AI_API_TOKEN=${CRAWL4AI_API_TOKEN:-}  # Optional API security
+      - MAX_CONCURRENT_TASKS=5
+      # LLM Provider Keys
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    volumes:
+      - /dev/shm:/dev/shm
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 1G
+```
+
+You can run it in two ways:
+
+1. Using environment variables directly:
 ```bash
-docker run -p 11235:11235 \
-    --memory=4g \
-    --cpus=2 \
-    unclecode/crawl4ai:all
+CRAWL4AI_API_TOKEN=secret123 OPENAI_API_KEY=sk-... docker-compose up
 ```
+
+2. Using a `.env` file (recommended):
+Create a `.env` file in the same directory:
+```env
+# API Security (optional)
+CRAWL4AI_API_TOKEN=your_secret_token
+
+# LLM Provider Keys
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+
+# Other Configuration
+MAX_CONCURRENT_TASKS=5
+```
+
+Then simply run:
+```bash
+docker-compose up
+```
+
+### Testing the Deployment 🧪
+
+```python
+import requests
+
+# For unsecured instances
+def test_unsecured():
+    # Health check
+    health = requests.get("http://localhost:11235/health")
+    print("Health check:", health.json())
+
+    # Basic crawl
+    response = requests.post(
+        "http://localhost:11235/crawl",
+        json={
+            "urls": "https://www.nbcnews.com/business",
+            "priority": 10
+        }
+    )
+    task_id = response.json()["task_id"]
+    print("Task ID:", task_id)
+
+# For secured instances
+def test_secured(api_token):
+    headers = {"Authorization": f"Bearer {api_token}"}
+    
+    # Basic crawl with authentication
+    response = requests.post(
+        "http://localhost:11235/crawl",
+        headers=headers,
+        json={
+            "urls": "https://www.nbcnews.com/business",
+            "priority": 10
+        }
+    )
+    task_id = response.json()["task_id"]
+    print("Task ID:", task_id)
+```
+
+### LLM Extraction Example 🤖
+
+When you've configured your LLM provider keys (via environment variables or `.env`), you can use LLM extraction:
+
+```python
+request = {
+    "urls": "https://example.com",
+    "extraction_config": {
+        "type": "llm",
+        "params": {
+            "provider": "openai/gpt-4",
+            "instruction": "Extract main topics from the page"
+        }
+    }
+}
+
+# Make the request (add headers if using API security)
+response = requests.post("http://localhost:11235/crawl", json=request)
+```
+
+> **Note**: Remember to add `.env` to your `.gitignore` to keep your API keys secure!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ## Usage Examples 📝
 

@@ -1,0 +1,67 @@
+services:
+  # Local build services for different platforms
+  crawl4ai-amd64:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PYTHON_VERSION: "3.10"
+        INSTALL_TYPE: ${INSTALL_TYPE:-basic}
+        ENABLE_GPU: false
+      platforms:
+        - linux/amd64
+    profiles: ["local-amd64"]
+    extends: &base-config
+      file: docker-compose.yml
+      service: base-config
+
+  crawl4ai-arm64:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PYTHON_VERSION: "3.10"
+        INSTALL_TYPE: ${INSTALL_TYPE:-basic}
+        ENABLE_GPU: false
+      platforms:
+        - linux/arm64
+    profiles: ["local-arm64"]
+    extends: *base-config
+
+  # Hub services for different platforms and versions
+  crawl4ai-hub-amd64:
+    image: unclecode/crawl4ai:${VERSION:-basic}-amd64
+    profiles: ["hub-amd64"]
+    extends: *base-config
+
+  crawl4ai-hub-arm64:
+    image: unclecode/crawl4ai:${VERSION:-basic}-arm64
+    profiles: ["hub-arm64"]
+    extends: *base-config
+
+  # Base configuration to be extended
+  base-config:
+    ports:
+      - "11235:11235"
+      - "8000:8000"
+      - "9222:9222"
+      - "8080:8080"
+    environment:
+      - CRAWL4AI_API_TOKEN=${CRAWL4AI_API_TOKEN:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY:-}
+    volumes:
+      - /dev/shm:/dev/shm
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 1G
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11235/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

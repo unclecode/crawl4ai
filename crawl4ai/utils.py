@@ -14,9 +14,156 @@ from typing import Dict, Any
 from urllib.parse import urljoin
 import requests
 from requests.exceptions import InvalidSchema
+import hashlib
+from typing import Optional, Tuple, Dict, Any
+import xxhash
+from colorama import Fore, Style, init
+import textwrap
 
+from .html2text import HTML2Text
+class CustomHTML2Text(HTML2Text):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.inside_pre = False
+        self.inside_code = False
+        self.preserve_tags = set()  # Set of tags to preserve
+        self.current_preserved_tag = None
+        self.preserved_content = []
+        self.preserve_depth = 0
+        
+        # Configuration options
+        self.skip_internal_links = False
+        self.single_line_break = False
+        self.mark_code = False
+        self.include_sup_sub = False
+        self.body_width = 0
+        self.ignore_mailto_links = True
+        self.ignore_links = False
+        self.escape_backslash = False
+        self.escape_dot = False
+        self.escape_plus = False
+        self.escape_dash = False
+        self.escape_snob = False
+
+    def update_params(self, **kwargs):
+        """Update parameters and set preserved tags."""
+        for key, value in kwargs.items():
+            if key == 'preserve_tags':
+                self.preserve_tags = set(value)
+            else:
+                setattr(self, key, value)
+
+    def handle_tag(self, tag, attrs, start):
+        # Handle preserved tags
+        if tag in self.preserve_tags:
+            if start:
+                if self.preserve_depth == 0:
+                    self.current_preserved_tag = tag
+                    self.preserved_content = []
+                    # Format opening tag with attributes
+                    attr_str = ''.join(f' {k}="{v}"' for k, v in attrs.items() if v is not None)
+                    self.preserved_content.append(f'<{tag}{attr_str}>')
+                self.preserve_depth += 1
+                return
+            else:
+                self.preserve_depth -= 1
+                if self.preserve_depth == 0:
+                    self.preserved_content.append(f'</{tag}>')
+                    # Output the preserved HTML block with proper spacing
+                    preserved_html = ''.join(self.preserved_content)
+                    self.o('\n' + preserved_html + '\n')
+                    self.current_preserved_tag = None
+                return
+
+        # If we're inside a preserved tag, collect all content
+        if self.preserve_depth > 0:
+            if start:
+                # Format nested tags with attributes
+                attr_str = ''.join(f' {k}="{v}"' for k, v in attrs.items() if v is not None)
+                self.preserved_content.append(f'<{tag}{attr_str}>')
+            else:
+                self.preserved_content.append(f'</{tag}>')
+            return
+
+        # Handle pre tags
+        if tag == 'pre':
+            if start:
+                self.o('```\n')
+                self.inside_pre = True
+            else:
+                self.o('\n```')
+                self.inside_pre = False
+        # elif tag in ["h1", "h2", "h3", "h4", "h5", "h6"]:
+        #     pass
+        else:
+            super().handle_tag(tag, attrs, start)
+
+    def handle_data(self, data, entity_char=False):
+        """Override handle_data to capture content within preserved tags."""
+        if self.preserve_depth > 0:
+            self.preserved_content.append(data)
+            return
+        super().handle_data(data, entity_char)
 class InvalidCSSSelectorError(Exception):
     pass
+
+
+def create_box_message(
+   message: str, 
+   type: str = "info", 
+   width: int = 80, 
+   add_newlines: bool = True,
+   double_line: bool = False
+) -> str:
+   init()
+   
+   # Define border and text colors for different types
+   styles = {
+       "warning": (Fore.YELLOW, Fore.LIGHTYELLOW_EX, "⚠"),
+       "info": (Fore.BLUE, Fore.LIGHTBLUE_EX, "ℹ"), 
+       "success": (Fore.GREEN, Fore.LIGHTGREEN_EX, "✓"),
+       "error": (Fore.RED, Fore.LIGHTRED_EX, "×"),
+   }
+   
+   border_color, text_color, prefix = styles.get(type.lower(), styles["info"])
+   
+   # Define box characters based on line style
+   box_chars = {
+       "single": ("─", "│", "┌", "┐", "└", "┘"),
+       "double": ("═", "║", "╔", "╗", "╚", "╝")
+   }
+   line_style = "double" if double_line else "single"
+   h_line, v_line, tl, tr, bl, br = box_chars[line_style]
+   
+   # Process lines with lighter text color
+   formatted_lines = []
+   raw_lines = message.split('\n')
+   
+   if raw_lines:
+       first_line = f"{prefix} {raw_lines[0].strip()}"
+       wrapped_first = textwrap.fill(first_line, width=width-4)
+       formatted_lines.extend(wrapped_first.split('\n'))
+       
+       for line in raw_lines[1:]:
+           if line.strip():
+               wrapped = textwrap.fill(f"  {line.strip()}", width=width-4)
+               formatted_lines.extend(wrapped.split('\n'))
+           else:
+               formatted_lines.append("")
+   
+   # Create the box with colored borders and lighter text
+   horizontal_line = h_line * (width - 1)
+   box = [
+       f"{border_color}{tl}{horizontal_line}{tr}",
+       *[f"{border_color}{v_line}{text_color} {line:<{width-2}}{border_color}{v_line}" for line in formatted_lines],
+       f"{border_color}{bl}{horizontal_line}{br}{Style.RESET_ALL}"
+   ]
+   
+   result = "\n".join(box)
+   if add_newlines:
+       result = f"\n{result}\n"
+   
+   return result
 
 def calculate_semaphore_count():
     cpu_count = os.cpu_count()
@@ -60,7 +207,7 @@ def get_system_memory():
         raise OSError("Unsupported operating system")
 
 def get_home_folder():
-    home_folder = os.path.join(Path.home(), ".crawl4ai")
+    home_folder = os.path.join(os.getenv("CRAWL4_AI_BASE_DIRECTORY", os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home())), ".crawl4ai")
     os.makedirs(home_folder, exist_ok=True)
     os.makedirs(f"{home_folder}/cache", exist_ok=True)
     os.makedirs(f"{home_folder}/models", exist_ok=True)
@@ -142,12 +289,17 @@ def sanitize_html(html):
 def sanitize_input_encode(text: str) -> str:
     """Sanitize input to handle potential encoding issues."""
     try:
-        # Attempt to encode and decode as UTF-8 to handle potential encoding issues
-        return text.encode('utf-8', errors='ignore').decode('utf-8')
-    except UnicodeEncodeError as e:
-        print(f"Warning: Encoding issue detected. Some characters may be lost. Error: {e}")
-        # Fall back to ASCII if UTF-8 fails
-        return text.encode('ascii', errors='ignore').decode('ascii')
+        try:
+            if not text:
+                return ''
+            # Attempt to encode and decode as UTF-8 to handle potential encoding issues
+            return text.encode('utf-8', errors='ignore').decode('utf-8')
+        except UnicodeEncodeError as e:
+            print(f"Warning: Encoding issue detected. Some characters may be lost. Error: {e}")
+            # Fall back to ASCII if UTF-8 fails
+            return text.encode('ascii', errors='ignore').decode('ascii')
+    except Exception as e:
+        raise ValueError(f"Error sanitizing input: {str(e)}") from e
 
 def escape_json_string(s):
     """
@@ -706,9 +858,12 @@ def get_content_of_website_optimized(url: str, html: str, word_count_threshold: 
     body = flatten_nested_elements(body)
     base64_pattern = re.compile(r'data:image/[^;]+;base64,([^"]+)')
     for img in imgs:
-        src = img.get('src', '')
-        if base64_pattern.match(src):
-            img['src'] = base64_pattern.sub('', src)
+        try:
+            src = img.get('src', '')
+            if base64_pattern.match(src):
+                img['src'] = base64_pattern.sub('', src)
+        except:
+            pass        
 
     cleaned_html = str(body).replace('\n\n', '\n').replace('  ', ' ')
     cleaned_html = sanitize_html(cleaned_html)
@@ -733,45 +888,53 @@ def get_content_of_website_optimized(url: str, html: str, word_count_threshold: 
         'metadata': meta
     }
 
-def extract_metadata(html, soup = None):
+def extract_metadata(html, soup=None):
     metadata = {}
     
-    if not html:
+    if not html and not soup:
+        return {}
+    
+    if not soup:
+        soup = BeautifulSoup(html, 'lxml')
+    
+    head = soup.head
+    if not head:
         return metadata
     
-    # Parse HTML content with BeautifulSoup
-    if not soup:
-        soup = BeautifulSoup(html, 'html.parser')
-
     # Title
-    title_tag = soup.find('title')
-    metadata['title'] = title_tag.string if title_tag else None
+    title_tag = head.find('title')
+    metadata['title'] = title_tag.string.strip() if title_tag and title_tag.string else None
 
     # Meta description
-    description_tag = soup.find('meta', attrs={'name': 'description'})
-    metadata['description'] = description_tag['content'] if description_tag else None
+    description_tag = head.find('meta', attrs={'name': 'description'})
+    metadata['description'] = description_tag.get('content', '').strip() if description_tag else None
 
     # Meta keywords
-    keywords_tag = soup.find('meta', attrs={'name': 'keywords'})
-    metadata['keywords'] = keywords_tag['content'] if keywords_tag else None
+    keywords_tag = head.find('meta', attrs={'name': 'keywords'})
+    metadata['keywords'] = keywords_tag.get('content', '').strip() if keywords_tag else None
 
     # Meta author
-    author_tag = soup.find('meta', attrs={'name': 'author'})
-    metadata['author'] = author_tag['content'] if author_tag else None
+    author_tag = head.find('meta', attrs={'name': 'author'})
+    metadata['author'] = author_tag.get('content', '').strip() if author_tag else None
 
     # Open Graph metadata
-    og_tags = soup.find_all('meta', attrs={'property': lambda value: value and value.startswith('og:')})
+    og_tags = head.find_all('meta', attrs={'property': re.compile(r'^og:')})
     for tag in og_tags:
-        property_name = tag['property']
-        metadata[property_name] = tag['content']
+        property_name = tag.get('property', '').strip()
+        content = tag.get('content', '').strip()
+        if property_name and content:
+            metadata[property_name] = content
 
     # Twitter Card metadata
-    twitter_tags = soup.find_all('meta', attrs={'name': lambda value: value and value.startswith('twitter:')})
+    twitter_tags = head.find_all('meta', attrs={'name': re.compile(r'^twitter:')})
     for tag in twitter_tags:
-        property_name = tag['name']
-        metadata[property_name] = tag['content']
-
+        property_name = tag.get('name', '').strip()
+        content = tag.get('content', '').strip()
+        if property_name and content:
+            metadata[property_name] = content
+    
     return metadata
+
 
 def extract_xml_tags(string):
     tags = re.findall(r'<(\w+)>', string)
@@ -977,8 +1140,53 @@ def wrap_text(draw, text, font, max_width):
     return '\n'.join(lines)
 
 def format_html(html_string):
-    soup = BeautifulSoup(html_string, 'html.parser')
+    soup = BeautifulSoup(html_string, 'lxml.parser')
     return soup.prettify()
+
+def fast_format_html(html_string):
+    """
+    A fast HTML formatter that uses string operations instead of parsing.
+    
+    Args:
+        html_string (str): The HTML string to format
+        
+    Returns:
+        str: The formatted HTML string
+    """
+    # Initialize variables
+    indent = 0
+    indent_str = "  "  # Two spaces for indentation
+    formatted = []
+    in_content = False
+    
+    # Split by < and > to separate tags and content
+    parts = html_string.replace('>', '>\n').replace('<', '\n<').split('\n')
+    
+    for part in parts:
+        if not part.strip():
+            continue
+            
+        # Handle closing tags
+        if part.startswith('</'):
+            indent -= 1
+            formatted.append(indent_str * indent + part)
+            
+        # Handle self-closing tags
+        elif part.startswith('<') and part.endswith('/>'):
+            formatted.append(indent_str * indent + part)
+            
+        # Handle opening tags
+        elif part.startswith('<'):
+            formatted.append(indent_str * indent + part)
+            indent += 1
+            
+        # Handle content between tags
+        else:
+            content = part.strip()
+            if content:
+                formatted.append(indent_str * indent + content)
+    
+    return '\n'.join(formatted)
 
 def normalize_url(href, base_url):
     """Normalize URLs to ensure consistent format"""
@@ -1043,3 +1251,82 @@ def is_external_url(url, base_domain):
         return False
         
     return False
+
+def clean_tokens(tokens: list[str]) -> list[str]:
+    # Set of tokens to remove
+    noise = {'ccp', 'up', '↑', '▲', '⬆️', 'a', 'an', 'at', 'by', 'in', 'of', 'on', 'to', 'the'}
+
+    STOP_WORDS = {
+        'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 
+        'has', 'he', 'in', 'is', 'it', 'its', 'of', 'on', 'that', 'the', 
+        'to', 'was', 'were', 'will', 'with',
+        
+        # Pronouns
+        'i', 'you', 'he', 'she', 'it', 'we', 'they',
+        'me', 'him', 'her', 'us', 'them',
+        'my', 'your', 'his', 'her', 'its', 'our', 'their',
+        'mine', 'yours', 'hers', 'ours', 'theirs',
+        'myself', 'yourself', 'himself', 'herself', 'itself', 'ourselves', 'themselves',
+        
+        # Common verbs
+        'am', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+        'have', 'has', 'had', 'having', 'do', 'does', 'did', 'doing',
+        
+        # Prepositions
+        'about', 'above', 'across', 'after', 'against', 'along', 'among', 'around',
+        'at', 'before', 'behind', 'below', 'beneath', 'beside', 'between', 'beyond',
+        'by', 'down', 'during', 'except', 'for', 'from', 'in', 'inside', 'into',
+        'near', 'of', 'off', 'on', 'out', 'outside', 'over', 'past', 'through',
+        'to', 'toward', 'under', 'underneath', 'until', 'up', 'upon', 'with', 'within',
+        
+        # Conjunctions
+        'and', 'but', 'or', 'nor', 'for', 'yet', 'so',
+        'although', 'because', 'since', 'unless',
+        
+        # Articles
+        'a', 'an', 'the',
+        
+        # Other common words
+        'this', 'that', 'these', 'those',
+        'what', 'which', 'who', 'whom', 'whose',
+        'when', 'where', 'why', 'how',
+        'all', 'any', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such',
+        'can', 'cannot', "can't", 'could', "couldn't",
+        'may', 'might', 'must', "mustn't",
+        'shall', 'should', "shouldn't",
+        'will', "won't", 'would', "wouldn't",
+        'not', "n't", 'no', 'nor', 'none'
+    }   
+   
+    # Single comprehension, more efficient than multiple passes
+    return [token for token in tokens 
+            if len(token) > 2 
+            and token not in noise 
+            and token not in STOP_WORDS
+            and not token.startswith('↑')
+            and not token.startswith('▲')
+            and not token.startswith('⬆')]
+
+
+def generate_content_hash(content: str) -> str:
+    """Generate a unique hash for content"""
+    return xxhash.xxh64(content.encode()).hexdigest()
+    # return hashlib.sha256(content.encode()).hexdigest()
+
+def ensure_content_dirs(base_path: str) -> Dict[str, str]:
+    """Create content directories if they don't exist"""
+    dirs = {
+        'html': 'html_content',
+        'cleaned': 'cleaned_html',
+        'markdown': 'markdown_content', 
+        'extracted': 'extracted_content',
+        'screenshots': 'screenshots'
+    }
+    
+    content_paths = {}
+    for key, dirname in dirs.items():
+        path = os.path.join(base_path, dirname)
+        os.makedirs(path, exist_ok=True)
+        content_paths[key] = path
+        
+    return content_paths

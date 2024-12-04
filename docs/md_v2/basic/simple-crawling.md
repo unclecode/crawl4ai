@@ -12,7 +12,9 @@ from crawl4ai import AsyncWebCrawler
 
 async def main():
     async with AsyncWebCrawler() as crawler:
-        result = await crawler.arun(url="https://example.com")
+        result = await crawler.arun(
+            url="https://example.com"
+        )
         print(result.markdown)  # Print clean markdown content
 
 if __name__ == "__main__":
@@ -24,7 +26,7 @@ if __name__ == "__main__":
 The `arun()` method returns a `CrawlResult` object with several useful properties. Here's a quick overview (see [CrawlResult](../api/crawl-result.md) for complete details):
 
 ```python
-result = await crawler.arun(url="https://example.com")
+result = await crawler.arun(url="https://example.com", fit_markdown=True)
 
 # Different content formats
 print(result.html)         # Raw HTML
@@ -81,7 +83,7 @@ Here's a more comprehensive example showing common usage patterns:
 
 ```python
 import asyncio
-from crawl4ai import AsyncWebCrawler
+from crawl4ai import AsyncWebCrawler, CacheMode
 
 async def main():
     async with AsyncWebCrawler(verbose=True) as crawler:
@@ -97,7 +99,7 @@ async def main():
             remove_overlay_elements=True,
             
             # Cache control
-            bypass_cache=False  # Use cache if available
+            cache_mode=CacheMode.ENABLE  # Use cache if available
         )
         
         if result.success:
