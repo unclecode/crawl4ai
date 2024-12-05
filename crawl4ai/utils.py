@@ -22,7 +22,7 @@ import textwrap
 
 from .html2text import HTML2Text
 class CustomHTML2Text(HTML2Text):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, handle_code_in_pre=False, **kwargs):
         super().__init__(*args, **kwargs)
         self.inside_pre = False
         self.inside_code = False
@@ -30,6 +30,7 @@ class CustomHTML2Text(HTML2Text):
         self.current_preserved_tag = None
         self.preserved_content = []
         self.preserve_depth = 0
+        self.handle_code_in_pre = handle_code_in_pre 
         
         # Configuration options
         self.skip_internal_links = False
@@ -50,6 +51,8 @@ class CustomHTML2Text(HTML2Text):
         for key, value in kwargs.items():
             if key == 'preserve_tags':
                 self.preserve_tags = set(value)
+            elif key == 'handle_code_in_pre':
+                self.handle_code_in_pre = value
             else:
                 setattr(self, key, value)
 
@@ -88,13 +91,21 @@ class CustomHTML2Text(HTML2Text):
         # Handle pre tags
         if tag == 'pre':
             if start:
-                self.o('```\n')
+                self.o('```\n')  # Markdown code block start
                 self.inside_pre = True
             else:
-                self.o('\n```')
+                self.o('\n```\n')  # Markdown code block end
                 self.inside_pre = False
-        # elif tag in ["h1", "h2", "h3", "h4", "h5", "h6"]:
-        #     pass
+        elif tag == 'code':
+            if self.inside_pre and not self.handle_code_in_pre:
+                # Ignore code tags inside pre blocks if handle_code_in_pre is False
+                return
+            if start:
+                self.o('`')  # Markdown inline code start
+                self.inside_code = True
+            else:
+                self.o('`')  # Markdown inline code end
+                self.inside_code = False
         else:
             super().handle_tag(tag, attrs, start)
 
@@ -103,7 +114,39 @@ class CustomHTML2Text(HTML2Text):
         if self.preserve_depth > 0:
             self.preserved_content.append(data)
             return
+
+        if self.inside_pre:
+            # Output the raw content for pre blocks, including content inside code tags
+            self.o(data)  # Directly output the data as-is (preserve newlines)
+            return
+        if self.inside_code:
+            # Inline code: no newlines allowed
+            self.o(data.replace('\n', ' '))
+            return
+
+        # Default behavior for other tags
         super().handle_data(data, entity_char)
+
+
+    #     # Handle pre tags
+    #     if tag == 'pre':
+    #         if start:
+    #             self.o('```\n')
+    #             self.inside_pre = True
+    #         else:
+    #             self.o('\n```')
+    #             self.inside_pre = False
+    #     # elif tag in ["h1", "h2", "h3", "h4", "h5", "h6"]:
+    #     #     pass
+    #     else:
+    #         super().handle_tag(tag, attrs, start)
+
+    # def handle_data(self, data, entity_char=False):
+    #     """Override handle_data to capture content within preserved tags."""
+    #     if self.preserve_depth > 0:
+    #         self.preserved_content.append(data)
+    #         return
+    #     super().handle_data(data, entity_char)
 class InvalidCSSSelectorError(Exception):
     pass
 

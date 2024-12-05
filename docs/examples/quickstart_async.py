@@ -547,6 +547,7 @@ async def generate_knowledge_graph():
             f.write(result.extracted_content)
 
 async def fit_markdown_remove_overlay():
+    
     async with AsyncWebCrawler(
             headless=True,  # Set to False to see what is happening
             verbose=True,
@@ -560,13 +561,15 @@ async def fit_markdown_remove_overlay():
             url='https://www.kidocode.com/degrees/technology',
             cache_mode=CacheMode.BYPASS,
             markdown_generator=DefaultMarkdownGenerator(
-                content_filter=PruningContentFilter(threshold=0.48, threshold_type="fixed", min_word_threshold=0),
+                content_filter=PruningContentFilter(
+                    threshold=0.48, threshold_type="fixed", min_word_threshold=0
+                ),
                 options={
                     "ignore_links": True
                 }
             ),
             # markdown_generator=DefaultMarkdownGenerator(
-            #     content_filter=BM25ContentFilter(user_query=None, bm25_threshold=1.0),
+            #     content_filter=BM25ContentFilter(user_query="", bm25_threshold=1.0),
             #     options={
             #         "ignore_links": True
             #     }
