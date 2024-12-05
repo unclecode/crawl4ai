@@ -4,7 +4,59 @@ This guide explains how to use content filtering strategies in Crawl4AI to extra
 
 ## Relevance Content Filter
 
-The `RelevanceContentFilter` is an abstract class that provides a common interface for content filtering strategies. Specific filtering algorithms, like `BM25ContentFilter`, inherit from this class and implement the `filter_content` method. This method takes the HTML content as input and returns a list of filtered text blocks.
+The `RelevanceContentFilter` is an abstract class that provides a common interface for content filtering strategies. Specific filtering algorithms, like `PruningContentFilter` or `BM25ContentFilter`, inherit from this class and implement the `filter_content` method. This method takes the HTML content as input and returns a list of filtered text blocks.
+
+
+## Pruning Content Filter
+
+The `PruningContentFilter` is a tree-shaking algorithm that analyzes the HTML DOM structure and removes less relevant nodes based on various metrics like text density, link density, and tag importance. It evaluates each node using a composite scoring system and "prunes" nodes that fall below a certain threshold.
+
+### Usage
+
+```python
+from crawl4ai import AsyncWebCrawler
+from crawl4ai.content_filter_strategy import PruningContentFilter
+
+async def filter_content(url):
+    async with AsyncWebCrawler() as crawler:
+        content_filter = PruningContentFilter(
+            min_word_threshold=5,
+            threshold_type='dynamic',
+            threshold=0.45
+        )
+        result = await crawler.arun(url=url, extraction_strategy=content_filter, fit_markdown=True)
+        if result.success:
+            print(f"Cleaned Markdown:\n{result.fit_markdown}")
+```
+
+### Parameters
+
+- **`min_word_threshold`**: (Optional) Minimum number of words a node must contain to be considered relevant. Nodes with fewer words are automatically pruned.
+
+- **`threshold_type`**: (Optional, default 'fixed') Controls how pruning thresholds are calculated:
+  - `'fixed'`: Uses a constant threshold value for all nodes
+  - `'dynamic'`: Adjusts threshold based on node characteristics like tag importance and text/link ratios
+
+- **`threshold`**: (Optional, default 0.48) Base threshold value for node pruning:
+  - For fixed threshold: Nodes scoring below this value are removed
+  - For dynamic threshold: This value is adjusted based on node properties
+
+### How It Works
+
+The pruning algorithm evaluates each node using multiple metrics:
+- Text density: Ratio of actual text to overall node content
+- Link density: Proportion of text within links
+- Tag importance: Weight based on HTML tag type (e.g., article, p, div)
+- Content quality: Metrics like text length and structural importance
+
+Nodes scoring below the threshold are removed, effectively "shaking" less relevant content from the DOM tree. This results in a cleaner document containing only the most relevant content blocks.
+
+The algorithm is particularly effective for:
+- Removing boilerplate content
+- Eliminating navigation menus and sidebars
+- Preserving main article content
+- Maintaining document structure while removing noise
+
 
 ## BM25 Algorithm
 
@@ -21,7 +73,7 @@ from crawl4ai.content_filter_strategy import BM25ContentFilter
 async def filter_content(url, query=None):
     async with AsyncWebCrawler() as crawler:
         content_filter = BM25ContentFilter(user_query=query)
-        result = await crawler.arun(url=url, content_filter=content_filter, fit_markdown=True) # Set fit_markdown flag to True to trigger BM25 filtering
+        result = await crawler.arun(url=url, extraction_strategy=content_filter, fit_markdown=True) # Set fit_markdown flag to True to trigger BM25 filtering
         if result.success:
             print(f"Filtered Content (JSON):\n{result.extracted_content}")
             print(f"\nFiltered Markdown:\n{result.fit_markdown}") # New field in CrawlResult object
@@ -71,7 +123,7 @@ class MyCustomFilter(RelevantContentFilter):
 async def custom_filter_demo(url: str):
     async with AsyncWebCrawler() as crawler:
         custom_filter = MyCustomFilter()
-        result = await crawler.arun(url, content_filter=custom_filter)
+        result = await crawler.arun(url, extraction_strategy=custom_filter)
         if result.success:
             print(result.extracted_content)
 

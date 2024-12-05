@@ -11,8 +11,9 @@ LINK_PATTERN = re.compile(r'!?\[([^\]]+)\]\(([^)]+?)(?:\s+"([^"]*)")?\)')
 
 class MarkdownGenerationStrategy(ABC):
     """Abstract base class for markdown generation strategies."""
-    def __init__(self, content_filter: Optional[RelevantContentFilter] = None):
+    def __init__(self, content_filter: Optional[RelevantContentFilter] = None, options: Optional[Dict[str, Any]] = None):
         self.content_filter = content_filter
+        self.options = options or {}
     
     @abstractmethod
     def generate_markdown(self, 
@@ -27,8 +28,8 @@ class MarkdownGenerationStrategy(ABC):
 
 class DefaultMarkdownGenerator(MarkdownGenerationStrategy):
     """Default implementation of markdown generation strategy."""
-    def __init__(self, content_filter: Optional[RelevantContentFilter] = None):
-        super().__init__(content_filter)
+    def __init__(self, content_filter: Optional[RelevantContentFilter] = None, options: Optional[Dict[str, Any]] = None):
+        super().__init__(content_filter, options)
     
     def convert_links_to_citations(self, markdown: str, base_url: str = "") -> Tuple[str, str]:
         link_map = {}
@@ -74,6 +75,7 @@ class DefaultMarkdownGenerator(MarkdownGenerationStrategy):
                          cleaned_html: str, 
                          base_url: str = "",
                          html2text_options: Optional[Dict[str, Any]] = None,
+                         options: Optional[Dict[str, Any]] = None,
                          content_filter: Optional[RelevantContentFilter] = None,
                          citations: bool = True,
                          **kwargs) -> MarkdownGenerationResult:
@@ -82,6 +84,10 @@ class DefaultMarkdownGenerator(MarkdownGenerationStrategy):
         h = CustomHTML2Text()
         if html2text_options:
             h.update_params(**html2text_options)
+        elif options:
+            h.update_params(**options)
+        elif self.options:
+            h.update_params(**self.options)
 
         # Generate raw markdown
         raw_markdown = h.handle(cleaned_html)
