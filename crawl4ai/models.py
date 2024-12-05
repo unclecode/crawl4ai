@@ -33,6 +33,7 @@ class CrawlResult(BaseModel):
     session_id: Optional[str] = None
     response_headers: Optional[dict] = None
     status_code: Optional[int] = None
+    storage_metadata: Optional[dict] = None
     
 class AsyncCrawlResponse(BaseModel):
     html: str
