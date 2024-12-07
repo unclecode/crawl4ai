@@ -198,7 +198,7 @@ Avoid Common Mistakes:
 - Do NOT add any comments using "//" or "#" in the JSON output. It causes parsing errors.
 - Make sure the JSON is properly formatted with curly braces, square brackets, and commas in the right places.
 - Do not miss closing </blocks> tag at the end of the JSON output.
-- Do not generate the Python coee show me how to do the task, this is your task to extract the information and return it in JSON format.
+- Do not generate the Python code show me how to do the task, this is your task to extract the information and return it in JSON format.
 
 Result
 Output the final list of JSON objects, wrapped in <blocks>...</blocks> XML tags. Make sure to close the tag properly."""
