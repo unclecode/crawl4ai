@@ -128,7 +128,7 @@ async def extract_structured_data_using_llm(provider: str, api_token: str = None
             extraction_strategy=LLMExtractionStrategy(
                 provider=provider,
                 api_token=api_token,
-                schema=OpenAIModelFee.schema(),
+                schema=OpenAIModelFee.model_json_schema(),
                 extraction_type="schema",
                 instruction="""From the crawled content, extract all mentioned model names along with their fees for input and output tokens. 
                 Do not miss any models in the entire content. One extracted model JSON format should look like this: 
@@ -547,6 +547,7 @@ async def generate_knowledge_graph():
             f.write(result.extracted_content)
 
 async def fit_markdown_remove_overlay():
+    
     async with AsyncWebCrawler(
             headless=True,  # Set to False to see what is happening
             verbose=True,
@@ -560,13 +561,15 @@ async def fit_markdown_remove_overlay():
             url='https://www.kidocode.com/degrees/technology',
             cache_mode=CacheMode.BYPASS,
             markdown_generator=DefaultMarkdownGenerator(
-                content_filter=PruningContentFilter(threshold=0.48, threshold_type="fixed", min_word_threshold=0),
+                content_filter=PruningContentFilter(
+                    threshold=0.48, threshold_type="fixed", min_word_threshold=0
+                ),
                 options={
                     "ignore_links": True
                 }
             ),
             # markdown_generator=DefaultMarkdownGenerator(
-            #     content_filter=BM25ContentFilter(user_query=None, bm25_threshold=1.0),
+            #     content_filter=BM25ContentFilter(user_query="", bm25_threshold=1.0),
             #     options={
             #         "ignore_links": True
             #     }
