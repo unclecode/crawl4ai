@@ -12,7 +12,7 @@ nav:
   - 'Quick Start': 'basic/quickstart.md'
   - Changelog & Blog:
     - 'Blog Home': 'blog/index.md'
-    - 'Latest (0.4.0)': 'blog/releases/0.4.0.md'
+    - 'Latest (0.4.1)': 'blog/releases/0.4.1.md'
     - 'Changelog': 'https://github.com/unclecode/crawl4ai/blob/main/CHANGELOG.md'
 
   - Basic:
