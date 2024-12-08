@@ -128,7 +128,7 @@ async def extract_structured_data_using_llm(provider: str, api_token: str = None
             extraction_strategy=LLMExtractionStrategy(
                 provider=provider,
                 api_token=api_token,
-                schema=OpenAIModelFee.schema(),
+                schema=OpenAIModelFee.model_json_schema(),
                 extraction_type="schema",
                 instruction="""From the crawled content, extract all mentioned model names along with their fees for input and output tokens. 
                 Do not miss any models in the entire content. One extracted model JSON format should look like this: 

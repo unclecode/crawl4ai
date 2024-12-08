@@ -11,10 +11,9 @@
 
 Crawl4AI is the #1 trending GitHub repository, actively maintained by a vibrant community. It delivers blazing-fast, AI-ready web crawling tailored for LLMs, AI agents, and data pipelines. Open source, flexible, and built for real-time performance, Crawl4AI empowers developers with unmatched speed, precision, and deployment ease.  
 
+[✨ Check out latest update v0.4.1](#-recent-updates)
 
-🎉 **Version 0.4.0 is out!** Introducing our experimental PruningContentFilter - a powerful new algorithm for smarter Markdown generation. Test it out and [share your feedback](https://github.com/unclecode/crawl4ai/issues)! [Read the release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/md_v2/blog/releases/0.4.0.md)
-
-[✨ Check out latest update v0.4.0](#-recent-updates)
+🎉 **Version 0.4.x is out!** Introducing our experimental PruningContentFilter - a powerful new algorithm for smarter Markdown generation. Test it out and [share your feedback](https://github.com/unclecode/crawl4ai/issues)! [Read the release notes →](https://crawl4ai.com/mkdocs/blog)
 
 ## 🧐 Why Crawl4AI?
 
@@ -80,6 +79,7 @@ if __name__ == "__main__":
 - 🧩 **Proxy Support**: Seamlessly connect to proxies with authentication for secure access.
 - ⚙️ **Full Browser Control**: Modify headers, cookies, user agents, and more for tailored crawling setups.
 - 🌍 **Multi-Browser Support**: Compatible with Chromium, Firefox, and WebKit.
+- 📐 **Dynamic Viewport Adjustment**: Automatically adjusts the browser viewport to match page content, ensuring complete rendering and capturing of all elements.
 
 </details>
 
@@ -95,6 +95,8 @@ if __name__ == "__main__":
 - 💾 **Caching**: Cache data for improved speed and to avoid redundant fetches.
 - 📄 **Metadata Extraction**: Retrieve structured metadata from web pages.
 - 📡 **IFrame Content Extraction**: Seamless extraction from embedded iframe content.
+- 🕵️ **Lazy Load Handling**: Waits for images to fully load, ensuring no content is missed due to lazy loading.
+- 🔄 **Full-Page Scanning**: Simulates scrolling to load and capture all dynamic content, perfect for infinite scroll pages.
 
 </details>
 
@@ -120,8 +122,6 @@ if __name__ == "__main__":
 - 🙌 **Community Recognition**: Acknowledges contributors and pull requests for transparency.
 
 </details>
-
-
 
 ## Try it Now!
 
@@ -626,13 +626,14 @@ async def test_news_crawl():
 
 ## ✨ Recent Updates   
 
-- 🔬 **PruningContentFilter**: New unsupervised filtering strategy for intelligent content extraction based on text density and relevance scoring.
-- 🧵 **Enhanced Thread Safety**: Improved multi-threaded environment handling with better locks and parallel processing support.
-- 🤖 **Smart User-Agent Generation**: Advanced user-agent generator with customization options and randomization capabilities.
-- 📝 **New Blog Launch**: Stay updated with our detailed release notes and technical deep dives at [crawl4ai.com/blog](https://crawl4ai.com/blog).
-- 🧪 **Expanded Test Coverage**: Comprehensive test suite for both PruningContentFilter and BM25ContentFilter with edge case handling.
+- 🖼️ **Lazy Load Handling**: Improved support for websites with lazy-loaded images. The crawler now waits for all images to fully load, ensuring no content is missed.
+- ⚡ **Text-Only Mode**: New mode for fast, lightweight crawling. Disables images, JavaScript, and GPU rendering, improving speed by 3-4x for text-focused crawls.
+- 📐 **Dynamic Viewport Adjustment**: Automatically adjusts the browser viewport to fit page content, ensuring accurate rendering and capturing of all elements.
+- 🔄 **Full-Page Scanning**: Added scrolling support for pages with infinite scroll or dynamic content loading. Ensures every part of the page is captured.
+- 🧑‍💻 **Session Reuse**: Introduced `create_session` for efficient crawling by reusing the same browser session across multiple requests.
+- 🌟 **Light Mode**: Optimized browser performance by disabling unnecessary features like extensions, background timers, and sync processes.
 
-Read the full details of this release in our [0.4.0 Release Notes](https://github.com/unclecode/crawl4ai/blob/main/docs/md_v2/blog/releases/0.4.0.md).
+Read the full details of this release in our [0.4.1 Release Notes](https://github.com/unclecode/crawl4ai/blob/main/docs/md_v2/blog/releases/0.4.1.md).
 
 ## 📖 Documentation & Roadmap 
 
