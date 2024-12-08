@@ -1,5 +1,91 @@
 # Changelog
 
+## [0.4.1] December 8, 2024
+
+### **File: `crawl4ai/async_crawler_strategy.py`**
+
+#### **New Parameters and Attributes Added**
+- **`text_only` (boolean)**: Enables text-only mode, disables images, JavaScript, and GPU-related features for faster, minimal rendering.
+- **`light_mode` (boolean)**: Optimizes the browser by disabling unnecessary background processes and features for efficiency.
+- **`viewport_width` and `viewport_height`**: Dynamically adjusts based on `text_only` mode (default values: 800x600 for `text_only`, 1920x1080 otherwise).
+- **`extra_args`**: Adds browser-specific flags for `text_only` mode.
+- **`adjust_viewport_to_content`**: Dynamically adjusts the viewport to the content size for accurate rendering.
+
+#### **Browser Context Adjustments**
+- Added **`viewport` adjustments**: Dynamically computed based on `text_only` or custom configuration.
+- Enhanced support for `light_mode` and `text_only` by adding specific browser arguments to reduce resource consumption.
+
+#### **Dynamic Content Handling**
+- **Full Page Scan Feature**:
+  - Scrolls through the entire page while dynamically detecting content changes.
+  - Ensures scrolling stops when no new dynamic content is loaded.
+
+#### **Session Management**
+- Added **`create_session`** method:
+  - Creates a new browser session and assigns a unique ID.
+  - Supports persistent and non-persistent contexts with full compatibility for cookies, headers, and proxies.
+
+#### **Improved Content Loading and Adjustment**
+- **`adjust_viewport_to_content`**:
+  - Automatically adjusts viewport to match content dimensions.
+  - Includes scaling via Chrome DevTools Protocol (CDP).
+- Enhanced content loading:
+  - Waits for images to load and ensures network activity is idle before proceeding.
+
+#### **Error Handling and Logging**
+- Improved error handling and detailed logging for:
+  - Viewport adjustment (`adjust_viewport_to_content`).
+  - Full page scanning (`scan_full_page`).
+  - Dynamic content loading.
+
+#### **Refactoring and Cleanup**
+- Removed hardcoded viewport dimensions in multiple places, replaced with dynamic values (`self.viewport_width`, `self.viewport_height`).
+- Removed commented-out and unused code for better readability.
+- Added default value for `delay_before_return_html` parameter.
+
+#### **Optimizations**
+- Reduced resource usage in `light_mode` by disabling unnecessary browser features such as extensions, background timers, and sync.
+- Improved compatibility for different browser types (`chrome`, `firefox`, `webkit`).
+
+---
+
+### **File: `docs/examples/quickstart_async.py`**
+
+#### **Schema Adjustment**
+- Changed schema reference for `LLMExtractionStrategy`:
+  - **Old**: `OpenAIModelFee.schema()`
+  - **New**: `OpenAIModelFee.model_json_schema()`
+  - This likely ensures better compatibility with the `OpenAIModelFee` class and its JSON schema.
+
+#### **Documentation Comments Updated**
+- Improved extraction instruction for schema-based LLM strategies.
+
+---
+
+### **New Features Added**
+1. **Text-Only Mode**:
+   - Focuses on minimal resource usage by disabling non-essential browser features.
+2. **Light Mode**:
+   - Optimizes browser for performance by disabling background tasks and unnecessary services.
+3. **Full Page Scanning**:
+   - Ensures the entire content of a page is crawled, including dynamic elements loaded during scrolling.
+4. **Dynamic Viewport Adjustment**:
+   - Automatically resizes the viewport to match content dimensions, improving compatibility and rendering accuracy.
+5. **Session Management**:
+   - Simplifies session handling with better support for persistent and non-persistent contexts.
+
+---
+
+### **Bug Fixes**
+- Fixed potential viewport mismatches by ensuring consistent use of `self.viewport_width` and `self.viewport_height` throughout the code.
+- Improved robustness of dynamic content loading to avoid timeouts and failed evaluations.
+
+
+
+
+
+
+
 ## [0.3.75] December 1, 2024
 
 ### PruningContentFilter
