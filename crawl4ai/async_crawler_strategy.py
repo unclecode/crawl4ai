@@ -220,8 +220,22 @@ class AsyncCrawlerStrategy(ABC):
 
 class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
     def __init__(self, use_cached_html=False, js_code=None, logger = None, **kwargs):
+        self.text_only = kwargs.get("text_only", False) 
+        self.light_mode = kwargs.get("light_mode", False)
         self.logger = logger
         self.use_cached_html = use_cached_html
+        self.viewport_width = kwargs.get("viewport_width", 800 if self.text_only else 1920)
+        self.viewport_height = kwargs.get("viewport_height", 600 if self.text_only else 1080)   
+        
+        if self.text_only:
+           self.extra_args = kwargs.get("extra_args", []) + [
+               '--disable-images',
+               '--disable-javascript',
+               '--disable-gpu',
+               '--disable-software-rasterizer',
+               '--disable-dev-shm-usage'
+           ]
+             
         self.user_agent = kwargs.get(
             "user_agent",
             # "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.5845.187 Safari/604.1 Edg/117.0.2045.47"
@@ -300,7 +314,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 else:
                     # If no default context exists, create one
                     self.default_context = await self.browser.new_context(
-                        viewport={"width": 1920, "height": 1080}
+                        # viewport={"width": 1920, "height": 1080}
+                        viewport={"width": self.viewport_width, "height": self.viewport_height}
                     )
                 
                 # Set up the default context
@@ -334,9 +349,39 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         "--ignore-certificate-errors",
                         "--ignore-certificate-errors-spki-list",
                         "--disable-blink-features=AutomationControlled",
-                        
+                        "--window-position=400,0",
+                        f"--window-size={self.viewport_width},{self.viewport_height}",     
                     ]
                 }
+                
+                if self.light_mode:
+                    browser_args["args"].extend([
+                        # "--disable-background-networking",
+                        "--disable-background-timer-throttling",
+                        "--disable-backgrounding-occluded-windows",
+                        "--disable-breakpad",
+                        "--disable-client-side-phishing-detection",
+                        "--disable-component-extensions-with-background-pages",
+                        "--disable-default-apps",
+                        "--disable-extensions",
+                        "--disable-features=TranslateUI",
+                        "--disable-hang-monitor",
+                        "--disable-ipc-flooding-protection",
+                        "--disable-popup-blocking",
+                        "--disable-prompt-on-repost",
+                        "--disable-sync",
+                        "--force-color-profile=srgb",
+                        "--metrics-recording-only",
+                        "--no-first-run",
+                        "--password-store=basic",
+                        "--use-mock-keychain"
+                    ])                
+                
+                if self.text_only:
+                   browser_args["args"].extend([
+                       '--blink-settings=imagesEnabled=false',
+                       '--disable-remote-fonts'
+                   ])
                 
                 # Add channel if specified (try Chrome first)
                 if self.chrome_channel:
@@ -367,6 +412,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     if self.browser_type == "firefox":
                         self.browser = await self.playwright.firefox.launch(**browser_args)
                     elif self.browser_type == "webkit":
+                        if "viewport" not in browser_args:
+                            browser_args["viewport"] = {"width": self.viewport_width, "height": self.viewport_height}                        
                         self.browser = await self.playwright.webkit.launch(**browser_args)
                     else:
                         if self.use_persistent_context and self.user_data_dir:
@@ -576,6 +623,38 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         # Return the page object
         return page  
     
+    async def create_session(self, **kwargs) -> str:
+        """Creates a new browser session and returns its ID."""
+        if not self.browser:
+            await self.start()
+            
+        session_id = kwargs.get('session_id') or str(uuid.uuid4())
+        
+        if self.use_managed_browser:
+            page = await self.default_context.new_page()
+            self.sessions[session_id] = (self.default_context, page, time.time())
+        else:
+            if self.use_persistent_context and self.browser_type in ["chrome", "chromium"]:
+                context = self.browser
+                page = await context.new_page()
+            else:
+                context = await self.browser.new_context(
+                    user_agent=kwargs.get("user_agent", self.user_agent),
+                    viewport={"width": self.viewport_width, "height": self.viewport_height},
+                    proxy={"server": self.proxy} if self.proxy else None,
+                    accept_downloads=self.accept_downloads,
+                    ignore_https_errors=True
+                )
+                
+                if self.cookies:
+                    await context.add_cookies(self.cookies)
+                await context.set_extra_http_headers(self.headers)
+                page = await context.new_page()
+                
+            self.sessions[session_id] = (context, page, time.time())
+        
+        return session_id
+    
     async def crawl(self, url: str, **kwargs) -> AsyncCrawlResponse:
         """
         Crawls a given URL or processes raw HTML/local file content based on the URL prefix.
@@ -684,12 +763,11 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     if self.use_persistent_context and self.browser_type in ["chrome", "chromium"]:
                         # In persistent context, browser is the context
                         context = self.browser
-                        page = await context.new_page()
                     else:
                         # Normal context creation for non-persistent or non-Chrome browsers
                         context = await self.browser.new_context(
                             user_agent=user_agent,
-                            viewport={"width": 1200, "height": 800},
+                            viewport={"width": self.viewport_width, "height": self.viewport_height},
                             proxy={"server": self.proxy} if self.proxy else None,
                             java_script_enabled=True,
                             accept_downloads=self.accept_downloads,
@@ -699,7 +777,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         if self.cookies:
                             await context.add_cookies(self.cookies)
                         await context.set_extra_http_headers(self.headers)
-                        page = await context.new_page()
+
+                    page = await context.new_page()
                     self.sessions[session_id] = (context, page, time.time())
             else:
                 if self.use_persistent_context and self.browser_type in ["chrome", "chromium"]:
@@ -709,7 +788,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     # Normal context creation
                     context = await self.browser.new_context(
                         user_agent=user_agent,
-                        viewport={"width": 1920, "height": 1080},
+                        # viewport={"width": 1920, "height": 1080},
+                        viewport={"width": self.viewport_width, "height": self.viewport_height},
                         proxy={"server": self.proxy} if self.proxy else None,
                         accept_downloads=self.accept_downloads,
                         ignore_https_errors=True  # Add this line
@@ -763,9 +843,6 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             if self.accept_downloads:
                 page.on("download", lambda download: asyncio.create_task(self._handle_download(download)))
 
-            # if self.verbose:
-            #     print(f"[LOG] 🕸️ Crawling {url} using AsyncPlaywrightCrawlerStrategy...")
-
             if self.use_cached_html:
                 cache_file_path = os.path.join(
                     os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home()), ".crawl4ai", "cache", hashlib.md5(url.encode()).hexdigest()
@@ -786,7 +863,6 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
             if not kwargs.get("js_only", False):
                 await self.execute_hook('before_goto', page, context = context)
-                
 
                 try:
                     response = await page.goto(
@@ -797,9 +873,6 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     )
                 except Error as e:
                     raise RuntimeError(f"Failed on navigating ACS-GOTO :\n{str(e)}")
-                
-                # response = await page.goto("about:blank")
-                # await page.evaluate(f"window.location.href = '{url}'")
                 
                 await self.execute_hook('after_goto', page, context = context)
                 
@@ -853,7 +926,83 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 else:
                     raise Error(f"Body element is hidden: {visibility_info}")
             
-            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            # CONTENT LOADING ASSURANCE
+            if not self.text_only and (kwargs.get("wait_for_images", True) or kwargs.get("adjust_viewport_to_content", False)):
+                # Wait for network idle after initial load and images to load
+                await page.wait_for_load_state("networkidle")
+                await asyncio.sleep(0.1)
+                await page.wait_for_function("Array.from(document.images).every(img => img.complete)")
+            
+            # After initial load, adjust viewport to content size
+            if not self.text_only and kwargs.get("adjust_viewport_to_content", False):
+                try:                       
+                    # Get actual page dimensions                        
+                    page_width = await page.evaluate("document.documentElement.scrollWidth")
+                    page_height = await page.evaluate("document.documentElement.scrollHeight")
+                    
+                    target_width = self.viewport_width
+                    target_height = int(target_width * page_width / page_height * 0.95)
+                    await page.set_viewport_size({"width": target_width, "height": target_height})
+
+                    # Compute scale factor
+                    # We want the entire page visible: the scale should make both width and height fit
+                    scale = min(target_width / page_width, target_height / page_height)
+
+                    # Now we call CDP to set metrics. 
+                    # We tell Chrome that the "device" is page_width x page_height in size, 
+                    # but we scale it down so everything fits within the real viewport.
+                    cdp = await page.context.new_cdp_session(page)
+                    await cdp.send('Emulation.setDeviceMetricsOverride', {
+                        'width': page_width,          # full page width
+                        'height': page_height,        # full page height
+                        'deviceScaleFactor': 1,       # keep normal DPR
+                        'mobile': False,
+                        'scale': scale                # scale the entire rendered content
+                    })
+                                    
+                except Exception as e:
+                    self.logger.warning(
+                        message="Failed to adjust viewport to content: {error}",
+                        tag="VIEWPORT",
+                        params={"error": str(e)}
+                    )                
+            
+            # After viewport adjustment, handle page scanning if requested
+            if kwargs.get("scan_full_page", False):
+                try:
+                    viewport_height = page.viewport_size.get("height", self.viewport_height)
+                    current_position = viewport_height  # Start with one viewport height
+                    scroll_delay = kwargs.get("scroll_delay", 0.2)
+                    
+                    # Initial scroll
+                    await page.evaluate(f"window.scrollTo(0, {current_position})")
+                    await asyncio.sleep(scroll_delay)
+                    
+                    # Get height after first scroll to account for any dynamic content
+                    total_height = await page.evaluate("document.documentElement.scrollHeight")
+                    
+                    while current_position < total_height:
+                        current_position = min(current_position + viewport_height, total_height)
+                        await page.evaluate(f"window.scrollTo(0, {current_position})")
+                        await asyncio.sleep(scroll_delay)
+                        
+                        # Check for dynamic content
+                        new_height = await page.evaluate("document.documentElement.scrollHeight")
+                        if new_height > total_height:
+                            total_height = new_height
+                    
+                    # Scroll back to top
+                    await page.evaluate("window.scrollTo(0, 0)")
+                    
+                except Exception as e:
+                    self.logger.warning(
+                        message="Failed to perform full page scan: {error}",
+                        tag="PAGE_SCAN", 
+                        params={"error": str(e)}
+                    )
+                else:
+                    # Scroll to the bottom of the page
+                    await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
 
             js_code = kwargs.get("js_code", kwargs.get("js", self.js_code))
             if js_code:
@@ -887,7 +1036,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             #     await page.wait_for_load_state('networkidle', timeout=5000)
 
             # Update image dimensions
-            update_image_dimensions_js = """
+            if not self.text_only:
+                update_image_dimensions_js = """
             () => {
                 return new Promise((resolve) => {
                     const filterImage = (img) => {
@@ -944,26 +1094,26 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             }
             """
             
-            try:
                 try:
-                    await page.wait_for_load_state(
-                        # state="load",
-                        state="domcontentloaded",
-                        timeout=5
+                    try:
+                        await page.wait_for_load_state(
+                            # state="load",
+                            state="domcontentloaded",
+                            timeout=5
+                        )
+                    except PlaywrightTimeoutError:
+                        pass
+                    await page.evaluate(update_image_dimensions_js)
+                except Exception as e:
+                    self.logger.error(
+                        message="Error updating image dimensions ACS-UPDATE_IMAGE_DIMENSIONS_JS: {error}",
+                        tag="ERROR",
+                        params={"error": str(e)}
                     )
-                except PlaywrightTimeoutError:
-                    pass
-                await page.evaluate(update_image_dimensions_js)
-            except Exception as e:
-                self.logger.error(
-                    message="Error updating image dimensions ACS-UPDATE_IMAGE_DIMENSIONS_JS: {error}",
-                    tag="ERROR",
-                    params={"error": str(e)}
-                )
-                # raise RuntimeError(f"Error updating image dimensions ACS-UPDATE_IMAGE_DIMENSIONS_JS: {str(e)}")
+                    # raise RuntimeError(f"Error updating image dimensions ACS-UPDATE_IMAGE_DIMENSIONS_JS: {str(e)}")
 
             # Wait a bit for any onload events to complete
-            await page.wait_for_timeout(100)
+            # await page.wait_for_timeout(100)
 
             # Process iframes
             if kwargs.get("process_iframes", False):
@@ -971,7 +1121,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             
             await self.execute_hook('before_retrieve_html', page, context = context)
             # Check if delay_before_return_html is set then wait for that time
-            delay_before_return_html = kwargs.get("delay_before_return_html")
+            delay_before_return_html = kwargs.get("delay_before_return_html", 0.1)
             if delay_before_return_html:
                 await asyncio.sleep(delay_before_return_html)
                 
