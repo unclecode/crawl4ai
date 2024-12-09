@@ -1128,7 +1128,10 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             # Check for remove_overlay_elements parameter
             if kwargs.get("remove_overlay_elements", False):
                 await self.remove_overlay_elements(page)
-            
+           
+            if kwargs.get("remove_invisible_texts", False):
+                await self.remove_invisible_texts(page)
+
             html = await page.content()
             await self.execute_hook('before_return_html', page, html, context = context)
             
@@ -1359,6 +1362,89 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             )            
             # if self.verbose:
             #     print(f"Warning: Failed to remove overlay elements: {str(e)}")
+
+    async def remove_invisible_texts(self, page: Page) -> None:
+        """
+        Removes invisible elements, hidden text nodes, and text nodes that are hidden 
+        and not within links from the page.
+        
+        Args:
+            page (Page): The Playwright page instance
+        """
+        await page.evaluate("""() => {
+            function isTextNodeInvisible(node) {
+                const parentElement = node.parentElement;
+                if (!parentElement) return false;
+
+                const isWithinLink = parentElement.closest('a') !== null;
+                const isTooltip = parentElement.getAttribute('role') === 'tooltip';
+
+                
+                // Check parent element's style
+                const style = window.getComputedStyle(parentElement);
+                
+                // Check if element is hidden
+                const isHidden = style.display === 'none' || 
+                               style.visibility === 'hidden' || 
+                               style.opacity === '0'
+                
+                // If element is hidden and not within a link, remove it
+                if (isHidden && !isWithinLink && !isTooltip) {
+                    return true;
+                }
+                
+                // Check for width and height
+                const isWidthAuto = style.width === 'auto';
+                const isHeightAuto = style.height === 'auto';
+
+                if (isWidthAuto || isHeightAuto) {
+                    return false;
+                }
+
+                const boundingRect = parentElement.getBoundingClientRect();
+                if (boundingRect.width <= 1 && boundingRect.height <= 1) {
+                    return true;
+                }        
+                            
+                return false;
+            }
+
+            function removeInvisibleTexts(element) {
+                if (!element) return;
+
+                // Handle text nodes
+                const walker = document.createTreeWalker(
+                    element,
+                    NodeFilter.SHOW_TEXT,
+                    {
+                        acceptNode: function(node) {
+                            // Skip empty text nodes
+                            if (!node.textContent.trim()) {
+                                return NodeFilter.FILTER_REJECT;
+                            }
+                            return NodeFilter.FILTER_ACCEPT;
+                        }
+                    }
+                );
+
+                let node;
+                const nodesToRemove = new Set();
+
+                while ((node = walker.nextNode())) {
+                    if (isTextNodeInvisible(node)) {
+                        const parent = node.parentElement;
+                        if (parent) {
+                            nodesToRemove.add(parent);
+                        }
+                    }
+                }
+
+                nodesToRemove.forEach((node) => node.remove());
+            }
+
+            // Start cleaning from body
+            removeInvisibleTexts(document.body);
+        }""")
 
     async def take_screenshot(self, page: Page) -> str:
         """
