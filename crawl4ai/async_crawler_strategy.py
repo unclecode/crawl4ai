@@ -7,6 +7,7 @@ import os, sys, shutil
 import tempfile, subprocess
 from playwright.async_api import async_playwright, Page, Browser, Error
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 from pathlib import Path
@@ -930,8 +931,12 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             if not self.text_only and (kwargs.get("wait_for_images", True) or kwargs.get("adjust_viewport_to_content", False)):
                 # Wait for network idle after initial load and images to load
                 await page.wait_for_load_state("networkidle")
-                await asyncio.sleep(0.1)
-                await page.wait_for_function("Array.from(document.images).every(img => img.complete)")
+                await asyncio.sleep(0.1)                
+                try:
+                    await page.wait_for_function("Array.from(document.images).every(img => img.complete)", timeout=1000)
+                # Check for TimeoutError and ignore it
+                except PlaywrightTimeoutError:
+                    pass
             
             # After initial load, adjust viewport to content size
             if not self.text_only and kwargs.get("adjust_viewport_to_content", False):
