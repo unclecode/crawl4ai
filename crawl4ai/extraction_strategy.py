@@ -632,7 +632,7 @@ class ContentSummarizationStrategy(ExtractionStrategy):
         # Sort summaries by the original section index to maintain order
         summaries.sort(key=lambda x: x[0])
         return [summary for _, summary in summaries]
-  
+ 
 class JsonCssExtractionStrategy(ExtractionStrategy):
     def __init__(self, schema: Dict[str, Any], **kwargs):
         super().__init__(**kwargs)

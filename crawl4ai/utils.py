@@ -147,6 +147,7 @@ class CustomHTML2Text(HTML2Text):
     #         self.preserved_content.append(data)
     #         return
     #     super().handle_data(data, entity_char)
+
 class InvalidCSSSelectorError(Exception):
     pass
 

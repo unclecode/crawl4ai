@@ -238,8 +238,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
              
         self.user_agent = kwargs.get(
             "user_agent",
-            # "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.5845.187 Safari/604.1 Edg/117.0.2045.47"
-            "Mozilla/5.0 (Linux; Android 11; SM-G973F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36"
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.5845.187 Safari/604.1 Edg/117.0.2045.47"
+            # "Mozilla/5.0 (Linux; Android 11; SM-G973F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36"
         )
         user_agenr_generator = UserAgentGenerator()
         if kwargs.get("user_agent_mode") == "random":
@@ -254,6 +254,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         self.browser_hint = user_agenr_generator.generate_client_hints(self.user_agent)
         self.headers.setdefault("sec-ch-ua", self.browser_hint)
         self.cookies = kwargs.get("cookies", [])
+        self.storage_state = kwargs.get("storage_state", None)
         self.sessions = {}
         self.session_ttl = 1800 
         self.js_code = js_code
@@ -315,7 +316,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     # If no default context exists, create one
                     self.default_context = await self.browser.new_context(
                         # viewport={"width": 1920, "height": 1080}
-                        viewport={"width": self.viewport_width, "height": self.viewport_height}
+                        viewport={"width": self.viewport_width, "height": self.viewport_height},
+                        storage_state=self.storage_state,
                     )
                 
                 # Set up the default context
@@ -323,6 +325,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     await self.default_context.set_extra_http_headers(self.headers)
                     if self.cookies:
                         await self.default_context.add_cookies(self.cookies)                    
+                    if self.storage_state:
+                        # If storage_state is a dictionary or file path, Playwright will handle it.
+                        await self.default_context.storage_state(path=None)  # Just ensuring default_context is ready
                     if self.accept_downloads:
                         await self.default_context.set_default_timeout(60000)
                         await self.default_context.set_default_navigation_timeout(60000)
@@ -426,6 +431,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                             self.default_context = self.browser
                         else:
                             self.browser = await self.playwright.chromium.launch(**browser_args)
+                            self.default_context = self.browser
                                 
                 except Exception as e:
                     # Fallback to chromium if Chrome channel fails
@@ -643,6 +649,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     viewport={"width": self.viewport_width, "height": self.viewport_height},
                     proxy={"server": self.proxy} if self.proxy else None,
                     accept_downloads=self.accept_downloads,
+                    storage_state=self.storage_state,
                     ignore_https_errors=True
                 )
                 
@@ -771,6 +778,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                             proxy={"server": self.proxy} if self.proxy else None,
                             java_script_enabled=True,
                             accept_downloads=self.accept_downloads,
+                            storage_state=self.storage_state,
                             # downloads_path=self.downloads_path if self.accept_downloads else None
                         )
                         await context.add_cookies([{"name": "cookiesEnabled", "value": "true", "url": url}])
@@ -792,6 +800,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         viewport={"width": self.viewport_width, "height": self.viewport_height},
                         proxy={"server": self.proxy} if self.proxy else None,
                         accept_downloads=self.accept_downloads,
+                        storage_state=self.storage_state,
                         ignore_https_errors=True  # Add this line
                     )
                     if self.cookies:
@@ -862,7 +871,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     return response
 
             if not kwargs.get("js_only", False):
-                await self.execute_hook('before_goto', page, context = context)
+                await self.execute_hook('before_goto', page, context = context, **kwargs)
 
                 try:
                     response = await page.goto(
@@ -874,7 +883,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 except Error as e:
                     raise RuntimeError(f"Failed on navigating ACS-GOTO :\n{str(e)}")
                 
-                await self.execute_hook('after_goto', page, context = context)
+                await self.execute_hook('after_goto', page, context = context, **kwargs)
                 
                 # Get status code and headers
                 status_code = response.status
@@ -929,9 +938,15 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             # CONTENT LOADING ASSURANCE
             if not self.text_only and (kwargs.get("wait_for_images", True) or kwargs.get("adjust_viewport_to_content", False)):
                 # Wait for network idle after initial load and images to load
-                await page.wait_for_load_state("networkidle")
+                # await page.wait_for_load_state("networkidle")
+                await page.wait_for_load_state("domcontentloaded")
                 await asyncio.sleep(0.1)
-                await page.wait_for_function("Array.from(document.images).every(img => img.complete)")
+                from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+                try:
+                    await page.wait_for_function("Array.from(document.images).every(img => img.complete)", timeout=1000)
+                # Check for TimeoutError and ignore it
+                except PlaywrightTimeoutError:
+                    pass
             
             # After initial load, adjust viewport to content size
             if not self.text_only and kwargs.get("adjust_viewport_to_content", False):
@@ -1015,7 +1030,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 # await page.wait_for_timeout(100)
                 
                 # Check for on execution event
-                await self.execute_hook('on_execution_started', page, context = context)
+                await self.execute_hook('on_execution_started', page, context = context, **kwargs)
                 
             if kwargs.get("simulate_user", False) or kwargs.get("magic", False):
                 # Simulate user interactions
@@ -1119,7 +1134,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             if kwargs.get("process_iframes", False):
                 page = await self.process_iframes(page)
             
-            await self.execute_hook('before_retrieve_html', page, context = context)
+            await self.execute_hook('before_retrieve_html', page, context = context, **kwargs)
             # Check if delay_before_return_html is set then wait for that time
             delay_before_return_html = kwargs.get("delay_before_return_html", 0.1)
             if delay_before_return_html:
@@ -1130,7 +1145,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 await self.remove_overlay_elements(page)
             
             html = await page.content()
-            await self.execute_hook('before_return_html', page, html, context = context)
+            await self.execute_hook('before_return_html', page, html, context = context, **kwargs)
             
             # Check if kwargs has screenshot=True then take screenshot
             screenshot_data = None
@@ -1394,6 +1409,25 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             return base64.b64encode(buffered.getvalue()).decode('utf-8')
         finally:
             await page.close()
+     
+    async def export_storage_state(self, path: str = None) -> dict:
+        """
+        Exports the current storage state (cookies, localStorage, sessionStorage)
+        to a JSON file at the specified path.
+        """
+        if self.default_context:
+            state = await self.default_context.storage_state(path=path)
+            self.logger.info(
+                message="Exported storage state to {path}",
+                tag="INFO",
+                params={"path": path}
+            )
+            return state
+        else:
+            self.logger.warning(
+                message="No default_context available to export storage state.",
+                tag="WARNING"
+            )
             
     async def _generate_screenshot_from_html(self, html: str) -> Optional[str]:
         """

@@ -182,6 +182,10 @@ class AsyncWebCrawler:
         Returns:
             CrawlResult: The result of crawling and processing
         """
+        # Check if url is not string and is not empty
+        if not isinstance(url, str) or not url:
+            raise ValueError("Invalid URL, make sure the URL is a non-empty string")
+        
         async with self._lock or nullcontext():
             try:
                 # Handle deprecated parameters
@@ -335,7 +339,8 @@ class AsyncWebCrawler:
                 # print(f"{Fore.RED}{self.tag_format('ERROR')} {self.log_icons['ERROR']} Failed to crawl {cache_context.display_url[:URL_LOG_SHORTEN_LENGTH]}... | {e.msg}{Style.RESET_ALL}")
                 
                 self.logger.error_status(
-                    url=cache_context.display_url,
+                    # url=cache_context.display_url,
+                    url=url,
                     error=create_box_message(e.msg, type = "error"),
                     tag="ERROR"
                 )            
