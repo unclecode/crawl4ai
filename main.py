@@ -342,7 +342,7 @@ app.add_middleware(
 
 # API token security
 security = HTTPBearer()
-CRAWL4AI_API_TOKEN = os.getenv("CRAWL4AI_API_TOKEN") or "test_api_code"
+CRAWL4AI_API_TOKEN = os.getenv("CRAWL4AI_API_TOKEN")
 
 async def verify_token(credentials: HTTPAuthorizationCredentials = Security(security)):
     if not CRAWL4AI_API_TOKEN:
