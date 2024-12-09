@@ -75,6 +75,7 @@ Our documentation is organized into several sections:
 - [Hooks & Authentication](advanced/hooks-auth.md)
 - [Proxy & Security](advanced/proxy-security.md)
 - [Content Processing](advanced/content-processing.md)
+- [Monitoring](advanced/monitoring.md)
 
 ### Extraction & Processing
 - [Extraction Strategies Overview](extraction/overview.md)
