@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "crawl4ai-apify-actor"
+version = "0.1.0"
+description = ""
+authors = ["Unclecode <unclecode@kidocode.com>"]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.13"
+apify = "^2.1.0"
+crawl4ai = "^0.3.75"
+pydantic = "^2.9.2"
+crawlee = { git = "https://github.com/apify/crawlee-python.git", branch = "request-provider-tandem" }
+
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.6.8"
+
+[tool.basedpyright]
+typeCheckingMode = "standard"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
