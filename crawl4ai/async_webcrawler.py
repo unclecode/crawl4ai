@@ -132,6 +132,11 @@ class AsyncWebCrawler:
         # if self.verbose:
         #     print(f"{Fore.GREEN}{self.tag_format('READY')} {self.log_icons['READY']} AsyncWebCrawler initialized{Style.RESET_ALL}")
 
+    @asynccontextmanager
+    async def nullcontext(self):
+        """异步空上下文管理器"""
+        yield
+    
     async def arun(
         self,
         url: str,
