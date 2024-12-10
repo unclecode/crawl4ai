@@ -839,7 +839,11 @@ def perform_completion_with_backoff(
     max_attempts = 3
     base_delay = 2  # Base delay in seconds, you can adjust this based on your needs
     
-    extra_args = {}
+    extra_args = {
+        "temperature": 0.01,
+        'api_key': api_token,
+        'base_url': base_url
+    }
     if json_response:
         extra_args["response_format"] = { "type": "json_object" }
         
@@ -848,14 +852,12 @@ def perform_completion_with_backoff(
     
     for attempt in range(max_attempts):
         try:
+            
             response =completion(
                 model=provider,
                 messages=[
                     {"role": "user", "content": prompt_with_variables}
                 ],
-                temperature=0.01,
-                api_key=api_token,
-                base_url=base_url,
                 **extra_args
             )
             return response  # Return the successful response

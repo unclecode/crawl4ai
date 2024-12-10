@@ -117,7 +117,13 @@ async def extract_structured_data_using_llm(provider: str, api_token: str = None
         print(f"API token is required for {provider}. Skipping this example.")
         return
 
-    extra_args = {}
+    # extra_args = {}
+    extra_args={
+        "temperature": 0, 
+        "top_p": 0.9,
+        "max_tokens": 2000,
+        # any other supported parameters for litellm
+    }
     if extra_headers:
         extra_args["extra_headers"] = extra_headers
 
@@ -598,6 +604,8 @@ async def fit_markdown_remove_overlay():
 
 
 async def main():
+    await extract_structured_data_using_llm("openai/gpt-4o", os.getenv("OPENAI_API_KEY"))
+    
     await simple_crawl()
     await simple_example_with_running_js_code()
     await simple_example_with_css_selector()
@@ -609,7 +617,6 @@ async def main():
     # await extract_structured_data_using_llm()
     # await extract_structured_data_using_llm("huggingface/meta-llama/Meta-Llama-3.1-8B-Instruct", os.getenv("HUGGINGFACE_API_KEY"))
     # await extract_structured_data_using_llm("ollama/llama3.2")    
-    await extract_structured_data_using_llm("openai/gpt-4o", os.getenv("OPENAI_API_KEY"))
 
     # You always can pass custom headers to the extraction strategy
     # custom_headers = {
