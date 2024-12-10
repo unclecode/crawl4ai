@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional, List, Union
 import json
 import asyncio
-from contextlib import nullcontext
+from contextlib import nullcontext, asynccontextmanager
 from .models import CrawlResult, MarkdownGenerationResult
 from .async_database import async_db_manager
 from .chunking_strategy import *
@@ -122,15 +122,14 @@ class AsyncWebCrawler:
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.crawler_strategy.__aexit__(exc_type, exc_val, exc_tb)
 
+    @asynccontextmanager
+    async def nullcontext(self):
+        yield
+    
     async def awarmup(self):
         """Initialize the crawler with warm-up sequence."""
         self.logger.info(f"Crawl4AI {crawl4ai_version}", tag="INIT")
-        # if self.verbose:
-        #     print(f"{Fore.CYAN}{self.tag_format('INIT')} {self.log_icons['INIT']} Crawl4AI {crawl4ai_version}{Style.RESET_ALL}")
-        #     print(f"{Fore.CYAN}{self.tag_format('INIT')} {self.log_icons['INIT']} Warming up AsyncWebCrawler{Style.RESET_ALL}")
         self.ready = True
-        # if self.verbose:
-        #     print(f"{Fore.GREEN}{self.tag_format('READY')} {self.log_icons['READY']} AsyncWebCrawler initialized{Style.RESET_ALL}")
 
     async def arun(
         self,
@@ -186,7 +185,7 @@ class AsyncWebCrawler:
         if not isinstance(url, str) or not url:
             raise ValueError("Invalid URL, make sure the URL is a non-empty string")
         
-        async with self._lock or nullcontext():
+        async with self._lock or self.nullcontext(): # Lock for thread safety previously -> nullcontext():
             try:
                 # Handle deprecated parameters
                 if any([bypass_cache, disable_cache, no_cache_read, no_cache_write]):
