@@ -17,6 +17,7 @@ from .async_crawler_strategy import AsyncCrawlerStrategy, AsyncPlaywrightCrawler
 from .cache_context import CacheMode, CacheContext, _legacy_to_cache_mode
 from .content_scraping_strategy import WebScrapingStrategy
 from .async_logger import AsyncLogger
+from .data_persistence_strategy import DataPersistenceStrategy, SkipDataPersistenceStrategy
 
 from .config import (
     MIN_WORD_THRESHOLD, 
@@ -143,6 +144,7 @@ class AsyncWebCrawler:
         word_count_threshold=MIN_WORD_THRESHOLD,
         extraction_strategy: ExtractionStrategy = None,
         chunking_strategy: ChunkingStrategy = RegexChunking(),
+        data_persistence_strategy: DataPersistenceStrategy = SkipDataPersistenceStrategy(),
         content_filter: RelevantContentFilter = None,
         cache_mode: Optional[CacheMode] = None,
         # Deprecated parameters
@@ -173,6 +175,7 @@ class AsyncWebCrawler:
             word_count_threshold: Minimum word count threshold
             extraction_strategy: Strategy for content extraction
             chunking_strategy: Strategy for content chunking
+            data_persistence_strategy: Strategy for storing the result
             css_selector: CSS selector for content extraction
             screenshot: Whether to capture screenshot
             user_agent: Custom user agent
@@ -226,7 +229,10 @@ class AsyncWebCrawler:
                     raise ValueError("Unsupported extraction strategy")
                 if not isinstance(chunking_strategy, ChunkingStrategy):
                     raise ValueError("Unsupported chunking strategy")
+                if not isinstance(data_persistence_strategy, DataPersistenceStrategy):
+                    raise ValueError("Unsupported data persistence strategy")
                 
+
                 word_count_threshold = max(word_count_threshold, MIN_WORD_THRESHOLD)
 
                 async_response: AsyncCrawlResponse = None
@@ -327,6 +333,10 @@ class AsyncWebCrawler:
                             "timing": Fore.YELLOW
                         }
                     )
+            
+                if data_persistence_strategy:
+                    crawl_result.storage_metadata = data_persistence_strategy.save(crawl_result)
+
 
                 # Update cache if appropriate
                 if cache_context.should_write() and not bool(cached_result):
@@ -357,6 +367,7 @@ class AsyncWebCrawler:
         word_count_threshold=MIN_WORD_THRESHOLD,
         extraction_strategy: ExtractionStrategy = None,
         chunking_strategy: ChunkingStrategy = RegexChunking(),
+        data_persistence_strategy: DataPersistenceStrategy = SkipDataPersistenceStrategy(),
         content_filter: RelevantContentFilter = None,
         cache_mode: Optional[CacheMode] = None,
         # Deprecated parameters
@@ -431,6 +442,7 @@ class AsyncWebCrawler:
                     word_count_threshold=word_count_threshold,
                     extraction_strategy=extraction_strategy,
                     chunking_strategy=chunking_strategy,
+                    data_persistence_strategy=data_persistence_strategy,
                     content_filter=content_filter,
                     cache_mode=cache_mode,
                     css_selector=css_selector,
