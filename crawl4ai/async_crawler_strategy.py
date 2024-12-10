@@ -19,7 +19,13 @@ from .js_snippet import load_js_script
 from .models import AsyncCrawlResponse
 from .utils import create_box_message
 from .user_agent_generator import UserAgentGenerator
+from .config import SCREENSHOT_HEIGHT_TRESHOLD
 from playwright_stealth import StealthConfig, stealth_async
+
+
+from io import BytesIO
+import base64
+from PIL import Image, ImageDraw, ImageFont
 
 stealth_config = StealthConfig(
     webdriver=True,
@@ -481,6 +487,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             self.user_agent = user_agenr_generator.generate(
                  **kwargs.get("user_agent_generator_config", {})
             )
+        self.pdf = kwargs.get("pdf", False)  # New flag
+        self.screenshot_requested = kwargs.get('screenshot', False)
+        
         self.proxy = kwargs.get("proxy")
         self.proxy_config = kwargs.get("proxy_config")
         self.headless = kwargs.get("headless", True)
@@ -752,7 +761,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         """
         response_headers = {}
         status_code = 200  # Default to 200 for local/raw HTML
-        screenshot_requested = kwargs.get('screenshot', False)
+        screenshot_requested = kwargs.get("screenshot", self.screenshot_requested)
+        pdf_requested = kwargs.get("pdf", self.pdf)
         screenshot_data = None
 
         if url.startswith(('http://', 'https://')):
@@ -795,6 +805,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
     async def _crawl_web(self, url: str, **kwargs) -> AsyncCrawlResponse:
         response_headers = {}
         status_code = None
+        
+        screenshot_requested = kwargs.get("screenshot", self.screenshot_requested)
+        pdf_requested = kwargs.get("pdf", self.pdf)
         
         # Reset downloaded files list for new crawl
         self._downloaded_files = []
@@ -1069,17 +1082,28 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             html = await page.content()
             await self.execute_hook('before_return_html', page, html, context = context, **kwargs)
             
+            start_export_time = time.perf_counter()
+            pdf_data = None
+            if pdf_requested:
+                # Generate PDF once
+                pdf_data = await self.export_pdf(page)            
+            
             # Check if kwargs has screenshot=True then take screenshot
             screenshot_data = None
-            if kwargs.get("screenshot"):
+            if screenshot_requested: #kwargs.get("screenshot"):
                 # Check we have screenshot_wait_for parameter, if we have simply wait for that time
                 screenshot_wait_for = kwargs.get("screenshot_wait_for")
                 if screenshot_wait_for:
                     await asyncio.sleep(screenshot_wait_for)
-                screenshot_data = await self.take_screenshot(page)          
-
-            # if self.verbose:
-            #     print(f"[LOG] ✅ Crawled {url} successfully!")
+                
+                screenshot_data = await self.take_screenshot(page, **kwargs)    
+            end_export_time = time.perf_counter()
+            if screenshot_data or pdf_data:
+                self.logger.info(
+                    message="Exporting PDF and taking screenshot took {duration:.2f}s",
+                    tag="EXPORT",
+                    params={"duration": end_export_time - start_export_time}
+                )
            
             if self.use_cached_html:
                 cache_file_path = os.path.join(
@@ -1105,6 +1129,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 response_headers=response_headers, 
                 status_code=status_code,
                 screenshot=screenshot_data,
+                pdf_data=pdf_data,
                 get_delayed_content=get_delayed_content,
                 downloaded_files=self._downloaded_files if self._downloaded_files else None
             )
@@ -1181,7 +1206,112 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             # if self.verbose:
             #     print(f"Warning: Failed to remove overlay elements: {str(e)}")
 
-    async def take_screenshot(self, page: Page) -> str:
+    async def export_pdf(self, page: Page) -> bytes:
+        """
+        Exports the current page as a PDF.
+        """
+        pdf_data = await page.pdf(print_background=True)
+        return pdf_data
+
+    async def take_screenshot(self, page, **kwargs) -> str:
+        page_height = await page.evaluate("document.documentElement.scrollHeight")
+        if page_height < kwargs.get("screenshot_height_threshold", SCREENSHOT_HEIGHT_TRESHOLD):
+            # Page is short enough, just take a screenshot
+            return await self.take_screenshot_naive(page)
+        else:
+            # Page is too long, try to take a full-page screenshot
+            return await self.take_screenshot_scroller(page, **kwargs)
+            # return await self.take_screenshot_from_pdf(await self.export_pdf(page))     
+
+    async def take_screenshot_from_pdf(self, pdf_data: bytes) -> str:
+        """
+        Convert the first page of the PDF to a screenshot.
+        Requires pdf2image and poppler.
+        """
+        try:
+            from pdf2image import convert_from_bytes
+            images = convert_from_bytes(pdf_data)
+            final_img = images[0].convert('RGB')
+            buffered = BytesIO()
+            final_img.save(buffered, format="JPEG")
+            return base64.b64encode(buffered.getvalue()).decode('utf-8')
+        except Exception as e:
+            error_message = f"Failed to take PDF-based screenshot: {str(e)}"
+            self.logger.error(
+                message="PDF Screenshot failed: {error}",
+                tag="ERROR",
+                params={"error": error_message}
+            )
+            # Return error image as fallback
+            img = Image.new('RGB', (800, 600), color='black')
+            draw = ImageDraw.Draw(img)
+            font = ImageFont.load_default()
+            draw.text((10, 10), error_message, fill=(255, 255, 255), font=font)
+            buffered = BytesIO()
+            img.save(buffered, format="JPEG")
+            return base64.b64encode(buffered.getvalue()).decode('utf-8')
+
+    async def take_screenshot_scroller(self, page: Page, **kwargs) -> str:
+        """
+        Attempt to set a large viewport and take a full-page screenshot.
+        If still too large, segment the page as before.
+        """
+        try:
+            # Get page height
+            page_height = await page.evaluate("document.documentElement.scrollHeight")
+            page_width = await page.evaluate("document.documentElement.scrollWidth")
+
+            # Set a large viewport
+            large_viewport_height = min(page_height, kwargs.get("screenshot_height_threshold", SCREENSHOT_HEIGHT_TRESHOLD))
+            await page.set_viewport_size({"width": page_width, "height": large_viewport_height})
+            
+            # Page still too long, segment approach
+            segments = []
+            viewport_size = page.viewport_size
+            viewport_height = viewport_size["height"]
+
+            num_segments = (page_height // viewport_height) + 1
+            for i in range(num_segments):
+                y_offset = i * viewport_height
+                await page.evaluate(f"window.scrollTo(0, {y_offset})")
+                await asyncio.sleep(0.01)  # wait for render
+                seg_shot = await page.screenshot(full_page=False)
+                img = Image.open(BytesIO(seg_shot)).convert('RGB')
+                segments.append(img)
+
+            total_height = sum(img.height for img in segments)
+            stitched = Image.new('RGB', (segments[0].width, total_height))
+            offset = 0
+            for img in segments:
+                # stitched.paste(img, (0, offset))
+                stitched.paste(img.convert('RGB'), (0, offset))
+                offset += img.height
+
+            buffered = BytesIO()
+            stitched = stitched.convert('RGB')
+            stitched.save(buffered, format="BMP", quality=85)
+            encoded = base64.b64encode(buffered.getvalue()).decode('utf-8')
+
+            return encoded
+        except Exception as e:
+            error_message = f"Failed to take large viewport screenshot: {str(e)}"
+            self.logger.error(
+                message="Large viewport screenshot failed: {error}",
+                tag="ERROR",
+                params={"error": error_message}
+            )
+            # return error image
+            img = Image.new('RGB', (800, 600), color='black')
+            draw = ImageDraw.Draw(img)
+            font = ImageFont.load_default()
+            draw.text((10, 10), error_message, fill=(255, 255, 255), font=font)
+            buffered = BytesIO()
+            img.save(buffered, format="JPEG")
+            return base64.b64encode(buffered.getvalue()).decode('utf-8')
+        finally:
+            await page.close()
+    
+    async def take_screenshot_naive(self, page: Page) -> str:
         """
         Takes a screenshot of the current page.
         
@@ -1193,7 +1323,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         """
         try:
             # The page is already loaded, just take the screenshot
-            screenshot = await page.screenshot(full_page=True)
+            screenshot = await page.screenshot(full_page=False)
             return base64.b64encode(screenshot).decode('utf-8')
         except Exception as e:
             error_message = f"Failed to take screenshot: {str(e)}"

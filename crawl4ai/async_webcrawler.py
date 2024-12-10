@@ -147,6 +147,7 @@ class AsyncWebCrawler:
         # Other parameters
         css_selector: str = None,
         screenshot: bool = False,
+        pdf: bool = False,
         user_agent: str = None,
         verbose=True,
         **kwargs,
@@ -230,6 +231,7 @@ class AsyncWebCrawler:
                 async_response: AsyncCrawlResponse = None
                 cached_result = None
                 screenshot_data = None
+                pdf_data = None
                 extracted_content = None
                 
                 start_time = time.perf_counter()
@@ -244,6 +246,10 @@ class AsyncWebCrawler:
                     if screenshot:
                         screenshot_data = cached_result.screenshot
                         if not screenshot_data:
+                            cached_result = None
+                    if pdf:
+                        pdf_data = cached_result.pdf
+                        if not pdf_data:
                             cached_result = None
                     # if verbose:
                     #     print(f"{Fore.BLUE}{self.tag_format('FETCH')} {self.log_icons['FETCH']} Cache hit for {cache_context.display_url} | Status: {Fore.GREEN if bool(html) else Fore.RED}{bool(html)}{Style.RESET_ALL} | Time: {time.perf_counter() - start_time:.2f}s")
@@ -264,10 +270,12 @@ class AsyncWebCrawler:
                     async_response: AsyncCrawlResponse = await self.crawler_strategy.crawl(
                         url, 
                         screenshot=screenshot, 
+                        pdf=pdf,
                         **kwargs
                     )
                     html = sanitize_input_encode(async_response.html)
                     screenshot_data = async_response.screenshot
+                    pdf_data = async_response.pdf_data
                     t2 = time.perf_counter()
                     self.logger.url_status(
                         url=cache_context.display_url,
@@ -289,6 +297,7 @@ class AsyncWebCrawler:
                     content_filter=content_filter,
                     css_selector=css_selector,
                     screenshot=screenshot_data,
+                    pdf_data=pdf_data,
                     verbose=verbose,
                     is_cached=bool(cached_result),
                     async_response=async_response,
@@ -362,6 +371,7 @@ class AsyncWebCrawler:
         bypass_cache: bool = False,
         css_selector: str = None,
         screenshot: bool = False,
+        pdf: bool = False,
         user_agent: str = None,
         verbose=True,
         **kwargs,
@@ -550,6 +560,7 @@ class AsyncWebCrawler:
             )
 
         screenshot = None if not screenshot else screenshot
+        pdf_data = kwargs.get("pdf_data", None) 
         
         
         if kwargs.get("prettiify", False):
@@ -567,6 +578,7 @@ class AsyncWebCrawler:
             links=links,
             metadata=metadata,
             screenshot=screenshot,
+            pdf=pdf_data,
             extracted_content=extracted_content,
             success=True,
             error_message="",
