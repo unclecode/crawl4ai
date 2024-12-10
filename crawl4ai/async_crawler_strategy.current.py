@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from typing import Callable, Dict, Any, List, Optional, Awaitable
 import os, sys, shutil
 import tempfile, subprocess
-from playwright.async_api import async_playwright, Page, Browser, Error, BrowserContext
+from playwright.async_api import async_playwright, Page, Browser, Error
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
@@ -15,7 +15,6 @@ from pydantic import BaseModel
 import hashlib
 import json
 import uuid
-from .js_snippet import load_js_script
 from .models import AsyncCrawlResponse
 from .utils import create_box_message
 from .user_agent_generator import UserAgentGenerator
@@ -220,222 +219,10 @@ class ManagedBrowser:
                 )
 
 
-class BrowserManager:
-    def __init__(self, use_managed_browser: bool, user_data_dir: Optional[str], headless: bool, logger, browser_type: str, proxy, proxy_config, chrome_channel: str, viewport_width: int, viewport_height: int, accept_downloads: bool, storage_state, ignore_https_errors: bool, java_script_enabled: bool, cookies: List[dict], headers: dict, extra_args: List[str], text_only: bool, light_mode: bool, user_agent: str, browser_hint: str, downloads_path: Optional[str]):
-        self.use_managed_browser = use_managed_browser
-        self.user_data_dir = user_data_dir
-        self.headless = headless
-        self.logger = logger
-        self.browser_type = browser_type
-        self.proxy = proxy
-        self.proxy_config = proxy_config
-        self.chrome_channel = chrome_channel
-        self.viewport_width = viewport_width
-        self.viewport_height = viewport_height
-        self.accept_downloads = accept_downloads
-        self.storage_state = storage_state
-        self.ignore_https_errors = ignore_https_errors
-        self.java_script_enabled = java_script_enabled
-        self.cookies = cookies or []
-        self.headers = headers or {}
-        self.extra_args = extra_args or []
-        self.text_only = text_only
-        self.light_mode = light_mode
-        self.browser = None
-        self.default_context : BrowserContext = None
-        self.managed_browser = None
-        self.sessions = {}
-        self.session_ttl = 1800
-        self.playwright = None
-        self.user_agent = user_agent
-        self.browser_hint = browser_hint
-        self.downloads_path = downloads_path        
-
-    async def start(self):
-        if self.playwright is None:
-            from playwright.async_api import async_playwright
-            self.playwright = await async_playwright().start()
-
-        if self.use_managed_browser:
-            self.managed_browser = ManagedBrowser(
-                browser_type=self.browser_type,
-                user_data_dir=self.user_data_dir,
-                headless=self.headless,
-                logger=self.logger
-            )
-            cdp_url = await self.managed_browser.start()
-            self.browser = await self.playwright.chromium.connect_over_cdp(cdp_url)
-            contexts = self.browser.contexts
-            if contexts:
-                self.default_context = contexts[0]
-            else:
-                self.default_context = await self.browser.new_context(
-                    viewport={"width": self.viewport_width, "height": self.viewport_height},
-                    storage_state=self.storage_state,
-                    user_agent=self.headers.get("User-Agent"),
-                    accept_downloads=self.accept_downloads,
-                    ignore_https_errors=self.ignore_https_errors,
-                    java_script_enabled=self.java_script_enabled
-                )
-            await self.setup_context(self.default_context)
-        else:
-            browser_args = {
-                "headless": self.headless,
-                "args": [
-                    "--no-sandbox",
-                    "--disable-dev-shm-usage",
-                    "--no-first-run",
-                    "--no-default-browser-check",
-                    "--disable-infobars",
-                    "--window-position=0,0",
-                    "--ignore-certificate-errors",
-                    "--ignore-certificate-errors-spki-list",
-                    "--disable-blink-features=AutomationControlled",
-                    "--window-position=400,0",
-                    f"--window-size={self.viewport_width},{self.viewport_height}",
-                ]
-            }
-
-            if self.light_mode:
-                browser_args["args"].extend(BROWSER_DISABLE_OPTIONS)
-
-            if self.text_only:
-                browser_args["args"].extend(['--blink-settings=imagesEnabled=false','--disable-remote-fonts'])
-
-            if self.chrome_channel:
-                browser_args["channel"] = self.chrome_channel
-
-            if self.extra_args:
-                browser_args["args"].extend(self.extra_args)
-
-            if self.accept_downloads:
-                browser_args["downloads_path"] = os.path.join(os.getcwd(), "downloads")
-                os.makedirs(browser_args["downloads_path"], exist_ok=True)
-
-            if self.proxy:
-                from playwright.async_api import ProxySettings
-                proxy_settings = ProxySettings(server=self.proxy)
-                browser_args["proxy"] = proxy_settings
-            elif self.proxy_config:
-                from playwright.async_api import ProxySettings
-                proxy_settings = ProxySettings(
-                    server=self.proxy_config.get("server"),
-                    username=self.proxy_config.get("username"),
-                    password=self.proxy_config.get("password")
-                )
-                browser_args["proxy"] = proxy_settings
-
-            if self.browser_type == "firefox":
-                self.browser = await self.playwright.firefox.launch(**browser_args)
-            elif self.browser_type == "webkit":
-                self.browser = await self.playwright.webkit.launch(**browser_args)
-            else:
-                self.browser = await self.playwright.chromium.launch(**browser_args)
-
-            self.default_context = self.browser
-            # Since default_context in non-managed mode is the browser, no setup needed here.
-
-
-    async def setup_context(self, context : BrowserContext, is_default=False):
-        # Set extra headers
-        if self.headers:
-            await context.set_extra_http_headers(self.headers)
-
-        # Add cookies if any
-        if self.cookies:
-            await context.add_cookies(self.cookies)
-
-        # Ensure storage_state if provided
-        if self.storage_state:
-            # If storage_state is a dictionary or file path, Playwright will handle it.
-            await context.storage_state(path=None)
-
-        # If accept_downloads, set timeouts and ensure properties
-        if self.accept_downloads:
-            await context.set_default_timeout(60000)
-            await context.set_default_navigation_timeout(60000)
-            if self.downloads_path:
-                context._impl_obj._options["accept_downloads"] = True
-                context._impl_obj._options["downloads_path"] = self.downloads_path
-
-        # If we have a user_agent, override it along with sec-ch-ua
-        if self.user_agent:
-            # Merge headers if needed
-            combined_headers = {"User-Agent": self.user_agent, "sec-ch-ua": self.browser_hint}
-            combined_headers.update(self.headers)
-            await context.set_extra_http_headers(combined_headers)
-            
-    async def close(self):
-        # Close all active sessions
-        session_ids = list(self.sessions.keys())
-        for session_id in session_ids:
-            await self.kill_session(session_id)
-
-        if self.browser:
-            await self.browser.close()
-            self.browser = None
-
-        if self.managed_browser:
-            await asyncio.sleep(0.5)
-            await self.managed_browser.cleanup()
-            self.managed_browser = None
-
-        if self.playwright:
-            await self.playwright.stop()
-            self.playwright = None
-
-    async def get_page(self, session_id: Optional[str], user_agent: str):
-        # Cleanup expired sessions
-        self._cleanup_expired_sessions()
-
-        if session_id:
-            context, page, _ = self.sessions.get(session_id, (None, None, None))
-            if context and page:
-                self.sessions[session_id] = (context, page, time.time())
-                return page, context
-
-        # Create a new context/page pair
-        if self.use_managed_browser:
-            context = self.default_context
-            page = await context.new_page()
-        else:
-            context = await self.browser.new_context(
-                user_agent=user_agent,
-                viewport={"width": self.viewport_width, "height": self.viewport_height},
-                proxy={"server": self.proxy} if self.proxy else None,
-                accept_downloads=self.accept_downloads,
-                storage_state=self.storage_state,
-                ignore_https_errors=self.ignore_https_errors
-            )
-            await self.setup_context(context)
-            page = await context.new_page()
-
-        if session_id:
-            self.sessions[session_id] = (context, page, time.time())
-
-        return page, context
-
-    async def kill_session(self, session_id: str):
-        if session_id in self.sessions:
-            context, page, _ = self.sessions[session_id]
-            await page.close()
-            if not self.use_managed_browser:
-                await context.close()
-            del self.sessions[session_id]
-
-    def _cleanup_expired_sessions(self):
-        current_time = time.time()
-        expired_sessions = [
-            sid for sid, (_, _, last_used) in self.sessions.items()
-            if current_time - last_used > self.session_ttl
-        ]
-        for sid in expired_sessions:
-            asyncio.create_task(self.kill_session(sid))
-
 class AsyncCrawlerStrategy(ABC):
     @abstractmethod
     async def crawl(self, url: str, **kwargs) -> AsyncCrawlResponse:
-        pass # 4 + 3
+        pass
     
     @abstractmethod
     async def crawl_many(self, urls: List[str], **kwargs) -> List[AsyncCrawlResponse]:
@@ -500,8 +287,6 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         self.use_managed_browser = kwargs.get("use_managed_browser", False)
         self.user_data_dir = kwargs.get("user_data_dir", None)
         self.use_persistent_context = kwargs.get("use_persistent_context", False)
-        if self.use_persistent_context:
-            self.use_managed_browser = True
         self.chrome_channel = kwargs.get("chrome_channel", "chrome")
         self.managed_browser = None
         self.default_context = None
@@ -523,31 +308,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         if self.accept_downloads and not self.downloads_path:
             self.downloads_path = os.path.join(os.getcwd(), "downloads")
             os.makedirs(self.downloads_path, exist_ok=True)        
-
-        self.browser_manager = BrowserManager(
-            use_managed_browser=self.use_managed_browser,
-            user_data_dir=self.user_data_dir,
-            headless=self.headless,
-            logger=self.logger,
-            browser_type=self.browser_type,
-            proxy=self.proxy,
-            proxy_config=self.proxy_config,
-            chrome_channel=self.chrome_channel,
-            viewport_width=self.viewport_width,
-            viewport_height=self.viewport_height,
-            accept_downloads=self.accept_downloads,
-            storage_state=self.storage_state,
-            ignore_https_errors=self.ignore_https_errors,
-            java_script_enabled=self.java_script_enabled,
-            cookies=self.cookies,
-            headers=self.headers,
-            extra_args=self.extra_args,
-            text_only=self.text_only,
-            light_mode=self.light_mode,
-            user_agent=self.user_agent,
-            browser_hint=self.browser_hint,
-            downloads_path=self.downloads_path            
-        )        
+        
 
     async def __aenter__(self):
         await self.start()
@@ -557,14 +318,166 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         await self.close()
 
     async def start(self):
-        await self.browser_manager.start()
-        await self.execute_hook('on_browser_created', self.browser_manager.browser, context = self.browser_manager.default_context)
-        
+        if self.playwright is None:
+            self.playwright = await async_playwright().start()
+        if self.browser is None:
+            if self.use_managed_browser:
+                # Use managed browser approach
+                self.managed_browser = ManagedBrowser(
+                    browser_type=self.browser_type,
+                    user_data_dir=self.user_data_dir,
+                    headless=self.headless,
+                    logger=self.logger
+                )
+                cdp_url = await self.managed_browser.start()
+                self.browser = await self.playwright.chromium.connect_over_cdp(cdp_url)
+                
+                # Get the default context that maintains the user profile
+                contexts = self.browser.contexts
+                if contexts:
+                    self.default_context = contexts[0]
+                else:
+                    # If no default context exists, create one
+                    self.default_context = await self.browser.new_context(
+                        viewport={"width": self.viewport_width, "height": self.viewport_height},
+                        storage_state=self.storage_state,
+                        user_agent= self.user_agent,
+                        accept_downloads=self.accept_downloads,
+                        ignore_https_errors=self.ignore_https_errors,
+                        java_script_enabled=self.java_script_enabled,
+                    )
+                
+                # Set up the default context
+                if self.default_context:
+                    await self.default_context.set_extra_http_headers(self.headers)
+                    if self.cookies:
+                        await self.default_context.add_cookies(self.cookies)                    
+                    if self.storage_state:
+                        # If storage_state is a dictionary or file path, Playwright will handle it.
+                        await self.default_context.storage_state(path=None)  # Just ensuring default_context is ready
+                    if self.accept_downloads:
+                        await self.default_context.set_default_timeout(60000)
+                        await self.default_context.set_default_navigation_timeout(60000)
+                        self.default_context._impl_obj._options["accept_downloads"] = True
+                        self.default_context._impl_obj._options["downloads_path"] = self.downloads_path
+                        
+                    if self.user_agent:
+                        await self.default_context.set_extra_http_headers({
+                            "User-Agent": self.user_agent,
+                            "sec-ch-ua": self.browser_hint,
+                            # **self.headers
+                        })
+            else:
+                # Base browser arguments
+                browser_args = {
+                    "headless": self.headless,
+                    "args": [
+                        "--no-sandbox",
+                        "--disable-dev-shm-usage",
+                        "--no-first-run",
+                        "--no-default-browser-check",
+                        "--disable-infobars",
+                        "--window-position=0,0",
+                        "--ignore-certificate-errors",
+                        "--ignore-certificate-errors-spki-list",
+                        "--disable-blink-features=AutomationControlled",
+                        "--window-position=400,0",
+                        f"--window-size={self.viewport_width},{self.viewport_height}",     
+                    ]
+                }
+                
+                if self.light_mode:
+                    browser_args["args"].extend(BROWSER_DISABLE_OPTIONS)              
+                
+                if self.text_only:
+                   browser_args["args"].extend([
+                       '--blink-settings=imagesEnabled=false',
+                       '--disable-remote-fonts'
+                   ])
+                
+                # Add channel if specified (try Chrome first)
+                if self.chrome_channel:
+                    browser_args["channel"] = self.chrome_channel
+                
+                # Add extra args if provided
+                if self.extra_args:
+                    browser_args["args"].extend(self.extra_args)
+                    
+                # Add downloads path if downloads are enabled
+                if self.accept_downloads:
+                    browser_args["downloads_path"] = self.downloads_path
+                
+                # Add proxy settings if a proxy is specified
+                if self.proxy:
+                    proxy_settings = ProxySettings(server=self.proxy)
+                    browser_args["proxy"] = proxy_settings
+                elif self.proxy_config:
+                    proxy_settings = ProxySettings(
+                        server=self.proxy_config.get("server"),
+                        username=self.proxy_config.get("username"),
+                        password=self.proxy_config.get("password")
+                    )
+                    browser_args["proxy"] = proxy_settings
+                    
+                try:
+                    # Select the appropriate browser based on the browser_type
+                    if self.browser_type == "firefox":
+                        self.browser = await self.playwright.firefox.launch(**browser_args)
+                    elif self.browser_type == "webkit":
+                        if "viewport" not in browser_args:
+                            browser_args["viewport"] = {"width": self.viewport_width, "height": self.viewport_height}                        
+                        self.browser = await self.playwright.webkit.launch(**browser_args)
+                    else:
+                        if self.use_persistent_context and self.user_data_dir:
+                            self.browser = await self.playwright.chromium.launch_persistent_context(
+                                user_data_dir=self.user_data_dir,
+                                accept_downloads=self.accept_downloads,
+                                downloads_path=self.downloads_path if self.accept_downloads else None,                                
+                                **browser_args
+                            )
+                            self.default_context = self.browser
+                        else:
+                            self.browser = await self.playwright.chromium.launch(**browser_args)
+                            self.default_context = self.browser
+                                
+                except Exception as e:
+                    # Fallback to chromium if Chrome channel fails
+                    if "chrome" in str(e) and browser_args.get("channel") == "chrome":
+                        browser_args["channel"] = "chromium"
+                        if self.use_persistent_context and self.user_data_dir:
+                            self.browser = await self.playwright.chromium.launch_persistent_context(
+                                user_data_dir=self.user_data_dir,
+                                **browser_args
+                            )
+                            self.default_context = self.browser
+                        else:
+                            self.browser = await self.playwright.chromium.launch(**browser_args)
+                    else:
+                        raise
+
+            await self.execute_hook('on_browser_created', self.browser)
+
     async def close(self):
         if self.sleep_on_close:
             await asyncio.sleep(0.5)
             
-        await self.browser_manager.close()
+        # Close all active sessions
+        session_ids = list(self.sessions.keys())
+        for session_id in session_ids:
+            await self.kill_session(session_id)
+            
+        if self.browser:
+            await self.browser.close()
+            self.browser = None
+            
+        if self.managed_browser:
+            await asyncio.sleep(0.5)
+            await self.managed_browser.cleanup()
+            self.managed_browser = None
+            
+        if self.playwright:
+            await self.playwright.stop()
+            self.playwright = None
 
     # Issue #256: Remove __del__ method to avoid potential issues with async cleanup
     # def __del__(self):
@@ -725,13 +638,35 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
     
     async def create_session(self, **kwargs) -> str:
         """Creates a new browser session and returns its ID."""
-        await self.start()
-        
+        if not self.browser:
+            await self.start()
+            
         session_id = kwargs.get('session_id') or str(uuid.uuid4())
         
-        user_agent = kwargs.get("user_agent", self.user_agent)
-        # Use browser_manager to get a fresh page & context assigned to this session_id
-        page, context = await self.browser_manager.get_page(session_id, user_agent)
+        if self.use_managed_browser:
+            page = await self.default_context.new_page()
+            self.sessions[session_id] = (self.default_context, page, time.time())
+        else:
+            if self.use_persistent_context and self.browser_type in ["chrome", "chromium"]:
+                context = self.browser
+                page = await context.new_page()
+            else:
+                context = await self.browser.new_context(
+                    user_agent=kwargs.get("user_agent", self.user_agent),
+                    viewport={"width": self.viewport_width, "height": self.viewport_height},
+                    proxy={"server": self.proxy} if self.proxy else None,
+                    accept_downloads=self.accept_downloads,
+                    storage_state=self.storage_state,
+                    ignore_https_errors=True
+                )
+                
+                if self.cookies:
+                    await context.add_cookies(self.cookies)
+                await context.set_extra_http_headers(self.headers)
+                page = await context.new_page()
+                
+            self.sessions[session_id] = (context, page, time.time())
+        
         return session_id
     
     async def crawl(self, url: str, **kwargs) -> AsyncCrawlResponse:
@@ -792,7 +727,18 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         else:
             raise ValueError("URL must start with 'http://', 'https://', 'file://', or 'raw:'")
 
+
     async def _crawl_web(self, url: str, **kwargs) -> AsyncCrawlResponse:
+        """
+        Existing web crawling logic remains unchanged.
+
+        Args:
+            url (str): The web URL to crawl.
+            **kwargs: Additional parameters.
+
+        Returns:
+            AsyncCrawlResponse: The response containing HTML, headers, status code, and optional screenshot.
+        """
         response_headers = {}
         status_code = None
         
@@ -812,13 +758,97 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             )
         
         # Handle page creation differently for managed browser
-        page, context = await self.browser_manager.get_page(session_id, user_agent)
-        await context.add_cookies([{"name": "cookiesEnabled", "value": "true", "url": url}])
-        
-        if kwargs.get("override_navigator", False) or kwargs.get("simulate_user", False) or kwargs.get("magic", False):
-            # Inject scripts to override navigator properties
-            await context.add_init_script(load_js_script("navigator_overrider"))
-        
+        context = None
+        if self.use_managed_browser:
+            if session_id:
+                # Reuse existing session if available
+                context, page, _ = self.sessions.get(session_id, (None, None, None))
+                if not page:
+                    # Create new page in default context if session doesn't exist
+                    page = await self.default_context.new_page()
+                    self.sessions[session_id] = (self.default_context, page, time.time())
+            else:
+                # Create new page in default context for non-session requests
+                page = await self.default_context.new_page()
+        else:
+            if session_id:
+                context, page, _ = self.sessions.get(session_id, (None, None, None))
+                if not context:
+                    if self.use_persistent_context and self.browser_type in ["chrome", "chromium"]:
+                        # In persistent context, browser is the context
+                        context = self.browser
+                    else:
+                        # Normal context creation for non-persistent or non-Chrome browsers
+                        context = await self.browser.new_context(
+                            user_agent=user_agent,
+                            viewport={"width": self.viewport_width, "height": self.viewport_height},
+                            proxy={"server": self.proxy} if self.proxy else None,
+                            java_script_enabled=True,
+                            accept_downloads=self.accept_downloads,
+                            storage_state=self.storage_state,
+                            # downloads_path=self.downloads_path if self.accept_downloads else None
+                        )
+                        await context.add_cookies([{"name": "cookiesEnabled", "value": "true", "url": url}])
+                        if self.cookies:
+                            await context.add_cookies(self.cookies)
+                        await context.set_extra_http_headers(self.headers)
+
+                    page = await context.new_page()
+                    self.sessions[session_id] = (context, page, time.time())
+            else:
+                if self.use_persistent_context and self.browser_type in ["chrome", "chromium"]:
+                    # In persistent context, browser is the context
+                    context = self.browser
+                else:
+                    # Normal context creation
+                    context = await self.browser.new_context(
+                        user_agent=user_agent,
+                        # viewport={"width": 1920, "height": 1080},
+                        viewport={"width": self.viewport_width, "height": self.viewport_height},
+                        proxy={"server": self.proxy} if self.proxy else None,
+                        accept_downloads=self.accept_downloads,
+                        storage_state=self.storage_state,
+                        ignore_https_errors=True  # Add this line
+                    )
+                    if self.cookies:
+                            await context.add_cookies(self.cookies)
+                    await context.set_extra_http_headers(self.headers)
+                
+                if kwargs.get("override_navigator", False) or kwargs.get("simulate_user", False) or kwargs.get("magic", False):
+                    # Inject scripts to override navigator properties
+                    await context.add_init_script("""
+                        // Pass the Permissions Test.
+                        const originalQuery = window.navigator.permissions.query;
+                        window.navigator.permissions.query = (parameters) => (
+                            parameters.name === 'notifications' ?
+                                Promise.resolve({ state: Notification.permission }) :
+                                originalQuery(parameters)
+                        );
+                        Object.defineProperty(navigator, 'webdriver', {
+                            get: () => undefined
+                        });
+                        window.navigator.chrome = {
+                            runtime: {},
+                            // Add other properties if necessary
+                        };
+                        Object.defineProperty(navigator, 'plugins', {
+                            get: () => [1, 2, 3, 4, 5],
+                        });
+                        Object.defineProperty(navigator, 'languages', {
+                            get: () => ['en-US', 'en'],
+                        });
+                        Object.defineProperty(document, 'hidden', {
+                            get: () => false
+                        });
+                        Object.defineProperty(document, 'visibilityState', {
+                            get: () => 'visible'
+                        });
+                    """)
+                
+                page = await context.new_page()
+                if kwargs.get("magic", False):
+                    await stealth_async(page, stealth_config)
+
         # Add console message and error logging
         if kwargs.get("log_console", False):
             page.on("console", lambda msg: print(f"Console: {msg.text}"))
@@ -1029,7 +1059,62 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
             # Update image dimensions
             if not self.text_only:
-                update_image_dimensions_js = load_js_script("update_image_dimensions")
+                update_image_dimensions_js = """
+            () => {
+                return new Promise((resolve) => {
+                    const filterImage = (img) => {
+                        // Filter out images that are too small
+                        if (img.width < 100 && img.height < 100) return false;
+                        
+                        // Filter out images that are not visible
+                        const rect = img.getBoundingClientRect();
+                        if (rect.width === 0 || rect.height === 0) return false;
+                        
+                        // Filter out images with certain class names (e.g., icons, thumbnails)
+                        if (img.classList.contains('icon') || img.classList.contains('thumbnail')) return false;
+                        
+                        // Filter out images with certain patterns in their src (e.g., placeholder images)
+                        if (img.src.includes('placeholder') || img.src.includes('icon')) return false;
+                        
+                        return true;
+                    };
+
+                    const images = Array.from(document.querySelectorAll('img')).filter(filterImage);
+                    let imagesLeft = images.length;
+                    
+                    if (imagesLeft === 0) {
+                        resolve();
+                        return;
+                    }
+
+                    const checkImage = (img) => {
+                        if (img.complete && img.naturalWidth !== 0) {
+                            img.setAttribute('width', img.naturalWidth);
+                            img.setAttribute('height', img.naturalHeight);
+                            imagesLeft--;
+                            if (imagesLeft === 0) resolve();
+                        }
+                    };
+
+                    images.forEach(img => {
+                        checkImage(img);
+                        if (!img.complete) {
+                            img.onload = () => {
+                                checkImage(img);
+                            };
+                            img.onerror = () => {
+                                imagesLeft--;
+                                if (imagesLeft === 0) resolve();
+                            };
+                        }
+                    });
+
+                    // Fallback timeout of 5 seconds
+                    // setTimeout(() => resolve(), 5000);
+                    resolve();
+                });
+            }
+            """
             
                 try:
                     try:
@@ -1167,8 +1252,124 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         Args:
             page (Page): The Playwright page instance
         """
-        remove_overlays_js = load_js_script("remove_overlays")
-    
+        remove_overlays_js = """
+        async () => {
+            // Function to check if element is visible
+            const isVisible = (elem) => {
+                const style = window.getComputedStyle(elem);
+                return style.display !== 'none' && 
+                       style.visibility !== 'hidden' && 
+                       style.opacity !== '0';
+            };
+
+            // Common selectors for popups and overlays
+            const commonSelectors = [
+                // Close buttons first
+                'button[class*="close" i]', 'button[class*="dismiss" i]', 
+                'button[aria-label*="close" i]', 'button[title*="close" i]',
+                'a[class*="close" i]', 'span[class*="close" i]',
+                
+                // Cookie notices
+                '[class*="cookie-banner" i]', '[id*="cookie-banner" i]',
+                '[class*="cookie-consent" i]', '[id*="cookie-consent" i]',
+                
+                // Newsletter/subscription dialogs
+                '[class*="newsletter" i]', '[class*="subscribe" i]',
+                
+                // Generic popups/modals
+                '[class*="popup" i]', '[class*="modal" i]', 
+                '[class*="overlay" i]', '[class*="dialog" i]',
+                '[role="dialog"]', '[role="alertdialog"]'
+            ];
+
+            // Try to click close buttons first
+            for (const selector of commonSelectors.slice(0, 6)) {
+                const closeButtons = document.querySelectorAll(selector);
+                for (const button of closeButtons) {
+                    if (isVisible(button)) {
+                        try {
+                            button.click();
+                            await new Promise(resolve => setTimeout(resolve, 100));
+                        } catch (e) {
+                            console.log('Error clicking button:', e);
+                        }
+                    }
+                }
+            }
+
+            // Remove remaining overlay elements
+            const removeOverlays = () => {
+                // Find elements with high z-index
+                const allElements = document.querySelectorAll('*');
+                for (const elem of allElements) {
+                    const style = window.getComputedStyle(elem);
+                    const zIndex = parseInt(style.zIndex);
+                    const position = style.position;
+                    
+                    if (
+                        isVisible(elem) && 
+                        (zIndex > 999 || position === 'fixed' || position === 'absolute') &&
+                        (
+                            elem.offsetWidth > window.innerWidth * 0.5 ||
+                            elem.offsetHeight > window.innerHeight * 0.5 ||
+                            style.backgroundColor.includes('rgba') ||
+                            parseFloat(style.opacity) < 1
+                        )
+                    ) {
+                        elem.remove();
+                    }
+                }
+
+                // Remove elements matching common selectors
+                for (const selector of commonSelectors) {
+                    const elements = document.querySelectorAll(selector);
+                    elements.forEach(elem => {
+                        if (isVisible(elem)) {
+                            elem.remove();
+                        }
+                    });
+                }
+            };
+
+            // Remove overlay elements
+            removeOverlays();
+
+            // Remove any fixed/sticky position elements at the top/bottom
+            const removeFixedElements = () => {
+                const elements = document.querySelectorAll('*');
+                elements.forEach(elem => {
+                    const style = window.getComputedStyle(elem);
+                    if (
+                        (style.position === 'fixed' || style.position === 'sticky') &&
+                        isVisible(elem)
+                    ) {
+                        elem.remove();
+                    }
+                });
+            };
+
+            removeFixedElements();
+            
+            // Remove empty block elements as: div, p, span, etc.
+            const removeEmptyBlockElements = () => {
+                const blockElements = document.querySelectorAll('div, p, span, section, article, header, footer, aside, nav, main, ul, ol, li, dl, dt, dd, h1, h2, h3, h4, h5, h6');
+                blockElements.forEach(elem => {
+                    if (elem.innerText.trim() === '') {
+                        elem.remove();
+                    }
+                });
+            };
+
+            // Remove margin-right and padding-right from body (often added by modal scripts)
+            document.body.style.marginRight = '0px';
+            document.body.style.paddingRight = '0px';
+            document.body.style.overflow = 'auto';
+
+            // Wait a bit for any animations to complete
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        """
+        
         try:
             await page.evaluate(remove_overlays_js)
             await page.wait_for_timeout(500)  # Wait for any animations to complete
@@ -1246,10 +1447,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             Optional[str]: Base64-encoded screenshot image or an error image if failed.
         """
         try:
-            await self.start()
-            # Create a temporary page without a session_id
-            page, context = await self.browser_manager.get_page(None, self.user_agent)
-            
+            if not self.browser:
+                await self.start()
+            page = await self.browser.new_page()
             await page.set_content(html, wait_until='networkidle')
             screenshot = await page.screenshot(full_page=True)
             await page.close()

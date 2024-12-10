@@ -19,138 +19,12 @@ from typing import Optional, Tuple, Dict, Any
 import xxhash
 from colorama import Fore, Style, init
 import textwrap
-
-from .html2text import HTML2Text
-class CustomHTML2Text(HTML2Text):
-    def __init__(self, *args, handle_code_in_pre=False, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.inside_pre = False
-        self.inside_code = False
-        self.preserve_tags = set()  # Set of tags to preserve
-        self.current_preserved_tag = None
-        self.preserved_content = []
-        self.preserve_depth = 0
-        self.handle_code_in_pre = handle_code_in_pre 
-        
-        # Configuration options
-        self.skip_internal_links = False
-        self.single_line_break = False
-        self.mark_code = False
-        self.include_sup_sub = False
-        self.body_width = 0
-        self.ignore_mailto_links = True
-        self.ignore_links = False
-        self.escape_backslash = False
-        self.escape_dot = False
-        self.escape_plus = False
-        self.escape_dash = False
-        self.escape_snob = False
-
-    def update_params(self, **kwargs):
-        """Update parameters and set preserved tags."""
-        for key, value in kwargs.items():
-            if key == 'preserve_tags':
-                self.preserve_tags = set(value)
-            elif key == 'handle_code_in_pre':
-                self.handle_code_in_pre = value
-            else:
-                setattr(self, key, value)
-
-    def handle_tag(self, tag, attrs, start):
-        # Handle preserved tags
-        if tag in self.preserve_tags:
-            if start:
-                if self.preserve_depth == 0:
-                    self.current_preserved_tag = tag
-                    self.preserved_content = []
-                    # Format opening tag with attributes
-                    attr_str = ''.join(f' {k}="{v}"' for k, v in attrs.items() if v is not None)
-                    self.preserved_content.append(f'<{tag}{attr_str}>')
-                self.preserve_depth += 1
-                return
-            else:
-                self.preserve_depth -= 1
-                if self.preserve_depth == 0:
-                    self.preserved_content.append(f'</{tag}>')
-                    # Output the preserved HTML block with proper spacing
-                    preserved_html = ''.join(self.preserved_content)
-                    self.o('\n' + preserved_html + '\n')
-                    self.current_preserved_tag = None
-                return
-
-        # If we're inside a preserved tag, collect all content
-        if self.preserve_depth > 0:
-            if start:
-                # Format nested tags with attributes
-                attr_str = ''.join(f' {k}="{v}"' for k, v in attrs.items() if v is not None)
-                self.preserved_content.append(f'<{tag}{attr_str}>')
-            else:
-                self.preserved_content.append(f'</{tag}>')
-            return
-
-        # Handle pre tags
-        if tag == 'pre':
-            if start:
-                self.o('```\n')  # Markdown code block start
-                self.inside_pre = True
-            else:
-                self.o('\n```\n')  # Markdown code block end
-                self.inside_pre = False
-        elif tag == 'code':
-            if self.inside_pre and not self.handle_code_in_pre:
-                # Ignore code tags inside pre blocks if handle_code_in_pre is False
-                return
-            if start:
-                self.o('`')  # Markdown inline code start
-                self.inside_code = True
-            else:
-                self.o('`')  # Markdown inline code end
-                self.inside_code = False
-        else:
-            super().handle_tag(tag, attrs, start)
-
-    def handle_data(self, data, entity_char=False):
-        """Override handle_data to capture content within preserved tags."""
-        if self.preserve_depth > 0:
-            self.preserved_content.append(data)
-            return
-
-        if self.inside_pre:
-            # Output the raw content for pre blocks, including content inside code tags
-            self.o(data)  # Directly output the data as-is (preserve newlines)
-            return
-        if self.inside_code:
-            # Inline code: no newlines allowed
-            self.o(data.replace('\n', ' '))
-            return
-
-        # Default behavior for other tags
-        super().handle_data(data, entity_char)
-
-
-    #     # Handle pre tags
-    #     if tag == 'pre':
-    #         if start:
-    #             self.o('```\n')
-    #             self.inside_pre = True
-    #         else:
-    #             self.o('\n```')
-    #             self.inside_pre = False
-    #     # elif tag in ["h1", "h2", "h3", "h4", "h5", "h6"]:
-    #     #     pass
-    #     else:
-    #         super().handle_tag(tag, attrs, start)
-
-    # def handle_data(self, data, entity_char=False):
-    #     """Override handle_data to capture content within preserved tags."""
-    #     if self.preserve_depth > 0:
-    #         self.preserved_content.append(data)
-    #         return
-    #     super().handle_data(data, entity_char)
+import cProfile
+import pstats
+from functools import wraps
 
 class InvalidCSSSelectorError(Exception):
     pass
-
 
 def create_box_message(
    message: str, 
@@ -373,50 +247,6 @@ def escape_json_string(s):
     s = re.sub(r'[\x00-\x1f\x7f-\x9f]', lambda x: '\\u{:04x}'.format(ord(x.group())), s)
     
     return s
-
-class CustomHTML2Text_v0(HTML2Text):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.inside_pre = False
-        self.inside_code = False
-        
-        self.skip_internal_links = False
-        self.single_line_break = False
-        self.mark_code = False
-        self.include_sup_sub = False
-        self.body_width = 0
-        self.ignore_mailto_links = True
-        self.ignore_links = False
-        self.escape_backslash = False
-        self.escape_dot = False
-        self.escape_plus = False
-        self.escape_dash = False
-        self.escape_snob = False
-
-
-    def handle_tag(self, tag, attrs, start):
-        if tag == 'pre':
-            if start:
-                self.o('```\n')
-                self.inside_pre = True
-            else:
-                self.o('\n```')
-                self.inside_pre = False
-        elif tag in ["h1", "h2", "h3", "h4", "h5", "h6"]:
-            pass
-
-
-        # elif tag == 'code' and not self.inside_pre:
-        #     if start:
-        #         if not self.inside_pre:
-        #             self.o('`')
-        #         self.inside_code = True
-        #     else:
-        #         if not self.inside_pre:
-        #             self.o('`')
-        #         self.inside_code = False
-
-        super().handle_tag(tag, attrs, start)
 
 def replace_inline_tags(soup, tags, only_text=False):
     tag_replacements = {
@@ -979,7 +809,6 @@ def extract_metadata(html, soup=None):
     
     return metadata
 
-
 def extract_xml_tags(string):
     tags = re.findall(r'<(\w+)>', string)
     return list(set(tags))
@@ -997,7 +826,6 @@ def extract_xml_data(tags, string):
 
     return data
     
-# Function to perform the completion with exponential backoff
 def perform_completion_with_backoff(
     provider, 
     prompt_with_variables, 
@@ -1351,6 +1179,35 @@ def clean_tokens(tokens: list[str]) -> list[str]:
             and not token.startswith('▲')
             and not token.startswith('⬆')]
 
+def profile_and_time(func):
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        # Start timer
+        start_time = time.perf_counter()
+        
+        # Setup profiler
+        profiler = cProfile.Profile()
+        profiler.enable()
+        
+        # Run function
+        result = func(self, *args, **kwargs)
+        
+        # Stop profiler
+        profiler.disable()
+        
+        # Calculate elapsed time
+        elapsed_time = time.perf_counter() - start_time
+        
+        # Print timing
+        print(f"[PROFILER] Scraping completed in {elapsed_time:.2f} seconds")
+        
+        # Print profiling stats
+        stats = pstats.Stats(profiler)
+        stats.sort_stats('cumulative')  # Sort by cumulative time
+        stats.print_stats(20)  # Print top 20 time-consuming functions
+        
+        return result
+    return wrapper
 
 def generate_content_hash(content: str) -> str:
     """Generate a unique hash for content"""
