@@ -14,15 +14,11 @@ from .content_filter_strategy import RelevantContentFilter, BM25ContentFilter#, 
 from .markdown_generation_strategy import MarkdownGenerationStrategy, DefaultMarkdownGenerator
 from .models import MarkdownGenerationResult
 from .utils import (
-    sanitize_input_encode,
-    sanitize_html,
     extract_metadata,
-    InvalidCSSSelectorError,
-    CustomHTML2Text,
     normalize_url,
     is_external_url    
 )
-from .tools import profile_and_time
+
 
 # Pre-compile regular expressions for Open Graph and Twitter metadata
 OG_REGEX = re.compile(r'^og:')
@@ -76,10 +72,10 @@ class WebScrapingStrategy(ContentScrapingStrategy):
             log_method(message=message, tag=tag, **kwargs)
                 
     def scrap(self, url: str, html: str, **kwargs) -> Dict[str, Any]:
-        return self._get_content_of_website_optimized(url, html, is_async=False, **kwargs)
+        return self._scrap(url, html, is_async=False, **kwargs)
 
     async def ascrap(self, url: str, html: str, **kwargs) -> Dict[str, Any]:
-        return await asyncio.to_thread(self._get_content_of_website_optimized, url, html, **kwargs)
+        return await asyncio.to_thread(self._scrap, url, html, **kwargs)
 
     def _generate_markdown_content(self, 
                                  cleaned_html: str,
@@ -103,8 +99,6 @@ class WebScrapingStrategy(ContentScrapingStrategy):
                     html2text_options=kwargs.get('html2text', {})
                 )
                 
-                help_message = """"""
-                
                 return {
                     'markdown': markdown_result.raw_markdown,  
                     'fit_markdown': markdown_result.fit_markdown,
@@ -126,38 +120,40 @@ class WebScrapingStrategy(ContentScrapingStrategy):
                 }
 
         # Legacy method
-        h = CustomHTML2Text()
-        h.update_params(**kwargs.get('html2text', {}))            
-        markdown = h.handle(cleaned_html)
-        markdown = markdown.replace('    ```', '```')
+        """
+        # h = CustomHTML2Text()
+        # h.update_params(**kwargs.get('html2text', {}))            
+        # markdown = h.handle(cleaned_html)
+        # markdown = markdown.replace('    ```', '```')
         
-        fit_markdown = "Set flag 'fit_markdown' to True to get cleaned HTML content."
-        fit_html = "Set flag 'fit_markdown' to True to get cleaned HTML content."
+        # fit_markdown = "Set flag 'fit_markdown' to True to get cleaned HTML content."
+        # fit_html = "Set flag 'fit_markdown' to True to get cleaned HTML content."
         
-        if kwargs.get('content_filter', None) or kwargs.get('fit_markdown', False):
-            content_filter = kwargs.get('content_filter', None)
-            if not content_filter:
-                content_filter = BM25ContentFilter(
-                    user_query=kwargs.get('fit_markdown_user_query', None),
-                    bm25_threshold=kwargs.get('fit_markdown_bm25_threshold', 1.0)
-                )
-            fit_html = content_filter.filter_content(html)
-            fit_html = '\n'.join('<div>{}</div>'.format(s) for s in fit_html)
-            fit_markdown = h.handle(fit_html)
+        # if kwargs.get('content_filter', None) or kwargs.get('fit_markdown', False):
+        #     content_filter = kwargs.get('content_filter', None)
+        #     if not content_filter:
+        #         content_filter = BM25ContentFilter(
+        #             user_query=kwargs.get('fit_markdown_user_query', None),
+        #             bm25_threshold=kwargs.get('fit_markdown_bm25_threshold', 1.0)
+        #         )
+        #     fit_html = content_filter.filter_content(html)
+        #     fit_html = '\n'.join('<div>{}</div>'.format(s) for s in fit_html)
+        #     fit_markdown = h.handle(fit_html)
 
-        markdown_v2 = MarkdownGenerationResult(
-            raw_markdown=markdown,
-            markdown_with_citations=markdown,
-            references_markdown=markdown,
-            fit_markdown=fit_markdown
-        )
+        # markdown_v2 = MarkdownGenerationResult(
+        #     raw_markdown=markdown,
+        #     markdown_with_citations=markdown,
+        #     references_markdown=markdown,
+        #     fit_markdown=fit_markdown
+        # )
         
-        return {
-            'markdown': markdown,
-            'fit_markdown': fit_markdown,
-            'fit_html': fit_html,
-            'markdown_v2' : markdown_v2
-        }
+        # return {
+        #     'markdown': markdown,
+        #     'fit_markdown': fit_markdown,
+        #     'fit_html': fit_html,
+        #     'markdown_v2' : markdown_v2
+        # }
+        """
 
     def flatten_nested_elements(self, node):
         if isinstance(node, NavigableString):
@@ -483,7 +479,7 @@ class WebScrapingStrategy(ContentScrapingStrategy):
             )                
             return False
 
-    def _get_content_of_website_optimized(self, url: str, html: str, word_count_threshold: int = MIN_WORD_THRESHOLD, css_selector: str = None, **kwargs) -> Dict[str, Any]:
+    def _scrap(self, url: str, html: str, word_count_threshold: int = MIN_WORD_THRESHOLD, css_selector: str = None, **kwargs) -> Dict[str, Any]:
         success = True
         if not html:
             return None

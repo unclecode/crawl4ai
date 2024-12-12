@@ -23,6 +23,7 @@ class CrawlResult(BaseModel):
     links: Dict[str, List[Dict]] = {}
     downloaded_files: Optional[List[str]] = None
     screenshot: Optional[str] = None
+    pdf : Optional[bytes] = None
     markdown: Optional[Union[str, MarkdownGenerationResult]] = None
     markdown_v2: Optional[MarkdownGenerationResult] = None
     fit_markdown: Optional[str] = None
@@ -39,6 +40,7 @@ class AsyncCrawlResponse(BaseModel):
     response_headers: Dict[str, str]
     status_code: int
     screenshot: Optional[str] = None
+    pdf_data: Optional[bytes] = None
     get_delayed_content: Optional[Callable[[Optional[float]], Awaitable[str]]] = None
     downloaded_files: Optional[List[str]] = None
 
