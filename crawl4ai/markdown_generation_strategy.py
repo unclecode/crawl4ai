@@ -1,13 +1,24 @@
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any, Tuple
 from .models import MarkdownGenerationResult
-from .utils import CustomHTML2Text
+from .html2text import CustomHTML2Text
 from .content_filter_strategy import RelevantContentFilter, BM25ContentFilter
 import re
 from urllib.parse import urljoin
 
 # Pre-compile the regex pattern
 LINK_PATTERN = re.compile(r'!?\[([^\]]+)\]\(([^)]+?)(?:\s+"([^"]*)")?\)')
+
+def fast_urljoin(base: str, url: str) -> str:
+    """Fast URL joining for common cases."""
+    if url.startswith(('http://', 'https://', 'mailto:', '//')):
+        return url
+    if url.startswith('/'):
+        # Handle absolute paths
+        if base.endswith('/'):
+            return base[:-1] + url
+        return base + url
+    return urljoin(base, url)
 
 class MarkdownGenerationStrategy(ABC):
     """Abstract base class for markdown generation strategies."""
@@ -118,13 +129,3 @@ class DefaultMarkdownGenerator(MarkdownGenerationStrategy):
             fit_html=filtered_html,
         )
 
-def fast_urljoin(base: str, url: str) -> str:
-    """Fast URL joining for common cases."""
-    if url.startswith(('http://', 'https://', 'mailto:', '//')):
-        return url
-    if url.startswith('/'):
-        # Handle absolute paths
-        if base.endswith('/'):
-            return base[:-1] + url
-        return base + url
-    return urljoin(base, url)
