@@ -11,9 +11,9 @@
 
 Crawl4AI is the #1 trending GitHub repository, actively maintained by a vibrant community. It delivers blazing-fast, AI-ready web crawling tailored for LLMs, AI agents, and data pipelines. Open source, flexible, and built for real-time performance, Crawl4AI empowers developers with unmatched speed, precision, and deployment ease.  
 
-[✨ Check out latest update v0.4.1](#-recent-updates)
+[✨ Check out latest update v0.4.2](#-recent-updates)
 
-🎉 **Version 0.4.x is out!** Introducing our experimental PruningContentFilter - a powerful new algorithm for smarter Markdown generation. Test it out and [share your feedback](https://github.com/unclecode/crawl4ai/issues)! [Read the release notes →](https://crawl4ai.com/mkdocs/blog)
+🎉 **Version 0.4.2 is out!** Introducing our experimental PruningContentFilter - a powerful new algorithm for smarter Markdown generation. Test it out and [share your feedback](https://github.com/unclecode/crawl4ai/issues)! [Read the release notes →](https://crawl4ai.com/mkdocs/blog)
 
 ## 🧐 Why Crawl4AI?
 
@@ -626,6 +626,10 @@ async def test_news_crawl():
 
 ## ✨ Recent Updates   
 
+- 🔧 **Configurable Crawlers and Browsers**: Simplified crawling with `BrowserConfig` and `CrawlerRunConfig`, making setups cleaner and more scalable.
+- 🔐 **Session Management Enhancements**: Import/export local storage for personalized crawling with seamless session reuse.
+- 📸 **Supercharged Screenshots**: Take lightning-fast, full-page screenshots of very long pages.
+- 📜 **Full-Page PDF Export**: Convert any web page into a PDF for easy sharing or archiving.
 - 🖼️ **Lazy Load Handling**: Improved support for websites with lazy-loaded images. The crawler now waits for all images to fully load, ensuring no content is missed.
 - ⚡ **Text-Only Mode**: New mode for fast, lightweight crawling. Disables images, JavaScript, and GPU rendering, improving speed by 3-4x for text-focused crawls.
 - 📐 **Dynamic Viewport Adjustment**: Automatically adjusts the browser viewport to fit page content, ensuring accurate rendering and capturing of all elements.
@@ -633,7 +637,8 @@ async def test_news_crawl():
 - 🧑‍💻 **Session Reuse**: Introduced `create_session` for efficient crawling by reusing the same browser session across multiple requests.
 - 🌟 **Light Mode**: Optimized browser performance by disabling unnecessary features like extensions, background timers, and sync processes.
 
-Read the full details of this release in our [0.4.1 Release Notes](https://github.com/unclecode/crawl4ai/blob/main/docs/md_v2/blog/releases/0.4.1.md).
+
+Read the full details of this release in our [0.4.2 Release Notes](https://github.com/unclecode/crawl4ai/blob/main/docs/md_v2/blog/releases/0.4.2.md).
 
 ## 📖 Documentation & Roadmap 
 
