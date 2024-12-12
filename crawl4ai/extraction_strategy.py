@@ -92,8 +92,10 @@ class LLMExtractionStrategy(ExtractionStrategy):
         
             
     def extract(self, url: str, ix:int, html: str) -> List[Dict[str, Any]]:
-        # print("[LOG] Extracting blocks from URL:", url)
-        print(f"[LOG] Call LLM for {url} - block index: {ix}")
+        if self.verbose:
+            # print("[LOG] Extracting blocks from URL:", url)
+            print(f"[LOG] Call LLM for {url} - block index: {ix}")
+
         variable_values = {
             "URL": url,
             "HTML": escape_json_string(sanitize_html(html)),

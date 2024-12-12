@@ -8,7 +8,7 @@ First, let's import the necessary modules and create an instance of `AsyncWebCra
 
 ```python
 import asyncio
-from crawl4ai import AsyncWebCrawler, CasheMode
+from crawl4ai import AsyncWebCrawler, CacheMode
 
 async def main():
     async with AsyncWebCrawler(verbose=True) as crawler:
