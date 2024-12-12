@@ -29,7 +29,7 @@ class InvalidCSSSelectorError(Exception):
 def create_box_message(
    message: str, 
    type: str = "info", 
-   width: int = 80, 
+   width: int = 120, 
    add_newlines: bool = True,
    double_line: bool = False
 ) -> str:
@@ -1223,7 +1223,8 @@ def ensure_content_dirs(base_path: str) -> Dict[str, str]:
         'cleaned': 'cleaned_html',
         'markdown': 'markdown_content', 
         'extracted': 'extracted_content',
-        'screenshots': 'screenshots'
+        'screenshots': 'screenshots',
+        'screenshot': 'screenshots'
     }
     
     content_paths = {}
@@ -1233,3 +1234,59 @@ def ensure_content_dirs(base_path: str) -> Dict[str, str]:
         content_paths[key] = path
         
     return content_paths
+
+def get_error_context(exc_info, context_lines: int = 5):
+    """
+    Extract error context with more reliable line number tracking.
+    
+    Args:
+        exc_info: The exception info from sys.exc_info()
+        context_lines: Number of lines to show before and after the error
+    
+    Returns:
+        dict: Error context information
+    """
+    import traceback
+    import linecache
+    import os
+    
+    # Get the full traceback
+    tb = traceback.extract_tb(exc_info[2])
+    
+    # Get the last frame (where the error occurred)
+    last_frame = tb[-1]
+    filename = last_frame.filename
+    line_no = last_frame.lineno
+    func_name = last_frame.name
+    
+    # Get the source code context using linecache
+    # This is more reliable than inspect.getsourcelines
+    context_start = max(1, line_no - context_lines)
+    context_end = line_no + context_lines + 1
+    
+    # Build the context lines with line numbers
+    context_lines = []
+    for i in range(context_start, context_end):
+        line = linecache.getline(filename, i)
+        if line:
+            # Remove any trailing whitespace/newlines and add the pointer for error line
+            line = line.rstrip()
+            pointer = '→' if i == line_no else ' '
+            context_lines.append(f"{i:4d} {pointer} {line}")
+    
+    # Join the lines with newlines
+    code_context = '\n'.join(context_lines)
+    
+    # Get relative path for cleaner output
+    try:
+        rel_path = os.path.relpath(filename)
+    except ValueError:
+        # Fallback if relpath fails (can happen on Windows with different drives)
+        rel_path = filename
+    
+    return {
+        "filename": rel_path,
+        "line_no": line_no,
+        "function": func_name,
+        "code_context": code_context
+    }
