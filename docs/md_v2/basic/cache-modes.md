@@ -1,7 +1,7 @@
 # Crawl4AI Cache System and Migration Guide
 
 ## Overview
-Starting from version X.X.X, Crawl4AI introduces a new caching system that replaces the old boolean flags with a more intuitive `CacheMode` enum. This change simplifies cache control and makes the behavior more predictable.
+Starting from version 0.5.0, Crawl4AI introduces a new caching system that replaces the old boolean flags with a more intuitive `CacheMode` enum. This change simplifies cache control and makes the behavior more predictable.
 
 ## Old vs New Approach
 
