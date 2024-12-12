@@ -380,97 +380,97 @@ def read_root():
     return {"message": "Crawl4AI API service is running"}
 
 
-@app.post("/crawl", dependencies=[Depends(verify_token)])
-async def crawl(request: CrawlRequest) -> Dict[str, str]:
-    task_id = await crawler_service.submit_task(request)
-    return {"task_id": task_id}
+# @app.post("/crawl", dependencies=[Depends(verify_token)])
+# async def crawl(request: CrawlRequest) -> Dict[str, str]:
+#     task_id = await crawler_service.submit_task(request)
+#     return {"task_id": task_id}
 
-@app.get("/task/{task_id}", dependencies=[Depends(verify_token)])
-async def get_task_status(task_id: str):
-    task_info = crawler_service.task_manager.get_task(task_id)
-    if not task_info:
-        raise HTTPException(status_code=404, detail="Task not found")
+# @app.get("/task/{task_id}", dependencies=[Depends(verify_token)])
+# async def get_task_status(task_id: str):
+#     task_info = crawler_service.task_manager.get_task(task_id)
+#     if not task_info:
+#         raise HTTPException(status_code=404, detail="Task not found")
 
-    response = {
-        "status": task_info.status,
-        "created_at": task_info.created_at,
-    }
+#     response = {
+#         "status": task_info.status,
+#         "created_at": task_info.created_at,
+#     }
 
-    if task_info.status == TaskStatus.COMPLETED:
-        # Convert CrawlResult to dict for JSON response
-        if isinstance(task_info.result, list):
-            response["results"] = [result.dict() for result in task_info.result]
-        else:
-            response["result"] = task_info.result.dict()
-    elif task_info.status == TaskStatus.FAILED:
-        response["error"] = task_info.error
+#     if task_info.status == TaskStatus.COMPLETED:
+#         # Convert CrawlResult to dict for JSON response
+#         if isinstance(task_info.result, list):
+#             response["results"] = [result.dict() for result in task_info.result]
+#         else:
+#             response["result"] = task_info.result.dict()
+#     elif task_info.status == TaskStatus.FAILED:
+#         response["error"] = task_info.error
 
-    return response
+#     return response
 
-@app.post("/crawl_sync", dependencies=[Depends(verify_token)])
-async def crawl_sync(request: CrawlRequest) -> Dict[str, Any]:
-    task_id = await crawler_service.submit_task(request)
+# @app.post("/crawl_sync", dependencies=[Depends(verify_token)])
+# async def crawl_sync(request: CrawlRequest) -> Dict[str, Any]:
+#     task_id = await crawler_service.submit_task(request)
     
-    # Wait up to 60 seconds for task completion
-    for _ in range(60):
-        task_info = crawler_service.task_manager.get_task(task_id)
-        if not task_info:
-            raise HTTPException(status_code=404, detail="Task not found")
+#     # Wait up to 60 seconds for task completion
+#     for _ in range(60):
+#         task_info = crawler_service.task_manager.get_task(task_id)
+#         if not task_info:
+#             raise HTTPException(status_code=404, detail="Task not found")
             
-        if task_info.status == TaskStatus.COMPLETED:
-            # Return same format as /task/{task_id} endpoint
-            if isinstance(task_info.result, list):
-                return {"status": task_info.status, "results": [result.dict() for result in task_info.result]}
-            return {"status": task_info.status, "result": task_info.result.dict()}
+#         if task_info.status == TaskStatus.COMPLETED:
+#             # Return same format as /task/{task_id} endpoint
+#             if isinstance(task_info.result, list):
+#                 return {"status": task_info.status, "results": [result.dict() for result in task_info.result]}
+#             return {"status": task_info.status, "result": task_info.result.dict()}
             
-        if task_info.status == TaskStatus.FAILED:
-            raise HTTPException(status_code=500, detail=task_info.error)
+#         if task_info.status == TaskStatus.FAILED:
+#             raise HTTPException(status_code=500, detail=task_info.error)
             
-        await asyncio.sleep(1)
+#         await asyncio.sleep(1)
     
-    # If we get here, task didn't complete within timeout
-    raise HTTPException(status_code=408, detail="Task timed out")
+#     # If we get here, task didn't complete within timeout
+#     raise HTTPException(status_code=408, detail="Task timed out")
 
-@app.post("/crawl_direct", dependencies=[Depends(verify_token)])
-async def crawl_direct(request: CrawlRequest) -> Dict[str, Any]:
-    try:
-        crawler = await crawler_service.crawler_pool.acquire(**request.crawler_params)
-        extraction_strategy = crawler_service._create_extraction_strategy(request.extraction_config)
+# @app.post("/crawl_direct", dependencies=[Depends(verify_token)])
+# async def crawl_direct(request: CrawlRequest) -> Dict[str, Any]:
+#     try:
+#         crawler = await crawler_service.crawler_pool.acquire(**request.crawler_params)
+#         extraction_strategy = crawler_service._create_extraction_strategy(request.extraction_config)
         
-        try:
-            if isinstance(request.urls, list):
-                results = await crawler.arun_many(
-                    urls=[str(url) for url in request.urls],
-                    extraction_strategy=extraction_strategy,
-                    js_code=request.js_code,
-                    wait_for=request.wait_for,
-                    css_selector=request.css_selector,
-                    screenshot=request.screenshot,
-                    magic=request.magic,
-                    cache_mode=request.cache_mode,
-                    session_id=request.session_id,
-                    **request.extra,
-                )
-                return {"results": [result.dict() for result in results]}
-            else:
-                result = await crawler.arun(
-                    url=str(request.urls),
-                    extraction_strategy=extraction_strategy,
-                    js_code=request.js_code,
-                    wait_for=request.wait_for,
-                    css_selector=request.css_selector,
-                    screenshot=request.screenshot,
-                    magic=request.magic,
-                    cache_mode=request.cache_mode,
-                    session_id=request.session_id,
-                    **request.extra,
-                )
-                return {"result": result.dict()}
-        finally:
-            await crawler_service.crawler_pool.release(crawler)
-    except Exception as e:
-        logger.error(f"Error in direct crawl: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+#         try:
+#             if isinstance(request.urls, list):
+#                 results = await crawler.arun_many(
+#                     urls=[str(url) for url in request.urls],
+#                     extraction_strategy=extraction_strategy,
+#                     js_code=request.js_code,
+#                     wait_for=request.wait_for,
+#                     css_selector=request.css_selector,
+#                     screenshot=request.screenshot,
+#                     magic=request.magic,
+#                     cache_mode=request.cache_mode,
+#                     session_id=request.session_id,
+#                     **request.extra,
+#                 )
+#                 return {"results": [result.dict() for result in results]}
+#             else:
+#                 result = await crawler.arun(
+#                     url=str(request.urls),
+#                     extraction_strategy=extraction_strategy,
+#                     js_code=request.js_code,
+#                     wait_for=request.wait_for,
+#                     css_selector=request.css_selector,
+#                     screenshot=request.screenshot,
+#                     magic=request.magic,
+#                     cache_mode=request.cache_mode,
+#                     session_id=request.session_id,
+#                     **request.extra,
+#                 )
+#                 return {"result": result.dict()}
+#         finally:
+#             await crawler_service.crawler_pool.release(crawler)
+#     except Exception as e:
+#         logger.error(f"Error in direct crawl: {str(e)}")
+#         raise HTTPException(status_code=500, detail=str(e))
     
 @app.get("/health")
 async def health_check():
