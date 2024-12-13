@@ -7,6 +7,7 @@ from .config import (
 from .user_agent_generator import UserAgentGenerator
 from .extraction_strategy import ExtractionStrategy
 from .chunking_strategy import ChunkingStrategy
+from .markdown_generation_strategy import MarkdownGenerationStrategy
 
 class BrowserConfig:
     """
@@ -269,6 +270,7 @@ class CrawlerRunConfig:
         word_count_threshold: int =  MIN_WORD_THRESHOLD ,
         extraction_strategy : ExtractionStrategy=None,  # Will default to NoExtractionStrategy if None
         chunking_strategy : ChunkingStrategy= None,    # Will default to RegexChunking if None
+        markdown_generator : MarkdownGenerationStrategy = None,
         content_filter=None,
         cache_mode=None,
         session_id: str = None,
@@ -309,6 +311,7 @@ class CrawlerRunConfig:
         self.word_count_threshold = word_count_threshold
         self.extraction_strategy = extraction_strategy
         self.chunking_strategy = chunking_strategy
+        self.markdown_generator = markdown_generator
         self.content_filter = content_filter
         self.cache_mode = cache_mode
         self.session_id = session_id
@@ -364,6 +367,7 @@ class CrawlerRunConfig:
             word_count_threshold=kwargs.get("word_count_threshold", 200),
             extraction_strategy=kwargs.get("extraction_strategy"),
             chunking_strategy=kwargs.get("chunking_strategy"),
+            markdown_generator=kwargs.get("markdown_generator"),
             content_filter=kwargs.get("content_filter"),
             cache_mode=kwargs.get("cache_mode"),
             session_id=kwargs.get("session_id"),

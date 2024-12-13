@@ -602,16 +602,16 @@ class WebScrapingStrategy(ContentScrapingStrategy):
 
         cleaned_html = str_body.replace('\n\n', '\n').replace('  ', ' ')
 
-        markdown_content = self._generate_markdown_content(
-            cleaned_html=cleaned_html,
-            html=html,
-            url=url,
-            success=success,
-            **kwargs
-        )
+        # markdown_content = self._generate_markdown_content(
+        #     cleaned_html=cleaned_html,
+        #     html=html,
+        #     url=url,
+        #     success=success,
+        #     **kwargs
+        # )
         
         return {
-            **markdown_content,
+            # **markdown_content,
             'cleaned_html': cleaned_html,
             'success': success,
             'media': media,

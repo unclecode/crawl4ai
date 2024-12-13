@@ -239,8 +239,10 @@ async def crawl_dynamic_content_pages_method_1():
         all_commits = []
 
         js_next_page = """
-        const button = document.querySelector('a[data-testid="pagination-next-button"]');
-        if (button) button.click();
+        (() => {
+            const button = document.querySelector('a[data-testid="pagination-next-button"]');
+            if (button) button.click();
+        })();
         """
 
         for page in range(3):  # Crawl 3 pages
@@ -604,14 +606,14 @@ async def fit_markdown_remove_overlay():
 
 
 async def main():
-    await extract_structured_data_using_llm("openai/gpt-4o", os.getenv("OPENAI_API_KEY"))
+    # await extract_structured_data_using_llm("openai/gpt-4o", os.getenv("OPENAI_API_KEY"))
     
-    await simple_crawl()
-    await simple_example_with_running_js_code()
-    await simple_example_with_css_selector()
-    # await use_proxy()
-    await capture_and_save_screenshot("https://www.example.com", os.path.join(__location__, "tmp/example_screenshot.jpg"))
-    await extract_structured_data_using_css_extractor()
+    # await simple_crawl()
+    # await simple_example_with_running_js_code()
+    # await simple_example_with_css_selector()
+    # # await use_proxy()
+    # await capture_and_save_screenshot("https://www.example.com", os.path.join(__location__, "tmp/example_screenshot.jpg"))
+    # await extract_structured_data_using_css_extractor()
 
     # LLM extraction examples
     # await extract_structured_data_using_llm()

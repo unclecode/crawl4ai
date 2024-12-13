@@ -7,7 +7,8 @@ from pathlib import Path
 from typing import Optional, List, Union
 import json
 import asyncio
-from contextlib import nullcontext, asynccontextmanager
+# from contextlib import nullcontext, asynccontextmanager
+from contextlib import asynccontextmanager
 from .models import CrawlResult, MarkdownGenerationResult
 from .async_database import async_db_manager
 from .chunking_strategy import *
@@ -15,6 +16,7 @@ from .content_filter_strategy import *
 from .extraction_strategy import *
 from .async_crawler_strategy import AsyncCrawlerStrategy, AsyncPlaywrightCrawlerStrategy, AsyncCrawlResponse
 from .cache_context import CacheMode, CacheContext, _legacy_to_cache_mode
+from .markdown_generation_strategy import DefaultMarkdownGenerator, MarkdownGenerationStrategy
 from .content_scraping_strategy import WebScrapingStrategy
 from .async_logger import AsyncLogger
 from .async_configs import BrowserConfig, CrawlerRunConfig
@@ -132,16 +134,11 @@ class AsyncWebCrawler:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.crawler_strategy.__aexit__(exc_type, exc_val, exc_tb)
-
-    @asynccontextmanager
-    async def nullcontext(self):
-        yield
     
     async def awarmup(self):
         """Initialize the crawler with warm-up sequence."""
         self.logger.info(f"Crawl4AI {crawl4ai_version}", tag="INIT")
         self.ready = True
-
 
     @asynccontextmanager
     async def nullcontext(self):
@@ -323,7 +320,8 @@ class AsyncWebCrawler:
                         config=config,  # Pass the config object instead of individual parameters
                         screenshot=screenshot_data,
                         pdf_data=pdf_data,
-                        verbose=config.verbose
+                        verbose=config.verbose,
+                        **kwargs
                     )
 
                     # Set response data
@@ -424,7 +422,8 @@ class AsyncWebCrawler:
                     css_selector=config.css_selector,
                     only_text=config.only_text,
                     image_description_min_word_threshold=config.image_description_min_word_threshold,
-                    content_filter=config.content_filter
+                    content_filter=config.content_filter,
+                    **kwargs
                 )
 
                 if result is None:
@@ -435,15 +434,28 @@ class AsyncWebCrawler:
             except Exception as e:
                 raise ValueError(f"Process HTML, Failed to extract content from the website: {url}, error: {str(e)}")
 
+       
+
             # Extract results
-            markdown_v2 = result.get("markdown_v2", None)
             cleaned_html = sanitize_input_encode(result.get("cleaned_html", ""))
-            markdown = sanitize_input_encode(result.get("markdown", ""))
             fit_markdown = sanitize_input_encode(result.get("fit_markdown", ""))
             fit_html = sanitize_input_encode(result.get("fit_html", ""))
             media = result.get("media", [])
             links = result.get("links", [])
             metadata = result.get("metadata", {})
+
+            # Markdown Generation
+            markdown_generator: Optional[MarkdownGenerationStrategy] = config.markdown_generator or DefaultMarkdownGenerator()
+            if not config.content_filter and not markdown_generator.content_filter:
+                markdown_generator.content_filter = PruningContentFilter()
+            
+            markdown_result: MarkdownGenerationResult = markdown_generator.generate_markdown(
+                cleaned_html=cleaned_html,
+                base_url=url,
+                # html2text_options=kwargs.get('html2text', {})
+            )
+            markdown_v2 = markdown_result
+            markdown = sanitize_input_encode(markdown_result.raw_markdown)
 
             # Log processing completion
             self.logger.info(
