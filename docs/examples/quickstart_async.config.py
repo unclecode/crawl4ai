@@ -142,6 +142,7 @@ async def extract_structured_data_using_llm(provider: str, api_token: str = None
     crawler_config = CrawlerRunConfig(
         cache_mode=CacheMode.BYPASS,
         word_count_threshold=1,
+        page_timeout = 80000,
         extraction_strategy=LLMExtractionStrategy(
             provider=provider,
             api_token=api_token,
@@ -497,21 +498,21 @@ async def main():
     
     # Advanced examples
     # await extract_structured_data_using_css_extractor()
-    # await extract_structured_data_using_llm("openai/gpt-4o", os.getenv("OPENAI_API_KEY"))
+    await extract_structured_data_using_llm("openai/gpt-4o", os.getenv("OPENAI_API_KEY"))
     # await crawl_dynamic_content_pages_method_1()
     # await crawl_dynamic_content_pages_method_2()
     
     # Browser comparisons
-    await crawl_custom_browser_type()
+    # await crawl_custom_browser_type()
     
     # Performance testing
     # await speed_comparison()
 
     # Screenshot example
-    await capture_and_save_screenshot(
-        "https://www.example.com",
-        os.path.join(__location__, "tmp/example_screenshot.jpg")
-    )
+    # await capture_and_save_screenshot(
+    #     "https://www.example.com",
+    #     os.path.join(__location__, "tmp/example_screenshot.jpg")
+    # )
 
 if __name__ == "__main__":
     asyncio.run(main())
