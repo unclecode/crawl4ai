@@ -25,6 +25,7 @@ from .config import (
     IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
     URL_LOG_SHORTEN_LENGTH
 )
+from .data_persistence_strategy import DataPersistenceStrategy, SkipDataPersistenceStrategy
 from .utils import (
     sanitize_input_encode,
     InvalidCSSSelectorError,
@@ -153,6 +154,7 @@ class AsyncWebCrawler:
             word_count_threshold=MIN_WORD_THRESHOLD,
             extraction_strategy: ExtractionStrategy = None,
             chunking_strategy: ChunkingStrategy = RegexChunking(),
+            data_persistence_strategy: DataPersistenceStrategy = SkipDataPersistenceStrategy(),
             content_filter: RelevantContentFilter = None,
             cache_mode: Optional[CacheMode] = None,
             # Deprecated cache parameters
@@ -206,7 +208,7 @@ class AsyncWebCrawler:
                     if crawler_config is not None:
                         if any(param is not None for param in [
                             word_count_threshold, extraction_strategy, chunking_strategy,
-                            content_filter, cache_mode, css_selector, screenshot, pdf
+                            data_persistence_strategy, content_filter, cache_mode, css_selector, screenshot, pdf
                         ]):
                             self.logger.warning(
                                 message="Both crawler_config and legacy parameters provided. crawler_config will take precedence.",
@@ -219,6 +221,7 @@ class AsyncWebCrawler:
                             "word_count_threshold": word_count_threshold,
                             "extraction_strategy": extraction_strategy,
                             "chunking_strategy": chunking_strategy,
+                            "data_persistence_strategy": data_persistence_strategy,
                             "content_filter": content_filter,
                             "cache_mode": cache_mode,
                             "bypass_cache": bypass_cache,
@@ -349,6 +352,9 @@ class AsyncWebCrawler:
                             "timing": Fore.YELLOW
                         }
                     )
+
+                    if config.data_persistence_strategy:
+                        crawl_result.storage_metadata = data_persistence_strategy.save(crawl_result)
 
                     # Update cache if appropriate
                     if cache_context.should_write() and not bool(cached_result):
@@ -530,6 +536,7 @@ class AsyncWebCrawler:
             word_count_threshold=MIN_WORD_THRESHOLD,
             extraction_strategy: ExtractionStrategy = None,
             chunking_strategy: ChunkingStrategy = RegexChunking(),
+            data_persistence_strategy: DataPersistenceStrategy = SkipDataPersistenceStrategy(),
             content_filter: RelevantContentFilter = None,
             cache_mode: Optional[CacheMode] = None,
             bypass_cache: bool = False,
@@ -682,5 +689,4 @@ class AsyncWebCrawler:
     async def aget_cache_size(self):
         """Get the total number of cached items."""
         return await async_db_manager.aget_total_count()
-
 
