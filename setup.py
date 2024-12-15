@@ -57,6 +57,9 @@ setup(
     author_email="unclecode@kidocode.com",
     license="MIT",
     packages=find_packages(),
+    package_data={
+        'crawl4ai': ['js_snippet/*.js']  # This matches the exact path structure
+    },
     install_requires=default_requirements
     + ["playwright", "aiofiles"],  # Added aiofiles
     extras_require={
