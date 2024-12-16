@@ -21,6 +21,7 @@ from .utils import get_error_context
 from .user_agent_generator import UserAgentGenerator
 from .config import SCREENSHOT_HEIGHT_TRESHOLD, DOWNLOAD_PAGE_TIMEOUT
 from .async_configs import BrowserConfig, CrawlerRunConfig
+from .async_logger import AsyncLogger
 from playwright_stealth import StealthConfig, stealth_async
 
 
@@ -462,7 +463,7 @@ class AsyncCrawlerStrategy(ABC):
         pass
 
 class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
-    def __init__(self, browser_config: BrowserConfig = None, logger = None, **kwargs):
+    def __init__(self, browser_config: BrowserConfig = None, logger : AsyncLogger = None, **kwargs):
         """
         Initialize the AsyncPlaywrightCrawlerStrategy with a browser configuration.
         
@@ -758,16 +759,22 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         
         # Set up console logging if requested
         if config.log_console:
-            page.on("console", lambda msg: self.logger.debug(
-                message="Console: {msg}",
-                tag="CONSOLE",
-                params={"msg": msg.text}
-            ))
-            page.on("pageerror", lambda exc: self.logger.error(
-                message="Page error: {exc}",
-                tag="ERROR",
-                params={"exc": exc}
-            ))
+            def log_consol(msg, console_log_type="debug"):  # Corrected the parameter syntax
+                if console_log_type == "error":
+                    self.logger.error(
+                        message=f"Console error: {msg}",  # Use f-string for variable interpolation
+                        tag="CONSOLE",
+                        params={"msg": msg.text}
+                    )
+                elif console_log_type == "debug":
+                    self.logger.debug(
+                        message=f"Console: {msg}",  # Use f-string for variable interpolation
+                        tag="CONSOLE",
+                        params={"msg": msg.text}
+                    )
+
+            page.on("console", log_consol)
+            page.on("pageerror", lambda e: log_consol(e, "error"))
         
         try:
             # Set up download handling
@@ -956,12 +963,11 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
             # Define delayed content getter
             async def get_delayed_content(delay: float = 5.0) -> str:
-                if self.config.verbose:
-                    self.logger.info(
-                        message="Waiting for {delay} seconds before retrieving content for {url}",
-                        tag="INFO",
-                        params={"delay": delay, "url": url}
-                    )                    
+                self.logger.info(
+                    message="Waiting for {delay} seconds before retrieving content for {url}",
+                    tag="INFO",
+                    params={"delay": delay, "url": url}
+                )                    
                 await asyncio.sleep(delay)
                 return await page.content()
 

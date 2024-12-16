@@ -1,13 +1,17 @@
 from .config import (
-    MIN_WORD_THRESHOLD, 
+    MIN_WORD_THRESHOLD,
     IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
     SCREENSHOT_HEIGHT_TRESHOLD,
-    PAGE_TIMEOUT
+    PAGE_TIMEOUT,
+    IMAGE_SCORE_THRESHOLD,
+    SOCIAL_MEDIA_DOMAINS,
+
 )
 from .user_agent_generator import UserAgentGenerator
 from .extraction_strategy import ExtractionStrategy
 from .chunking_strategy import ChunkingStrategy
 from .markdown_generation_strategy import MarkdownGenerationStrategy
+
 
 class BrowserConfig:
     """
@@ -127,7 +131,7 @@ class BrowserConfig:
         self.extra_args = extra_args if extra_args is not None else []
         self.sleep_on_close = sleep_on_close
         self.verbose = verbose
-        
+
         user_agenr_generator = UserAgentGenerator()
         if self.user_agent_mode != "random":
             self.user_agent = user_agenr_generator.generate(
@@ -160,15 +164,16 @@ class BrowserConfig:
             java_script_enabled=kwargs.get("java_script_enabled", True),
             cookies=kwargs.get("cookies", []),
             headers=kwargs.get("headers", {}),
-            user_agent=kwargs.get("user_agent",
+            user_agent=kwargs.get(
+                "user_agent",
                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36"
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36",
             ),
             user_agent_mode=kwargs.get("user_agent_mode"),
             user_agent_generator_config=kwargs.get("user_agent_generator_config"),
             text_only=kwargs.get("text_only", False),
             light_mode=kwargs.get("light_mode", False),
-            extra_args=kwargs.get("extra_args", [])
+            extra_args=kwargs.get("extra_args", []),
         )
 
 
@@ -182,22 +187,37 @@ class CrawlerRunConfig:
     By using this class, you have a single place to understand and adjust the crawling options.
 
     Attributes:
+        # Content Processing Parameters
         word_count_threshold (int): Minimum word count threshold before processing content.
                                     Default: MIN_WORD_THRESHOLD (typically 200).
         extraction_strategy (ExtractionStrategy or None): Strategy to extract structured data from crawled pages.
                                                           Default: None (NoExtractionStrategy is used if None).
         chunking_strategy (ChunkingStrategy): Strategy to chunk content before extraction.
                                               Default: RegexChunking().
+        markdown_generator (MarkdownGenerationStrategy): Strategy for generating markdown.
+                                                         Default: None.
         content_filter (RelevantContentFilter or None): Optional filter to prune irrelevant content.
                                                         Default: None.
+        only_text (bool): If True, attempt to extract text-only content where applicable.
+                          Default: False.
+        css_selector (str or None): CSS selector to extract a specific portion of the page.
+                                    Default: None.
+        excluded_tags (list of str or None): List of HTML tags to exclude from processing.
+                                             Default: None.
+        keep_data_attributes (bool): If True, retain `data-*` attributes while removing unwanted attributes.
+                                     Default: False.
+        remove_forms (bool): If True, remove all `<form>` elements from the HTML.
+                             Default: False.
+        prettiify (bool): If True, apply `fast_format_html` to produce prettified HTML output.
+                          Default: False.
+
+        # Caching Parameters
         cache_mode (CacheMode or None): Defines how caching is handled.
                                         If None, defaults to CacheMode.ENABLED internally.
                                         Default: None.
-        session_id (str or None):   Optional session ID to persist the browser context and the created 
-                                    page instance. If the ID already exists, the crawler does not 
-                                    create a new page and uses the current page to preserve the state;
-                                    if not, it creates a new page and context then stores it in 
-                                    memory with the given session ID.
+        session_id (str or None): Optional session ID to persist the browser context and the created
+                                  page instance. If the ID already exists, the crawler does not
+                                  create a new page and uses the current page to preserve the state.
         bypass_cache (bool): Legacy parameter, if True acts like CacheMode.BYPASS.
                              Default: False.
         disable_cache (bool): Legacy parameter, if True acts like CacheMode.DISABLED.
@@ -206,36 +226,32 @@ class CrawlerRunConfig:
                               Default: False.
         no_cache_write (bool): Legacy parameter, if True acts like CacheMode.READ_ONLY.
                                Default: False.
-        css_selector (str or None): CSS selector to extract a specific portion of the page.
-                                    Default: None.
-        screenshot (bool): Whether to take a screenshot after crawling.
-                           Default: False.
-        pdf (bool): Whether to generate a PDF of the page.
-                    Default: False.
-        verbose (bool): Enable verbose logging.
-                        Default: True.
-        only_text (bool): If True, attempt to extract text-only content where applicable.
-                          Default: False.
-        image_description_min_word_threshold (int): Minimum words for image description extraction.
-                                                    Default: IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD (e.g., 50).
-        prettiify (bool): If True, apply `fast_format_html` to produce prettified HTML output.
-                          Default: False.
-        js_code (str or list of str or None): JavaScript code/snippets to run on the page.
-                                              Default: None.
-        wait_for (str or None): A CSS selector or JS condition to wait for before extracting content.
-                                Default: None.
-        js_only (bool): If True, indicates subsequent calls are JS-driven updates, not full page loads.
-                        Default: False.
+
+        # Page Navigation and Timing Parameters
         wait_until (str): The condition to wait for when navigating, e.g. "domcontentloaded".
                           Default: "domcontentloaded".
         page_timeout (int): Timeout in ms for page operations like navigation.
                             Default: 60000 (60 seconds).
+        wait_for (str or None): A CSS selector or JS condition to wait for before extracting content.
+                                Default: None.
+        wait_for_images (bool): If True, wait for images to load before extracting content.
+                                Default: True.
+        delay_before_return_html (float): Delay in seconds before retrieving final HTML.
+                                          Default: 0.1.
+        mean_delay (float): Mean base delay between requests when calling arun_many.
+                            Default: 0.1.
+        max_range (float): Max random additional delay range for requests in arun_many.
+                           Default: 0.3.
+        semaphore_count (int): Number of concurrent operations allowed.
+                               Default: 5.
+
+        # Page Interaction Parameters
+        js_code (str or list of str or None): JavaScript code/snippets to run on the page.
+                                              Default: None.
+        js_only (bool): If True, indicates subsequent calls are JS-driven updates, not full page loads.
+                        Default: False.
         ignore_body_visibility (bool): If True, ignore whether the body is visible before proceeding.
                                        Default: True.
-        wait_for_images (bool): If True, wait for images to load before extracting content. 
-                                Default: True.
-        adjust_viewport_to_content (bool): If True, adjust viewport according to the page content dimensions.
-                                           Default: False.
         scan_full_page (bool): If True, scroll through the entire page to load all content.
                                Default: False.
         scroll_delay (float): Delay in seconds between scroll steps if scan_full_page is True.
@@ -244,163 +260,322 @@ class CrawlerRunConfig:
                                 Default: False.
         remove_overlay_elements (bool): If True, remove overlays/popups before extracting HTML.
                                         Default: False.
-        delay_before_return_html (float): Delay in seconds before retrieving final HTML.
-                                          Default: 0.1.
-        log_console (bool): If True, log console messages from the page.
-                            Default: False.
         simulate_user (bool): If True, simulate user interactions (mouse moves, clicks) for anti-bot measures.
                               Default: False.
         override_navigator (bool): If True, overrides navigator properties for more human-like behavior.
                                    Default: False.
         magic (bool): If True, attempts automatic handling of overlays/popups.
                       Default: False.
+        adjust_viewport_to_content (bool): If True, adjust viewport according to the page content dimensions.
+                                           Default: False.
+
+        # Media Handling Parameters
+        screenshot (bool): Whether to take a screenshot after crawling.
+                           Default: False.
         screenshot_wait_for (float or None): Additional wait time before taking a screenshot.
                                              Default: None.
         screenshot_height_threshold (int): Threshold for page height to decide screenshot strategy.
                                            Default: SCREENSHOT_HEIGHT_TRESHOLD (from config, e.g. 20000).
-        mean_delay (float): Mean base delay between requests when calling arun_many.
-                            Default: 0.1.
-        max_range (float): Max random additional delay range for requests in arun_many.
-                           Default: 0.3.
-        # session_id and semaphore_count might be set at runtime, not needed as defaults here.
+        pdf (bool): Whether to generate a PDF of the page.
+                    Default: False.
+        image_description_min_word_threshold (int): Minimum words for image description extraction.
+                                                    Default: IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD (e.g., 50).
+        image_score_threshold (int): Minimum score threshold for processing an image.
+                                     Default: IMAGE_SCORE_THRESHOLD (e.g., 3).
+        exclude_external_images (bool): If True, exclude all external images from processing.
+                                         Default: False.
+
+        # Link and Domain Handling Parameters
+        exclude_social_media_domains (list of str): List of domains to exclude for social media links.
+                                                    Default: SOCIAL_MEDIA_DOMAINS (from config).
+        exclude_external_links (bool): If True, exclude all external links from the results.
+                                       Default: False.
+        exclude_social_media_links (bool): If True, exclude links pointing to social media domains.
+                                           Default: False.
+        exclude_domains (list of str): List of specific domains to exclude from results.
+                                       Default: [].
+
+        # Debugging and Logging Parameters
+        verbose (bool): Enable verbose logging.
+                        Default: True.
+        log_console (bool): If True, log console messages from the page.
+                            Default: False.
     """
 
     def __init__(
         self,
-        word_count_threshold: int =  MIN_WORD_THRESHOLD ,
-        extraction_strategy : ExtractionStrategy=None,  # Will default to NoExtractionStrategy if None
-        chunking_strategy : ChunkingStrategy= None,    # Will default to RegexChunking if None
-        markdown_generator : MarkdownGenerationStrategy = None,
+        # Content Processing Parameters
+        word_count_threshold: int = MIN_WORD_THRESHOLD,
+        extraction_strategy: ExtractionStrategy = None,
+        chunking_strategy: ChunkingStrategy = None,
+        markdown_generator: MarkdownGenerationStrategy = None,
         content_filter=None,
+        only_text: bool = False,
+        css_selector: str = None,
+        excluded_tags: list = None,
+        keep_data_attributes: bool = False,
+        remove_forms: bool = False,
+        prettiify: bool = False,
+
+        # Caching Parameters
         cache_mode=None,
         session_id: str = None,
         bypass_cache: bool = False,
         disable_cache: bool = False,
         no_cache_read: bool = False,
         no_cache_write: bool = False,
-        css_selector: str = None,
-        screenshot: bool = False,
-        pdf: bool = False,
-        verbose: bool = True,
-        only_text: bool = False,
-        image_description_min_word_threshold: int = IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
-        prettiify: bool = False,
-        js_code=None,
-        wait_for: str = None,
-        js_only: bool = False,
+
+        # Page Navigation and Timing Parameters
         wait_until: str = "domcontentloaded",
         page_timeout: int = PAGE_TIMEOUT,
-        ignore_body_visibility: bool = True,
+        wait_for: str = None,
         wait_for_images: bool = True,
-        adjust_viewport_to_content: bool = False,
+        delay_before_return_html: float = 0.1,
+        mean_delay: float = 0.1,
+        max_range: float = 0.3,
+        semaphore_count: int = 5,
+
+        # Page Interaction Parameters
+        js_code=None,
+        js_only: bool = False,
+        ignore_body_visibility: bool = True,
         scan_full_page: bool = False,
         scroll_delay: float = 0.2,
         process_iframes: bool = False,
         remove_overlay_elements: bool = False,
-        delay_before_return_html: float = 0.1,
-        log_console: bool = False,
         simulate_user: bool = False,
         override_navigator: bool = False,
         magic: bool = False,
+        adjust_viewport_to_content: bool = False,
+
+        # Media Handling Parameters
+        screenshot: bool = False,
         screenshot_wait_for: float = None,
         screenshot_height_threshold: int = SCREENSHOT_HEIGHT_TRESHOLD,
-        mean_delay: float = 0.1,
-        max_range: float = 0.3,
-        semaphore_count: int = 5,
+        pdf: bool = False,
+        image_description_min_word_threshold: int = IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
+        image_score_threshold: int = IMAGE_SCORE_THRESHOLD,
+        exclude_external_images: bool = False,
+
+        # Link and Domain Handling Parameters
+        exclude_social_media_domains: list = None,
+        exclude_external_links: bool = False,
+        exclude_social_media_links: bool = False,
+        exclude_domains: list = None,
+
+        # Debugging and Logging Parameters
+        verbose: bool = True,
+        log_console: bool = False,
     ):
+        # Content Processing Parameters
         self.word_count_threshold = word_count_threshold
         self.extraction_strategy = extraction_strategy
         self.chunking_strategy = chunking_strategy
         self.markdown_generator = markdown_generator
         self.content_filter = content_filter
+        self.only_text = only_text
+        self.css_selector = css_selector
+        self.excluded_tags = excluded_tags or []
+        self.keep_data_attributes = keep_data_attributes
+        self.remove_forms = remove_forms
+        self.prettiify = prettiify
+
+        # Caching Parameters
         self.cache_mode = cache_mode
         self.session_id = session_id
         self.bypass_cache = bypass_cache
         self.disable_cache = disable_cache
         self.no_cache_read = no_cache_read
         self.no_cache_write = no_cache_write
-        self.css_selector = css_selector
-        self.screenshot = screenshot
-        self.pdf = pdf
-        self.verbose = verbose
-        self.only_text = only_text
-        self.image_description_min_word_threshold = image_description_min_word_threshold
-        self.prettiify = prettiify
-        self.js_code = js_code
-        self.wait_for = wait_for
-        self.js_only = js_only
+
+        # Page Navigation and Timing Parameters
         self.wait_until = wait_until
         self.page_timeout = page_timeout
-        self.ignore_body_visibility = ignore_body_visibility
+        self.wait_for = wait_for
         self.wait_for_images = wait_for_images
-        self.adjust_viewport_to_content = adjust_viewport_to_content
-        self.scan_full_page = scan_full_page
-        self.scroll_delay = scroll_delay
-        self.process_iframes = process_iframes
-        self.remove_overlay_elements = remove_overlay_elements
         self.delay_before_return_html = delay_before_return_html
-        self.log_console = log_console
-        self.simulate_user = simulate_user
-        self.override_navigator = override_navigator
-        self.magic = magic
-        self.screenshot_wait_for = screenshot_wait_for
-        self.screenshot_height_threshold = screenshot_height_threshold
         self.mean_delay = mean_delay
         self.max_range = max_range
         self.semaphore_count = semaphore_count
 
+        # Page Interaction Parameters
+        self.js_code = js_code
+        self.js_only = js_only
+        self.ignore_body_visibility = ignore_body_visibility
+        self.scan_full_page = scan_full_page
+        self.scroll_delay = scroll_delay
+        self.process_iframes = process_iframes
+        self.remove_overlay_elements = remove_overlay_elements
+        self.simulate_user = simulate_user
+        self.override_navigator = override_navigator
+        self.magic = magic
+        self.adjust_viewport_to_content = adjust_viewport_to_content
+
+        # Media Handling Parameters
+        self.screenshot = screenshot
+        self.screenshot_wait_for = screenshot_wait_for
+        self.screenshot_height_threshold = screenshot_height_threshold
+        self.pdf = pdf
+        self.image_description_min_word_threshold = image_description_min_word_threshold
+        self.image_score_threshold = image_score_threshold
+        self.exclude_external_images = exclude_external_images
+
+        # Link and Domain Handling Parameters
+        self.exclude_social_media_domains = exclude_social_media_domains or SOCIAL_MEDIA_DOMAINS
+        self.exclude_external_links = exclude_external_links
+        self.exclude_social_media_links = exclude_social_media_links
+        self.exclude_domains = exclude_domains or []
+
+        # Debugging and Logging Parameters
+        self.verbose = verbose
+        self.log_console = log_console
+
         # Validate type of extraction strategy and chunking strategy if they are provided
-        if self.extraction_strategy is not None and not isinstance(self.extraction_strategy, ExtractionStrategy):
+        if self.extraction_strategy is not None and not isinstance(
+            self.extraction_strategy, ExtractionStrategy
+        ):
             raise ValueError("extraction_strategy must be an instance of ExtractionStrategy")
-        if self.chunking_strategy is not None and not isinstance(self.chunking_strategy, ChunkingStrategy):
+        if self.chunking_strategy is not None and not isinstance(
+            self.chunking_strategy, ChunkingStrategy
+        ):
             raise ValueError("chunking_strategy must be an instance of ChunkingStrategy")
 
         # Set default chunking strategy if None
         if self.chunking_strategy is None:
             from .chunking_strategy import RegexChunking
             self.chunking_strategy = RegexChunking()
-        
 
     @staticmethod
     def from_kwargs(kwargs: dict) -> "CrawlerRunConfig":
         return CrawlerRunConfig(
+            # Content Processing Parameters
             word_count_threshold=kwargs.get("word_count_threshold", 200),
             extraction_strategy=kwargs.get("extraction_strategy"),
             chunking_strategy=kwargs.get("chunking_strategy"),
             markdown_generator=kwargs.get("markdown_generator"),
             content_filter=kwargs.get("content_filter"),
+            only_text=kwargs.get("only_text", False),
+            css_selector=kwargs.get("css_selector"),
+            excluded_tags=kwargs.get("excluded_tags", []),
+            keep_data_attributes=kwargs.get("keep_data_attributes", False),
+            remove_forms=kwargs.get("remove_forms", False),
+            prettiify=kwargs.get("prettiify", False),
+
+            # Caching Parameters
             cache_mode=kwargs.get("cache_mode"),
             session_id=kwargs.get("session_id"),
             bypass_cache=kwargs.get("bypass_cache", False),
             disable_cache=kwargs.get("disable_cache", False),
             no_cache_read=kwargs.get("no_cache_read", False),
             no_cache_write=kwargs.get("no_cache_write", False),
-            css_selector=kwargs.get("css_selector"),
-            screenshot=kwargs.get("screenshot", False),
-            pdf=kwargs.get("pdf", False),
-            verbose=kwargs.get("verbose", True),
-            only_text=kwargs.get("only_text", False),
-            image_description_min_word_threshold=kwargs.get("image_description_min_word_threshold",  IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD),
-            prettiify=kwargs.get("prettiify", False),
-            js_code=kwargs.get("js_code"), # If not provided here, will default inside constructor
-            wait_for=kwargs.get("wait_for"),
-            js_only=kwargs.get("js_only", False),
+
+            # Page Navigation and Timing Parameters
             wait_until=kwargs.get("wait_until", "domcontentloaded"),
             page_timeout=kwargs.get("page_timeout", 60000),
+            wait_for=kwargs.get("wait_for"),
+            wait_for_images=kwargs.get("wait_for_images", True),
+            delay_before_return_html=kwargs.get("delay_before_return_html", 0.1),
+            mean_delay=kwargs.get("mean_delay", 0.1),
+            max_range=kwargs.get("max_range", 0.3),
+            semaphore_count=kwargs.get("semaphore_count", 5),
+
+            # Page Interaction Parameters
+            js_code=kwargs.get("js_code"),
+            js_only=kwargs.get("js_only", False),
             ignore_body_visibility=kwargs.get("ignore_body_visibility", True),
-            adjust_viewport_to_content=kwargs.get("adjust_viewport_to_content", False),
             scan_full_page=kwargs.get("scan_full_page", False),
             scroll_delay=kwargs.get("scroll_delay", 0.2),
             process_iframes=kwargs.get("process_iframes", False),
             remove_overlay_elements=kwargs.get("remove_overlay_elements", False),
-            delay_before_return_html=kwargs.get("delay_before_return_html", 0.1),
-            log_console=kwargs.get("log_console", False),
             simulate_user=kwargs.get("simulate_user", False),
             override_navigator=kwargs.get("override_navigator", False),
             magic=kwargs.get("magic", False),
+            adjust_viewport_to_content=kwargs.get("adjust_viewport_to_content", False),
+
+            # Media Handling Parameters
+            screenshot=kwargs.get("screenshot", False),
             screenshot_wait_for=kwargs.get("screenshot_wait_for"),
-            screenshot_height_threshold=kwargs.get("screenshot_height_threshold", 20000),
-            mean_delay=kwargs.get("mean_delay", 0.1),
-            max_range=kwargs.get("max_range", 0.3),
-            semaphore_count=kwargs.get("semaphore_count", 5)
+            screenshot_height_threshold=kwargs.get("screenshot_height_threshold", SCREENSHOT_HEIGHT_TRESHOLD),
+            pdf=kwargs.get("pdf", False),
+            image_description_min_word_threshold=kwargs.get("image_description_min_word_threshold", IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD),
+            image_score_threshold=kwargs.get("image_score_threshold", IMAGE_SCORE_THRESHOLD),
+            exclude_external_images=kwargs.get("exclude_external_images", False),
+
+            # Link and Domain Handling Parameters
+            exclude_social_media_domains=kwargs.get("exclude_social_media_domains", SOCIAL_MEDIA_DOMAINS),
+            exclude_external_links=kwargs.get("exclude_external_links", False),
+            exclude_social_media_links=kwargs.get("exclude_social_media_links", False),
+            exclude_domains=kwargs.get("exclude_domains", []),
+
+            # Debugging and Logging Parameters
+            verbose=kwargs.get("verbose", True),
+            log_console=kwargs.get("log_console", False),
         )
+        
+        
+        
+        
+    # @staticmethod
+    # def from_kwargs(kwargs: dict) -> "CrawlerRunConfig":
+    #     return CrawlerRunConfig(
+    #         word_count_threshold=kwargs.get("word_count_threshold", 200),
+    #         extraction_strategy=kwargs.get("extraction_strategy"),
+    #         chunking_strategy=kwargs.get("chunking_strategy"),
+    #         markdown_generator=kwargs.get("markdown_generator"),
+    #         content_filter=kwargs.get("content_filter"),
+    #         cache_mode=kwargs.get("cache_mode"),
+    #         session_id=kwargs.get("session_id"),
+    #         bypass_cache=kwargs.get("bypass_cache", False),
+    #         disable_cache=kwargs.get("disable_cache", False),
+    #         no_cache_read=kwargs.get("no_cache_read", False),
+    #         no_cache_write=kwargs.get("no_cache_write", False),
+    #         css_selector=kwargs.get("css_selector"),
+    #         screenshot=kwargs.get("screenshot", False),
+    #         pdf=kwargs.get("pdf", False),
+    #         verbose=kwargs.get("verbose", True),
+    #         only_text=kwargs.get("only_text", False),
+    #         image_description_min_word_threshold=kwargs.get(
+    #             "image_description_min_word_threshold",
+    #             IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
+    #         ),
+    #         prettiify=kwargs.get("prettiify", False),
+    #         js_code=kwargs.get(
+    #             "js_code"
+    #         ),  # If not provided here, will default inside constructor
+    #         wait_for=kwargs.get("wait_for"),
+    #         js_only=kwargs.get("js_only", False),
+    #         wait_until=kwargs.get("wait_until", "domcontentloaded"),
+    #         page_timeout=kwargs.get("page_timeout", 60000),
+    #         ignore_body_visibility=kwargs.get("ignore_body_visibility", True),
+    #         adjust_viewport_to_content=kwargs.get("adjust_viewport_to_content", False),
+    #         scan_full_page=kwargs.get("scan_full_page", False),
+    #         scroll_delay=kwargs.get("scroll_delay", 0.2),
+    #         process_iframes=kwargs.get("process_iframes", False),
+    #         remove_overlay_elements=kwargs.get("remove_overlay_elements", False),
+    #         delay_before_return_html=kwargs.get("delay_before_return_html", 0.1),
+    #         log_console=kwargs.get("log_console", False),
+    #         simulate_user=kwargs.get("simulate_user", False),
+    #         override_navigator=kwargs.get("override_navigator", False),
+    #         magic=kwargs.get("magic", False),
+    #         screenshot_wait_for=kwargs.get("screenshot_wait_for"),
+    #         screenshot_height_threshold=kwargs.get(
+    #             "screenshot_height_threshold", 20000
+    #         ),
+    #         mean_delay=kwargs.get("mean_delay", 0.1),
+    #         max_range=kwargs.get("max_range", 0.3),
+    #         semaphore_count=kwargs.get("semaphore_count", 5),
+    #         image_score_threshold=kwargs.get(
+    #             "image_score_threshold", IMAGE_SCORE_THRESHOLD
+    #         ),
+    #         exclude_social_media_domains=kwargs.get(
+    #             "exclude_social_media_domains", SOCIAL_MEDIA_DOMAINS
+    #         ),
+    #         exclude_external_links=kwargs.get("exclude_external_links", False),
+    #         exclude_social_media_links=kwargs.get("exclude_social_media_links", False),
+    #         exclude_domains=kwargs.get("exclude_domains", []),
+    #         exclude_external_images=kwargs.get("exclude_external_images", False),
+    #         remove_forms=kwargs.get("remove_forms", False),
+    #         keep_data_attributes=kwargs.get("keep_data_attributes", False),
+    #         excluded_tags=kwargs.get("excluded_tags", []),
+    #     )
+        

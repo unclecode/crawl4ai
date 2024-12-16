@@ -42,7 +42,7 @@ class AsyncLogger:
     def __init__(
         self,
         log_file: Optional[str] = None,
-        log_level: LogLevel = LogLevel.INFO,
+        log_level: LogLevel = LogLevel.DEBUG,
         tag_width: int = 10,
         icons: Optional[Dict[str, str]] = None,
         colors: Optional[Dict[LogLevel, str]] = None,
