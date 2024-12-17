@@ -1,5 +1,248 @@
 # Changelog
 
+## [0.4.1] December 8, 2024
+
+### **File: `crawl4ai/async_crawler_strategy.py`**
+
+#### **New Parameters and Attributes Added**
+- **`text_only` (boolean)**: Enables text-only mode, disables images, JavaScript, and GPU-related features for faster, minimal rendering.
+- **`light_mode` (boolean)**: Optimizes the browser by disabling unnecessary background processes and features for efficiency.
+- **`viewport_width` and `viewport_height`**: Dynamically adjusts based on `text_only` mode (default values: 800x600 for `text_only`, 1920x1080 otherwise).
+- **`extra_args`**: Adds browser-specific flags for `text_only` mode.
+- **`adjust_viewport_to_content`**: Dynamically adjusts the viewport to the content size for accurate rendering.
+
+#### **Browser Context Adjustments**
+- Added **`viewport` adjustments**: Dynamically computed based on `text_only` or custom configuration.
+- Enhanced support for `light_mode` and `text_only` by adding specific browser arguments to reduce resource consumption.
+
+#### **Dynamic Content Handling**
+- **Full Page Scan Feature**:
+  - Scrolls through the entire page while dynamically detecting content changes.
+  - Ensures scrolling stops when no new dynamic content is loaded.
+
+#### **Session Management**
+- Added **`create_session`** method:
+  - Creates a new browser session and assigns a unique ID.
+  - Supports persistent and non-persistent contexts with full compatibility for cookies, headers, and proxies.
+
+#### **Improved Content Loading and Adjustment**
+- **`adjust_viewport_to_content`**:
+  - Automatically adjusts viewport to match content dimensions.
+  - Includes scaling via Chrome DevTools Protocol (CDP).
+- Enhanced content loading:
+  - Waits for images to load and ensures network activity is idle before proceeding.
+
+#### **Error Handling and Logging**
+- Improved error handling and detailed logging for:
+  - Viewport adjustment (`adjust_viewport_to_content`).
+  - Full page scanning (`scan_full_page`).
+  - Dynamic content loading.
+
+#### **Refactoring and Cleanup**
+- Removed hardcoded viewport dimensions in multiple places, replaced with dynamic values (`self.viewport_width`, `self.viewport_height`).
+- Removed commented-out and unused code for better readability.
+- Added default value for `delay_before_return_html` parameter.
+
+#### **Optimizations**
+- Reduced resource usage in `light_mode` by disabling unnecessary browser features such as extensions, background timers, and sync.
+- Improved compatibility for different browser types (`chrome`, `firefox`, `webkit`).
+
+---
+
+### **File: `docs/examples/quickstart_async.py`**
+
+#### **Schema Adjustment**
+- Changed schema reference for `LLMExtractionStrategy`:
+  - **Old**: `OpenAIModelFee.schema()`
+  - **New**: `OpenAIModelFee.model_json_schema()`
+  - This likely ensures better compatibility with the `OpenAIModelFee` class and its JSON schema.
+
+#### **Documentation Comments Updated**
+- Improved extraction instruction for schema-based LLM strategies.
+
+---
+
+### **New Features Added**
+1. **Text-Only Mode**:
+   - Focuses on minimal resource usage by disabling non-essential browser features.
+2. **Light Mode**:
+   - Optimizes browser for performance by disabling background tasks and unnecessary services.
+3. **Full Page Scanning**:
+   - Ensures the entire content of a page is crawled, including dynamic elements loaded during scrolling.
+4. **Dynamic Viewport Adjustment**:
+   - Automatically resizes the viewport to match content dimensions, improving compatibility and rendering accuracy.
+5. **Session Management**:
+   - Simplifies session handling with better support for persistent and non-persistent contexts.
+
+---
+
+### **Bug Fixes**
+- Fixed potential viewport mismatches by ensuring consistent use of `self.viewport_width` and `self.viewport_height` throughout the code.
+- Improved robustness of dynamic content loading to avoid timeouts and failed evaluations.
+
+
+
+
+
+
+
+## [0.3.75] December 1, 2024
+
+### PruningContentFilter
+
+#### 1. Introduced PruningContentFilter (Dec 01, 2024) (Dec 01, 2024)
+A new content filtering strategy that removes less relevant nodes based on metrics like text and link density.
+
+**Affected Files:**
+- `crawl4ai/content_filter_strategy.py`: Enhancement of content filtering capabilities.
+```diff
+Implemented effective pruning algorithm with comprehensive scoring.
+```
+- `README.md`: Improved documentation regarding new features.
+```diff
+Updated to include usage and explanation for the PruningContentFilter.
+```
+- `docs/md_v2/basic/content_filtering.md`: Expanded documentation for users.
+```diff
+Added detailed section explaining the PruningContentFilter.
+```
+
+#### 2. Added Unit Tests for PruningContentFilter (Dec 01, 2024) (Dec 01, 2024)
+Comprehensive tests added to ensure correct functionality of PruningContentFilter
+
+**Affected Files:**
+- `tests/async/test_content_filter_prune.py`: Increased test coverage for content filtering strategies.
+```diff
+Created test cases for various scenarios using the PruningContentFilter.
+```
+
+### Development Updates
+
+#### 3. Enhanced BM25ContentFilter tests (Dec 01, 2024) (Dec 01, 2024)
+Extended testing to cover additional edge cases and performance metrics.
+
+**Affected Files:**
+- `tests/async/test_content_filter_bm25.py`: Improved reliability and performance assurance.
+```diff
+Added tests for new extraction scenarios including malformed HTML.
+```
+
+### Infrastructure & Documentation
+
+#### 4. Updated Examples (Dec 01, 2024) (Dec 01, 2024)
+Altered examples in documentation to promote the use of PruningContentFilter alongside existing strategies.
+
+**Affected Files:**
+- `docs/examples/quickstart_async.py`: Enhanced usability and clarity for new users.
+- Revised example to illustrate usage of PruningContentFilter.
+
+## [0.3.746] November 29, 2024
+
+### Major Features
+1. Enhanced Docker Support (Nov 29, 2024)
+   - Improved GPU support in Docker images.
+   - Dockerfile refactored for better platform-specific installations.
+   - Introduced new Docker commands for different platforms:
+     - `basic-amd64`, `all-amd64`, `gpu-amd64` for AMD64.
+     - `basic-arm64`, `all-arm64`, `gpu-arm64` for ARM64.
+
+### Infrastructure & Documentation
+- Enhanced README.md to improve user guidance and installation instructions.
+- Added installation instructions for Playwright setup in README.
+- Created and updated examples in `docs/examples/quickstart_async.py` to be more useful and user-friendly.
+- Updated `requirements.txt` with a new `pydantic` dependency.
+- Bumped version number in `crawl4ai/__version__.py` to 0.3.746.
+
+### Breaking Changes
+- Streamlined application structure:
+  - Removed static pages and related code from `main.py` which might affect existing deployments relying on static content.
+
+### Development Updates
+- Developed `post_install` method in `crawl4ai/install.py` to streamline post-installation setup tasks.
+- Refined migration processes in `crawl4ai/migrations.py` with enhanced logging for better error visibility.
+- Updated `docker-compose.yml` to support local and hub services for different architectures, enhancing build and deploy capabilities.
+- Refactored example test cases in `docs/examples/docker_example.py` to facilitate comprehensive testing.
+
+### README.md
+Updated README with new docker commands and setup instructions.
+Enhanced installation instructions and guidance.
+
+### crawl4ai/install.py
+Added post-install script functionality.
+Introduced `post_install` method for automation of post-installation tasks.
+
+### crawl4ai/migrations.py
+Improved migration logging.
+Refined migration processes and added better logging.
+
+### docker-compose.yml
+Refactored docker-compose for better service management.
+Updated to define services for different platforms and versions.
+
+### requirements.txt
+Updated dependencies.
+Added `pydantic` to requirements file.
+
+### crawler/__version__.py
+Updated version number.
+Bumped version number to 0.3.746.
+
+### docs/examples/quickstart_async.py
+Enhanced example scripts.
+Uncommented example usage in async guide for user functionality.
+
+### main.py
+Refactored code to improve maintainability.
+Streamlined app structure by removing static pages code.
+
+## [0.3.743] November 27, 2024
+
+Enhance features and documentation
+- Updated version to 0.3.743
+- Improved ManagedBrowser configuration with dynamic host/port
+- Implemented fast HTML formatting in web crawler
+- Enhanced markdown generation with a new generator class
+- Improved sanitization and utility functions
+- Added contributor details and pull request acknowledgments
+- Updated documentation for clearer usage scenarios
+- Adjusted tests to reflect class name changes
+
+### CONTRIBUTORS.md
+Added new contributors and pull request details.
+Updated community contributions and acknowledged pull requests.
+
+### crawl4ai/__version__.py
+Version update.
+Bumped version to 0.3.743.
+
+### crawl4ai/async_crawler_strategy.py
+Improved ManagedBrowser configuration.
+Enhanced browser initialization with configurable host and debugging port; improved hook execution.
+
+### crawl4ai/async_webcrawler.py
+Optimized HTML processing.
+Implemented 'fast_format_html' for optimized HTML formatting; applied it when 'prettiify' is enabled.
+
+### crawl4ai/content_scraping_strategy.py
+Enhanced markdown generation strategy.
+Updated to use DefaultMarkdownGenerator and improved markdown generation with filters option.
+
+### crawl4ai/markdown_generation_strategy.py
+Refactored markdown generation class.
+Renamed DefaultMarkdownGenerationStrategy to DefaultMarkdownGenerator; added content filter handling.
+
+### crawl4ai/utils.py
+Enhanced utility functions.
+Improved input sanitization and enhanced HTML formatting method.
+
+### docs/md_v2/advanced/hooks-auth.md
+Improved documentation for hooks.
+Updated code examples to include cookies in crawler strategy initialization.
+
+### tests/async/test_markdown_genertor.py
+Refactored tests to match class renaming.
+Updated tests to use renamed DefaultMarkdownGenerator class.
+
 ## [0.3.74] November 17, 2024
 
 This changelog details the updates and changes introduced in Crawl4AI version 0.3.74. It's designed to inform developers about new features, modifications to existing components, removals, and other important information.

@@ -92,8 +92,10 @@ class LLMExtractionStrategy(ExtractionStrategy):
         
             
     def extract(self, url: str, ix:int, html: str) -> List[Dict[str, Any]]:
-        # print("[LOG] Extracting blocks from URL:", url)
-        print(f"[LOG] Call LLM for {url} - block index: {ix}")
+        if self.verbose:
+            # print("[LOG] Extracting blocks from URL:", url)
+            print(f"[LOG] Call LLM for {url} - block index: {ix}")
+
         variable_values = {
             "URL": url,
             "HTML": escape_json_string(sanitize_html(html)),
@@ -632,7 +634,7 @@ class ContentSummarizationStrategy(ExtractionStrategy):
         # Sort summaries by the original section index to maintain order
         summaries.sort(key=lambda x: x[0])
         return [summary for _, summary in summaries]
-  
+ 
 class JsonCssExtractionStrategy(ExtractionStrategy):
     def __init__(self, schema: Dict[str, Any], **kwargs):
         super().__init__(**kwargs)

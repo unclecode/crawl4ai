@@ -11,7 +11,7 @@ import asyncio
 import os
 import time
 from typing import Dict, Any
-from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerationStrategy
+from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
 # Get current directory
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
@@ -41,7 +41,7 @@ def test_basic_markdown_conversion():
     with open(__location__ + "/data/wikipedia.html", "r") as f:
         cleaned_html = f.read()
 
-    generator = DefaultMarkdownGenerationStrategy()
+    generator = DefaultMarkdownGenerator()
     
     start_time = time.perf_counter()
     result = generator.generate_markdown(
@@ -70,7 +70,7 @@ def test_relative_links():
     Also an [image](/images/test.png) and another [page](/wiki/Banana).
     """
     
-    generator = DefaultMarkdownGenerationStrategy()
+    generator = DefaultMarkdownGenerator()
     result = generator.generate_markdown(
         cleaned_html=markdown,
         base_url="https://en.wikipedia.org"
@@ -86,7 +86,7 @@ def test_duplicate_links():
     Here's a [link](/test) and another [link](/test) and a [different link](/other).
     """
     
-    generator = DefaultMarkdownGenerationStrategy()
+    generator = DefaultMarkdownGenerator()
     result = generator.generate_markdown(
         cleaned_html=markdown,
         base_url="https://example.com"
@@ -102,7 +102,7 @@ def test_link_descriptions():
     Here's a [link with title](/test "Test Title") and a [link with description](/other) to test.
     """
     
-    generator = DefaultMarkdownGenerationStrategy()
+    generator = DefaultMarkdownGenerator()
     result = generator.generate_markdown(
         cleaned_html=markdown,
         base_url="https://example.com"
@@ -120,7 +120,7 @@ def test_performance_large_document():
     iterations = 5
     times = []
     
-    generator = DefaultMarkdownGenerationStrategy()
+    generator = DefaultMarkdownGenerator()
     
     for i in range(iterations):
         start_time = time.perf_counter()
@@ -144,7 +144,7 @@ def test_image_links():
     And a regular [link](/page).
     """
     
-    generator = DefaultMarkdownGenerationStrategy()
+    generator = DefaultMarkdownGenerator()
     result = generator.generate_markdown(
         cleaned_html=markdown,
         base_url="https://example.com"

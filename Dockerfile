@@ -1,6 +1,9 @@
 # syntax=docker/dockerfile:1.4
 
-# Build arguments
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+
+# Other build arguments
 ARG PYTHON_VERSION=3.10
 
 # Base stage with system dependencies
@@ -63,13 +66,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # GPU support if enabled and architecture is supported
-RUN if [ "$ENABLE_GPU" = "true" ] && [ "$(dpkg --print-architecture)" != "arm64" ] ; then \
-        apt-get update && apt-get install -y --no-install-recommends \
-        nvidia-cuda-toolkit \
-        && rm -rf /var/lib/apt/lists/* ; \
-    else \
-        echo "Skipping NVIDIA CUDA Toolkit installation (unsupported architecture or GPU disabled)"; \
-    fi
+RUN if [ "$ENABLE_GPU" = "true" ] && [ "$TARGETPLATFORM" = "linux/amd64" ] ; then \
+    apt-get update && apt-get install -y --no-install-recommends \
+    nvidia-cuda-toolkit \
+    && rm -rf /var/lib/apt/lists/* ; \
+else \
+    echo "Skipping NVIDIA CUDA Toolkit installation (unsupported platform or GPU disabled)"; \
+fi
 
 # Create and set working directory
 WORKDIR /app
@@ -120,7 +123,11 @@ RUN pip install --no-cache-dir \
 RUN mkdocs build
 
 # Install Playwright and browsers
-RUN playwright install
+RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
+    playwright install chromium; \
+    elif [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
+    playwright install chromium; \
+    fi
 
 # Expose port
 EXPOSE 8000 11235 9222 8080

@@ -78,20 +78,20 @@ def test_docker_deployment(version="basic"):
             time.sleep(5)
     
     # Test cases based on version
-    # test_basic_crawl(tester)
-    # test_basic_crawl(tester)
-    # test_basic_crawl_sync(tester)
     test_basic_crawl_direct(tester)
+    test_basic_crawl(tester)
+    test_basic_crawl(tester)
+    test_basic_crawl_sync(tester)
     
-    # if version in ["full", "transformer"]:
-    #     test_cosine_extraction(tester)
+    if version in ["full", "transformer"]:
+        test_cosine_extraction(tester)
 
-    # test_js_execution(tester)
-    # test_css_selector(tester)
-    # test_structured_extraction(tester)
-    # test_llm_extraction(tester)
-    # test_llm_with_ollama(tester)
-    # test_screenshot(tester)
+    test_js_execution(tester)
+    test_css_selector(tester)
+    test_structured_extraction(tester)
+    test_llm_extraction(tester)
+    test_llm_with_ollama(tester)
+    test_screenshot(tester)
     
 
 def test_basic_crawl(tester: Crawl4AiTester):

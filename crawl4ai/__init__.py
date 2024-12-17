@@ -1,15 +1,29 @@
 # __init__.py
 
 from .async_webcrawler import AsyncWebCrawler, CacheMode
-
+from .async_configs import BrowserConfig, CrawlerRunConfig
+from .extraction_strategy import ExtractionStrategy, LLMExtractionStrategy, CosineStrategy, JsonCssExtractionStrategy
+from .chunking_strategy import ChunkingStrategy, RegexChunking
+from .markdown_generation_strategy import DefaultMarkdownGenerator
+from .content_filter_strategy import PruningContentFilter, BM25ContentFilter
 from .models import CrawlResult
 from .__version__ import __version__
-# __version__ = "0.3.73"
 
 __all__ = [
     "AsyncWebCrawler",
     "CrawlResult",
     "CacheMode",
+    'BrowserConfig',
+    'CrawlerRunConfig',
+    'ExtractionStrategy',
+    'LLMExtractionStrategy',
+    'CosineStrategy',
+    'JsonCssExtractionStrategy',
+    'ChunkingStrategy',
+    'RegexChunking',
+    'DefaultMarkdownGenerator',
+    'PruningContentFilter',
+    'BM25ContentFilter',
 ]
 
 def is_sync_version_installed():

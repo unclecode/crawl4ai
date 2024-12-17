@@ -340,12 +340,9 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers
 )
 
-# Mount the pages directory as a static directory
-app.mount("/pages", StaticFiles(directory=__location__ + "/pages"), name="pages")
-
 # API token security
 security = HTTPBearer()
-CRAWL4AI_API_TOKEN = os.getenv("CRAWL4AI_API_TOKEN") or "test_api_code"
+CRAWL4AI_API_TOKEN = os.getenv("CRAWL4AI_API_TOKEN")
 
 async def verify_token(credentials: HTTPAuthorizationCredentials = Security(security)):
     if not CRAWL4AI_API_TOKEN:
@@ -364,7 +361,6 @@ if os.path.exists(__location__ + "/site"):
     app.mount("/mkdocs", StaticFiles(directory="site", html=True), name="mkdocs")
 
 site_templates = Jinja2Templates(directory=__location__ + "/site")
-templates = Jinja2Templates(directory=__location__ + "/pages")
 
 crawler_service = CrawlerService()
 

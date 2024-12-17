@@ -4,11 +4,18 @@ from typing import List, Tuple, Dict
 from rank_bm25 import BM25Okapi
 from time import perf_counter
 from collections import deque
-from bs4 import BeautifulSoup, NavigableString, Tag
+from bs4 import BeautifulSoup, NavigableString, Tag, Comment
 from .utils import clean_tokens
 from abc import ABC, abstractmethod
-
+import math
 from snowballstemmer import stemmer
+
+
+# import regex
+# def tokenize_text(text):
+#     # Regular expression to match words or CJK (Chinese, Japanese, Korean) characters
+#     pattern = r'\p{L}+|\p{N}+|[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー]|[\p{P}]'
+#     return regex.findall(pattern, text)
 
 # from nltk.stem import PorterStemmer
 # ps = PorterStemmer()
@@ -57,9 +64,14 @@ class RelevantContentFilter(ABC):
         query_parts = []
         
         # Title
-        if soup.title:
-            query_parts.append(soup.title.string)
-        elif soup.find('h1'):
+        try:
+            title = soup.title.string
+            if title:
+                query_parts.append(title)
+        except Exception:
+            pass
+
+        if soup.find('h1'):
             query_parts.append(soup.find('h1').get_text())
             
         # Meta tags
@@ -81,7 +93,7 @@ class RelevantContentFilter(ABC):
         return ' '.join(filter(None, query_parts))
 
 
-    def extract_text_chunks(self, body: Tag) -> List[Tuple[str, str]]:
+    def extract_text_chunks(self, body: Tag, min_word_threshold: int = None) -> List[Tuple[str, str]]:
         """
         Extracts text chunks from a BeautifulSoup body element while preserving order.
         Returns list of tuples (text, tag_name) for classification.
@@ -154,6 +166,9 @@ class RelevantContentFilter(ABC):
             text = ' '.join(''.join(current_text).split())
             if text:
                 chunks.append((chunk_index, text, 'content', body))
+        
+        if min_word_threshold:
+            chunks = [chunk for chunk in chunks if len(chunk[1].split()) >= min_word_threshold]
         
         return chunks    
     
@@ -274,15 +289,26 @@ class BM25ContentFilter(RelevantContentFilter):
         }
         self.stemmer = stemmer(language)
 
-    def filter_content(self, html: str) -> List[str]:
+    def filter_content(self, html: str, min_word_threshold: int = None) -> List[str]:
         """Implements content filtering using BM25 algorithm with priority tag handling"""
         if not html or not isinstance(html, str):
             return []
 
         soup = BeautifulSoup(html, 'lxml')
+        
+        # Check if body is present
+        if not soup.body:
+            # Wrap in body tag if missing
+            soup = BeautifulSoup(f'<body>{html}</body>', 'lxml')        
         body = soup.find('body')
-        query = self.extract_page_query(soup.find('head'), body)
-        candidates = self.extract_text_chunks(body)
+        
+        query = self.extract_page_query(soup, body)
+        
+        if not query:
+            return []
+            # return [self.clean_element(soup)]
+            
+        candidates = self.extract_text_chunks(body, min_word_threshold)
 
         if not candidates:
             return []
@@ -298,6 +324,10 @@ class BM25ContentFilter(RelevantContentFilter):
         tokenized_corpus = [[self.stemmer.stemWord(word) for word in chunk.lower().split()] 
                    for _, chunk, _, _ in candidates]
         tokenized_query = [self.stemmer.stemWord(word) for word in query.lower().split()]
+
+        # tokenized_corpus = [[self.stemmer.stemWord(word) for word in tokenize_text(chunk.lower())] 
+        #            for _, chunk, _, _ in candidates]
+        # tokenized_query = [self.stemmer.stemWord(word) for word in tokenize_text(query.lower())]
 
         # Clean from stop words and noise
         tokenized_corpus = [clean_tokens(tokens) for tokens in tokenized_corpus]
@@ -326,3 +356,188 @@ class BM25ContentFilter(RelevantContentFilter):
         selected_candidates.sort(key=lambda x: x[0])
 
         return [self.clean_element(tag) for _, _, tag in selected_candidates]
+
+
+
+
+
+
+class PruningContentFilter(RelevantContentFilter):
+    def __init__(self, user_query: str = None, min_word_threshold: int = None, 
+                 threshold_type: str = 'fixed', threshold: float = 0.48):
+        super().__init__(user_query)
+        self.min_word_threshold = min_word_threshold
+        self.threshold_type = threshold_type
+        self.threshold = threshold
+        
+        # Add tag importance for dynamic threshold
+        self.tag_importance = {
+            'article': 1.5,
+            'main': 1.4,
+            'section': 1.3,
+            'p': 1.2,
+            'h1': 1.4,
+            'h2': 1.3,
+            'h3': 1.2,
+            'div': 0.7,
+            'span': 0.6
+        }
+        
+        # Metric configuration
+        self.metric_config = {
+            'text_density': True,
+            'link_density': True,
+            'tag_weight': True,
+            'class_id_weight': True,
+            'text_length': True,
+        }
+        
+        self.metric_weights = {
+            'text_density': 0.4,
+            'link_density': 0.2,
+            'tag_weight': 0.2,
+            'class_id_weight': 0.1,
+            'text_length': 0.1,
+        }
+        
+        self.tag_weights = {
+            'div': 0.5,
+            'p': 1.0,
+            'article': 1.5,
+            'section': 1.0,
+            'span': 0.3,
+            'li': 0.5,
+            'ul': 0.5,
+            'ol': 0.5,
+            'h1': 1.2,
+            'h2': 1.1,
+            'h3': 1.0,
+            'h4': 0.9,
+            'h5': 0.8,
+            'h6': 0.7,
+        }
+
+    def filter_content(self, html: str, min_word_threshold: int = None) -> List[str]:
+        if not html or not isinstance(html, str):
+            return []
+            
+        soup = BeautifulSoup(html, 'lxml')
+        if not soup.body:
+            soup = BeautifulSoup(f'<body>{html}</body>', 'lxml')
+        
+        # Remove comments and unwanted tags
+        self._remove_comments(soup)
+        self._remove_unwanted_tags(soup)
+        
+        # Prune tree starting from body
+        body = soup.find('body')
+        self._prune_tree(body)
+        
+        # Extract remaining content as list of HTML strings
+        content_blocks = []
+        for element in body.children:
+            if isinstance(element, str) or not hasattr(element, 'name'):
+                continue
+            if len(element.get_text(strip=True)) > 0:
+                content_blocks.append(str(element))
+                
+        return content_blocks
+
+    def _remove_comments(self, soup):
+        for element in soup(text=lambda text: isinstance(text, Comment)):
+            element.extract()
+
+    def _remove_unwanted_tags(self, soup):
+        for tag in self.excluded_tags:
+            for element in soup.find_all(tag):
+                element.decompose()
+
+    def _prune_tree(self, node):
+        if not node or not hasattr(node, 'name') or node.name is None:
+            return
+
+        text_len = len(node.get_text(strip=True))
+        tag_len = len(node.encode_contents().decode('utf-8'))
+        link_text_len = sum(len(s.strip()) for s in (a.string for a in node.find_all('a', recursive=False)) if s)
+
+        metrics = {
+            'node': node,
+            'tag_name': node.name,
+            'text_len': text_len,
+            'tag_len': tag_len,
+            'link_text_len': link_text_len
+        }
+
+        score = self._compute_composite_score(metrics, text_len, tag_len, link_text_len)
+
+        if self.threshold_type == 'fixed':
+            should_remove = score < self.threshold
+        else:  # dynamic
+            tag_importance = self.tag_importance.get(node.name, 0.7)
+            text_ratio = text_len / tag_len if tag_len > 0 else 0
+            link_ratio = link_text_len / text_len if text_len > 0 else 1
+            
+            threshold = self.threshold  # base threshold
+            if tag_importance > 1:
+                threshold *= 0.8
+            if text_ratio > 0.4:
+                threshold *= 0.9
+            if link_ratio > 0.6:
+                threshold *= 1.2
+                
+            should_remove = score < threshold
+
+        if should_remove:
+            node.decompose()
+        else:
+            children = [child for child in node.children if hasattr(child, 'name')]
+            for child in children:
+                self._prune_tree(child)
+
+    def _compute_composite_score(self, metrics, text_len, tag_len, link_text_len):
+        if self.min_word_threshold:
+            # Get raw text from metrics node - avoid extra processing
+            text = metrics['node'].get_text(strip=True)
+            word_count = text.count(' ') + 1
+            if word_count < self.min_word_threshold:
+                return -1.0  # Guaranteed removal
+        score = 0.0
+        total_weight = 0.0
+
+        if self.metric_config['text_density']:
+            density = text_len / tag_len if tag_len > 0 else 0
+            score += self.metric_weights['text_density'] * density
+            total_weight += self.metric_weights['text_density']
+
+        if self.metric_config['link_density']:
+            density = 1 - (link_text_len / text_len if text_len > 0 else 0)
+            score += self.metric_weights['link_density'] * density
+            total_weight += self.metric_weights['link_density']
+
+        if self.metric_config['tag_weight']:
+            tag_score = self.tag_weights.get(metrics['tag_name'], 0.5)
+            score += self.metric_weights['tag_weight'] * tag_score
+            total_weight += self.metric_weights['tag_weight']
+
+        if self.metric_config['class_id_weight']:
+            class_score = self._compute_class_id_weight(metrics['node'])
+            score += self.metric_weights['class_id_weight'] * max(0, class_score)
+            total_weight += self.metric_weights['class_id_weight']
+
+        if self.metric_config['text_length']:
+            score += self.metric_weights['text_length'] * math.log(text_len + 1)
+            total_weight += self.metric_weights['text_length']
+
+        return score / total_weight if total_weight > 0 else 0
+
+    def _compute_class_id_weight(self, node):
+        class_id_score = 0
+        if 'class' in node.attrs:
+            classes = ' '.join(node['class'])
+            if self.negative_patterns.match(classes):
+                class_id_score -= 0.5
+        if 'id' in node.attrs:
+            element_id = node['id']
+            if self.negative_patterns.match(element_id):
+                class_id_score -= 0.5
+        return class_id_score

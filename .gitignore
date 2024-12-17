@@ -206,6 +206,7 @@ pypi_build.sh
 git_issues.py
 git_issues.md
 
+.next/
 .tests/
 .issues/
 .docs/
@@ -214,3 +215,6 @@ git_issues.md
 todo_executor.md
 protect-all-except-feature.sh
 manage-collab.sh
+publish.sh
+combine.sh
+combined_output.txt
