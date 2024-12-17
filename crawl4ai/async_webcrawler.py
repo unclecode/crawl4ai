@@ -274,6 +274,7 @@ class AsyncWebCrawler:
                     if cached_result:
                         html = sanitize_input_encode(cached_result.html)
                         extracted_content = sanitize_input_encode(cached_result.extracted_content or "")
+                        extracted_content = None if not extracted_content or extracted_content == "[]" else extracted_content
                         # If screenshot is requested but its not in cache, then set cache_result to None
                         screenshot_data = cached_result.screenshot
                         pdf_data = cached_result.pdf
@@ -476,7 +477,7 @@ class AsyncWebCrawler:
                 t1 = time.perf_counter()
                 
                 # Handle different extraction strategy types
-                if isinstance(config.extraction_strategy, (JsonCssExtractionStrategy, JsonCssExtractionStrategy)):
+                if isinstance(config.extraction_strategy, (JsonCssExtractionStrategy, JsonXPathExtractionStrategy)):
                     config.extraction_strategy.verbose = verbose
                     extracted_content = config.extraction_strategy.run(url, [html])
                     extracted_content = json.dumps(extracted_content, indent=4, default=str, ensure_ascii=False)
