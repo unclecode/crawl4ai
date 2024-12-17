@@ -795,9 +795,14 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     raise RuntimeError(f"Failed on navigating ACS-GOTO:\n{str(e)}")
                 
                 await self.execute_hook('after_goto', page, context=context)
+
+                if response is None:
+                    status_code = 200
+                    response_headers = {}
+                else:
+                    status_code = response.status
+                    response_headers = response.headers
                 
-                status_code = response.status
-                response_headers = response.headers
             else:
                 status_code = 200
                 response_headers = {}

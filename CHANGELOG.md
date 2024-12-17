@@ -709,7 +709,7 @@ This commit introduces several key enhancements, including improved error handli
 - Improved `AsyncPlaywrightCrawlerStrategy.close()` method to use a shorter sleep time (0.5 seconds instead of 500), significantly reducing wait time when closing the crawler.
 - Enhanced flexibility in `CosineStrategy`:
   - Now uses a more generic `load_HF_embedding_model` function, allowing for easier swapping of embedding models.
-- Updated `JsonCssExtractionStrategy` and `JsonXPATHExtractionStrategy` for better JSON-based extraction.
+- Updated `JsonCssExtractionStrategy` and `JsonXPathExtractionStrategy` for better JSON-based extraction.
 
 ### Fixed
 - Addressed potential issues with the sliding window chunking strategy to ensure all text is properly chunked.
