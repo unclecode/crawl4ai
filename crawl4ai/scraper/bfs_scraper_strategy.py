@@ -14,7 +14,7 @@ from collections import defaultdict
 from .models import CrawlResult
 from .filters import FilterChain
 from .scorers import URLScorer
-from ..async_webcrawler import AsyncWebCrawler
+from ..async_webcrawler import AsyncWebCrawler, CrawlerRunConfig
 from .scraper_strategy import ScraperStrategy
 
 @dataclass
@@ -116,7 +116,8 @@ class BFSScraperStrategy(ScraperStrategy):
     ) -> CrawlResult:
         """Crawl URL with retry logic"""
         try:
-            return await asyncio.wait_for(crawler.arun(url), timeout=self.timeout)
+            crawler_config = CrawlerRunConfig(cache_mode="BYPASS")
+            return await asyncio.wait_for(crawler.arun(url, config=crawler_config), timeout=self.timeout)
         except asyncio.TimeoutError:
             self.logger.error(f"Timeout crawling {url}")
             raise

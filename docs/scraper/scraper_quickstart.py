@@ -6,8 +6,10 @@ from crawl4ai.scraper import (
     URLPatternFilter,
     ContentTypeFilter
 )
-from crawl4ai.async_webcrawler import AsyncWebCrawler
+from crawl4ai.async_webcrawler import AsyncWebCrawler, BrowserConfig
 import re
+
+browser_config = BrowserConfig(headless=True, viewport_width=800, viewport_height=600)
 
 async def basic_scraper_example():
     """
@@ -34,7 +36,7 @@ async def basic_scraper_example():
     )
 
     # Create the crawler and scraper
-    async with AsyncWebCrawler(verbose=True) as crawler:
+    async with AsyncWebCrawler(config=browser_config,verbose=True) as crawler:
         scraper = AsyncWebScraper(crawler, strategy)
         # Start scraping
         try:
@@ -118,12 +120,12 @@ async def advanced_scraper_example():
         max_depth=2,
         filter_chain=filter_chain,
         url_scorer=scorer,
-        max_concurrent=5,
+        max_concurrent=2,
         min_crawl_delay=1
     )
 
     # Create crawler and scraper
-    async with AsyncWebCrawler(verbose=True) as crawler:
+    async with AsyncWebCrawler(verbose=True, config=browser_config) as crawler:
         scraper = AsyncWebScraper(crawler, strategy)
 
         # Track statistics
