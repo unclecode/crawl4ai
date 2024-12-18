@@ -84,6 +84,12 @@ class TopicSegmentationChunking(ChunkingStrategy):
 # Fixed-length word chunks
 class FixedLengthWordChunking(ChunkingStrategy):
     def __init__(self, chunk_size=100, **kwargs):
+        """
+        Initialize the fixed-length word chunking strategy with the given chunk size.
+        
+        Args:
+            chunk_size (int): The size of each chunk in words.
+        """
         self.chunk_size = chunk_size
 
     def chunk(self, text: str) -> list:
@@ -93,14 +99,64 @@ class FixedLengthWordChunking(ChunkingStrategy):
 # Sliding window chunking
 class SlidingWindowChunking(ChunkingStrategy):
     def __init__(self, window_size=100, step=50, **kwargs):
+        """
+        Initialize the sliding window chunking strategy with the given window size and
+        step size.
+        
+        Args:
+            window_size (int): The size of the sliding window in words.
+            step (int): The step size for sliding the window in words.
+        """
         self.window_size = window_size
         self.step = step
 
     def chunk(self, text: str) -> list:
         words = text.split()
         chunks = []
-        for i in range(0, len(words), self.step):
-            chunks.append(' '.join(words[i:i + self.window_size]))
+        
+        if len(words) <= self.window_size:
+            return [text]
+        
+        for i in range(0, len(words) - self.window_size + 1, self.step):
+            chunk = ' '.join(words[i:i + self.window_size])
+            chunks.append(chunk)
+        
+        # Handle the last chunk if it doesn't align perfectly
+        if i + self.window_size < len(words):
+            chunks.append(' '.join(words[-self.window_size:]))
+        
         return chunks
     
 
+class OverlappingWindowChunking(ChunkingStrategy):
+    def __init__(self, window_size=1000, overlap=100, **kwargs):
+        """
+        Initialize the overlapping window chunking strategy with the given window size and
+        overlap size.
+        
+        Args:
+            window_size (int): The size of the window in words.
+            overlap (int): The size of the overlap between consecutive chunks in words.
+        """
+        self.window_size = window_size
+        self.overlap = overlap
+
+    def chunk(self, text: str) -> list:
+        words = text.split()
+        chunks = []
+        
+        if len(words) <= self.window_size:
+            return [text]
+        
+        start = 0
+        while start < len(words):
+            end = start + self.window_size
+            chunk = ' '.join(words[start:end])
+            chunks.append(chunk)
+            
+            if end >= len(words):
+                break
+            
+            start = end - self.overlap
+        
+        return chunks

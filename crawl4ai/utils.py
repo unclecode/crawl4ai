@@ -1,13 +1,12 @@
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from bs4 import BeautifulSoup, Comment, element, Tag, NavigableString
-import html2text
 import json
 import html
 import re
 import os
 import platform
-from html2text import HTML2Text
+from .html2text import HTML2Text
 from .prompts import PROMPT_EXTRACT_BLOCKS
 from .config import *
 from pathlib import Path
@@ -15,9 +14,74 @@ from typing import Dict, Any
 from urllib.parse import urljoin
 import requests
 from requests.exceptions import InvalidSchema
+import hashlib
+from typing import Optional, Tuple, Dict, Any
+import xxhash
+from colorama import Fore, Style, init
+import textwrap
+import cProfile
+import pstats
+from functools import wraps
 
 class InvalidCSSSelectorError(Exception):
     pass
+
+def create_box_message(
+   message: str, 
+   type: str = "info", 
+   width: int = 120, 
+   add_newlines: bool = True,
+   double_line: bool = False
+) -> str:
+   init()
+   
+   # Define border and text colors for different types
+   styles = {
+       "warning": (Fore.YELLOW, Fore.LIGHTYELLOW_EX, "⚠"),
+       "info": (Fore.BLUE, Fore.LIGHTBLUE_EX, "ℹ"), 
+       "success": (Fore.GREEN, Fore.LIGHTGREEN_EX, "✓"),
+       "error": (Fore.RED, Fore.LIGHTRED_EX, "×"),
+   }
+   
+   border_color, text_color, prefix = styles.get(type.lower(), styles["info"])
+   
+   # Define box characters based on line style
+   box_chars = {
+       "single": ("─", "│", "┌", "┐", "└", "┘"),
+       "double": ("═", "║", "╔", "╗", "╚", "╝")
+   }
+   line_style = "double" if double_line else "single"
+   h_line, v_line, tl, tr, bl, br = box_chars[line_style]
+   
+   # Process lines with lighter text color
+   formatted_lines = []
+   raw_lines = message.split('\n')
+   
+   if raw_lines:
+       first_line = f"{prefix} {raw_lines[0].strip()}"
+       wrapped_first = textwrap.fill(first_line, width=width-4)
+       formatted_lines.extend(wrapped_first.split('\n'))
+       
+       for line in raw_lines[1:]:
+           if line.strip():
+               wrapped = textwrap.fill(f"  {line.strip()}", width=width-4)
+               formatted_lines.extend(wrapped.split('\n'))
+           else:
+               formatted_lines.append("")
+   
+   # Create the box with colored borders and lighter text
+   horizontal_line = h_line * (width - 1)
+   box = [
+       f"{border_color}{tl}{horizontal_line}{tr}",
+       *[f"{border_color}{v_line}{text_color} {line:<{width-2}}{border_color}{v_line}" for line in formatted_lines],
+       f"{border_color}{bl}{horizontal_line}{br}{Style.RESET_ALL}"
+   ]
+   
+   result = "\n".join(box)
+   if add_newlines:
+       result = f"\n{result}\n"
+   
+   return result
 
 def calculate_semaphore_count():
     cpu_count = os.cpu_count()
@@ -61,7 +125,7 @@ def get_system_memory():
         raise OSError("Unsupported operating system")
 
 def get_home_folder():
-    home_folder = os.path.join(Path.home(), ".crawl4ai")
+    home_folder = os.path.join(os.getenv("CRAWL4_AI_BASE_DIRECTORY", os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home())), ".crawl4ai")
     os.makedirs(home_folder, exist_ok=True)
     os.makedirs(f"{home_folder}/cache", exist_ok=True)
     os.makedirs(f"{home_folder}/models", exist_ok=True)
@@ -143,12 +207,17 @@ def sanitize_html(html):
 def sanitize_input_encode(text: str) -> str:
     """Sanitize input to handle potential encoding issues."""
     try:
-        # Attempt to encode and decode as UTF-8 to handle potential encoding issues
-        return text.encode('utf-8', errors='ignore').decode('utf-8')
-    except UnicodeEncodeError as e:
-        print(f"Warning: Encoding issue detected. Some characters may be lost. Error: {e}")
-        # Fall back to ASCII if UTF-8 fails
-        return text.encode('ascii', errors='ignore').decode('ascii')
+        try:
+            if not text:
+                return ''
+            # Attempt to encode and decode as UTF-8 to handle potential encoding issues
+            return text.encode('utf-8', errors='ignore').decode('utf-8')
+        except UnicodeEncodeError as e:
+            print(f"Warning: Encoding issue detected. Some characters may be lost. Error: {e}")
+            # Fall back to ASCII if UTF-8 fails
+            return text.encode('ascii', errors='ignore').decode('ascii')
+    except Exception as e:
+        raise ValueError(f"Error sanitizing input: {str(e)}") from e
 
 def escape_json_string(s):
     """
@@ -178,33 +247,6 @@ def escape_json_string(s):
     s = re.sub(r'[\x00-\x1f\x7f-\x9f]', lambda x: '\\u{:04x}'.format(ord(x.group())), s)
     
     return s
-
-class CustomHTML2Text(HTML2Text):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.ignore_links = True
-        self.inside_pre = False
-        self.inside_code = False
-
-    def handle_tag(self, tag, attrs, start):
-        if tag == 'pre':
-            if start:
-                self.o('```\n')
-                self.inside_pre = True
-            else:
-                self.o('\n```')
-                self.inside_pre = False
-        # elif tag == 'code' and not self.inside_pre:
-        #     if start:
-        #         if not self.inside_pre:
-        #             self.o('`')
-        #         self.inside_code = True
-        #     else:
-        #         if not self.inside_pre:
-        #             self.o('`')
-        #         self.inside_code = False
-
-        super().handle_tag(tag, attrs, start)
 
 def replace_inline_tags(soup, tags, only_text=False):
     tag_replacements = {
@@ -690,10 +732,13 @@ def get_content_of_website_optimized(url: str, html: str, word_count_threshold: 
     body = flatten_nested_elements(body)
     base64_pattern = re.compile(r'data:image/[^;]+;base64,([^"]+)')
     for img in imgs:
-        src = img.get('src', '')
-        if base64_pattern.match(src):
-            # Replace base64 data with empty string
-            img['src'] = base64_pattern.sub('', src)
+        try:
+            src = img.get('src', '')
+            if base64_pattern.match(src):
+                img['src'] = base64_pattern.sub('', src)
+        except:
+            pass        
+
     cleaned_html = str(body).replace('\n\n', '\n').replace('  ', ' ')
     cleaned_html = sanitize_html(cleaned_html)
 
@@ -717,44 +762,51 @@ def get_content_of_website_optimized(url: str, html: str, word_count_threshold: 
         'metadata': meta
     }
 
-def extract_metadata(html, soup = None):
+def extract_metadata(html, soup=None):
     metadata = {}
     
-    if not html:
+    if not html and not soup:
+        return {}
+    
+    if not soup:
+        soup = BeautifulSoup(html, 'lxml')
+    
+    head = soup.head
+    if not head:
         return metadata
     
-    # Parse HTML content with BeautifulSoup
-    if not soup:
-        soup = BeautifulSoup(html, 'html.parser')
-
     # Title
-    title_tag = soup.find('title')
-    metadata['title'] = title_tag.string if title_tag else None
+    title_tag = head.find('title')
+    metadata['title'] = title_tag.string.strip() if title_tag and title_tag.string else None
 
     # Meta description
-    description_tag = soup.find('meta', attrs={'name': 'description'})
-    metadata['description'] = description_tag['content'] if description_tag else None
+    description_tag = head.find('meta', attrs={'name': 'description'})
+    metadata['description'] = description_tag.get('content', '').strip() if description_tag else None
 
     # Meta keywords
-    keywords_tag = soup.find('meta', attrs={'name': 'keywords'})
-    metadata['keywords'] = keywords_tag['content'] if keywords_tag else None
+    keywords_tag = head.find('meta', attrs={'name': 'keywords'})
+    metadata['keywords'] = keywords_tag.get('content', '').strip() if keywords_tag else None
 
     # Meta author
-    author_tag = soup.find('meta', attrs={'name': 'author'})
-    metadata['author'] = author_tag['content'] if author_tag else None
+    author_tag = head.find('meta', attrs={'name': 'author'})
+    metadata['author'] = author_tag.get('content', '').strip() if author_tag else None
 
     # Open Graph metadata
-    og_tags = soup.find_all('meta', attrs={'property': lambda value: value and value.startswith('og:')})
+    og_tags = head.find_all('meta', attrs={'property': re.compile(r'^og:')})
     for tag in og_tags:
-        property_name = tag['property']
-        metadata[property_name] = tag['content']
+        property_name = tag.get('property', '').strip()
+        content = tag.get('content', '').strip()
+        if property_name and content:
+            metadata[property_name] = content
 
     # Twitter Card metadata
-    twitter_tags = soup.find_all('meta', attrs={'name': lambda value: value and value.startswith('twitter:')})
+    twitter_tags = head.find_all('meta', attrs={'name': re.compile(r'^twitter:')})
     for tag in twitter_tags:
-        property_name = tag['name']
-        metadata[property_name] = tag['content']
-
+        property_name = tag.get('name', '').strip()
+        content = tag.get('content', '').strip()
+        if property_name and content:
+            metadata[property_name] = content
+    
     return metadata
 
 def extract_xml_tags(string):
@@ -774,7 +826,6 @@ def extract_xml_data(tags, string):
 
     return data
     
-# Function to perform the completion with exponential backoff
 def perform_completion_with_backoff(
     provider, 
     prompt_with_variables, 
@@ -788,7 +839,11 @@ def perform_completion_with_backoff(
     max_attempts = 3
     base_delay = 2  # Base delay in seconds, you can adjust this based on your needs
     
-    extra_args = {}
+    extra_args = {
+        "temperature": 0.01,
+        'api_key': api_token,
+        'base_url': base_url
+    }
     if json_response:
         extra_args["response_format"] = { "type": "json_object" }
         
@@ -797,14 +852,12 @@ def perform_completion_with_backoff(
     
     for attempt in range(max_attempts):
         try:
+            
             response =completion(
                 model=provider,
                 messages=[
                     {"role": "user", "content": prompt_with_variables}
                 ],
-                temperature=0.01,
-                api_key=api_token,
-                base_url=base_url,
                 **extra_args
             )
             return response  # Return the successful response
@@ -961,7 +1014,279 @@ def wrap_text(draw, text, font, max_width):
     return '\n'.join(lines)
 
 def format_html(html_string):
-    soup = BeautifulSoup(html_string, 'html.parser')
+    soup = BeautifulSoup(html_string, 'lxml.parser')
     return soup.prettify()
 
+def fast_format_html(html_string):
+    """
+    A fast HTML formatter that uses string operations instead of parsing.
+    
+    Args:
+        html_string (str): The HTML string to format
+        
+    Returns:
+        str: The formatted HTML string
+    """
+    # Initialize variables
+    indent = 0
+    indent_str = "  "  # Two spaces for indentation
+    formatted = []
+    in_content = False
+    
+    # Split by < and > to separate tags and content
+    parts = html_string.replace('>', '>\n').replace('<', '\n<').split('\n')
+    
+    for part in parts:
+        if not part.strip():
+            continue
+            
+        # Handle closing tags
+        if part.startswith('</'):
+            indent -= 1
+            formatted.append(indent_str * indent + part)
+            
+        # Handle self-closing tags
+        elif part.startswith('<') and part.endswith('/>'):
+            formatted.append(indent_str * indent + part)
+            
+        # Handle opening tags
+        elif part.startswith('<'):
+            formatted.append(indent_str * indent + part)
+            indent += 1
+            
+        # Handle content between tags
+        else:
+            content = part.strip()
+            if content:
+                formatted.append(indent_str * indent + content)
+    
+    return '\n'.join(formatted)
 
+def normalize_url(href, base_url):
+    """Normalize URLs to ensure consistent format"""
+    from urllib.parse import urljoin, urlparse
+
+    # Parse base URL to get components
+    parsed_base = urlparse(base_url)
+    if not parsed_base.scheme or not parsed_base.netloc:
+        raise ValueError(f"Invalid base URL format: {base_url}")
+
+    # Use urljoin to handle all cases
+    normalized = urljoin(base_url, href.strip())
+    return normalized
+
+def normalize_url_tmp(href, base_url):
+    """Normalize URLs to ensure consistent format"""
+    # Extract protocol and domain from base URL
+    try:
+        base_parts = base_url.split('/')
+        protocol = base_parts[0]
+        domain = base_parts[2]
+    except IndexError:
+        raise ValueError(f"Invalid base URL format: {base_url}")
+    
+    # Handle special protocols
+    special_protocols = {'mailto:', 'tel:', 'ftp:', 'file:', 'data:', 'javascript:'}
+    if any(href.lower().startswith(proto) for proto in special_protocols):
+        return href.strip()
+        
+    # Handle anchor links
+    if href.startswith('#'):
+        return f"{base_url}{href}"
+        
+    # Handle protocol-relative URLs
+    if href.startswith('//'):
+        return f"{protocol}{href}"
+        
+    # Handle root-relative URLs
+    if href.startswith('/'):
+        return f"{protocol}//{domain}{href}"
+        
+    # Handle relative URLs
+    if not href.startswith(('http://', 'https://')):
+        # Remove leading './' if present
+        href = href.lstrip('./')
+        return f"{protocol}//{domain}/{href}"
+        
+    return href.strip()
+
+def is_external_url(url, base_domain):
+    """Determine if a URL is external"""
+    special_protocols = {'mailto:', 'tel:', 'ftp:', 'file:', 'data:', 'javascript:'}
+    if any(url.lower().startswith(proto) for proto in special_protocols):
+        return True
+        
+    try:
+        # Handle URLs with protocol
+        if url.startswith(('http://', 'https://')):
+            url_domain = url.split('/')[2]
+            return base_domain.lower() not in url_domain.lower()
+    except IndexError:
+        return False
+        
+    return False
+
+def clean_tokens(tokens: list[str]) -> list[str]:
+    # Set of tokens to remove
+    noise = {'ccp', 'up', '↑', '▲', '⬆️', 'a', 'an', 'at', 'by', 'in', 'of', 'on', 'to', 'the'}
+
+    STOP_WORDS = {
+        'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 
+        'has', 'he', 'in', 'is', 'it', 'its', 'of', 'on', 'that', 'the', 
+        'to', 'was', 'were', 'will', 'with',
+        
+        # Pronouns
+        'i', 'you', 'he', 'she', 'it', 'we', 'they',
+        'me', 'him', 'her', 'us', 'them',
+        'my', 'your', 'his', 'her', 'its', 'our', 'their',
+        'mine', 'yours', 'hers', 'ours', 'theirs',
+        'myself', 'yourself', 'himself', 'herself', 'itself', 'ourselves', 'themselves',
+        
+        # Common verbs
+        'am', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+        'have', 'has', 'had', 'having', 'do', 'does', 'did', 'doing',
+        
+        # Prepositions
+        'about', 'above', 'across', 'after', 'against', 'along', 'among', 'around',
+        'at', 'before', 'behind', 'below', 'beneath', 'beside', 'between', 'beyond',
+        'by', 'down', 'during', 'except', 'for', 'from', 'in', 'inside', 'into',
+        'near', 'of', 'off', 'on', 'out', 'outside', 'over', 'past', 'through',
+        'to', 'toward', 'under', 'underneath', 'until', 'up', 'upon', 'with', 'within',
+        
+        # Conjunctions
+        'and', 'but', 'or', 'nor', 'for', 'yet', 'so',
+        'although', 'because', 'since', 'unless',
+        
+        # Articles
+        'a', 'an', 'the',
+        
+        # Other common words
+        'this', 'that', 'these', 'those',
+        'what', 'which', 'who', 'whom', 'whose',
+        'when', 'where', 'why', 'how',
+        'all', 'any', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such',
+        'can', 'cannot', "can't", 'could', "couldn't",
+        'may', 'might', 'must', "mustn't",
+        'shall', 'should', "shouldn't",
+        'will', "won't", 'would', "wouldn't",
+        'not', "n't", 'no', 'nor', 'none'
+    }   
+   
+    # Single comprehension, more efficient than multiple passes
+    return [token for token in tokens 
+            if len(token) > 2 
+            and token not in noise 
+            and token not in STOP_WORDS
+            and not token.startswith('↑')
+            and not token.startswith('▲')
+            and not token.startswith('⬆')]
+
+def profile_and_time(func):
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        # Start timer
+        start_time = time.perf_counter()
+        
+        # Setup profiler
+        profiler = cProfile.Profile()
+        profiler.enable()
+        
+        # Run function
+        result = func(self, *args, **kwargs)
+        
+        # Stop profiler
+        profiler.disable()
+        
+        # Calculate elapsed time
+        elapsed_time = time.perf_counter() - start_time
+        
+        # Print timing
+        print(f"[PROFILER] Scraping completed in {elapsed_time:.2f} seconds")
+        
+        # Print profiling stats
+        stats = pstats.Stats(profiler)
+        stats.sort_stats('cumulative')  # Sort by cumulative time
+        stats.print_stats(20)  # Print top 20 time-consuming functions
+        
+        return result
+    return wrapper
+
+def generate_content_hash(content: str) -> str:
+    """Generate a unique hash for content"""
+    return xxhash.xxh64(content.encode()).hexdigest()
+    # return hashlib.sha256(content.encode()).hexdigest()
+
+def ensure_content_dirs(base_path: str) -> Dict[str, str]:
+    """Create content directories if they don't exist"""
+    dirs = {
+        'html': 'html_content',
+        'cleaned': 'cleaned_html',
+        'markdown': 'markdown_content', 
+        'extracted': 'extracted_content',
+        'screenshots': 'screenshots',
+        'screenshot': 'screenshots'
+    }
+    
+    content_paths = {}
+    for key, dirname in dirs.items():
+        path = os.path.join(base_path, dirname)
+        os.makedirs(path, exist_ok=True)
+        content_paths[key] = path
+        
+    return content_paths
+
+def get_error_context(exc_info, context_lines: int = 5):
+    """
+    Extract error context with more reliable line number tracking.
+    
+    Args:
+        exc_info: The exception info from sys.exc_info()
+        context_lines: Number of lines to show before and after the error
+    
+    Returns:
+        dict: Error context information
+    """
+    import traceback
+    import linecache
+    import os
+    
+    # Get the full traceback
+    tb = traceback.extract_tb(exc_info[2])
+    
+    # Get the last frame (where the error occurred)
+    last_frame = tb[-1]
+    filename = last_frame.filename
+    line_no = last_frame.lineno
+    func_name = last_frame.name
+    
+    # Get the source code context using linecache
+    # This is more reliable than inspect.getsourcelines
+    context_start = max(1, line_no - context_lines)
+    context_end = line_no + context_lines + 1
+    
+    # Build the context lines with line numbers
+    context_lines = []
+    for i in range(context_start, context_end):
+        line = linecache.getline(filename, i)
+        if line:
+            # Remove any trailing whitespace/newlines and add the pointer for error line
+            line = line.rstrip()
+            pointer = '→' if i == line_no else ' '
+            context_lines.append(f"{i:4d} {pointer} {line}")
+    
+    # Join the lines with newlines
+    code_context = '\n'.join(context_lines)
+    
+    # Get relative path for cleaner output
+    try:
+        rel_path = os.path.relpath(filename)
+    except ValueError:
+        # Fallback if relpath fails (can happen on Windows with different drives)
+        rel_path = filename
+    
+    return {
+        "filename": rel_path,
+        "line_no": line_no,
+        "function": func_name,
+        "code_context": code_context
+    }

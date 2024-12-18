@@ -1,10 +1,9 @@
-from abc import ABC, abstractmethod
-from typing import Union, AsyncGenerator, Optional, Dict, Set
+from typing import AsyncGenerator, Optional, Dict, Set
 from dataclasses import dataclass
 from datetime import datetime
 import asyncio
 import logging
-from urllib.parse import urljoin, urlparse, urlunparse
+from urllib.parse import urlparse
 from urllib.robotparser import RobotFileParser
 import validators
 import time
@@ -12,10 +11,11 @@ from aiolimiter import AsyncLimiter
 from tenacity import retry, stop_after_attempt, wait_exponential
 from collections import defaultdict
 
-from .models import ScraperResult, CrawlResult
+from .models import CrawlResult
 from .filters import FilterChain
 from .scorers import URLScorer
-from ..async_webcrawler import AsyncWebCrawler
+from ..async_webcrawler import AsyncWebCrawler, CrawlerRunConfig
+from .scraper_strategy import ScraperStrategy
 
 @dataclass
 class CrawlStats:
@@ -28,30 +28,6 @@ class CrawlStats:
     current_depth: int = 0
     robots_blocked: int = 0
 
-class ScraperStrategy(ABC):
-    """Base class for scraping strategies"""
-    
-    @abstractmethod
-    async def ascrape(
-        self, 
-        url: str, 
-        crawler: AsyncWebCrawler, 
-        parallel_processing: bool = True,
-        stream: bool = False
-    ) -> Union[AsyncGenerator[CrawlResult, None], ScraperResult]:
-        """Abstract method for scraping implementation"""
-        pass
-
-    @abstractmethod
-    async def can_process_url(self, url: str) -> bool:
-        """Check if URL can be processed based on strategy rules"""
-        pass
-
-    @abstractmethod
-    async def shutdown(self):
-        """Clean up resources used by the strategy"""
-        pass
-
 class BFSScraperStrategy(ScraperStrategy):
     """Breadth-First Search scraping strategy with politeness controls"""
 
@@ -60,6 +36,7 @@ class BFSScraperStrategy(ScraperStrategy):
         max_depth: int,
         filter_chain: FilterChain,
         url_scorer: URLScorer,
+        process_external_links: bool = False,
         max_concurrent: int = 5,
         min_crawl_delay: int = 1,
         timeout: int = 30,
@@ -76,7 +53,7 @@ class BFSScraperStrategy(ScraperStrategy):
         # Crawl control
         self.stats = CrawlStats(start_time=datetime.now())
         self._cancel_event = asyncio.Event()
-        self.process_external_links = False
+        self.process_external_links = process_external_links
         
         # Rate limiting and politeness
         self.rate_limiter = AsyncLimiter(1, 1)
@@ -84,7 +61,7 @@ class BFSScraperStrategy(ScraperStrategy):
         self.robot_parsers: Dict[str, RobotFileParser] = {}
         self.domain_queues: Dict[str, asyncio.Queue] = defaultdict(asyncio.Queue)
 
-    async def can_process_url(self, url: str) -> bool:
+    async def can_process_url(self, url: str, depth: int) -> bool:
         """Check if URL can be processed based on robots.txt and filters
         This is our gatekeeper method that determines if a URL should be processed. It:
             - Validates URL format using the validators library
@@ -103,7 +80,11 @@ class BFSScraperStrategy(ScraperStrategy):
             self.logger.info(f"Blocked by robots.txt: {url}")
             return False
 
-        return self.filter_chain.apply(url)
+        # Apply the filter chain it's not start page
+        if depth != 0 and not self.filter_chain.apply(url):
+            return False
+
+        return True
 
     async def _get_robot_parser(self, url: str) -> Optional[RobotFileParser]:
         """Get or create robots.txt parser for domain.
@@ -135,11 +116,16 @@ class BFSScraperStrategy(ScraperStrategy):
     ) -> CrawlResult:
         """Crawl URL with retry logic"""
         try:
-            async with asyncio.timeout(self.timeout):
-                return await crawler.arun(url)
+            crawler_config = CrawlerRunConfig(cache_mode="BYPASS")
+            return await asyncio.wait_for(crawler.arun(url, config=crawler_config), timeout=self.timeout)
         except asyncio.TimeoutError:
             self.logger.error(f"Timeout crawling {url}")
             raise
+        except Exception as e:
+            # Catch any other exceptions that may cause retries
+            self.logger.error(f"Error crawling {url}: {e}")
+            raise
+
 
     async def process_url(
         self,
@@ -165,7 +151,7 @@ class BFSScraperStrategy(ScraperStrategy):
         if self._cancel_event.is_set():
             return None
             
-        if not await self.can_process_url(url):
+        if not await self.can_process_url(url, depth):
             self.stats.urls_skipped += 1
             return None
 
@@ -181,15 +167,13 @@ class BFSScraperStrategy(ScraperStrategy):
             async with self.rate_limiter:
                 result = await self._crawl_with_retry(crawler, url)
                 self.stats.urls_processed += 1
+                 # Process links
+                await self._process_links(result, url, depth, queue, visited, depths)
+                return result
         except Exception as e:
             self.logger.error(f"Error crawling {url}: {e}")
             self.stats.urls_failed += 1
             return None
-
-        # Process links
-        await self._process_links(result, url, depth, queue, visited, depths)
-        
-        return result
 
     async def _process_links(
         self,
@@ -210,25 +194,26 @@ class BFSScraperStrategy(ScraperStrategy):
             Adds valid URLs to the queue
             Updates maximum depth statistics
         """
-        links_ro_process = result.links["internal"]
+        links_to_process = result.links["internal"]
         if self.process_external_links:
-            links_ro_process += result.links["external"]
-        for link_type in links_ro_process:
-            for link in result.links[link_type]:
-                url = link['href']
-                # url = urljoin(source_url, link['href'])
-                # url = urlunparse(urlparse(url)._replace(fragment=""))
-                
-                if url not in visited and await self.can_process_url(url):
-                    new_depth = depths[source_url] + 1
-                    if new_depth <= self.max_depth:
+            links_to_process += result.links["external"]
+        for link in links_to_process:
+            url = link['href']
+            if url not in visited:
+                new_depth = depths[source_url] + 1
+                if new_depth <= self.max_depth:
+                    if self.url_scorer:
                         score = self.url_scorer.score(url)
-                        await queue.put((score, new_depth, url))
-                        depths[url] = new_depth
-                        self.stats.total_depth_reached = max(
-                            self.stats.total_depth_reached, 
-                            new_depth
-                        )
+                    else:
+                        # When no url_scorer is provided all urls will have same score of 0.
+                        # Therefore will be process in FIFO order as per URL depth
+                        score = 0
+                    await queue.put((score, new_depth, url))
+                    depths[url] = new_depth
+                    self.stats.total_depth_reached = max(
+                        self.stats.total_depth_reached, 
+                        new_depth
+                    )
 
     async def ascrape(
         self,
