@@ -76,12 +76,9 @@ class AsyncWebCrawler:
         """  
         # Handle browser configuration
         browser_config = config
+        legacy_warning = False
         if browser_config is not None:
-            if any(k in kwargs for k in ["browser_type", "headless", "viewport_width", "viewport_height"]):
-                self.logger.warning(
-                    message="Both browser_config and legacy browser parameters provided. browser_config will take precedence.",
-                    tag="WARNING"
-                )
+            legacy_warning = any(k in kwargs for k in ["browser_type", "headless", "viewport_width", "viewport_height"])
         else:
             # Create browser config from kwargs for backwards compatibility
             browser_config = BrowserConfig.from_kwargs(kwargs)
@@ -95,7 +92,12 @@ class AsyncWebCrawler:
             tag_width=10
         )
 
-        
+        if legacy_warning:
+            self.logger.warning(
+                message="Both browser_config and legacy browser parameters provided. browser_config will take precedence.",
+                tag="WARNING"
+            )
+
         # Initialize crawler strategy
         self.crawler_strategy = crawler_strategy or AsyncPlaywrightCrawlerStrategy(
             browser_config=browser_config,
