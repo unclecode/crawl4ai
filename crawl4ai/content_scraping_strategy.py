@@ -197,12 +197,15 @@ class WebScrapingStrategy(ContentScrapingStrategy):
         # Constants for checks
         classes_to_check = frozenset(['button', 'icon', 'logo'])
         tags_to_check = frozenset(['button', 'input'])
+        image_formats = frozenset(['jpg', 'jpeg', 'png', 'webp', 'avif', 'gif'])
         
         # Pre-fetch commonly used attributes
         style = img.get('style', '')
         alt = img.get('alt', '')
         src = img.get('src', '')
         data_src = img.get('data-src', '')
+        srcset = img.get('srcset', '')
+        data_srcset = img.get('data-srcset', '')        
         width = img.get('width')
         height = img.get('height')
         parent = img.parent
@@ -228,14 +231,36 @@ class WebScrapingStrategy(ContentScrapingStrategy):
             score += 1
         score += index/total_images < 0.5
         
-        image_format = ''
-        if "data:image/" in src:
-            image_format = src.split(',')[0].split(';')[0].split('/')[1].split(';')[0]
-        else:
-            image_format = os.path.splitext(src)[1].lower().strip('.').split('?')[0]
+        # image_format = ''
+        # if "data:image/" in src:
+        #     image_format = src.split(',')[0].split(';')[0].split('/')[1].split(';')[0]
+        # else:
+        #     image_format = os.path.splitext(src)[1].lower().strip('.').split('?')[0]
         
-        if image_format in ('jpg', 'png', 'webp', 'avif'):
+        # if image_format in ('jpg', 'png', 'webp', 'avif'):
+        #     score += 1
+            
+            
+        # Check for image format in all possible sources
+        def has_image_format(url):
+            return any(fmt in url.lower() for fmt in image_formats)
+        
+        # Score for having proper image sources
+        if any(has_image_format(url) for url in [src, data_src, srcset, data_srcset]):
             score += 1
+        if srcset or data_srcset:
+            score += 1
+        if img.find_parent('picture'):
+            score += 1
+        
+        # Detect format from any available source
+        detected_format = None
+        for url in [src, data_src, srcset, data_srcset]:
+            if url:
+                format_matches = [fmt for fmt in image_formats if fmt in url.lower()]
+                if format_matches:
+                    detected_format = format_matches[0]
+                    break            
 
         if score <= kwargs.get('image_score_threshold', IMAGE_SCORE_THRESHOLD):
             return None
@@ -254,7 +279,8 @@ class WebScrapingStrategy(ContentScrapingStrategy):
             'desc': self.find_closest_parent_with_useful_text(img, **kwargs),
             'score': score,
             'type': 'image',
-            'group_id': group_id # Group ID for this set of variants
+            'group_id': group_id, # Group ID for this set of variants
+            'format': detected_format,
         }
 
         # Inline function for adding variants
@@ -287,7 +313,6 @@ class WebScrapingStrategy(ContentScrapingStrategy):
 
         return image_variants if image_variants else None
 
-    
     def process_element(self, url, element: PageElement, **kwargs) -> Dict[str, Any]:        
         media = {'images': [], 'videos': [], 'audios': []}
         internal_links_dict = {}

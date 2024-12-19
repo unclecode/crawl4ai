@@ -61,7 +61,7 @@ class BrowserConfig:
                                        user_agent as-is. Default: None.
         user_agent_generator_config (dict or None): Configuration for user agent generation if user_agent_mode is set.
                                                     Default: None.
-        text_only (bool): If True, disables images and other rich content for potentially faster load times.
+        text_mode (bool): If True, disables images and other rich content for potentially faster load times.
                           Default: False.
         light_mode (bool): Disables certain background features for performance gains. Default: False.
         extra_args (list): Additional command-line arguments passed to the browser.
@@ -78,8 +78,8 @@ class BrowserConfig:
         chrome_channel: str = "chrome",
         proxy: str = None,
         proxy_config: dict = None,
-        viewport_width: int = 1920,
-        viewport_height: int = 1080,
+        viewport_width: int = 800,
+        viewport_height: int = 600, 
         accept_downloads: bool = False,
         downloads_path: str = None,
         storage_state=None,
@@ -95,7 +95,7 @@ class BrowserConfig:
         ),
         user_agent_mode: str = None,
         user_agent_generator_config: dict = None,
-        text_only: bool = False,
+        text_mode: bool = False,
         light_mode: bool = False,
         extra_args: list = None,
     ):
@@ -126,7 +126,7 @@ class BrowserConfig:
         self.user_agent = user_agent
         self.user_agent_mode = user_agent_mode
         self.user_agent_generator_config = user_agent_generator_config
-        self.text_only = text_only
+        self.text_mode = text_mode
         self.light_mode = light_mode
         self.extra_args = extra_args if extra_args is not None else []
         self.sleep_on_close = sleep_on_close
@@ -171,7 +171,7 @@ class BrowserConfig:
             ),
             user_agent_mode=kwargs.get("user_agent_mode"),
             user_agent_generator_config=kwargs.get("user_agent_generator_config"),
-            text_only=kwargs.get("text_only", False),
+            text_mode=kwargs.get("text_mode", False),
             light_mode=kwargs.get("light_mode", False),
             extra_args=kwargs.get("extra_args", []),
         )
@@ -366,7 +366,11 @@ class CrawlerRunConfig:
         # Debugging and Logging Parameters
         verbose: bool = True,
         log_console: bool = False,
+        
+        url: str = None,
     ):
+        self.url = url
+        
         # Content Processing Parameters
         self.word_count_threshold = word_count_threshold
         self.extraction_strategy = extraction_strategy
@@ -510,6 +514,8 @@ class CrawlerRunConfig:
             # Debugging and Logging Parameters
             verbose=kwargs.get("verbose", True),
             log_console=kwargs.get("log_console", False),
+            
+            url=kwargs.get("url"),
         )
         
         

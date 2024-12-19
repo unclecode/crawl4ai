@@ -32,7 +32,7 @@ async def test_browser_config_object():
 async def test_browser_performance_config():
     """Test browser configurations focused on performance"""
     browser_config = BrowserConfig(
-        text_only=True,
+        text_mode=True,
         light_mode=True,
         extra_args=['--disable-gpu', '--disable-software-rasterizer'],
         ignore_https_errors=True,

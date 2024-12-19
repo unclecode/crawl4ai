@@ -4,16 +4,21 @@ This guide covers the basics of web crawling with Crawl4AI. You'll learn how to 
 
 ## Basic Usage
 
-Here's the simplest way to crawl a webpage:
+Set up a simple crawl using `BrowserConfig` and `CrawlerRunConfig`:
 
 ```python
 import asyncio
 from crawl4ai import AsyncWebCrawler
+from crawl4ai.async_configs import BrowserConfig, CrawlerRunConfig
 
 async def main():
-    async with AsyncWebCrawler() as crawler:
+    browser_config = BrowserConfig()  # Default browser configuration
+    run_config = CrawlerRunConfig()   # Default crawl run configuration
+
+    async with AsyncWebCrawler(browser_config=browser_config) as crawler:
         result = await crawler.arun(
-            url="https://example.com"
+            url="https://example.com",
+            config=run_config
         )
         print(result.markdown)  # Print clean markdown content
 
@@ -26,7 +31,10 @@ if __name__ == "__main__":
 The `arun()` method returns a `CrawlResult` object with several useful properties. Here's a quick overview (see [CrawlResult](../api/crawl-result.md) for complete details):
 
 ```python
-result = await crawler.arun(url="https://example.com", fit_markdown=True)
+result = await crawler.arun(
+    url="https://example.com",
+    config=CrawlerRunConfig(fit_markdown=True)
+)
 
 # Different content formats
 print(result.html)         # Raw HTML
@@ -45,15 +53,19 @@ print(result.links)        # Dictionary of internal and external links
 
 ## Adding Basic Options
 
-Customize your crawl with these common options:
+Customize your crawl using `CrawlerRunConfig`:
 
 ```python
-result = await crawler.arun(
-    url="https://example.com",
+run_config = CrawlerRunConfig(
     word_count_threshold=10,        # Minimum words per content block
     exclude_external_links=True,    # Remove external links
     remove_overlay_elements=True,   # Remove popups/modals
     process_iframes=True           # Process iframe content
+)
+
+result = await crawler.arun(
+    url="https://example.com",
+    config=run_config
 )
 ```
 
@@ -62,7 +74,9 @@ result = await crawler.arun(
 Always check if the crawl was successful:
 
 ```python
-result = await crawler.arun(url="https://example.com")
+run_config = CrawlerRunConfig()
+result = await crawler.arun(url="https://example.com", config=run_config)
+
 if not result.success:
     print(f"Crawl failed: {result.error_message}")
     print(f"Status code: {result.status_code}")
@@ -70,36 +84,45 @@ if not result.success:
 
 ## Logging and Debugging
 
-Enable verbose mode for detailed logging:
+Enable verbose logging in `BrowserConfig`:
 
 ```python
-async with AsyncWebCrawler(verbose=True) as crawler:
-    result = await crawler.arun(url="https://example.com")
+browser_config = BrowserConfig(verbose=True)
+
+async with AsyncWebCrawler(browser_config=browser_config) as crawler:
+    run_config = CrawlerRunConfig()
+    result = await crawler.arun(url="https://example.com", config=run_config)
 ```
 
 ## Complete Example
 
-Here's a more comprehensive example showing common usage patterns:
+Here's a more comprehensive example demonstrating common usage patterns:
 
 ```python
 import asyncio
-from crawl4ai import AsyncWebCrawler, CacheMode
+from crawl4ai import AsyncWebCrawler
+from crawl4ai.async_configs import BrowserConfig, CrawlerRunConfig, CacheMode
 
 async def main():
-    async with AsyncWebCrawler(verbose=True) as crawler:
+    browser_config = BrowserConfig(verbose=True)
+    run_config = CrawlerRunConfig(
+        # Content filtering
+        word_count_threshold=10,
+        excluded_tags=['form', 'header'],
+        exclude_external_links=True,
+        
+        # Content processing
+        process_iframes=True,
+        remove_overlay_elements=True,
+        
+        # Cache control
+        cache_mode=CacheMode.ENABLED  # Use cache if available
+    )
+
+    async with AsyncWebCrawler(browser_config=browser_config) as crawler:
         result = await crawler.arun(
             url="https://example.com",
-            # Content filtering
-            word_count_threshold=10,
-            excluded_tags=['form', 'header'],
-            exclude_external_links=True,
-            
-            # Content processing
-            process_iframes=True,
-            remove_overlay_elements=True,
-            
-            # Cache control
-            cache_mode=CacheMode.ENABLE  # Use cache if available
+            config=run_config
         )
         
         if result.success:
