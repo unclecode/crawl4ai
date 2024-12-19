@@ -1,74 +1,70 @@
-# Session Management
+### Session Management
 
-Session management in Crawl4AI allows you to maintain state across multiple requests and handle complex multi-page crawling tasks, particularly useful for dynamic websites.
+Session management in Crawl4AI is a powerful feature that allows you to maintain state across multiple requests, making it particularly suitable for handling complex multi-step crawling tasks. It enables you to reuse the same browser tab (or page object) across sequential actions and crawls, which is beneficial for:
 
-## Basic Session Usage
+- **Performing JavaScript actions before and after crawling.**
+- **Executing multiple sequential crawls faster** without needing to reopen tabs or allocate memory repeatedly.
 
-Use `session_id` to maintain state between requests:
+**Note:** This feature is designed for sequential workflows and is not suitable for parallel operations.
+
+---
+
+#### Basic Session Usage
+
+Use `BrowserConfig` and `CrawlerRunConfig` to maintain state with a `session_id`:
 
 ```python
+from crawl4ai.async_configs import BrowserConfig, CrawlerRunConfig
+
 async with AsyncWebCrawler() as crawler:
     session_id = "my_session"
-    
+
+    # Define configurations
+    config1 = CrawlerRunConfig(url="https://example.com/page1", session_id=session_id)
+    config2 = CrawlerRunConfig(url="https://example.com/page2", session_id=session_id)
+
     # First request
-    result1 = await crawler.arun(
-        url="https://example.com/page1",
-        session_id=session_id
-    )
-    
-    # Subsequent request using same session
-    result2 = await crawler.arun(
-        url="https://example.com/page2",
-        session_id=session_id
-    )
-    
+    result1 = await crawler.arun(config=config1)
+
+    # Subsequent request using the same session
+    result2 = await crawler.arun(config=config2)
+
     # Clean up when done
     await crawler.crawler_strategy.kill_session(session_id)
 ```
 
-## Dynamic Content with Sessions
+---
 
-Here's a real-world example of crawling GitHub commits across multiple pages:
+#### Dynamic Content with Sessions
+
+Here's an example of crawling GitHub commits across multiple pages while preserving session state:
 
 ```python
+from crawl4ai.async_configs import CrawlerRunConfig
+from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai.cache_context import CacheMode
+
 async def crawl_dynamic_content():
-    async with AsyncWebCrawler(verbose=True) as crawler:
+    async with AsyncWebCrawler() as crawler:
+        session_id = "github_commits_session"
         url = "https://github.com/microsoft/TypeScript/commits/main"
-        session_id = "typescript_commits_session"
         all_commits = []
 
-        # Define navigation JavaScript
-        js_next_page = """
-        const button = document.querySelector('a[data-testid="pagination-next-button"]');
-        if (button) button.click();
-        """
-
-        # Define wait condition
-        wait_for = """() => {
-            const commits = document.querySelectorAll('li.Box-sc-g0xbh4-0 h4');
-            if (commits.length === 0) return false;
-            const firstCommit = commits[0].textContent.trim();
-            return firstCommit !== window.firstCommit;
-        }"""
-        
         # Define extraction schema
         schema = {
             "name": "Commit Extractor",
             "baseSelector": "li.Box-sc-g0xbh4-0",
-            "fields": [
-                {
-                    "name": "title",
-                    "selector": "h4.markdown-title",
-                    "type": "text",
-                    "transform": "strip",
-                },
-            ],
+            "fields": [{"name": "title", "selector": "h4.markdown-title", "type": "text"}],
         }
         extraction_strategy = JsonCssExtractionStrategy(schema)
 
+        # JavaScript and wait configurations
+        js_next_page = """document.querySelector('a[data-testid="pagination-next-button"]').click();"""
+        wait_for = """() => document.querySelectorAll('li.Box-sc-g0xbh4-0').length > 0"""
+
         # Crawl multiple pages
         for page in range(3):
-            result = await crawler.arun(
+            config = CrawlerRunConfig(
                 url=url,
                 session_id=session_id,
                 extraction_strategy=extraction_strategy,
@@ -78,6 +74,7 @@ async def crawl_dynamic_content():
                 cache_mode=CacheMode.BYPASS
             )
 
+            result = await crawler.arun(config=config)
             if result.success:
                 commits = json.loads(result.extracted_content)
                 all_commits.extend(commits)
@@ -88,46 +85,53 @@ async def crawl_dynamic_content():
         return all_commits
 ```
 
-## Session Best Practices
+---
 
-1. **Session Naming**:
-```python
-# Use descriptive session IDs
-session_id = "login_flow_session"
-session_id = "product_catalog_session"
-```
+#### Session Best Practices
+
+1. **Descriptive Session IDs**:
+   Use meaningful names for session IDs to organize workflows:
+   ```python
+   session_id = "login_flow_session"
+   session_id = "product_catalog_session"
+   ```
 
 2. **Resource Management**:
-```python
-try:
-    # Your crawling code
-    pass
-finally:
-    # Always clean up sessions
-    await crawler.crawler_strategy.kill_session(session_id)
-```
+   Always ensure sessions are cleaned up to free resources:
+   ```python
+   try:
+       # Your crawling code here
+       pass
+   finally:
+       await crawler.crawler_strategy.kill_session(session_id)
+   ```
 
-3. **State Management**:
-```python
-# First page: login
-result = await crawler.arun(
-    url="https://example.com/login",
-    session_id=session_id,
-    js_code="document.querySelector('form').submit();"
-)
+3. **State Maintenance**:
+   Reuse the session for subsequent actions within the same workflow:
+   ```python
+   # Step 1: Login
+   login_config = CrawlerRunConfig(
+       url="https://example.com/login",
+       session_id=session_id,
+       js_code="document.querySelector('form').submit();"
+   )
+   await crawler.arun(config=login_config)
 
-# Second page: verify login success
-result = await crawler.arun(
-    url="https://example.com/dashboard",
-    session_id=session_id,
-    wait_for="css:.user-profile"  # Wait for authenticated content
-)
-```
+   # Step 2: Verify login success
+   dashboard_config = CrawlerRunConfig(
+       url="https://example.com/dashboard",
+       session_id=session_id,
+       wait_for="css:.user-profile"  # Wait for authenticated content
+   )
+   result = await crawler.arun(config=dashboard_config)
+   ```
 
-## Common Use Cases
+---
 
-1. **Authentication Flows**
-2. **Pagination Handling**
-3. **Form Submissions**
-4. **Multi-step Processes**
-5. **Dynamic Content Navigation**
+#### Common Use Cases for Sessions
+
+1. **Authentication Flows**: Login and interact with secured pages.
+2. **Pagination Handling**: Navigate through multiple pages.
+3. **Form Submissions**: Fill forms, submit, and process results.
+4. **Multi-step Processes**: Complete workflows that span multiple actions.
+5. **Dynamic Content Navigation**: Handle JavaScript-rendered or event-triggered content.

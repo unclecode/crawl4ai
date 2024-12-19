@@ -1,136 +1,188 @@
-# Content Filtering in Crawl4AI
+#  Creating Browser Instances, Contexts, and Pages
 
-This guide explains how to use content filtering strategies in Crawl4AI to extract the most relevant information from crawled web pages.  You'll learn how to use the built-in `BM25ContentFilter` and how to create your own custom content filtering strategies.
+## 1 Introduction
 
-## Relevance Content Filter
+### Overview of Browser Management in Crawl4AI
+Crawl4AI's browser management system is designed to provide developers with advanced tools for handling complex web crawling tasks. By managing browser instances, contexts, and pages, Crawl4AI ensures optimal performance, anti-bot measures, and session persistence for high-volume, dynamic web crawling.
 
-The `RelevanceContentFilter` is an abstract class that provides a common interface for content filtering strategies. Specific filtering algorithms, like `PruningContentFilter` or `BM25ContentFilter`, inherit from this class and implement the `filter_content` method. This method takes the HTML content as input and returns a list of filtered text blocks.
+### Key Objectives
+- **Anti-Bot Handling**:
+  - Implements stealth techniques to evade detection mechanisms used by modern websites.
+  - Simulates human-like behavior, such as mouse movements, scrolling, and key presses.
+  - Supports integration with third-party services to bypass CAPTCHA challenges.
+- **Persistent Sessions**:
+  - Retains session data (cookies, local storage) for workflows requiring user authentication.
+  - Allows seamless continuation of tasks across multiple runs without re-authentication.
+- **Scalable Crawling**:
+  - Optimized resource utilization for handling thousands of URLs concurrently.
+  - Flexible configuration options to tailor crawling behavior to specific requirements.
 
+---
 
-## Pruning Content Filter
+## 2 Browser Creation Methods
 
-The `PruningContentFilter` is a tree-shaking algorithm that analyzes the HTML DOM structure and removes less relevant nodes based on various metrics like text density, link density, and tag importance. It evaluates each node using a composite scoring system and "prunes" nodes that fall below a certain threshold.
+### Standard Browser Creation
+Standard browser creation initializes a browser instance with default or minimal configurations. It is suitable for tasks that do not require session persistence or heavy customization.
 
-### Usage
+#### Features and Limitations
+- **Features**:
+  - Quick and straightforward setup for small-scale tasks.
+  - Supports headless and headful modes.
+- **Limitations**:
+  - Lacks advanced customization options like session reuse.
+  - May struggle with sites employing strict anti-bot measures.
 
+#### Example Usage
 ```python
-from crawl4ai import AsyncWebCrawler
-from crawl4ai.content_filter_strategy import PruningContentFilter
+from crawl4ai import AsyncWebCrawler, BrowserConfig
 
-async def filter_content(url):
-    async with AsyncWebCrawler() as crawler:
-        content_filter = PruningContentFilter(
-            min_word_threshold=5,
-            threshold_type='dynamic',
-            threshold=0.45
-        )
-        result = await crawler.arun(url=url, extraction_strategy=content_filter, fit_markdown=True)
-        if result.success:
-            print(f"Cleaned Markdown:\n{result.fit_markdown}")
+browser_config = BrowserConfig(browser_type="chromium", headless=True)
+async with AsyncWebCrawler(browser_config=browser_config) as crawler:
+    result = await crawler.arun("https://crawl4ai.com")
+    print(result.markdown)
 ```
 
-### Parameters
+### Persistent Contexts
+Persistent contexts create browser sessions with stored data, enabling workflows that require maintaining login states or other session-specific information.
 
-- **`min_word_threshold`**: (Optional) Minimum number of words a node must contain to be considered relevant. Nodes with fewer words are automatically pruned.
+#### Benefits of Using `user_data_dir`
+- **Session Persistence**:
+  - Stores cookies, local storage, and cache between crawling sessions.
+  - Reduces overhead for repetitive logins or multi-step workflows.
+- **Enhanced Performance**:
+  - Leverages pre-loaded resources for faster page loading.
+- **Flexibility**:
+  - Adapts to complex workflows requiring user-specific configurations.
 
-- **`threshold_type`**: (Optional, default 'fixed') Controls how pruning thresholds are calculated:
-  - `'fixed'`: Uses a constant threshold value for all nodes
-  - `'dynamic'`: Adjusts threshold based on node characteristics like tag importance and text/link ratios
-
-- **`threshold`**: (Optional, default 0.48) Base threshold value for node pruning:
-  - For fixed threshold: Nodes scoring below this value are removed
-  - For dynamic threshold: This value is adjusted based on node properties
-
-### How It Works
-
-The pruning algorithm evaluates each node using multiple metrics:
-- Text density: Ratio of actual text to overall node content
-- Link density: Proportion of text within links
-- Tag importance: Weight based on HTML tag type (e.g., article, p, div)
-- Content quality: Metrics like text length and structural importance
-
-Nodes scoring below the threshold are removed, effectively "shaking" less relevant content from the DOM tree. This results in a cleaner document containing only the most relevant content blocks.
-
-The algorithm is particularly effective for:
-- Removing boilerplate content
-- Eliminating navigation menus and sidebars
-- Preserving main article content
-- Maintaining document structure while removing noise
-
-
-## BM25 Algorithm
-
-The `BM25ContentFilter` uses the BM25 algorithm, a ranking function used in information retrieval to estimate the relevance of documents to a given search query. In Crawl4AI, this algorithm helps to identify and extract text chunks that are most relevant to the page's metadata or a user-specified query.
-
-### Usage
-
-To use the `BM25ContentFilter`, initialize it and then pass it as the `extraction_strategy` parameter to the `arun` method of the crawler.
-
+#### Example: Setting Up Persistent Contexts
 ```python
-from crawl4ai import AsyncWebCrawler
-from crawl4ai.content_filter_strategy import BM25ContentFilter
-
-async def filter_content(url, query=None):
-    async with AsyncWebCrawler() as crawler:
-        content_filter = BM25ContentFilter(user_query=query)
-        result = await crawler.arun(url=url, extraction_strategy=content_filter, fit_markdown=True) # Set fit_markdown flag to True to trigger BM25 filtering
-        if result.success:
-            print(f"Filtered Content (JSON):\n{result.extracted_content}")
-            print(f"\nFiltered Markdown:\n{result.fit_markdown}") # New field in CrawlResult object
-            print(f"\nFiltered HTML:\n{result.fit_html}") # New field in CrawlResult object. Note that raw HTML may have tags re-organized due to internal parsing.
-        else:
-            print("Error:", result.error_message)
-
-# Example usage:
-asyncio.run(filter_content("https://en.wikipedia.org/wiki/Apple", "fruit nutrition health")) # with query
-asyncio.run(filter_content("https://en.wikipedia.org/wiki/Apple")) # without query, metadata will be used as the query.
-
+config = BrowserConfig(user_data_dir="/path/to/user/data")
+async with AsyncWebCrawler(browser_config=config) as crawler:
+    result = await crawler.arun("https://crawl4ai.com")
+    print(result.markdown)
 ```
 
-### Parameters
+### Managed Browser
+The `ManagedBrowser` class offers a high-level abstraction for managing browser instances, emphasizing resource management, debugging capabilities, and anti-bot measures.
 
-- **`user_query`**:  (Optional) A string representing the search query. If not provided, the filter extracts relevant metadata (title, description, keywords) from the page and uses that as the query.
-- **`bm25_threshold`**: (Optional, default 1.0)  A float value that controls the threshold for relevance.  Higher values result in stricter filtering, returning only the most relevant text chunks. Lower values result in more lenient filtering.
+#### How It Works
+- **Browser Process Management**:
+  - Automates initialization and cleanup of browser processes.
+  - Optimizes resource usage by pooling and reusing browser instances.
+- **Debugging Support**:
+  - Integrates with debugging tools like Chrome Developer Tools for real-time inspection.
+- **Anti-Bot Measures**:
+  - Implements stealth plugins to mimic real user behavior and bypass bot detection.
 
+#### Features
+- **Customizable Configurations**:
+  - Supports advanced options such as viewport resizing, proxy settings, and header manipulation.
+- **Debugging and Logging**:
+  - Logs detailed browser interactions for debugging and performance analysis.
+- **Scalability**:
+  - Handles multiple browser instances concurrently, scaling dynamically based on workload.
 
-## Fit Markdown Flag
-
-Setting the `fit_markdown` flag to `True` in the `arun` method activates the BM25 content filtering during the crawl. The `fit_markdown` parameter instructs the scraper to extract and clean the HTML, primarily to prepare for a Large Language Model that cannot process large amounts of data. Setting this flag not only improves the quality of the extracted content but also adds the filtered content to two new attributes in the returned  `CrawlResult` object: `fit_markdown` and `fit_html`.
-
-
-## Custom Content Filtering Strategies
-
-You can create your own custom filtering strategies by inheriting from the `RelevantContentFilter` class and implementing the `filter_content` method.  This allows you to tailor the filtering logic to your specific needs.
-
+#### Example: Using `ManagedBrowser`
 ```python
-from crawl4ai.content_filter_strategy import RelevantContentFilter
-from bs4 import BeautifulSoup, Tag
-from typing import List
+from crawl4ai import AsyncWebCrawler, BrowserConfig
 
-class MyCustomFilter(RelevantContentFilter):
-    def filter_content(self, html: str) -> List[str]:
-        soup = BeautifulSoup(html, 'lxml')
-        # Implement custom filtering logic here
-        # Example: extract all paragraphs within divs with class "article-body"
-        filtered_paragraphs = []
-        for tag in soup.select("div.article-body p"):
-            if isinstance(tag, Tag):
-                filtered_paragraphs.append(str(tag)) # Add the cleaned HTML element.  
-        return filtered_paragraphs
-
-
-
-async def custom_filter_demo(url: str):
-    async with AsyncWebCrawler() as crawler:
-        custom_filter = MyCustomFilter()
-        result = await crawler.arun(url, extraction_strategy=custom_filter)
-        if result.success:
-            print(result.extracted_content)
-
+config = BrowserConfig(headless=False, debug_port=9222)
+async with AsyncWebCrawler(browser_config=config) as crawler:
+    result = await crawler.arun("https://crawl4ai.com")
+    print(result.markdown)
 ```
 
-This example demonstrates extracting paragraphs from a specific div class.  You can customize this logic to implement different filtering strategies, use regular expressions, analyze text density, or apply other relevant techniques.
+---
 
-## Conclusion
+## 3 Context and Page Management
 
-Content filtering strategies provide a powerful way to refine the output of your crawls. By using `BM25ContentFilter` or creating custom strategies, you can focus on the most pertinent information and improve the efficiency of your data processing pipeline.
+### Creating and Configuring Browser Contexts
+Browser contexts act as isolated environments within a single browser instance, enabling independent browsing sessions with their own cookies, cache, and storage.
+
+#### Customizations
+- **Headers and Cookies**:
+  - Define custom headers to mimic specific devices or browsers.
+  - Set cookies for authenticated sessions.
+- **Session Reuse**:
+  - Retain and reuse session data across multiple requests.
+  - Example: Preserve login states for authenticated crawls.
+
+#### Example: Context Initialization
+```python
+from crawl4ai import CrawlerRunConfig
+
+config = CrawlerRunConfig(headers={"User-Agent": "Crawl4AI/1.0"})
+async with AsyncWebCrawler() as crawler:
+    result = await crawler.arun("https://crawl4ai.com", config=config)
+    print(result.markdown)
+```
+
+### Creating Pages
+Pages represent individual tabs or views within a browser context. They are responsible for rendering content, executing JavaScript, and handling user interactions.
+
+#### Key Features
+- **IFrame Handling**:
+  - Extract content from embedded iframes.
+  - Navigate and interact with nested content.
+- **Viewport Customization**:
+  - Adjust viewport size to match target device dimensions.
+- **Lazy Loading**:
+  - Ensure dynamic elements are fully loaded before extraction.
+
+#### Example: Page Initialization
+```python
+config = CrawlerRunConfig(viewport_width=1920, viewport_height=1080)
+async with AsyncWebCrawler() as crawler:
+    result = await crawler.arun("https://crawl4ai.com", config=config)
+    print(result.markdown)
+```
+
+---
+
+## 4 Advanced Features and Best Practices
+
+### Debugging and Logging
+Remote debugging provides a powerful way to troubleshoot complex crawling workflows.
+
+#### Example: Enabling Remote Debugging
+```python
+config = BrowserConfig(debug_port=9222)
+async with AsyncWebCrawler(browser_config=config) as crawler:
+    result = await crawler.arun("https://crawl4ai.com")
+```
+
+### Anti-Bot Techniques
+- **Human Behavior Simulation**:
+  - Mimic real user actions, such as scrolling, clicking, and typing.
+  - Example: Use JavaScript to simulate interactions.
+- **Captcha Handling**:
+  - Integrate with third-party services like 2Captcha or AntiCaptcha for automated solving.
+
+#### Example: Simulating User Actions
+```python
+js_code = """
+(async () => {
+    document.querySelector('input[name="search"]').value = 'test';
+    document.querySelector('button[type="submit"]').click();
+})();
+"""
+config = CrawlerRunConfig(js_code=[js_code])
+async with AsyncWebCrawler() as crawler:
+    result = await crawler.arun("https://crawl4ai.com", config=config)
+```
+
+### Optimizations for Performance and Scalability
+- **Persistent Contexts**:
+  - Reuse browser contexts to minimize resource consumption.
+- **Concurrent Crawls**:
+  - Use `arun_many` with a controlled semaphore count for efficient batch processing.
+
+#### Example: Scaling Crawls
+```python
+urls = ["https://example1.com", "https://example2.com"]
+config = CrawlerRunConfig(semaphore_count=10)
+async with AsyncWebCrawler() as crawler:
+    results = await crawler.arun_many(urls, config=config)
+    for result in results:
+        print(result.url, result.markdown)
+```
