@@ -28,6 +28,7 @@ class BrowserConfig:
                          Default: True.
         use_managed_browser (bool): Launch the browser using a managed approach (e.g., via CDP), allowing
                                     advanced manipulation. Default: False.
+        debugging_port (int): Port for the browser debugging protocol. Default: 9222.
         use_persistent_context (bool): Use a persistent browser context (like a persistent profile).
                                        Automatically sets use_managed_browser=True. Default: False.
         user_data_dir (str or None): Path to a user data directory for persistent sessions. If None, a
@@ -98,6 +99,7 @@ class BrowserConfig:
         text_mode: bool = False,
         light_mode: bool = False,
         extra_args: list = None,
+        debugging_port : int = 9222,
     ):
         self.browser_type = browser_type
         self.headless = headless
@@ -131,6 +133,7 @@ class BrowserConfig:
         self.extra_args = extra_args if extra_args is not None else []
         self.sleep_on_close = sleep_on_close
         self.verbose = verbose
+        self.debugging_port = debugging_port
 
         user_agenr_generator = UserAgentGenerator()
         if self.user_agent_mode != "random":
