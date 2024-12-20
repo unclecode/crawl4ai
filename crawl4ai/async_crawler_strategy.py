@@ -265,6 +265,7 @@ class BrowserManager:
                 user_data_dir=self.config.user_data_dir,
                 headless=self.config.headless,
                 logger=self.logger,
+                debugging_port=self.config.debugging_port,
             )
 
     async def start(self):
@@ -505,21 +506,6 @@ class BrowserManager:
             page = await context.new_page()
         else:
             context = await self.create_browser_context()
-            # context = await self.browser.new_context(
-            #     user_agent=self.config.headers.get(
-            #             "User-Agent", self.config.user_agent
-            #         ),
-            #     viewport={
-            #         "width": self.config.viewport_width,
-            #         "height": self.config.viewport_height,
-            #     },
-            #     proxy={"server": self.config.proxy} if self.config.proxy else None,
-            #     accept_downloads=self.config.accept_downloads,
-            #     storage_state=self.config.storage_state,
-            #     ignore_https_errors=self.config.ignore_https_errors,
-            #     java_script_enabled=self.config.java_script_enabled,
-            #     device_scale_factor=1.0,
-            # )
             await self.setup_context(context, crawlerRunConfig)
             page = await context.new_page()
 
