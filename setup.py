@@ -78,6 +78,7 @@ setup(
             "crawl4ai-download-models=crawl4ai.model_loader:main",
             "crawl4ai-migrate=crawl4ai.migrations:main",  
             'crawl4ai-setup=crawl4ai.install:post_install', 
+            'crawl=crawl4ai.cli:cli',
         ],
     },
     classifiers=[

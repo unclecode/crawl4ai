@@ -2,6 +2,7 @@ import subprocess
 import sys
 import asyncio
 from .async_logger import AsyncLogger, LogLevel
+from .docs_manager import DocsManager
 
 # Initialize logger
 logger = AsyncLogger(log_level=LogLevel.DEBUG, verbose=True)
@@ -11,6 +12,7 @@ def post_install():
     logger.info("Running post-installation setup...", tag="INIT")
     install_playwright()
     run_migration()
+    asyncio.run(setup_docs())
     logger.success("Post-installation setup completed!", tag="COMPLETE")
     
 def install_playwright():
@@ -42,3 +44,8 @@ def run_migration():
     except Exception as e:
         logger.warning(f"Database initialization failed: {e}")
         logger.warning("Database will be initialized on first use")
+
+async def setup_docs():
+    """Download documentation files"""
+    docs_manager = DocsManager(logger)
+    await docs_manager.update_docs()
