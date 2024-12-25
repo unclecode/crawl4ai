@@ -731,6 +731,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             AsyncCrawlResponse: The response containing HTML, headers, status code, and optional data
         """
         response_headers = {}
+        ssl_certificate = None
         status_code = None
         
         # Reset downloaded files list for new crawl
@@ -791,9 +792,12 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 
                 status_code = response.status
                 response_headers = response.headers
+                if config.catch_ssl_certificate:
+                    ssl_certificate = await response.security_details()
             else:
                 status_code = 200
                 response_headers = {}
+                ssl_certificate = None
 
             # Wait for body element and visibility
             try:
@@ -969,6 +973,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             return AsyncCrawlResponse(
                 html=html,
                 response_headers=response_headers,
+                ssl_certificate=ssl_certificate,
                 status_code=status_code,
                 screenshot=screenshot_data,
                 pdf_data=pdf_data,

@@ -328,6 +328,7 @@ class AsyncWebCrawler:
                     if async_response:
                         crawl_result.status_code = async_response.status_code
                         crawl_result.response_headers = async_response.response_headers
+                        crawl_result.ssl_certificate = async_response.ssl_certificate
                         crawl_result.downloaded_files = async_response.downloaded_files
                     else:
                         crawl_result.status_code = 200

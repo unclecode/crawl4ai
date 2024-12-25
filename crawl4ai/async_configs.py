@@ -208,6 +208,8 @@ class CrawlerRunConfig:
                                Default: False.
         css_selector (str or None): CSS selector to extract a specific portion of the page.
                                     Default: None.
+        catch_ssl_certificate (bool): Whether to take the ssl certificate on crawling.
+                           Default: False.
         screenshot (bool): Whether to take a screenshot after crawling.
                            Default: False.
         pdf (bool): Whether to generate a PDF of the page.
@@ -279,6 +281,7 @@ class CrawlerRunConfig:
         no_cache_read: bool = False,
         no_cache_write: bool = False,
         css_selector: str = None,
+        catch_ssl_certificate: bool = False,
         screenshot: bool = False,
         pdf: bool = False,
         verbose: bool = True,
@@ -320,6 +323,7 @@ class CrawlerRunConfig:
         self.no_cache_read = no_cache_read
         self.no_cache_write = no_cache_write
         self.css_selector = css_selector
+        self.catch_ssl_certificate = catch_ssl_certificate
         self.screenshot = screenshot
         self.pdf = pdf
         self.verbose = verbose
@@ -376,6 +380,7 @@ class CrawlerRunConfig:
             no_cache_read=kwargs.get("no_cache_read", False),
             no_cache_write=kwargs.get("no_cache_write", False),
             css_selector=kwargs.get("css_selector"),
+            catch_ssl_certificate=kwargs.get("catch_ssl_certificate", False),
             screenshot=kwargs.get("screenshot", False),
             pdf=kwargs.get("pdf", False),
             verbose=kwargs.get("verbose", True),
