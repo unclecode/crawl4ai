@@ -39,8 +39,8 @@ async def main():
                     f.write(b64decode(result.screenshot))
             
             # Save PDF
-            if result.pdf_data:
-                pdf_bytes = b64decode(result.pdf_data)
+            if result.pdf:
+                pdf_bytes = b64decode(result.pdf)
                 with open(os.path.join(__location__, "page.pdf"), "wb") as f:
                     f.write(pdf_bytes)
 

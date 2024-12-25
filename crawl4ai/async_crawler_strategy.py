@@ -23,11 +23,7 @@ from .config import SCREENSHOT_HEIGHT_TRESHOLD, DOWNLOAD_PAGE_TIMEOUT
 from .async_configs import BrowserConfig, CrawlerRunConfig
 from .async_logger import AsyncLogger
 from playwright_stealth import StealthConfig, stealth_async
-
-
-from io import BytesIO
-import base64
-from PIL import Image, ImageDraw, ImageFont
+from .utilities.ssl_utils import get_ssl_certificate
 
 stealth_config = StealthConfig(
     webdriver=True,
@@ -566,18 +562,6 @@ class AsyncCrawlerStrategy(ABC):
     async def crawl_many(self, urls: List[str], **kwargs) -> List[AsyncCrawlResponse]:
         pass
 
-    @abstractmethod
-    async def take_screenshot(self, **kwargs) -> str:
-        pass
-
-    @abstractmethod
-    def update_user_agent(self, user_agent: str):
-        pass
-
-    @abstractmethod
-    def set_hook(self, hook_type: str, hook: Callable):
-        pass
-
 
 class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
     def __init__(
@@ -928,6 +912,11 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             page.on("pageerror", lambda e: log_consol(e, "error"))
 
         try:
+            # Get SSL certificate information if requested and URL is HTTPS
+            ssl_certificate = None
+            if config.fetch_ssl_certificate and url.startswith('https://'):
+                ssl_certificate = get_ssl_certificate(url)
+
             # Set up download handling
             if self.browser_config.accept_downloads:
                 page.on(
@@ -1155,6 +1144,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 screenshot=screenshot_data,
                 pdf_data=pdf_data,
                 get_delayed_content=get_delayed_content,
+                ssl_certificate=ssl_certificate,
                 downloaded_files=(
                     self._downloaded_files if self._downloaded_files else None
                 ),

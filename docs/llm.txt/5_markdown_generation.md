@@ -96,6 +96,30 @@ async with AsyncWebCrawler() as crawler:
 
 In this example, we ignore all hyperlinks, do not escape HTML entities, wrap text at 80 characters wide, skip internal links, mark code regions, and include superscript/subscript formatting.
 
+### Using Content Filters
+
+When you need filtered markdown (fit_markdown), configure the content filter with the markdown generator:
+
+```python
+from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
+from crawl4ai.content_filter_strategy import PruningContentFilter
+from crawl4ai import CrawlerRunConfig
+
+config = CrawlerRunConfig(
+    markdown_generator=DefaultMarkdownGenerator(
+        content_filter=PruningContentFilter(),  # Content filter goes here
+        options={
+            "ignore_links": True,
+            "escape_html": False
+        }
+    )
+)
+```
+
+This setup enables:
+- Raw markdown generation (always available)
+- Filtered markdown (fit_markdown) through PruningContentFilter
+
 ### Using Content Filters in Markdown Generation
 
 - **`content_filter` (object):**  

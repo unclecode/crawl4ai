@@ -14,3 +14,4 @@ aiofiles>=24.1.0
 colorama~=0.4
 snowballstemmer~=2.2
 pydantic>=2.10
+pyOpenSSL>=24.3.0

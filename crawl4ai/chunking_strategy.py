@@ -14,7 +14,12 @@ class ChunkingStrategy(ABC):
         Abstract method to chunk the given text.
         """
         pass
-    
+
+# Create an identity chunking strategy f(x) = [x]
+class IdentityChunking(ChunkingStrategy):
+    def chunk(self, text: str) -> list:
+        return [text]
+
 # Regex-based chunking
 class RegexChunking(ChunkingStrategy):
     def __init__(self, patterns=None, **kwargs):
@@ -127,7 +132,6 @@ class SlidingWindowChunking(ChunkingStrategy):
         
         return chunks
     
-
 class OverlappingWindowChunking(ChunkingStrategy):
     def __init__(self, window_size=1000, overlap=100, **kwargs):
         """

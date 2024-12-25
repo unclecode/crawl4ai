@@ -1,58 +1,12 @@
-Below is a structured list of hypothetical questions derived from the file’s content, followed by a bullet-point summary of key topics discussed.
-
-### Hypothetical Questions
-
-1. **General Hook Usage**
-   - *"What are hooks in Crawl4AI, and how do they help customize the crawling process?"*
-   - *"Which stages of the crawling lifecycle can I attach hooks to?"*
-
-2. **Specific Hooks**
-   - *"What does the `on_browser_created` hook allow me to do?"*
-   - *"How can I use the `on_page_context_created` hook to modify requests before navigation?"*
-   - *"When should I use `before_goto` and `after_goto` hooks?"*
-   - *"How does `on_execution_started` help with custom JavaScript execution?"*
-   - *"What kind of preprocessing can I do in `before_return_html`?"*
-
-3. **Authentication and Customization**
-   - *"How can I perform authentication (like logging in) before actual crawling begins?"*
-   - *"Can I set cookies, headers, or modify requests using hooks?"*
-
-4. **Error Handling and Debugging**
-   - *"If my hooks fail or raise errors, how is that handled during the crawling process?"*
-   - *"How can I use hooks to troubleshoot issues, like blocking image requests or logging console messages?"*
-
-5. **Complex Scenarios**
-   - *"Can I combine multiple hooks to handle complex workflows like login, script execution, and dynamic content blocking?"*
-   - *"Is it possible to add conditional logic in hooks to treat certain URLs differently?"*
-
-6. **Performance and Reliability**
-   - *"Do these hooks run asynchronously, and how does that affect the crawler’s performance?"*
-   - *"Can I cancel requests or actions via hooks to improve efficiency?"*
-
-7. **Integration with `BrowserConfig` and `CrawlerRunConfig`**
-   - *"How do I use `BrowserConfig` and `CrawlerRunConfig` in tandem with hooks?"*
-   - *"Does setting hooks require changes to the configuration objects or can I apply them at runtime?"*
-
-### Topics Discussed in the File
-
-- **Hooks in `AsyncWebCrawler`**:  
-  Hooks are asynchronous callback functions triggered at key points in the crawling lifecycle. They allow advanced customization, such as modifying browser/page contexts, injecting scripts, or altering network requests.
-
-- **Hook Types and Purposes**:  
-  - **`on_browser_created`**: Initialize browser state, handle authentication (login), set cookies.  
-  - **`on_page_context_created`**: Set up request routing, block resources, or modify requests before navigation.  
-  - **`before_goto`**: Add or modify HTTP headers, prepare the page before actually navigating to the target URL.  
-  - **`after_goto`**: Verify the current URL, log details, or ensure that page navigation succeeded.  
-  - **`on_execution_started`**: Perform actions right after JS execution, like logging console output or checking state.  
-  - **`before_return_html`**: Analyze, log, or preprocess the extracted HTML before it’s returned.
-
-- **Practical Examples**:  
-  Demonstrations of handling authentication via `on_browser_created`, blocking images using `on_page_context_created` with a custom routing function, adding HTTP headers in `before_goto`, and logging content details in `before_return_html`.
-
-- **Integration with Configuration Objects**:  
-  Using `BrowserConfig` for initial browser settings and `CrawlerRunConfig` for specifying JavaScript code, wait conditions, and more, then combining them with hooks for a fully customizable crawling workflow.
-
-- **Asynchronous and Flexible**:  
-  Hooks are async, fitting seamlessly into the event-driven model of crawling. They can abort requests, continue them, or conditionally modify behavior based on URL patterns.
-
-In summary, this file explains how to use hooks in Crawl4AI’s `AsyncWebCrawler` to customize nearly every aspect of the crawling process. By attaching hooks at various lifecycle stages, developers can implement authentication routines, block certain types of requests, tweak headers, run custom JS, and analyze the final HTML—all while maintaining control and flexibility.
+crawler_hooks: AsyncWebCrawler supports customizable hooks for modifying crawler behavior | hooks, async functions, crawler customization | crawler.crawler_strategy.set_hook()
+browser_creation_hook: on_browser_created hook executes when browser is initialized for authentication and setup | browser setup, login, authentication | async def on_browser_created(browser: Browser, **kwargs)
+page_context_hook: on_page_context_created hook handles routing and initial page setup | page context, routing, resource blocking | async def on_page_context_created(context: BrowserContext, page: Page, **kwargs)
+navigation_pre_hook: before_goto hook allows adding custom headers before URL navigation | headers, pre-navigation, request modification | async def before_goto(page: Page, context: BrowserContext, **kwargs)
+navigation_post_hook: after_goto hook executes after URL navigation for verification | post-navigation, URL logging | async def after_goto(page: Page, context: BrowserContext, **kwargs)
+js_execution_hook: on_execution_started hook runs after custom JavaScript execution | JavaScript, script execution | async def on_execution_started(page: Page, context: BrowserContext, **kwargs)
+html_processing_hook: before_return_html hook processes HTML content before returning | HTML content, preprocessing | async def before_return_html(page: Page, context: BrowserContext, html: str, **kwargs)
+browser_configuration: BrowserConfig allows setting headless mode and viewport dimensions | browser settings, viewport | BrowserConfig(headless=True, viewport_width=1920, viewport_height=1080)
+crawler_configuration: CrawlerRunConfig defines JavaScript execution and wait conditions | crawler settings, JS code, wait conditions | CrawlerRunConfig(js_code="window.scrollTo(0)", wait_for="footer")
+resource_management: Route handlers can block or modify specific resource types | resource blocking, request handling | if route.request.resource_type == "image": await route.abort()
+authentication_flow: Browser authentication handled through login form interaction and cookie setting | login process, cookies | await page.fill("input[name='username']", "testuser")
+hook_registration: Hooks are registered using the crawler strategy's set_hook method | hook setup, strategy | crawler.crawler_strategy.set_hook("hook_name", hook_function)

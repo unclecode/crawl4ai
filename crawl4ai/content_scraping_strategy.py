@@ -1,4 +1,5 @@
 import re  # Point 1: Pre-Compile Regular Expressions
+import time
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 from bs4 import BeautifulSoup
@@ -16,7 +17,8 @@ from .models import MarkdownGenerationResult
 from .utils import (
     extract_metadata,
     normalize_url,
-    is_external_url    
+    is_external_url,    
+    get_base_domain,    
 )
 
 
@@ -341,6 +343,7 @@ class WebScrapingStrategy(ContentScrapingStrategy):
             # if element.name == 'img':
             #     process_image(element, url, 0, 1)
             #     return True
+            base_domain = kwargs.get("base_domain", get_base_domain(url))
 
             if element.name in ['script', 'style', 'link', 'meta', 'noscript']:
                 element.decompose()
@@ -348,8 +351,10 @@ class WebScrapingStrategy(ContentScrapingStrategy):
 
             keep_element = False
             
-            exclude_social_media_domains = SOCIAL_MEDIA_DOMAINS + kwargs.get('exclude_social_media_domains', [])
-            exclude_social_media_domains = list(set(exclude_social_media_domains))
+            exclude_domains = kwargs.get('exclude_domains', [])
+            # exclude_social_media_domains = kwargs.get('exclude_social_media_domains', set(SOCIAL_MEDIA_DOMAINS))
+            # exclude_social_media_domains = SOCIAL_MEDIA_DOMAINS + kwargs.get('exclude_social_media_domains', [])
+            # exclude_social_media_domains = list(set(exclude_social_media_domains))
             
             try:
                 if element.name == 'a' and element.get('href'):
@@ -369,33 +374,43 @@ class WebScrapingStrategy(ContentScrapingStrategy):
                     link_data = {
                         'href': normalized_href,
                         'text': element.get_text().strip(),
-                        'title': element.get('title', '').strip()
+                        'title': element.get('title', '').strip(),
+                        'base_domain': base_domain
                     }
+                                        
+                    is_external = is_external_url(normalized_href, base_domain)
+                            
+                    keep_element = True
                     
-                    # Check for duplicates and add to appropriate dictionary
-                    is_external = is_external_url(normalized_href, url_base)
+                    # Handle external link exclusions
+                    if is_external:
+                        link_base_domain = get_base_domain(normalized_href)
+                        link_data['base_domain'] = link_base_domain
+                        if kwargs.get('exclude_external_links', False):
+                            element.decompose()
+                            return False
+                        # elif kwargs.get('exclude_social_media_links', False):
+                        #     if link_base_domain in exclude_social_media_domains:
+                        #         element.decompose()
+                        #         return False
+                            # if any(domain in normalized_href.lower() for domain in exclude_social_media_domains):
+                            #     element.decompose()
+                            #     return False
+                        elif exclude_domains:
+                            if link_base_domain in exclude_domains:
+                                element.decompose()
+                                return False
+                            # if any(domain in normalized_href.lower() for domain in kwargs.get('exclude_domains', [])):
+                            #     element.decompose()
+                            #     return False
+
                     if is_external:
                         if normalized_href not in external_links_dict:
                             external_links_dict[normalized_href] = link_data
                     else:
                         if normalized_href not in internal_links_dict:
                             internal_links_dict[normalized_href] = link_data
-                            
-                    keep_element = True
-                    
-                    # Handle external link exclusions
-                    if is_external:
-                        if kwargs.get('exclude_external_links', False):
-                            element.decompose()
-                            return False
-                        elif kwargs.get('exclude_social_media_links', False):
-                            if any(domain in normalized_href.lower() for domain in exclude_social_media_domains):
-                                element.decompose()
-                                return False
-                        elif kwargs.get('exclude_domains', []):
-                            if any(domain in normalized_href.lower() for domain in kwargs.get('exclude_domains', [])):
-                                element.decompose()
-                                return False
+
                                 
             except Exception as e:
                 raise Exception(f"Error processing links: {str(e)}")
@@ -414,26 +429,40 @@ class WebScrapingStrategy(ContentScrapingStrategy):
                     if 'srcset' in element.attrs:
                         src = element.attrs['srcset'].split(',')[0].split(' ')[0]
                         
+                    # If image src is internal, then skip
+                    if not is_external_url(src, base_domain):
+                        return True
+                    
+                    image_src_base_domain = get_base_domain(src)
+                    
                     # Check flag if we should remove external images
                     if kwargs.get('exclude_external_images', False):
-                        src_url_base = src.split('/')[2]
-                        url_base = url.split('/')[2]
-                        if url_base not in src_url_base:
-                            element.decompose()
-                            return False
+                        element.decompose()
+                        return False
+                        # src_url_base = src.split('/')[2]
+                        # url_base = url.split('/')[2]
+                        # if url_base not in src_url_base:
+                        #     element.decompose()
+                        #     return False
                         
-                    if not kwargs.get('exclude_external_images', False) and kwargs.get('exclude_social_media_links', False):
-                        src_url_base = src.split('/')[2]
-                        url_base = url.split('/')[2]
-                        if any(domain in src for domain in exclude_social_media_domains):
-                            element.decompose()
-                            return False
+                    # if kwargs.get('exclude_social_media_links', False):
+                    #     if image_src_base_domain in exclude_social_media_domains:
+                    #         element.decompose()
+                    #         return False
+                        # src_url_base = src.split('/')[2]
+                        # url_base = url.split('/')[2]
+                        # if any(domain in src for domain in exclude_social_media_domains):
+                        #     element.decompose()
+                        #     return False
                         
                     # Handle exclude domains
-                    if kwargs.get('exclude_domains', []):
-                        if any(domain in src for domain in kwargs.get('exclude_domains', [])):
+                    if exclude_domains:                        
+                        if image_src_base_domain in exclude_domains:
                             element.decompose()
                             return False
+                        # if any(domain in src for domain in kwargs.get('exclude_domains', [])):
+                        #     element.decompose()
+                        #     return False
                     
                     return True  # Always keep image elements
             except Exception as e:
@@ -511,6 +540,7 @@ class WebScrapingStrategy(ContentScrapingStrategy):
 
         soup = BeautifulSoup(html, 'lxml')
         body = soup.body
+        base_domain = get_base_domain(url)
         
         try:
             meta = extract_metadata("", soup)
@@ -556,10 +586,16 @@ class WebScrapingStrategy(ContentScrapingStrategy):
             for el in selected_elements:
                 body.append(el)
 
+        kwargs['exclude_social_media_domains'] = set(kwargs.get('exclude_social_media_domains', []) + SOCIAL_MEDIA_DOMAINS)
+        kwargs['exclude_domains'] = set(kwargs.get('exclude_domains', []))
+        if kwargs.get('exclude_social_media_links', False):
+            kwargs['exclude_domains'] = kwargs['exclude_domains'].union(kwargs['exclude_social_media_domains'])
+        
         result_obj = self.process_element(
             url, 
             body, 
             word_count_threshold = word_count_threshold, 
+            base_domain=base_domain,
             **kwargs
         )
         

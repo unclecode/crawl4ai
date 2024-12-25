@@ -1,0 +1,10 @@
+storage_state_concept: Storage state preserves session data including cookies and localStorage across crawler runs | session persistence, state management | storage_state="mystate.json"
+storage_state_formats: Storage state can be provided as either a dictionary or path to JSON file | state configuration, json format | storage_state={"cookies": [...], "origins": [...]}
+cookie_structure: Cookies in storage state require name, value, domain, path, and expiration properties | cookie configuration, session cookies | "cookies": [{"name": "session", "value": "abcd1234", "domain": "example.com"}]
+localstorage_structure: localStorage entries are organized by origin with name-value pairs | web storage, browser storage | "localStorage": [{"name": "token", "value": "my_auth_token"}]
+authentication_preservation: Storage state enables starting crawls in authenticated state without repeating login flow | session management, login persistence | AsyncWebCrawler(storage_state="my_storage_state.json")
+state_export: Browser context state can be exported to JSON file after successful login | session export, state saving | await context.storage_state(path="my_storage_state.json")
+login_automation: Initial login can be performed using browser_created_hook to establish authenticated state | authentication automation, login process | on_browser_created_hook(browser)
+persistent_context: Crawler supports persistent context with user data directory for maintaining state | browser persistence, session storage | use_persistent_context=True, user_data_dir="./my_user_data"
+protected_content: Storage state enables direct access to protected content by preserving authentication tokens | authenticated access, protected pages | crawler.arun(url='https://example.com/protected')
+state_reuse: Subsequent crawler runs can reuse saved storage state to skip authentication steps | session reuse, login bypass | AsyncWebCrawler(storage_state="my_storage_state.json")

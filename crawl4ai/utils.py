@@ -1,4 +1,5 @@
 import time
+from urllib.parse import urlparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from bs4 import BeautifulSoup, Comment, element, Tag, NavigableString
 import json
@@ -6,7 +7,6 @@ import html
 import re
 import os
 import platform
-from .html2text import HTML2Text
 from .prompts import PROMPT_EXTRACT_BLOCKS
 from .config import *
 from pathlib import Path
@@ -14,7 +14,6 @@ from typing import Dict, Any
 from urllib.parse import urljoin
 import requests
 from requests.exceptions import InvalidSchema
-import hashlib
 from typing import Optional, Tuple, Dict, Any
 import xxhash
 from colorama import Fore, Style, init
@@ -1110,21 +1109,52 @@ def normalize_url_tmp(href, base_url):
         
     return href.strip()
 
-def is_external_url(url, base_domain):
-    """Determine if a URL is external"""
-    special_protocols = {'mailto:', 'tel:', 'ftp:', 'file:', 'data:', 'javascript:'}
-    if any(url.lower().startswith(proto) for proto in special_protocols):
+def get_base_domain(url: str) -> str:
+    """Extract base domain from URL, handling various edge cases."""
+    try:
+        # Get domain from URL
+        domain = urlparse(url).netloc.lower()
+        if not domain:
+            return ""
+            
+        # Remove port if present
+        domain = domain.split(':')[0]
+        
+        # Remove www
+        domain = re.sub(r'^www\.', '', domain)
+        
+        # Extract last two parts of domain (handles co.uk etc)
+        parts = domain.split('.')
+        if len(parts) > 2 and parts[-2] in {
+            'co', 'com', 'org', 'gov', 'edu', 'net', 
+            'mil', 'int', 'ac', 'ad', 'ae', 'af', 'ag'
+        }:
+            return '.'.join(parts[-3:])
+            
+        return '.'.join(parts[-2:])
+    except Exception:
+        return ""
+
+def is_external_url(url: str, base_domain: str) -> bool:
+    """Check if URL is external to base domain."""
+    special = {'mailto:', 'tel:', 'ftp:', 'file:', 'data:', 'javascript:'}
+    if any(url.lower().startswith(p) for p in special):
         return True
         
     try:
-        # Handle URLs with protocol
-        if url.startswith(('http://', 'https://')):
-            url_domain = url.split('/')[2]
-            return base_domain.lower() not in url_domain.lower()
-    except IndexError:
-        return False
+        parsed = urlparse(url)
+        if not parsed.netloc:  # Relative URL
+            return False
+            
+        # Strip 'www.' from both domains for comparison
+        url_domain = parsed.netloc.lower().replace('www.', '')
+        base = base_domain.lower().replace('www.', '')
         
-    return False
+        # Check if URL domain ends with base domain
+        return not url_domain.endswith(base)
+    except Exception:
+        return False
+
 
 def clean_tokens(tokens: list[str]) -> list[str]:
     # Set of tokens to remove
@@ -1290,3 +1320,6 @@ def get_error_context(exc_info, context_lines: int = 5):
         "function": func_name,
         "code_context": code_context
     }
+    
+    
+    
