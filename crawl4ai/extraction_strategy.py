@@ -6,6 +6,7 @@ import json, time
 from .prompts import *
 from .config import *
 from .utils import *
+from .models import *
 from functools import partial
 from .model_loader import *
 import math
@@ -13,13 +14,23 @@ import numpy as np
 import re
 from bs4 import BeautifulSoup
 from lxml import html, etree
+from dataclasses import dataclass
 
 class ExtractionStrategy(ABC):
     """
     Abstract base class for all extraction strategies.
     """
     
-    def __init__(self, **kwargs):
+    def __init__(self, input_format: str = "markdown", **kwargs):
+        """
+        Initialize the extraction strategy.
+
+        Args:
+            input_format: Content format to use for extraction.
+                         Options: "markdown" (default), "html", "fit_markdown"
+            **kwargs: Additional keyword arguments
+        """
+        self.input_format = input_format
         self.DEL = "<|DEL|>"
         self.name = self.__class__.__name__
         self.verbose = kwargs.get("verbose", False)
@@ -62,6 +73,8 @@ class NoExtractionStrategy(ExtractionStrategy):
 # Strategies using LLM-based extraction for text data #
 #######################################################
 
+
+    
 class LLMExtractionStrategy(ExtractionStrategy):
     def __init__(self, 
                  provider: str = DEFAULT_PROVIDER, api_token: Optional[str] = None, 
@@ -73,7 +86,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
         :param api_token: The API token for the provider.
         :param instruction: The instruction to use for the LLM model.
         """
-        super().__init__() 
+        super().__init__(**kwargs)
         self.provider = provider
         self.api_token = api_token or PROVIDER_MODELS.get(provider, "no-token") or os.getenv("OPENAI_API_KEY")
         self.instruction = instruction
@@ -93,6 +106,8 @@ class LLMExtractionStrategy(ExtractionStrategy):
             self.chunk_token_threshold = 1e9
         
         self.verbose = kwargs.get("verbose", False)
+        self.usages = []  # Store individual usages
+        self.total_usage = TokenUsage()  # Accumulated usage        
         
         if not self.api_token:
             raise ValueError("API token must be provided for LLMExtractionStrategy. Update the config.py or set OPENAI_API_KEY environment variable.")
@@ -129,6 +144,21 @@ class LLMExtractionStrategy(ExtractionStrategy):
             base_url=self.api_base or self.base_url,
             extra_args = self.extra_args
             ) # , json_response=self.extract_type == "schema")
+        # Track usage
+        usage = TokenUsage(
+            completion_tokens=response.usage.completion_tokens,
+            prompt_tokens=response.usage.prompt_tokens,
+            total_tokens=response.usage.total_tokens,
+            completion_tokens_details=response.usage.completion_tokens_details.__dict__ if response.usage.completion_tokens_details else {},
+            prompt_tokens_details=response.usage.prompt_tokens_details.__dict__ if response.usage.prompt_tokens_details else {}
+        )
+        self.usages.append(usage)
+        
+        # Update totals
+        self.total_usage.completion_tokens += usage.completion_tokens
+        self.total_usage.prompt_tokens += usage.prompt_tokens 
+        self.total_usage.total_tokens += usage.total_tokens
+        
         try:
             blocks = extract_xml_data(["blocks"], response.choices[0].message.content)['blocks']
             blocks = json.loads(blocks)
@@ -238,6 +268,22 @@ class LLMExtractionStrategy(ExtractionStrategy):
 
         
         return extracted_content        
+    
+    
+    def show_usage(self) -> None:
+        """Print a detailed token usage report showing total and per-request usage."""
+        print("\n=== Token Usage Summary ===")
+        print(f"{'Type':<15} {'Count':>12}")
+        print("-" * 30)
+        print(f"{'Completion':<15} {self.total_usage.completion_tokens:>12,}")
+        print(f"{'Prompt':<15} {self.total_usage.prompt_tokens:>12,}")
+        print(f"{'Total':<15} {self.total_usage.total_tokens:>12,}")
+
+        print("\n=== Usage History ===")
+        print(f"{'Request #':<10} {'Completion':>12} {'Prompt':>12} {'Total':>12}")
+        print("-" * 48)
+        for i, usage in enumerate(self.usages, 1):
+            print(f"{i:<10} {usage.completion_tokens:>12,} {usage.prompt_tokens:>12,} {usage.total_tokens:>12,}")
   
 
 #######################################################
@@ -256,7 +302,7 @@ class CosineStrategy(ExtractionStrategy):
             linkage_method (str): The linkage method for hierarchical clustering.
             top_k (int): Number of top categories to extract.
         """
-        super().__init__()
+        super().__init__(**kwargs)
         
         import numpy as np
         
@@ -537,7 +583,7 @@ class TopicExtractionStrategy(ExtractionStrategy):
         :param num_keywords: Number of keywords to represent each topic segment.
         """
         import nltk
-        super().__init__()
+        super().__init__(**kwargs)
         self.num_keywords = num_keywords
         self.tokenizer = nltk.TextTilingTokenizer()
 
@@ -604,6 +650,7 @@ class ContentSummarizationStrategy(ExtractionStrategy):
 
         :param model_name: The model to use for summarization.
         """
+        super().__init__(**kwargs)
         from transformers import pipeline
         self.summarizer = pipeline("summarization", model=model_name)
 
@@ -809,6 +856,10 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
         pass
 
 class JsonCssExtractionStrategy(JsonElementExtractionStrategy):
+    def __init__(self, schema: Dict[str, Any], **kwargs):
+        kwargs['input_format'] = 'html'  # Force HTML input
+        super().__init__(schema, **kwargs)
+
     def _parse_html(self, html_content: str):
         return BeautifulSoup(html_content, 'html.parser')
 
@@ -829,6 +880,10 @@ class JsonCssExtractionStrategy(JsonElementExtractionStrategy):
         return element.get(attribute)
 
 class JsonXPathExtractionStrategy(JsonElementExtractionStrategy):
+    def __init__(self, schema: Dict[str, Any], **kwargs):
+        kwargs['input_format'] = 'html'  # Force HTML input
+        super().__init__(schema, **kwargs)
+
     def _parse_html(self, html_content: str):
         return html.fromstring(html_content)
 
@@ -869,6 +924,7 @@ class JsonXPathExtractionStrategy(JsonElementExtractionStrategy):
  
 class _JsonCssExtractionStrategy(ExtractionStrategy):
     def __init__(self, schema: Dict[str, Any], **kwargs):
+        kwargs['input_format'] = 'html'  # Force HTML input
         super().__init__(**kwargs)
         self.schema = schema
 
@@ -983,6 +1039,7 @@ class _JsonCssExtractionStrategy(ExtractionStrategy):
         return self.extract(url, combined_html, **kwargs)
 class _JsonXPathExtractionStrategy(ExtractionStrategy):
     def __init__(self, schema: Dict[str, Any], **kwargs):
+        kwargs['input_format'] = 'html'  # Force HTML input
         super().__init__(**kwargs)
         self.schema = schema
 

@@ -4,10 +4,30 @@
 
 Streamlined parameters, usage, and code snippets for quick LLM reference.
 
+## Input Formats
+
+- **markdown** (default): Raw markdown from HTML
+- **html**: Raw HTML content
+- **fit_markdown**: Cleaned markdown (needs markdown_generator + content_filter)
+
+```python
+strategy = LLMExtractionStrategy(
+    input_format="html",  # Choose format
+    provider="openai/gpt-4",
+    instruction="Extract data"
+)
+
+config = CrawlerRunConfig(
+    extraction_strategy=strategy,
+    markdown_generator=DefaultMarkdownGenerator(),  # For fit_markdown
+    content_filter=PruningContentFilter()          # For fit_markdown
+)
+```
+
 ## LLMExtractionStrategy
 
 - Uses LLM to extract structured data from HTML.
-- Supports `instruction`, `schema`, `extraction_type`, `chunk_token_threshold`, `overlap_rate`.
+- Supports `instruction`, `schema`, `extraction_type`, `chunk_token_threshold`, `overlap_rate`, `input_format`.
 ```python
 from crawl4ai.extraction_strategy import LLMExtractionStrategy
 strategy = LLMExtractionStrategy(
@@ -15,7 +35,8 @@ strategy = LLMExtractionStrategy(
     api_token="your_api_token",
     instruction="Extract prices",
     schema={"fields": [...]},
-    extraction_type="schema"
+    extraction_type="schema",
+    input_format="html"
 )
 ```
 

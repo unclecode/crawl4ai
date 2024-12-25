@@ -42,6 +42,26 @@ class AsyncWebCrawler:
     """
     Asynchronous web crawler with flexible caching capabilities.
     
+    There are two ways to use the crawler:
+
+    1. Using context manager (recommended for simple cases):
+        ```python
+        async with AsyncWebCrawler() as crawler:
+            result = await crawler.arun(url="https://example.com")
+        ```
+
+    2. Using explicit lifecycle management (recommended for long-running applications):
+        ```python
+        crawler = AsyncWebCrawler()
+        await crawler.start()
+        
+        # Use the crawler multiple times
+        result1 = await crawler.arun(url="https://example.com")
+        result2 = await crawler.arun(url="https://another.com")
+        
+        await crawler.close()
+        ```
+    
     Migration Guide:
     Old way (deprecated):
         crawler = AsyncWebCrawler(always_by_pass_cache=True, browser_type="chromium", headless=True)
@@ -127,16 +147,49 @@ class AsyncWebCrawler:
         
         self.ready = False
 
-    async def __aenter__(self):
+    async def start(self):
+        """
+        Start the crawler explicitly without using context manager.
+        This is equivalent to using 'async with' but gives more control over the lifecycle.
+        
+        This method will:
+        1. Initialize the browser and context
+        2. Perform warmup sequence
+        3. Return the crawler instance for method chaining
+        
+        Returns:
+            AsyncWebCrawler: The initialized crawler instance
+        """
         await self.crawler_strategy.__aenter__()
         await self.awarmup()
         return self
 
+    async def close(self):
+        """
+        Close the crawler explicitly without using context manager.
+        This should be called when you're done with the crawler if you used start().
+        
+        This method will:
+        1. Clean up browser resources
+        2. Close any open pages and contexts
+        """
+        await self.crawler_strategy.__aexit__(None, None, None)
+
+    async def __aenter__(self):
+        return await self.start()
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self.crawler_strategy.__aexit__(exc_type, exc_val, exc_tb)
+        await self.close()
     
     async def awarmup(self):
-        """Initialize the crawler with warm-up sequence."""
+        """
+        Initialize the crawler with warm-up sequence.
+        
+        This method:
+        1. Logs initialization info
+        2. Sets up browser configuration
+        3. Marks the crawler as ready
+        """
         self.logger.info(f"Crawl4AI {crawl4ai_version}", tag="INIT")
         self.ready = True
 
@@ -144,7 +197,7 @@ class AsyncWebCrawler:
     async def nullcontext(self):
         """异步空上下文管理器"""
         yield
-    
+
     async def arun(
             self,
             url: str,
@@ -204,14 +257,14 @@ class AsyncWebCrawler:
                 try:
                     # Handle configuration
                     if crawler_config is not None:
-                        if any(param is not None for param in [
-                            word_count_threshold, extraction_strategy, chunking_strategy,
-                            content_filter, cache_mode, css_selector, screenshot, pdf
-                        ]):
-                            self.logger.warning(
-                                message="Both crawler_config and legacy parameters provided. crawler_config will take precedence.",
-                                tag="WARNING"
-                            )
+                        # if any(param is not None for param in [
+                        #     word_count_threshold, extraction_strategy, chunking_strategy,
+                        #     content_filter, cache_mode, css_selector, screenshot, pdf
+                        # ]):
+                        #     self.logger.warning(
+                        #         message="Both crawler_config and legacy parameters provided. crawler_config will take precedence.",
+                        #         tag="WARNING"
+                        #     )
                         config = crawler_config
                     else:
                         # Merge all parameters into a single kwargs dict for config creation
@@ -322,6 +375,7 @@ class AsyncWebCrawler:
                         screenshot=screenshot_data,
                         pdf_data=pdf_data,
                         verbose=config.verbose,
+                        is_raw_html = True if url.startswith("raw:") else False,
                         **kwargs
                     )
 
@@ -330,9 +384,11 @@ class AsyncWebCrawler:
                         crawl_result.status_code = async_response.status_code
                         crawl_result.response_headers = async_response.response_headers
                         crawl_result.downloaded_files = async_response.downloaded_files
+                        crawl_result.ssl_certificate = async_response.ssl_certificate  # Add SSL certificate
                     else:
                         crawl_result.status_code = 200
                         crawl_result.response_headers = cached_result.response_headers if cached_result else {}
+                        crawl_result.ssl_certificate = cached_result.ssl_certificate if cached_result else None  # Add SSL certificate from cache
 
                     crawl_result.success = bool(html)
                     crawl_result.session_id = getattr(config, 'session_id', None)
@@ -416,15 +472,20 @@ class AsyncWebCrawler:
                 scrapping_strategy = WebScrapingStrategy(logger=self.logger)
 
                 # Process HTML content
+                params = {k:v for k, v in config.to_dict().items() if k not in ["url"]}
+                # add keys from kwargs to params that doesn't exist in params
+                params.update({k:v for k, v in kwargs.items() if k not in params.keys()})
+                
                 result = scrapping_strategy.scrap(
                     url,
                     html,
-                    word_count_threshold=config.word_count_threshold,
-                    css_selector=config.css_selector,
-                    only_text=config.only_text,
-                    image_description_min_word_threshold=config.image_description_min_word_threshold,
-                    content_filter=config.content_filter,
-                    **kwargs
+                    **params,
+                    # word_count_threshold=config.word_count_threshold,
+                    # css_selector=config.css_selector,
+                    # only_text=config.only_text,
+                    # image_description_min_word_threshold=config.image_description_min_word_threshold,
+                    # content_filter=config.content_filter,
+                    # **kwargs
                 )
 
                 if result is None:
@@ -476,15 +537,27 @@ class AsyncWebCrawler:
                 
                 t1 = time.perf_counter()
                 
-                # Handle different extraction strategy types
-                if isinstance(config.extraction_strategy, (JsonCssExtractionStrategy, JsonXPathExtractionStrategy)):
-                    config.extraction_strategy.verbose = verbose
-                    extracted_content = config.extraction_strategy.run(url, [html])
-                    extracted_content = json.dumps(extracted_content, indent=4, default=str, ensure_ascii=False)
-                else:
-                    sections = config.chunking_strategy.chunk(markdown)
-                    extracted_content = config.extraction_strategy.run(url, sections)
-                    extracted_content = json.dumps(extracted_content, indent=4, default=str, ensure_ascii=False)
+                # Choose content based on input_format
+                content_format = config.extraction_strategy.input_format
+                if content_format == "fit_markdown" and not markdown_result.fit_markdown:
+                    self.logger.warning(
+                        message="Fit markdown requested but not available. Falling back to raw markdown.",
+                        tag="EXTRACT",
+                        params={"url": _url}
+                    )
+                    content_format = "markdown"
+
+                content = {
+                    "markdown": markdown,
+                    "html": html,
+                    "fit_markdown": markdown_result.raw_markdown
+                }.get(content_format, markdown)
+                
+                # Use IdentityChunking for HTML input, otherwise use provided chunking strategy
+                chunking = IdentityChunking() if content_format == "html" else config.chunking_strategy
+                sections = chunking.chunk(content)
+                extracted_content = config.extraction_strategy.run(url, sections)
+                extracted_content = json.dumps(extracted_content, indent=4, default=str, ensure_ascii=False)
 
                 # Log extraction completion
                 self.logger.info(
@@ -683,5 +756,3 @@ class AsyncWebCrawler:
     async def aget_cache_size(self):
         """Get the total number of cached items."""
         return await async_db_manager.aget_total_count()
-
-

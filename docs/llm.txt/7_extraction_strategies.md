@@ -3,6 +3,33 @@
 ## Extraction Strategies
 Structured data extraction strategies are designed to convert raw web content into organized, JSON-formatted data. These strategies handle diverse extraction scenarios, including schema-based, language model-driven, and clustering methods. This section covers models using LLMs or without using them to extract data with precision and flexibility.
 
+## Input Formats
+All extraction strategies support different input formats to give you more control over how content is processed:
+
+- **markdown** (default): Uses the raw markdown conversion of the HTML content. Best for general text extraction where HTML structure isn't critical.
+- **html**: Uses the raw HTML content. Useful when you need to preserve HTML structure or extract data from specific HTML elements.
+- **fit_markdown**: Uses the cleaned and filtered markdown content. Best for extracting relevant content while removing noise. Requires a markdown generator with content filter to be configured.
+
+To specify an input format:
+```python
+strategy = LLMExtractionStrategy(
+    input_format="html",  # or "markdown" or "fit_markdown"
+    provider="openai/gpt-4",
+    instruction="Extract product information"
+)
+```
+
+Note: When using "fit_markdown", ensure your CrawlerRunConfig includes a markdown generator and content filter:
+```python
+config = CrawlerRunConfig(
+    extraction_strategy=strategy,
+    markdown_generator=DefaultMarkdownGenerator(),
+    content_filter=PruningContentFilter()
+)
+```
+
+If fit_markdown is requested but not available (no markdown generator or content filter), the system will automatically fall back to raw markdown with a warning.
+
 ###  LLM Extraction Strategy
 The **LLM Extraction Strategy** employs a large language model (LLM) to process content dynamically. It supports:
 - **Schema-Based Extraction**: Using a defined JSON schema to structure output.

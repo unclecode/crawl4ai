@@ -207,6 +207,8 @@ class CrawlerRunConfig:
                                     Default: None.
         excluded_tags (list of str or None): List of HTML tags to exclude from processing.
                                              Default: None.
+        excluded_selector (str or None): CSS selector to exclude from processing.
+                                         Default: None.
         keep_data_attributes (bool): If True, retain `data-*` attributes while removing unwanted attributes.
                                      Default: False.
         remove_forms (bool): If True, remove all `<form>` elements from the HTML.
@@ -316,9 +318,13 @@ class CrawlerRunConfig:
         only_text: bool = False,
         css_selector: str = None,
         excluded_tags: list = None,
+        excluded_selector: str = None,
         keep_data_attributes: bool = False,
         remove_forms: bool = False,
         prettiify: bool = False,
+
+        # SSL Parameters
+        fetch_ssl_certificate: bool = False,
 
         # Caching Parameters
         cache_mode=None,
@@ -383,9 +389,13 @@ class CrawlerRunConfig:
         self.only_text = only_text
         self.css_selector = css_selector
         self.excluded_tags = excluded_tags or []
+        self.excluded_selector = excluded_selector or ""
         self.keep_data_attributes = keep_data_attributes
         self.remove_forms = remove_forms
         self.prettiify = prettiify
+
+        # SSL Parameters
+        self.fetch_ssl_certificate = fetch_ssl_certificate
 
         # Caching Parameters
         self.cache_mode = cache_mode
@@ -464,9 +474,13 @@ class CrawlerRunConfig:
             only_text=kwargs.get("only_text", False),
             css_selector=kwargs.get("css_selector"),
             excluded_tags=kwargs.get("excluded_tags", []),
+            excluded_selector=kwargs.get("excluded_selector", ""),
             keep_data_attributes=kwargs.get("keep_data_attributes", False),
             remove_forms=kwargs.get("remove_forms", False),
             prettiify=kwargs.get("prettiify", False),
+
+            # SSL Parameters
+            fetch_ssl_certificate=kwargs.get("fetch_ssl_certificate", False),
 
             # Caching Parameters
             cache_mode=kwargs.get("cache_mode"),
@@ -521,70 +535,59 @@ class CrawlerRunConfig:
             url=kwargs.get("url"),
         )
         
-        
-        
-        
-    # @staticmethod
-    # def from_kwargs(kwargs: dict) -> "CrawlerRunConfig":
-    #     return CrawlerRunConfig(
-    #         word_count_threshold=kwargs.get("word_count_threshold", 200),
-    #         extraction_strategy=kwargs.get("extraction_strategy"),
-    #         chunking_strategy=kwargs.get("chunking_strategy"),
-    #         markdown_generator=kwargs.get("markdown_generator"),
-    #         content_filter=kwargs.get("content_filter"),
-    #         cache_mode=kwargs.get("cache_mode"),
-    #         session_id=kwargs.get("session_id"),
-    #         bypass_cache=kwargs.get("bypass_cache", False),
-    #         disable_cache=kwargs.get("disable_cache", False),
-    #         no_cache_read=kwargs.get("no_cache_read", False),
-    #         no_cache_write=kwargs.get("no_cache_write", False),
-    #         css_selector=kwargs.get("css_selector"),
-    #         screenshot=kwargs.get("screenshot", False),
-    #         pdf=kwargs.get("pdf", False),
-    #         verbose=kwargs.get("verbose", True),
-    #         only_text=kwargs.get("only_text", False),
-    #         image_description_min_word_threshold=kwargs.get(
-    #             "image_description_min_word_threshold",
-    #             IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
-    #         ),
-    #         prettiify=kwargs.get("prettiify", False),
-    #         js_code=kwargs.get(
-    #             "js_code"
-    #         ),  # If not provided here, will default inside constructor
-    #         wait_for=kwargs.get("wait_for"),
-    #         js_only=kwargs.get("js_only", False),
-    #         wait_until=kwargs.get("wait_until", "domcontentloaded"),
-    #         page_timeout=kwargs.get("page_timeout", 60000),
-    #         ignore_body_visibility=kwargs.get("ignore_body_visibility", True),
-    #         adjust_viewport_to_content=kwargs.get("adjust_viewport_to_content", False),
-    #         scan_full_page=kwargs.get("scan_full_page", False),
-    #         scroll_delay=kwargs.get("scroll_delay", 0.2),
-    #         process_iframes=kwargs.get("process_iframes", False),
-    #         remove_overlay_elements=kwargs.get("remove_overlay_elements", False),
-    #         delay_before_return_html=kwargs.get("delay_before_return_html", 0.1),
-    #         log_console=kwargs.get("log_console", False),
-    #         simulate_user=kwargs.get("simulate_user", False),
-    #         override_navigator=kwargs.get("override_navigator", False),
-    #         magic=kwargs.get("magic", False),
-    #         screenshot_wait_for=kwargs.get("screenshot_wait_for"),
-    #         screenshot_height_threshold=kwargs.get(
-    #             "screenshot_height_threshold", 20000
-    #         ),
-    #         mean_delay=kwargs.get("mean_delay", 0.1),
-    #         max_range=kwargs.get("max_range", 0.3),
-    #         semaphore_count=kwargs.get("semaphore_count", 5),
-    #         image_score_threshold=kwargs.get(
-    #             "image_score_threshold", IMAGE_SCORE_THRESHOLD
-    #         ),
-    #         exclude_social_media_domains=kwargs.get(
-    #             "exclude_social_media_domains", SOCIAL_MEDIA_DOMAINS
-    #         ),
-    #         exclude_external_links=kwargs.get("exclude_external_links", False),
-    #         exclude_social_media_links=kwargs.get("exclude_social_media_links", False),
-    #         exclude_domains=kwargs.get("exclude_domains", []),
-    #         exclude_external_images=kwargs.get("exclude_external_images", False),
-    #         remove_forms=kwargs.get("remove_forms", False),
-    #         keep_data_attributes=kwargs.get("keep_data_attributes", False),
-    #         excluded_tags=kwargs.get("excluded_tags", []),
-    #     )
-        
+    # Create a funciton returns dict of the object
+    def to_dict(self):
+        return {
+            "word_count_threshold": self.word_count_threshold,
+            "extraction_strategy": self.extraction_strategy,
+            "chunking_strategy": self.chunking_strategy,
+            "markdown_generator": self.markdown_generator,
+            "content_filter": self.content_filter,
+            "only_text": self.only_text,
+            "css_selector": self.css_selector,
+            "excluded_tags": self.excluded_tags,
+            "excluded_selector": self.excluded_selector,
+            "keep_data_attributes": self.keep_data_attributes,
+            "remove_forms": self.remove_forms,
+            "prettiify": self.prettiify,
+            "fetch_ssl_certificate": self.fetch_ssl_certificate,
+            "cache_mode": self.cache_mode,
+            "session_id": self.session_id,
+            "bypass_cache": self.bypass_cache,
+            "disable_cache": self.disable_cache,
+            "no_cache_read": self.no_cache_read,
+            "no_cache_write": self.no_cache_write,
+            "wait_until": self.wait_until,
+            "page_timeout": self.page_timeout,
+            "wait_for": self.wait_for,
+            "wait_for_images": self.wait_for_images,
+            "delay_before_return_html": self.delay_before_return_html,
+            "mean_delay": self.mean_delay,
+            "max_range": self.max_range,
+            "semaphore_count": self.semaphore_count,
+            "js_code": self.js_code,
+            "js_only": self.js_only,
+            "ignore_body_visibility": self.ignore_body_visibility,
+            "scan_full_page": self.scan_full_page,
+            "scroll_delay": self.scroll_delay,
+            "process_iframes": self.process_iframes,
+            "remove_overlay_elements": self.remove_overlay_elements,
+            "simulate_user": self.simulate_user,
+            "override_navigator": self.override_navigator,
+            "magic": self.magic,
+            "adjust_viewport_to_content": self.adjust_viewport_to_content,
+            "screenshot": self.screenshot,
+            "screenshot_wait_for": self.screenshot_wait_for,
+            "screenshot_height_threshold": self.screenshot_height_threshold,
+            "pdf": self.pdf,
+            "image_description_min_word_threshold": self.image_description_min_word_threshold,
+            "image_score_threshold": self.image_score_threshold,
+            "exclude_external_images": self.exclude_external_images,
+            "exclude_social_media_domains": self.exclude_social_media_domains,
+            "exclude_external_links": self.exclude_external_links,
+            "exclude_social_media_links": self.exclude_social_media_links,
+            "exclude_domains": self.exclude_domains,
+            "verbose": self.verbose,
+            "log_console": self.log_console,
+            "url": self.url,
+        }

@@ -330,9 +330,9 @@ if result.screenshot:
     with open("page.png", "wb") as f:
         f.write(result.screenshot)
 
-if result.pdf_data:
+if result.pdf:
     with open("page.pdf", "wb") as f:
-        f.write(result.pdf_data)
+        f.write(result.pdf)
 ```
 
 **File Downloads:**

@@ -206,12 +206,9 @@ pypi_build.sh
 git_issues.py
 git_issues.md
 
-.local/
 .next/
 .tests/
-.issues/
 .docs/
-.issues/
 .gitboss/
 todo_executor.md
 protect-all-except-feature.sh
@@ -220,3 +217,4 @@ publish.sh
 combine.sh
 combined_output.txt
 tree.md
+

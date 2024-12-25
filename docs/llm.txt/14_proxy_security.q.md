@@ -1,53 +1,8 @@
-### Hypothetical Questions
-
-1. **Basic Proxy Configuration**
-   - *"How do I set a basic HTTP proxy for the crawler?"*
-   - *"Can I use a SOCKS proxy instead of an HTTP proxy?"*
-
-2. **Authenticated Proxies**
-   - *"How do I provide a username and password for an authenticated proxy server?"*
-   - *"What is the `proxy_config` dictionary, and how do I use it?"*
-
-3. **Rotating Proxies**
-   - *"How can I dynamically change the proxy server for each request?"*
-   - *"What patterns or logic can I implement to rotate proxies from a pool?"*
-
-4. **Custom Headers for Security and Anonymity**
-   - *"How do I set custom HTTP headers in `BrowserConfig` to appear more human-like or meet security policies?"*
-   - *"Can I add headers like `X-Forwarded-For`, `Accept-Language`, or `Cache-Control`?"*
-
-5. **Combining Proxies with Magic Mode**
-   - *"What is Magic Mode, and how does it help with anti-detection features?"*
-   - *"Can I use Magic Mode in combination with proxies and custom headers for better anonymity?"*
-
-6. **Troubleshooting and Edge Cases**
-   - *"What if my authenticated proxy doesn’t accept credentials?"*
-   - *"How do I handle errors when switching proxies mid-crawl?"*
-
-7. **Performance and Reliability**
-   - *"Does using a proxy slow down the crawling process?"*
-   - *"How do I ensure stable and fast connections when rotating proxies frequently?"*
-
-8. **Integration with Other Crawl4AI Features**
-   - *"Can I use proxy configurations with hooks, caching, or LLM extraction strategies?"*
-   - *"How do I integrate proxy-based crawling into a larger pipeline that includes data extraction and content filtering?"*
-
-
-### Topics Discussed in the File
-
-- **Proxy Configuration**:  
-  Shows how to set an HTTP or SOCKS proxy in `BrowserConfig` for the crawler, enabling you to route traffic through a specific server.
-
-- **Authenticated Proxies**:  
-  Demonstrates how to provide username and password credentials to access proxy servers that require authentication.
-
-- **Rotating Proxies**:  
-  Suggests a pattern for dynamically updating proxy settings before each request, allowing you to cycle through multiple proxies to avoid throttling or blocking.
-
-- **Custom Headers**:  
-  Explains how to add custom HTTP headers in `BrowserConfig` for security, anonymity, or compliance with certain websites’ requirements.
-
-- **Integration with Magic Mode**:  
-  Shows how to combine proxy usage, custom headers, and Magic Mode (`magic=True` in `CrawlerRunConfig`) to enhance anti-detection measures, making it harder for websites to detect automated crawlers.
-
-In summary, the file explains how to configure proxies (including authenticated proxies), rotate them dynamically, set custom headers for extra security and privacy, and combine these techniques with Magic Mode for robust anti-detection strategies in Crawl4AI.
+proxy_setup: Configure basic proxy in Crawl4AI using BrowserConfig with proxy URL | proxy configuration, proxy setup, basic proxy | BrowserConfig(proxy="http://proxy.example.com:8080")
+socks_proxy: Use SOCKS proxy protocol for web crawling | SOCKS5, proxy protocol, SOCKS connection | BrowserConfig(proxy="socks5://proxy.example.com:1080")
+authenticated_proxy: Set up proxy with username and password authentication | proxy auth, proxy credentials, authenticated connection | BrowserConfig(proxy_config={"server": "http://proxy.example.com:8080", "username": "user", "password": "pass"})
+rotating_proxies: Implement dynamic proxy rotation during crawling | proxy rotation, proxy switching, dynamic proxies | browser_config.proxy_config = await get_next_proxy()
+custom_headers: Add security headers to browser configuration for enhanced protection | HTTP headers, request headers, security headers | BrowserConfig(headers={"X-Forwarded-For": "203.0.113.195", "Accept-Language": "en-US,en;q=0.9"})
+magic_mode: Combine proxy settings with Magic Mode for maximum anti-detection | anti-detection, stealth mode, protection features | CrawlerRunConfig(magic=True) with BrowserConfig(proxy="http://proxy.example.com:8080")
+crawler_context: Use AsyncWebCrawler with async context manager for proper resource management | async crawler, context manager, crawler setup | async with AsyncWebCrawler(config=browser_config) as crawler
+cache_control: Set cache control headers to prevent caching during crawling | caching headers, no-cache, cache prevention | BrowserConfig(headers={"Cache-Control": "no-cache", "Pragma": "no-cache"})
