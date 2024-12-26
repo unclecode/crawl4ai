@@ -206,7 +206,6 @@ pypi_build.sh
 git_issues.py
 git_issues.md
 
-.local/
 .next/
 .tests/
 .issues/

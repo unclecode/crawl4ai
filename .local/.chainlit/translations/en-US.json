@@ -1,0 +1,231 @@
+{
+    "components": {
+        "atoms": {
+            "buttons": {
+                "userButton": {
+                    "menu": {
+                        "settings": "Settings",
+                        "settingsKey": "S",
+                        "APIKeys": "API Keys",
+                        "logout": "Logout"
+                    }
+                }
+            }
+        },
+        "molecules": {
+            "newChatButton": {
+                "newChat": "New Chat"
+            },
+            "tasklist": {
+                "TaskList": {
+                    "title": "\ud83d\uddd2\ufe0f Task List",
+                    "loading": "Loading...",
+                    "error": "An error occured"
+                }
+            },
+            "attachments": {
+                "cancelUpload": "Cancel upload",
+                "removeAttachment": "Remove attachment"
+            },
+            "newChatDialog": {
+                "createNewChat": "Create new chat?",
+                "clearChat": "This will clear the current messages and start a new chat.",
+                "cancel": "Cancel",
+                "confirm": "Confirm"
+            },
+            "settingsModal": {
+                "settings": "Settings",
+                "expandMessages": "Expand Messages",
+                "hideChainOfThought": "Hide Chain of Thought",
+                "darkMode": "Dark Mode"
+            },
+            "detailsButton": {
+                "using": "Using",
+                "running": "Running",
+                "took_one": "Took {{count}} step",
+                "took_other": "Took {{count}} steps"
+            },
+            "auth": {
+                "authLogin": {
+                    "title": "Login to access the app.",
+                    "form": {
+                        "email": "Email address",
+                        "password": "Password",
+                        "noAccount": "Don't have an account?",
+                        "alreadyHaveAccount": "Already have an account?",
+                        "signup": "Sign Up",
+                        "signin": "Sign In",
+                        "or": "OR",
+                        "continue": "Continue",
+                        "forgotPassword": "Forgot password?",
+                        "passwordMustContain": "Your password must contain:",
+                        "emailRequired": "email is a required field",
+                        "passwordRequired": "password is a required field"
+                    },
+                    "error": {
+                        "default": "Unable to sign in.",
+                        "signin": "Try signing in with a different account.",
+                        "oauthsignin": "Try signing in with a different account.",
+                        "redirect_uri_mismatch": "The redirect URI is not matching the oauth app configuration.",
+                        "oauthcallbackerror": "Try signing in with a different account.",
+                        "oauthcreateaccount": "Try signing in with a different account.",
+                        "emailcreateaccount": "Try signing in with a different account.",
+                        "callback": "Try signing in with a different account.",
+                        "oauthaccountnotlinked": "To confirm your identity, sign in with the same account you used originally.",
+                        "emailsignin": "The e-mail could not be sent.",
+                        "emailverify": "Please verify your email, a new email has been sent.",
+                        "credentialssignin": "Sign in failed. Check the details you provided are correct.",
+                        "sessionrequired": "Please sign in to access this page."
+                    }
+                },
+                "authVerifyEmail": {
+                    "almostThere": "You're almost there! We've sent an email to ",
+                    "verifyEmailLink": "Please click on the link in that email to complete your signup.",
+                    "didNotReceive": "Can't find the email?",
+                    "resendEmail": "Resend email",
+                    "goBack": "Go Back",
+                    "emailSent": "Email sent successfully.",
+                    "verifyEmail": "Verify your email address"
+                },
+                "providerButton": {
+                    "continue": "Continue with {{provider}}",
+                    "signup": "Sign up with {{provider}}"
+                },
+                "authResetPassword": {
+                    "newPasswordRequired": "New password is a required field",
+                    "passwordsMustMatch": "Passwords must match",
+                    "confirmPasswordRequired": "Confirm password is a required field",
+                    "newPassword": "New password",
+                    "confirmPassword": "Confirm password",
+                    "resetPassword": "Reset Password"
+                },
+                "authForgotPassword": {
+                    "email": "Email address",
+                    "emailRequired": "email is a required field",
+                    "emailSent": "Please check the email address {{email}} for instructions to reset your password.",
+                    "enterEmail": "Enter your email address and we will send you instructions to reset your password.",
+                    "resendEmail": "Resend email",
+                    "continue": "Continue",
+                    "goBack": "Go Back"
+                }
+            }
+        },
+        "organisms": {
+            "chat": {
+                "history": {
+                    "index": {
+                        "showHistory": "Show history",
+                        "lastInputs": "Last Inputs",
+                        "noInputs": "Such empty...",
+                        "loading": "Loading..."
+                    }
+                },
+                "inputBox": {
+                    "input": {
+                        "placeholder": "Type your message here..."
+                    },
+                    "speechButton": {
+                        "start": "Start recording",
+                        "stop": "Stop recording"
+                    },
+                    "SubmitButton": {
+                        "sendMessage": "Send message",
+                        "stopTask": "Stop Task"
+                    },
+                    "UploadButton": {
+                        "attachFiles": "Attach files"
+                    },
+                    "waterMark": {
+                        "text": "Built with"
+                    }
+                },
+                "Messages": {
+                    "index": {
+                        "running": "Running",
+                        "executedSuccessfully": "executed successfully",
+                        "failed": "failed",
+                        "feedbackUpdated": "Feedback updated",
+                        "updating": "Updating"
+                    }
+                },
+                "dropScreen": {
+                    "dropYourFilesHere": "Drop your files here"
+                },
+                "index": {
+                    "failedToUpload": "Failed to upload",
+                    "cancelledUploadOf": "Cancelled upload of",
+                    "couldNotReachServer": "Could not reach the server",
+                    "continuingChat": "Continuing previous chat"
+                },
+                "settings": {
+                    "settingsPanel": "Settings panel",
+                    "reset": "Reset",
+                    "cancel": "Cancel",
+                    "confirm": "Confirm"
+                }
+            },
+            "threadHistory": {
+                "sidebar": {
+                    "filters": {
+                        "FeedbackSelect": {
+                            "feedbackAll": "Feedback: All",
+                            "feedbackPositive": "Feedback: Positive",
+                            "feedbackNegative": "Feedback: Negative"
+                        },
+                        "SearchBar": {
+                            "search": "Search"
+                        }
+                    },
+                    "DeleteThreadButton": {
+                        "confirmMessage": "This will delete the thread as well as it's messages and elements.",
+                        "cancel": "Cancel",
+                        "confirm": "Confirm",
+                        "deletingChat": "Deleting chat",
+                        "chatDeleted": "Chat deleted"
+                    },
+                    "index": {
+                        "pastChats": "Past Chats"
+                    },
+                    "ThreadList": {
+                        "empty": "Empty...",
+                        "today": "Today",
+                        "yesterday": "Yesterday",
+                        "previous7days": "Previous 7 days",
+                        "previous30days": "Previous 30 days"
+                    },
+                    "TriggerButton": {
+                        "closeSidebar": "Close sidebar",
+                        "openSidebar": "Open sidebar"
+                    }
+                },
+                "Thread": {
+                    "backToChat": "Go back to chat",
+                    "chatCreatedOn": "This chat was created on"
+                }
+            },
+            "header": {
+                "chat": "Chat",
+                "readme": "Readme"
+            }
+        }
+    },
+    "hooks": {
+        "useLLMProviders": {
+            "failedToFetchProviders": "Failed to fetch providers:"
+        }
+    },
+    "pages": {
+        "Design": {},
+        "Env": {
+            "savedSuccessfully": "Saved successfully",
+            "requiredApiKeys": "Required API Keys",
+            "requiredApiKeysInfo": "To use this app, the following API keys are required. The keys are stored on your device's local storage."
+        },
+        "Page": {
+            "notPartOfProject": "You are not part of this project."
+        },
+        "ResumeButton": {
+            "resumeChat": "Resume Chat"
+        }
+    }
+}

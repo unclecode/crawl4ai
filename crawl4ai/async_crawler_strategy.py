@@ -23,7 +23,7 @@ from .config import SCREENSHOT_HEIGHT_TRESHOLD, DOWNLOAD_PAGE_TIMEOUT
 from .async_configs import BrowserConfig, CrawlerRunConfig
 from .async_logger import AsyncLogger
 from playwright_stealth import StealthConfig, stealth_async
-from .utilities.ssl_utils import get_ssl_certificate
+from .ssl_certificate import SSLCertificate
 
 stealth_config = StealthConfig(
     webdriver=True,
@@ -913,9 +913,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
         try:
             # Get SSL certificate information if requested and URL is HTTPS
-            ssl_certificate = None
-            if config.fetch_ssl_certificate and url.startswith('https://'):
-                ssl_certificate = get_ssl_certificate(url)
+            ssl_cert = None
+            if config.fetch_ssl_certificate:
+                ssl_cert = SSLCertificate.from_url(url)
 
             # Set up download handling
             if self.browser_config.accept_downloads:
@@ -1144,7 +1144,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 screenshot=screenshot_data,
                 pdf_data=pdf_data,
                 get_delayed_content=get_delayed_content,
-                ssl_certificate=ssl_certificate,
+                ssl_certificate=ssl_cert,
                 downloaded_files=(
                     self._downloaded_files if self._downloaded_files else None
                 ),
