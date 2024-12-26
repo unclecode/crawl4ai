@@ -125,7 +125,7 @@ run_config = CrawlerRunConfig(
 
 ## 4. Basic Crawling & Simple Extraction
 ```python
-async with AsyncWebCrawler(browser_config=browser_config) as crawler:
+async with AsyncWebCrawler(config=browser_config) as crawler:
     result = await crawler.arun("https://news.example.com/article", config=run_config)
     print(result.markdown) # Basic markdown content
 ```
@@ -375,7 +375,7 @@ async def on_page_context_created_hook(context, page, **kwargs):
     await context.route("**/*.{png,jpg,jpeg}", lambda route: route.abort())
     print("[HOOK] Image requests blocked")
 
-async with AsyncWebCrawler(browser_config=browser_config) as crawler:
+async with AsyncWebCrawler(config=browser_config) as crawler:
     crawler.crawler_strategy.set_hook("on_page_context_created", on_page_context_created_hook)
     result = await crawler.arun("https://imageheavy.example.com", config=run_config)
     print("Crawl finished with images blocked.")

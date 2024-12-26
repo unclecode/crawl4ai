@@ -19,7 +19,7 @@ async def main():
     browser_config = BrowserConfig(browser_type="chromium", headless=True)
     
     # Run the crawler asynchronously
-    async with AsyncWebCrawler(browser_config=browser_config) as crawler:
+    async with AsyncWebCrawler(config=browser_config) as crawler:
         result = await crawler.arun("https://example.com")
         print("Extracted Markdown:")
         print(result.markdown)
@@ -52,7 +52,7 @@ browser_config = BrowserConfig(
     verbose=True
 )
 
-async with AsyncWebCrawler(browser_config=browser_config) as crawler:
+async with AsyncWebCrawler(config=browser_config) as crawler:
     result = await crawler.arun("https://yourwebsite.com")
     print(result.markdown)
 ```

@@ -10,7 +10,7 @@ from crawl4ai import AsyncWebCrawler, BrowserConfig
 import asyncio
 
 async def main():
-    async with AsyncWebCrawler(browser_config=BrowserConfig(browser_type="chromium", headless=True)) as c:
+    async with AsyncWebCrawler(config=BrowserConfig(browser_type="chromium", headless=True)) as c:
         r = await c.arun("https://example.com")
         print(r.markdown)
 
@@ -21,7 +21,7 @@ asyncio.run(main())
 **Params:** `browser_type`, `headless`, `viewport_width`, `viewport_height`, `verbose`, `proxy`.
 ```python
 browser_config = BrowserConfig(browser_type="firefox", headless=False)
-async with AsyncWebCrawler(browser_config=browser_config) as c:
+async with AsyncWebCrawler(config=browser_config) as c:
     r = await c.arun("https://site.com")
 ```
 

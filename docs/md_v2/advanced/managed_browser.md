@@ -37,7 +37,7 @@ Standard browser creation initializes a browser instance with default or minimal
 from crawl4ai import AsyncWebCrawler, BrowserConfig
 
 browser_config = BrowserConfig(browser_type="chromium", headless=True)
-async with AsyncWebCrawler(browser_config=browser_config) as crawler:
+async with AsyncWebCrawler(config=browser_config) as crawler:
     result = await crawler.arun("https://crawl4ai.com")
     print(result.markdown)
 ```
@@ -57,7 +57,7 @@ Persistent contexts create browser sessions with stored data, enabling workflows
 #### Example: Setting Up Persistent Contexts
 ```python
 config = BrowserConfig(user_data_dir="/path/to/user/data")
-async with AsyncWebCrawler(browser_config=config) as crawler:
+async with AsyncWebCrawler(config=config) as crawler:
     result = await crawler.arun("https://crawl4ai.com")
     print(result.markdown)
 ```
@@ -87,7 +87,7 @@ The `ManagedBrowser` class offers a high-level abstraction for managing browser 
 from crawl4ai import AsyncWebCrawler, BrowserConfig
 
 config = BrowserConfig(headless=False, debug_port=9222)
-async with AsyncWebCrawler(browser_config=config) as crawler:
+async with AsyncWebCrawler(config=config) as crawler:
     result = await crawler.arun("https://crawl4ai.com")
     print(result.markdown)
 ```
@@ -147,7 +147,7 @@ Remote debugging provides a powerful way to troubleshoot complex crawling workfl
 #### Example: Enabling Remote Debugging
 ```python
 config = BrowserConfig(debug_port=9222)
-async with AsyncWebCrawler(browser_config=config) as crawler:
+async with AsyncWebCrawler(config=config) as crawler:
     result = await crawler.arun("https://crawl4ai.com")
 ```
 

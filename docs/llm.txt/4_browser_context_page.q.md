@@ -1,4 +1,4 @@
-browser_creation: Create standard browser instance with default configurations | browser initialization, basic setup, minimal config | AsyncWebCrawler(browser_config=BrowserConfig(browser_type="chromium", headless=True))
+browser_creation: Create standard browser instance with default configurations | browser initialization, basic setup, minimal config | AsyncWebCrawler(config=BrowserConfig(browser_type="chromium", headless=True))
 persistent_context: Use persistent browser contexts to maintain session data and cookies | user_data_dir, session storage, login state | BrowserConfig(user_data_dir="/path/to/user/data")
 managed_browser: High-level browser management with resource optimization and debugging | browser process, stealth mode, debugging tools | BrowserConfig(headless=False, debug_port=9222)
 context_config: Configure browser context with custom headers and cookies | headers customization, session reuse | CrawlerRunConfig(headers={"User-Agent": "Crawl4AI/1.0"})
