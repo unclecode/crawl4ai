@@ -1,4 +1,4 @@
-quick_start: Basic async crawl setup requires BrowserConfig and AsyncWebCrawler initialization | getting started, basic usage, initialization | asyncio.run(AsyncWebCrawler(browser_config=BrowserConfig(browser_type="chromium", headless=True)))
+quick_start: Basic async crawl setup requires BrowserConfig and AsyncWebCrawler initialization | getting started, basic usage, initialization | asyncio.run(AsyncWebCrawler(config=BrowserConfig(browser_type="chromium", headless=True)))
 browser_types: AsyncWebCrawler supports multiple browser types including Chromium and Firefox | supported browsers, browser options | BrowserConfig(browser_type="chromium")
 headless_mode: Browser can run in headless mode without UI for better performance | invisible browser, no GUI | BrowserConfig(headless=True)
 viewport_settings: Configure browser viewport dimensions for proper page rendering | screen size, window size | BrowserConfig(viewport_width=1920, viewport_height=1080)

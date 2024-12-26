@@ -84,7 +84,7 @@ async def main():
     )
 
     # Initialize crawler
-    async with AsyncWebCrawler(browser_config=browser_config) as crawler:
+    async with AsyncWebCrawler(config=browser_config) as crawler:
         crawler.crawler_strategy.set_hook("on_browser_created", on_browser_created)
         crawler.crawler_strategy.set_hook("on_page_context_created", on_page_context_created)
         crawler.crawler_strategy.set_hook("before_goto", before_goto)

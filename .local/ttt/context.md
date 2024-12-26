@@ -568,7 +568,7 @@ async def main():
     )
 
     # Initialize crawler
-    async with AsyncWebCrawler(browser_config=browser_config) as crawler:
+    async with AsyncWebCrawler(config=browser_config) as crawler:
         crawler.crawler_strategy.set_hook("on_browser_created", on_browser_created)
         crawler.crawler_strategy.set_hook("on_page_context_created", on_page_context_created)
         crawler.crawler_strategy.set_hook("before_goto", before_goto)
@@ -1627,7 +1627,7 @@ async def main():
     browser_config = BrowserConfig(browser_type="chromium", headless=True)
     
     # Run the crawler asynchronously
-    async with AsyncWebCrawler(browser_config=browser_config) as crawler:
+    async with AsyncWebCrawler(config=browser_config) as crawler:
         result = await crawler.arun("https://example.com")
         print("Extracted Markdown:")
         print(result.markdown)
@@ -1660,7 +1660,7 @@ browser_config = BrowserConfig(
     verbose=True
 )
 
-async with AsyncWebCrawler(browser_config=browser_config) as crawler:
+async with AsyncWebCrawler(config=browser_config) as crawler:
     result = await crawler.arun("https://yourwebsite.com")
     print(result.markdown)
 ```
@@ -1927,7 +1927,7 @@ Standard browser creation initializes a browser instance with default or minimal
 from crawl4ai import AsyncWebCrawler, BrowserConfig
 
 browser_config = BrowserConfig(browser_type="chromium", headless=True)
-async with AsyncWebCrawler(browser_config=browser_config) as crawler:
+async with AsyncWebCrawler(config=browser_config) as crawler:
     result = await crawler.arun("https://crawl4ai.com")
     print(result.markdown)
 ```
@@ -1947,7 +1947,7 @@ Persistent contexts create browser sessions with stored data, enabling workflows
 ##### Example: Setting Up Persistent Contexts
 ```python
 config = BrowserConfig(user_data_dir="/path/to/user/data")
-async with AsyncWebCrawler(browser_config=config) as crawler:
+async with AsyncWebCrawler(config=config) as crawler:
     result = await crawler.arun("https://crawl4ai.com")
     print(result.markdown)
 ```
@@ -1978,7 +1978,7 @@ The `ManagedBrowser` class offers a high-level abstraction for managing browser 
 from crawl4ai import AsyncWebCrawler, BrowserConfig
 
 config = BrowserConfig(headless=False, debug_port=9222)
-async with AsyncWebCrawler(browser_config=config) as crawler:
+async with AsyncWebCrawler(config=config) as crawler:
     result = await crawler.arun("https://crawl4ai.com")
     print(result.markdown)
 ```
@@ -2082,7 +2082,7 @@ I'll help create a section about using command-line Chrome with a user data dire
        user_data_dir="/path/to/ChromeProfiles/CrawlProfile"  # Use the same directory from step 1
    )
    
-   async with AsyncWebCrawler(browser_config=browser_config) as crawler:
+   async with AsyncWebCrawler(config=browser_config) as crawler:
        result = await crawler.arun("https://example.com")
    ```
 

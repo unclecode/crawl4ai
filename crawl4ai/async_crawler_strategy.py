@@ -928,7 +928,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
             # Handle page navigation and content loading
             if not config.js_only:
-                await self.execute_hook("before_goto", page, context=context)
+                await self.execute_hook("before_goto", page, context=context, url=url)
 
                 try:
                     response = await page.goto(
@@ -937,7 +937,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 except Error as e:
                     raise RuntimeError(f"Failed on navigating ACS-GOTO:\n{str(e)}")
 
-                await self.execute_hook("after_goto", page, context=context)
+                await self.execute_hook("after_goto", page, context=context, url=url, response=response)
 
                 if response is None:
                     status_code = 200
@@ -1102,7 +1102,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
             # Get final HTML content
             html = await page.content()
-            await self.execute_hook("before_return_html", page, html, context=context)
+            await self.execute_hook("before_return_html", page = page, html = html, context=context)
 
             # Handle PDF and screenshot generation
             start_export_time = time.perf_counter()

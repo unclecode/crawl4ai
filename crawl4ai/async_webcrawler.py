@@ -68,7 +68,7 @@ class AsyncWebCrawler:
     
     New way (recommended):
         browser_config = BrowserConfig(browser_type="chromium", headless=True)
-        crawler = AsyncWebCrawler(browser_config=browser_config)
+        crawler = AsyncWebCrawler(config=browser_config)
     """
     _domain_last_hit = {}
 
@@ -117,11 +117,18 @@ class AsyncWebCrawler:
 
         
         # Initialize crawler strategy
+        params = {
+            k:v for k, v in kwargs.items() if k in ['browser_congig', 'logger']
+        }
         self.crawler_strategy = crawler_strategy or AsyncPlaywrightCrawlerStrategy(
             browser_config=browser_config,
             logger=self.logger,
-            **kwargs  # Pass remaining kwargs for backwards compatibility
+            **params  # Pass remaining kwargs for backwards compatibility
         )
+        
+        # If craweler strategy doesnt have logger, use crawler logger
+        if not self.crawler_strategy.logger:
+            self.crawler_strategy.logger = self.logger
         
         # Handle deprecated cache parameter
         if always_by_pass_cache is not None:

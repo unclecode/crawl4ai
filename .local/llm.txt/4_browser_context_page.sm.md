@@ -20,21 +20,21 @@
 from crawl4ai import AsyncWebCrawler, BrowserConfig
 
 cfg = BrowserConfig(browser_type="chromium", headless=True)
-async with AsyncWebCrawler(browser_config=cfg) as c:
+async with AsyncWebCrawler(config=cfg) as c:
     r = await c.arun("https://example.com")
 ```
 
 ### Persistent Contexts
 ```python
 cfg = BrowserConfig(user_data_dir="/path/to/data")
-async with AsyncWebCrawler(browser_config=cfg) as c:
+async with AsyncWebCrawler(config=cfg) as c:
     r = await c.arun("https://example.com")
 ```
 
 ### Managed Browser
 ```python
 cfg = BrowserConfig(headless=False, debug_port=9222, use_managed_browser=True)
-async with AsyncWebCrawler(browser_config=cfg) as c:
+async with AsyncWebCrawler(config=cfg) as c:
     r = await c.arun("https://example.com")
 ```
 
@@ -80,7 +80,7 @@ cfg = BrowserConfig(
     use_managed_browser=True,
     user_data_dir="/path/to/Profile"
 )
-async with AsyncWebCrawler(browser_config=cfg) as c:
+async with AsyncWebCrawler(config=cfg) as c:
     r = await c.arun("https://example.com")
 ```
 
@@ -96,7 +96,7 @@ cfg = BrowserConfig(
 )
 crawl_cfg = CrawlerRunConfig(extraction_strategy=JsonCssExtractionStrategy(schema))
 
-async with AsyncWebCrawler(browser_config=cfg) as c:
+async with AsyncWebCrawler(config=cfg) as c:
     r = await c.arun("https://example.com", config=crawl_cfg)
 ```
 
