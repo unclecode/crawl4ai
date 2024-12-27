@@ -99,7 +99,7 @@ async def main():
             remove_overlay_elements=True,
             
             # Cache control
-            cache_mode=CacheMode.ENABLE  # Use cache if available
+            cache_mode=CacheMode.ENABLED  # Use cache if available
         )
         
         if result.success:
