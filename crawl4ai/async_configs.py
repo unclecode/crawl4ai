@@ -71,7 +71,7 @@ class BrowserConfig:
         use_managed_browser: bool = False,
         use_persistent_context: bool = False,
         user_data_dir: str = None,
-        chrome_channel: str = "chrome",
+        chrome_channel: str = "chromium",
         proxy: str = None,
         proxy_config: dict = None,
         viewport_width: int = 1920,
@@ -100,14 +100,10 @@ class BrowserConfig:
         self.use_managed_browser = use_managed_browser
         self.use_persistent_context = use_persistent_context
         self.user_data_dir = user_data_dir
-        if self.browser_type == "chromium":
-            self.chrome_channel = "chrome"
-        elif self.browser_type == "firefox":
-            self.chrome_channel = "firefox"
-        elif self.browser_type == "webkit":
-            self.chrome_channel = "webkit"
-        else:
-            self.chrome_channel = chrome_channel or "chrome"
+        
+        # Directly assign browser_type to chrome_channel, with fallback to default
+        self.chrome_channel = chrome_channel or self.browser_type or "chromium"
+
         self.proxy = proxy
         self.proxy_config = proxy_config
         self.viewport_width = viewport_width
