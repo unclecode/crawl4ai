@@ -1050,3 +1050,391 @@ class JsonXPathExtractionStrategy(JsonElementExtractionStrategy):
     def _get_element_attribute(self, element, attribute: str):
         return element.get(attribute)
  
+
+#######################################################
+# Strategies based on the extraction of specific types#
+#######################################################
+    
+class TopicExtractionStrategy(ExtractionStrategy):
+    def __init__(self, num_keywords: int = 3, **kwargs):
+        """
+        Initialize the topic extraction strategy with parameters for topic segmentation.
+
+        :param num_keywords: Number of keywords to represent each topic segment.
+        """
+        import nltk
+        super().__init__(**kwargs)
+        self.num_keywords = num_keywords
+        self.tokenizer = nltk.TextTilingTokenizer()
+
+    def extract_keywords(self, text: str) -> List[str]:
+        """
+        Extract keywords from a given text segment using simple frequency analysis.
+
+        :param text: The text segment from which to extract keywords.
+        :return: A list of keyword strings.
+        """
+        import nltk
+        # Tokenize the text and compute word frequency
+        words = nltk.word_tokenize(text)
+        freq_dist = nltk.FreqDist(words)
+        # Get the most common words as keywords
+        keywords = [word for (word, _) in freq_dist.most_common(self.num_keywords)]
+        return keywords
+
+    def extract(self, url: str, html: str, *q, **kwargs) -> List[Dict[str, Any]]:
+        """
+        Extract topics from HTML content using TextTiling for segmentation and keyword extraction.
+
+        :param url: The URL of the webpage.
+        :param html: The HTML content of the webpage.
+        :param provider: The provider to be used for extraction (not used here).
+        :param api_token: Optional API token for the provider (not used here).
+        :return: A list of dictionaries representing the topics.
+        """
+        # Use TextTiling to segment the text into topics
+        segmented_topics = html.split(self.DEL)  # Split by lines or paragraphs as needed
+
+        # Prepare the output as a list of dictionaries
+        topic_list = []
+        for i, segment in enumerate(segmented_topics):
+            # Extract keywords for each segment
+            keywords = self.extract_keywords(segment)
+            topic_list.append({
+                "index": i,
+                "content": segment,
+                "keywords": keywords
+            })
+
+        return topic_list
+
+    def run(self, url: str, sections: List[str], *q, **kwargs) -> List[Dict[str, Any]]:
+        """
+        Process sections using topic segmentation and keyword extraction.
+
+        :param url: The URL of the webpage.
+        :param sections: List of sections (strings) to process.
+        :param provider: The provider to be used for extraction (not used here).
+        :param api_token: Optional API token for the provider (not used here).
+        :return: A list of processed JSON blocks.
+        """
+        # Concatenate sections into a single text for coherent topic segmentation
+        
+        
+        return self.extract(url, self.DEL.join(sections), **kwargs)
+    
+class ContentSummarizationStrategy(ExtractionStrategy):
+    def __init__(self, model_name: str = "sshleifer/distilbart-cnn-12-6", **kwargs):
+        """
+        Initialize the content summarization strategy with a specific model.
+
+        :param model_name: The model to use for summarization.
+        """
+        super().__init__(**kwargs)
+        from transformers import pipeline
+        self.summarizer = pipeline("summarization", model=model_name)
+
+    def extract(self, url: str, text: str, provider: str = None, api_token: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        Summarize a single section of text.
+
+        :param url: The URL of the webpage.
+        :param text: A section of text to summarize.
+        :param provider: The provider to be used for extraction (not used here).
+        :param api_token: Optional API token for the provider (not used here).
+        :return: A dictionary with the summary.
+        """
+        try:
+            summary = self.summarizer(text, max_length=130, min_length=30, do_sample=False)
+            return {"summary": summary[0]['summary_text']}
+        except Exception as e:
+            print(f"Error summarizing text: {e}")
+            return {"summary": text}  # Fallback to original text if summarization fails
+
+    def run(self, url: str, sections: List[str], provider: str = None, api_token: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        Process each section in parallel to produce summaries.
+
+        :param url: The URL of the webpage.
+        :param sections: List of sections (strings) to summarize.
+        :param provider: The provider to be used for extraction (not used here).
+        :param api_token: Optional API token for the provider (not used here).
+        :return: A list of dictionaries with summaries for each section.
+        """
+        # Use a ThreadPoolExecutor to summarize in parallel
+        summaries = []
+        with ThreadPoolExecutor() as executor:
+            # Create a future for each section's summarization
+            future_to_section = {executor.submit(self.extract, url, section, provider, api_token): i for i, section in enumerate(sections)}
+            for future in as_completed(future_to_section):
+                section_index = future_to_section[future]
+                try:
+                    summary_result = future.result()
+                    summaries.append((section_index, summary_result))
+                except Exception as e:
+                    print(f"Error processing section {section_index}: {e}")
+                    summaries.append((section_index, {"summary": sections[section_index]}))  # Fallback to original text
+
+        # Sort summaries by the original section index to maintain order
+        summaries.sort(key=lambda x: x[0])
+        return [summary for _, summary in summaries]
+ 
+#######################################################
+# Deprecated strategies
+#######################################################
+ 
+class _JsonCssExtractionStrategy(ExtractionStrategy):
+    def __init__(self, schema: Dict[str, Any], **kwargs):
+        kwargs['input_format'] = 'html'  # Force HTML input
+        super().__init__(**kwargs)
+        self.schema = schema
+
+    def extract(self, url: str, html: str, *q, **kwargs) -> List[Dict[str, Any]]:
+        soup = BeautifulSoup(html, 'html.parser')
+        base_elements = soup.select(self.schema['baseSelector'])
+        
+        results = []
+        for element in base_elements:
+            # Extract base element attributes first
+            item = {}
+            if 'baseFields' in self.schema:
+                for field in self.schema['baseFields']:
+                    value = self._extract_single_field(element, field)
+                    if value is not None:
+                        item[field['name']] = value
+            
+            # Then extract child fields
+            field_data = self._extract_item(element, self.schema['fields'])
+            item.update(field_data)
+            
+            results.append(item)
+        
+        return results
+
+    def _extract_field(self, element, field):
+        try:
+            if field['type'] == 'nested':
+                nested_element = element.select_one(field['selector'])
+                return self._extract_item(nested_element, field['fields']) if nested_element else {}
+            
+            if field['type'] == 'list':
+                elements = element.select(field['selector'])
+                return [self._extract_list_item(el, field['fields']) for el in elements]
+            
+            if field['type'] == 'nested_list':
+                elements = element.select(field['selector'])
+                return [self._extract_item(el, field['fields']) for el in elements]
+            
+            return self._extract_single_field(element, field)
+        except Exception as e:
+            if self.verbose:
+                print(f"Error extracting field {field['name']}: {str(e)}")
+            return field.get('default')
+
+    def _extract_list_item(self, element, fields):
+        item = {}
+        for field in fields:
+            value = self._extract_single_field(element, field)
+            if value is not None:
+                item[field['name']] = value
+        return item
+    
+    def _extract_single_field(self, element, field):
+        if 'selector' in field:
+            selected = element.select_one(field['selector'])
+            if not selected:
+                return field.get('default')
+        else:
+            selected = element
+
+        value = None
+        if field['type'] == 'text':
+            value = selected.get_text(strip=True)
+        elif field['type'] == 'attribute':
+            value = selected.get(field['attribute'])
+        elif field['type'] == 'html':
+            value = str(selected)
+        elif field['type'] == 'regex':
+            text = selected.get_text(strip=True)
+            match = re.search(field['pattern'], text)
+            value = match.group(1) if match else None
+
+        if 'transform' in field:
+            value = self._apply_transform(value, field['transform'])
+
+        return value if value is not None else field.get('default')
+
+    def _extract_item(self, element, fields):
+        item = {}
+        for field in fields:
+            if field['type'] == 'computed':
+                value = self._compute_field(item, field)
+            else:
+                value = self._extract_field(element, field)
+            if value is not None:
+                item[field['name']] = value
+        return item
+    
+    def _apply_transform(self, value, transform):
+        if transform == 'lowercase':
+            return value.lower()
+        elif transform == 'uppercase':
+            return value.upper()
+        elif transform == 'strip':
+            return value.strip()
+        return value
+
+    def _compute_field(self, item, field):
+        try:
+            if 'expression' in field:
+                return eval(field['expression'], {}, item)
+            elif 'function' in field:
+                return field['function'](item)
+        except Exception as e:
+            if self.verbose:
+                print(f"Error computing field {field['name']}: {str(e)}")
+            return field.get('default')
+
+    def run(self, url: str, sections: List[str], *q, **kwargs) -> List[Dict[str, Any]]:
+        combined_html = self.DEL.join(sections)
+        return self.extract(url, combined_html, **kwargs)
+class _JsonXPathExtractionStrategy(ExtractionStrategy):
+    def __init__(self, schema: Dict[str, Any], **kwargs):
+        kwargs['input_format'] = 'html'  # Force HTML input
+        super().__init__(**kwargs)
+        self.schema = schema
+
+    def extract(self, url: str, html_content: str, *q, **kwargs) -> List[Dict[str, Any]]:
+        tree = html.fromstring(html_content)
+        base_xpath = self.schema['baseSelector']
+        base_elements = tree.xpath(base_xpath)
+        
+        results = []
+        for element in base_elements:
+            # Extract base element attributes first
+            item = {}
+            if 'baseFields' in self.schema:
+                for field in self.schema['baseFields']:
+                    value = self._extract_single_field(element, field)
+                    if value is not None:
+                        item[field['name']] = value
+            
+            # Then extract child fields
+            field_data = self._extract_item(element, self.schema['fields'])
+            item.update(field_data)
+            
+            results.append(item)
+        
+        return results
+
+    def _css_to_xpath(self, css_selector: str) -> str:
+        """Convert CSS selector to XPath if needed"""
+        if '/' in css_selector:  # Already an XPath
+            return css_selector
+        else:
+            # Fallback to basic conversion for common cases
+            return self._basic_css_to_xpath(css_selector)
+
+    def _basic_css_to_xpath(self, css_selector: str) -> str:
+        """Basic CSS to XPath conversion for common cases"""
+        # Handle basic cases
+        if ' > ' in css_selector:
+            parts = css_selector.split(' > ')
+            return '//' + '/'.join(parts)
+        if ' ' in css_selector:
+            parts = css_selector.split(' ')
+            return '//' + '//'.join(parts)
+        return '//' + css_selector
+
+    def _extract_field(self, element, field):
+        try:
+            if field['type'] == 'nested':
+                xpath = self._css_to_xpath(field['selector'])
+                nested_element = element.xpath(xpath)[0] if element.xpath(xpath) else None
+                return self._extract_item(nested_element, field['fields']) if nested_element is not None else {}
+            
+            if field['type'] == 'list':
+                xpath = self._css_to_xpath(field['selector'])
+                elements = element.xpath(xpath)
+                return [self._extract_list_item(el, field['fields']) for el in elements]
+            
+            if field['type'] == 'nested_list':
+                xpath = self._css_to_xpath(field['selector'])
+                elements = element.xpath(xpath)
+                return [self._extract_item(el, field['fields']) for el in elements]
+            
+            return self._extract_single_field(element, field)
+        except Exception as e:
+            if self.verbose:
+                print(f"Error extracting field {field['name']}: {str(e)}")
+            return field.get('default')
+
+    def _extract_list_item(self, element, fields):
+        item = {}
+        for field in fields:
+            value = self._extract_single_field(element, field)
+            if value is not None:
+                item[field['name']] = value
+        return item
+    
+    def _extract_single_field(self, element, field):
+        if 'selector' in field:
+            xpath = self._css_to_xpath(field['selector'])
+            selected = element.xpath(xpath)
+            if not selected:
+                return field.get('default')
+            selected = selected[0]
+        else:
+            selected = element
+
+        value = None
+        if field['type'] == 'text':
+            value = ''.join(selected.xpath('.//text()')).strip()
+        elif field['type'] == 'attribute':
+            value = selected.get(field['attribute'])
+        elif field['type'] == 'html':
+            value = etree.tostring(selected, encoding='unicode')
+        elif field['type'] == 'regex':
+            text = ''.join(selected.xpath('.//text()')).strip()
+            match = re.search(field['pattern'], text)
+            value = match.group(1) if match else None
+
+        if 'transform' in field:
+            value = self._apply_transform(value, field['transform'])
+
+        return value if value is not None else field.get('default')
+
+    def _extract_item(self, element, fields):
+        item = {}
+        for field in fields:
+            if field['type'] == 'computed':
+                value = self._compute_field(item, field)
+            else:
+                value = self._extract_field(element, field)
+            if value is not None:
+                item[field['name']] = value
+        return item
+    
+    def _apply_transform(self, value, transform):
+        if transform == 'lowercase':
+            return value.lower()
+        elif transform == 'uppercase':
+            return value.upper()
+        elif transform == 'strip':
+            return value.strip()
+        return value
+
+    def _compute_field(self, item, field):
+        try:
+            if 'expression' in field:
+                return eval(field['expression'], {}, item)
+            elif 'function' in field:
+                return field['function'](item)
+        except Exception as e:
+            if self.verbose:
+                print(f"Error computing field {field['name']}: {str(e)}")
+            return field.get('default')
+
+    def run(self, url: str, sections: List[str], *q, **kwargs) -> List[Dict[str, Any]]:
+        combined_html = self.DEL.join(sections)
+        return self.extract(url, combined_html, **kwargs)    

@@ -4,6 +4,34 @@ import re
 
 
 class UserAgentGenerator:
+    """
+    Generate random user agents with specified constraints.
+    
+    Attributes:
+        desktop_platforms (dict): A dictionary of possible desktop platforms and their corresponding user agent strings.
+        mobile_platforms (dict): A dictionary of possible mobile platforms and their corresponding user agent strings.
+        browser_combinations (dict): A dictionary of possible browser combinations and their corresponding user agent strings.
+        rendering_engines (dict): A dictionary of possible rendering engines and their corresponding user agent strings.
+        chrome_versions (list): A list of possible Chrome browser versions.
+        firefox_versions (list): A list of possible Firefox browser versions.
+        edge_versions (list): A list of possible Edge browser versions.
+        safari_versions (list): A list of possible Safari browser versions.
+        ios_versions (list): A list of possible iOS browser versions.
+        android_versions (list): A list of possible Android browser versions.
+        
+        Methods:
+            generate_user_agent(
+                platform: Literal["desktop", "mobile"] = "desktop",
+                browser: str = "chrome",
+                rendering_engine: str = "chrome_webkit",
+                chrome_version: Optional[str] = None,
+                firefox_version: Optional[str] = None,
+                edge_version: Optional[str] = None,
+                safari_version: Optional[str] = None,
+                ios_version: Optional[str] = None,
+                android_version: Optional[str] = None
+            ): Generates a random user agent string based on the specified parameters.    
+    """
     def __init__(self):
         # Previous platform definitions remain the same...
         self.desktop_platforms = {
@@ -105,7 +133,21 @@ class UserAgentGenerator:
         ]
 
     def get_browser_stack(self, num_browsers: int = 1) -> List[str]:
-        """Get a valid combination of browser versions"""
+        """
+        Get a valid combination of browser versions.
+        
+        How it works:
+        1. Check if the number of browsers is supported.
+        2. Randomly choose a combination of browsers.
+        3. Iterate through the combination and add browser versions.
+        4. Return the browser stack.
+        
+        Args:
+            num_browsers: Number of browser specifications (1-3)
+            
+        Returns:
+            List[str]: A list of browser versions.
+        """
         if num_browsers not in self.browser_combinations:
             raise ValueError(f"Unsupported number of browsers: {num_browsers}")
         

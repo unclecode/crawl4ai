@@ -310,22 +310,6 @@ response = requests.post("http://localhost:11235/crawl", json=request)
 > **Note**: Remember to add `.env` to your `.gitignore` to keep your API keys secure!
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ## Usage Examples 📝
 
 ### Basic Crawling

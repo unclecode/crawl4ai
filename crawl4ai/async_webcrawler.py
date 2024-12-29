@@ -69,6 +69,24 @@ class AsyncWebCrawler:
     New way (recommended):
         browser_config = BrowserConfig(browser_type="chromium", headless=True)
         crawler = AsyncWebCrawler(config=browser_config)
+    
+    
+    Attributes:
+        browser_config (BrowserConfig): Configuration object for browser settings.
+        crawler_strategy (AsyncCrawlerStrategy): Strategy for crawling web pages.
+        logger (AsyncLogger): Logger instance for recording events and errors.
+        always_bypass_cache (bool): Whether to always bypass cache.
+        crawl4ai_folder (str): Directory for storing cache.
+        base_directory (str): Base directory for storing cache.
+        ready (bool): Whether the crawler is ready for use.
+        
+        Methods:
+            start(): Start the crawler explicitly without using context manager.
+            close(): Close the crawler explicitly without using context manager.
+            arun(): Run the crawler for a single source: URL (web, local file, or raw HTML).
+            awarmup(): Perform warmup sequence.
+            arun_many(): Run the crawler for multiple sources.
+            aprocess_html(): Process HTML content.
     """
     _domain_last_hit = {}
 
@@ -321,7 +339,7 @@ class AsyncWebCrawler:
 
                     # Initialize processing variables
                     async_response: AsyncCrawlResponse = None
-                    cached_result = None
+                    cached_result: CrawlResult = None
                     screenshot_data = None
                     pdf_data = None
                     extracted_content = None
@@ -373,52 +391,89 @@ class AsyncWebCrawler:
                             tag="FETCH"
                         )
 
-                    # Process the HTML content
-                    crawl_result = await self.aprocess_html(
-                        url=url,
-                        html=html,
-                        extracted_content=extracted_content,
-                        config=config,  # Pass the config object instead of individual parameters
-                        screenshot=screenshot_data,
-                        pdf_data=pdf_data,
-                        verbose=config.verbose,
-                        is_raw_html = True if url.startswith("raw:") else False,
-                        **kwargs
-                    )
+                        # Process the HTML content
+                        crawl_result = await self.aprocess_html(
+                            url=url,
+                            html=html,
+                            extracted_content=extracted_content,
+                            config=config,  # Pass the config object instead of individual parameters
+                            screenshot=screenshot_data,
+                            pdf_data=pdf_data,
+                            verbose=config.verbose,
+                            is_raw_html = True if url.startswith("raw:") else False,
+                            **kwargs
+                        )
 
-                    # Set response data
-                    if async_response:
-                        crawl_result.status_code = async_response.status_code
-                        crawl_result.response_headers = async_response.response_headers
-                        crawl_result.downloaded_files = async_response.downloaded_files
-                        crawl_result.ssl_certificate = async_response.ssl_certificate  # Add SSL certificate
+                    #     crawl_result.status_code = async_response.status_code
+                    #     crawl_result.response_headers = async_response.response_headers
+                    #     crawl_result.downloaded_files = async_response.downloaded_files
+                    #     crawl_result.ssl_certificate = async_response.ssl_certificate  # Add SSL certificate
+                    # else:
+                    #     crawl_result.status_code = 200
+                    #     crawl_result.response_headers = cached_result.response_headers if cached_result else {}
+                    #     crawl_result.ssl_certificate = cached_result.ssl_certificate if cached_result else None  # Add SSL certificate from cache
+
+                        # # Check and set values from async_response to crawl_result
+                        try:
+                            for key in vars(async_response):
+                                if hasattr(crawl_result, key):
+                                    value = getattr(async_response, key, None)
+                                    current_value = getattr(crawl_result, key, None)
+                                    if value is not None and not current_value:
+                                        try:
+                                            setattr(crawl_result, key, value)
+                                        except Exception as e:
+                                            self.logger.warning(
+                                                message=f"Failed to set attribute {key}: {str(e)}",
+                                                tag="WARNING"
+                                            )
+                        except Exception as e:
+                            self.logger.warning(
+                                message=f"Error copying response attributes: {str(e)}",
+                                tag="WARNING"
+                            )
+
+                        crawl_result.success = bool(html)
+                        crawl_result.session_id = getattr(config, 'session_id', None)
+
+                        self.logger.success(
+                            message="{url:.50}... | Status: {status} | Total: {timing}",
+                            tag="COMPLETE",
+                            params={
+                                "url": cache_context.display_url,
+                                "status": crawl_result.success,
+                                "timing": f"{time.perf_counter() - start_time:.2f}s"
+                            },
+                            colors={
+                                "status": Fore.GREEN if crawl_result.success else Fore.RED,
+                                "timing": Fore.YELLOW
+                            }
+                        )
+
+                        # Update cache if appropriate
+                        if cache_context.should_write() and not bool(cached_result):
+                            await async_db_manager.acache_url(crawl_result)
+
+                        return crawl_result
+
                     else:
-                        crawl_result.status_code = 200
-                        crawl_result.response_headers = cached_result.response_headers if cached_result else {}
-                        crawl_result.ssl_certificate = cached_result.ssl_certificate if cached_result else None  # Add SSL certificate from cache
+                        self.logger.success(
+                            message="{url:.50}... | Status: {status} | Total: {timing}",
+                            tag="COMPLETE",
+                            params={
+                                "url": cache_context.display_url,
+                                "status": True,
+                                "timing": f"{time.perf_counter() - start_time:.2f}s"
+                            },
+                            colors={
+                                "status": Fore.GREEN,
+                                "timing": Fore.YELLOW
+                            }
+                        )
 
-                    crawl_result.success = bool(html)
-                    crawl_result.session_id = getattr(config, 'session_id', None)
-
-                    self.logger.success(
-                        message="{url:.50}... | Status: {status} | Total: {timing}",
-                        tag="COMPLETE",
-                        params={
-                            "url": cache_context.display_url,
-                            "status": crawl_result.success,
-                            "timing": f"{time.perf_counter() - start_time:.2f}s"
-                        },
-                        colors={
-                            "status": Fore.GREEN if crawl_result.success else Fore.RED,
-                            "timing": Fore.YELLOW
-                        }
-                    )
-
-                    # Update cache if appropriate
-                    if cache_context.should_write() and not bool(cached_result):
-                        await async_db_manager.acache_url(crawl_result)
-
-                    return crawl_result
+                        cached_result.success = bool(html)
+                        cached_result.session_id = getattr(config, 'session_id', None)
+                        return cached_result
 
                 except Exception as e:
                     error_context = get_error_context(sys.exc_info())
@@ -465,6 +520,7 @@ class AsyncWebCrawler:
                 extracted_content: Previously extracted content (if any)
                 config: Configuration object controlling processing behavior
                 screenshot: Screenshot data (if any)
+                pdf_data: PDF data (if any)
                 verbose: Whether to enable verbose logging
                 **kwargs: Additional parameters for backwards compatibility
             

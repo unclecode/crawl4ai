@@ -7,22 +7,43 @@ from .utils import *
 
 # Define the abstract base class for chunking strategies
 class ChunkingStrategy(ABC):
+    """
+    Abstract base class for chunking strategies.
+    """
     
     @abstractmethod
     def chunk(self, text: str) -> list:
         """
         Abstract method to chunk the given text.
+        
+        Args:
+            text (str): The text to chunk.
+        
+        Returns:
+            list: A list of chunks.
         """
         pass
 
 # Create an identity chunking strategy f(x) = [x]
 class IdentityChunking(ChunkingStrategy):
+    """
+    Chunking strategy that returns the input text as a single chunk.
+    """
     def chunk(self, text: str) -> list:
         return [text]
 
 # Regex-based chunking
 class RegexChunking(ChunkingStrategy):
+    """
+    Chunking strategy that splits text based on regular expression patterns.
+    """
     def __init__(self, patterns=None, **kwargs):
+        """
+        Initialize the RegexChunking object.
+        
+        Args:
+            patterns (list): A list of regular expression patterns to split text.
+        """
         if patterns is None:
             patterns = [r'\n\n']  # Default split pattern
         self.patterns = patterns
@@ -38,9 +59,15 @@ class RegexChunking(ChunkingStrategy):
     
 # NLP-based sentence chunking 
 class NlpSentenceChunking(ChunkingStrategy):
+    """
+    Chunking strategy that splits text into sentences using NLTK's sentence tokenizer.
+    """ 
     def __init__(self, **kwargs):
+        """
+        Initialize the NlpSentenceChunking object.
+        """
         load_nltk_punkt()
-        pass
+        
 
     def chunk(self, text: str) -> list:
         # Improved regex for sentence splitting
@@ -57,8 +84,21 @@ class NlpSentenceChunking(ChunkingStrategy):
     
 # Topic-based segmentation using TextTiling
 class TopicSegmentationChunking(ChunkingStrategy):
+    """
+    Chunking strategy that segments text into topics using NLTK's TextTilingTokenizer.
+    
+    How it works:
+    1. Segment the text into topics using TextTilingTokenizer
+    2. Extract keywords for each topic segment
+    """
     
     def __init__(self, num_keywords=3, **kwargs):
+        """
+        Initialize the TopicSegmentationChunking object.
+        
+        Args:
+            num_keywords (int): The number of keywords to extract for each topic segment.
+        """
         import nltk as nl
         self.tokenizer = nl.tokenize.TextTilingTokenizer()
         self.num_keywords = num_keywords
@@ -88,6 +128,14 @@ class TopicSegmentationChunking(ChunkingStrategy):
     
 # Fixed-length word chunks
 class FixedLengthWordChunking(ChunkingStrategy):
+    """
+    Chunking strategy that splits text into fixed-length word chunks.
+    
+    How it works:
+    1. Split the text into words
+    2. Create chunks of fixed length
+    3. Return the list of chunks
+    """
     def __init__(self, chunk_size=100, **kwargs):
         """
         Initialize the fixed-length word chunking strategy with the given chunk size.
@@ -103,6 +151,14 @@ class FixedLengthWordChunking(ChunkingStrategy):
     
 # Sliding window chunking
 class SlidingWindowChunking(ChunkingStrategy):
+    """
+    Chunking strategy that splits text into overlapping word chunks.
+    
+    How it works:
+    1. Split the text into words
+    2. Create chunks of fixed length
+    3. Return the list of chunks
+    """
     def __init__(self, window_size=100, step=50, **kwargs):
         """
         Initialize the sliding window chunking strategy with the given window size and
@@ -133,6 +189,15 @@ class SlidingWindowChunking(ChunkingStrategy):
         return chunks
     
 class OverlappingWindowChunking(ChunkingStrategy):
+    """
+    Chunking strategy that splits text into overlapping word chunks.
+    
+    How it works:
+    1. Split the text into words using whitespace
+    2. Create chunks of fixed length equal to the window size
+    3. Slide the window by the overlap size
+    4. Return the list of chunks
+    """
     def __init__(self, window_size=1000, overlap=100, **kwargs):
         """
         Initialize the overlapping window chunking strategy with the given window size and

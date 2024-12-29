@@ -74,9 +74,10 @@ The Markdown generation process transforms raw HTML into a structured format. At
 
 ```python
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
-from crawl4ai import CrawlerRunConfig, AsyncWebCrawler
+from crawl4ai import CrawlerRunConfig, AsyncWebCrawler, CacheMode
 
 config = CrawlerRunConfig(
+    cache_mode=CacheMode.BYPASS,
     markdown_generator=DefaultMarkdownGenerator(
         options={
             "ignore_links": True,
