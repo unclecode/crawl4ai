@@ -9,17 +9,8 @@ from .utils import clean_tokens
 from abc import ABC, abstractmethod
 import math
 from snowballstemmer import stemmer
-
-
-# import regex
-# def tokenize_text(text):
-#     # Regular expression to match words or CJK (Chinese, Japanese, Korean) characters
-#     pattern = r'\p{L}+|\p{N}+|[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー]|[\p{P}]'
-#     return regex.findall(pattern, text)
-
-# from nltk.stem import PorterStemmer
-# ps = PorterStemmer()
 class RelevantContentFilter(ABC):
+    """Abstract base class for content filtering strategies"""
     def __init__(self, user_query: str = None):
         self.user_query = user_query
         self.included_tags = {
@@ -171,9 +162,8 @@ class RelevantContentFilter(ABC):
             chunks = [chunk for chunk in chunks if len(chunk[1].split()) >= min_word_threshold]
         
         return chunks    
-    
 
-    def extract_text_chunks1(self, soup: BeautifulSoup) -> List[Tuple[int, str, Tag]]:
+    def _deprecated_extract_text_chunks(self, soup: BeautifulSoup) -> List[Tuple[int, str, Tag]]:
         """Common method for extracting text chunks"""
         _text_cache = {}
         def fast_text(element: Tag) -> str:
@@ -271,7 +261,38 @@ class RelevantContentFilter(ABC):
             return str(tag)  # Fallback to original if anything fails
 
 class BM25ContentFilter(RelevantContentFilter):
+    """
+    Content filtering using BM25 algorithm with priority tag handling.
+    
+    How it works:
+    1. Extracts page metadata with fallbacks.
+    2. Extracts text chunks from the body element.
+    3. Tokenizes the corpus and query.
+    4. Applies BM25 algorithm to calculate scores for each chunk.
+    5. Filters out chunks below the threshold.
+    6. Sorts chunks by score in descending order.
+    7. Returns the top N chunks.
+    
+    Attributes:
+        user_query (str): User query for filtering (optional).
+        bm25_threshold (float): BM25 threshold for filtering (default: 1.0).
+        language (str): Language for stemming (default: 'english').
+        
+        Methods:
+            filter_content(self, html: str, min_word_threshold: int = None)
+    """
     def __init__(self, user_query: str = None, bm25_threshold: float = 1.0, language: str = 'english'):
+        """
+        Initializes the BM25ContentFilter class, if not provided, falls back to page metadata.
+        
+        Note:
+        If no query is given and no page metadata is available, then it tries to pick up the first significant paragraph.
+        
+        Args:
+            user_query (str): User query for filtering (optional).
+            bm25_threshold (float): BM25 threshold for filtering (default: 1.0).
+            language (str): Language for stemming (default: 'english').
+        """
         super().__init__(user_query=user_query)
         self.bm25_threshold = bm25_threshold
         self.priority_tags = {
@@ -290,7 +311,20 @@ class BM25ContentFilter(RelevantContentFilter):
         self.stemmer = stemmer(language)
 
     def filter_content(self, html: str, min_word_threshold: int = None) -> List[str]:
-        """Implements content filtering using BM25 algorithm with priority tag handling"""
+        """
+        Implements content filtering using BM25 algorithm with priority tag handling.
+        
+            Note:
+        This method implements the filtering logic for the BM25ContentFilter class.
+        It takes HTML content as input and returns a list of filtered text chunks.
+        
+        Args:
+            html (str): HTML content to be filtered.
+            min_word_threshold (int): Minimum word threshold for filtering (optional).
+        
+        Returns:
+            List[str]: List of filtered text chunks.
+        """
         if not html or not isinstance(html, str):
             return []
 
@@ -357,15 +391,42 @@ class BM25ContentFilter(RelevantContentFilter):
 
         return [self.clean_element(tag) for _, _, tag in selected_candidates]
 
-
-
-
-
-
 class PruningContentFilter(RelevantContentFilter):
+    """
+    Content filtering using pruning algorithm with dynamic threshold.
+    
+    How it works:
+    1. Extracts page metadata with fallbacks.
+    2. Extracts text chunks from the body element.
+    3. Applies pruning algorithm to calculate scores for each chunk.
+    4. Filters out chunks below the threshold.
+    5. Sorts chunks by score in descending order.
+    6. Returns the top N chunks.
+
+    Attributes:
+        user_query (str): User query for filtering (optional), if not provided, falls back to page metadata.
+        min_word_threshold (int): Minimum word threshold for filtering (optional).
+        threshold_type (str): Threshold type for dynamic threshold (default: 'fixed').
+        threshold (float): Fixed threshold value (default: 0.48).
+        
+        Methods:
+            filter_content(self, html: str, min_word_threshold: int = None):
+    """
     def __init__(self, user_query: str = None, min_word_threshold: int = None, 
                  threshold_type: str = 'fixed', threshold: float = 0.48):
-        super().__init__(user_query)
+        """
+        Initializes the PruningContentFilter class, if not provided, falls back to page metadata.
+        
+        Note:
+        If no query is given and no page metadata is available, then it tries to pick up the first significant paragraph.
+        
+        Args:
+            user_query (str): User query for filtering (optional).
+            min_word_threshold (int): Minimum word threshold for filtering (optional).
+            threshold_type (str): Threshold type for dynamic threshold (default: 'fixed').
+            threshold (float): Fixed threshold value (default: 0.48).
+        """
+        super().__init__(None)
         self.min_word_threshold = min_word_threshold
         self.threshold_type = threshold_type
         self.threshold = threshold
@@ -418,6 +479,20 @@ class PruningContentFilter(RelevantContentFilter):
         }
 
     def filter_content(self, html: str, min_word_threshold: int = None) -> List[str]:
+        """
+        Implements content filtering using pruning algorithm with dynamic threshold.
+        
+        Note:
+        This method implements the filtering logic for the PruningContentFilter class.
+        It takes HTML content as input and returns a list of filtered text chunks.
+        
+        Args:
+            html (str): HTML content to be filtered.
+            min_word_threshold (int): Minimum word threshold for filtering (optional).
+        
+        Returns:
+            List[str]: List of filtered text chunks.
+        """
         if not html or not isinstance(html, str):
             return []
             
@@ -444,15 +519,23 @@ class PruningContentFilter(RelevantContentFilter):
         return content_blocks
 
     def _remove_comments(self, soup):
+        """Removes HTML comments"""
         for element in soup(text=lambda text: isinstance(text, Comment)):
             element.extract()
 
     def _remove_unwanted_tags(self, soup):
+        """Removes unwanted tags"""
         for tag in self.excluded_tags:
             for element in soup.find_all(tag):
                 element.decompose()
 
     def _prune_tree(self, node):
+        """
+        Prunes the tree starting from the given node.
+        
+        Args:
+            node (Tag): The node from which the pruning starts.
+        """
         if not node or not hasattr(node, 'name') or node.name is None:
             return
 
@@ -495,6 +578,7 @@ class PruningContentFilter(RelevantContentFilter):
                 self._prune_tree(child)
 
     def _compute_composite_score(self, metrics, text_len, tag_len, link_text_len):
+        """Computes the composite score"""
         if self.min_word_threshold:
             # Get raw text from metrics node - avoid extra processing
             text = metrics['node'].get_text(strip=True)
@@ -531,6 +615,7 @@ class PruningContentFilter(RelevantContentFilter):
         return score / total_weight if total_weight > 0 else 0
 
     def _compute_class_id_weight(self, node):
+        """Computes the class ID weight"""
         class_id_score = 0
         if 'class' in node.attrs:
             classes = ' '.join(node['class'])

@@ -2,20 +2,39 @@
 
 Crawl4AI, the **#1 trending GitHub repository**, streamlines web content extraction into AI-ready formats. Perfect for AI assistants, semantic search engines, or data pipelines, Crawl4AI transforms raw HTML into structured Markdown or JSON effortlessly. Integrate with LLMs, open-source models, or your own retrieval-augmented generation workflows.
 
-**Key Links:**  
-- **Website:** [https://crawl4ai.com](https://crawl4ai.com)  
-- **GitHub:** [https://github.com/unclecode/crawl4ai](https://github.com/unclecode/crawl4ai)  
-- **Colab Notebook:** [Try on Google Colab](https://colab.research.google.com/drive/1SgRPrByQLzjRfwoRNq1wSGE9nYY_EE8C?usp=sharing)  
-- **Quickstart Code Example:** [quickstart_async.config.py](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/quickstart_async.config.py)  
-- **Examples Folder:** [Crawl4AI Examples](https://github.com/unclecode/crawl4ai/tree/main/docs/examples)
+**What Crawl4AI is not:**
+
+Crawl4AI is not a replacement for traditional web scraping libraries, Selenium, or Playwright. It's not designed as a general-purpose web automation tool. Instead, Crawl4AI has a specific, focused goal:
+
+-   To generate perfect, AI-friendly data (particularly for LLMs) from web content
+-   To maximize speed and efficiency in data extraction and processing
+-   To operate at scale, from Raspberry Pi to cloud infrastructures
+
+Crawl4AI is engineered with a "scale-first" mindset, aiming to handle millions of links while maintaining exceptional performance. It's super efficient and fast, optimized to:
+
+1. Transform raw web content into structured, LLM-ready formats (Markdown/JSON)
+2. Implement intelligent extraction strategies to reduce reliance on costly API calls
+3. Provide a streamlined pipeline for AI data preparation and ingestion
+
+In essence, Crawl4AI bridges the gap between web content and AI systems, focusing on delivering high-quality, processed data rather than offering broad web automation capabilities.
+
+**Key Links:**
+
+-   **Website:** [https://crawl4ai.com](https://crawl4ai.com)
+-   **GitHub:** [https://github.com/unclecode/crawl4ai](https://github.com/unclecode/crawl4ai)
+-   **Colab Notebook:** [Try on Google Colab](https://colab.research.google.com/drive/1SgRPrByQLzjRfwoRNq1wSGE9nYY_EE8C?usp=sharing)
+-   **Quickstart Code Example:** [quickstart_async.config.py](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/quickstart_async.config.py)
+-   **Examples Folder:** [Crawl4AI Examples](https://github.com/unclecode/crawl4ai/tree/main/docs/examples)
 
 ---
 
 ## Table of Contents
+
 - [Crawl4AI Quick Start Guide: Your All-in-One AI-Ready Web Crawling \& AI Integration Solution](#crawl4ai-quick-start-guide-your-all-in-one-ai-ready-web-crawling--ai-integration-solution)
   - [Table of Contents](#table-of-contents)
   - [1. Introduction \& Key Concepts](#1-introduction--key-concepts)
   - [2. Installation \& Environment Setup](#2-installation--environment-setup)
+    - [Test Your Installation](#test-your-installation)
   - [3. Core Concepts \& Configuration](#3-core-concepts--configuration)
   - [4. Basic Crawling \& Simple Extraction](#4-basic-crawling--simple-extraction)
   - [5. Markdown Generation \& AI-Optimized Output](#5-markdown-generation--ai-optimized-output)
@@ -38,15 +57,17 @@ Crawl4AI, the **#1 trending GitHub repository**, streamlines web content extract
 ---
 
 ## 1. Introduction & Key Concepts
+
 Crawl4AI transforms websites into structured, AI-friendly data. It efficiently handles large-scale crawling, integrates with both proprietary and open-source LLMs, and optimizes content for semantic search or RAG pipelines.
 
 **Quick Test:**
+
 ```python
 import asyncio
 from crawl4ai import AsyncWebCrawler
 
 async def test_run():
-    async with AsyncWebCrawler(verbose=True) as crawler:
+    async with AsyncWebCrawler() as crawler:
         result = await crawler.arun("https://example.com")
         print(result.markdown)
 
@@ -60,11 +81,40 @@ If you see Markdown output, everything is working!
 ---
 
 ## 2. Installation & Environment Setup
+
 ```bash
+# Install the package
 pip install crawl4ai
 crawl4ai-setup
-playwright install chromium
+
+# Install Playwright with system dependencies (recommended)
+playwright install --with-deps  # Installs all browsers
+
+# Or install specific browsers:
+playwright install --with-deps chrome  # Recommended for Colab/Linux
+playwright install --with-deps firefox
+playwright install --with-deps webkit
+playwright install --with-deps chromium
+
+# Keep Playwright updated periodically
+playwright install
 ```
+
+> **Note**: For Google Colab and some Linux environments, use `chrome` instead of `chromium` - it tends to work more reliably.
+
+### Test Your Installation
+Try these one-liners:
+
+```python
+# Visible browser test
+python -c "from playwright.sync_api import sync_playwright; p = sync_playwright().start(); browser = p.chromium.launch(headless=False); page = browser.new_page(); page.goto('https://example.com'); input('Press Enter to close...')"
+
+# Headless test (for servers/CI)
+python -c "from playwright.sync_api import sync_playwright; p = sync_playwright().start(); browser = p.chromium.launch(headless=True); page = browser.new_page(); page.goto('https://example.com'); print(f'Title: {page.title()}'); browser.close()"
+```
+
+You should see a browser window (in visible test) loading example.com. If you get errors, try with Firefox using `playwright install --with-deps firefox`.
+
 
 **Try in Colab:**  
 [Open Colab Notebook](https://colab.research.google.com/drive/1SgRPrByQLzjRfwoRNq1wSGE9nYY_EE8C?usp=sharing)
@@ -74,16 +124,19 @@ playwright install chromium
 ---
 
 ## 3. Core Concepts & Configuration
+
 Use `AsyncWebCrawler`, `CrawlerRunConfig`, and `BrowserConfig` to control crawling.
 
 **Example config:**
+
 ```python
 from crawl4ai.async_configs import BrowserConfig, CrawlerRunConfig
 
 browser_config = BrowserConfig(
     headless=True,
-    viewport_width=1920,
-    viewport_height=1080,
+    verbose=True,
+    viewport_width=1080,
+    viewport_height=600,
     text_mode=False,
     ignore_https_errors=True,
     java_script_enabled=True
@@ -97,7 +150,7 @@ run_config = CrawlerRunConfig(
     wait_for="css:.article-loaded",
     page_timeout=60000,
     delay_before_return_html=1.0,
-    mean_delay=0.1, 
+    mean_delay=0.1,
     max_range=0.3,
     process_iframes=True,
     remove_overlay_elements=True,
@@ -115,15 +168,17 @@ run_config = CrawlerRunConfig(
 ```
 
 **Prefixes:**
-- `http://` or `https://` for live pages
-- `file://local.html` for local
-- `raw:<html>` for raw HTML strings
+
+-   `http://` or `https://` for live pages
+-   `file://local.html` for local
+-   `raw:<html>` for raw HTML strings
 
 **More info:** [See /docs/async_webcrawler](#) or [3_async_webcrawler.ex.md](https://github.com/unclecode/crawl4ai/blob/main/async_webcrawler.ex.md)
 
 ---
 
 ## 4. Basic Crawling & Simple Extraction
+
 ```python
 async with AsyncWebCrawler(config=browser_config) as crawler:
     result = await crawler.arun("https://news.example.com/article", config=run_config)
@@ -137,13 +192,15 @@ async with AsyncWebCrawler(config=browser_config) as crawler:
 ## 5. Markdown Generation & AI-Optimized Output
 
 After crawling, `result.markdown_v2` provides:
-- `raw_markdown`: Unfiltered markdown
-- `markdown_with_citations`: Links as references at the bottom
-- `references_markdown`: A separate list of reference links
-- `fit_markdown`: Filtered, relevant markdown (e.g., after BM25)
-- `fit_html`: The HTML used to produce `fit_markdown`
+
+-   `raw_markdown`: Unfiltered markdown
+-   `markdown_with_citations`: Links as references at the bottom
+-   `references_markdown`: A separate list of reference links
+-   `fit_markdown`: Filtered, relevant markdown (e.g., after BM25)
+-   `fit_html`: The HTML used to produce `fit_markdown`
 
 **Example:**
+
 ```python
 print("RAW:", result.markdown_v2.raw_markdown[:200])
 print("CITED:", result.markdown_v2.markdown_with_citations[:200])
@@ -158,9 +215,11 @@ For AI training, `fit_markdown` focuses on the most relevant content.
 ---
 
 ## 6. Structured Data Extraction (CSS, XPath, LLM)
+
 Extract JSON data without LLMs:
 
 **CSS:**
+
 ```python
 from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
 
@@ -176,6 +235,7 @@ run_config.extraction_strategy = JsonCssExtractionStrategy(schema)
 ```
 
 **XPath:**
+
 ```python
 from crawl4ai.extraction_strategy import JsonXPathExtractionStrategy
 
@@ -195,6 +255,7 @@ run_config.extraction_strategy = JsonXPathExtractionStrategy(xpath_schema)
 ---
 
 ## 7. Advanced Extraction: LLM & Open-Source Models
+
 Use LLMExtractionStrategy for complex tasks. Works with OpenAI or open-source models (e.g., Ollama).
 
 ```python
@@ -217,7 +278,9 @@ run_config.extraction_strategy = LLMExtractionStrategy(
 ---
 
 ## 8. Page Interactions, JS Execution, & Dynamic Content
+
 Insert `js_code` and use `wait_for` to ensure content loads. Example:
+
 ```python
 run_config.js_code = """
 (async () => {
@@ -233,6 +296,7 @@ run_config.wait_for = "css:.item-loaded"
 ---
 
 ## 9. Media, Links, & Metadata Handling
+
 `result.media["images"]`: List of images with `src`, `score`, `alt`. Score indicates relevance.
 
 `result.media["videos"]`, `result.media["audios"]` similarly hold media info.
@@ -242,6 +306,7 @@ run_config.wait_for = "css:.item-loaded"
 `result.metadata`: Title, description, keywords, author.
 
 **Example:**
+
 ```python
 # Images
 for img in result.media["images"]:
@@ -263,30 +328,37 @@ print("Description:", result.metadata["description"])
 ## 10. Authentication & Identity Preservation
 
 ### Manual Setup via User Data Directory
+
 1. **Open Chrome with a custom user data dir:**
-   ```bash
-   "C:\Program Files\Google\Chrome\Application\chrome.exe" --user-data-dir="C:\MyChromeProfile"
-   ```
-   On macOS:
-   ```bash
-   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --user-data-dir="/Users/username/ChromeProfiles/MyProfile"
-   ```
+
+    ```bash
+    "C:\Program Files\Google\Chrome\Application\chrome.exe" --user-data-dir="C:\MyChromeProfile"
+    ```
+
+    On macOS:
+
+    ```bash
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --user-data-dir="/Users/username/ChromeProfiles/MyProfile"
+    ```
 
 2. **Log in to sites, solve CAPTCHAs, adjust settings manually.**  
    The browser saves cookies/localStorage in that directory.
 
 3. **Use `user_data_dir` in `BrowserConfig`:**
-   ```python
-   browser_config = BrowserConfig(
-       headless=True,
-       user_data_dir="/Users/username/ChromeProfiles/MyProfile"
-   )
-   ```
 
-   Now the crawler starts with those cookies, sessions, etc.
+    ```python
+    browser_config = BrowserConfig(
+        headless=True,
+        user_data_dir="/Users/username/ChromeProfiles/MyProfile"
+    )
+    ```
+
+    Now the crawler starts with those cookies, sessions, etc.
 
 ### Using `storage_state`
+
 Alternatively, export and reuse storage states:
+
 ```python
 browser_config = BrowserConfig(
     headless=True,
@@ -301,7 +373,9 @@ No repeated logins needed.
 ---
 
 ## 11. Proxy & Security Enhancements
+
 Use `proxy_config` for authenticated proxies:
+
 ```python
 browser_config.proxy_config = {
     "server": "http://proxy.example.com:8080",
@@ -317,6 +391,7 @@ Combine with `headers` or `ignore_https_errors` as needed.
 ---
 
 ## 12. Screenshots, PDFs & File Downloads
+
 Enable `screenshot=True` or `pdf=True` in `CrawlerRunConfig`:
 
 ```python
@@ -325,6 +400,7 @@ run_config.pdf = True
 ```
 
 After crawling:
+
 ```python
 if result.screenshot:
     with open("page.png", "wb") as f:
@@ -336,6 +412,7 @@ if result.pdf:
 ```
 
 **File Downloads:**
+
 ```python
 browser_config.accept_downloads = True
 browser_config.downloads_path = "./downloads"
@@ -351,7 +428,9 @@ Also [10_file_download.md](https://github.com/unclecode/crawl4ai/blob/main/file_
 ---
 
 ## 13. Caching & Performance Optimization
+
 Set `cache_mode` to reuse fetch results:
+
 ```python
 from crawl4ai import CacheMode
 run_config.cache_mode = CacheMode.ENABLED
@@ -364,11 +443,13 @@ Adjust delays, increase concurrency, or use `text_mode=True` for faster extracti
 ---
 
 ## 14. Hooks for Custom Logic
+
 Hooks let you run code at specific lifecycle events without creating pages manually in `on_browser_created`.
 
 Use `on_page_context_created` to apply routing or modify page contexts before crawling the URL:
 
 **Example Hook:**
+
 ```python
 async def on_page_context_created_hook(context, page, **kwargs):
     # Block all images to speed up load
@@ -388,21 +469,25 @@ This hook is clean and doesn’t create a separate page itself—it just modifie
 ---
 
 ## 15. Dockerization & Scaling
+
 Use Docker images:
 
-- AMD64 basic:
+-   AMD64 basic:
+
 ```bash
 docker pull unclecode/crawl4ai:basic-amd64
 docker run -p 11235:11235 unclecode/crawl4ai:basic-amd64
 ```
 
-- ARM64 for M1/M2:
+-   ARM64 for M1/M2:
+
 ```bash
 docker pull unclecode/crawl4ai:basic-arm64
 docker run -p 11235:11235 unclecode/crawl4ai:basic-arm64
 ```
 
-- GPU support:
+-   GPU support:
+
 ```bash
 docker pull unclecode/crawl4ai:gpu-amd64
 docker run --gpus all -p 11235:11235 unclecode/crawl4ai:gpu-amd64
@@ -415,23 +500,26 @@ Scale with load balancers or Kubernetes.
 ---
 
 ## 16. Troubleshooting & Common Pitfalls
-- Empty results? Relax filters, check selectors.
-- Timeouts? Increase `page_timeout` or refine `wait_for`.
-- CAPTCHAs? Use `user_data_dir` or `storage_state` after manual solving.
-- JS errors? Try headful mode for debugging.
+
+-   Empty results? Relax filters, check selectors.
+-   Timeouts? Increase `page_timeout` or refine `wait_for`.
+-   CAPTCHAs? Use `user_data_dir` or `storage_state` after manual solving.
+-   JS errors? Try headful mode for debugging.
 
 Check [examples](https://github.com/unclecode/crawl4ai/tree/main/docs/examples) & [quickstart_async.config.py](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/quickstart_async.config.py) for more code.
 
 ---
 
 ## 17. Comprehensive End-to-End Example
+
 Combine hooks, JS execution, PDF saving, LLM extraction—see [quickstart_async.config.py](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/quickstart_async.config.py) for a full example.
 
 ---
 
 ## 18. Further Resources & Community
-- **Docs:** [https://crawl4ai.com](https://crawl4ai.com)  
-- **Issues & PRs:** [https://github.com/unclecode/crawl4ai/issues](https://github.com/unclecode/crawl4ai/issues)
+
+-   **Docs:** [https://crawl4ai.com](https://crawl4ai.com)
+-   **Issues & PRs:** [https://github.com/unclecode/crawl4ai/issues](https://github.com/unclecode/crawl4ai/issues)
 
 Follow [@unclecode](https://x.com/unclecode) for news & community updates.
 

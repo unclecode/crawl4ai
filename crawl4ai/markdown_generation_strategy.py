@@ -38,11 +38,44 @@ class MarkdownGenerationStrategy(ABC):
         pass
 
 class DefaultMarkdownGenerator(MarkdownGenerationStrategy):
-    """Default implementation of markdown generation strategy."""
+    """
+    Default implementation of markdown generation strategy.
+    
+    How it works:
+    1. Generate raw markdown from cleaned HTML.
+    2. Convert links to citations.
+    3. Generate fit markdown if content filter is provided.
+    4. Return MarkdownGenerationResult.
+    
+    Args:
+        content_filter (Optional[RelevantContentFilter]): Content filter for generating fit markdown.
+        options (Optional[Dict[str, Any]]): Additional options for markdown generation. Defaults to None.
+        
+    Returns:
+        MarkdownGenerationResult: Result containing raw markdown, fit markdown, fit HTML, and references markdown.
+    """
     def __init__(self, content_filter: Optional[RelevantContentFilter] = None, options: Optional[Dict[str, Any]] = None):
         super().__init__(content_filter, options)
     
     def convert_links_to_citations(self, markdown: str, base_url: str = "") -> Tuple[str, str]:
+        """
+        Convert links in markdown to citations.
+        
+        How it works:
+        1. Find all links in the markdown.
+        2. Convert links to citations.
+        3. Return converted markdown and references markdown.
+        
+        Note:
+        This function uses a regex pattern to find links in markdown.
+        
+        Args:
+            markdown (str): Markdown text.
+            base_url (str): Base URL for URL joins.
+            
+        Returns:
+            Tuple[str, str]: Converted markdown and references markdown.
+        """
         link_map = {}
         url_cache = {}  # Cache for URL joins
         parts = []
@@ -90,7 +123,26 @@ class DefaultMarkdownGenerator(MarkdownGenerationStrategy):
                          content_filter: Optional[RelevantContentFilter] = None,
                          citations: bool = True,
                          **kwargs) -> MarkdownGenerationResult:
-        """Generate markdown with citations from cleaned HTML."""
+        """
+        Generate markdown with citations from cleaned HTML.
+        
+        How it works:
+        1. Generate raw markdown from cleaned HTML.
+        2. Convert links to citations.
+        3. Generate fit markdown if content filter is provided.
+        4. Return MarkdownGenerationResult.
+        
+        Args:
+            cleaned_html (str): Cleaned HTML content.
+            base_url (str): Base URL for URL joins.
+            html2text_options (Optional[Dict[str, Any]]): HTML2Text options.
+            options (Optional[Dict[str, Any]]): Additional options for markdown generation.
+            content_filter (Optional[RelevantContentFilter]): Content filter for generating fit markdown.
+            citations (bool): Whether to generate citations.
+            
+        Returns:
+            MarkdownGenerationResult: Result containing raw markdown, fit markdown, fit HTML, and references markdown.
+        """
         # Initialize HTML2Text with options
         h = CustomHTML2Text()
         if html2text_options:

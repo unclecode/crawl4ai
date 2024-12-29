@@ -11,6 +11,7 @@ from .user_agent_generator import UserAgentGenerator
 from .extraction_strategy import ExtractionStrategy
 from .chunking_strategy import ChunkingStrategy
 from .markdown_generation_strategy import MarkdownGenerationStrategy
+from typing import Union, List
 
 
 class BrowserConfig:
@@ -39,8 +40,8 @@ class BrowserConfig:
                              Default: None.
         proxy_config (dict or None): Detailed proxy configuration, e.g. {"server": "...", "username": "..."}.
                                      If None, no additional proxy config. Default: None.
-        viewport_width (int): Default viewport width for pages. Default: 1920.
-        viewport_height (int): Default viewport height for pages. Default: 1080.
+        viewport_width (int): Default viewport width for pages. Default: 1080.
+        viewport_height (int): Default viewport height for pages. Default: 600.
         verbose (bool): Enable verbose logging.
                         Default: True.
         accept_downloads (bool): Whether to allow file downloads. If True, requires a downloads_path.
@@ -79,7 +80,7 @@ class BrowserConfig:
         chrome_channel: str = "chrome",
         proxy: str = None,
         proxy_config: dict = None,
-        viewport_width: int = 800,
+        viewport_width: int = 1080,
         viewport_height: int = 600, 
         accept_downloads: bool = False,
         downloads_path: str = None,
@@ -136,10 +137,15 @@ class BrowserConfig:
         self.debugging_port = debugging_port
 
         user_agenr_generator = UserAgentGenerator()
-        if self.user_agent_mode != "random":
+        if self.user_agent_mode != "random" and self.user_agent_generator_config:
             self.user_agent = user_agenr_generator.generate(
                 **(self.user_agent_generator_config or {})
             )
+        elif self.user_agent_mode == "random":
+            self.user_agent = user_agenr_generator.generate()
+        else:
+            pass
+        
         self.browser_hint = user_agenr_generator.generate_client_hints(self.user_agent)
         self.headers.setdefault("sec-ch-ua", self.browser_hint)
 
@@ -158,8 +164,8 @@ class BrowserConfig:
             chrome_channel=kwargs.get("chrome_channel", "chrome"),
             proxy=kwargs.get("proxy"),
             proxy_config=kwargs.get("proxy_config"),
-            viewport_width=kwargs.get("viewport_width", 1920),
-            viewport_height=kwargs.get("viewport_height", 1080),
+            viewport_width=kwargs.get("viewport_width", 1080),
+            viewport_height=kwargs.get("viewport_height", 600),
             accept_downloads=kwargs.get("accept_downloads", False),
             downloads_path=kwargs.get("downloads_path"),
             storage_state=kwargs.get("storage_state"),
@@ -215,6 +221,8 @@ class CrawlerRunConfig:
                              Default: False.
         prettiify (bool): If True, apply `fast_format_html` to produce prettified HTML output.
                           Default: False.
+        parser_type (str): Type of parser to use for HTML parsing.
+                           Default: "lxml".
 
         # Caching Parameters
         cache_mode (CacheMode or None): Defines how caching is handled.
@@ -322,6 +330,7 @@ class CrawlerRunConfig:
         keep_data_attributes: bool = False,
         remove_forms: bool = False,
         prettiify: bool = False,
+        parser_type: str = "lxml",
 
         # SSL Parameters
         fetch_ssl_certificate: bool = False,
@@ -345,7 +354,7 @@ class CrawlerRunConfig:
         semaphore_count: int = 5,
 
         # Page Interaction Parameters
-        js_code=None,
+        js_code: Union[str, List[str]] = None,
         js_only: bool = False,
         ignore_body_visibility: bool = True,
         scan_full_page: bool = False,
@@ -393,6 +402,7 @@ class CrawlerRunConfig:
         self.keep_data_attributes = keep_data_attributes
         self.remove_forms = remove_forms
         self.prettiify = prettiify
+        self.parser_type = parser_type
 
         # SSL Parameters
         self.fetch_ssl_certificate = fetch_ssl_certificate
@@ -478,6 +488,7 @@ class CrawlerRunConfig:
             keep_data_attributes=kwargs.get("keep_data_attributes", False),
             remove_forms=kwargs.get("remove_forms", False),
             prettiify=kwargs.get("prettiify", False),
+            parser_type=kwargs.get("parser_type", "lxml"),
 
             # SSL Parameters
             fetch_ssl_certificate=kwargs.get("fetch_ssl_certificate", False),
@@ -550,6 +561,7 @@ class CrawlerRunConfig:
             "keep_data_attributes": self.keep_data_attributes,
             "remove_forms": self.remove_forms,
             "prettiify": self.prettiify,
+            "parser_type": self.parser_type,
             "fetch_ssl_certificate": self.fetch_ssl_certificate,
             "cache_mode": self.cache_mode,
             "session_id": self.session_id,
