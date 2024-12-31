@@ -17,7 +17,8 @@ from crawl4ai import (
     BrowserConfig,
     CrawlerRunConfig,
     CacheMode,
-    LLMExtractionStrategy
+    LLMExtractionStrategy,
+    JsonCssExtractionStrategy
 )
 from crawl4ai.content_filter_strategy import RelevantContentFilter
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator 
