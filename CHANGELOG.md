@@ -1,19 +1,86 @@
 # Changelog
 
-## [0.4.1] December 8, 2024
+All notable changes to Crawl4AI will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.4.24] - 2024-12-31
+
+### Added
+- **Browser and SSL Handling**
+  - SSL certificate validation options in extraction strategies
+  - Custom certificate paths support
+  - Configurable certificate validation skipping
+  - Enhanced response status code handling with retry logic
+
+- **Content Processing**
+  - New content filtering system with regex support
+  - Advanced chunking strategies for large content
+  - Memory-efficient parallel processing
+  - Configurable chunk size optimization
+
+- **JSON Extraction**
+  - Complex JSONPath expression support
+  - JSON-LD and Microdata extraction
+  - RDFa parsing capabilities
+  - Advanced data transformation pipeline
+
+- **Field Types**
+  - New field types: `computed`, `conditional`, `aggregate`, `template`
+  - Field inheritance system
+  - Reusable field definitions
+  - Custom validation rules
+
+### Changed
+- **Performance**
+  - Optimized selector compilation with caching
+  - Improved HTML parsing efficiency
+  - Enhanced memory management for large documents
+  - Batch processing optimizations
+
+- **Error Handling**
+  - More detailed error messages and categorization
+  - Enhanced debugging capabilities
+  - Improved performance metrics tracking
+  - Better error recovery mechanisms
+
+### Deprecated
+- Old field computation method using `eval`
+- Direct browser manipulation without proper SSL handling
+- Simple text-based content filtering
+
+### Removed
+- Legacy extraction patterns without proper error handling
+- Unsafe eval-based field computation
+- Direct DOM manipulation without sanitization
+
+### Fixed
+- Memory leaks in large document processing
+- SSL certificate validation issues
+- Incorrect handling of nested JSON structures
+- Performance bottlenecks in parallel processing
+
+### Security
+- Improved input validation and sanitization
+- Safe expression evaluation system
+- Enhanced resource protection
+- Rate limiting implementation
+
+## [0.4.1] - 2024-12-08
 
 ### **File: `crawl4ai/async_crawler_strategy.py`**
 
 #### **New Parameters and Attributes Added**
-- **`text_only` (boolean)**: Enables text-only mode, disables images, JavaScript, and GPU-related features for faster, minimal rendering.
+- **`text_mode` (boolean)**: Enables text-only mode, disables images, JavaScript, and GPU-related features for faster, minimal rendering.
 - **`light_mode` (boolean)**: Optimizes the browser by disabling unnecessary background processes and features for efficiency.
-- **`viewport_width` and `viewport_height`**: Dynamically adjusts based on `text_only` mode (default values: 800x600 for `text_only`, 1920x1080 otherwise).
-- **`extra_args`**: Adds browser-specific flags for `text_only` mode.
+- **`viewport_width` and `viewport_height`**: Dynamically adjusts based on `text_mode` mode (default values: 800x600 for `text_mode`, 1920x1080 otherwise).
+- **`extra_args`**: Adds browser-specific flags for `text_mode` mode.
 - **`adjust_viewport_to_content`**: Dynamically adjusts the viewport to the content size for accurate rendering.
 
 #### **Browser Context Adjustments**
-- Added **`viewport` adjustments**: Dynamically computed based on `text_only` or custom configuration.
-- Enhanced support for `light_mode` and `text_only` by adding specific browser arguments to reduce resource consumption.
+- Added **`viewport` adjustments**: Dynamically computed based on `text_mode` or custom configuration.
+- Enhanced support for `light_mode` and `text_mode` by adding specific browser arguments to reduce resource consumption.
 
 #### **Dynamic Content Handling**
 - **Full Page Scan Feature**:
@@ -709,7 +776,7 @@ This commit introduces several key enhancements, including improved error handli
 - Improved `AsyncPlaywrightCrawlerStrategy.close()` method to use a shorter sleep time (0.5 seconds instead of 500), significantly reducing wait time when closing the crawler.
 - Enhanced flexibility in `CosineStrategy`:
   - Now uses a more generic `load_HF_embedding_model` function, allowing for easier swapping of embedding models.
-- Updated `JsonCssExtractionStrategy` and `JsonXPATHExtractionStrategy` for better JSON-based extraction.
+- Updated `JsonCssExtractionStrategy` and `JsonXPathExtractionStrategy` for better JSON-based extraction.
 
 ### Fixed
 - Addressed potential issues with the sliding window chunking strategy to ensure all text is properly chunked.
@@ -980,6 +1047,6 @@ These changes focus on refining the existing codebase, resulting in a more stabl
 - Maintaining the semantic context of inline tags (e.g., abbreviation, DEL, INS) for improved LLM-friendliness.
 - Updated Dockerfile to ensure compatibility across multiple platforms (Hopefully!).
 
-## [0.2.4] - 2024-06-17
+## [v0.2.4] - 2024-06-17
 ### Fixed
 - Fix issue #22: Use MD5 hash for caching HTML files to handle long URLs

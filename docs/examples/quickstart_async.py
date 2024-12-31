@@ -627,13 +627,13 @@ async def main():
     # }
     # await extract_structured_data_using_llm(extra_headers=custom_headers)
     
-    await crawl_dynamic_content_pages_method_1()
-    await crawl_dynamic_content_pages_method_2()
+    # await crawl_dynamic_content_pages_method_1()
+    # await crawl_dynamic_content_pages_method_2()
     await crawl_dynamic_content_pages_method_3()
     
-    await crawl_custom_browser_type()
+    # await crawl_custom_browser_type()
     
-    await speed_comparison()
+    # await speed_comparison()
 
 
 if __name__ == "__main__":

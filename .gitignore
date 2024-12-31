@@ -208,7 +208,7 @@ git_issues.md
 
 .next/
 .tests/
-.issues/
+# .issues/
 .docs/
 .issues/
 .gitboss/
@@ -221,3 +221,7 @@ combined_output.txt
 .local
 .scripts
 tree.md
+tree.md
+.scripts
+.local
+.do

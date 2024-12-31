@@ -45,13 +45,15 @@ if __name__ == "__main__":
 ### New Code (Recommended)
 ```python
 import asyncio
-from crawl4ai import AsyncWebCrawler, CacheMode  # Import CacheMode
+from crawl4ai import AsyncWebCrawler, CacheMode
+from crawl4ai.async_configs import CrawlerRunConfig
 
 async def use_proxy():
+    config = CrawlerRunConfig(cache_mode=CacheMode.BYPASS)  # Use CacheMode in CrawlerRunConfig
     async with AsyncWebCrawler(verbose=True) as crawler:
         result = await crawler.arun(
             url="https://www.nbcnews.com/business",
-            cache_mode=CacheMode.BYPASS  # New way
+            config=config  # Pass the configuration object
         )
         print(len(result.markdown))
 
@@ -64,12 +66,12 @@ if __name__ == "__main__":
 
 ## Common Migration Patterns
 
-Old Flag | New Mode
----------|----------
-`bypass_cache=True` | `cache_mode=CacheMode.BYPASS`
-`disable_cache=True` | `cache_mode=CacheMode.DISABLED`
-`no_cache_read=True` | `cache_mode=CacheMode.WRITE_ONLY`
-`no_cache_write=True` | `cache_mode=CacheMode.READ_ONLY`
+| Old Flag              | New Mode                       |
+|-----------------------|---------------------------------|
+| `bypass_cache=True`   | `cache_mode=CacheMode.BYPASS`  |
+| `disable_cache=True`  | `cache_mode=CacheMode.DISABLED`|
+| `no_cache_read=True`  | `cache_mode=CacheMode.WRITE_ONLY` |
+| `no_cache_write=True` | `cache_mode=CacheMode.READ_ONLY` |
 
 ## Suppressing Deprecation Warnings
 If you need time to migrate, you can temporarily suppress deprecation warnings:

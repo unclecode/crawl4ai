@@ -1,68 +1,58 @@
-# Content Selection
+### Content Selection
 
 Crawl4AI provides multiple ways to select and filter specific content from webpages. Learn how to precisely target the content you need.
 
-## CSS Selectors
+#### CSS Selectors
 
-The simplest way to extract specific content:
+Extract specific content using a `CrawlerRunConfig` with CSS selectors:
 
 ```python
-# Extract specific content using CSS selector
-result = await crawler.arun(
-    url="https://example.com",
-    css_selector=".main-article"  # Target main article content
-)
+from crawl4ai.async_configs import CrawlerRunConfig
 
-# Multiple selectors
-result = await crawler.arun(
-    url="https://example.com",
-    css_selector="article h1, article .content"  # Target heading and content
-)
+config = CrawlerRunConfig(css_selector=".main-article")  # Target main article content
+result = await crawler.arun(url="https://crawl4ai.com", config=config)
+
+config = CrawlerRunConfig(css_selector="article h1, article .content")  # Target heading and content
+result = await crawler.arun(url="https://crawl4ai.com", config=config)
 ```
 
-## Content Filtering
+#### Content Filtering
 
-Control what content is included or excluded:
+Control content inclusion or exclusion with `CrawlerRunConfig`:
 
 ```python
-result = await crawler.arun(
-    url="https://example.com",
-    # Content thresholds
+config = CrawlerRunConfig(
     word_count_threshold=10,        # Minimum words per block
-    
-    # Tag exclusions
-    excluded_tags=['form', 'header', 'footer', 'nav'],
-    
-    # Link filtering
+    excluded_tags=['form', 'header', 'footer', 'nav'],  # Excluded tags
     exclude_external_links=True,    # Remove external links
     exclude_social_media_links=True,  # Remove social media links
-    
-    # Media filtering
     exclude_external_images=True   # Remove external images
 )
+
+result = await crawler.arun(url="https://crawl4ai.com", config=config)
 ```
 
-## Iframe Content
+#### Iframe Content
 
-Process content inside iframes:
+Process iframe content by enabling specific options in `CrawlerRunConfig`:
 
 ```python
-result = await crawler.arun(
-    url="https://example.com",
-    process_iframes=True,  # Extract iframe content
+config = CrawlerRunConfig(
+    process_iframes=True,          # Extract iframe content
     remove_overlay_elements=True  # Remove popups/modals that might block iframes
 )
+
+result = await crawler.arun(url="https://crawl4ai.com", config=config)
 ```
 
-## Structured Content Selection
+#### Structured Content Selection Using LLMs
 
-### Using LLMs for Smart Selection
-
-Use LLMs to intelligently extract specific types of content:
+Leverage LLMs for intelligent content extraction:
 
 ```python
-from pydantic import BaseModel
 from crawl4ai.extraction_strategy import LLMExtractionStrategy
+from pydantic import BaseModel
+from typing import List
 
 class ArticleContent(BaseModel):
     title: str
@@ -70,28 +60,27 @@ class ArticleContent(BaseModel):
     conclusion: str
 
 strategy = LLMExtractionStrategy(
-    provider="ollama/nemotron",  # Works with any supported LLM
+    provider="ollama/nemotron",
     schema=ArticleContent.schema(),
     instruction="Extract the main article title, key points, and conclusion"
 )
 
-result = await crawler.arun(
-    url="https://example.com",
-    extraction_strategy=strategy
-)
+config = CrawlerRunConfig(extraction_strategy=strategy)
+
+result = await crawler.arun(url="https://crawl4ai.com", config=config)
 article = json.loads(result.extracted_content)
 ```
 
-### Pattern-Based Selection
+#### Pattern-Based Selection
 
-For repeated content patterns (like product listings, news feeds):
+Extract content matching repetitive patterns:
 
 ```python
 from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
 
 schema = {
     "name": "News Articles",
-    "baseSelector": "article.news-item",  # Repeated element
+    "baseSelector": "article.news-item",
     "fields": [
         {"name": "headline", "selector": "h2", "type": "text"},
         {"name": "summary", "selector": ".summary", "type": "text"},
@@ -108,51 +97,19 @@ schema = {
 }
 
 strategy = JsonCssExtractionStrategy(schema)
-result = await crawler.arun(
-    url="https://example.com",
-    extraction_strategy=strategy
-)
+config = CrawlerRunConfig(extraction_strategy=strategy)
+
+result = await crawler.arun(url="https://crawl4ai.com", config=config)
 articles = json.loads(result.extracted_content)
 ```
 
-## Domain-Based Filtering
+#### Comprehensive Example
 
-Control content based on domains:
-
-```python
-result = await crawler.arun(
-    url="https://example.com",
-    exclude_domains=["ads.com", "tracker.com"],
-    exclude_social_media_domains=["facebook.com", "twitter.com"],  # Custom social media domains to exclude
-    exclude_social_media_links=True
-)
-```
-
-## Media Selection
-
-Select specific types of media:
+Combine different selection methods using `CrawlerRunConfig`:
 
 ```python
-result = await crawler.arun(url="https://example.com")
+from crawl4ai.async_configs import BrowserConfig, CrawlerRunConfig
 
-# Access different media types
-images = result.media["images"]  # List of image details
-videos = result.media["videos"]  # List of video details
-audios = result.media["audios"]  # List of audio details
-
-# Image with metadata
-for image in images:
-    print(f"URL: {image['src']}")
-    print(f"Alt text: {image['alt']}")
-    print(f"Description: {image['desc']}")
-    print(f"Relevance score: {image['score']}")
-```
-
-## Comprehensive Example
-
-Here's how to combine different selection methods:
-
-```python
 async def extract_article_content(url: str):
     # Define structured extraction
     article_schema = {
@@ -163,37 +120,16 @@ async def extract_article_content(url: str):
             {"name": "content", "selector": ".content", "type": "text"}
         ]
     }
-    
-    # Define LLM extraction
-    class ArticleAnalysis(BaseModel):
-        key_points: List[str]
-        sentiment: str
-        category: str
+
+    # Define configuration
+    config = CrawlerRunConfig(
+        extraction_strategy=JsonCssExtractionStrategy(article_schema),
+        word_count_threshold=10,
+        excluded_tags=['nav', 'footer'],
+        exclude_external_links=True
+    )
 
     async with AsyncWebCrawler() as crawler:
-        # Get structured content
-        pattern_result = await crawler.arun(
-            url=url,
-            extraction_strategy=JsonCssExtractionStrategy(article_schema),
-            word_count_threshold=10,
-            excluded_tags=['nav', 'footer'],
-            exclude_external_links=True
-        )
-        
-        # Get semantic analysis
-        analysis_result = await crawler.arun(
-            url=url,
-            extraction_strategy=LLMExtractionStrategy(
-                provider="ollama/nemotron",
-                schema=ArticleAnalysis.schema(),
-                instruction="Analyze the article content"
-            )
-        )
-        
-        # Combine results
-        return {
-            "article": json.loads(pattern_result.extracted_content),
-            "analysis": json.loads(analysis_result.extracted_content),
-            "media": pattern_result.media
-        }
+        result = await crawler.arun(url=url, config=config)
+        return json.loads(result.extracted_content)
 ```

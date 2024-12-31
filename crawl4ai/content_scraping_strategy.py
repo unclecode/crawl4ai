@@ -1,4 +1,5 @@
 import re  # Point 1: Pre-Compile Regular Expressions
+import time
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 from bs4 import BeautifulSoup
@@ -16,7 +17,8 @@ from .models import MarkdownGenerationResult
 from .utils import (
     extract_metadata,
     normalize_url,
-    is_external_url    
+    is_external_url,    
+    get_base_domain,    
 )
 
 
@@ -62,6 +64,17 @@ class ContentScrapingStrategy(ABC):
         pass
 
 class WebScrapingStrategy(ContentScrapingStrategy):
+    """
+    Class for web content scraping. Perhaps the most important class. 
+    
+    How it works:
+    1. Extract content from HTML using BeautifulSoup.
+    2. Clean the extracted content using a content cleaning strategy.
+    3. Filter the cleaned content using a content filtering strategy.
+    4. Generate markdown content from the filtered content.
+    5. Return the markdown content.
+    """
+    
     def __init__(self, logger=None):
         self.logger = logger
 
@@ -72,17 +85,57 @@ class WebScrapingStrategy(ContentScrapingStrategy):
             log_method(message=message, tag=tag, **kwargs)
                 
     def scrap(self, url: str, html: str, **kwargs) -> Dict[str, Any]:
+        """
+        Main entry point for content scraping.  
+
+        Args:
+            url (str): The URL of the page to scrape.
+            html (str): The HTML content of the page.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            Dict[str, Any]: A dictionary containing the scraped content. This dictionary contains the following keys:
+
+            - 'markdown': The generated markdown content, type is str, however soon will become MarkdownGenerationResult via 'markdown.raw_markdown'.
+            - 'fit_markdown': The generated markdown content with relevant content filtered, this will be removed soon and available in 'markdown.fit_markdown'.
+            - 'fit_html': The HTML content with relevant content filtered, this will be removed soon and available in 'markdown.fit_html'.
+            - 'markdown_v2': The generated markdown content with relevant content filtered, this is temporary and will be removed soon and replaced with 'markdown'
+        """
         return self._scrap(url, html, is_async=False, **kwargs)
 
     async def ascrap(self, url: str, html: str, **kwargs) -> Dict[str, Any]:
+        """
+        Main entry point for asynchronous content scraping.
+
+        Args:
+            url (str): The URL of the page to scrape.
+            html (str): The HTML content of the page.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            Dict[str, Any]: A dictionary containing the scraped content. This dictionary contains the following keys:
+
+            - 'markdown': The generated markdown content, type is str, however soon will become MarkdownGenerationResult via 'markdown.raw_markdown'.
+            - 'fit_markdown': The generated markdown content with relevant content filtered, this will be removed soon and available in 'markdown.fit_markdown'.
+            - 'fit_html': The HTML content with relevant content filtered, this will be removed soon and available in 'markdown.fit_html'.
+            - 'markdown_v2': The generated markdown content with relevant content filtered, this is temporary and will be removed soon and replaced with 'markdown'
+        """
         return await asyncio.to_thread(self._scrap, url, html, **kwargs)
 
-    def _generate_markdown_content(self, 
-                                 cleaned_html: str,
-                                 html: str,
-                                 url: str,
-                                 success: bool,
-                                 **kwargs) -> Dict[str, Any]:
+    def _generate_markdown_content(self, cleaned_html: str,html: str,url: str, success: bool, **kwargs) -> Dict[str, Any]:
+        """
+        Generate markdown content from cleaned HTML.
+
+        Args:
+            cleaned_html (str): The cleaned HTML content.
+            html (str): The original HTML content.
+            url (str): The URL of the page.
+            success (bool): Whether the content was successfully cleaned.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            Dict[str, Any]: A dictionary containing the generated markdown content.
+        """
         markdown_generator: Optional[MarkdownGenerationStrategy] = kwargs.get('markdown_generator', DefaultMarkdownGenerator())
         
         if markdown_generator:
@@ -156,6 +209,15 @@ class WebScrapingStrategy(ContentScrapingStrategy):
         """
 
     def flatten_nested_elements(self, node):
+        """
+        Flatten nested elements in a HTML tree.
+
+        Args:
+            node (Tag): The root node of the HTML tree.
+
+        Returns:
+            Tag: The flattened HTML tree.
+        """
         if isinstance(node, NavigableString):
             return node
         if len(node.contents) == 1 and isinstance(node.contents[0], Tag) and node.contents[0].name == node.name:
@@ -164,6 +226,16 @@ class WebScrapingStrategy(ContentScrapingStrategy):
         return node
 
     def find_closest_parent_with_useful_text(self, tag, **kwargs):
+        """
+        Find the closest parent with useful text.
+
+        Args:
+            tag (Tag): The starting tag to search from.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            Tag: The closest parent with useful text, or None if not found.
+        """
         image_description_min_word_threshold = kwargs.get('image_description_min_word_threshold', IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD)
         current_tag = tag
         while current_tag:
@@ -177,6 +249,17 @@ class WebScrapingStrategy(ContentScrapingStrategy):
         return None
 
     def remove_unwanted_attributes(self, element, important_attrs, keep_data_attributes=False):
+        """
+        Remove unwanted attributes from an HTML element.
+
+        Args:    
+            element (Tag): The HTML element to remove attributes from.
+            important_attrs (list): List of important attributes to keep.
+            keep_data_attributes (bool): Whether to keep data attributes.
+
+        Returns:
+            None
+        """
         attrs_to_remove = []
         for attr in element.attrs:
             if attr not in important_attrs:
@@ -190,6 +273,26 @@ class WebScrapingStrategy(ContentScrapingStrategy):
             del element[attr]
 
     def process_image(self, img, url, index, total_images, **kwargs):
+        """
+        Process an image element.
+        
+        How it works:
+        1. Check if the image has valid display and inside undesired html elements.
+        2. Score an image for it's usefulness.
+        3. Extract image file metadata to extract size and extension.
+        4. Generate a dictionary with the processed image information.
+        5. Return the processed image information.
+
+        Args:
+            img (Tag): The image element to process.
+            url (str): The URL of the page containing the image.
+            index (int): The index of the image in the list of images.
+            total_images (int): The total number of images in the list.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            dict: A dictionary containing the processed image information.
+        """
         parse_srcset = lambda s: [{'url': u.strip().split()[0], 'width': u.strip().split()[-1].rstrip('w') 
                         if ' ' in u else None} 
                         for u in [f"http{p}" for p in s.split("http") if p]]
@@ -197,12 +300,15 @@ class WebScrapingStrategy(ContentScrapingStrategy):
         # Constants for checks
         classes_to_check = frozenset(['button', 'icon', 'logo'])
         tags_to_check = frozenset(['button', 'input'])
+        image_formats = frozenset(['jpg', 'jpeg', 'png', 'webp', 'avif', 'gif'])
         
         # Pre-fetch commonly used attributes
         style = img.get('style', '')
         alt = img.get('alt', '')
         src = img.get('src', '')
         data_src = img.get('data-src', '')
+        srcset = img.get('srcset', '')
+        data_srcset = img.get('data-srcset', '')        
         width = img.get('width')
         height = img.get('height')
         parent = img.parent
@@ -228,14 +334,36 @@ class WebScrapingStrategy(ContentScrapingStrategy):
             score += 1
         score += index/total_images < 0.5
         
-        image_format = ''
-        if "data:image/" in src:
-            image_format = src.split(',')[0].split(';')[0].split('/')[1].split(';')[0]
-        else:
-            image_format = os.path.splitext(src)[1].lower().strip('.').split('?')[0]
+        # image_format = ''
+        # if "data:image/" in src:
+        #     image_format = src.split(',')[0].split(';')[0].split('/')[1].split(';')[0]
+        # else:
+        #     image_format = os.path.splitext(src)[1].lower().strip('.').split('?')[0]
         
-        if image_format in ('jpg', 'png', 'webp', 'avif'):
+        # if image_format in ('jpg', 'png', 'webp', 'avif'):
+        #     score += 1
+            
+            
+        # Check for image format in all possible sources
+        def has_image_format(url):
+            return any(fmt in url.lower() for fmt in image_formats)
+        
+        # Score for having proper image sources
+        if any(has_image_format(url) for url in [src, data_src, srcset, data_srcset]):
             score += 1
+        if srcset or data_srcset:
+            score += 1
+        if img.find_parent('picture'):
+            score += 1
+        
+        # Detect format from any available source
+        detected_format = None
+        for url in [src, data_src, srcset, data_srcset]:
+            if url:
+                format_matches = [fmt for fmt in image_formats if fmt in url.lower()]
+                if format_matches:
+                    detected_format = format_matches[0]
+                    break            
 
         if score <= kwargs.get('image_score_threshold', IMAGE_SCORE_THRESHOLD):
             return None
@@ -254,7 +382,8 @@ class WebScrapingStrategy(ContentScrapingStrategy):
             'desc': self.find_closest_parent_with_useful_text(img, **kwargs),
             'score': score,
             'type': 'image',
-            'group_id': group_id # Group ID for this set of variants
+            'group_id': group_id, # Group ID for this set of variants
+            'format': detected_format,
         }
 
         # Inline function for adding variants
@@ -287,8 +416,24 @@ class WebScrapingStrategy(ContentScrapingStrategy):
 
         return image_variants if image_variants else None
 
-    
     def process_element(self, url, element: PageElement, **kwargs) -> Dict[str, Any]:        
+        """
+        Process an HTML element.
+        
+        How it works:
+        1. Check if the element is an image, video, or audio.
+        2. Extract the element's attributes and content.
+        3. Process the element based on its type.
+        4. Return the processed element information.
+
+        Args:
+            url (str): The URL of the page containing the element.
+            element (Tag): The HTML element to process.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            dict: A dictionary containing the processed element information.
+        """
         media = {'images': [], 'videos': [], 'audios': []}
         internal_links_dict = {}
         external_links_dict = {}
@@ -307,6 +452,9 @@ class WebScrapingStrategy(ContentScrapingStrategy):
         }
         
     def _process_element(self, url, element: PageElement,  media: Dict[str, Any], internal_links_dict: Dict[str, Any], external_links_dict: Dict[str, Any], **kwargs) -> bool:
+        """
+        Process an HTML element.        
+        """
         try:
             if isinstance(element, NavigableString):
                 if isinstance(element, Comment):
@@ -316,6 +464,7 @@ class WebScrapingStrategy(ContentScrapingStrategy):
             # if element.name == 'img':
             #     process_image(element, url, 0, 1)
             #     return True
+            base_domain = kwargs.get("base_domain", get_base_domain(url))
 
             if element.name in ['script', 'style', 'link', 'meta', 'noscript']:
                 element.decompose()
@@ -323,8 +472,10 @@ class WebScrapingStrategy(ContentScrapingStrategy):
 
             keep_element = False
             
-            exclude_social_media_domains = SOCIAL_MEDIA_DOMAINS + kwargs.get('exclude_social_media_domains', [])
-            exclude_social_media_domains = list(set(exclude_social_media_domains))
+            exclude_domains = kwargs.get('exclude_domains', [])
+            # exclude_social_media_domains = kwargs.get('exclude_social_media_domains', set(SOCIAL_MEDIA_DOMAINS))
+            # exclude_social_media_domains = SOCIAL_MEDIA_DOMAINS + kwargs.get('exclude_social_media_domains', [])
+            # exclude_social_media_domains = list(set(exclude_social_media_domains))
             
             try:
                 if element.name == 'a' and element.get('href'):
@@ -344,33 +495,43 @@ class WebScrapingStrategy(ContentScrapingStrategy):
                     link_data = {
                         'href': normalized_href,
                         'text': element.get_text().strip(),
-                        'title': element.get('title', '').strip()
+                        'title': element.get('title', '').strip(),
+                        'base_domain': base_domain
                     }
+                                        
+                    is_external = is_external_url(normalized_href, base_domain)
+                            
+                    keep_element = True
                     
-                    # Check for duplicates and add to appropriate dictionary
-                    is_external = is_external_url(normalized_href, url_base)
+                    # Handle external link exclusions
+                    if is_external:
+                        link_base_domain = get_base_domain(normalized_href)
+                        link_data['base_domain'] = link_base_domain
+                        if kwargs.get('exclude_external_links', False):
+                            element.decompose()
+                            return False
+                        # elif kwargs.get('exclude_social_media_links', False):
+                        #     if link_base_domain in exclude_social_media_domains:
+                        #         element.decompose()
+                        #         return False
+                            # if any(domain in normalized_href.lower() for domain in exclude_social_media_domains):
+                            #     element.decompose()
+                            #     return False
+                        elif exclude_domains:
+                            if link_base_domain in exclude_domains:
+                                element.decompose()
+                                return False
+                            # if any(domain in normalized_href.lower() for domain in kwargs.get('exclude_domains', [])):
+                            #     element.decompose()
+                            #     return False
+
                     if is_external:
                         if normalized_href not in external_links_dict:
                             external_links_dict[normalized_href] = link_data
                     else:
                         if normalized_href not in internal_links_dict:
                             internal_links_dict[normalized_href] = link_data
-                            
-                    keep_element = True
-                    
-                    # Handle external link exclusions
-                    if is_external:
-                        if kwargs.get('exclude_external_links', False):
-                            element.decompose()
-                            return False
-                        elif kwargs.get('exclude_social_media_links', False):
-                            if any(domain in normalized_href.lower() for domain in exclude_social_media_domains):
-                                element.decompose()
-                                return False
-                        elif kwargs.get('exclude_domains', []):
-                            if any(domain in normalized_href.lower() for domain in kwargs.get('exclude_domains', [])):
-                                element.decompose()
-                                return False
+
                                 
             except Exception as e:
                 raise Exception(f"Error processing links: {str(e)}")
@@ -389,26 +550,40 @@ class WebScrapingStrategy(ContentScrapingStrategy):
                     if 'srcset' in element.attrs:
                         src = element.attrs['srcset'].split(',')[0].split(' ')[0]
                         
+                    # If image src is internal, then skip
+                    if not is_external_url(src, base_domain):
+                        return True
+                    
+                    image_src_base_domain = get_base_domain(src)
+                    
                     # Check flag if we should remove external images
                     if kwargs.get('exclude_external_images', False):
-                        src_url_base = src.split('/')[2]
-                        url_base = url.split('/')[2]
-                        if url_base not in src_url_base:
-                            element.decompose()
-                            return False
+                        element.decompose()
+                        return False
+                        # src_url_base = src.split('/')[2]
+                        # url_base = url.split('/')[2]
+                        # if url_base not in src_url_base:
+                        #     element.decompose()
+                        #     return False
                         
-                    if not kwargs.get('exclude_external_images', False) and kwargs.get('exclude_social_media_links', False):
-                        src_url_base = src.split('/')[2]
-                        url_base = url.split('/')[2]
-                        if any(domain in src for domain in exclude_social_media_domains):
-                            element.decompose()
-                            return False
+                    # if kwargs.get('exclude_social_media_links', False):
+                    #     if image_src_base_domain in exclude_social_media_domains:
+                    #         element.decompose()
+                    #         return False
+                        # src_url_base = src.split('/')[2]
+                        # url_base = url.split('/')[2]
+                        # if any(domain in src for domain in exclude_social_media_domains):
+                        #     element.decompose()
+                        #     return False
                         
                     # Handle exclude domains
-                    if kwargs.get('exclude_domains', []):
-                        if any(domain in src for domain in kwargs.get('exclude_domains', [])):
+                    if exclude_domains:                        
+                        if image_src_base_domain in exclude_domains:
                             element.decompose()
                             return False
+                        # if any(domain in src for domain in kwargs.get('exclude_domains', [])):
+                        #     element.decompose()
+                        #     return False
                     
                     return True  # Always keep image elements
             except Exception as e:
@@ -480,12 +655,27 @@ class WebScrapingStrategy(ContentScrapingStrategy):
             return False
 
     def _scrap(self, url: str, html: str, word_count_threshold: int = MIN_WORD_THRESHOLD, css_selector: str = None, **kwargs) -> Dict[str, Any]:
+        """
+        Extract content from HTML using BeautifulSoup.
+
+        Args:
+            url (str): The URL of the page to scrape.
+            html (str): The HTML content of the page to scrape.
+            word_count_threshold (int): The minimum word count threshold for content extraction.
+            css_selector (str): The CSS selector to use for content extraction.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            dict: A dictionary containing the extracted content.
+        """
         success = True
         if not html:
             return None
 
-        soup = BeautifulSoup(html, 'lxml')
+        parser_type = kwargs.get('parser', 'lxml')
+        soup = BeautifulSoup(html, parser_type)
         body = soup.body
+        base_domain = get_base_domain(url)
         
         try:
             meta = extract_metadata("", soup)
@@ -531,10 +721,16 @@ class WebScrapingStrategy(ContentScrapingStrategy):
             for el in selected_elements:
                 body.append(el)
 
+        kwargs['exclude_social_media_domains'] = set(kwargs.get('exclude_social_media_domains', []) + SOCIAL_MEDIA_DOMAINS)
+        kwargs['exclude_domains'] = set(kwargs.get('exclude_domains', []))
+        if kwargs.get('exclude_social_media_links', False):
+            kwargs['exclude_domains'] = kwargs['exclude_domains'].union(kwargs['exclude_social_media_domains'])
+        
         result_obj = self.process_element(
             url, 
             body, 
             word_count_threshold = word_count_threshold, 
+            base_domain=base_domain,
             **kwargs
         )
         

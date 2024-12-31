@@ -1,0 +1,96 @@
+site_name: Crawl4AI Documentation
+site_description: 🔥🕷️ Crawl4AI, Open-source LLM Friendly Web Crawler & Scrapper
+site_url: https://docs.crawl4ai.com
+repo_url: https://github.com/unclecode/crawl4ai
+repo_name: unclecode/crawl4ai
+docs_dir: docs/md_v3
+
+
+nav:
+  - Home: index.md
+
+  - Tutorials:
+    - "Getting Started": tutorials/getting-started.md
+    - "AsyncWebCrawler Basics": tutorials/async-webcrawler-basics.md
+    - "Targeted Crawling Techniques": tutorials/targeted-crawling.md
+    - "Link & Media Analysis": tutorials/link-media-analysis.md
+    - "Advanced Features (Proxy, PDF, Screenshots)": tutorials/advanced-features.md
+    - "Hooks & Custom Code": tutorials/hooks-custom.md
+    - "Markdown Generation Basics": tutorials/markdown-basics.md
+    - "Extracting JSON (No LLM)": tutorials/json-extraction-basic.md
+    - "Extracting JSON (LLM)": tutorials/json-extraction-llm.md
+    - "Deploying with Docker (Quickstart)": tutorials/docker-quickstart.md
+
+  - How-To Guides:
+    - "Advanced Browser Configuration": how-to/advanced-browser-config.md
+    - "Managing Browser Contexts & Remote Browsers": how-to/browser-contexts-remote.md
+    - "Identity-Based Crawling (Anti-Bot)": how-to/identity-anti-bot.md
+    - "Link & Media Analysis": how-to/link-media-analysis.md
+    - "Markdown Generation Customization": how-to/markdown-custom.md
+    - "Structured Data Extraction (Advanced)": how-to/structured-data-advanced.md
+    - "Deployment Options": how-to/deployment-options.md
+    - "Performance & Caching": how-to/performance-caching.md
+
+  - Explanations:
+    - "AsyncWebCrawler & Internal Flow": explanations/async-webcrawler-flow.md
+    - "Configuration Objects Explained": explanations/configuration-objects.md
+    - "Browser Context & Managed Browser": explanations/browser-management.md
+    - "Markdown Generation Architecture": explanations/markdown-architecture.md
+    - "Extraction & Chunking Strategies": explanations/extraction-chunking.md
+    - "Identity-Based Crawling & Anti-Bot": explanations/identity-anti-bot.md
+    - "Deployment Architectures": explanations/deployment-architectures.md
+
+  - Reference:
+    - "Configuration": reference/configuration.md
+    - "Core Crawler": reference/core-crawler.md
+    - "Browser Strategies": reference/browser-strategies.md
+    - "Markdown Generation": reference/markdown-generation.md
+    - "Content Filters": reference/content-filters.md
+    - "Extraction Strategies": reference/extraction-strategies.md
+    - "Chunking Strategies": reference/chunking-strategies.md
+    - "Identity & Utility": reference/identity-utilities.md
+    - "Models": reference/models.md
+
+  - Blog: 
+    - "Blog Overview": blog/index.md
+    #  You can add real-life application posts here in the future
+    #  - "Cool Real-World E-Commerce Scraping": blog/ecommerce-case-study.md
+    #  - "Dealing with Complex Anti-Bot Systems": blog/anti-bot-tricks.md
+
+
+theme:
+  name: terminal
+  palette: dark
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          analysis:
+            follow_imports: true
+          rendering:
+            show_root_full_path: false
+
+markdown_extensions:
+  - codehilite
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - admonition
+  - pymdownx.details
+  - attr_list
+  - tables
+
+extra_css:
+  - assets/styles.css
+  - assets/highlight.css
+  - assets/dmvendor.css
+
+extra_javascript:
+  - assets/highlight.min.js
+  - assets/highlight_init.js
