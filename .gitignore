@@ -220,3 +220,4 @@ combine.sh
 combined_output.txt
 tree.md
 .scripts
+.local

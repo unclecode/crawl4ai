@@ -65,7 +65,7 @@
 
 #### `viewport_width` and `viewport_height`
 - **Description**: Sets the default browser viewport dimensions.
-  - Default: `1920` (width), `1080` (height)
+  - Default: `1080` (width), `600` (height)
 - **Use Case**:
   - Adjust for crawling responsive layouts or specific device emulations.
 
@@ -133,6 +133,19 @@
   - Default: `[]`
 - **Use Case**:
   - Use for advanced browser configurations like WebRTC or GPU tuning.
+
+#### `verbose`
+- **Description**: Enable verbose logging of browser operations.
+  - Default: `True`
+- **Use Case**:
+  - Enable for detailed logging during development and debugging.
+  - Disable in production for better performance.
+
+#### `sleep_on_close`
+- **Description**: Adds a delay before closing the browser.
+  - Default: `False`
+- **Use Case**:
+  - Enable when you need to ensure all browser operations are complete before closing.
 
 ## CrawlerRunConfig
 The `CrawlerRunConfig` class centralizes parameters for controlling crawl operations. This configuration covers content extraction, page interactions, caching, and runtime behaviors. Below is an exhaustive breakdown of parameters and their best-use scenarios.
@@ -341,3 +354,37 @@ The `CrawlerRunConfig` class centralizes parameters for controlling crawl operat
 - **Use Case**:
   - Enable when debugging JavaScript errors on pages.
 
+##### `parser_type`
+- **Description**: Type of parser to use for HTML parsing.
+  - Default: `"lxml"`
+- **Use Case**:
+  - Use when specific HTML parsing requirements are needed.
+  - `"lxml"` provides good performance and standards compliance.
+
+##### `prettiify`
+- **Description**: Apply `fast_format_html` to produce prettified HTML output.
+  - Default: `False`
+- **Use Case**:
+  - Enable for better readability of extracted HTML content.
+  - Useful during development and debugging.
+
+##### `fetch_ssl_certificate`
+- **Description**: Fetch and store SSL certificate information during crawling.
+  - Default: `False`
+- **Use Case**:
+  - Enable when SSL certificate analysis is required.
+  - Useful for security audits and certificate validation.
+
+##### `url`
+- **Description**: Target URL for the crawl operation.
+  - Default: `None`
+- **Use Case**:
+  - Set when initializing a crawler for a specific URL.
+  - Can be overridden during actual crawl operations.
+
+##### `log_console`
+- **Description**: Log browser console messages during crawling.
+  - Default: `False`
+- **Use Case**:
+  - Enable to capture JavaScript console output.
+  - Useful for debugging JavaScript-heavy pages.

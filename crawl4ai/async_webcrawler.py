@@ -87,6 +87,20 @@ class AsyncWebCrawler:
             awarmup(): Perform warmup sequence.
             arun_many(): Run the crawler for multiple sources.
             aprocess_html(): Process HTML content.
+    
+    Typical Usage:
+        async with AsyncWebCrawler() as crawler:
+            result = await crawler.arun(url="https://example.com")
+            print(result.markdown)
+            
+        Using configuration:
+        browser_config = BrowserConfig(browser_type="chromium", headless=True)
+        async with AsyncWebCrawler(config=browser_config) as crawler:
+            crawler_config = CrawlerRunConfig(
+                cache_mode=CacheMode.BYPASS                
+            )
+            result = await crawler.arun(url="https://example.com", config=crawler_config)
+            print(result.markdown)
     """
     _domain_last_hit = {}
 
@@ -257,7 +271,7 @@ class AsyncWebCrawler:
                     screenshot=True,
                     ...
                 )
-            
+
             New way (recommended):
                 config = CrawlerRunConfig(
                     word_count_threshold=200,
@@ -270,7 +284,7 @@ class AsyncWebCrawler:
                 url: The URL to crawl (http://, https://, file://, or raw:)
                 crawler_config: Configuration object controlling crawl behavior
                 [other parameters maintained for backwards compatibility]
-            
+
             Returns:
                 CrawlResult: The result of crawling and processing
             """
