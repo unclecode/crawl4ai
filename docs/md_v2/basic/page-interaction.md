@@ -7,11 +7,13 @@ Crawl4AI provides powerful features for interacting with dynamic webpages, handl
 ### Basic Execution
 
 ```python
+from crawl4ai.async_configs import CrawlerRunConfig
+
 # Single JavaScript command
-result = await crawler.arun(
-    url="https://example.com",
+config = CrawlerRunConfig(
     js_code="window.scrollTo(0, document.body.scrollHeight);"
 )
+result = await crawler.arun(url="https://example.com", config=config)
 
 # Multiple commands
 js_commands = [
@@ -19,10 +21,8 @@ js_commands = [
     "document.querySelector('.load-more').click();",
     "document.querySelector('#consent-button').click();"
 ]
-result = await crawler.arun(
-    url="https://example.com",
-    js_code=js_commands
-)
+config = CrawlerRunConfig(js_code=js_commands)
+result = await crawler.arun(url="https://example.com", config=config)
 ```
 
 ## Wait Conditions
@@ -32,10 +32,8 @@ result = await crawler.arun(
 Wait for elements to appear:
 
 ```python
-result = await crawler.arun(
-    url="https://example.com",
-    wait_for="css:.dynamic-content"  # Wait for element with class 'dynamic-content'
-)
+config = CrawlerRunConfig(wait_for="css:.dynamic-content")  # Wait for element with class 'dynamic-content'
+result = await crawler.arun(url="https://example.com", config=config)
 ```
 
 ### JavaScript-Based Waiting
@@ -48,10 +46,8 @@ wait_condition = """() => {
     return document.querySelectorAll('.item').length > 10;
 }"""
 
-result = await crawler.arun(
-    url="https://example.com",
-    wait_for=f"js:{wait_condition}"
-)
+config = CrawlerRunConfig(wait_for=f"js:{wait_condition}")
+result = await crawler.arun(url="https://example.com", config=config)
 
 # Wait for dynamic content to load
 wait_for_content = """() => {
@@ -59,10 +55,8 @@ wait_for_content = """() => {
     return content && content.innerText.length > 100;
 }"""
 
-result = await crawler.arun(
-    url="https://example.com",
-    wait_for=f"js:{wait_for_content}"
-)
+config = CrawlerRunConfig(wait_for=f"js:{wait_for_content}")
+result = await crawler.arun(url="https://example.com", config=config)
 ```
 
 ## Handling Dynamic Content
@@ -72,18 +66,14 @@ result = await crawler.arun(
 Handle infinite scroll or load more buttons:
 
 ```python
-# Scroll and wait pattern
-result = await crawler.arun(
-    url="https://example.com",
+config = CrawlerRunConfig(
     js_code=[
-        # Scroll to bottom
-        "window.scrollTo(0, document.body.scrollHeight);",
-        # Click load more if exists
-        "const loadMore = document.querySelector('.load-more'); if(loadMore) loadMore.click();"
+        "window.scrollTo(0, document.body.scrollHeight);",  # Scroll to bottom
+        "const loadMore = document.querySelector('.load-more'); if(loadMore) loadMore.click();"  # Click load more
     ],
-    # Wait for new content
-    wait_for="js:() => document.querySelectorAll('.item').length > previousCount"
+    wait_for="js:() => document.querySelectorAll('.item').length > previousCount"  # Wait for new content
 )
+result = await crawler.arun(url="https://example.com", config=config)
 ```
 
 ### Form Interaction
@@ -92,17 +82,15 @@ Handle forms and inputs:
 
 ```python
 js_form_interaction = """
-    // Fill form fields
-    document.querySelector('#search').value = 'search term';
-    // Submit form
-    document.querySelector('form').submit();
+    document.querySelector('#search').value = 'search term';  // Fill form fields
+    document.querySelector('form').submit();                 // Submit form
 """
 
-result = await crawler.arun(
-    url="https://example.com",
+config = CrawlerRunConfig(
     js_code=js_form_interaction,
     wait_for="css:.results"  # Wait for results to load
 )
+result = await crawler.arun(url="https://example.com", config=config)
 ```
 
 ## Timing Control
@@ -112,11 +100,11 @@ result = await crawler.arun(
 Control timing of interactions:
 
 ```python
-result = await crawler.arun(
-    url="https://example.com",
+config = CrawlerRunConfig(
     page_timeout=60000,              # Page load timeout (ms)
-    delay_before_return_html=2.0,    # Wait before capturing content
+    delay_before_return_html=2.0     # Wait before capturing content
 )
+result = await crawler.arun(url="https://example.com", config=config)
 ```
 
 ## Complex Interactions Example
@@ -124,43 +112,37 @@ result = await crawler.arun(
 Here's an example of handling a dynamic page with multiple interactions:
 
 ```python
+from crawl4ai.async_configs import BrowserConfig, CrawlerRunConfig
+
 async def crawl_dynamic_content():
     async with AsyncWebCrawler() as crawler:
         # Initial page load
-        result = await crawler.arun(
-            url="https://example.com",
-            # Handle cookie consent
-            js_code="document.querySelector('.cookie-accept')?.click();",
+        config = CrawlerRunConfig(
+            js_code="document.querySelector('.cookie-accept')?.click();",  # Handle cookie consent
             wait_for="css:.main-content"
         )
+        result = await crawler.arun(url="https://example.com", config=config)
 
         # Load more content
         session_id = "dynamic_session"  # Keep session for multiple interactions
         
         for page in range(3):  # Load 3 pages of content
-            result = await crawler.arun(
-                url="https://example.com",
+            config = CrawlerRunConfig(
                 session_id=session_id,
                 js_code=[
-                    # Scroll to bottom
-                    "window.scrollTo(0, document.body.scrollHeight);",
-                    # Store current item count
-                    "window.previousCount = document.querySelectorAll('.item').length;",
-                    # Click load more
-                    "document.querySelector('.load-more')?.click();"
+                    "window.scrollTo(0, document.body.scrollHeight);",  # Scroll to bottom
+                    "window.previousCount = document.querySelectorAll('.item').length;",  # Store item count
+                    "document.querySelector('.load-more')?.click();"   # Click load more
                 ],
-                # Wait for new items
                 wait_for="""() => {
                     const currentCount = document.querySelectorAll('.item').length;
                     return currentCount > window.previousCount;
                 }""",
-                # Only execute JS without reloading page
-                js_only=True if page > 0 else False
+                js_only=(page > 0)  # Execute JS without reloading page for subsequent interactions
             )
-            
-            # Process content after each load
+            result = await crawler.arun(url="https://example.com", config=config)
             print(f"Page {page + 1} items:", len(result.cleaned_html))
-            
+
         # Clean up session
         await crawler.crawler_strategy.kill_session(session_id)
 ```
@@ -171,6 +153,7 @@ Combine page interaction with structured extraction:
 
 ```python
 from crawl4ai.extraction_strategy import JsonCssExtractionStrategy, LLMExtractionStrategy
+from crawl4ai.async_configs import CrawlerRunConfig
 
 # Pattern-based extraction after interaction
 schema = {
@@ -182,20 +165,19 @@ schema = {
     ]
 }
 
-result = await crawler.arun(
-    url="https://example.com",
+config = CrawlerRunConfig(
     js_code="window.scrollTo(0, document.body.scrollHeight);",
     wait_for="css:.item:nth-child(10)",  # Wait for 10 items
     extraction_strategy=JsonCssExtractionStrategy(schema)
 )
+result = await crawler.arun(url="https://example.com", config=config)
 
 # Or use LLM to analyze dynamic content
 class ContentAnalysis(BaseModel):
     topics: List[str]
     summary: str
 
-result = await crawler.arun(
-    url="https://example.com",
+config = CrawlerRunConfig(
     js_code="document.querySelector('.show-more').click();",
     wait_for="css:.full-content",
     extraction_strategy=LLMExtractionStrategy(
@@ -204,4 +186,5 @@ result = await crawler.arun(
         instruction="Analyze the full content"
     )
 )
+result = await crawler.arun(url="https://example.com", config=config)
 ```

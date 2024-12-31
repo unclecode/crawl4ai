@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 import logging
 import json  # Added for serialization/deserialization
 from .utils import ensure_content_dirs, generate_content_hash
-from .models import CrawlResult
+from .models import CrawlResult, MarkdownGenerationResult
 import xxhash
 import aiofiles
 from .config import NEED_MIGRATION
@@ -295,13 +295,18 @@ class AsyncDatabaseManager:
                         row_dict[field] = ""
 
                 # Parse JSON fields
-                json_fields = ['media', 'links', 'metadata', 'response_headers']
+                json_fields = ['media', 'links', 'metadata', 'response_headers', 'markdown']
                 for field in json_fields:
                     try:
                         row_dict[field] = json.loads(row_dict[field]) if row_dict[field] else {}
                     except json.JSONDecodeError:
                         row_dict[field] = {}
 
+                if isinstance(row_dict['markdown'], Dict):
+                    row_dict['markdown_v2'] = row_dict['markdown']
+                    if row_dict['markdown'].get('raw_markdown'):
+                        row_dict['markdown'] = row_dict['markdown']['raw_markdown']
+                
                 # Parse downloaded_files
                 try:
                     row_dict['downloaded_files'] = json.loads(row_dict['downloaded_files']) if row_dict['downloaded_files'] else []
@@ -331,10 +336,28 @@ class AsyncDatabaseManager:
         content_map = {
             'html': (result.html, 'html'),
             'cleaned_html': (result.cleaned_html or "", 'cleaned'),
-            'markdown': (result.markdown or "", 'markdown'),
+            'markdown': None,
             'extracted_content': (result.extracted_content or "", 'extracted'),
             'screenshot': (result.screenshot or "", 'screenshots')
         }
+
+        try:
+            if isinstance(result.markdown, MarkdownGenerationResult):
+                content_map['markdown'] = (result.markdown.model_dump_json(), 'markdown')
+            elif hasattr(result, 'markdown_v2'):
+                content_map['markdown'] = (result.markdown_v2.model_dump_json(), 'markdown')
+            elif isinstance(result.markdown, str):
+                markdown_result = MarkdownGenerationResult(raw_markdown=result.markdown)
+                content_map['markdown'] = (markdown_result.model_dump_json(), 'markdown')
+            else:
+                content_map['markdown'] = (MarkdownGenerationResult().model_dump_json(), 'markdown')
+        except Exception as e:
+            self.logger.warning(
+                message=f"Error processing markdown content: {str(e)}",
+                tag="WARNING"
+            )
+            # Fallback to empty markdown result
+            content_map['markdown'] = (MarkdownGenerationResult().model_dump_json(), 'markdown')
         
         content_hashes = {}
         for field, (content, content_type) in content_map.items():

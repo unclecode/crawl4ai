@@ -351,8 +351,8 @@ async def verify_token(credentials: HTTPAuthorizationCredentials = Security(secu
         raise HTTPException(status_code=401, detail="Invalid token")
     return credentials
 
-# Helper function to conditionally apply security
 def secure_endpoint():
+    """Returns security dependency only if CRAWL4AI_API_TOKEN is set"""
     return Depends(verify_token) if CRAWL4AI_API_TOKEN else None
 
 # Check if site directory exists
@@ -379,13 +379,12 @@ def read_root():
     # Return a json response
     return {"message": "Crawl4AI API service is running"}
 
-
-@app.post("/crawl", dependencies=[Depends(verify_token)])
+@app.post("/crawl", dependencies=[secure_endpoint()] if CRAWL4AI_API_TOKEN else [])
 async def crawl(request: CrawlRequest) -> Dict[str, str]:
     task_id = await crawler_service.submit_task(request)
     return {"task_id": task_id}
 
-@app.get("/task/{task_id}", dependencies=[Depends(verify_token)])
+@app.get("/task/{task_id}", dependencies=[secure_endpoint()] if CRAWL4AI_API_TOKEN else [])
 async def get_task_status(task_id: str):
     task_info = crawler_service.task_manager.get_task(task_id)
     if not task_info:
@@ -407,7 +406,7 @@ async def get_task_status(task_id: str):
 
     return response
 
-@app.post("/crawl_sync", dependencies=[Depends(verify_token)])
+@app.post("/crawl_sync", dependencies=[secure_endpoint()] if CRAWL4AI_API_TOKEN else [])
 async def crawl_sync(request: CrawlRequest) -> Dict[str, Any]:
     task_id = await crawler_service.submit_task(request)
     
@@ -431,7 +430,7 @@ async def crawl_sync(request: CrawlRequest) -> Dict[str, Any]:
     # If we get here, task didn't complete within timeout
     raise HTTPException(status_code=408, detail="Task timed out")
 
-@app.post("/crawl_direct", dependencies=[Depends(verify_token)])
+@app.post("/crawl_direct", dependencies=[secure_endpoint()] if CRAWL4AI_API_TOKEN else [])
 async def crawl_direct(request: CrawlRequest) -> Dict[str, Any]:
     try:
         crawler = await crawler_service.crawler_pool.acquire(**request.crawler_params)
