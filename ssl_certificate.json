@@ -1,0 +1,63 @@
+{
+  "subject": {
+    "C": "US",
+    "ST": "California",
+    "L": "Los Angeles",
+    "O": "Internet Corporation for Assigned Names and Numbers",
+    "CN": "www.example.org"
+  },
+  "issuer": {
+    "C": "US",
+    "O": "DigiCert Inc",
+    "CN": "DigiCert Global G2 TLS RSA SHA256 2020 CA1"
+  },
+  "version": 2,
+  "serial_number": "0x75bcef30689c8addf13e51af4afe187",
+  "not_before": "20240130000000Z",
+  "not_after": "20250301235959Z",
+  "fingerprint": "45463a42413a32363a44383a43313a43453a33373a37393a41433a37373a36333a30413a39303a46383a32313a36333a41333a44363a38393a32453a44363a41463a45453a34303a38363a37323a43463a31393a45423a41373a41333a3632",
+  "signature_algorithm": "sha256WithRSAEncryption",
+  "raw_cert": "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",
+  "extensions": [
+    {
+      "name": "authorityKeyIdentifier",
+      "value": "74:85:80:C0:66:C7:DF:37:DE:CF:BD:29:37:AA:03:1D:BE:ED:CD:17"
+    },
+    {
+      "name": "subjectKeyIdentifier",
+      "value": "4C:FE:D0:12:4D:2E:21:CF:6B:FA:F2:F2:B8:4C:49:02:1D:31:91:8A"
+    },
+    {
+      "name": "subjectAltName",
+      "value": "DNS:www.example.org, DNS:example.net, DNS:example.edu, DNS:example.com, DNS:example.org, DNS:www.example.com, DNS:www.example.edu, DNS:www.example.net"
+    },
+    {
+      "name": "certificatePolicies",
+      "value": "Policy: 2.23.140.1.2.2\n  CPS: http://www.digicert.com/CPS"
+    },
+    {
+      "name": "keyUsage",
+      "value": "Digital Signature, Key Encipherment"
+    },
+    {
+      "name": "extendedKeyUsage",
+      "value": "TLS Web Server Authentication, TLS Web Client Authentication"
+    },
+    {
+      "name": "crlDistributionPoints",
+      "value": "Full Name:\n  URI:http://crl3.digicert.com/DigiCertGlobalG2TLSRSASHA2562020CA1-1.crl\nFull Name:\n  URI:http://crl4.digicert.com/DigiCertGlobalG2TLSRSASHA2562020CA1-1.crl"
+    },
+    {
+      "name": "authorityInfoAccess",
+      "value": "OCSP - URI:http://ocsp.digicert.com\nCA Issuers - URI:http://cacerts.digicert.com/DigiCertGlobalG2TLSRSASHA2562020CA1-1.crt"
+    },
+    {
+      "name": "basicConstraints",
+      "value": "CA:FALSE"
+    },
+    {
+      "name": "ct_precert_scts",
+      "value": "Signed Certificate Timestamp:\n    Version   : v1 (0x0)\n    Log ID    : 4E:75:A3:27:5C:9A:10:C3:38:5B:6C:D4:DF:3F:52:EB:\n                1D:F0:E0:8E:1B:8D:69:C0:B1:FA:64:B1:62:9A:39:DF\n    Timestamp : Jan 30 19:22:50.340 2024 GMT\n    Extensions: none\n    Signature : ecdsa-with-SHA256\n                30:43:02:1F:40:51:0A:0C:4F:6C:10:55:C6:17:16:67:\n                6E:9A:F0:90:9E:F3:73:F5:25:9E:B0:9A:FE:7A:1A:C5:\n                5C:C8:C0:02:20:38:29:31:B1:28:E4:72:48:4D:34:4F:\n                9E:8C:93:E2:61:BC:70:BA:D6:8C:4B:E1:72:15:1D:11:\n                C5:94:BA:4D:53\nSigned Certificate Timestamp:\n    Version   : v1 (0x0)\n    Log ID    : 7D:59:1E:12:E1:78:2A:7B:1C:61:67:7C:5E:FD:F8:D0:\n                87:5C:14:A0:4E:95:9E:B9:03:2F:D9:0E:8C:2E:79:B8\n    Timestamp : Jan 30 19:22:50.288 2024 GMT\n    Extensions: none\n    Signature : ecdsa-with-SHA256\n                30:45:02:20:5D:BF:96:77:A5:91:5B:7E:0A:0C:DE:D1:\n                A9:09:33:37:67:10:4C:42:CC:41:45:27:53:4B:A7:7C:\n                77:63:40:73:02:21:00:B2:E8:09:3F:66:4C:C3:7D:3B:\n                21:73:20:15:79:32:45:D5:2F:2B:93:7F:63:80:CC:03:\n                9A:ED:DF:31:D8:7E:97\nSigned Certificate Timestamp:\n    Version   : v1 (0x0)\n    Log ID    : E6:D2:31:63:40:77:8C:C1:10:41:06:D7:71:B9:CE:C1:\n                D2:40:F6:96:84:86:FB:BA:87:32:1D:FD:1E:37:8E:50\n    Timestamp : Jan 30 19:22:50.335 2024 GMT\n    Extensions: none\n    Signature : ecdsa-with-SHA256\n                30:46:02:21:00:E0:AA:21:FD:58:B3:75:05:35:B6:36:\n                76:13:65:46:81:64:97:5E:4C:27:42:68:98:86:60:1E:\n                29:C5:4B:1D:E0:02:21:00:FB:24:81:85:B1:D1:A8:97:\n                B9:2C:B3:6A:5E:E2:56:2B:0A:03:D5:73:E8:86:66:4B:\n                AA:9E:3D:BA:86:A8:6B:D1"
+    }
+  ]
+}

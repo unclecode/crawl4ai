@@ -83,7 +83,6 @@ class RelevantContentFilter(ABC):
                                 
         return ' '.join(filter(None, query_parts))
 
-
     def extract_text_chunks(self, body: Tag, min_word_threshold: int = None) -> List[Tuple[str, str]]:
         """
         Extracts text chunks from a BeautifulSoup body element while preserving order.
