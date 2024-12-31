@@ -1,8 +1,0 @@
-proxy_setup: Configure basic proxy in Crawl4AI using BrowserConfig with proxy URL | proxy configuration, proxy setup, basic proxy | BrowserConfig(proxy="http://proxy.example.com:8080")
-socks_proxy: Use SOCKS proxy protocol for web crawling | SOCKS5, proxy protocol, SOCKS connection | BrowserConfig(proxy="socks5://proxy.example.com:1080")
-authenticated_proxy: Set up proxy with username and password authentication | proxy auth, proxy credentials, authenticated connection | BrowserConfig(proxy_config={"server": "http://proxy.example.com:8080", "username": "user", "password": "pass"})
-rotating_proxies: Implement dynamic proxy rotation during crawling | proxy rotation, proxy switching, dynamic proxies | browser_config.proxy_config = await get_next_proxy()
-custom_headers: Add security headers to browser configuration for enhanced protection | HTTP headers, request headers, security headers | BrowserConfig(headers={"X-Forwarded-For": "203.0.113.195", "Accept-Language": "en-US,en;q=0.9"})
-magic_mode: Combine proxy settings with Magic Mode for maximum anti-detection | anti-detection, stealth mode, protection features | CrawlerRunConfig(magic=True) with BrowserConfig(proxy="http://proxy.example.com:8080")
-crawler_context: Use AsyncWebCrawler with async context manager for proper resource management | async crawler, context manager, crawler setup | async with AsyncWebCrawler(config=browser_config) as crawler
-cache_control: Set cache control headers to prevent caching during crawling | caching headers, no-cache, cache prevention | BrowserConfig(headers={"Cache-Control": "no-cache", "Pragma": "no-cache"})
