@@ -470,7 +470,7 @@ async def test_news_crawl():
 
 - 🔒 **Enhanced SSL & Security**: New SSL certificate handling with custom paths and validation options for secure crawling
 - 🔍 **Smart Content Filtering**: Advanced filtering system with regex support and efficient chunking strategies
-- 📦 **Improved JSON Extraction**: Support for complex JSONPath, JSON-LD, and Microdata extraction
+- 📦 **Improved JSON Extraction**: Support for complex JSONPath, JSON-CSS, and Microdata extraction
 - 🏗️ **New Field Types**: Added `computed`, `conditional`, `aggregate`, and `template` field types
 - ⚡ **Performance Boost**: Optimized caching, parallel processing, and memory management
 - 🐛 **Better Error Handling**: Enhanced debugging capabilities with detailed error tracking
