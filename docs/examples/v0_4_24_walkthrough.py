@@ -9,6 +9,7 @@ Each section includes detailed examples and explanations of the new capabilities
 import asyncio
 import os
 import json
+import re
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from crawl4ai import (
@@ -18,7 +19,9 @@ from crawl4ai import (
     CacheMode,
     LLMExtractionStrategy
 )
-from crawl4ai.content_filter_strategy import PruningContentFilter
+from crawl4ai.content_filter_strategy import RelevantContentFilter
+from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator 
+from bs4 import BeautifulSoup
 
 # Sample HTML for demonstrations
 SAMPLE_HTML = """
@@ -68,10 +71,7 @@ async def demo_ssl_features():
     print("\n1. Enhanced SSL & Security Demo")
     print("--------------------------------")
 
-    browser_config = BrowserConfig(
-        ignore_https_errors=True,
-        verbose=True
-    )
+    browser_config = BrowserConfig()
 
     run_config = CrawlerRunConfig(
         cache_mode=CacheMode.BYPASS,
@@ -84,38 +84,91 @@ async def demo_ssl_features():
             config=run_config
         )
         print(f"SSL Crawl Success: {result.success}")
+        result.ssl_certificate.to_json(
+            os.path.join(os.getcwd(), "ssl_certificate.json")
+        )
         if not result.success:
             print(f"SSL Error: {result.error_message}")
 
 async def demo_content_filtering():
     """
     Smart Content Filtering Demo
-    --------------------------
+    ----------------------
     
-    Demonstrates the new content filtering system with:
-    1. Regular expression pattern matching
-    2. Length-based filtering
-    3. Custom filtering rules
-    4. Content chunking strategies
-    
-    This is particularly useful for:
-    - Removing advertisements and boilerplate content
-    - Extracting meaningful paragraphs
-    - Filtering out irrelevant sections
-    - Processing content in manageable chunks
+    Demonstrates advanced content filtering capabilities:
+    1. Custom filter to identify and extract specific content
+    2. Integration with markdown generation
+    3. Flexible pruning rules
     """
     print("\n2. Smart Content Filtering Demo")
     print("--------------------------------")
 
-    content_filter = PruningContentFilter(
-        min_word_threshold=50,
-        threshold_type='dynamic',
-        threshold=0.5
+    # Create a custom content filter
+    class CustomNewsFilter(RelevantContentFilter):
+        def __init__(self):
+            super().__init__()
+            # Add news-specific patterns
+            self.negative_patterns = re.compile(
+                r'nav|footer|header|sidebar|ads|comment|share|related|recommended|popular|trending',
+                re.I
+            )
+            self.min_word_count = 30  # Higher threshold for news content
+
+        def filter_content(self, html: str, min_word_threshold: int = None) -> List[str]:
+            """
+            Implements news-specific content filtering logic.
+            
+            Args:
+                html (str): HTML content to be filtered
+                min_word_threshold (int, optional): Minimum word count threshold
+                
+            Returns:
+                List[str]: List of filtered HTML content blocks
+            """
+            if not html or not isinstance(html, str):
+                return []
+                
+            soup = BeautifulSoup(html, 'lxml')
+            if not soup.body:
+                soup = BeautifulSoup(f'<body>{html}</body>', 'lxml')
+            
+            body = soup.find('body')
+            
+            # Extract chunks with metadata
+            chunks = self.extract_text_chunks(body, min_word_threshold or self.min_word_count)
+            
+            # Filter chunks based on news-specific criteria
+            filtered_chunks = []
+            for _, text, tag_type, element in chunks:
+                # Skip if element has negative class/id
+                if self.is_excluded(element):
+                    continue
+                    
+                # Headers are important in news articles
+                if tag_type == 'header':
+                    filtered_chunks.append(self.clean_element(element))
+                    continue
+                    
+                # For content, check word count and link density
+                text = element.get_text(strip=True)
+                if len(text.split()) >= (min_word_threshold or self.min_word_count):
+                    # Calculate link density
+                    links_text = ' '.join(a.get_text(strip=True) for a in element.find_all('a'))
+                    link_density = len(links_text) / len(text) if text else 1
+                    
+                    # Accept if link density is reasonable
+                    if link_density < 0.5:
+                        filtered_chunks.append(self.clean_element(element))
+            
+            return filtered_chunks
+
+    # Create markdown generator with custom filter
+    markdown_gen = DefaultMarkdownGenerator(
+        content_filter=CustomNewsFilter()
     )
 
     run_config = CrawlerRunConfig(
-        content_filter=content_filter,
-        cache_mode=CacheMode.BYPASS
+        markdown_generator=markdown_gen
     )
 
     async with AsyncWebCrawler() as crawler:
@@ -124,25 +177,22 @@ async def demo_content_filtering():
             config=run_config
         )
         print("Filtered Content Sample:")
-        print(result.markdown[:500] + "...\n")
+        print(result.markdown[:500])  # Show first 500 chars
 
 async def demo_json_extraction():
     """
-    Advanced JSON Extraction Demo
+    Improved JSON Extraction Demo
     ---------------------------
     
     Demonstrates the enhanced JSON extraction capabilities:
-    1. Using different input formats (markdown, html)
-    2. Base element attributes extraction
-    3. Complex nested structures
-    4. Multiple extraction patterns
+    1. Base element attributes extraction
+    2. Complex nested structures
+    3. Multiple extraction patterns
     
     Key features shown:
-    - Extracting from different input formats (markdown vs html)
     - Extracting attributes from base elements (href, data-* attributes)
     - Processing repeated patterns
     - Handling optional fields
-    - Computing derived values
     """
     print("\n3. Improved JSON Extraction Demo")
     print("--------------------------------")
@@ -152,13 +202,17 @@ async def demo_json_extraction():
         schema={
             "name": "Blog Posts",
             "baseSelector": "div.article-list",
+            "baseFields": [
+                {"name": "list_id", "type": "attribute", "attribute": "data-list-id"},
+                {"name": "category", "type": "attribute", "attribute": "data-category"}
+            ],
             "fields": [
                 {
                     "name": "posts",
                     "selector": "article.post",
                     "type": "nested_list",
                     "baseFields": [
-                        {"name": "category", "type": "attribute", "attribute": "data-category"},
+                        {"name": "post_id", "type": "attribute", "attribute": "data-post-id"},
                         {"name": "author_id", "type": "attribute", "attribute": "data-author"}
                     ],
                     "fields": [
@@ -378,9 +432,9 @@ async def main():
     print("====================================")
 
     # Run all demos
-    # await demo_ssl_features()
-    # await demo_content_filtering()
-    # await demo_json_extraction()
+    await demo_ssl_features()
+    await demo_content_filtering()
+    await demo_json_extraction()
     await demo_input_formats()
 
 if __name__ == "__main__":
