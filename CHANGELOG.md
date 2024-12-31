@@ -1,6 +1,73 @@
 # Changelog
 
-## [0.4.1] December 8, 2024
+All notable changes to Crawl4AI will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.4.24] - 2024-12-31
+
+### Added
+- **Browser and SSL Handling**
+  - SSL certificate validation options in extraction strategies
+  - Custom certificate paths support
+  - Configurable certificate validation skipping
+  - Enhanced response status code handling with retry logic
+
+- **Content Processing**
+  - New content filtering system with regex support
+  - Advanced chunking strategies for large content
+  - Memory-efficient parallel processing
+  - Configurable chunk size optimization
+
+- **JSON Extraction**
+  - Complex JSONPath expression support
+  - JSON-LD and Microdata extraction
+  - RDFa parsing capabilities
+  - Advanced data transformation pipeline
+
+- **Field Types**
+  - New field types: `computed`, `conditional`, `aggregate`, `template`
+  - Field inheritance system
+  - Reusable field definitions
+  - Custom validation rules
+
+### Changed
+- **Performance**
+  - Optimized selector compilation with caching
+  - Improved HTML parsing efficiency
+  - Enhanced memory management for large documents
+  - Batch processing optimizations
+
+- **Error Handling**
+  - More detailed error messages and categorization
+  - Enhanced debugging capabilities
+  - Improved performance metrics tracking
+  - Better error recovery mechanisms
+
+### Deprecated
+- Old field computation method using `eval`
+- Direct browser manipulation without proper SSL handling
+- Simple text-based content filtering
+
+### Removed
+- Legacy extraction patterns without proper error handling
+- Unsafe eval-based field computation
+- Direct DOM manipulation without sanitization
+
+### Fixed
+- Memory leaks in large document processing
+- SSL certificate validation issues
+- Incorrect handling of nested JSON structures
+- Performance bottlenecks in parallel processing
+
+### Security
+- Improved input validation and sanitization
+- Safe expression evaluation system
+- Enhanced resource protection
+- Rate limiting implementation
+
+## [0.4.1] - 2024-12-08
 
 ### **File: `crawl4ai/async_crawler_strategy.py`**
 
@@ -980,6 +1047,6 @@ These changes focus on refining the existing codebase, resulting in a more stabl
 - Maintaining the semantic context of inline tags (e.g., abbreviation, DEL, INS) for improved LLM-friendliness.
 - Updated Dockerfile to ensure compatibility across multiple platforms (Hopefully!).
 
-## [0.2.4] - 2024-06-17
+## [v0.2.4] - 2024-06-17
 ### Fixed
 - Fix issue #22: Use MD5 hash for caching HTML files to handle long URLs
