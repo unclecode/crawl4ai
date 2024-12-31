@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **JSON Extraction**
   - Complex JSONPath expression support
-  - JSON-LD and Microdata extraction
+  - JSON-CSS and Microdata extraction
   - RDFa parsing capabilities
   - Advanced data transformation pipeline
 
