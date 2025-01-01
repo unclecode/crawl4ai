@@ -418,34 +418,30 @@ class AsyncWebCrawler:
                             **kwargs
                         )
 
-                    #     crawl_result.status_code = async_response.status_code
-                    #     crawl_result.response_headers = async_response.response_headers
-                    #     crawl_result.downloaded_files = async_response.downloaded_files
-                    #     crawl_result.ssl_certificate = async_response.ssl_certificate  # Add SSL certificate
-                    # else:
-                    #     crawl_result.status_code = 200
-                    #     crawl_result.response_headers = cached_result.response_headers if cached_result else {}
-                    #     crawl_result.ssl_certificate = cached_result.ssl_certificate if cached_result else None  # Add SSL certificate from cache
+                        crawl_result.status_code = async_response.status_code
+                        crawl_result.response_headers = async_response.response_headers
+                        crawl_result.downloaded_files = async_response.downloaded_files
+                        crawl_result.ssl_certificate = async_response.ssl_certificate  # Add SSL certificate
 
                         # # Check and set values from async_response to crawl_result
-                        try:
-                            for key in vars(async_response):
-                                if hasattr(crawl_result, key):
-                                    value = getattr(async_response, key, None)
-                                    current_value = getattr(crawl_result, key, None)
-                                    if value is not None and not current_value:
-                                        try:
-                                            setattr(crawl_result, key, value)
-                                        except Exception as e:
-                                            self.logger.warning(
-                                                message=f"Failed to set attribute {key}: {str(e)}",
-                                                tag="WARNING"
-                                            )
-                        except Exception as e:
-                            self.logger.warning(
-                                message=f"Error copying response attributes: {str(e)}",
-                                tag="WARNING"
-                            )
+                        # try:
+                        #     for key in vars(async_response):
+                        #         if hasattr(crawl_result, key):
+                        #             value = getattr(async_response, key, None)
+                        #             current_value = getattr(crawl_result, key, None)
+                        #             if value is not None and not current_value:
+                        #                 try:
+                        #                     setattr(crawl_result, key, value)
+                        #                 except Exception as e:
+                        #                     self.logger.warning(
+                        #                         message=f"Failed to set attribute {key}: {str(e)}",
+                        #                         tag="WARNING"
+                        #                     )
+                        # except Exception as e:
+                        #     self.logger.warning(
+                        #         message=f"Error copying response attributes: {str(e)}",
+                        #         tag="WARNING"
+                        #     )
 
                         crawl_result.success = bool(html)
                         crawl_result.session_id = getattr(config, 'session_id', None)
@@ -585,8 +581,10 @@ class AsyncWebCrawler:
 
             # Markdown Generation
             markdown_generator: Optional[MarkdownGenerationStrategy] = config.markdown_generator or DefaultMarkdownGenerator()
-            if not config.content_filter and not markdown_generator.content_filter:
-                markdown_generator.content_filter = PruningContentFilter()
+            
+            # Uncomment if by default we want to use PruningContentFilter
+            # if not config.content_filter and not markdown_generator.content_filter:
+            #     markdown_generator.content_filter = PruningContentFilter()
             
             markdown_result: MarkdownGenerationResult = markdown_generator.generate_markdown(
                 cleaned_html=cleaned_html,
