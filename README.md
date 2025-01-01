@@ -49,7 +49,7 @@ crawl4ai-doctor
 
 If you encounter any browser-related issues, you can install them manually:
 ```bash
-python -m playwright install --with-deps chrome chromium
+python -m playwright install --with-deps chromium
 ```
 
 2. Run a simple web crawl:
