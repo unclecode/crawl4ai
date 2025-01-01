@@ -20,9 +20,9 @@
 
 Crawl4AI is the #1 trending GitHub repository, actively maintained by a vibrant community. It delivers blazing-fast, AI-ready web crawling tailored for LLMs, AI agents, and data pipelines. Open source, flexible, and built for real-time performance, Crawl4AI empowers developers with unmatched speed, precision, and deployment ease.  
 
-[✨ Check out latest update v0.4.24](#-recent-updates)
+[✨ Check out latest update v0.4.24x](#-recent-updates)
 
-🎉 **Version 0.4.24 is out!** Major improvements in extraction strategies with enhanced JSON handling, SSL security, and Amazon product extraction. Plus, a completely revamped content filtering system! [Read the release notes →](https://crawl4ai.com/mkdocs/blog)
+🎉 **Version 0.4.24x is out!** Major improvements in extraction strategies with enhanced JSON handling, SSL security, and Amazon product extraction. Plus, a completely revamped content filtering system! [Read the release notes →](https://crawl4ai.com/mkdocs/blog)
 
 ## 🧐 Why Crawl4AI?
 
@@ -38,7 +38,7 @@ Crawl4AI is the #1 trending GitHub repository, actively maintained by a vibrant 
 1. Install Crawl4AI:
 ```bash
 # Install the package
-pip install crawl4ai
+pip install -U crawl4ai
 
 # Run post-installation setup
 crawl4ai-setup
