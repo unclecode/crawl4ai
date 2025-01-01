@@ -16,7 +16,8 @@ def post_install():
 def install_playwright():
     logger.info("Installing Playwright browsers...", tag="INIT")
     try:
-        subprocess.check_call([sys.executable, "-m", "playwright", "install", "--with-deps"])
+        subprocess.check_call([sys.executable, "-m", "playwright", "install", "--with-deps", "chrome"])
+        subprocess.check_call([sys.executable, "-m", "playwright", "install", "--with-deps", "chromium"])
         logger.success("Playwright installation completed successfully.", tag="COMPLETE")
     except subprocess.CalledProcessError as e:
         # logger.error(f"Error during Playwright installation: {e}", tag="ERROR")
