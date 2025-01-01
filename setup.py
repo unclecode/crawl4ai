@@ -31,13 +31,17 @@ for folder in content_folders:
 # Read requirements and version
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 with open(os.path.join(__location__, "requirements.txt")) as f:
-    requirements = f.read().splitlines()
+    requirements = [line for line in f.read().splitlines() if line and not line.startswith('#')]
 
-with open("crawl4ai/__version__.py") as f:
-    for line in f:
-        if line.startswith("__version__"):
-            version = line.split("=")[1].strip().strip('"')
-            break
+version = "0.0.0"  # This will be overridden by pyproject.toml's dynamic version
+try:
+    with open("crawl4ai/__version__.py") as f:
+        for line in f:
+            if line.startswith("__version__"):
+                version = line.split("=")[1].strip().strip('"')
+                break
+except Exception:
+    pass  # Let pyproject.toml handle version
 
 # Define requirements
 default_requirements = requirements
@@ -49,7 +53,7 @@ sync_requirements = ["selenium"]
 setup(
     name="Crawl4AI",
     version=version,
-    description="🔥🕷️ Crawl4AI: Open-source LLM Friendly Web Crawler & scraper",
+    description="🚀🤖 Crawl4AI: Open-source LLM Friendly Web Crawler & scraper",
     long_description=open("README.md", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
     url="https://github.com/unclecode/crawl4ai",
@@ -86,10 +90,11 @@ setup(
         "Intended Audience :: Developers",
         "License :: OSI Approved :: Apache Software License",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.7",
-        "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
     ],
-    python_requires=">=3.7",
+    python_requires=">=3.9",
 )

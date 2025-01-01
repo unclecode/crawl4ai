@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=64.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "Crawl4AI"
+dynamic = ["version"]
+description = "🚀🤖 Crawl4AI: Open-source LLM Friendly Web Crawler & scraper"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+    {name = "Unclecode", email = "unclecode@kidocode.com"}
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+
+[tool.setuptools]
+packages = ["crawl4ai"]
+package-data = {"crawl4ai" = ["js_snippet/*.js"]}
+
+[tool.setuptools.dynamic]
+version = {attr = "crawl4ai.__version__.__version__"}
