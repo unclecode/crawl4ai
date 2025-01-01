@@ -1,3 +1,5 @@
+# Note: These requirements are also specified in pyproject.toml
+# This file is kept for development environment setup and compatibility
 aiosqlite~=0.20
 lxml~=5.3
 litellm>=1.53.1
@@ -15,3 +17,5 @@ colorama~=0.4
 snowballstemmer~=2.2
 pydantic>=2.10
 pyOpenSSL>=24.3.0
+psutil>=6.1.1
+nltk>=3.9.1

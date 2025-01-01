@@ -31,7 +31,14 @@ By the end of this guide, you’ll have installed Crawl4AI, performed a basic cr
 ```bash
 pip install crawl4ai
 crawl4ai-setup
-playwright install --with-deps  
+
+# Verify your installation
+crawl4ai-doctor
+```
+
+If you encounter any browser-related issues, you can install them manually:
+```bash
+python -m playwright install --with-deps chrome chromium
 ```
 
 - **`crawl4ai-setup`** installs and configures Playwright (Chromium by default).
