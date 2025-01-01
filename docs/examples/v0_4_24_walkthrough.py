@@ -169,7 +169,8 @@ async def demo_content_filtering():
     )
 
     run_config = CrawlerRunConfig(
-        markdown_generator=markdown_gen
+        markdown_generator=markdown_gen,
+        cache_mode=CacheMode.BYPASS
     )
 
     async with AsyncWebCrawler() as crawler:
@@ -436,7 +437,7 @@ async def main():
     await demo_ssl_features()
     await demo_content_filtering()
     await demo_json_extraction()
-    await demo_input_formats()
+    # await demo_input_formats()
 
 if __name__ == "__main__":
     asyncio.run(main())
