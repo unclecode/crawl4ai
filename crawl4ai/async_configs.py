@@ -35,7 +35,9 @@ class BrowserConfig:
         user_data_dir (str or None): Path to a user data directory for persistent sessions. If None, a
                                      temporary directory may be used. Default: None.
         chrome_channel (str): The Chrome channel to launch (e.g., "chrome", "msedge"). Only applies if browser_type
-                              is "chromium". Default: "chrome".
+                              is "chromium". Default: "chromium".
+        channel (str): The channel to launch (e.g., "chromium", "chrome", "msedge"). Only applies if browser_type
+                              is "chromium". Default: "chromium".
         proxy (str or None): Proxy server URL (e.g., "http://username:password@proxy:port"). If None, no proxy is used.
                              Default: None.
         proxy_config (dict or None): Detailed proxy configuration, e.g. {"server": "...", "username": "..."}.
@@ -77,7 +79,8 @@ class BrowserConfig:
         use_managed_browser: bool = False,
         use_persistent_context: bool = False,
         user_data_dir: str = None,
-        chrome_channel: str = "chrome",
+        chrome_channel: str = "chromium",
+        channel: str = "chromium",
         proxy: str = None,
         proxy_config: dict = None,
         viewport_width: int = 1080,
@@ -107,14 +110,8 @@ class BrowserConfig:
         self.use_managed_browser = use_managed_browser
         self.use_persistent_context = use_persistent_context
         self.user_data_dir = user_data_dir
-        if self.browser_type == "chromium":
-            self.chrome_channel = "chrome"
-        elif self.browser_type == "firefox":
-            self.chrome_channel = "firefox"
-        elif self.browser_type == "webkit":
-            self.chrome_channel = "webkit"
-        else:
-            self.chrome_channel = chrome_channel or "chrome"
+        self.chrome_channel = chrome_channel or self.browser_type or "chromium"
+        self.channel = channel or self.browser_type or "chromium"
         self.proxy = proxy
         self.proxy_config = proxy_config
         self.viewport_width = viewport_width
