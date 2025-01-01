@@ -3,6 +3,8 @@ import os
 from pathlib import Path
 import shutil
 
+# Note: Most configuration is now in pyproject.toml
+# This setup.py is kept for backwards compatibility
 
 # Create the .crawl4ai folder in the user's home directory if it doesn't exist
 # If the folder already exists, remove the cache folder
