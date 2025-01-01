@@ -1,9 +1,3 @@
-import os, sys
-
-sys.path.append(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-)
-
 import asyncio
 from crawl4ai import *
 
@@ -16,7 +10,7 @@ async def main():
             )
         )
         result = await crawler.arun(
-            url="https://www.nbcnews.com/business",
+            url="https://crawl4ai.com",
             config=crawler_config
         )
         print(result.markdown_v2.raw_markdown[:500])
