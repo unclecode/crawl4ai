@@ -69,7 +69,7 @@ crawl4ai-doctor = "crawl4ai.install:doctor"
 crawl = "crawl4ai.cli:cli"
 
 [tool.setuptools]
-packages = ["crawl4ai", "crawl4ai.js_snippet"]
+packages = {find = {where = ["."], include = ["crawl4ai*"]}}
 
 [tool.setuptools.package-data]
 crawl4ai = ["js_snippet/*.js"]
