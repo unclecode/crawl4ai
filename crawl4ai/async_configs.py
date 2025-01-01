@@ -246,7 +246,7 @@ class CrawlerRunConfig:
         wait_for (str or None): A CSS selector or JS condition to wait for before extracting content.
                                 Default: None.
         wait_for_images (bool): If True, wait for images to load before extracting content.
-                                Default: True.
+                                Default: False.
         delay_before_return_html (float): Delay in seconds before retrieving final HTML.
                                           Default: 0.1.
         mean_delay (float): Mean base delay between requests when calling arun_many.
@@ -345,7 +345,7 @@ class CrawlerRunConfig:
         wait_until: str = "domcontentloaded",
         page_timeout: int = PAGE_TIMEOUT,
         wait_for: str = None,
-        wait_for_images: bool = True,
+        wait_for_images: bool = False,
         delay_before_return_html: float = 0.1,
         mean_delay: float = 0.1,
         max_range: float = 0.3,
@@ -503,7 +503,7 @@ class CrawlerRunConfig:
             wait_until=kwargs.get("wait_until", "domcontentloaded"),
             page_timeout=kwargs.get("page_timeout", 60000),
             wait_for=kwargs.get("wait_for"),
-            wait_for_images=kwargs.get("wait_for_images", True),
+            wait_for_images=kwargs.get("wait_for_images", False),
             delay_before_return_html=kwargs.get("delay_before_return_html", 0.1),
             mean_delay=kwargs.get("mean_delay", 0.1),
             max_range=kwargs.get("max_range", 0.3),
