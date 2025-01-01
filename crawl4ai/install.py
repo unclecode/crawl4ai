@@ -2,7 +2,6 @@ import subprocess
 import sys
 import asyncio
 from .async_logger import AsyncLogger, LogLevel
-from .docs_manager import DocsManager
 
 # Initialize logger
 logger = AsyncLogger(log_level=LogLevel.DEBUG, verbose=True)
@@ -45,7 +44,3 @@ def run_migration():
         logger.warning(f"Database initialization failed: {e}")
         logger.warning("Database will be initialized on first use")
 
-async def setup_docs():
-    """Download documentation files"""
-    docs_manager = DocsManager(logger)
-    await docs_manager.update_docs()
