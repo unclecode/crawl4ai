@@ -11,7 +11,6 @@ def post_install():
     logger.info("Running post-installation setup...", tag="INIT")
     install_playwright()
     run_migration()
-    asyncio.run(setup_docs())
     logger.success("Post-installation setup completed!", tag="COMPLETE")
     
 def install_playwright():
@@ -20,15 +19,11 @@ def install_playwright():
         subprocess.check_call([sys.executable, "-m", "playwright", "install", "--with-deps"])
         logger.success("Playwright installation completed successfully.", tag="COMPLETE")
     except subprocess.CalledProcessError as e:
-        logger.error(f"Error during Playwright installation: {e}", tag="ERROR")
-        logger.warning(
-            "Please run 'python -m playwright install' manually after the installation."
-        )
+        # logger.error(f"Error during Playwright installation: {e}", tag="ERROR")
+        logger.warning(f"Please run '{sys.executable} -m playwright install --with-deps' manually after the installation.")
     except Exception as e:
-        logger.error(f"Unexpected error during Playwright installation: {e}", tag="ERROR")
-        logger.warning(
-            "Please run 'python -m playwright install' manually after the installation."
-        )
+        # logger.error(f"Unexpected error during Playwright installation: {e}", tag="ERROR")
+        logger.warning(f"Please run '{sys.executable} -m playwright install --with-deps' manually after the installation.")
 
 def run_migration():
     """Initialize database during installation"""
