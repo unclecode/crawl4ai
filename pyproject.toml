@@ -69,8 +69,10 @@ crawl4ai-doctor = "crawl4ai.install:doctor"
 crawl = "crawl4ai.cli:cli"
 
 [tool.setuptools]
-packages = ["crawl4ai"]
-package-data = {"crawl4ai" = ["js_snippet/*.js"]}
+packages = ["crawl4ai", "crawl4ai.js_snippet"]
+
+[tool.setuptools.package-data]
+crawl4ai = ["js_snippet/*.js"]
 
 [tool.setuptools.dynamic]
 version = {attr = "crawl4ai.__version__.__version__"}
