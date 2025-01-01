@@ -39,13 +39,17 @@ Crawl4AI is the #1 trending GitHub repository, actively maintained by a vibrant 
 ```bash
 # Install the package
 pip install crawl4ai
+
+# Run post-installation setup
 crawl4ai-setup
 
-# Install Playwright with system dependencies (recommended)
-playwright install --with-deps 
+# Verify your installation
+crawl4ai-doctor
+```
 
-# Or install specific browsers:
-playwright install --with-deps chrome  # Recommended for Colab/Linux
+If you encounter any browser-related issues, you can install them manually:
+```bash
+python -m playwright install --with-deps chrome chromium
 ```
 
 2. Run a simple web crawl:
