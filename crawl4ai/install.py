@@ -16,8 +16,8 @@ def post_install():
 def install_playwright():
     logger.info("Installing Playwright browsers...", tag="INIT")
     try:
-        subprocess.check_call([sys.executable, "-m", "playwright", "install", "--with-deps", "chrome"])
-        subprocess.check_call([sys.executable, "-m", "playwright", "install", "--with-deps", "chromium"])
+        subprocess.check_call([sys.executable, "-m", "playwright", "install", "--with-deps", "--force", "chrome"])
+        subprocess.check_call([sys.executable, "-m", "playwright", "install", "--with-deps", "--force", "chromium"])
         logger.success("Playwright installation completed successfully.", tag="COMPLETE")
     except subprocess.CalledProcessError as e:
         # logger.error(f"Error during Playwright installation: {e}", tag="ERROR")
@@ -40,3 +40,44 @@ def run_migration():
         logger.warning(f"Database initialization failed: {e}")
         logger.warning("Database will be initialized on first use")
 
+async def run_doctor():
+    """Test if Crawl4AI is working properly"""
+    logger.info("Running Crawl4AI health check...", tag="INIT")
+    try:
+        from .async_webcrawler import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
+
+        browser_config = BrowserConfig(
+            headless=True,
+            browser_type="chromium",
+            ignore_https_errors=True,
+            light_mode=True,
+            viewport_width=1280,
+            viewport_height=720
+        )
+
+        run_config = CrawlerRunConfig(
+            cache_mode=CacheMode.BYPASS,
+            screenshot=True,
+        )
+
+        async with AsyncWebCrawler(config=browser_config) as crawler:
+            logger.info("Testing crawling capabilities...", tag="TEST")
+            result = await crawler.arun(
+                url="https://crawl4ai.com",
+                config=run_config
+            )
+
+            if result and result.markdown:
+                logger.success("✅ Crawling test passed!", tag="COMPLETE")
+                return True
+            else:
+                raise Exception("Failed to get content")
+
+    except Exception as e:
+        logger.error(f"❌ Test failed: {e}", tag="ERROR")
+        return False
+
+def doctor():
+    """Entry point for the doctor command"""
+    import asyncio
+    return asyncio.run(run_doctor())
