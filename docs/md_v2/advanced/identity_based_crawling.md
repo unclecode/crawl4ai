@@ -24,7 +24,7 @@ Crawl4AI empowers you to navigate and interact with the web using your authentic
        headless=False,  # Set to False for initial setup to view browser actions
        verbose=True,
        user_agent_mode="random",
-       use_managed_browser=True,  # Enables persistent browser sessions
+       use_remote_browser=True,  # Enables persistent browser sessions
        browser_type="chromium",
        user_data_dir="/path/to/user_profile_data"  # Path to save session data
    )
@@ -61,7 +61,7 @@ async def main():
     browser_config = BrowserConfig(
         headless=True,  # Automate subsequent runs
         verbose=True,
-        use_managed_browser=True,
+        use_remote_browser=True,
         user_data_dir="/path/to/user_profile_data"
     )
 

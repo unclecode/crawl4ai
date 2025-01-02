@@ -489,7 +489,7 @@ request = {
         
         # Session Management
         "user_data_dir": "./browser-data",   # Browser profile location
-        "use_managed_browser": True,         # Use persistent browser
+        "use_remote_browser": True,         # Use persistent browser
     }
 }
 ```

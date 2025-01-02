@@ -24,6 +24,7 @@ from .async_configs import BrowserConfig, CrawlerRunConfig
 from .async_logger import AsyncLogger
 from playwright_stealth import StealthConfig, stealth_async
 from .ssl_certificate import SSLCertificate
+from .browser_farm.docker_browser import DockerBrowser
 
 stealth_config = StealthConfig(
     webdriver=True,
@@ -63,7 +64,7 @@ BROWSER_DISABLE_OPTIONS = [
 ]
 
 
-class ManagedBrowser:
+class RemoteConnector:
     """
     Manages the browser process and context. This class allows to connect to the browser using CDP protocol.
     
@@ -104,7 +105,7 @@ class ManagedBrowser:
         debugging_port: int = 9222,
     ):
         """
-        Initialize the ManagedBrowser instance.
+        Initialize the RemoteConnector instance.
         
         Args:
             browser_type (str): The type of browser to launch. Supported values: "chromium", "firefox", "webkit".
@@ -295,7 +296,7 @@ class BrowserManager:
         logger: Logger instance for recording events and errors
         browser (Browser): The browser instance
         default_context (BrowserContext): The default browser context    
-        managed_browser (ManagedBrowser): The managed browser instance
+        remote_browser (RemoteConnector or DockerBrowser): The remote browser instance
         playwright (Playwright): The Playwright instance
         sessions (dict): Dictionary to store session information
         session_ttl (int): Session timeout in seconds
@@ -314,16 +315,18 @@ class BrowserManager:
         # Browser state
         self.browser = None
         self.default_context = None
-        self.managed_browser = None
+        self.remote_browser = None  # Used for both managed and docker browsers
         self.playwright = None
 
         # Session management
         self.sessions = {}
         self.session_ttl = 1800  # 30 minutes
 
-        # Initialize ManagedBrowser if needed
-        if self.config.use_managed_browser:
-            self.managed_browser = ManagedBrowser(
+        # Initialize remote browser connection
+        if self.config.use_docker:
+            self.remote_browser = DockerBrowser()
+        elif self.config.use_remote_browser:
+            self.remote_browser = RemoteConnector(
                 browser_type=self.config.browser_type,
                 user_data_dir=self.config.user_data_dir,
                 headless=self.config.headless,
@@ -348,29 +351,24 @@ class BrowserManager:
 
             self.playwright = await async_playwright().start()
 
-        if self.config.use_managed_browser:
-            cdp_url = await self.managed_browser.start()
+        if self.config.use_docker or self.config.use_remote_browser:
+            # Get endpoint from remote browser (Docker or managed)
+            if self.config.use_docker:
+                host, port = await self.remote_browser.get_browser_endpoint()
+                cdp_url = f"http://{host}:{port}"
+            else:
+                cdp_url = await self.remote_browser.start()
+            
+            # Connect to remote browser
             self.browser = await self.playwright.chromium.connect_over_cdp(cdp_url)
             contexts = self.browser.contexts
             if contexts:
                 self.default_context = contexts[0]
             else:
                 self.default_context = await self.create_browser_context()
-                # self.default_context = await self.browser.new_context(
-                #     viewport={
-                #         "width": self.config.viewport_width,
-                #         "height": self.config.viewport_height,
-                #     },
-                #     storage_state=self.config.storage_state,
-                #     user_agent=self.config.headers.get(
-                #         "User-Agent", self.config.user_agent
-                #     ),
-                #     accept_downloads=self.config.accept_downloads,
-                #     ignore_https_errors=self.config.ignore_https_errors,
-                #     java_script_enabled=self.config.java_script_enabled,
-                # )
-            await self.setup_context(self.default_context)
+            await self.setup_context(self.default_context, None)
         else:
+            # Regular browser launch code
             browser_args = self._build_browser_args()
 
             # Launch appropriate browser type
@@ -453,12 +451,7 @@ class BrowserManager:
 
         return browser_args
 
-    async def setup_context(
-        self,
-        context: BrowserContext,
-        crawlerRunConfig: CrawlerRunConfig,
-        is_default=False,
-    ):
+    async def setup_context(self, context: BrowserContext, crawlerRunConfig: CrawlerRunConfig, is_default=False, ):
         """
         Set up a browser context with the configured options.
 
@@ -514,18 +507,18 @@ class BrowserManager:
             combined_headers.update(self.config.headers)
             await context.set_extra_http_headers(combined_headers)
 
-        # Add default cookie
-        await context.add_cookies(
-            [{"name": "cookiesEnabled", "value": "true", "url": crawlerRunConfig.url}]
-        )
-
-        # Handle navigator overrides
-        if (
-            crawlerRunConfig.override_navigator
-            or crawlerRunConfig.simulate_user
-            or crawlerRunConfig.magic
-        ):
-            await context.add_init_script(load_js_script("navigator_overrider"))
+        if crawlerRunConfig:
+            # Add default cookie
+            await context.add_cookies(
+                [{"name": "cookiesEnabled", "value": "true", "url": crawlerRunConfig.url}]
+            )
+            # Handle navigator overrides
+            if (
+                crawlerRunConfig.override_navigator
+                or crawlerRunConfig.simulate_user
+                or crawlerRunConfig.magic
+            ):
+                await context.add_init_script(load_js_script("navigator_overrider"))
 
     async def create_browser_context(self):
         """
@@ -610,7 +603,7 @@ class BrowserManager:
             self.sessions[crawlerRunConfig.session_id] = (context, page, time.time())
             return page, context
 
-        if self.config.use_managed_browser:
+        if self.config.use_remote_browser:
             context = self.default_context
             page = await context.new_page()
         else:
@@ -633,7 +626,7 @@ class BrowserManager:
         if session_id in self.sessions:
             context, page, _ = self.sessions[session_id]
             await page.close()
-            if not self.config.use_managed_browser:
+            if not self.config.use_remote_browser:
                 await context.close()
             del self.sessions[session_id]
 
@@ -661,10 +654,11 @@ class BrowserManager:
             await self.browser.close()
             self.browser = None
 
-        if self.managed_browser:
+        if self.remote_browser:
             await asyncio.sleep(0.5)
-            await self.managed_browser.cleanup()
-            self.managed_browser = None
+            if hasattr(self.remote_browser, 'cleanup'):
+                await self.remote_browser.cleanup()
+            self.remote_browser = None
 
         if self.playwright:
             await self.playwright.stop()

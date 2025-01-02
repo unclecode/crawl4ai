@@ -11,7 +11,7 @@ from .user_agent_generator import UserAgentGenerator
 from .extraction_strategy import ExtractionStrategy
 from .chunking_strategy import ChunkingStrategy
 from .markdown_generation_strategy import MarkdownGenerationStrategy
-from typing import Union, List
+from typing import Union, List, Optional
 
 
 class BrowserConfig:
@@ -27,11 +27,12 @@ class BrowserConfig:
                             Default: "chromium".
         headless (bool): Whether to run the browser in headless mode (no visible GUI).
                          Default: True.
-        use_managed_browser (bool): Launch the browser using a managed approach (e.g., via CDP), allowing
+        use_remote_browser (bool): Launch the browser using a managed approach (e.g., via CDP), allowing
                                     advanced manipulation. Default: False.
+        use_docker (bool): Whether to use Docker for browser execution. Default: False.
         debugging_port (int): Port for the browser debugging protocol. Default: 9222.
         use_persistent_context (bool): Use a persistent browser context (like a persistent profile).
-                                       Automatically sets use_managed_browser=True. Default: False.
+                                       Automatically sets use_remote_browser=True. Default: False.
         user_data_dir (str or None): Path to a user data directory for persistent sessions. If None, a
                                      temporary directory may be used. Default: None.
         chrome_channel (str): The Chrome channel to launch (e.g., "chrome", "msedge"). Only applies if browser_type
@@ -76,9 +77,10 @@ class BrowserConfig:
         self,
         browser_type: str = "chromium",
         headless: bool = True,
-        use_managed_browser: bool = False,
+        use_remote_browser: bool = False,
+        use_docker: bool = False,
         use_persistent_context: bool = False,
-        user_data_dir: str = None,
+        user_data_dir: Optional[str] = None,
         chrome_channel: str = "chromium",
         channel: str = "chromium",
         proxy: str = None,
@@ -107,7 +109,8 @@ class BrowserConfig:
     ):
         self.browser_type = browser_type
         self.headless = headless
-        self.use_managed_browser = use_managed_browser
+        self.use_remote_browser = use_remote_browser
+        self.use_docker = use_docker
         self.use_persistent_context = use_persistent_context
         self.user_data_dir = user_data_dir
         self.chrome_channel = chrome_channel or self.browser_type or "chromium"
@@ -148,14 +151,15 @@ class BrowserConfig:
 
         # If persistent context is requested, ensure managed browser is enabled
         if self.use_persistent_context:
-            self.use_managed_browser = True
+            self.use_remote_browser = True
 
     @staticmethod
     def from_kwargs(kwargs: dict) -> "BrowserConfig":
         return BrowserConfig(
             browser_type=kwargs.get("browser_type", "chromium"),
             headless=kwargs.get("headless", True),
-            use_managed_browser=kwargs.get("use_managed_browser", False),
+            use_remote_browser=kwargs.get("use_remote_browser", False),
+            use_docker=kwargs.get("use_docker", False),
             use_persistent_context=kwargs.get("use_persistent_context", False),
             user_data_dir=kwargs.get("user_data_dir"),
             chrome_channel=kwargs.get("chrome_channel", "chromium"),

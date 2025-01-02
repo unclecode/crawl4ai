@@ -160,7 +160,7 @@ async def browser_management_example():
     print(f"Browser profile will be saved to: {user_data_dir}")
     
     async with AsyncWebCrawler(
-        use_managed_browser=True,
+        use_remote_browser=True,
         user_data_dir=user_data_dir,
         headless=False,
         verbose=True
@@ -221,7 +221,7 @@ async def api_example():
             },
             "crawler_params": {
                 "headless": True,
-                # "use_managed_browser": True
+                # "use_remote_browser": True
             },
             "cache_mode": "bypass",
             # "screenshot": True,

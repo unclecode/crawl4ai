@@ -63,7 +63,7 @@ async with AsyncWebCrawler(config=config) as crawler:
 ```
 
 ### Managed Browser
-The `ManagedBrowser` class offers a high-level abstraction for managing browser instances, emphasizing resource management, debugging capabilities, and anti-bot measures.
+The `RemoteConnector` class offers a high-level abstraction for managing browser instances, emphasizing resource management, debugging capabilities, and anti-bot measures.
 
 #### How It Works
 - **Browser Process Management**:
@@ -82,7 +82,7 @@ The `ManagedBrowser` class offers a high-level abstraction for managing browser 
 - **Scalability**:
   - Handles multiple browser instances concurrently, scaling dynamically based on workload.
 
-#### Example: Using `ManagedBrowser`
+#### Example: Using `RemoteConnector`
 ```python
 from crawl4ai import AsyncWebCrawler, BrowserConfig
 

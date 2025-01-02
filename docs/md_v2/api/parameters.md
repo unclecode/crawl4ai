@@ -10,7 +10,7 @@
 | async_crawler_strategy.py | headers | `kwargs.get("headers", {})` | AsyncPlaywrightCrawlerStrategy | Custom HTTP headers for requests |
 | async_crawler_strategy.py | verbose | `kwargs.get("verbose", False)` | AsyncPlaywrightCrawlerStrategy | Enable detailed logging output |
 | async_crawler_strategy.py | sleep_on_close | `kwargs.get("sleep_on_close", False)` | AsyncPlaywrightCrawlerStrategy | Add delay before closing browser |
-| async_crawler_strategy.py | use_managed_browser | `kwargs.get("use_managed_browser", False)` | AsyncPlaywrightCrawlerStrategy | Use managed browser instance |
+| async_crawler_strategy.py | use_remote_browser | `kwargs.get("use_remote_browser", False)` | AsyncPlaywrightCrawlerStrategy | Use managed browser instance |
 | async_crawler_strategy.py | user_data_dir | `kwargs.get("user_data_dir", None)` | AsyncPlaywrightCrawlerStrategy | Custom directory for browser profile data |
 | async_crawler_strategy.py | session_id | `kwargs.get("session_id")` | AsyncPlaywrightCrawlerStrategy | Unique identifier for browser session |
 | async_crawler_strategy.py | override_navigator | `kwargs.get("override_navigator", False)` | AsyncPlaywrightCrawlerStrategy | Override browser navigator properties |

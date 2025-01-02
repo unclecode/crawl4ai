@@ -19,7 +19,7 @@ async def test_browser_config_object():
         headless=False,
         viewport_width=1920,
         viewport_height=1080,
-        use_managed_browser=True,
+        use_remote_browser=True,
         user_agent_mode="random",
         user_agent_generator_config={"device_type": "desktop", "os_type": "windows"}
     )

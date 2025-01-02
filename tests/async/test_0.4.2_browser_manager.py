@@ -18,7 +18,7 @@ async def test_default_headless():
         verbose=True,
         user_agent_mode="random",
         user_agent_generator_config={"device_type": "mobile", "os_type": "android"},
-        use_managed_browser=False,
+        use_remote_browser=False,
         use_persistent_context=False,
         ignore_https_errors=True,
         # Testing normal ephemeral context
@@ -31,14 +31,14 @@ async def test_default_headless():
         print("[test_default_headless] success:", result.success)
         print("HTML length:", len(result.html if result.html else ""))
         
-async def test_managed_browser_persistent():
-    # Treating use_persistent_context=True as managed_browser scenario.
+async def test_remote_browser_persistent():
+    # Treating use_persistent_context=True as remote_browser scenario.
     async with AsyncWebCrawler(
         headless=False,
         verbose=True,
         user_agent_mode="random",
         user_agent_generator_config={"device_type": "desktop", "os_type": "mac"},
-        use_managed_browser=True,
+        use_remote_browser=True,
         use_persistent_context=True,  # now should behave same as managed browser
         user_data_dir="./outpu/test_profile",
         # This should store and reuse profile data across runs
@@ -48,7 +48,7 @@ async def test_managed_browser_persistent():
             cache_mode=CacheMode.BYPASS,
             markdown_generator=DefaultMarkdownGenerator(options={"ignore_links": True})
         )
-        print("[test_managed_browser_persistent] success:", result.success)
+        print("[test_remote_browser_persistent] success:", result.success)
         print("HTML length:", len(result.html if result.html else ""))
 
 async def test_session_reuse():
@@ -59,7 +59,7 @@ async def test_session_reuse():
         verbose=True,
         user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
         # Fixed user-agent for consistency
-        use_managed_browser=False,
+        use_remote_browser=False,
         use_persistent_context=False,
     ) as crawler:
         
@@ -88,7 +88,7 @@ async def test_magic_mode():
         verbose=True,
         user_agent_mode="random",
         user_agent_generator_config={"device_type": "desktop", "os_type": "windows"},
-        use_managed_browser=False,
+        use_remote_browser=False,
         use_persistent_context=False,
         magic=True,
         override_navigator=True,
@@ -109,7 +109,7 @@ async def test_proxy_settings():
         verbose=False,
         user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
         proxy="http://127.0.0.1:8080",  # Assuming local proxy server for test
-        use_managed_browser=False,
+        use_remote_browser=False,
         use_persistent_context=False,
     ) as crawler:
         result = await crawler.arun(
@@ -130,7 +130,7 @@ async def test_ignore_https_errors():
         verbose=True,
         user_agent="Mozilla/5.0",
         ignore_https_errors=True,
-        use_managed_browser=False,
+        use_remote_browser=False,
         use_persistent_context=False,
     ) as crawler:
         result = await crawler.arun(
@@ -143,7 +143,7 @@ async def test_ignore_https_errors():
 async def main():
     print("Running tests...")
     # await test_default_headless()
-    # await test_managed_browser_persistent()
+    # await test_remote_browser_persistent()
     # await test_session_reuse()
     # await test_magic_mode()
     # await test_proxy_settings()
