@@ -2163,7 +2163,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             }
         """)
     
-    async def page_need_scroll(self, page: Page):
+    async def page_need_scroll(self, page: Page) -> bool:
         """
         Determine whether the page need to scroll
         
@@ -2171,12 +2171,21 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             page: Playwright page object
             
         Returns:
-            page should scroll or not
+            bool: True if page needs scrolling
         """
-        return await page.evaluate("""
+        try:
+            need_scroll = await page.evaluate("""
             () => {
                 const scrollHeight = document.documentElement.scrollHeight;
                 const viewportHeight = window.innerHeight;
                 return scrollHeight > viewportHeight;
             }
-        """)
+            """)
+            return need_scroll
+        except Exception as e:
+            self.logger.warning(
+                message="Failed to check scroll need: {error}. Defaulting to True for safety.",
+                tag="SCROLL",
+                params={"error": str(e)}
+            )
+            return True  # Default to scrolling if check fails
