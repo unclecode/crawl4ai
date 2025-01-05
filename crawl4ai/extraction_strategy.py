@@ -974,8 +974,7 @@ class JsonCssExtractionStrategy(JsonElementExtractionStrategy):
         return parsed_html.select(selector)
 
     def _get_elements(self, element, selector: str):
-        selected = element.select_one(selector)
-        return [selected] if selected else []
+        return element.select(selector)
 
     def _get_element_text(self, element) -> str:
         return element.get_text(strip=True)
@@ -1050,3 +1049,4 @@ class JsonXPathExtractionStrategy(JsonElementExtractionStrategy):
     def _get_element_attribute(self, element, attribute: str):
         return element.get(attribute)
  
+

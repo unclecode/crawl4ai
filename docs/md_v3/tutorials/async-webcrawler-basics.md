@@ -148,7 +148,24 @@ Below are a few `BrowserConfig` and `CrawlerRunConfig` parameters you might twea
 
 ---
 
-## 5. Putting It All Together
+## 5. Windows-Specific Configuration
+
+When using AsyncWebCrawler on Windows, you might encounter a `NotImplementedError` related to `asyncio.create_subprocess_exec`. This is a known Windows-specific issue that occurs because Windows' default event loop doesn't support subprocess operations.
+
+To resolve this, Crawl4AI provides a utility function to configure Windows to use the ProactorEventLoop. Call this function before running any async operations:
+
+```python
+from crawl4ai.utils import configure_windows_event_loop
+
+# Call this before any async operations if you're on Windows
+configure_windows_event_loop()
+
+# Your AsyncWebCrawler code here
+```
+
+---
+
+## 6. Putting It All Together
 
 Here’s a slightly more in-depth example that shows off a few key config parameters at once:
 
@@ -193,7 +210,7 @@ if __name__ == "__main__":
 
 ---
 
-## 6. Next Steps
+## 7. Next Steps
 
 - **Smart Crawling Techniques**: Learn to handle iframes, advanced caching, and selective extraction in the [next tutorial](./smart-crawling.md).
 - **Hooks & Custom Code**: See how to inject custom logic before and after navigation in a dedicated [Hooks Tutorial](./hooks-custom.md).
