@@ -1644,11 +1644,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         Returns:
             str: The base64-encoded screenshot data
         """
-        dimensions = await self.get_page_dimensions(page)
-        page_height = dimensions['height']        
-        if page_height < kwargs.get(
-            "screenshot_height_threshold", SCREENSHOT_HEIGHT_TRESHOLD
-        ):
+        need_scroll = await self.page_need_scroll(page)
+        
+        if not need_scroll:
             # Page is short enough, just take a screenshot
             return await self.take_screenshot_naive(page)
         else:
@@ -2162,5 +2160,23 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             () => {
                 const {scrollWidth, scrollHeight} = document.documentElement;
                 return {width: scrollWidth, height: scrollHeight};
+            }
+        """)
+    
+    async def page_need_scroll(self, page: Page):
+        """
+        Determine whether the page need to scroll
+        
+        Args:
+            page: Playwright page object
+            
+        Returns:
+            page should scroll or not
+        """
+        return await page.evaluate("""
+            () => {
+                const scrollHeight = document.documentElement.scrollHeight;
+                const viewportHeight = window.innerHeight;
+                return scrollHeight > viewportHeight;
             }
         """)
