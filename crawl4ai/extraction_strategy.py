@@ -974,6 +974,8 @@ class JsonCssExtractionStrategy(JsonElementExtractionStrategy):
         return parsed_html.select(selector)
 
     def _get_elements(self, element, selector: str):
+        # Return all matching elements using select() instead of select_one()
+        # This ensures that we get all elements that match the selector, not just the first one
         return element.select(selector)
 
     def _get_element_text(self, element) -> str:
@@ -1048,5 +1050,3 @@ class JsonXPathExtractionStrategy(JsonElementExtractionStrategy):
 
     def _get_element_attribute(self, element, attribute: str):
         return element.get(attribute)
- 
-
