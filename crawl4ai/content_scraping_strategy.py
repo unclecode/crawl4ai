@@ -248,7 +248,7 @@ class WebScrapingStrategy(ContentScrapingStrategy):
                     return text_content
         return None
 
-    def remove_unwanted_attributes(self, element, important_attrs, keep_data_attributes=False):
+    def remove_unwanted_attributes(self, element, important_attrs, keep_data_attributes=False, keep_aria_label_attribute=False):
         """
         Remove unwanted attributes from an HTML element.
 
@@ -256,6 +256,7 @@ class WebScrapingStrategy(ContentScrapingStrategy):
             element (Tag): The HTML element to remove attributes from.
             important_attrs (list): List of important attributes to keep.
             keep_data_attributes (bool): Whether to keep data attributes.
+            keep_aria_label_attribute (bool): Whether to keep aria-label attribute.
 
         Returns:
             None
@@ -265,6 +266,9 @@ class WebScrapingStrategy(ContentScrapingStrategy):
             if attr not in important_attrs:
                 if keep_data_attributes:
                     if not attr.startswith('data-'):
+                        attrs_to_remove.append(attr)
+                elif keep_aria_label_attribute:
+                    if not attr == 'aria-label':
                         attrs_to_remove.append(attr)
                 else:
                     attrs_to_remove.append(attr)
@@ -617,7 +621,7 @@ class WebScrapingStrategy(ContentScrapingStrategy):
                     element.replace_with(element.get_text())
 
             try:
-                self.remove_unwanted_attributes(element, IMPORTANT_ATTRS, kwargs.get('keep_data_attributes', False))
+                self.remove_unwanted_attributes(element, IMPORTANT_ATTRS, kwargs.get('keep_data_attributes', False), kwargs.get('keep_aria_label_attribute', False))
             except Exception as e:
                 # print('Error removing unwanted attributes:', str(e))
                 self._log('error',

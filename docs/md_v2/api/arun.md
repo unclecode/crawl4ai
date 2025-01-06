@@ -38,6 +38,7 @@ await crawler.arun(
     only_text=False,                        # Extract only text content
     excluded_tags=['form', 'nav'],          # HTML tags to exclude
     keep_data_attributes=False,             # Preserve data-* attributes
+    keep_aria_label_attribute=False,         # Preserve aria-label attribute
 )
 ```
 
@@ -239,6 +240,7 @@ await crawler.arun(
        remove_overlay_elements=True,  # Remove popups
        excluded_tags=['nav', 'aside'],# Remove unnecessary elements
        keep_data_attributes=False,    # Remove data attributes
+       keep_aria_label_attribute=False, # Remove aria-label attribute
        cache_mode=CacheMode.ENABLED   # Use cache for faster processing
    )
    ```
