@@ -122,92 +122,6 @@ class WebScrapingStrategy(ContentScrapingStrategy):
         """
         return await asyncio.to_thread(self._scrap, url, html, **kwargs)
 
-    def _generate_markdown_content(self, cleaned_html: str,html: str,url: str, success: bool, **kwargs) -> Dict[str, Any]:
-        """
-        Generate markdown content from cleaned HTML.
-
-        Args:
-            cleaned_html (str): The cleaned HTML content.
-            html (str): The original HTML content.
-            url (str): The URL of the page.
-            success (bool): Whether the content was successfully cleaned.
-            **kwargs: Additional keyword arguments.
-
-        Returns:
-            Dict[str, Any]: A dictionary containing the generated markdown content.
-        """
-        markdown_generator: Optional[MarkdownGenerationStrategy] = kwargs.get('markdown_generator', DefaultMarkdownGenerator())
-        
-        if markdown_generator:
-            try:
-                if kwargs.get('fit_markdown', False) and not markdown_generator.content_filter:
-                        markdown_generator.content_filter = BM25ContentFilter(
-                            user_query=kwargs.get('fit_markdown_user_query', None),
-                            bm25_threshold=kwargs.get('fit_markdown_bm25_threshold', 1.0)
-                        )
-                
-                markdown_result: MarkdownGenerationResult = markdown_generator.generate_markdown(
-                    cleaned_html=cleaned_html,
-                    base_url=url,
-                    html2text_options=kwargs.get('html2text', {})
-                )
-                
-                return {
-                    'markdown': markdown_result.raw_markdown,  
-                    'fit_markdown': markdown_result.fit_markdown,
-                    'fit_html': markdown_result.fit_html, 
-                    'markdown_v2': markdown_result
-                }
-            except Exception as e:
-                self._log('error',
-                    message="Error using new markdown generation strategy: {error}",
-                    tag="SCRAPE",
-                    params={"error": str(e)}
-                )
-                markdown_generator = None
-                return {
-                    'markdown': f"Error using new markdown generation strategy: {str(e)}",
-                    'fit_markdown': "Set flag 'fit_markdown' to True to get cleaned HTML content.",
-                    'fit_html': "Set flag 'fit_markdown' to True to get cleaned HTML content.",
-                    'markdown_v2': None                    
-                }
-
-        # Legacy method
-        """
-        # h = CustomHTML2Text()
-        # h.update_params(**kwargs.get('html2text', {}))            
-        # markdown = h.handle(cleaned_html)
-        # markdown = markdown.replace('    ```', '```')
-        
-        # fit_markdown = "Set flag 'fit_markdown' to True to get cleaned HTML content."
-        # fit_html = "Set flag 'fit_markdown' to True to get cleaned HTML content."
-        
-        # if kwargs.get('content_filter', None) or kwargs.get('fit_markdown', False):
-        #     content_filter = kwargs.get('content_filter', None)
-        #     if not content_filter:
-        #         content_filter = BM25ContentFilter(
-        #             user_query=kwargs.get('fit_markdown_user_query', None),
-        #             bm25_threshold=kwargs.get('fit_markdown_bm25_threshold', 1.0)
-        #         )
-        #     fit_html = content_filter.filter_content(html)
-        #     fit_html = '\n'.join('<div>{}</div>'.format(s) for s in fit_html)
-        #     fit_markdown = h.handle(fit_html)
-
-        # markdown_v2 = MarkdownGenerationResult(
-        #     raw_markdown=markdown,
-        #     markdown_with_citations=markdown,
-        #     references_markdown=markdown,
-        #     fit_markdown=fit_markdown
-        # )
-        
-        # return {
-        #     'markdown': markdown,
-        #     'fit_markdown': fit_markdown,
-        #     'fit_html': fit_html,
-        #     'markdown_v2' : markdown_v2
-        # }
-        """
-
     def flatten_nested_elements(self, node):
         """
         Flatten nested elements in a HTML tree.
@@ -798,13 +712,6 @@ class WebScrapingStrategy(ContentScrapingStrategy):
 
         cleaned_html = str_body.replace('\n\n', '\n').replace('  ', ' ')
 
-        # markdown_content = self._generate_markdown_content(
-        #     cleaned_html=cleaned_html,
-        #     html=html,
-        #     url=url,
-        #     success=success,
-        #     **kwargs
-        # )
         
         return {
             # **markdown_content,
