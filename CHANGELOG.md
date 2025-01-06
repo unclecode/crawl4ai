@@ -5,6 +5,43 @@ All notable changes to Crawl4AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+---
+
+## [0.4.267] - 2025 - 01 - 06
+
+### Added
+- **Windows Event Loop Configuration**: Introduced a utility function `configure_windows_event_loop` to resolve `NotImplementedError` for asyncio subprocesses on Windows. ([#utils.py](crawl4ai/utils.py), [#tutorials/async-webcrawler-basics.md](docs/md_v3/tutorials/async-webcrawler-basics.md))
+- **`page_need_scroll` Method**: Added a method to determine if a page requires scrolling before taking actions in `AsyncPlaywrightCrawlerStrategy`. ([#async_crawler_strategy.py](crawl4ai/async_crawler_strategy.py))
+
+### Changed
+- **Version Bump**: Updated the version from `0.4.246` to `0.4.247`. ([#__version__.py](crawl4ai/__version__.py))
+- **Improved Scrolling Logic**: Enhanced scrolling methods in `AsyncPlaywrightCrawlerStrategy` by adding a `scroll_delay` parameter for better control. ([#async_crawler_strategy.py](crawl4ai/async_crawler_strategy.py))
+- **Markdown Generation Example**: Updated the `hello_world.py` example to reflect the latest API changes and better illustrate features. ([#examples/hello_world.py](docs/examples/hello_world.py))
+- **Documentation Update**: 
+  - Added Windows-specific instructions for handling asyncio event loops. ([#async-webcrawler-basics.md](docs/md_v3/tutorials/async-webcrawler-basics.md))
+
+### Removed
+- **Legacy Markdown Generation Code**: Removed outdated and unused code for markdown generation in `content_scraping_strategy.py`. ([#content_scraping_strategy.py](crawl4ai/content_scraping_strategy.py))
+
+### Fixed
+- **Page Closing to Prevent Memory Leaks**:
+  - **Description**: Added a `finally` block to ensure pages are closed when no `session_id` is provided.
+  - **Impact**: Prevents memory leaks caused by lingering pages after a crawl.
+  - **File**: [`async_crawler_strategy.py`](crawl4ai/async_crawler_strategy.py)
+  - **Code**:
+    ```python
+    finally:
+        # If no session_id is given we should close the page
+        if not config.session_id:
+            await page.close()
+    ```
+- **Multiple Element Selection**: Modified `_get_elements` in `JsonCssExtractionStrategy` to return all matching elements instead of just the first one, ensuring comprehensive extraction. ([#extraction_strategy.py](crawl4ai/extraction_strategy.py))
+- **Error Handling in Scrolling**: Added robust error handling to ensure scrolling proceeds safely even if a configuration is missing. ([#async_crawler_strategy.py](crawl4ai/async_crawler_strategy.py))
+
+### Other
+- **Git Ignore Update**: Added `/plans` to `.gitignore` for better development environment consistency. ([#.gitignore](.gitignore))
+
+
 ## [0.4.24] - 2024-12-31
 
 ### Added

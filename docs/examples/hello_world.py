@@ -2,7 +2,8 @@ import asyncio
 from crawl4ai import *
 
 async def main():
-    async with AsyncWebCrawler() as crawler:
+    browser_config = BrowserConfig(headless=True, verbose=True)
+    async with AsyncWebCrawler(config=browser_config) as crawler:
         crawler_config = CrawlerRunConfig(
             cache_mode=CacheMode.BYPASS,
             markdown_generator=DefaultMarkdownGenerator(
@@ -10,7 +11,7 @@ async def main():
             )
         )
         result = await crawler.arun(
-            url="https://crawl4ai.com",
+            url="https://www.helloworld.org",
             config=crawler_config
         )
         print(result.markdown_v2.raw_markdown[:500])

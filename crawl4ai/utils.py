@@ -21,6 +21,8 @@ import textwrap
 import cProfile
 import pstats
 from functools import wraps
+import asyncio
+
 
 class InvalidCSSSelectorError(Exception):
     pass
@@ -1578,6 +1580,25 @@ def ensure_content_dirs(base_path: str) -> Dict[str, str]:
         content_paths[key] = path
         
     return content_paths
+
+def configure_windows_event_loop():
+    """
+    Configure the Windows event loop to use ProactorEventLoop.
+    This resolves the NotImplementedError that occurs on Windows when using asyncio subprocesses.
+    
+    This function should only be called on Windows systems and before any async operations.
+    On non-Windows systems, this function does nothing.
+    
+    Example:
+        ```python
+        from crawl4ai.async_configs import configure_windows_event_loop
+        
+        # Call this before any async operations if you're on Windows
+        configure_windows_event_loop()
+        ```
+    """
+    if platform.system() == 'Windows':
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 def get_error_context(exc_info, context_lines: int = 5):
     """
