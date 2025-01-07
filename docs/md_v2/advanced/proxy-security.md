@@ -1,6 +1,4 @@
-# Proxy & Security
-
-Configure proxy settings and enhance security features in Crawl4AI for reliable data extraction.
+# Proxy 
 
 ## Basic Proxy Setup
 
@@ -58,38 +56,3 @@ async with AsyncWebCrawler(config=browser_config) as crawler:
         result = await crawler.arun(url=url, config=browser_config)
 ```
 
-## Custom Headers
-
-Add security-related headers via `BrowserConfig`:
-
-```python
-from crawl4ai.async_configs import BrowserConfig
-
-headers = {
-    "X-Forwarded-For": "203.0.113.195",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Cache-Control": "no-cache",
-    "Pragma": "no-cache"
-}
-
-browser_config = BrowserConfig(headers=headers)
-async with AsyncWebCrawler(config=browser_config) as crawler:
-    result = await crawler.arun(url="https://example.com")
-```
-
-## Combining with Magic Mode
-
-For maximum protection, combine proxy with Magic Mode via `CrawlerRunConfig` and `BrowserConfig`:
-
-```python
-from crawl4ai.async_configs import BrowserConfig, CrawlerRunConfig
-
-browser_config = BrowserConfig(
-    proxy="http://proxy.example.com:8080",
-    headers={"Accept-Language": "en-US"}
-)
-crawler_config = CrawlerRunConfig(magic=True)  # Enable all anti-detection features
-
-async with AsyncWebCrawler(config=browser_config) as crawler:
-    result = await crawler.arun(url="https://example.com", config=crawler_config)
-```
