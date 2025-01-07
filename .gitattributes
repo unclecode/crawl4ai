@@ -1,5 +1,6 @@
 # Ignore Markdown files for language statistics
 *.md linguist-documentation=true
+*.html linguist-documentation=true
 
 # Force Python files to be detected
 *.py linguist-language=Python
