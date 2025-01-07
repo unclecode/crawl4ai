@@ -453,12 +453,7 @@ class BrowserManager:
 
         return browser_args
 
-    async def setup_context(
-        self,
-        context: BrowserContext,
-        crawlerRunConfig: CrawlerRunConfig,
-        is_default=False,
-    ):
+    async def setup_context(self, context: BrowserContext, crawlerRunConfig: CrawlerRunConfig = None, is_default=False):
         """
         Set up a browser context with the configured options.
 
@@ -516,16 +511,17 @@ class BrowserManager:
 
         # Add default cookie
         await context.add_cookies(
-            [{"name": "cookiesEnabled", "value": "true", "url": crawlerRunConfig.url}]
+            [{"name": "cookiesEnabled", "value": "true", "url": crawlerRunConfig.url if crawlerRunConfig else "https://crawl4ai.com/"}]
         )
 
         # Handle navigator overrides
-        if (
-            crawlerRunConfig.override_navigator
-            or crawlerRunConfig.simulate_user
-            or crawlerRunConfig.magic
-        ):
-            await context.add_init_script(load_js_script("navigator_overrider"))
+        if crawlerRunConfig:
+            if (
+                crawlerRunConfig.override_navigator
+                or crawlerRunConfig.simulate_user
+                or crawlerRunConfig.magic
+            ):
+                await context.add_init_script(load_js_script("navigator_overrider"))
 
     async def create_browser_context(self):
         """

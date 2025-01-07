@@ -33,7 +33,8 @@ dependencies = [
     "psutil>=6.1.1",
     "nltk>=3.9.1",
     "playwright",
-    "aiofiles"
+    "aiofiles",
+    "rich>=13.9.4",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
