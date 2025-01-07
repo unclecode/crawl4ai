@@ -25,7 +25,8 @@ Crawl4AI is the #1 trending GitHub repository, actively maintained by a vibrant 
 🎉 **Version 0.4.24x is out!** Major improvements in extraction strategies with enhanced JSON handling, SSL security, and Amazon product extraction. Plus, a completely revamped content filtering system! [Read the release notes →](https://crawl4ai.com/mkdocs/blog)
 
 <details>
-<summary>📦 <strong>My Personal Story</strong></summary>
+<summary>🤓 <strong>My Personal Story</strong></summary>
+
 I’ve always loved exploring the web development, back from when HTML and JavaScript were hardly intertwined. My curiosity drove me into web development, mathematics, AI, and machine learning, always keeping a close tie to real industrial applications. In 2009–2010, as a postgraduate student, I created platforms to gather and organize published papers for Master’s and PhD researchers. Faced with post-grad students’ data challenges, I built a helper app to crawl newly published papers and public data. Relying on Internet Explorer and DLL hacks was far more cumbersome than modern tools, highlighting my longtime background in data extraction.
 
 Fast-forward to 2023: I needed to fetch web data and transform it into neat **markdown** for my AI pipeline. All solutions I found were either **closed-source**, overpriced, or produced low-quality output. As someone who has built large edu-tech ventures (like KidoCode), I believe **data belongs to the people**. We shouldn’t pay $16 just to parse the web’s publicly available content. This friction led me to create my own library, **Crawl4AI**, in a matter of days to meet my immediate needs. Unexpectedly, it went **viral**, accumulating thousands of GitHub stars.
