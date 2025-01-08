@@ -227,3 +227,6 @@ tree.md
 .do
 /plans
 plans/
+
+# Codeium
+.codeiumignore
