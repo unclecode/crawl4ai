@@ -6,7 +6,7 @@ In some cases, you need to extract **complex or unstructured** information from 
 2. Automatically splits content into chunks (if desired) to handle token limits, then combines results.  
 3. Lets you define a **schema** (like a Pydantic model) or a simpler “block” extraction approach.
 
-**Important**: LLM-based extraction can be slower and costlier than schema-based approaches. If your page data is highly structured, consider using [`JsonCssExtractionStrategy`](./json-extraction-basic.md) or [`JsonXPathExtractionStrategy`](./json-extraction-basic.md) first. But if you need AI to interpret or reorganize content, read on!
+**Important**: LLM-based extraction can be slower and costlier than schema-based approaches. If your page data is highly structured, consider using [`JsonCssExtractionStrategy`](./no-llm-strategies.md) or [`JsonXPathExtractionStrategy`](./no-llm-strategies.md) first. But if you need AI to interpret or reorganize content, read on!
 
 ---
 
@@ -295,7 +295,7 @@ if __name__ == "__main__":
 - Tweak **`chunk_token_threshold`**, **`overlap_rate`**, and **`apply_chunking`** to handle large content efficiently.  
 - Monitor token usage with `show_usage()`.
 
-If your site’s data is consistent or repetitive, consider [`JsonCssExtractionStrategy`](./json-extraction-basic.md) first for speed and simplicity. But if you need an **AI-driven** approach, `LLMExtractionStrategy` offers a flexible, multi-provider solution for extracting structured JSON from any website.
+If your site’s data is consistent or repetitive, consider [`JsonCssExtractionStrategy`](./no-llm-strategies.md) first for speed and simplicity. But if you need an **AI-driven** approach, `LLMExtractionStrategy` offers a flexible, multi-provider solution for extracting structured JSON from any website.
 
 **Next Steps**:
 
@@ -303,25 +303,17 @@ If your site’s data is consistent or repetitive, consider [`JsonCssExtractionS
    - Try switching the `provider` (e.g., `"ollama/llama2"`, `"openai/gpt-4o"`, etc.) to see differences in speed, accuracy, or cost.  
    - Pass different `extra_args` like `temperature`, `top_p`, and `max_tokens` to fine-tune your results.
 
-2. **Combine With Other Strategies**  
-   - Use [content filters](../../how-to/content-filters.md) like BM25 or Pruning prior to LLM extraction to remove noise and reduce token usage.  
-   - Apply a [CSS or XPath extraction strategy](./json-extraction-basic.md) first for obvious, structured data, then send only the tricky parts to the LLM.
-
-3. **Performance Tuning**  
+2. **Performance Tuning**  
    - If pages are large, tweak `chunk_token_threshold`, `overlap_rate`, or `apply_chunking` to optimize throughput.  
    - Check the usage logs with `show_usage()` to keep an eye on token consumption and identify potential bottlenecks.
 
-4. **Validate Outputs**  
+3. **Validate Outputs**  
    - If using `extraction_type="schema"`, parse the LLM’s JSON with a Pydantic model for a final validation step.  
    - Log or handle any parse errors gracefully, especially if the model occasionally returns malformed JSON.
 
-5. **Explore Hooks & Automation**  
-   - Integrate LLM extraction with [hooks](./hooks-custom.md) for complex pre/post-processing.  
+4. **Explore Hooks & Automation**  
+   - Integrate LLM extraction with [hooks](../advanced/hooks-auth.md) for complex pre/post-processing.  
    - Use a multi-step pipeline: crawl, filter, LLM-extract, then store or index results for further analysis.
-
-6. **Scale and Deploy**  
-   - Combine your LLM extraction setup with [Docker or other deployment solutions](./docker-quickstart.md) to run at scale.  
-   - Monitor memory usage and concurrency if you call LLMs frequently.
 
 **Last Updated**: 2025-01-01
 

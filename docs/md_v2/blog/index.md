@@ -33,12 +33,6 @@ Introduced significant improvements to content filtering, multi-threaded environ
 
 Curious about how Crawl4AI has evolved? Check out our [complete changelog](https://github.com/unclecode/crawl4ai/blob/main/CHANGELOG.md) for a detailed history of all versions and updates.
 
-## Categories
-
-- [Technical Deep Dives](/blog/technical) - Coming soon
-- [Tutorials & Guides](/blog/tutorials) - Coming soon
-- [Community Updates](/blog/community) - Coming soon
-
 ## Stay Updated
 
 - Star us on [GitHub](https://github.com/unclecode/crawl4ai)
