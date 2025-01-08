@@ -40,24 +40,21 @@ try:
 except Exception:
     pass  # Let pyproject.toml handle version
 
-setup(
-    name="Crawl4AI",
-    version=version,
-    description="🚀🤖 Crawl4AI: Open-source LLM Friendly Web Crawler & scraper",
-    long_description=open("README.md", encoding="utf-8").read(),
-    long_description_content_type="text/markdown",
-    url="https://github.com/unclecode/crawl4ai",
-    author="Unclecode",
-    author_email="unclecode@kidocode.com",
+ssetup(
+    name="your_package_name",  # Replace with your package's name
+    version="0.1",  # Adjust the version number
     license="MIT",
     packages=find_packages(),
     package_data={
-        'crawl4ai': ['js_snippet/*.js']
+        'crawl4ai': [
+            'js_snippet/*.js',
+            'py.typed',  # Include the py.typed file
+        ],
     },
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",
-        "License :: OSI Approved :: Apache Software License",
+        "License :: OSI Approved :: MIT License",  # Fixed license information
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
@@ -67,3 +64,4 @@ setup(
     ],
     python_requires=">=3.9",
 )
+
