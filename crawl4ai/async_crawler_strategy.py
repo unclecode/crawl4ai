@@ -1382,6 +1382,10 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 await page.keyboard.press("ArrowDown")
 
             # Handle wait_for condition
+            # Todo: Decide how to handle this
+            if not config.wait_for and config.css_selector and False:
+                config.wait_for = f"css:{config.css_selector}"
+            
             if config.wait_for:
                 try:
                     await self.smart_wait(
