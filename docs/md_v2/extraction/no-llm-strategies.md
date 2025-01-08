@@ -193,7 +193,8 @@ This snippet includes categories, products, features, reviews, and related items
 schema = {
     "name": "E-commerce Product Catalog",
     "baseSelector": "div.category",
-    # (1) We can define optional baseFields if we want to extract attributes from the category container
+    # (1) We can define optional baseFields if we want to extract attributes 
+    # from the category container
     "baseFields": [
         {"name": "data_cat_id", "type": "attribute", "attribute": "data-cat-id"}, 
     ],
@@ -223,8 +224,16 @@ schema = {
                     "selector": "div.product-details",
                     "type": "nested",  # single sub-object
                     "fields": [
-                        {"name": "brand", "selector": "span.brand", "type": "text"},
-                        {"name": "model", "selector": "span.model", "type": "text"}
+                        {
+                            "name": "brand",
+                            "selector": "span.brand",
+                            "type": "text"
+                        },
+                        {
+                            "name": "model",
+                            "selector": "span.model",
+                            "type": "text"
+                        }
                     ]
                 },
                 {
@@ -240,9 +249,21 @@ schema = {
                     "selector": "div.review",
                     "type": "nested_list",
                     "fields": [
-                        {"name": "reviewer", "selector": "span.reviewer", "type": "text"},
-                        {"name": "rating", "selector": "span.rating", "type": "text"},
-                        {"name": "comment", "selector": "p.review-text", "type": "text"}
+                        {
+                            "name": "reviewer", 
+                            "selector": "span.reviewer", 
+                            "type": "text"
+                        },
+                        {
+                            "name": "rating", 
+                            "selector": "span.rating", 
+                            "type": "text"
+                        },
+                        {
+                            "name": "comment", 
+                            "selector": "p.review-text", 
+                            "type": "text"
+                        }
                     ]
                 },
                 {
@@ -250,8 +271,16 @@ schema = {
                     "selector": "ul.related-products li",
                     "type": "list",
                     "fields": [
-                        {"name": "name", "selector": "span.related-name", "type": "text"},
-                        {"name": "price", "selector": "span.related-price", "type": "text"}
+                        {
+                            "name": "name", 
+                            "selector": "span.related-name", 
+                            "type": "text"
+                        },
+                        {
+                            "name": "price", 
+                            "selector": "span.related-price", 
+                            "type": "text"
+                        }
                     ]
                 }
             ]
@@ -382,7 +411,6 @@ With **JsonCssExtractionStrategy** (or **JsonXPathExtractionStrategy**), you can
 
 **Next Steps**:
 
-- Explore the [Advanced Usage of JSON Extraction](../../explanations/extraction-chunking.md) for deeper details on schema nesting, transformations, or hooking.  
 - Combine your extracted JSON with advanced filtering or summarization in a second pass if needed.  
 - For dynamic pages, combine strategies with `js_code` or infinite scroll hooking to ensure all content is loaded.
 

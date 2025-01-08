@@ -1,7 +1,3 @@
-Below is the **updated** guide for the **AsyncWebCrawler** class, reflecting the **new** recommended approach of configuring the browser via **`BrowserConfig`** and each crawl via **`CrawlerRunConfig`**. While the crawler still accepts legacy parameters for backward compatibility, the modern, maintainable way is shown below.
-
----
-
 # AsyncWebCrawler
 
 The **`AsyncWebCrawler`** is the core class for asynchronous web crawling in Crawl4AI. You typically create it **once**, optionally customize it with a **`BrowserConfig`** (e.g., headless, user agent), then **run** multiple **`arun()`** calls with different **`CrawlerRunConfig`** objects.
@@ -32,14 +28,20 @@ class AsyncWebCrawler:
         Create an AsyncWebCrawler instance.
 
         Args:
-            crawler_strategy: (Advanced) Provide a custom crawler strategy if needed.
-            config: A BrowserConfig object specifying how the browser is set up.
-            always_bypass_cache: (Deprecated) Use CrawlerRunConfig.cache_mode instead.
-            base_directory: Folder for storing caches/logs (if relevant).
-            thread_safe: If True, attempts some concurrency safeguards. Usually False.
-            **kwargs: Additional legacy or debugging parameters.
+            crawler_strategy: 
+                (Advanced) Provide a custom crawler strategy if needed.
+            config: 
+                A BrowserConfig object specifying how the browser is set up.
+            always_bypass_cache: 
+                (Deprecated) Use CrawlerRunConfig.cache_mode instead.
+            base_directory:     
+                Folder for storing caches/logs (if relevant).
+            thread_safe: 
+                If True, attempts some concurrency safeguards. Usually False.
+            **kwargs: 
+                Additional legacy or debugging parameters.
         """
-```
+    )
 
 ### Typical Initialization
 
@@ -216,8 +218,17 @@ async def main():
         "name": "Articles",
         "baseSelector": "article.post",
         "fields": [
-            {"name": "title", "selector": "h2", "type": "text"},
-            {"name": "url", "selector": "a", "type": "attribute", "attribute": "href"}
+            {
+                "name": "title", 
+                "selector": "h2", 
+                "type": "text"
+            },
+            {
+                "name": "url", 
+                "selector": "a", 
+                "type": "attribute", 
+                "attribute": "href"
+            }
         ]
     }
 
