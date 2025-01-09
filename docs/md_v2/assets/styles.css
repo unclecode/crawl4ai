@@ -7,7 +7,7 @@
 
 :root {
     --global-font-size: 16px;
-    --global-code-font-size: 14px;
+    --global-code-font-size: 16px;
     --global-line-height: 1.5em;
     --global-space: 10px;
     --font-stack: Menlo, Monaco, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono,
@@ -233,4 +233,13 @@ pre {
 
 .terminal h1, .terminal h2, .terminal h3, .terminal h4, .terminal h5, .terminal h6 {
     text-shadow: 0 0 0px var(--font-color), 0 0 0px var(--font-color), 0 0 0px var(--font-color);
+}
+
+/* Lower max height or width for these images */
+div.badges a {
+    /* no underline */
+    text-decoration: none !important;
+}
+div.badges a > img {
+    width: auto;
 }

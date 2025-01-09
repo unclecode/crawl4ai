@@ -699,4 +699,4 @@ Content-Type: application/json
 GET /task/{task_id}
 ```
 
-For more details, visit the [official documentation](https://crawl4ai.com/mkdocs/).
+For more details, visit the [official documentation](https://docs.crawl4ai.com/).
