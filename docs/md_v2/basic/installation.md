@@ -132,6 +132,6 @@ This script should successfully crawl the example website and print the first 50
 
 ## Getting Help
 
-If you encounter any issues during installation or usage, please check the [documentation](https://crawl4ai.com/mkdocs/) or raise an issue on the [GitHub repository](https://github.com/unclecode/crawl4ai/issues).
+If you encounter any issues during installation or usage, please check the [documentation](https://docs.crawl4ai.com/) or raise an issue on the [GitHub repository](https://github.com/unclecode/crawl4ai/issues).
 
 Happy crawling! 🕷️🤖
