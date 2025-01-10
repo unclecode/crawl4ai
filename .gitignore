@@ -226,4 +226,5 @@ tree.md
 .local
 .do
 /plans
+.codeiumignore
 todo/

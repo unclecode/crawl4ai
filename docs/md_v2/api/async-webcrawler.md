@@ -1,320 +1,294 @@
 # AsyncWebCrawler
 
-The `AsyncWebCrawler` class is the main interface for web crawling operations. It provides asynchronous web crawling capabilities with extensive configuration options.
+The **`AsyncWebCrawler`** is the core class for asynchronous web crawling in Crawl4AI. You typically create it **once**, optionally customize it with a **`BrowserConfig`** (e.g., headless, user agent), then **run** multiple **`arun()`** calls with different **`CrawlerRunConfig`** objects.
 
-## Constructor
+**Recommended usage**:
+1. **Create** a `BrowserConfig` for global browser settings.  
+2. **Instantiate** `AsyncWebCrawler(config=browser_config)`.  
+3. **Use** the crawler in an async context manager (`async with`) or manage start/close manually.  
+4. **Call** `arun(url, config=crawler_run_config)` for each page you want.
+
+---
+
+## 1. Constructor Overview
 
 ```python
-AsyncWebCrawler(
-    # Browser Settings
-    browser_type: str = "chromium",         # Options: "chromium", "firefox", "webkit"
-    headless: bool = True,                  # Run browser in headless mode
-    verbose: bool = False,                  # Enable verbose logging
-    
-    # Cache Settings
-    always_by_pass_cache: bool = False,     # Always bypass cache
-    base_directory: str = str(os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home())), # Base directory for cache
-    
-    # Network Settings
-    proxy: str = None,                      # Simple proxy URL
-    proxy_config: Dict = None,              # Advanced proxy configuration
-    
-    # Browser Behavior
-    sleep_on_close: bool = False,           # Wait before closing browser
-    
-    # Custom Settings
-    user_agent: str = None,                 # Custom user agent
-    headers: Dict[str, str] = {},           # Custom HTTP headers
-    js_code: Union[str, List[str]] = None,  # Default JavaScript to execute
+class AsyncWebCrawler:
+    def __init__(
+        self,
+        crawler_strategy: Optional[AsyncCrawlerStrategy] = None,
+        config: Optional[BrowserConfig] = None,
+        always_bypass_cache: bool = False,           # deprecated
+        always_by_pass_cache: Optional[bool] = None, # also deprecated
+        base_directory: str = ...,
+        thread_safe: bool = False,
+        **kwargs,
+    ):
+        """
+        Create an AsyncWebCrawler instance.
+
+        Args:
+            crawler_strategy: 
+                (Advanced) Provide a custom crawler strategy if needed.
+            config: 
+                A BrowserConfig object specifying how the browser is set up.
+            always_bypass_cache: 
+                (Deprecated) Use CrawlerRunConfig.cache_mode instead.
+            base_directory:     
+                Folder for storing caches/logs (if relevant).
+            thread_safe: 
+                If True, attempts some concurrency safeguards. Usually False.
+            **kwargs: 
+                Additional legacy or debugging parameters.
+        """
+    )
+
+### Typical Initialization
+
+```python
+from crawl4ai import AsyncWebCrawler, BrowserConfig
+
+browser_cfg = BrowserConfig(
+    browser_type="chromium",
+    headless=True,
+    verbose=True
 )
+
+crawler = AsyncWebCrawler(config=browser_cfg)
 ```
 
-### Parameters in Detail
+**Notes**:
+- **Legacy** parameters like `always_bypass_cache` remain for backward compatibility, but prefer to set **caching** in `CrawlerRunConfig`.
 
-#### Browser Settings
+---
 
-- **browser_type** (str, optional)
-  - Default: `"chromium"`
-  - Options: `"chromium"`, `"firefox"`, `"webkit"`
-  - Controls which browser engine to use
-  ```python
-  # Example: Using Firefox
-  crawler = AsyncWebCrawler(browser_type="firefox")
-  ```
+## 2. Lifecycle: Start/Close or Context Manager
 
-- **headless** (bool, optional)
-  - Default: `True`
-  - When `True`, browser runs without GUI
-  - Set to `False` for debugging
-  ```python
-  # Visible browser for debugging
-  crawler = AsyncWebCrawler(headless=False)
-  ```
+### 2.1 Context Manager (Recommended)
 
-- **verbose** (bool, optional)
-  - Default: `False`
-  - Enables detailed logging
-  ```python
-  # Enable detailed logging
-  crawler = AsyncWebCrawler(verbose=True)
-  ```
+```python
+async with AsyncWebCrawler(config=browser_cfg) as crawler:
+    result = await crawler.arun("https://example.com")
+    # The crawler automatically starts/closes resources
+```
 
-#### Cache Settings
+When the `async with` block ends, the crawler cleans up (closes the browser, etc.).
 
-- **always_by_pass_cache** (bool, optional)
-  - Default: `False`
-  - When `True`, always fetches fresh content
-  ```python
-  # Always fetch fresh content
-  crawler = AsyncWebCrawler(always_by_pass_cache=True)
-  ```
+### 2.2 Manual Start & Close
 
-- **base_directory** (str, optional)
-  - Default: User's home directory
-  - Base path for cache storage
-  ```python
-  # Custom cache directory
-  crawler = AsyncWebCrawler(base_directory="/path/to/cache")
-  ```
+```python
+crawler = AsyncWebCrawler(config=browser_cfg)
+await crawler.start()
 
-#### Network Settings
+result1 = await crawler.arun("https://example.com")
+result2 = await crawler.arun("https://another.com")
 
-- **proxy** (str, optional)
-  - Simple proxy URL
-  ```python
-  # Using simple proxy
-  crawler = AsyncWebCrawler(proxy="http://proxy.example.com:8080")
-  ```
+await crawler.close()
+```
 
-- **proxy_config** (Dict, optional)
-  - Advanced proxy configuration with authentication
-  ```python
-  # Advanced proxy with auth
-  crawler = AsyncWebCrawler(proxy_config={
-      "server": "http://proxy.example.com:8080",
-      "username": "user",
-      "password": "pass"
-  })
-  ```
+Use this style if you have a **long-running** application or need full control of the crawler’s lifecycle.
 
-#### Browser Behavior
+---
 
-- **sleep_on_close** (bool, optional)
-  - Default: `False`
-  - Adds delay before closing browser
-  ```python
-  # Wait before closing
-  crawler = AsyncWebCrawler(sleep_on_close=True)
-  ```
-
-#### Custom Settings
-
-- **user_agent** (str, optional)
-  - Custom user agent string
-  ```python
-  # Custom user agent
-  crawler = AsyncWebCrawler(
-      user_agent="Mozilla/5.0 (Custom Agent) Chrome/90.0"
-  )
-  ```
-
-- **headers** (Dict[str, str], optional)
-  - Custom HTTP headers
-  ```python
-  # Custom headers
-  crawler = AsyncWebCrawler(
-      headers={
-          "Accept-Language": "en-US",
-          "Custom-Header": "Value"
-      }
-  )
-  ```
-
-- **js_code** (Union[str, List[str]], optional)
-  - Default JavaScript to execute on each page
-  ```python
-  # Default JavaScript
-  crawler = AsyncWebCrawler(
-      js_code=[
-          "window.scrollTo(0, document.body.scrollHeight);",
-          "document.querySelector('.load-more').click();"
-      ]
-  )
-  ```
-
-## Methods
-
-### arun()
-
-The primary method for crawling web pages.
+## 3. Primary Method: `arun()`
 
 ```python
 async def arun(
-    # Required
-    url: str,                              # URL to crawl
-    
-    # Content Selection
-    css_selector: str = None,              # CSS selector for content
-    word_count_threshold: int = 10,        # Minimum words per block
-    
-    # Cache Control
-    bypass_cache: bool = False,            # Bypass cache for this request
-    
-    # Session Management
-    session_id: str = None,                # Session identifier
-    
-    # Screenshot Options
-    screenshot: bool = False,              # Take screenshot
-    screenshot_wait_for: float = None,     # Wait before screenshot
-    
-    # Content Processing
-    process_iframes: bool = False,         # Process iframe content
-    remove_overlay_elements: bool = False, # Remove popups/modals
-    
-    # Anti-Bot Settings
-    simulate_user: bool = False,           # Simulate human behavior
-    override_navigator: bool = False,      # Override navigator properties
-    magic: bool = False,                   # Enable all anti-detection
-    
-    # Content Filtering
-    excluded_tags: List[str] = None,       # HTML tags to exclude
-    exclude_external_links: bool = False,  # Remove external links
-    exclude_social_media_links: bool = False, # Remove social media links
-    
-    # JavaScript Handling
-    js_code: Union[str, List[str]] = None, # JavaScript to execute
-    wait_for: str = None,                  # Wait condition
-    
-    # Page Loading
-    page_timeout: int = 60000,            # Page load timeout (ms)
-    delay_before_return_html: float = None, # Wait before return
-    
-    # Extraction
-    extraction_strategy: ExtractionStrategy = None  # Extraction strategy
+    self,
+    url: str,
+    config: Optional[CrawlerRunConfig] = None,
+    # Legacy parameters for backward compatibility...
 ) -> CrawlResult:
+    ...
 ```
 
-### Usage Examples
+### 3.1 New Approach
 
-#### Basic Crawling
-```python
-async with AsyncWebCrawler() as crawler:
-    result = await crawler.arun(url="https://example.com")
-```
-
-#### Advanced Crawling
-```python
-async with AsyncWebCrawler(
-    browser_type="firefox",
-    verbose=True,
-    headers={"Custom-Header": "Value"}
-) as crawler:
-    result = await crawler.arun(
-        url="https://example.com",
-        css_selector=".main-content",
-        word_count_threshold=20,
-        process_iframes=True,
-        magic=True,
-        wait_for="css:.dynamic-content",
-        screenshot=True
-    )
-```
-
-#### Session Management
-```python
-async with AsyncWebCrawler() as crawler:
-    # First request
-    result1 = await crawler.arun(
-        url="https://example.com/login",
-        session_id="my_session"
-    )
-    
-    # Subsequent request using same session
-    result2 = await crawler.arun(
-        url="https://example.com/protected",
-        session_id="my_session"
-    )
-```
-
-## Context Manager
-
-AsyncWebCrawler implements the async context manager protocol:
+You pass a `CrawlerRunConfig` object that sets up everything about a crawl—content filtering, caching, session reuse, JS code, screenshots, etc.
 
 ```python
-async def __aenter__(self) -> 'AsyncWebCrawler':
-    # Initialize browser and resources
-    return self
+import asyncio
+from crawl4ai import CrawlerRunConfig, CacheMode
 
-async def __aexit__(self, *args):
-    # Cleanup resources
-    pass
-```
-
-Always use AsyncWebCrawler with async context manager:
-```python
-async with AsyncWebCrawler() as crawler:
-    # Your crawling code here
-    pass
-```
-
-## Best Practices
-
-1. **Resource Management**
-```python
-# Always use context manager
-async with AsyncWebCrawler() as crawler:
-    # Crawler will be properly cleaned up
-    pass
-```
-
-2. **Error Handling**
-```python
-try:
-    async with AsyncWebCrawler() as crawler:
-        result = await crawler.arun(url="https://example.com")
-        if not result.success:
-            print(f"Crawl failed: {result.error_message}")
-except Exception as e:
-    print(f"Error: {str(e)}")
-```
-
-3. **Performance Optimization**
-```python
-# Enable caching for better performance
-crawler = AsyncWebCrawler(
-    always_by_pass_cache=False,
-    verbose=True
+run_cfg = CrawlerRunConfig(
+    cache_mode=CacheMode.BYPASS,
+    css_selector="main.article",
+    word_count_threshold=10,
+    screenshot=True
 )
+
+async with AsyncWebCrawler(config=browser_cfg) as crawler:
+    result = await crawler.arun("https://example.com/news", config=run_cfg)
+    print("Crawled HTML length:", len(result.cleaned_html))
+    if result.screenshot:
+        print("Screenshot base64 length:", len(result.screenshot))
 ```
 
-4. **Anti-Detection**
+### 3.2 Legacy Parameters Still Accepted
+
+For **backward** compatibility, `arun()` can still accept direct arguments like `css_selector=...`, `word_count_threshold=...`, etc., but we strongly advise migrating them into a **`CrawlerRunConfig`**.
+
+---
+
+## 4. Helper Methods
+
+### 4.1 `arun_many()`
+
 ```python
-# Maximum stealth
-crawler = AsyncWebCrawler(
-    headless=True,
-    user_agent="Mozilla/5.0...",
-    headers={"Accept-Language": "en-US"}
-)
-result = await crawler.arun(
-    url="https://example.com",
-    magic=True,
-    simulate_user=True
-)
+async def arun_many(
+    self,
+    urls: List[str],
+    config: Optional[CrawlerRunConfig] = None,
+    # Legacy parameters...
+) -> List[CrawlResult]:
+    ...
 ```
 
-## Note on Browser Types
+Crawls multiple URLs in concurrency. Accepts the same style `CrawlerRunConfig`. Example:
 
-Each browser type has its characteristics:
-
-- **chromium**: Best overall compatibility
-- **firefox**: Good for specific use cases
-- **webkit**: Lighter weight, good for basic crawling
-
-Choose based on your specific needs:
 ```python
-# High compatibility
-crawler = AsyncWebCrawler(browser_type="chromium")
+run_cfg = CrawlerRunConfig(
+    # e.g., concurrency, wait_for, caching, extraction, etc.
+    semaphore_count=5
+)
 
-# Memory efficient
-crawler = AsyncWebCrawler(browser_type="webkit")
+async with AsyncWebCrawler(config=browser_cfg) as crawler:
+    results = await crawler.arun_many(
+        urls=["https://example.com", "https://another.com"],
+        config=run_cfg
+    )
+    for r in results:
+        print(r.url, ":", len(r.cleaned_html))
 ```
+
+### 4.2 `start()` & `close()`
+
+Allows manual lifecycle usage instead of context manager:
+
+```python
+crawler = AsyncWebCrawler(config=browser_cfg)
+await crawler.start()
+
+# Perform multiple operations
+resultA = await crawler.arun("https://exampleA.com", config=run_cfg)
+resultB = await crawler.arun("https://exampleB.com", config=run_cfg)
+
+await crawler.close()
+```
+
+---
+
+## 5. `CrawlResult` Output
+
+Each `arun()` returns a **`CrawlResult`** containing:
+
+- `url`: Final URL (if redirected).
+- `html`: Original HTML.
+- `cleaned_html`: Sanitized HTML.
+- `markdown_v2` (or future `markdown`): Markdown outputs (raw, fit, etc.).
+- `extracted_content`: If an extraction strategy was used (JSON for CSS/LLM strategies).
+- `screenshot`, `pdf`: If screenshots/PDF requested.
+- `media`, `links`: Information about discovered images/links.
+- `success`, `error_message`: Status info.
+
+For details, see [CrawlResult doc](./crawl-result.md).
+
+---
+
+## 6. Quick Example
+
+Below is an example hooking it all together:
+
+```python
+import asyncio
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
+from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+import json
+
+async def main():
+    # 1. Browser config
+    browser_cfg = BrowserConfig(
+        browser_type="firefox",
+        headless=False,
+        verbose=True
+    )
+
+    # 2. Run config
+    schema = {
+        "name": "Articles",
+        "baseSelector": "article.post",
+        "fields": [
+            {
+                "name": "title", 
+                "selector": "h2", 
+                "type": "text"
+            },
+            {
+                "name": "url", 
+                "selector": "a", 
+                "type": "attribute", 
+                "attribute": "href"
+            }
+        ]
+    }
+
+    run_cfg = CrawlerRunConfig(
+        cache_mode=CacheMode.BYPASS,
+        extraction_strategy=JsonCssExtractionStrategy(schema),
+        word_count_threshold=15,
+        remove_overlay_elements=True,
+        wait_for="css:.post"  # Wait for posts to appear
+    )
+
+    async with AsyncWebCrawler(config=browser_cfg) as crawler:
+        result = await crawler.arun(
+            url="https://example.com/blog",
+            config=run_cfg
+        )
+
+        if result.success:
+            print("Cleaned HTML length:", len(result.cleaned_html))
+            if result.extracted_content:
+                articles = json.loads(result.extracted_content)
+                print("Extracted articles:", articles[:2])
+        else:
+            print("Error:", result.error_message)
+
+asyncio.run(main())
+```
+
+**Explanation**:
+- We define a **`BrowserConfig`** with Firefox, no headless, and `verbose=True`.  
+- We define a **`CrawlerRunConfig`** that **bypasses cache**, uses a **CSS** extraction schema, has a `word_count_threshold=15`, etc.  
+- We pass them to `AsyncWebCrawler(config=...)` and `arun(url=..., config=...)`.
+
+---
+
+## 7. Best Practices & Migration Notes
+
+1. **Use** `BrowserConfig` for **global** settings about the browser’s environment.  
+2. **Use** `CrawlerRunConfig` for **per-crawl** logic (caching, content filtering, extraction strategies, wait conditions).  
+3. **Avoid** legacy parameters like `css_selector` or `word_count_threshold` directly in `arun()`. Instead:
+
+   ```python
+   run_cfg = CrawlerRunConfig(css_selector=".main-content", word_count_threshold=20)
+   result = await crawler.arun(url="...", config=run_cfg)
+   ```
+
+4. **Context Manager** usage is simplest unless you want a persistent crawler across many calls.
+
+---
+
+## 8. Summary
+
+**AsyncWebCrawler** is your entry point to asynchronous crawling:
+
+- **Constructor** accepts **`BrowserConfig`** (or defaults).  
+- **`arun(url, config=CrawlerRunConfig)`** is the main method for single-page crawls.  
+- **`arun_many(urls, config=CrawlerRunConfig)`** handles concurrency across multiple URLs.  
+- For advanced lifecycle control, use `start()` and `close()` explicitly.  
+
+**Migration**:  
+- If you used `AsyncWebCrawler(browser_type="chromium", css_selector="...")`, move browser settings to `BrowserConfig(...)` and content/crawl logic to `CrawlerRunConfig(...)`.
+
+This modular approach ensures your code is **clean**, **scalable**, and **easy to maintain**. For any advanced or rarely used parameters, see the [BrowserConfig docs](../api/parameters.md).

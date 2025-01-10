@@ -453,12 +453,7 @@ class BrowserManager:
 
         return browser_args
 
-    async def setup_context(
-        self,
-        context: BrowserContext,
-        crawlerRunConfig: CrawlerRunConfig,
-        is_default=False,
-    ):
+    async def setup_context(self, context: BrowserContext, crawlerRunConfig: CrawlerRunConfig = None, is_default=False):
         """
         Set up a browser context with the configured options.
 
@@ -516,16 +511,17 @@ class BrowserManager:
 
         # Add default cookie
         await context.add_cookies(
-            [{"name": "cookiesEnabled", "value": "true", "url": crawlerRunConfig.url}]
+            [{"name": "cookiesEnabled", "value": "true", "url": crawlerRunConfig.url if crawlerRunConfig else "https://crawl4ai.com/"}]
         )
 
         # Handle navigator overrides
-        if (
-            crawlerRunConfig.override_navigator
-            or crawlerRunConfig.simulate_user
-            or crawlerRunConfig.magic
-        ):
-            await context.add_init_script(load_js_script("navigator_overrider"))
+        if crawlerRunConfig:
+            if (
+                crawlerRunConfig.override_navigator
+                or crawlerRunConfig.simulate_user
+                or crawlerRunConfig.magic
+            ):
+                await context.add_init_script(load_js_script("navigator_overrider"))
 
     async def create_browser_context(self):
         """
@@ -1386,6 +1382,10 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 await page.keyboard.press("ArrowDown")
 
             # Handle wait_for condition
+            # Todo: Decide how to handle this
+            if not config.wait_for and config.css_selector and False:
+                config.wait_for = f"css:{config.css_selector}"
+            
             if config.wait_for:
                 try:
                     await self.smart_wait(
@@ -1644,11 +1644,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         Returns:
             str: The base64-encoded screenshot data
         """
-        dimensions = await self.get_page_dimensions(page)
-        page_height = dimensions['height']        
-        if page_height < kwargs.get(
-            "screenshot_height_threshold", SCREENSHOT_HEIGHT_TRESHOLD
-        ):
+        need_scroll = await self.page_need_scroll(page)
+        
+        if not need_scroll:
             # Page is short enough, just take a screenshot
             return await self.take_screenshot_naive(page)
         else:
@@ -2164,3 +2162,30 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 return {width: scrollWidth, height: scrollHeight};
             }
         """)
+    
+    async def page_need_scroll(self, page: Page) -> bool:
+        """
+        Determine whether the page need to scroll
+        
+        Args:
+            page: Playwright page object
+            
+        Returns:
+            bool: True if page needs scrolling
+        """
+        try:
+            need_scroll = await page.evaluate("""
+            () => {
+                const scrollHeight = document.documentElement.scrollHeight;
+                const viewportHeight = window.innerHeight;
+                return scrollHeight > viewportHeight;
+            }
+            """)
+            return need_scroll
+        except Exception as e:
+            self.logger.warning(
+                message="Failed to check scroll need: {error}. Defaulting to True for safety.",
+                tag="SCROLL",
+                params={"error": str(e)}
+            )
+            return True  # Default to scrolling if check fails

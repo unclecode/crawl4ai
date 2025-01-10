@@ -22,7 +22,19 @@ Crawl4AI is the #1 trending GitHub repository, actively maintained by a vibrant 
 
 [✨ Check out latest update v0.4.24x](#-recent-updates)
 
-🎉 **Version 0.4.24x is out!** Major improvements in extraction strategies with enhanced JSON handling, SSL security, and Amazon product extraction. Plus, a completely revamped content filtering system! [Read the release notes →](https://crawl4ai.com/mkdocs/blog)
+🎉 **Version 0.4.24x is out!** Major improvements in extraction strategies with enhanced JSON handling, SSL security, and Amazon product extraction. Plus, a completely revamped content filtering system! [Read the release notes →](https://docs.crawl4ai.com/blog)
+
+<details>
+<summary>🤓 <strong>My Personal Story</strong></summary>
+
+My journey with computers started in childhood when my dad, a computer scientist, introduced me to an Amstrad computer. Those early days sparked a fascination with technology, leading me to pursue computer science and specialize in NLP during my postgraduate studies. It was during this time that I first delved into web crawling, building tools to help researchers organize papers and extract information from publications a challenging yet rewarding experience that honed my skills in data extraction.
+
+Fast forward to 2023, I was working on a tool for a project and needed a crawler to convert a webpage into markdown. While exploring solutions, I found one that claimed to be open-source but required creating an account and generating an API token. Worse, it turned out to be a SaaS model charging $16, and its quality didn’t meet my standards. Frustrated, I realized this was a deeper problem. That frustration turned into turbo anger mode, and I decided to build my own solution. In just a few days, I created Crawl4AI. To my surprise, it went viral, earning thousands of GitHub stars and resonating with a global community.
+
+I made Crawl4AI open-source for two reasons. First, it’s my way of giving back to the open-source community that has supported me throughout my career. Second, I believe data should be accessible to everyone, not locked behind paywalls or monopolized by a few. Open access to data lays the foundation for the democratization of AI—a vision where individuals can train their own models and take ownership of their information. This library is the first step in a larger journey to create the best open-source data extraction and generation tool the world has ever seen, built collaboratively by a passionate community.
+
+Thank you to everyone who has supported this project, used it, and shared feedback. Your encouragement motivates me to dream even bigger. Join us, file issues, submit PRs, or spread the word. Together, we can build a tool that truly empowers people to access their own data and reshape the future of AI.
+</details>
 
 ## 🧐 Why Crawl4AI?
 
@@ -148,7 +160,7 @@ if __name__ == "__main__":
 
 ✨ Play around with this [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1SgRPrByQLzjRfwoRNq1wSGE9nYY_EE8C?usp=sharing)
 
-✨ Visit our [Documentation Website](https://crawl4ai.com/mkdocs/)
+✨ Visit our [Documentation Website](https://docs.crawl4ai.com/)
 
 ## Installation 🛠️
 
@@ -264,7 +276,7 @@ task_id = response.json()["task_id"]
 result = requests.get(f"http://localhost:11235/task/{task_id}")
 ```
 
-For more examples, see our [Docker Examples](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/docker_example.py). For advanced configuration, environment variables, and usage examples, see our [Docker Deployment Guide](https://crawl4ai.com/mkdocs/basic/docker-deployment/).
+For more examples, see our [Docker Examples](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/docker_example.py). For advanced configuration, environment variables, and usage examples, see our [Docker Deployment Guide](https://docs.crawl4ai.com/basic/docker-deployment/).
 
 </details>
 
@@ -486,7 +498,7 @@ Read the full details of this release in our [0.4.24 Release Notes](https://gith
 
 > 🚨 **Documentation Update Alert**: We're undertaking a major documentation overhaul next week to reflect recent updates and improvements. Stay tuned for a more comprehensive and up-to-date guide!
 
-For current documentation, including installation instructions, advanced features, and API reference, visit our [Documentation Website](https://crawl4ai.com/mkdocs/).
+For current documentation, including installation instructions, advanced features, and API reference, visit our [Documentation Website](https://docs.crawl4ai.com/).
 
 To check our development plans and upcoming features, visit our [Roadmap](https://github.com/unclecode/crawl4ai/blob/main/ROADMAP.md).
 
