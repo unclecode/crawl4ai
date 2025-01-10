@@ -36,7 +36,7 @@ async def main():
             'domain': '.example.com',
             'path': '/'
         }])
-        await page.set_viewport_size({"width": 1920, "height": 1080})
+        await page.set_viewport_size({"width": 1080, "height": 800})
         return page
 
     async def on_user_agent_updated(page: Page, context: BrowserContext, user_agent: str, **kwargs):

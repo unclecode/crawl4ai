@@ -74,280 +74,7 @@ class NoExtractionStrategy(ExtractionStrategy):
     def run(self, url: str, sections: List[str], *q, **kwargs) -> List[Dict[str, Any]]:
         return [{"index": i, "tags": [], "content": section} for i, section in enumerate(sections)]
 
-#######################################################
-# Strategies using LLM-based extraction for text data #
-#######################################################
-class LLMExtractionStrategy(ExtractionStrategy):
-    """
-    A strategy that uses an LLM to extract meaningful content from the HTML.
-    
-    Attributes:
-        provider: The provider to use for extraction. It follows the format <provider_name>/<model_name>, e.g., "ollama/llama3.3".
-        api_token: The API token for the provider.
-        instruction: The instruction to use for the LLM model.  
-        schema: Pydantic model schema for structured data.
-        extraction_type: "block" or "schema".
-        chunk_token_threshold: Maximum tokens per chunk.
-        overlap_rate: Overlap between chunks.
-        word_token_rate: Word to token conversion rate.
-        apply_chunking: Whether to apply chunking.
-        base_url: The base URL for the API request.
-        api_base: The base URL for the API request.
-        extra_args: Additional arguments for the API request, such as temprature, max_tokens, etc.
-        verbose: Whether to print verbose output.
-        usages: List of individual token usages.
-        total_usage: Accumulated token usage.
-    """
 
-    def __init__(self, 
-                 provider: str = DEFAULT_PROVIDER, api_token: Optional[str] = None, 
-                 instruction:str = None, schema:Dict = None, extraction_type = "block", **kwargs):
-        """
-        Initialize the strategy with clustering parameters.
-        
-        Args:
-            provider: The provider to use for extraction. It follows the format <provider_name>/<model_name>, e.g., "ollama/llama3.3".
-            api_token: The API token for the provider.
-            instruction: The instruction to use for the LLM model.  
-            schema: Pydantic model schema for structured data.
-            extraction_type: "block" or "schema".
-            chunk_token_threshold: Maximum tokens per chunk.
-            overlap_rate: Overlap between chunks.
-            word_token_rate: Word to token conversion rate.
-            apply_chunking: Whether to apply chunking.
-            base_url: The base URL for the API request.
-            api_base: The base URL for the API request.
-            extra_args: Additional arguments for the API request, such as temprature, max_tokens, etc.
-            verbose: Whether to print verbose output.
-            usages: List of individual token usages.
-            total_usage: Accumulated token usage.   
-
-        """
-        super().__init__(**kwargs)
-        self.provider = provider
-        self.api_token = api_token or PROVIDER_MODELS.get(provider, "no-token") or os.getenv("OPENAI_API_KEY")
-        self.instruction = instruction
-        self.extract_type = extraction_type
-        self.schema = schema
-        if schema:
-            self.extract_type = "schema"
-        
-        self.chunk_token_threshold = kwargs.get("chunk_token_threshold", CHUNK_TOKEN_THRESHOLD)
-        self.overlap_rate = kwargs.get("overlap_rate", OVERLAP_RATE)
-        self.word_token_rate = kwargs.get("word_token_rate", WORD_TOKEN_RATE)
-        self.apply_chunking = kwargs.get("apply_chunking", True)
-        self.base_url = kwargs.get("base_url", None)
-        self.api_base = kwargs.get("api_base", kwargs.get("base_url", None))
-        self.extra_args = kwargs.get("extra_args", {})
-        if not self.apply_chunking:
-            self.chunk_token_threshold = 1e9
-        
-        self.verbose = kwargs.get("verbose", False)
-        self.usages = []  # Store individual usages
-        self.total_usage = TokenUsage()  # Accumulated usage        
-        
-        if not self.api_token:
-            raise ValueError("API token must be provided for LLMExtractionStrategy. Update the config.py or set OPENAI_API_KEY environment variable.")
-        
-            
-    def extract(self, url: str, ix:int, html: str) -> List[Dict[str, Any]]:
-        """
-        Extract meaningful blocks or chunks from the given HTML using an LLM.
-        
-        How it works:
-        1. Construct a prompt with variables.
-        2. Make a request to the LLM using the prompt.
-        3. Parse the response and extract blocks or chunks.
-        
-        Args:
-            url: The URL of the webpage.
-            ix: Index of the block.
-            html: The HTML content of the webpage.
-            
-        Returns:
-            A list of extracted blocks or chunks.
-        """
-        if self.verbose:
-            # print("[LOG] Extracting blocks from URL:", url)
-            print(f"[LOG] Call LLM for {url} - block index: {ix}")
-
-        variable_values = {
-            "URL": url,
-            "HTML": escape_json_string(sanitize_html(html)),
-        }
-        
-        prompt_with_variables = PROMPT_EXTRACT_BLOCKS
-        if self.instruction:
-            variable_values["REQUEST"] = self.instruction
-            prompt_with_variables = PROMPT_EXTRACT_BLOCKS_WITH_INSTRUCTION
-            
-        if self.extract_type == "schema" and self.schema:
-            variable_values["SCHEMA"] = json.dumps(self.schema, indent=2)
-            prompt_with_variables = PROMPT_EXTRACT_SCHEMA_WITH_INSTRUCTION
-
-        for variable in variable_values:
-            prompt_with_variables = prompt_with_variables.replace(
-                "{" + variable + "}", variable_values[variable]
-            )
-        
-        response = perform_completion_with_backoff(
-            self.provider, 
-            prompt_with_variables, 
-            self.api_token, 
-            base_url=self.api_base or self.base_url,
-            extra_args = self.extra_args
-            ) # , json_response=self.extract_type == "schema")
-        # Track usage
-        usage = TokenUsage(
-            completion_tokens=response.usage.completion_tokens,
-            prompt_tokens=response.usage.prompt_tokens,
-            total_tokens=response.usage.total_tokens,
-            completion_tokens_details=response.usage.completion_tokens_details.__dict__ if response.usage.completion_tokens_details else {},
-            prompt_tokens_details=response.usage.prompt_tokens_details.__dict__ if response.usage.prompt_tokens_details else {}
-        )
-        self.usages.append(usage)
-        
-        # Update totals
-        self.total_usage.completion_tokens += usage.completion_tokens
-        self.total_usage.prompt_tokens += usage.prompt_tokens 
-        self.total_usage.total_tokens += usage.total_tokens
-        
-        try:
-            blocks = extract_xml_data(["blocks"], response.choices[0].message.content)['blocks']
-            blocks = json.loads(blocks)
-            for block in blocks:
-                block['error'] = False
-        except Exception as e:
-            parsed, unparsed = split_and_parse_json_objects(response.choices[0].message.content)
-            blocks = parsed
-            if unparsed:
-                blocks.append({
-                    "index": 0,
-                    "error": True,
-                    "tags": ["error"],
-                    "content": unparsed
-                })
-        
-        if self.verbose:
-            print("[LOG] Extracted", len(blocks), "blocks from URL:", url, "block index:", ix)
-        return blocks
-    
-    def _merge(self, documents, chunk_token_threshold, overlap):
-        """
-        Merge documents into sections based on chunk_token_threshold and overlap.
-        """
-        chunks = []
-        sections = []
-        total_tokens = 0
-
-        # Calculate the total tokens across all documents
-        for document in documents:
-            total_tokens += len(document.split(' ')) * self.word_token_rate
-
-        # Calculate the number of sections needed
-        num_sections = math.floor(total_tokens / chunk_token_threshold)
-        if num_sections < 1:
-            num_sections = 1  # Ensure there is at least one section
-        adjusted_chunk_threshold = total_tokens / num_sections
-
-        total_token_so_far = 0
-        current_chunk = []
-
-        for document in documents:
-            tokens = document.split(' ')
-            token_count = len(tokens) * self.word_token_rate
-            
-            if total_token_so_far + token_count <= adjusted_chunk_threshold:
-                current_chunk.extend(tokens)
-                total_token_so_far += token_count
-            else:
-                # Ensure to handle the last section properly
-                if len(sections) == num_sections - 1:
-                    current_chunk.extend(tokens)
-                    continue
-                
-                # Add overlap if specified
-                if overlap > 0 and current_chunk:
-                    overlap_tokens = current_chunk[-overlap:]
-                    current_chunk.extend(overlap_tokens)
-                
-                sections.append(' '.join(current_chunk))
-                current_chunk = tokens
-                total_token_so_far = token_count
-
-        # Add the last chunk
-        if current_chunk:
-            sections.append(' '.join(current_chunk))
-
-        return sections
-
-
-    def run(self, url: str, sections: List[str]) -> List[Dict[str, Any]]:
-        """
-        Process sections sequentially with a delay for rate limiting issues, specifically for LLMExtractionStrategy.
-        
-        Args:
-            url: The URL of the webpage.
-            sections: List of sections (strings) to process.
-            
-        Returns:
-            A list of extracted blocks or chunks.
-        """
-        
-        merged_sections = self._merge(
-            sections, self.chunk_token_threshold,
-            overlap= int(self.chunk_token_threshold * self.overlap_rate)
-        )
-        extracted_content = []
-        if self.provider.startswith("groq/"):
-            # Sequential processing with a delay
-            for ix, section in enumerate(merged_sections):
-                extract_func = partial(self.extract, url)
-                extracted_content.extend(extract_func(ix, sanitize_input_encode(section)))
-                time.sleep(0.5)  # 500 ms delay between each processing
-        else:
-            # Parallel processing using ThreadPoolExecutor
-            # extract_func = partial(self.extract, url)
-            # for ix, section in enumerate(merged_sections):
-            #     extracted_content.append(extract_func(ix, section))            
-            
-            with ThreadPoolExecutor(max_workers=4) as executor:
-                extract_func = partial(self.extract, url)
-                futures = [executor.submit(extract_func, ix, sanitize_input_encode(section)) for ix, section in enumerate(merged_sections)]
-                
-                for future in as_completed(futures):
-                    try:
-                        extracted_content.extend(future.result())
-                    except Exception as e:
-                        if self.verbose:
-                            print(f"Error in thread execution: {e}")
-                        # Add error information to extracted_content
-                        extracted_content.append({
-                            "index": 0,
-                            "error": True,
-                            "tags": ["error"],
-                            "content": str(e)
-                        })
-
-        
-        return extracted_content        
-    
-    
-    def show_usage(self) -> None:
-        """Print a detailed token usage report showing total and per-request usage."""
-        print("\n=== Token Usage Summary ===")
-        print(f"{'Type':<15} {'Count':>12}")
-        print("-" * 30)
-        print(f"{'Completion':<15} {self.total_usage.completion_tokens:>12,}")
-        print(f"{'Prompt':<15} {self.total_usage.prompt_tokens:>12,}")
-        print(f"{'Total':<15} {self.total_usage.total_tokens:>12,}")
-
-        print("\n=== Usage History ===")
-        print(f"{'Request #':<10} {'Completion':>12} {'Prompt':>12} {'Total':>12}")
-        print("-" * 48)
-        for i, usage in enumerate(self.usages, 1):
-            print(f"{i:<10} {usage.completion_tokens:>12,} {usage.prompt_tokens:>12,} {usage.total_tokens:>12,}")
-  
 #######################################################
 # Strategies using clustering for text data extraction #
 #######################################################
@@ -664,6 +391,284 @@ class CosineStrategy(ExtractionStrategy):
         # This strategy processes all sections together
         
         return self.extract(url, self.DEL.join(sections), **kwargs)
+
+
+
+#######################################################
+# Strategies using LLM-based extraction for text data #
+#######################################################
+class LLMExtractionStrategy(ExtractionStrategy):
+    """
+    A strategy that uses an LLM to extract meaningful content from the HTML.
+    
+    Attributes:
+        provider: The provider to use for extraction. It follows the format <provider_name>/<model_name>, e.g., "ollama/llama3.3".
+        api_token: The API token for the provider.
+        instruction: The instruction to use for the LLM model.  
+        schema: Pydantic model schema for structured data.
+        extraction_type: "block" or "schema".
+        chunk_token_threshold: Maximum tokens per chunk.
+        overlap_rate: Overlap between chunks.
+        word_token_rate: Word to token conversion rate.
+        apply_chunking: Whether to apply chunking.
+        base_url: The base URL for the API request.
+        api_base: The base URL for the API request.
+        extra_args: Additional arguments for the API request, such as temprature, max_tokens, etc.
+        verbose: Whether to print verbose output.
+        usages: List of individual token usages.
+        total_usage: Accumulated token usage.
+    """
+
+    def __init__(self, 
+                 provider: str = DEFAULT_PROVIDER, api_token: Optional[str] = None, 
+                 instruction:str = None, schema:Dict = None, extraction_type = "block", **kwargs):
+        """
+        Initialize the strategy with clustering parameters.
+        
+        Args:
+            provider: The provider to use for extraction. It follows the format <provider_name>/<model_name>, e.g., "ollama/llama3.3".
+            api_token: The API token for the provider.
+            instruction: The instruction to use for the LLM model.  
+            schema: Pydantic model schema for structured data.
+            extraction_type: "block" or "schema".
+            chunk_token_threshold: Maximum tokens per chunk.
+            overlap_rate: Overlap between chunks.
+            word_token_rate: Word to token conversion rate.
+            apply_chunking: Whether to apply chunking.
+            base_url: The base URL for the API request.
+            api_base: The base URL for the API request.
+            extra_args: Additional arguments for the API request, such as temprature, max_tokens, etc.
+            verbose: Whether to print verbose output.
+            usages: List of individual token usages.
+            total_usage: Accumulated token usage.   
+
+        """
+        super().__init__(**kwargs)
+        self.provider = provider
+        self.api_token = api_token or PROVIDER_MODELS.get(provider, "no-token") or os.getenv("OPENAI_API_KEY")
+        self.instruction = instruction
+        self.extract_type = extraction_type
+        self.schema = schema
+        if schema:
+            self.extract_type = "schema"
+        
+        self.chunk_token_threshold = kwargs.get("chunk_token_threshold", CHUNK_TOKEN_THRESHOLD)
+        self.overlap_rate = kwargs.get("overlap_rate", OVERLAP_RATE)
+        self.word_token_rate = kwargs.get("word_token_rate", WORD_TOKEN_RATE)
+        self.apply_chunking = kwargs.get("apply_chunking", True)
+        self.base_url = kwargs.get("base_url", None)
+        self.api_base = kwargs.get("api_base", kwargs.get("base_url", None))
+        self.extra_args = kwargs.get("extra_args", {})
+        if not self.apply_chunking:
+            self.chunk_token_threshold = 1e9
+        
+        self.verbose = kwargs.get("verbose", False)
+        self.usages = []  # Store individual usages
+        self.total_usage = TokenUsage()  # Accumulated usage        
+        
+        if not self.api_token:
+            raise ValueError("API token must be provided for LLMExtractionStrategy. Update the config.py or set OPENAI_API_KEY environment variable.")
+        
+            
+    def extract(self, url: str, ix:int, html: str) -> List[Dict[str, Any]]:
+        """
+        Extract meaningful blocks or chunks from the given HTML using an LLM.
+        
+        How it works:
+        1. Construct a prompt with variables.
+        2. Make a request to the LLM using the prompt.
+        3. Parse the response and extract blocks or chunks.
+        
+        Args:
+            url: The URL of the webpage.
+            ix: Index of the block.
+            html: The HTML content of the webpage.
+            
+        Returns:
+            A list of extracted blocks or chunks.
+        """
+        if self.verbose:
+            # print("[LOG] Extracting blocks from URL:", url)
+            print(f"[LOG] Call LLM for {url} - block index: {ix}")
+
+        variable_values = {
+            "URL": url,
+            "HTML": escape_json_string(sanitize_html(html)),
+        }
+        
+        prompt_with_variables = PROMPT_EXTRACT_BLOCKS
+        if self.instruction:
+            variable_values["REQUEST"] = self.instruction
+            prompt_with_variables = PROMPT_EXTRACT_BLOCKS_WITH_INSTRUCTION
+            
+        if self.extract_type == "schema" and self.schema:
+            variable_values["SCHEMA"] = json.dumps(self.schema, indent=2)
+            prompt_with_variables = PROMPT_EXTRACT_SCHEMA_WITH_INSTRUCTION
+
+        for variable in variable_values:
+            prompt_with_variables = prompt_with_variables.replace(
+                "{" + variable + "}", variable_values[variable]
+            )
+        
+        response = perform_completion_with_backoff(
+            self.provider, 
+            prompt_with_variables, 
+            self.api_token, 
+            base_url=self.api_base or self.base_url,
+            extra_args = self.extra_args
+            ) # , json_response=self.extract_type == "schema")
+        # Track usage
+        usage = TokenUsage(
+            completion_tokens=response.usage.completion_tokens,
+            prompt_tokens=response.usage.prompt_tokens,
+            total_tokens=response.usage.total_tokens,
+            completion_tokens_details=response.usage.completion_tokens_details.__dict__ if response.usage.completion_tokens_details else {},
+            prompt_tokens_details=response.usage.prompt_tokens_details.__dict__ if response.usage.prompt_tokens_details else {}
+        )
+        self.usages.append(usage)
+        
+        # Update totals
+        self.total_usage.completion_tokens += usage.completion_tokens
+        self.total_usage.prompt_tokens += usage.prompt_tokens 
+        self.total_usage.total_tokens += usage.total_tokens
+        
+        try:
+            blocks = extract_xml_data(["blocks"], response.choices[0].message.content)['blocks']
+            blocks = json.loads(blocks)
+            for block in blocks:
+                block['error'] = False
+        except Exception as e:
+            parsed, unparsed = split_and_parse_json_objects(response.choices[0].message.content)
+            blocks = parsed
+            if unparsed:
+                blocks.append({
+                    "index": 0,
+                    "error": True,
+                    "tags": ["error"],
+                    "content": unparsed
+                })
+        
+        if self.verbose:
+            print("[LOG] Extracted", len(blocks), "blocks from URL:", url, "block index:", ix)
+        return blocks
+    
+    def _merge(self, documents, chunk_token_threshold, overlap):
+        """
+        Merge documents into sections based on chunk_token_threshold and overlap.
+        """
+        chunks = []
+        sections = []
+        total_tokens = 0
+
+        # Calculate the total tokens across all documents
+        for document in documents:
+            total_tokens += len(document.split(' ')) * self.word_token_rate
+
+        # Calculate the number of sections needed
+        num_sections = math.floor(total_tokens / chunk_token_threshold)
+        if num_sections < 1:
+            num_sections = 1  # Ensure there is at least one section
+        adjusted_chunk_threshold = total_tokens / num_sections
+
+        total_token_so_far = 0
+        current_chunk = []
+
+        for document in documents:
+            tokens = document.split(' ')
+            token_count = len(tokens) * self.word_token_rate
+            
+            if total_token_so_far + token_count <= adjusted_chunk_threshold:
+                current_chunk.extend(tokens)
+                total_token_so_far += token_count
+            else:
+                # Ensure to handle the last section properly
+                if len(sections) == num_sections - 1:
+                    current_chunk.extend(tokens)
+                    continue
+                
+                # Add overlap if specified
+                if overlap > 0 and current_chunk:
+                    overlap_tokens = current_chunk[-overlap:]
+                    current_chunk.extend(overlap_tokens)
+                
+                sections.append(' '.join(current_chunk))
+                current_chunk = tokens
+                total_token_so_far = token_count
+
+        # Add the last chunk
+        if current_chunk:
+            sections.append(' '.join(current_chunk))
+
+        return sections
+
+
+    def run(self, url: str, sections: List[str]) -> List[Dict[str, Any]]:
+        """
+        Process sections sequentially with a delay for rate limiting issues, specifically for LLMExtractionStrategy.
+        
+        Args:
+            url: The URL of the webpage.
+            sections: List of sections (strings) to process.
+            
+        Returns:
+            A list of extracted blocks or chunks.
+        """
+        
+        merged_sections = self._merge(
+            sections, self.chunk_token_threshold,
+            overlap= int(self.chunk_token_threshold * self.overlap_rate)
+        )
+        extracted_content = []
+        if self.provider.startswith("groq/"):
+            # Sequential processing with a delay
+            for ix, section in enumerate(merged_sections):
+                extract_func = partial(self.extract, url)
+                extracted_content.extend(extract_func(ix, sanitize_input_encode(section)))
+                time.sleep(0.5)  # 500 ms delay between each processing
+        else:
+            # Parallel processing using ThreadPoolExecutor
+            # extract_func = partial(self.extract, url)
+            # for ix, section in enumerate(merged_sections):
+            #     extracted_content.append(extract_func(ix, section))            
+            
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                extract_func = partial(self.extract, url)
+                futures = [executor.submit(extract_func, ix, sanitize_input_encode(section)) for ix, section in enumerate(merged_sections)]
+                
+                for future in as_completed(futures):
+                    try:
+                        extracted_content.extend(future.result())
+                    except Exception as e:
+                        if self.verbose:
+                            print(f"Error in thread execution: {e}")
+                        # Add error information to extracted_content
+                        extracted_content.append({
+                            "index": 0,
+                            "error": True,
+                            "tags": ["error"],
+                            "content": str(e)
+                        })
+
+        
+        return extracted_content        
+    
+    
+    def show_usage(self) -> None:
+        """Print a detailed token usage report showing total and per-request usage."""
+        print("\n=== Token Usage Summary ===")
+        print(f"{'Type':<15} {'Count':>12}")
+        print("-" * 30)
+        print(f"{'Completion':<15} {self.total_usage.completion_tokens:>12,}")
+        print(f"{'Prompt':<15} {self.total_usage.prompt_tokens:>12,}")
+        print(f"{'Total':<15} {self.total_usage.total_tokens:>12,}")
+
+        print("\n=== Usage History ===")
+        print(f"{'Request #':<10} {'Completion':>12} {'Prompt':>12} {'Total':>12}")
+        print("-" * 48)
+        for i, usage in enumerate(self.usages, 1):
+            print(f"{i:<10} {usage.completion_tokens:>12,} {usage.prompt_tokens:>12,} {usage.total_tokens:>12,}")
+
+
     
 #######################################################
 # New extraction strategies for JSON-based extraction #
@@ -974,8 +979,9 @@ class JsonCssExtractionStrategy(JsonElementExtractionStrategy):
         return parsed_html.select(selector)
 
     def _get_elements(self, element, selector: str):
-        selected = element.select_one(selector)
-        return [selected] if selected else []
+        # Return all matching elements using select() instead of select_one()
+        # This ensures that we get all elements that match the selector, not just the first one
+        return element.select(selector)
 
     def _get_element_text(self, element) -> str:
         return element.get_text(strip=True)
@@ -1049,4 +1055,3 @@ class JsonXPathExtractionStrategy(JsonElementExtractionStrategy):
 
     def _get_element_attribute(self, element, attribute: str):
         return element.get(attribute)
- 
