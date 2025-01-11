@@ -130,51 +130,88 @@ For **backward** compatibility, `arun()` can still accept direct arguments like 
 
 ---
 
-## 4. Helper Methods
-
-### 4.1 `arun_many()`
+## 4. Batch Processing: `arun_many()`
 
 ```python
 async def arun_many(
     self,
     urls: List[str],
     config: Optional[CrawlerRunConfig] = None,
-    # Legacy parameters...
+    # Legacy parameters maintained for backwards compatibility...
 ) -> List[CrawlResult]:
-    ...
+    """
+    Process multiple URLs with intelligent rate limiting and resource monitoring.
+    """
 ```
 
-Crawls multiple URLs in concurrency. Accepts the same style `CrawlerRunConfig`. Example:
+### 4.1 Resource-Aware Crawling
+
+The `arun_many()` method now uses an intelligent dispatcher that:
+- Monitors system memory usage
+- Implements adaptive rate limiting
+- Provides detailed progress monitoring
+- Manages concurrent crawls efficiently
+
+### 4.2 Example Usage
 
 ```python
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, RateLimitConfig
+from crawl4ai.dispatcher import DisplayMode
+
+# Configure browser
+browser_cfg = BrowserConfig(headless=True)
+
+# Configure crawler with rate limiting
 run_cfg = CrawlerRunConfig(
-    # e.g., concurrency, wait_for, caching, extraction, etc.
-    semaphore_count=5
+    # Enable rate limiting
+    enable_rate_limiting=True,
+    rate_limit_config=RateLimitConfig(
+        base_delay=(1.0, 2.0),  # Random delay between 1-2 seconds
+        max_delay=30.0,         # Maximum delay after rate limit hits
+        max_retries=2,          # Number of retries before giving up
+        rate_limit_codes=[429, 503]  # Status codes that trigger rate limiting
+    ),
+    # Resource monitoring
+    memory_threshold_percent=70.0,  # Pause if memory exceeds this
+    check_interval=0.5,            # How often to check resources
+    max_session_permit=3,          # Maximum concurrent crawls
+    display_mode=DisplayMode.DETAILED.value  # Show detailed progress
 )
 
+urls = [
+    "https://example.com/page1",
+    "https://example.com/page2",
+    "https://example.com/page3"
+]
+
 async with AsyncWebCrawler(config=browser_cfg) as crawler:
-    results = await crawler.arun_many(
-        urls=["https://example.com", "https://another.com"],
-        config=run_cfg
-    )
-    for r in results:
-        print(r.url, ":", len(r.cleaned_html))
+    results = await crawler.arun_many(urls, config=run_cfg)
+    for result in results:
+        print(f"URL: {result.url}, Success: {result.success}")
 ```
 
-### 4.2 `start()` & `close()`
+### 4.3 Key Features
 
-Allows manual lifecycle usage instead of context manager:
+1. **Rate Limiting**
+   - Automatic delay between requests
+   - Exponential backoff on rate limit detection
+   - Domain-specific rate limiting
+   - Configurable retry strategy
 
-```python
-crawler = AsyncWebCrawler(config=browser_cfg)
-await crawler.start()
+2. **Resource Monitoring**
+   - Memory usage tracking
+   - Adaptive concurrency based on system load
+   - Automatic pausing when resources are constrained
 
-# Perform multiple operations
-resultA = await crawler.arun("https://exampleA.com", config=run_cfg)
-resultB = await crawler.arun("https://exampleB.com", config=run_cfg)
+3. **Progress Monitoring**
+   - Detailed or aggregated progress display
+   - Real-time status updates
+   - Memory usage statistics
 
-await crawler.close()
-```
+4. **Error Handling**
+   - Graceful handling of rate limits
+   - Automatic retries with backoff
+   - Detailed error reporting
 
 ---
 

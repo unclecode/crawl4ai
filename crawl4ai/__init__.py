@@ -6,7 +6,8 @@ from .extraction_strategy import ExtractionStrategy, LLMExtractionStrategy, Cosi
 from .chunking_strategy import ChunkingStrategy, RegexChunking
 from .markdown_generation_strategy import DefaultMarkdownGenerator
 from .content_filter_strategy import PruningContentFilter, BM25ContentFilter
-from .models import CrawlResult
+from .models import CrawlResult, MarkdownGenerationResult
+from .async_dispatcher import MemoryAdaptiveDispatcher, SemaphoreDispatcher, RateLimiter, CrawlerMonitor, DisplayMode
 from .__version__ import __version__
 
 __all__ = [
@@ -24,6 +25,12 @@ __all__ = [
     'DefaultMarkdownGenerator',
     'PruningContentFilter',
     'BM25ContentFilter',
+    'MemoryAdaptiveDispatcher',
+    'SemaphoreDispatcher',
+    'RateLimiter',
+    'CrawlerMonitor',
+    'DisplayMode',
+    'MarkdownGenerationResult',
 ]
 
 def is_sync_version_installed():

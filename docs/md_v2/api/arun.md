@@ -1,7 +1,3 @@
-Below is a **revised parameter guide** for **`arun()`** in **AsyncWebCrawler**, reflecting the **new** approach where all parameters are passed via a **`CrawlerRunConfig`** instead of directly to `arun()`. Each section includes example usage in the new style, ensuring a clear, modern approach.
-
----
-
 # `arun()` Parameter Guide (New Approach)
 
 In Crawl4AI’s **latest** configuration model, nearly all parameters that once went directly to `arun()` are now part of **`CrawlerRunConfig`**. When calling `arun()`, you provide:

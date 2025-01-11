@@ -116,6 +116,12 @@ class CrawlerRunConfig:
         wait_for=None,
         screenshot=False,
         pdf=False,
+        enable_rate_limiting=False,
+        rate_limit_config=None,
+        memory_threshold_percent=70.0,
+        check_interval=1.0,
+        max_session_permit=20,
+        display_mode=None,
         verbose=True,
         # ... other advanced parameters omitted
     ):
@@ -156,6 +162,58 @@ class CrawlerRunConfig:
    - Logs additional runtime details.  
    - Overlaps with the browser’s verbosity if also set to `True` in `BrowserConfig`.
 
+9. **`enable_rate_limiting`**:  
+   - If `True`, enables rate limiting for batch processing.  
+   - Requires `rate_limit_config` to be set.
+
+10. **`rate_limit_config`**:  
+    - A `RateLimitConfig` object controlling rate limiting behavior.  
+    - See below for details.
+
+11. **`memory_threshold_percent`**:  
+    - The memory threshold (as a percentage) to monitor.  
+    - If exceeded, the crawler will pause or slow down.
+
+12. **`check_interval`**:  
+    - The interval (in seconds) to check system resources.  
+    - Affects how often memory and CPU usage are monitored.
+
+13. **`max_session_permit`**:  
+    - The maximum number of concurrent crawl sessions.  
+    - Helps prevent overwhelming the system.
+
+14. **`display_mode`**:  
+    - The display mode for progress information (`DETAILED`, `BRIEF`, etc.).  
+    - Affects how much information is printed during the crawl.
+
+### Rate Limiting & Resource Management
+
+For batch processing with `arun_many()`, you can enable intelligent rate limiting:
+
+```python
+from crawl4ai import RateLimitConfig
+    
+config = CrawlerRunConfig(
+    enable_rate_limiting=True,
+    rate_limit_config=RateLimitConfig(
+        base_delay=(1.0, 3.0),    # Random delay range
+        max_delay=60.0,           # Max delay after rate limits
+        max_retries=3,            # Retries before giving up
+        rate_limit_codes=[429, 503]  # Status codes to watch
+    ),
+    memory_threshold_percent=70.0,  # Memory threshold
+    check_interval=1.0,            # Resource check interval
+    max_session_permit=20,         # Max concurrent crawls
+    display_mode="DETAILED"        # Progress display mode
+)
+```
+
+This configuration:
+- Implements intelligent rate limiting per domain
+- Monitors system resources
+- Provides detailed progress information
+- Manages concurrent crawls efficiently
+
 **Minimal Example**:
 
 ```python
@@ -164,7 +222,14 @@ from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
 crawl_conf = CrawlerRunConfig(
     js_code="document.querySelector('button#loadMore')?.click()",
     wait_for="css:.loaded-content",
-    screenshot=True
+    screenshot=True,
+    enable_rate_limiting=True,
+    rate_limit_config=RateLimitConfig(
+        base_delay=(1.0, 3.0),
+        max_delay=60.0,
+        max_retries=3,
+        rate_limit_codes=[429, 503]
+    )
 )
 
 async with AsyncWebCrawler() as crawler:
@@ -205,7 +270,14 @@ async def main():
     # 3) Crawler run config: skip cache, use extraction
     run_conf = CrawlerRunConfig(
         extraction_strategy=extraction,
-        cache_mode=CacheMode.BYPASS
+        cache_mode=CacheMode.BYPASS,
+        enable_rate_limiting=True,
+        rate_limit_config=RateLimitConfig(
+            base_delay=(1.0, 3.0),
+            max_delay=60.0,
+            max_retries=3,
+            rate_limit_codes=[429, 503]
+        )
     )
 
     async with AsyncWebCrawler(config=browser_conf) as crawler:

@@ -1,7 +1,3 @@
-Below is the **revised Quickstart** guide with the **Installation** section removed, plus an updated **dynamic content** crawl example that uses `BrowserConfig` and `CrawlerRunConfig` (instead of passing parameters directly to `arun()`). Everything else remains as before.
-
----
-
 # Getting Started with Crawl4AI
 
 Welcome to **Crawl4AI**, an open-source LLM-friendly Web Crawler & Scraper. In this tutorial, you’ll:
@@ -254,7 +250,39 @@ if __name__ == "__main__":
 
 ---
 
-## 7. Dynamic Content Example
+## 7. Multi-URL Concurrency (Preview)
+
+If you need to crawl multiple URLs in **parallel**, you can use `arun_many()`. By default, Crawl4AI employs a **MemoryAdaptiveDispatcher**, automatically adjusting concurrency based on system resources. Here’s a quick glimpse:
+
+```python
+import asyncio
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
+
+async def quick_parallel_example():
+    urls = [
+        "https://example.com/page1",
+        "https://example.com/page2",
+        "https://example.com/page3"
+    ]
+    
+    run_conf = CrawlerRunConfig(cache_mode=CacheMode.BYPASS)
+
+    async with AsyncWebCrawler() as crawler:
+        results = await crawler.arun_many(urls, config=run_conf)
+        for res in results:
+            if res.success:
+                print(f"[OK] {res.url}, length: {len(res.markdown_v2.raw_markdown)}")
+            else:
+                print(f"[ERROR] {res.url} => {res.error_message}")
+
+if __name__ == "__main__":
+    asyncio.run(quick_parallel_example())
+```
+
+For more advanced concurrency (e.g., a **semaphore-based** approach, **adaptive memory usage throttling**, or customized rate limiting), see [Advanced Multi-URL Crawling](../advanced/multi-url-crawling.md).
+
+
+## 8. Dynamic Content Example
 
 Some sites require multiple “page clicks” or dynamic JavaScript updates. Below is an example showing how to **click** a “Next Page” button and wait for new commits to load on GitHub, using **`BrowserConfig`** and **`CrawlerRunConfig`**:
 
@@ -343,7 +371,7 @@ if __name__ == "__main__":
 
 ---
 
-## 8. Next Steps
+## 9. Next Steps
 
 Congratulations! You have:
 
