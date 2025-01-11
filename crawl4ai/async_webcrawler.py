@@ -9,7 +9,7 @@ import json
 import asyncio
 # from contextlib import nullcontext, asynccontextmanager
 from contextlib import asynccontextmanager
-from .models import CrawlResult, MarkdownGenerationResult
+from .models import CrawlResult, MarkdownGenerationResult, CrawlerTaskResult
 from .async_database import async_db_manager
 from .chunking_strategy import *
 from .content_filter_strategy import *
@@ -20,6 +20,8 @@ from .markdown_generation_strategy import DefaultMarkdownGenerator, MarkdownGene
 from .content_scraping_strategy import WebScrapingStrategy
 from .async_logger import AsyncLogger
 from .async_configs import BrowserConfig, CrawlerRunConfig
+from .async_dispatcher import *
+
 from .config import (
     MIN_WORD_THRESHOLD, 
     IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
@@ -675,6 +677,7 @@ class AsyncWebCrawler:
             self,
             urls: List[str],
             config: Optional[CrawlerRunConfig] = None,
+            dispatcher: Optional[BaseDispatcher] = None,
             # Legacy parameters maintained for backwards compatibility
             word_count_threshold=MIN_WORD_THRESHOLD,
             extraction_strategy: ExtractionStrategy = None,
@@ -690,7 +693,7 @@ class AsyncWebCrawler:
             **kwargs,
         ) -> List[CrawlResult]:
             """
-            Runs the crawler for multiple URLs concurrently using MemoryAdaptiveDispatcher.
+            Runs the crawler for multiple URLs concurrently using a configurable dispatcher strategy.
 
             Migration Guide:
             Old way (deprecated):
@@ -705,84 +708,83 @@ class AsyncWebCrawler:
                 config = CrawlerRunConfig(
                     word_count_threshold=200,
                     screenshot=True,
-                    enable_rate_limiting=True,
-                    rate_limit_config=RateLimitConfig(...),
+                    dispatcher_config=DispatcherConfig(
+                        enable_rate_limiting=True,
+                        rate_limit_config=RateLimitConfig(...),
+                    ),
                     ...
                 )
-                results = await crawler.arun_many(urls, config=config)
+                results = await crawler.arun_many(
+                    urls, 
+                    config=config,
+                    dispatcher_strategy=MemoryAdaptiveDispatcher  # Optional, this is the default
+                )
 
             Args:
                 urls: List of URLs to crawl
                 config: Configuration object controlling crawl behavior for all URLs
+                dispatcher_strategy: The dispatcher strategy class to use. Defaults to MemoryAdaptiveDispatcher.
                 [other parameters maintained for backwards compatibility]
         
             Returns:
                 List[CrawlResult]: Results for each URL
             """
-            # Handle configuration
-            if config is not None:
-                if any(param is not None for param in [
-                    word_count_threshold, extraction_strategy, chunking_strategy,
-                    content_filter, cache_mode, css_selector, screenshot, pdf
-                ]):
-                    self.logger.warning(
-                        message="Both config and legacy parameters provided. config will take precedence.",
-                        tag="WARNING"
-                    )
-            else:
-                # Merge all parameters into a single kwargs dict for config creation
-                config_kwargs = {
-                    "word_count_threshold": word_count_threshold,
-                    "extraction_strategy": extraction_strategy,
-                    "chunking_strategy": chunking_strategy,
-                    "content_filter": content_filter,
-                    "cache_mode": cache_mode,
-                    "bypass_cache": bypass_cache,
-                    "css_selector": css_selector,
-                    "screenshot": screenshot,
-                    "pdf": pdf,
-                    "verbose": verbose,
+            # Create config if not provided
+            if config is None:
+                config = CrawlerRunConfig(
+                    word_count_threshold=word_count_threshold,
+                    extraction_strategy=extraction_strategy,
+                    chunking_strategy=chunking_strategy,
+                    content_filter=content_filter,
+                    cache_mode=cache_mode,
+                    bypass_cache=bypass_cache,
+                    css_selector=css_selector,
+                    screenshot=screenshot,
+                    pdf=pdf,
+                    verbose=verbose,
                     **kwargs
-                }
-                config = CrawlerRunConfig.from_kwargs(config_kwargs)
-
-            if bypass_cache:
-                if kwargs.get("warning", True):
-                    warnings.warn(
-                        "'bypass_cache' is deprecated and will be removed in version 0.5.0. "
-                        "Use 'cache_mode=CacheMode.BYPASS' instead. "
-                        "Pass warning=False to suppress this warning.",
-                        DeprecationWarning,
-                        stacklevel=2
-                    )
-                if config.cache_mode is None:
-                    config.cache_mode = CacheMode.BYPASS
-
-            from .dispatcher import MemoryAdaptiveDispatcher, CrawlerMonitor, DisplayMode
-
-            # Create dispatcher with configuration from CrawlerRunConfig
-            dispatcher = MemoryAdaptiveDispatcher(
-                crawler=self,
-                memory_threshold_percent=config.memory_threshold_percent,
-                check_interval=config.check_interval,
-                max_session_permit=config.max_session_permit,
-                enable_rate_limiting=config.enable_rate_limiting,
-                rate_limit_config=vars(config.rate_limit_config) if config.rate_limit_config else None
-            )
-
-            # Create monitor if display mode is specified
-            monitor = None
-            if config.display_mode:
-                monitor = CrawlerMonitor(
-                    max_visible_rows=15,
-                    display_mode=DisplayMode(config.display_mode)
                 )
 
-            # Run URLs through dispatcher
-            task_results = await dispatcher.run_urls(urls, config, monitor=monitor)
-        
-            # Convert CrawlerTaskResult to CrawlResult
-            return [task_result.result for task_result in task_results]
+            # # Initialize the dispatcher with the selected strategy
+            # dispatcher = dispatcher_strategy(self, config.dispatcher_config)
+            
+            # memory_monitor: CrawlerMonitor = None
+            # if config.dispatcher_config.enable_monitor:
+            #     memory_monitor = CrawlerMonitor(max_visible_rows=config.dispatcher_config.max_display_rows, display_mode=config.dispatcher_config.display_mode)
+            
+            # Create default dispatcher if none provided
+            if dispatcher is None:
+                dispatcher = MemoryAdaptiveDispatcher(
+                    self,
+                    rate_limiter=RateLimiter(
+                        base_delay=(1.0, 3.0),
+                        max_delay=60.0,
+                        max_retries=3
+                    )
+                )            
+                        
+            # Run the URLs through the dispatcher
+            _results: List[CrawlerTaskResult] = await dispatcher.run_urls(
+                crawler=self,
+                urls=urls, 
+                config=config
+            )
+                       
+            results: CrawlResult = []
+            for res in _results:
+                _res : CrawlResult = res.result
+                dispatch_result: DispatchResult = DispatchResult(
+                    task_id=res.task_id,
+                    memory_usage=res.memory_usage,
+                    peak_memory=res.peak_memory,
+                    start_time=res.start_time,
+                    end_time=res.end_time,
+                    error_message=res.error_message
+                )
+                _res.dispatch_result = dispatch_result
+                results.append(_res)
+                
+            return results
 
     async def aclear_cache(self):
         """Clear the cache database."""

@@ -11,8 +11,7 @@ from .user_agent_generator import UserAgentGenerator
 from .extraction_strategy import ExtractionStrategy
 from .chunking_strategy import ChunkingStrategy
 from .markdown_generation_strategy import MarkdownGenerationStrategy
-from typing import Union, List, Tuple, Optional
-from dataclasses import dataclass, field
+from typing import Union, List
 
 class BrowserConfig:
     """
@@ -184,14 +183,6 @@ class BrowserConfig:
         )
 
 
-@dataclass
-class RateLimitConfig:
-    base_delay: Tuple[float, float] = (1.0, 3.0)
-    max_delay: float = 60.0
-    max_retries: int = 3
-    rate_limit_codes: List[int] = field(default_factory=lambda: [429, 503])
-
-
 class CrawlerRunConfig:
     """
     Configuration class for controlling how the crawler runs each crawl operation.
@@ -320,14 +311,8 @@ class CrawlerRunConfig:
         log_console (bool): If True, log console messages from the page.
                             Default: False.
         
-        # Dispatcher configuration
-        memory_threshold_percent: float = 70.0
-        check_interval: float = 1.0
-        max_session_permit: int = 20
-        enable_rate_limiting: bool = False
-        rate_limit_config: Optional[RateLimitConfig] = None
-        display_mode: Optional[str] = None
-        url: str = None
+        # Optional Parameters
+        url: str = None  # This is not a compulsory parameter
     """
 
     def __init__(
@@ -400,13 +385,6 @@ class CrawlerRunConfig:
         verbose: bool = True,
         log_console: bool = False,
         
-        # Dispatcher configuration
-        memory_threshold_percent: float = 70.0,
-        check_interval: float = 1.0,
-        max_session_permit: int = 20,
-        enable_rate_limiting: bool = False,
-        rate_limit_config: Optional[RateLimitConfig] = None,
-        display_mode: Optional[str] = None,
         url: str = None,
     ):
         self.url = url
@@ -478,14 +456,6 @@ class CrawlerRunConfig:
         # Debugging and Logging Parameters
         self.verbose = verbose
         self.log_console = log_console
-
-        # Dispatcher configuration
-        self.memory_threshold_percent = memory_threshold_percent
-        self.check_interval = check_interval
-        self.max_session_permit = max_session_permit
-        self.enable_rate_limiting = enable_rate_limiting
-        self.rate_limit_config = rate_limit_config
-        self.display_mode = display_mode
 
         # Validate type of extraction strategy and chunking strategy if they are provided
         if self.extraction_strategy is not None and not isinstance(
@@ -573,13 +543,6 @@ class CrawlerRunConfig:
             verbose=kwargs.get("verbose", True),
             log_console=kwargs.get("log_console", False),
             
-            # Dispatcher configuration
-            memory_threshold_percent=kwargs.get("memory_threshold_percent", 70.0),
-            check_interval=kwargs.get("check_interval", 1.0),
-            max_session_permit=kwargs.get("max_session_permit", 20),
-            enable_rate_limiting=kwargs.get("enable_rate_limiting", False),
-            rate_limit_config=kwargs.get("rate_limit_config"),
-            display_mode=kwargs.get("display_mode"),
             url=kwargs.get("url"),
         )
         
@@ -638,11 +601,5 @@ class CrawlerRunConfig:
             "exclude_domains": self.exclude_domains,
             "verbose": self.verbose,
             "log_console": self.log_console,
-            "memory_threshold_percent": self.memory_threshold_percent,
-            "check_interval": self.check_interval,
-            "max_session_permit": self.max_session_permit,
-            "enable_rate_limiting": self.enable_rate_limiting,
-            "rate_limit_config": self.rate_limit_config,
-            "display_mode": self.display_mode,
             "url": self.url,
         }

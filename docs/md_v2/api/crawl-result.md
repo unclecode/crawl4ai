@@ -26,6 +26,7 @@ class CrawlResult(BaseModel):
     response_headers: Optional[dict] = None
     status_code: Optional[int] = None
     ssl_certificate: Optional[SSLCertificate] = None
+    dispatch_result: Optional[DispatchResult] = None
     ...
 ```
 
@@ -262,7 +263,31 @@ if result.metadata:
 
 ---
 
-## 6. Example: Accessing Everything
+## 6. `dispatch_result` (optional)
+
+A `DispatchResult` object providing additional concurrency and resource usage information when crawling URLs in parallel (e.g., via `arun_many()` with custom dispatchers). It contains:
+
+- **`task_id`**: A unique identifier for the parallel task.
+- **`memory_usage`** (float): The memory (in MB) used at the time of completion.
+- **`peak_memory`** (float): The peak memory usage (in MB) recorded during the task’s execution.
+- **`start_time`** / **`end_time`** (datetime): Time range for this crawling task.
+- **`error_message`** (str): Any dispatcher- or concurrency-related error encountered.
+
+```python
+# Example usage:
+for result in results:
+    if result.success and result.dispatch_result:
+        dr = result.dispatch_result
+        print(f"URL: {result.url}, Task ID: {dr.task_id}")
+        print(f"Memory: {dr.memory_usage:.1f} MB (Peak: {dr.peak_memory:.1f} MB)")
+        print(f"Duration: {dr.end_time - dr.start_time}")
+```
+
+> **Note**: This field is typically populated when using `arun_many(...)` alongside a **dispatcher** (e.g., `MemoryAdaptiveDispatcher` or `SemaphoreDispatcher`). If no concurrency or dispatcher is used, `dispatch_result` may remain `None`. 
+
+---
+
+## 7. Example: Accessing Everything
 
 ```python
 async def handle_result(result: CrawlResult):
@@ -306,7 +331,7 @@ async def handle_result(result: CrawlResult):
 
 ---
 
-## 7. Key Points & Future
+## 8. Key Points & Future
 
 1. **`markdown_v2` vs `markdown`**  
    - Right now, `markdown_v2` is the more robust container (`MarkdownGenerationResult`), providing **raw_markdown**, **markdown_with_citations**, references, plus possible **fit_markdown**.  
