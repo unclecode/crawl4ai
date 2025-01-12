@@ -17,7 +17,7 @@ from .extraction_strategy import *
 from .async_crawler_strategy import AsyncCrawlerStrategy, AsyncPlaywrightCrawlerStrategy, AsyncCrawlResponse
 from .cache_context import CacheMode, CacheContext, _legacy_to_cache_mode
 from .markdown_generation_strategy import DefaultMarkdownGenerator, MarkdownGenerationStrategy
-from .content_scraping_strategy import WebScrapingStrategy
+from .content_scraping_strategy import WebScrapingStrategy, LXMLWebScrapingStrategy
 from .async_logger import AsyncLogger
 from .async_configs import BrowserConfig, CrawlerRunConfig
 from .async_dispatcher import *
@@ -543,8 +543,11 @@ class AsyncWebCrawler:
                 _url = url if not kwargs.get("is_raw_html", False) else "Raw HTML"
                 t1 = time.perf_counter()
 
-                # Initialize scraping strategy
-                scrapping_strategy = WebScrapingStrategy(logger=self.logger)
+                # Initialize scraping strategy based on mode
+                if config.scraping_mode == ScrapingMode.LXML:
+                    scrapping_strategy = LXMLWebScrapingStrategy(logger=self.logger)
+                else:  # Default to BeautifulSoup
+                    scrapping_strategy = WebScrapingStrategy(logger=self.logger)
 
                 # Process HTML content
                 params = {k:v for k, v in config.to_dict().items() if k not in ["url"]}

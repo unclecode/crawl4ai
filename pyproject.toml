@@ -35,6 +35,7 @@ dependencies = [
     "playwright",
     "aiofiles",
     "rich>=13.9.4",
+    "cssselect>=1.2.0",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",

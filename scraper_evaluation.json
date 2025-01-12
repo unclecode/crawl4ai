@@ -1,0 +1,52 @@
+{
+  "original": {
+    "performance": [],
+    "differences": []
+  },
+  "batch": {
+    "performance": [
+      {
+        "case": "basic",
+        "metrics": {
+          "time": 0.8874530792236328,
+          "memory": 98.328125
+        }
+      }
+    ],
+    "differences": [
+      {
+        "case": "basic",
+        "differences": {
+          "images_count": {
+            "old": 50,
+            "new": 0,
+            "diff": -50
+          }
+        }
+      }
+    ]
+  },
+  "lxml": {
+    "performance": [
+      {
+        "case": "basic",
+        "metrics": {
+          "time": 1.210719108581543,
+          "memory": 99.921875
+        }
+      }
+    ],
+    "differences": [
+      {
+        "case": "basic",
+        "differences": {
+          "images_count": {
+            "old": 50,
+            "new": 0,
+            "diff": -50
+          }
+        }
+      }
+    ]
+  }
+}

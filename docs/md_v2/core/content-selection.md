@@ -318,7 +318,45 @@ if __name__ == "__main__":
 
 ---
 
-## 6. Conclusion
+## 6. Scraping Modes
+
+Crawl4AI provides two different scraping modes for HTML content processing: BeautifulSoup (default) and LXML. The LXML mode offers significantly better performance, especially for large HTML documents.
+
+```python
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, ScrapingMode
+
+async def main():
+    config = CrawlerRunConfig(
+        scraping_mode=ScrapingMode.LXML  # Faster alternative to default BeautifulSoup
+    )
+    async with AsyncWebCrawler() as crawler:
+        result = await crawler.arun(
+            url="https://example.com", 
+            config=config
+        )
+```
+
+### Performance Considerations
+
+The LXML mode can be up to 10-20x faster than BeautifulSoup mode, particularly when processing large HTML documents. However, please note:
+
+1. LXML mode is currently experimental
+2. In some edge cases, the parsing results might differ slightly from BeautifulSoup
+3. If you encounter any inconsistencies between LXML and BeautifulSoup results, please [raise an issue](https://github.com/codeium/crawl4ai/issues) with a reproducible example
+
+Choose LXML mode when:
+- Processing large HTML documents (recommended for >100KB)
+- Performance is critical
+- Working with well-formed HTML
+
+Stick to BeautifulSoup mode (default) when:
+- Maximum compatibility is needed
+- Working with malformed HTML
+- Exact parsing behavior is critical
+
+---
+
+## 7. Conclusion
 
 By mixing **css_selector** scoping, **content filtering** parameters, and advanced **extraction strategies**, you can precisely **choose** which data to keep. Key parameters in **`CrawlerRunConfig`** for content selection include:
 
