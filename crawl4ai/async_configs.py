@@ -12,6 +12,7 @@ from .extraction_strategy import ExtractionStrategy
 from .chunking_strategy import ChunkingStrategy
 from .markdown_generation_strategy import MarkdownGenerationStrategy
 from typing import Union, List
+from enum import Enum
 
 class BrowserConfig:
     """
@@ -183,6 +184,12 @@ class BrowserConfig:
         )
 
 
+class ScrapingMode(str, Enum):
+    """Enum for different scraping modes."""
+    BEAUTIFULSOUP = "beautifulsoup"
+    LXML = "lxml"
+
+
 class CrawlerRunConfig:
     """
     Configuration class for controlling how the crawler runs each crawl operation.
@@ -220,6 +227,8 @@ class CrawlerRunConfig:
                           Default: False.
         parser_type (str): Type of parser to use for HTML parsing.
                            Default: "lxml".
+        scraping_mode (ScrapingMode): Scraping mode to use.
+                           Default: ScrapingMode.BEAUTIFULSOUP.
 
         # Caching Parameters
         cache_mode (CacheMode or None): Defines how caching is handled.
@@ -331,6 +340,7 @@ class CrawlerRunConfig:
         remove_forms: bool = False,
         prettiify: bool = False,
         parser_type: str = "lxml",
+        scraping_mode: ScrapingMode = ScrapingMode.BEAUTIFULSOUP,
 
         # SSL Parameters
         fetch_ssl_certificate: bool = False,
@@ -403,6 +413,7 @@ class CrawlerRunConfig:
         self.remove_forms = remove_forms
         self.prettiify = prettiify
         self.parser_type = parser_type
+        self.scraping_mode = scraping_mode
 
         # SSL Parameters
         self.fetch_ssl_certificate = fetch_ssl_certificate
@@ -489,6 +500,7 @@ class CrawlerRunConfig:
             remove_forms=kwargs.get("remove_forms", False),
             prettiify=kwargs.get("prettiify", False),
             parser_type=kwargs.get("parser_type", "lxml"),
+            scraping_mode=kwargs.get("scraping_mode", ScrapingMode.BEAUTIFULSOUP),
 
             # SSL Parameters
             fetch_ssl_certificate=kwargs.get("fetch_ssl_certificate", False),
@@ -562,6 +574,7 @@ class CrawlerRunConfig:
             "remove_forms": self.remove_forms,
             "prettiify": self.prettiify,
             "parser_type": self.parser_type,
+            "scraping_mode": self.scraping_mode,
             "fetch_ssl_certificate": self.fetch_ssl_certificate,
             "cache_mode": self.cache_mode,
             "session_id": self.session_id,

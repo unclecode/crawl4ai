@@ -1,0 +1,16 @@
+{
+  "tests": [
+    {
+      "case": "complicated_exclude_all_links",
+      "lxml_mode": {
+        "differences": {},
+        "execution_time": 0.0019578933715820312
+      },
+      "original_time": 0.0059909820556640625
+    }
+  ],
+  "summary": {
+    "passed": 1,
+    "failed": 0
+  }
+}
