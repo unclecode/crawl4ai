@@ -1,16 +1,17 @@
-import os, sys
-parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(parent_dir)
-__location__ = os.path.realpath(    os.path.join(os.getcwd(), os.path.dirname(__file__)))
-
-import os, sys
+import os
+import sys
 import asyncio
 from crawl4ai import AsyncWebCrawler, CacheMode
-from crawl4ai.content_filter_strategy import PruningContentFilter
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
-# Assuming that the changes made allow different configurations 
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(parent_dir)
+__location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
+
+
+# Assuming that the changes made allow different configurations
 # for managed browser, persistent context, and so forth.
+
 
 async def test_default_headless():
     async with AsyncWebCrawler(
@@ -24,13 +25,14 @@ async def test_default_headless():
         # Testing normal ephemeral context
     ) as crawler:
         result = await crawler.arun(
-            url='https://www.kidocode.com/degrees/technology',
+            url="https://www.kidocode.com/degrees/technology",
             cache_mode=CacheMode.BYPASS,
             markdown_generator=DefaultMarkdownGenerator(options={"ignore_links": True}),
         )
         print("[test_default_headless] success:", result.success)
         print("HTML length:", len(result.html if result.html else ""))
-        
+
+
 async def test_managed_browser_persistent():
     # Treating use_persistent_context=True as managed_browser scenario.
     async with AsyncWebCrawler(
@@ -44,12 +46,13 @@ async def test_managed_browser_persistent():
         # This should store and reuse profile data across runs
     ) as crawler:
         result = await crawler.arun(
-            url='https://www.google.com',
+            url="https://www.google.com",
             cache_mode=CacheMode.BYPASS,
-            markdown_generator=DefaultMarkdownGenerator(options={"ignore_links": True})
+            markdown_generator=DefaultMarkdownGenerator(options={"ignore_links": True}),
         )
         print("[test_managed_browser_persistent] success:", result.success)
         print("HTML length:", len(result.html if result.html else ""))
+
 
 async def test_session_reuse():
     # Test creating a session, using it for multiple calls
@@ -62,24 +65,24 @@ async def test_session_reuse():
         use_managed_browser=False,
         use_persistent_context=False,
     ) as crawler:
-        
         # First call: create session
         result1 = await crawler.arun(
-            url='https://www.example.com',
+            url="https://www.example.com",
             cache_mode=CacheMode.BYPASS,
             session_id=session_id,
-            markdown_generator=DefaultMarkdownGenerator(options={"ignore_links": True})
+            markdown_generator=DefaultMarkdownGenerator(options={"ignore_links": True}),
         )
         print("[test_session_reuse first call] success:", result1.success)
-        
+
         # Second call: same session, possibly cookie retained
         result2 = await crawler.arun(
-            url='https://www.example.com/about',
+            url="https://www.example.com/about",
             cache_mode=CacheMode.BYPASS,
             session_id=session_id,
-            markdown_generator=DefaultMarkdownGenerator(options={"ignore_links": True})
+            markdown_generator=DefaultMarkdownGenerator(options={"ignore_links": True}),
         )
         print("[test_session_reuse second call] success:", result2.success)
+
 
 async def test_magic_mode():
     # Test magic mode with override_navigator and simulate_user
@@ -95,12 +98,13 @@ async def test_magic_mode():
         simulate_user=True,
     ) as crawler:
         result = await crawler.arun(
-            url='https://www.kidocode.com/degrees/business',
+            url="https://www.kidocode.com/degrees/business",
             cache_mode=CacheMode.BYPASS,
-            markdown_generator=DefaultMarkdownGenerator(options={"ignore_links": True})
+            markdown_generator=DefaultMarkdownGenerator(options={"ignore_links": True}),
         )
         print("[test_magic_mode] success:", result.success)
         print("HTML length:", len(result.html if result.html else ""))
+
 
 async def test_proxy_settings():
     # Test with a proxy (if available) to ensure code runs with proxy
@@ -113,13 +117,14 @@ async def test_proxy_settings():
         use_persistent_context=False,
     ) as crawler:
         result = await crawler.arun(
-            url='https://httpbin.org/ip',
+            url="https://httpbin.org/ip",
             cache_mode=CacheMode.BYPASS,
-            markdown_generator=DefaultMarkdownGenerator(options={"ignore_links": True})
+            markdown_generator=DefaultMarkdownGenerator(options={"ignore_links": True}),
         )
         print("[test_proxy_settings] success:", result.success)
         if result.success:
             print("HTML preview:", result.html[:200] if result.html else "")
+
 
 async def test_ignore_https_errors():
     # Test ignore HTTPS errors with a self-signed or invalid cert domain
@@ -134,11 +139,12 @@ async def test_ignore_https_errors():
         use_persistent_context=False,
     ) as crawler:
         result = await crawler.arun(
-            url='https://self-signed.badssl.com/',
+            url="https://self-signed.badssl.com/",
             cache_mode=CacheMode.BYPASS,
-            markdown_generator=DefaultMarkdownGenerator(options={"ignore_links": True})
+            markdown_generator=DefaultMarkdownGenerator(options={"ignore_links": True}),
         )
         print("[test_ignore_https_errors] success:", result.success)
+
 
 async def main():
     print("Running tests...")
@@ -148,6 +154,7 @@ async def main():
     # await test_magic_mode()
     # await test_proxy_settings()
     await test_ignore_https_errors()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

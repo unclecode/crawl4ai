@@ -5,7 +5,6 @@ from .config import (
     PAGE_TIMEOUT,
     IMAGE_SCORE_THRESHOLD,
     SOCIAL_MEDIA_DOMAINS,
-
 )
 from .user_agent_generator import UserAgentGenerator
 from .extraction_strategy import ExtractionStrategy
@@ -13,6 +12,7 @@ from .chunking_strategy import ChunkingStrategy, RegexChunking
 from .markdown_generation_strategy import MarkdownGenerationStrategy
 from .content_scraping_strategy import ContentScrapingStrategy, WebScrapingStrategy
 from typing import Union, List
+
 
 class BrowserConfig:
     """
@@ -84,7 +84,7 @@ class BrowserConfig:
         proxy: str = None,
         proxy_config: dict = None,
         viewport_width: int = 1080,
-        viewport_height: int = 600, 
+        viewport_height: int = 600,
         accept_downloads: bool = False,
         downloads_path: str = None,
         storage_state=None,
@@ -103,7 +103,7 @@ class BrowserConfig:
         text_mode: bool = False,
         light_mode: bool = False,
         extra_args: list = None,
-        debugging_port : int = 9222,
+        debugging_port: int = 9222,
     ):
         self.browser_type = browser_type
         self.headless = headless
@@ -142,7 +142,7 @@ class BrowserConfig:
             self.user_agent = user_agenr_generator.generate()
         else:
             pass
-        
+
         self.browser_hint = user_agenr_generator.generate_client_hints(self.user_agent)
         self.headers.setdefault("sec-ch-ua", self.browser_hint)
 
@@ -313,7 +313,7 @@ class CrawlerRunConfig:
                         Default: True.
         log_console (bool): If True, log console messages from the page.
                             Default: False.
-        
+
         # Optional Parameters
         url: str = None  # This is not a compulsory parameter
     """
@@ -335,10 +335,8 @@ class CrawlerRunConfig:
         prettiify: bool = False,
         parser_type: str = "lxml",
         scraping_strategy: ContentScrapingStrategy = None,
-
         # SSL Parameters
         fetch_ssl_certificate: bool = False,
-
         # Caching Parameters
         cache_mode=None,
         session_id: str = None,
@@ -346,7 +344,6 @@ class CrawlerRunConfig:
         disable_cache: bool = False,
         no_cache_read: bool = False,
         no_cache_write: bool = False,
-
         # Page Navigation and Timing Parameters
         wait_until: str = "domcontentloaded",
         page_timeout: int = PAGE_TIMEOUT,
@@ -356,7 +353,6 @@ class CrawlerRunConfig:
         mean_delay: float = 0.1,
         max_range: float = 0.3,
         semaphore_count: int = 5,
-
         # Page Interaction Parameters
         js_code: Union[str, List[str]] = None,
         js_only: bool = False,
@@ -369,7 +365,6 @@ class CrawlerRunConfig:
         override_navigator: bool = False,
         magic: bool = False,
         adjust_viewport_to_content: bool = False,
-
         # Media Handling Parameters
         screenshot: bool = False,
         screenshot_wait_for: float = None,
@@ -378,21 +373,18 @@ class CrawlerRunConfig:
         image_description_min_word_threshold: int = IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
         image_score_threshold: int = IMAGE_SCORE_THRESHOLD,
         exclude_external_images: bool = False,
-
         # Link and Domain Handling Parameters
         exclude_social_media_domains: list = None,
         exclude_external_links: bool = False,
         exclude_social_media_links: bool = False,
         exclude_domains: list = None,
-
         # Debugging and Logging Parameters
         verbose: bool = True,
         log_console: bool = False,
-        
         url: str = None,
     ):
         self.url = url
-        
+
         # Content Processing Parameters
         self.word_count_threshold = word_count_threshold
         self.extraction_strategy = extraction_strategy
@@ -453,7 +445,9 @@ class CrawlerRunConfig:
         self.exclude_external_images = exclude_external_images
 
         # Link and Domain Handling Parameters
-        self.exclude_social_media_domains = exclude_social_media_domains or SOCIAL_MEDIA_DOMAINS
+        self.exclude_social_media_domains = (
+            exclude_social_media_domains or SOCIAL_MEDIA_DOMAINS
+        )
         self.exclude_external_links = exclude_external_links
         self.exclude_social_media_links = exclude_social_media_links
         self.exclude_domains = exclude_domains or []
@@ -466,11 +460,15 @@ class CrawlerRunConfig:
         if self.extraction_strategy is not None and not isinstance(
             self.extraction_strategy, ExtractionStrategy
         ):
-            raise ValueError("extraction_strategy must be an instance of ExtractionStrategy")
+            raise ValueError(
+                "extraction_strategy must be an instance of ExtractionStrategy"
+            )
         if self.chunking_strategy is not None and not isinstance(
             self.chunking_strategy, ChunkingStrategy
         ):
-            raise ValueError("chunking_strategy must be an instance of ChunkingStrategy")
+            raise ValueError(
+                "chunking_strategy must be an instance of ChunkingStrategy"
+            )
 
         # Set default chunking strategy if None
         if self.chunking_strategy is None:
@@ -494,10 +492,8 @@ class CrawlerRunConfig:
             prettiify=kwargs.get("prettiify", False),
             parser_type=kwargs.get("parser_type", "lxml"),
             scraping_strategy=kwargs.get("scraping_strategy"),
-
             # SSL Parameters
             fetch_ssl_certificate=kwargs.get("fetch_ssl_certificate", False),
-
             # Caching Parameters
             cache_mode=kwargs.get("cache_mode"),
             session_id=kwargs.get("session_id"),
@@ -505,7 +501,6 @@ class CrawlerRunConfig:
             disable_cache=kwargs.get("disable_cache", False),
             no_cache_read=kwargs.get("no_cache_read", False),
             no_cache_write=kwargs.get("no_cache_write", False),
-
             # Page Navigation and Timing Parameters
             wait_until=kwargs.get("wait_until", "domcontentloaded"),
             page_timeout=kwargs.get("page_timeout", 60000),
@@ -515,7 +510,6 @@ class CrawlerRunConfig:
             mean_delay=kwargs.get("mean_delay", 0.1),
             max_range=kwargs.get("max_range", 0.3),
             semaphore_count=kwargs.get("semaphore_count", 5),
-
             # Page Interaction Parameters
             js_code=kwargs.get("js_code"),
             js_only=kwargs.get("js_only", False),
@@ -528,29 +522,34 @@ class CrawlerRunConfig:
             override_navigator=kwargs.get("override_navigator", False),
             magic=kwargs.get("magic", False),
             adjust_viewport_to_content=kwargs.get("adjust_viewport_to_content", False),
-
             # Media Handling Parameters
             screenshot=kwargs.get("screenshot", False),
             screenshot_wait_for=kwargs.get("screenshot_wait_for"),
-            screenshot_height_threshold=kwargs.get("screenshot_height_threshold", SCREENSHOT_HEIGHT_TRESHOLD),
+            screenshot_height_threshold=kwargs.get(
+                "screenshot_height_threshold", SCREENSHOT_HEIGHT_TRESHOLD
+            ),
             pdf=kwargs.get("pdf", False),
-            image_description_min_word_threshold=kwargs.get("image_description_min_word_threshold", IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD),
-            image_score_threshold=kwargs.get("image_score_threshold", IMAGE_SCORE_THRESHOLD),
+            image_description_min_word_threshold=kwargs.get(
+                "image_description_min_word_threshold",
+                IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
+            ),
+            image_score_threshold=kwargs.get(
+                "image_score_threshold", IMAGE_SCORE_THRESHOLD
+            ),
             exclude_external_images=kwargs.get("exclude_external_images", False),
-
             # Link and Domain Handling Parameters
-            exclude_social_media_domains=kwargs.get("exclude_social_media_domains", SOCIAL_MEDIA_DOMAINS),
+            exclude_social_media_domains=kwargs.get(
+                "exclude_social_media_domains", SOCIAL_MEDIA_DOMAINS
+            ),
             exclude_external_links=kwargs.get("exclude_external_links", False),
             exclude_social_media_links=kwargs.get("exclude_social_media_links", False),
             exclude_domains=kwargs.get("exclude_domains", []),
-
             # Debugging and Logging Parameters
             verbose=kwargs.get("verbose", True),
             log_console=kwargs.get("log_console", False),
-            
             url=kwargs.get("url"),
         )
-        
+
     # Create a funciton returns dict of the object
     def to_dict(self):
         return {
