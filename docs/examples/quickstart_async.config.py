@@ -8,12 +8,12 @@ import asyncio
 import time
 import json
 import re
-from typing import Dict, List
+from typing import Dict
 from bs4 import BeautifulSoup
 from pydantic import BaseModel, Field
 from crawl4ai import AsyncWebCrawler, CacheMode, BrowserConfig, CrawlerRunConfig
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
-from crawl4ai.content_filter_strategy import BM25ContentFilter, PruningContentFilter
+from crawl4ai.content_filter_strategy import PruningContentFilter
 from crawl4ai.extraction_strategy import (
     JsonCssExtractionStrategy,
     LLMExtractionStrategy,
@@ -62,6 +62,7 @@ async def clean_content():
         print(f"Full Markdown Length: {full_markdown_length}")
         print(f"Fit Markdown Length: {fit_markdown_length}")
 
+
 async def link_analysis():
     crawler_config = CrawlerRunConfig(
         cache_mode=CacheMode.ENABLED,
@@ -76,8 +77,9 @@ async def link_analysis():
         print(f"Found {len(result.links['internal'])} internal links")
         print(f"Found {len(result.links['external'])} external links")
 
-        for link in result.links['internal'][:5]:
+        for link in result.links["internal"][:5]:
             print(f"Href: {link['href']}\nText: {link['text']}\n")
+
 
 # JavaScript Execution Example
 async def simple_example_with_running_js_code():
@@ -112,25 +114,29 @@ async def simple_example_with_css_selector():
         )
         print(result.markdown[:500])
 
+
 async def media_handling():
-    crawler_config = CrawlerRunConfig(cache_mode=CacheMode.BYPASS, exclude_external_images=True, screenshot=True)
+    crawler_config = CrawlerRunConfig(
+        cache_mode=CacheMode.BYPASS, exclude_external_images=True, screenshot=True
+    )
     async with AsyncWebCrawler() as crawler:
         result = await crawler.arun(
-            url="https://www.nbcnews.com/business",
-            config=crawler_config
+            url="https://www.nbcnews.com/business", config=crawler_config
         )
-        for img in result.media['images'][:5]:
+        for img in result.media["images"][:5]:
             print(f"Image URL: {img['src']}, Alt: {img['alt']}, Score: {img['score']}")
+
 
 async def custom_hook_workflow(verbose=True):
     async with AsyncWebCrawler() as crawler:
         # Set a 'before_goto' hook to run custom code just before navigation
-        crawler.crawler_strategy.set_hook("before_goto", lambda page, context: print("[Hook] Preparing to navigate..."))
+        crawler.crawler_strategy.set_hook(
+            "before_goto",
+            lambda page, context: print("[Hook] Preparing to navigate..."),
+        )
 
         # Perform the crawl operation
-        result = await crawler.arun(
-            url="https://crawl4ai.com"
-        )
+        result = await crawler.arun(url="https://crawl4ai.com")
         print(result.markdown_v2.raw_markdown[:500].replace("\n", " -- "))
 
 
@@ -412,20 +418,21 @@ async def cosine_similarity_extraction():
         cache_mode=CacheMode.BYPASS,
         extraction_strategy=CosineStrategy(
             word_count_threshold=10,
-            max_dist=0.2, # Maximum distance between two words
-            linkage_method="ward", # Linkage method for hierarchical clustering (ward, complete, average, single)
-            top_k=3, # Number of top keywords to extract
-            sim_threshold=0.3, # Similarity threshold for clustering
-            semantic_filter="McDonald's economic impact, American consumer trends", # Keywords to filter the content semantically using embeddings
-            verbose=True
-        ),        
+            max_dist=0.2,  # Maximum distance between two words
+            linkage_method="ward",  # Linkage method for hierarchical clustering (ward, complete, average, single)
+            top_k=3,  # Number of top keywords to extract
+            sim_threshold=0.3,  # Similarity threshold for clustering
+            semantic_filter="McDonald's economic impact, American consumer trends",  # Keywords to filter the content semantically using embeddings
+            verbose=True,
+        ),
     )
     async with AsyncWebCrawler() as crawler:
         result = await crawler.arun(
             url="https://www.nbcnews.com/business/consumer/how-mcdonalds-e-coli-crisis-inflation-politics-reflect-american-story-rcna177156",
-            config=crawl_config
+            config=crawl_config,
         )
         print(json.loads(result.extracted_content)[:5])
+
 
 # Browser Comparison
 async def crawl_custom_browser_type():
@@ -484,38 +491,41 @@ async def crawl_with_user_simulation():
         result = await crawler.arun(url="YOUR-URL-HERE", config=crawler_config)
         print(result.markdown)
 
+
 async def ssl_certification():
     # Configure crawler to fetch SSL certificate
     config = CrawlerRunConfig(
         fetch_ssl_certificate=True,
-        cache_mode=CacheMode.BYPASS  # Bypass cache to always get fresh certificates
+        cache_mode=CacheMode.BYPASS,  # Bypass cache to always get fresh certificates
     )
 
     async with AsyncWebCrawler() as crawler:
-        result = await crawler.arun(
-            url='https://example.com',
-            config=config
-        )
-        
+        result = await crawler.arun(url="https://example.com", config=config)
+
         if result.success and result.ssl_certificate:
             cert = result.ssl_certificate
-            
+
             # 1. Access certificate properties directly
             print("\nCertificate Information:")
             print(f"Issuer: {cert.issuer.get('CN', '')}")
             print(f"Valid until: {cert.valid_until}")
             print(f"Fingerprint: {cert.fingerprint}")
-            
+
             # 2. Export certificate in different formats
             cert.to_json(os.path.join(tmp_dir, "certificate.json"))  # For analysis
             print("\nCertificate exported to:")
             print(f"- JSON: {os.path.join(tmp_dir, 'certificate.json')}")
-            
-            pem_data = cert.to_pem(os.path.join(tmp_dir, "certificate.pem"))  # For web servers
+
+            pem_data = cert.to_pem(
+                os.path.join(tmp_dir, "certificate.pem")
+            )  # For web servers
             print(f"- PEM: {os.path.join(tmp_dir, 'certificate.pem')}")
-            
-            der_data = cert.to_der(os.path.join(tmp_dir, "certificate.der"))  # For Java apps
+
+            der_data = cert.to_der(
+                os.path.join(tmp_dir, "certificate.der")
+            )  # For Java apps
             print(f"- DER: {os.path.join(tmp_dir, 'certificate.der')}")
+
 
 # Speed Comparison
 async def speed_comparison():

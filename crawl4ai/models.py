@@ -1,16 +1,10 @@
 from pydantic import BaseModel, HttpUrl
-from typing import List, Dict, Optional, Callable, Awaitable, Union, Tuple, Any
+from typing import List, Dict, Optional, Callable, Awaitable, Union, Any
 from enum import Enum
-from dataclasses import dataclass, field
-from .ssl_certificate import SSLCertificate
-
 from dataclasses import dataclass
+from .ssl_certificate import SSLCertificate
 from datetime import datetime
-from enum import Enum
-from typing import Optional
-
 from datetime import timedelta
-
 
 
 ###############################
@@ -21,6 +15,7 @@ class DomainState:
     last_request_time: float = 0
     current_delay: float = 0
     fail_count: int = 0
+
 
 @dataclass
 class CrawlerTaskResult:
@@ -33,11 +28,13 @@ class CrawlerTaskResult:
     end_time: datetime
     error_message: str = ""
 
+
 class CrawlStatus(Enum):
     QUEUED = "QUEUED"
     IN_PROGRESS = "IN_PROGRESS"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
+
 
 @dataclass
 class CrawlStats:
@@ -49,7 +46,7 @@ class CrawlStats:
     memory_usage: float = 0.0
     peak_memory: float = 0.0
     error_message: str = ""
-    
+
     @property
     def duration(self) -> str:
         if not self.start_time:
@@ -58,9 +55,11 @@ class CrawlStats:
         duration = end - self.start_time
         return str(timedelta(seconds=int(duration.total_seconds())))
 
+
 class DisplayMode(Enum):
     DETAILED = "DETAILED"
     AGGREGATED = "AGGREGATED"
+
 
 ###############################
 # Crawler Models
@@ -68,15 +67,16 @@ class DisplayMode(Enum):
 @dataclass
 class TokenUsage:
     completion_tokens: int = 0
-    prompt_tokens: int = 0 
+    prompt_tokens: int = 0
     total_tokens: int = 0
     completion_tokens_details: Optional[dict] = None
     prompt_tokens_details: Optional[dict] = None
-    
+
 
 class UrlModel(BaseModel):
     url: HttpUrl
     forced: bool = False
+
 
 class MarkdownGenerationResult(BaseModel):
     raw_markdown: str
@@ -85,6 +85,7 @@ class MarkdownGenerationResult(BaseModel):
     fit_markdown: Optional[str] = None
     fit_html: Optional[str] = None
 
+
 class DispatchResult(BaseModel):
     task_id: str
     memory_usage: float
@@ -92,6 +93,8 @@ class DispatchResult(BaseModel):
     start_time: datetime
     end_time: datetime
     error_message: str = ""
+
+
 class CrawlResult(BaseModel):
     url: str
     html: str
@@ -101,7 +104,7 @@ class CrawlResult(BaseModel):
     links: Dict[str, List[Dict]] = {}
     downloaded_files: Optional[List[str]] = None
     screenshot: Optional[str] = None
-    pdf : Optional[bytes] = None
+    pdf: Optional[bytes] = None
     markdown: Optional[Union[str, MarkdownGenerationResult]] = None
     markdown_v2: Optional[MarkdownGenerationResult] = None
     fit_markdown: Optional[str] = None
@@ -114,8 +117,10 @@ class CrawlResult(BaseModel):
     status_code: Optional[int] = None
     ssl_certificate: Optional[SSLCertificate] = None
     dispatch_result: Optional[DispatchResult] = None
+
     class Config:
         arbitrary_types_allowed = True
+
 
 class AsyncCrawlResponse(BaseModel):
     html: str
@@ -130,6 +135,7 @@ class AsyncCrawlResponse(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
+
 ###############################
 # Scraping Models
 ###############################
@@ -143,20 +149,28 @@ class MediaItem(BaseModel):
     format: Optional[str] = None
     width: Optional[int] = None
 
+
 class Link(BaseModel):
     href: str
     text: str
     title: Optional[str] = None
     base_domain: str
 
+
 class Media(BaseModel):
     images: List[MediaItem] = []
-    videos: List[MediaItem] = []  # Using MediaItem model for now, can be extended with Video model if needed
-    audios: List[MediaItem] = []  # Using MediaItem model for now, can be extended with Audio model if needed
+    videos: List[
+        MediaItem
+    ] = []  # Using MediaItem model for now, can be extended with Video model if needed
+    audios: List[
+        MediaItem
+    ] = []  # Using MediaItem model for now, can be extended with Audio model if needed
+
 
 class Links(BaseModel):
     internal: List[Link] = []
     external: List[Link] = []
+
 
 class ScrapingResult(BaseModel):
     cleaned_html: str

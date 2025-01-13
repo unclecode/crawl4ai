@@ -51,9 +51,7 @@ setup(
     author_email="unclecode@kidocode.com",
     license="MIT",
     packages=find_packages(),
-    package_data={
-        'crawl4ai': ['js_snippet/*.js']
-    },
+    package_data={"crawl4ai": ["js_snippet/*.js"]},
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",
