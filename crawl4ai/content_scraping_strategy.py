@@ -21,6 +21,7 @@ from .utils import (
 from lxml import etree
 from lxml import html as lhtml
 from typing import Dict, Any, List, Tuple
+from .models import ScrapingResult, MediaItem, Link, Media, Links
 
 # Pre-compile regular expressions for Open Graph and Twitter metadata
 OG_REGEX = re.compile(r'^og:')
@@ -73,11 +74,11 @@ def fetch_image_file_size(img, base_url):
 
 class ContentScrapingStrategy(ABC):
     @abstractmethod
-    def scrap(self, url: str, html: str, **kwargs) -> Dict[str, Any]:
+    def scrap(self, url: str, html: str, **kwargs) -> ScrapingResult:
         pass
 
     @abstractmethod
-    async def ascrap(self, url: str, html: str, **kwargs) -> Dict[str, Any]:
+    async def ascrap(self, url: str, html: str, **kwargs) -> ScrapingResult:
         pass
 
 class WebScrapingStrategy(ContentScrapingStrategy):
@@ -101,7 +102,7 @@ class WebScrapingStrategy(ContentScrapingStrategy):
             log_method = getattr(self.logger, level)
             log_method(message=message, tag=tag, **kwargs)
                 
-    def scrap(self, url: str, html: str, **kwargs) -> Dict[str, Any]:
+    def scrap(self, url: str, html: str, **kwargs) -> ScrapingResult:
         """
         Main entry point for content scraping.  
 
@@ -111,16 +112,40 @@ class WebScrapingStrategy(ContentScrapingStrategy):
             **kwargs: Additional keyword arguments.
 
         Returns:
-            Dict[str, Any]: A dictionary containing the scraped content. This dictionary contains the following keys:
-
-            - 'markdown': The generated markdown content, type is str, however soon will become MarkdownGenerationResult via 'markdown.raw_markdown'.
-            - 'fit_markdown': The generated markdown content with relevant content filtered, this will be removed soon and available in 'markdown.fit_markdown'.
-            - 'fit_html': The HTML content with relevant content filtered, this will be removed soon and available in 'markdown.fit_html'.
-            - 'markdown_v2': The generated markdown content with relevant content filtered, this is temporary and will be removed soon and replaced with 'markdown'
+            ScrapingResult: A structured result containing the scraped content.
         """
-        return self._scrap(url, html, is_async=False, **kwargs)
+        raw_result = self._scrap(url, html, is_async=False, **kwargs)
+        if raw_result is None:
+            return ScrapingResult(
+                cleaned_html="",
+                success=False,
+                media=Media(),
+                links=Links(),
+                metadata={}
+            )
 
-    async def ascrap(self, url: str, html: str, **kwargs) -> Dict[str, Any]:
+        # Convert media items
+        media = Media(
+            images=[MediaItem(**img) for img in raw_result.get("media", {}).get("images", []) if img],
+            videos=[MediaItem(**vid) for vid in raw_result.get("media", {}).get("videos", []) if vid],
+            audios=[MediaItem(**aud) for aud in raw_result.get("media", {}).get("audios", []) if aud]
+        )
+
+        # Convert links
+        links = Links(
+            internal=[Link(**link) for link in raw_result.get("links", {}).get("internal", []) if link],
+            external=[Link(**link) for link in raw_result.get("links", {}).get("external", []) if link]
+        )
+
+        return ScrapingResult(
+            cleaned_html=raw_result.get("cleaned_html", ""),
+            success=raw_result.get("success", False),
+            media=media,
+            links=links,
+            metadata=raw_result.get("metadata", {})
+        )
+
+    async def ascrap(self, url: str, html: str, **kwargs) -> ScrapingResult:
         """
         Main entry point for asynchronous content scraping.
 
@@ -130,12 +155,7 @@ class WebScrapingStrategy(ContentScrapingStrategy):
             **kwargs: Additional keyword arguments.
 
         Returns:
-            Dict[str, Any]: A dictionary containing the scraped content. This dictionary contains the following keys:
-
-            - 'markdown': The generated markdown content, type is str, however soon will become MarkdownGenerationResult via 'markdown.raw_markdown'.
-            - 'fit_markdown': The generated markdown content with relevant content filtered, this will be removed soon and available in 'markdown.fit_markdown'.
-            - 'fit_html': The HTML content with relevant content filtered, this will be removed soon and available in 'markdown.fit_html'.
-            - 'markdown_v2': The generated markdown content with relevant content filtered, this is temporary and will be removed soon and replaced with 'markdown'
+            ScrapingResult: A structured result containing the scraped content.
         """
         return await asyncio.to_thread(self._scrap, url, html, **kwargs)
 

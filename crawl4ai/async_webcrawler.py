@@ -543,27 +543,20 @@ class AsyncWebCrawler:
                 _url = url if not kwargs.get("is_raw_html", False) else "Raw HTML"
                 t1 = time.perf_counter()
 
-                # Initialize scraping strategy based on mode
-                if config.scraping_mode == ScrapingMode.LXML:
-                    scrapping_strategy = LXMLWebScrapingStrategy(logger=self.logger)
-                else:  # Default to BeautifulSoup
-                    scrapping_strategy = WebScrapingStrategy(logger=self.logger)
+                # Get scraping strategy and ensure it has a logger
+                scraping_strategy = config.scraping_strategy
+                if not scraping_strategy.logger:
+                    scraping_strategy.logger = self.logger
 
                 # Process HTML content
                 params = {k:v for k, v in config.to_dict().items() if k not in ["url"]}
                 # add keys from kwargs to params that doesn't exist in params
                 params.update({k:v for k, v in kwargs.items() if k not in params.keys()})
                 
-                result = scrapping_strategy.scrap(
+                result = scraping_strategy.scrap(
                     url,
                     html,
-                    **params,
-                    # word_count_threshold=config.word_count_threshold,
-                    # css_selector=config.css_selector,
-                    # only_text=config.only_text,
-                    # image_description_min_word_threshold=config.image_description_min_word_threshold,
-                    # content_filter=config.content_filter,
-                    # **kwargs
+                    **params
                 )
 
                 if result is None:
@@ -576,13 +569,17 @@ class AsyncWebCrawler:
 
        
 
-            # Extract results
-            cleaned_html = sanitize_input_encode(result.get("cleaned_html", ""))
-            fit_markdown = sanitize_input_encode(result.get("fit_markdown", ""))
-            fit_html = sanitize_input_encode(result.get("fit_html", ""))
-            media = result.get("media", [])
-            links = result.get("links", [])
-            metadata = result.get("metadata", {})
+            # Extract results - handle both dict and ScrapingResult
+            if isinstance(result, dict):
+                cleaned_html = sanitize_input_encode(result.get("cleaned_html", ""))
+                media = result.get("media", {})
+                links = result.get("links", {})
+                metadata = result.get("metadata", {})
+            else:
+                cleaned_html = sanitize_input_encode(result.cleaned_html)
+                media = result.media.model_dump()
+                links = result.links.model_dump()
+                metadata = result.metadata
 
             # Markdown Generation
             markdown_generator: Optional[MarkdownGenerationStrategy] = config.markdown_generator or DefaultMarkdownGenerator()
@@ -610,10 +607,7 @@ class AsyncWebCrawler:
             )
 
             # Handle content extraction if needed
-            if (extracted_content is None and 
-                config.extraction_strategy and 
-                config.chunking_strategy and 
-                not isinstance(config.extraction_strategy, NoExtractionStrategy)):
+            if (not bool(extracted_content) and config.extraction_strategy and not isinstance(config.extraction_strategy, NoExtractionStrategy)):
                 
                 t1 = time.perf_counter()
                 
@@ -664,8 +658,8 @@ class AsyncWebCrawler:
                 cleaned_html=cleaned_html,
                 markdown_v2=markdown_v2,
                 markdown=markdown,
-                fit_markdown=fit_markdown,
-                fit_html=fit_html,
+                fit_markdown=markdown_result.fit_markdown,
+                fit_html=markdown_result.fit_html,
                 media=media,
                 links=links,
                 metadata=metadata,
