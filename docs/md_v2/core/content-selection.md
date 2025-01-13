@@ -320,14 +320,14 @@ if __name__ == "__main__":
 
 ## 6. Scraping Modes
 
-Crawl4AI provides two different scraping modes for HTML content processing: BeautifulSoup (default) and LXML. The LXML mode offers significantly better performance, especially for large HTML documents.
+Crawl4AI provides two different scraping strategies for HTML content processing: `WebScrapingStrategy` (BeautifulSoup-based, default) and `LXMLWebScrapingStrategy` (LXML-based). The LXML strategy offers significantly better performance, especially for large HTML documents.
 
 ```python
-from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, ScrapingMode
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, LXMLWebScrapingStrategy
 
 async def main():
     config = CrawlerRunConfig(
-        scraping_mode=ScrapingMode.LXML  # Faster alternative to default BeautifulSoup
+        scraping_strategy=LXMLWebScrapingStrategy()  # Faster alternative to default BeautifulSoup
     )
     async with AsyncWebCrawler() as crawler:
         result = await crawler.arun(
@@ -336,20 +336,69 @@ async def main():
         )
 ```
 
+You can also create your own custom scraping strategy by inheriting from `ContentScrapingStrategy`. The strategy must return a `ScrapingResult` object with the following structure:
+
+```python
+from crawl4ai import ContentScrapingStrategy, ScrapingResult, MediaItem, Media, Link, Links
+
+class CustomScrapingStrategy(ContentScrapingStrategy):
+    def scrap(self, url: str, html: str, **kwargs) -> ScrapingResult:
+        # Implement your custom scraping logic here
+        return ScrapingResult(
+            cleaned_html="<html>...</html>",  # Cleaned HTML content
+            success=True,                     # Whether scraping was successful
+            media=Media(
+                images=[                      # List of images found
+                    MediaItem(
+                        src="https://example.com/image.jpg",
+                        alt="Image description",
+                        desc="Surrounding text",
+                        score=1,
+                        type="image",
+                        group_id=1,
+                        format="jpg",
+                        width=800
+                    )
+                ],
+                videos=[],                    # List of videos (same structure as images)
+                audios=[]                     # List of audio files (same structure as images)
+            ),
+            links=Links(
+                internal=[                    # List of internal links
+                    Link(
+                        href="https://example.com/page",
+                        text="Link text",
+                        title="Link title",
+                        base_domain="example.com"
+                    )
+                ],
+                external=[]                   # List of external links (same structure)
+            ),
+            metadata={                        # Additional metadata
+                "title": "Page Title",
+                "description": "Page description"
+            }
+        )
+
+    async def ascrap(self, url: str, html: str, **kwargs) -> ScrapingResult:
+        # For simple cases, you can use the sync version
+        return await asyncio.to_thread(self.scrap, url, html, **kwargs)
+```
+
 ### Performance Considerations
 
-The LXML mode can be up to 10-20x faster than BeautifulSoup mode, particularly when processing large HTML documents. However, please note:
+The LXML strategy can be up to 10-20x faster than BeautifulSoup strategy, particularly when processing large HTML documents. However, please note:
 
-1. LXML mode is currently experimental
+1. LXML strategy is currently experimental
 2. In some edge cases, the parsing results might differ slightly from BeautifulSoup
 3. If you encounter any inconsistencies between LXML and BeautifulSoup results, please [raise an issue](https://github.com/codeium/crawl4ai/issues) with a reproducible example
 
-Choose LXML mode when:
+Choose LXML strategy when:
 - Processing large HTML documents (recommended for >100KB)
 - Performance is critical
 - Working with well-formed HTML
 
-Stick to BeautifulSoup mode (default) when:
+Stick to BeautifulSoup strategy (default) when:
 - Maximum compatibility is needed
 - Working with malformed HTML
 - Exact parsing behavior is critical

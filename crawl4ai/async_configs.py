@@ -9,10 +9,10 @@ from .config import (
 )
 from .user_agent_generator import UserAgentGenerator
 from .extraction_strategy import ExtractionStrategy
-from .chunking_strategy import ChunkingStrategy
+from .chunking_strategy import ChunkingStrategy, RegexChunking
 from .markdown_generation_strategy import MarkdownGenerationStrategy
+from .content_scraping_strategy import ContentScrapingStrategy, WebScrapingStrategy
 from typing import Union, List
-from enum import Enum
 
 class BrowserConfig:
     """
@@ -184,12 +184,6 @@ class BrowserConfig:
         )
 
 
-class ScrapingMode(str, Enum):
-    """Enum for different scraping modes."""
-    BEAUTIFULSOUP = "beautifulsoup"
-    LXML = "lxml"
-
-
 class CrawlerRunConfig:
     """
     Configuration class for controlling how the crawler runs each crawl operation.
@@ -227,8 +221,8 @@ class CrawlerRunConfig:
                           Default: False.
         parser_type (str): Type of parser to use for HTML parsing.
                            Default: "lxml".
-        scraping_mode (ScrapingMode): Scraping mode to use.
-                           Default: ScrapingMode.BEAUTIFULSOUP.
+        scraping_strategy (ContentScrapingStrategy): Scraping strategy to use.
+                           Default: WebScrapingStrategy.
 
         # Caching Parameters
         cache_mode (CacheMode or None): Defines how caching is handled.
@@ -329,7 +323,7 @@ class CrawlerRunConfig:
         # Content Processing Parameters
         word_count_threshold: int = MIN_WORD_THRESHOLD,
         extraction_strategy: ExtractionStrategy = None,
-        chunking_strategy: ChunkingStrategy = None,
+        chunking_strategy: ChunkingStrategy = RegexChunking(),
         markdown_generator: MarkdownGenerationStrategy = None,
         content_filter=None,
         only_text: bool = False,
@@ -340,7 +334,7 @@ class CrawlerRunConfig:
         remove_forms: bool = False,
         prettiify: bool = False,
         parser_type: str = "lxml",
-        scraping_mode: ScrapingMode = ScrapingMode.BEAUTIFULSOUP,
+        scraping_strategy: ContentScrapingStrategy = None,
 
         # SSL Parameters
         fetch_ssl_certificate: bool = False,
@@ -413,7 +407,7 @@ class CrawlerRunConfig:
         self.remove_forms = remove_forms
         self.prettiify = prettiify
         self.parser_type = parser_type
-        self.scraping_mode = scraping_mode
+        self.scraping_strategy = scraping_strategy or WebScrapingStrategy()
 
         # SSL Parameters
         self.fetch_ssl_certificate = fetch_ssl_certificate
@@ -480,7 +474,6 @@ class CrawlerRunConfig:
 
         # Set default chunking strategy if None
         if self.chunking_strategy is None:
-            from .chunking_strategy import RegexChunking
             self.chunking_strategy = RegexChunking()
 
     @staticmethod
@@ -489,7 +482,7 @@ class CrawlerRunConfig:
             # Content Processing Parameters
             word_count_threshold=kwargs.get("word_count_threshold", 200),
             extraction_strategy=kwargs.get("extraction_strategy"),
-            chunking_strategy=kwargs.get("chunking_strategy"),
+            chunking_strategy=kwargs.get("chunking_strategy", RegexChunking()),
             markdown_generator=kwargs.get("markdown_generator"),
             content_filter=kwargs.get("content_filter"),
             only_text=kwargs.get("only_text", False),
@@ -500,7 +493,7 @@ class CrawlerRunConfig:
             remove_forms=kwargs.get("remove_forms", False),
             prettiify=kwargs.get("prettiify", False),
             parser_type=kwargs.get("parser_type", "lxml"),
-            scraping_mode=kwargs.get("scraping_mode", ScrapingMode.BEAUTIFULSOUP),
+            scraping_strategy=kwargs.get("scraping_strategy"),
 
             # SSL Parameters
             fetch_ssl_certificate=kwargs.get("fetch_ssl_certificate", False),
@@ -574,7 +567,7 @@ class CrawlerRunConfig:
             "remove_forms": self.remove_forms,
             "prettiify": self.prettiify,
             "parser_type": self.parser_type,
-            "scraping_mode": self.scraping_mode,
+            "scraping_strategy": self.scraping_strategy,
             "fetch_ssl_certificate": self.fetch_ssl_certificate,
             "cache_mode": self.cache_mode,
             "session_id": self.session_id,

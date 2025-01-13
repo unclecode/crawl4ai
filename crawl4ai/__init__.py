@@ -1,7 +1,8 @@
 # __init__.py
 
 from .async_webcrawler import AsyncWebCrawler, CacheMode
-from .async_configs import BrowserConfig, CrawlerRunConfig, ScrapingMode
+from .async_configs import BrowserConfig, CrawlerRunConfig
+from .content_scraping_strategy import ContentScrapingStrategy, WebScrapingStrategy, LXMLWebScrapingStrategy
 from .extraction_strategy import ExtractionStrategy, LLMExtractionStrategy, CosineStrategy, JsonCssExtractionStrategy
 from .chunking_strategy import ChunkingStrategy, RegexChunking
 from .markdown_generation_strategy import DefaultMarkdownGenerator
@@ -14,7 +15,9 @@ __all__ = [
     "AsyncWebCrawler",
     "CrawlResult",
     "CacheMode",
-    "ScrapingMode",
+    "ContentScrapingStrategy",
+    "WebScrapingStrategy",
+    "LXMLWebScrapingStrategy",
     'BrowserConfig',
     'CrawlerRunConfig',
     'ExtractionStrategy',

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, HttpUrl
-from typing import List, Dict, Optional, Callable, Awaitable, Union, Tuple
+from typing import List, Dict, Optional, Callable, Awaitable, Union, Tuple, Any
 from enum import Enum
 from dataclasses import dataclass, field
 from .ssl_certificate import SSLCertificate
@@ -129,3 +129,38 @@ class AsyncCrawlResponse(BaseModel):
 
     class Config:
         arbitrary_types_allowed = True
+
+###############################
+# Scraping Models
+###############################
+class MediaItem(BaseModel):
+    src: str
+    alt: Optional[str] = None
+    desc: Optional[str] = None
+    score: int
+    type: str = "image"
+    group_id: int
+    format: Optional[str] = None
+    width: Optional[int] = None
+
+class Link(BaseModel):
+    href: str
+    text: str
+    title: Optional[str] = None
+    base_domain: str
+
+class Media(BaseModel):
+    images: List[MediaItem] = []
+    videos: List[MediaItem] = []  # Using MediaItem model for now, can be extended with Video model if needed
+    audios: List[MediaItem] = []  # Using MediaItem model for now, can be extended with Audio model if needed
+
+class Links(BaseModel):
+    internal: List[Link] = []
+    external: List[Link] = []
+
+class ScrapingResult(BaseModel):
+    cleaned_html: str
+    success: bool
+    media: Media = Media()
+    links: Links = Links()
+    metadata: Dict[str, Any] = {}
