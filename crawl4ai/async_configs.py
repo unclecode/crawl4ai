@@ -11,7 +11,7 @@ from .extraction_strategy import ExtractionStrategy
 from .chunking_strategy import ChunkingStrategy, RegexChunking
 from .markdown_generation_strategy import MarkdownGenerationStrategy
 from .content_scraping_strategy import ContentScrapingStrategy, WebScrapingStrategy
-from typing import Union, List
+from typing import Optional, Union, List
 
 
 class BrowserConfig:
@@ -38,7 +38,7 @@ class BrowserConfig:
                               is "chromium". Default: "chromium".
         channel (str): The channel to launch (e.g., "chromium", "chrome", "msedge"). Only applies if browser_type
                               is "chromium". Default: "chromium".
-        proxy (str or None): Proxy server URL (e.g., "http://username:password@proxy:port"). If None, no proxy is used.
+        proxy (Optional[str]): Proxy server URL (e.g., "http://username:password@proxy:port"). If None, no proxy is used.
                              Default: None.
         proxy_config (dict or None): Detailed proxy configuration, e.g. {"server": "...", "username": "..."}.
                                      If None, no additional proxy config. Default: None.
@@ -81,7 +81,7 @@ class BrowserConfig:
         user_data_dir: str = None,
         chrome_channel: str = "chromium",
         channel: str = "chromium",
-        proxy: str = None,
+        proxy: Optional[str] = None,
         proxy_config: dict = None,
         viewport_width: int = 1080,
         viewport_height: int = 600,
