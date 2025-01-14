@@ -5,20 +5,17 @@ import json
 import time
 import os
 
-from .prompts import PROMPT_EXTRACT_BLOCKS
+from .prompts import PROMPT_EXTRACT_BLOCKS, PROMPT_EXTRACT_BLOCKS_WITH_INSTRUCTION, PROMPT_EXTRACT_SCHEMA_WITH_INSTRUCTION
 from .config import (
     DEFAULT_PROVIDER, PROVIDER_MODELS, 
     CHUNK_TOKEN_THRESHOLD,
     OVERLAP_RATE,
     WORD_TOKEN_RATE,
-    PROMPT_EXTRACT_BLOCKS_WITH_INSTRUCTION,
-    PROMPT_EXTRACT_SCHEMA_WITH_INSTRUCTION
 )
 from .utils import *  # noqa: F403
 
 from .utils import (
     sanitize_html,
-    calculate_batch_size,
     escape_json_string,
     perform_completion_with_backoff,
     extract_xml_data,
@@ -34,6 +31,7 @@ from .model_loader import (
     get_device,
     load_HF_embedding_model,
     load_text_multilabel_classifier,
+    calculate_batch_size
 )
 
 from functools import partial

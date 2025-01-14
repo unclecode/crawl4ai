@@ -10,7 +10,7 @@ import asyncio
 
 # from contextlib import nullcontext, asynccontextmanager
 from contextlib import asynccontextmanager
-from .models import CrawlResult, MarkdownGenerationResult, CrawlerTaskResult, DispatchResult, RateLimiter
+from .models import CrawlResult, MarkdownGenerationResult, CrawlerTaskResult, DispatchResult
 from .async_database import async_db_manager
 from .chunking_strategy import *  # noqa: F403
 from .chunking_strategy import RegexChunking, ChunkingStrategy, IdentityChunking
@@ -31,7 +31,7 @@ from .markdown_generation_strategy import (
 from .async_logger import AsyncLogger
 from .async_configs import BrowserConfig, CrawlerRunConfig
 from .async_dispatcher import * # noqa: F403
-from .async_dispatcher import BaseDispatcher, MemoryAdaptiveDispatcher
+from .async_dispatcher import BaseDispatcher, MemoryAdaptiveDispatcher, RateLimiter
 
 from .config import MIN_WORD_THRESHOLD
 from .utils import (
@@ -783,7 +783,7 @@ class AsyncWebCrawler:
             crawler=self, urls=urls, config=config
         )
 
-        results: CrawlResult = []
+        results: List[CrawlResult] = []
         for res in _results:
             _res: CrawlResult = res.result
             dispatch_result: DispatchResult = DispatchResult(
