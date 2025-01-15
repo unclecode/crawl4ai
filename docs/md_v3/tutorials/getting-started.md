@@ -129,8 +129,8 @@ config = CrawlerRunConfig(markdown_generator=md_generator)
 
 async with AsyncWebCrawler() as crawler:
     result = await crawler.arun("https://news.ycombinator.com", config=config)
-    print("Raw Markdown length:", len(result.markdown.raw_markdown))
-    print("Fit Markdown length:", len(result.markdown.fit_markdown))
+    print("Raw Markdown length:", len(result.markdown_v2.raw_markdown))
+    print("Fit Markdown length:", len(result.markdown_v2.fit_markdown))
 ```
 
 **Note**: If you do **not** specify a content filter or markdown generator, you’ll typically see only the raw Markdown. We’ll dive deeper into these strategies in a dedicated **Markdown Generation** tutorial.
