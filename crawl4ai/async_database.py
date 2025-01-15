@@ -14,8 +14,8 @@ from .async_logger import AsyncLogger
 from .utils import get_error_context, create_box_message
 
 # Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# logging.basicConfig(level=logging.INFO)
+# logger = logging.getLogger(__name__)
 
 base_directory = DB_PATH = os.path.join(
     os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home()), ".crawl4ai"
@@ -333,7 +333,11 @@ class AsyncDatabaseManager:
                             json.loads(row_dict[field]) if row_dict[field] else {}
                         )
                     except json.JSONDecodeError:
-                        row_dict[field] = {}
+                        # Very UGLY, never mention it to me please
+                        if field == "markdown" and isinstance(row_dict[field], str):
+                            row_dict[field] = row_dict[field]
+                        else:
+                            row_dict[field] = {}
 
                 if isinstance(row_dict["markdown"], Dict):
                     row_dict["markdown_v2"] = row_dict["markdown"]

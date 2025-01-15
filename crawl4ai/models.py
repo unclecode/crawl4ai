@@ -140,21 +140,21 @@ class AsyncCrawlResponse(BaseModel):
 # Scraping Models
 ###############################
 class MediaItem(BaseModel):
-    src: str
-    alt: Optional[str] = None
-    desc: Optional[str] = None
-    score: int
+    src: Optional[str] = ""
+    alt: Optional[str] = ""
+    desc: Optional[str] = ""
+    score: Optional[int] = 0
     type: str = "image"
-    group_id: int
+    group_id: Optional[int] = 0
     format: Optional[str] = None
     width: Optional[int] = None
 
 
 class Link(BaseModel):
-    href: str
-    text: str
-    title: Optional[str] = None
-    base_domain: str
+    href: Optional[str] = ""
+    text: Optional[str] = ""
+    title: Optional[str] = ""
+    base_domain: Optional[str] = ""
 
 
 class Media(BaseModel):

@@ -23,6 +23,7 @@ from .async_dispatcher import (
     RateLimiter,
     CrawlerMonitor,
     DisplayMode,
+    BaseDispatcher
 )
 
 __all__ = [
@@ -43,6 +44,7 @@ __all__ = [
     "DefaultMarkdownGenerator",
     "PruningContentFilter",
     "BM25ContentFilter",
+    "BaseDispatcher",
     "MemoryAdaptiveDispatcher",
     "SemaphoreDispatcher",
     "RateLimiter",
