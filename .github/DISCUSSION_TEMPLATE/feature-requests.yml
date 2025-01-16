@@ -1,8 +1,5 @@
-name: Feature Request
-description: Template for submitting a new feature request
 title: "[Feature Request]: "
 labels: ["New"]
-
 body:
   - type: markdown
     attributes:
