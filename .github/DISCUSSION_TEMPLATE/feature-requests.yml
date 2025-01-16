@@ -4,7 +4,6 @@ body:
   - type: markdown
     attributes:
       value: |
-        # 🎉 Feature Request Template
         Thank you for your interest in suggesting a new feature! Before you submit, please take a moment to check if already exists in
         this discussions category to avoid duplicates. 😊
 
