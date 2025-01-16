@@ -1,7 +1,7 @@
 ## Summary
 Please include a summary of the change and/or which issues are fixed.
 
-eg: Fixes #[issue_number] (Tag in this format(#<Issue-Number>), so Github automatically links the issues with your PR)
+eg: `Fixes #123` (Tag GitHub issue numbers in this format, so it automatically links the issues with your PR)
 
 ## List of files changed and why
 eg: quickstart.py - To update the example as per new changes
