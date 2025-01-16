@@ -317,7 +317,7 @@ class BaseDispatcher(ABC):
 class MemoryAdaptiveDispatcher(BaseDispatcher):
     def __init__(
         self,
-        memory_threshold_percent: float = 70.0,
+        memory_threshold_percent: float = 90.0,
         check_interval: float = 1.0,
         max_session_permit: int = 20,
         memory_wait_timeout: float = 300.0,  # 5 minutes default timeout
