@@ -1,0 +1,37 @@
+name: Pull Request
+description: Template for submitting a pull request to Crawl4AI
+title: "[Fix]: "
+labels: ["enhancement", "bug"]
+
+body:
+  - type: input
+    id: issue_number
+    attributes:
+      label: "Fixes Issue(s)"
+      description: "Reference the Github issues this PR fixes"
+      placeholder: "e.g., Fixes #123, Closes #123 or Resolves #123"
+    validations:
+      required: true
+
+  - type: textarea
+    id: changes_made
+    attributes:
+      label: "Changes Made"
+      description: "Provide a brief description of the changes made in this pull request."
+      placeholder: |
+        - Brief description of fix
+        - Files changed and why
+    validations:
+      required: true
+
+  - type: checklist
+    id: testing
+    attributes:
+      label: "Testing"
+      description: "Verify that the changes have been thoroughly tested"
+      options:
+        - "Added/updated unit tests"
+        - "Tested manually with example case"
+        - "Verified no regressions"
+    validations:
+      required: true
