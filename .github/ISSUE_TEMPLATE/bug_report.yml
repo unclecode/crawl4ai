@@ -119,11 +119,11 @@ body:
       required: false
 
   # Screenshots Field (File Upload)
-  - type: file
-    id: screenshots
-    attributes:
-      label: Screenshots (if applicable)
-      description: Upload any relevant screenshots to help us understand the issue.
-      accept: "image/*"
-    validations:
-      required: false
+  # - type: file
+  #   id: screenshots
+  #   attributes:
+  #     label: Screenshots (if applicable)
+  #     description: Upload any relevant screenshots to help us understand the issue.
+  #     accept: "image/*"
+  #   validations:
+  #     required: false
