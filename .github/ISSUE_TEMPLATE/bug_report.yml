@@ -1,7 +1,7 @@
 name: Bug Report
 description: Report a bug with the Crawl4AI.
 title: "[Bug]: "
-labels: ["bug"]
+labels: ["bug","needs-triage"]
 body:
   - type: input
     id: crawl4ai_version
@@ -112,18 +112,8 @@ body:
   - type: textarea
     id: error_logs
     attributes:
-      label: Error logs (if any)
-      description: If you encountered any errors, please provide the error logs.
-      placeholder: "Paste error logs here."
+      label: Error logs & Screenshots (if applicable)
+      description: If you encountered any errors, please provide the error logs. Attach any relevant screenshots to help us understand the issue.
+      placeholder: "Paste error logs here and attach your screenshots"
     validations:
       required: false
-
-  # Screenshots Field (File Upload)
-  # - type: file
-  #   id: screenshots
-  #   attributes:
-  #     label: Screenshots (if applicable)
-  #     description: Upload any relevant screenshots to help us understand the issue.
-  #     accept: "image/*"
-  #   validations:
-  #     required: false
