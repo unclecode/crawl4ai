@@ -32,7 +32,7 @@ body:
       description: Who would benefit from this feature? (e.g., specific teams, developers, users, etc.)
       placeholder: "e.g., Marketing teams, developers"
     validations:
-      required: true
+      required: false
 
   - type: textarea
     id: current_workarounds
@@ -55,7 +55,7 @@ body:
       description: Share any ideas you have for how this feature could be implemented.
       placeholder: "e.g., Implement a breadth first traversal algorithm for scraper"
     validations:
-      required: true
+      required: false
 
   - type: textarea
     id: potential_challenges
@@ -73,7 +73,7 @@ body:
       description: What criteria will indicate that this feature is successful?
       placeholder: "e.g., Decreased crawl time, Increased accuracy"
     validations:
-      required: true
+      required: false
 
   - type: markdown
     attributes:
@@ -87,7 +87,7 @@ body:
       description: Provide real-world examples or scenarios where this feature would be useful.
       placeholder: "e.g., Users scraping for data from specific financial reports"
     validations:
-      required: true
+      required: false
 
   - type: textarea
     id: related_features_issues
