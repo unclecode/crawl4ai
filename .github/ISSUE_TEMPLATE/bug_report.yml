@@ -41,9 +41,9 @@ body:
       label: Is this reproducible?
       description: Indicate whether this bug can be reproduced consistently.
       options:
-        - Yes
-        - No
-        - Sometimes
+        - "Yes"
+        - "No"
+        - "Sometimes"
     validations:
       required: true
 

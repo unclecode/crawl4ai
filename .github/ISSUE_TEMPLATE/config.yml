@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "Feature Requests"
+    url: "../../discussions/categories/feature-requests"
+    about: "Suggest new features or improvements for the project."
+  - name: "General Questions"
+    url: "../../discussions"
+    about: "Ask questions or engage in general discussions about the project."
