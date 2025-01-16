@@ -66,9 +66,9 @@ body:
   # Header Section with Title
   - type: markdown
     attributes:
-    value: |
-      ## Supporting Information
-      Please provide the following details to help us understand and resolve your issue. This will assist us in reproducing and diagnosing the problem
+      value: |
+          ## Supporting Information
+          Please provide the following details to help us understand and resolve your issue. This will assist us in reproducing and diagnosing the problem
 
   - type: input
     id: os
