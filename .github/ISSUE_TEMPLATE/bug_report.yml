@@ -1,14 +1,16 @@
 name: Bug Report
-description: Report a bug with the Crawl4AI. For feature requests or general questions, please use our GitHub Discussions.
+description: Report a bug with the Crawl4AI.
 title: "[Bug]: "
 labels: ["bug"]
 body:
-  - type: markdown
+  - type: input
+    id: crawl4ai_version
     attributes:
-      value: |
-        Thank you for reporting a bug! Please note:
-        - **For feature requests**, visit our [Feature Requests](../../discussions/categories/feature-requests).
-        - **For questions or general discussions**, go to our [Forums](../../discussions).
+      label: crawl4ai version
+      description: Specify the version of crawl4ai you are using.
+      placeholder: "e.g., 2.0.0"
+    validations:
+      required: true
 
   - type: textarea
     id: expected_behavior
@@ -16,6 +18,8 @@ body:
       label: Expected Behavior
       description: Describe what you expected to happen.
       placeholder: "Provide a detailed explanation of the expected outcome."
+    validations:
+      required: true
 
   - type: textarea
     id: current_behavior
@@ -23,6 +27,8 @@ body:
       label: Current Behavior
       description: Describe what is happening instead of the expected behavior.
       placeholder: "Describe the actual result or issue you encountered."
+    validations:
+      required: true
 
   - type: textarea
     id: steps_to_reproduce
@@ -43,7 +49,6 @@ body:
       options:
         - "Yes"
         - "No"
-        - "Sometimes"
     validations:
       required: true
 
@@ -58,16 +63,67 @@ body:
         - Input data (if applicable): 
       render: bash
 
-  - type: textarea
-    id: supporting_information
+  # Header Section with Title
+  - type: markdown
     attributes:
-      label: Supporting Information
-      description: Provide additional details like environment information, logs, or screenshots.
-      placeholder: |
-        - OS: 
-        - Python version: 
-        - Browser & version: 
-        - crawl4ai version: 
-        - Error logs (if any): 
-        - Screenshots (if applicable): 
-      render: yaml
+    value: |
+      ## Supporting Information
+      Please provide the following details to help us understand and resolve your issue. This will assist us in reproducing and diagnosing the problem
+
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      description: Please provide the operating system & distro where the issue occurs.
+      placeholder: "e.g., Windows, macOS, Linux"
+    validations:
+      required: true
+
+  - type: input
+    id: python_version
+    attributes:
+      label: Python version
+      description: Specify the Python version being used.
+      placeholder: "e.g., 3.8.5"
+    validations:
+      required: true
+
+  # Browser Field
+  - type: input
+    id: browser
+    attributes:
+      label: Browser
+      description: Provide the name of the browser you are using.
+      placeholder: "e.g., Chrome, Firefox, Safari"
+    validations:
+      required: false
+
+  # Browser Version Field
+  - type: input
+    id: browser_version
+    attributes:
+      label: Browser version
+      description: Provide the version of the browser you are using.
+      placeholder: "e.g., 91.0.4472.124"
+    validations:
+      required: false
+
+  # Error Logs Field (Text Area)
+  - type: textarea
+    id: error_logs
+    attributes:
+      label: Error logs (if any)
+      description: If you encountered any errors, please provide the error logs.
+      placeholder: "Paste error logs here."
+    validations:
+      required: false
+
+  # Screenshots Field (File Upload)
+  - type: file
+    id: screenshots
+    attributes:
+      label: Screenshots (if applicable)
+      description: Upload any relevant screenshots to help us understand the issue.
+      accept: "image/*"
+    validations:
+      required: false
