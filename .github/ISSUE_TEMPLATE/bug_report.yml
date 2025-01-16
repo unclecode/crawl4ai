@@ -1,0 +1,73 @@
+name: Bug Report
+description: Report a bug with the project. For feature requests or general questions, please use our GitHub Discussions.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a bug! Please note:
+        - **For feature requests**, visit our [Feature Requests](../../discussions/categories/feature-requests).
+        - **For questions or general discussions**, go to our [Forums](../../discussions).
+
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: Expected Behavior
+      description: Describe what you expected to happen.
+      placeholder: "Provide a detailed explanation of the expected outcome."
+
+  - type: textarea
+    id: current_behavior
+    attributes:
+      label: Current Behavior
+      description: Describe what is happening instead of the expected behavior.
+      placeholder: "Describe the actual result or issue you encountered."
+
+  - type: textarea
+    id: steps_to_reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: Provide step-by-step instructions to reproduce the issue.
+      placeholder: |
+        1. Go to...
+        2. Click on...
+        3. Observe the issue...
+      render: bash
+
+  - type: dropdown
+    id: reproducible
+    attributes:
+      label: Is this reproducible?
+      description: Indicate whether this bug can be reproduced consistently.
+      options:
+        - Yes
+        - No
+        - Sometimes
+    validations:
+      required: true
+
+  - type: textarea
+    id: inputs
+    attributes:
+      label: Inputs Causing the Bug
+      description: Provide details about the inputs causing the issue.
+      placeholder: |
+        - URL(s): 
+        - Settings used: 
+        - Input data (if applicable): 
+      render: bash
+
+  - type: textarea
+    id: supporting_information
+    attributes:
+      label: Supporting Information
+      description: Provide additional details like environment information, logs, or screenshots.
+      placeholder: |
+        - OS: 
+        - Python version: 
+        - Browser & version: 
+        - crawl4ai version: 
+        - Error logs (if any): 
+        - Screenshots (if applicable): 
+      render: yaml
