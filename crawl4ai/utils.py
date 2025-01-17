@@ -209,6 +209,58 @@ def get_home_folder():
     os.makedirs(f"{home_folder}/models", exist_ok=True)
     return home_folder
 
+async def get_chromium_path(browser_type) -> str:
+    """Returns the browser executable path using playwright's browser management.
+    
+    Uses playwright's built-in browser management to get the correct browser executable
+    path regardless of platform. This ensures we're using the same browser version
+    that playwright is tested with.
+    
+    Returns:
+        str: Path to browser executable
+    Raises:
+        RuntimeError: If browser executable cannot be found
+    """        
+    browser_types = {
+        "chromium": "chromium",
+        "firefox": "firefox",
+        "webkit": "webkit"
+    }
+    
+    browser_type = browser_types.get(browser_type)
+    if not browser_type:
+        raise RuntimeError(f"Unsupported browser type: {browser_type}")
+
+    # Check if a path has already been saved for this browser type
+    home_folder = get_home_folder()
+    path_file = os.path.join(home_folder, f"{browser_type.lower()}.path")
+    if os.path.exists(path_file):
+        with open(path_file, "r") as f:
+            return f.read()
+
+    from playwright.async_api import async_playwright
+    async with async_playwright() as p:
+        browsers = {
+            'chromium': p.chromium,
+            'firefox': p.firefox, 
+            'webkit': p.webkit
+        }
+        
+        if browser_type.lower() not in browsers:
+            raise ValueError(
+                f"Invalid browser type. Must be one of: {', '.join(browsers.keys())}"
+            )
+            
+        # Save the path int the crawl4ai home folder
+        home_folder = get_home_folder()
+        browser_path = browsers[browser_type.lower()].executable_path
+        if not browser_path:
+            raise RuntimeError(f"Browser executable not found for type: {browser_type}")
+        # Save the path in a text file with browser type name
+        with open(os.path.join(home_folder, f"{browser_type.lower()}.path"), "w") as f:
+            f.write(browser_path)
+        
+        return browser_path
 
 def beautify_html(escaped_html):
     """
