@@ -22,6 +22,7 @@ from .async_configs import BrowserConfig, CrawlerRunConfig
 from .async_logger import AsyncLogger
 from playwright_stealth import StealthConfig
 from .ssl_certificate import SSLCertificate
+from .utils import get_home_folder, get_chromium_path
 
 stealth_config = StealthConfig(
     webdriver=True,
@@ -139,7 +140,7 @@ class ManagedBrowser:
 
         # Get browser path and args based on OS and browser type
         # browser_path = self._get_browser_path()
-        args = self._get_browser_args()
+        args = await self._get_browser_args()
 
         # Start browser process
         try:
@@ -200,7 +201,7 @@ class ManagedBrowser:
                         params={"error": str(e)},
                     )
 
-    def _get_browser_path(self) -> str:
+    def _get_browser_path_WIP(self) -> str:
         """Returns the browser executable path based on OS and browser type"""
         if sys.platform == "darwin":  # macOS
             paths = {
@@ -223,9 +224,13 @@ class ManagedBrowser:
 
         return paths.get(self.browser_type)
 
-    def _get_browser_args(self) -> List[str]:
+    async def _get_browser_path(self) -> str:
+        browser_path = await get_chromium_path(self.browser_type)
+        return browser_path
+
+    async def _get_browser_args(self) -> List[str]:
         """Returns browser-specific command line arguments"""
-        base_args = [self._get_browser_path()]
+        base_args = [await self._get_browser_path()]
 
         if self.browser_type == "chromium":
             args = [

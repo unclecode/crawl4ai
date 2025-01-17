@@ -16,6 +16,7 @@ from .utils import get_error_context, create_box_message
 # Set up logging
 # logging.basicConfig(level=logging.INFO)
 # logger = logging.getLogger(__name__)
+# logger.setLevel(logging.INFO)
 
 base_directory = DB_PATH = os.path.join(
     os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home()), ".crawl4ai"
