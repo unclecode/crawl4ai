@@ -6,7 +6,8 @@ from . import __version__
 
 class VersionManager:
     def __init__(self):
-        self.home_dir = Path.home() / ".crawl4ai"
+        base_dir = os.getenv("CRAWL4_AI_BASE_DIRECTORY")
+        self.home_dir = Path(base_dir) if base_dir else Path.home() / ".crawl4ai"
         self.version_file = self.home_dir / "version.txt"
         
     def get_installed_version(self):

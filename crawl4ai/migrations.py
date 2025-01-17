@@ -141,7 +141,7 @@ async def backup_database(db_path: str) -> str:
 async def run_migration(db_path: Optional[str] = None):
     """Run database migration"""
     if db_path is None:
-        db_path = os.path.join(Path.home(), ".crawl4ai", "crawl4ai.db")
+        db_path = os.path.join(os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home()), ".crawl4ai", "crawl4ai.db")
     
     if not os.path.exists(db_path):
         logger.info("No existing database found. Skipping migration.", tag="INIT")

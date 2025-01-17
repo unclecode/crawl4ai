@@ -1,3 +1,4 @@
+import os
 import requests
 import shutil
 from pathlib import Path
@@ -6,7 +7,9 @@ from crawl4ai.llmtxt import AsyncLLMTextManager
 
 class DocsManager:
     def __init__(self, logger=None):
-        self.docs_dir = Path.home() / ".crawl4ai" / "docs"
+        base_dir = os.getenv("CRAWL4_AI_BASE_DIRECTORY")
+        home_dir = Path(base_dir) if base_dir else Path.home() / ".crawl4ai"
+        self.docs_dir = home_dir / "docs"
         self.local_docs = Path(__file__).parent.parent / "docs" / "llm.txt"
         self.docs_dir.mkdir(parents=True, exist_ok=True)
         self.logger = logger or AsyncLogger(verbose=True)
