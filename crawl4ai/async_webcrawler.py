@@ -788,7 +788,7 @@ class AsyncWebCrawler:
                 async with semaphore:
                     return await self.arun(
                         url,
-                        crawler_config=config,  # Pass the entire config object
+                        config=config,  # Pass the entire config object
                         user_agent=user_agent  # Maintain user_agent override capability
                     )
 
