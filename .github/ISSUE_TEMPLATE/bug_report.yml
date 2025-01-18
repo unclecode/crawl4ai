@@ -30,17 +30,6 @@ body:
     validations:
       required: true
 
-  - type: textarea
-    id: steps_to_reproduce
-    attributes:
-      label: Steps to Reproduce
-      description: Provide step-by-step instructions to reproduce the issue.
-      placeholder: |
-        1. Go to...
-        2. Click on...
-        3. Observe the issue...
-      render: bash
-
   - type: dropdown
     id: reproducible
     attributes:
@@ -61,6 +50,17 @@ body:
         - URL(s): 
         - Settings used: 
         - Input data (if applicable): 
+      render: bash
+  
+  - type: textarea
+    id: steps_to_reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: Provide step-by-step instructions to reproduce the issue.
+      placeholder: |
+        1. Go to...
+        2. Click on...
+        3. Observe the issue...
       render: bash
 
   # Header Section with Title
