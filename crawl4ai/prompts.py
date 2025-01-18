@@ -202,3 +202,58 @@ Avoid Common Mistakes:
 
 Result
 Output the final list of JSON objects, wrapped in <blocks>...</blocks> XML tags. Make sure to close the tag properly."""
+
+
+PROMPT_FILTER_CONTENT = """Your task is to filter and convert HTML content into clean, focused markdown that's optimized for use with LLMs and information retrieval systems.
+
+INPUT HTML: 
+<|HTML_CONTENT_START|>
+{HTML}
+<|HTML_CONTENT_END|>
+
+
+SPECIFIC INSTRUCTION: 
+<|USER_INSTRUCTION_START|>
+{REQUEST}
+<|USER_INSTRUCTION_END|>
+
+TASK DETAILS:
+1. Content Selection
+- DO: Keep essential information, main content, key details
+- DO: Preserve hierarchical structure using markdown headers
+- DO: Keep code blocks, tables, key lists
+- DON'T: Include navigation menus, ads, footers, cookie notices
+- DON'T: Keep social media widgets, sidebars, related content
+
+2. Content Transformation
+- DO: Use proper markdown syntax (#, ##, **, `, etc)
+- DO: Convert tables to markdown tables
+- DO: Preserve code formatting with ```language blocks
+- DO: Maintain link texts but remove tracking parameters
+- DON'T: Include HTML tags in output
+- DON'T: Keep class names, ids, or other HTML attributes
+
+3. Content Organization
+- DO: Maintain logical flow of information
+- DO: Group related content under appropriate headers
+- DO: Use consistent header levels
+- DON'T: Fragment related content
+- DON'T: Duplicate information
+
+Example Input:
+<div class="main-content"><h1>Setup Guide</h1><p>Follow these steps...</p></div>
+<div class="sidebar">Related articles...</div>
+
+Example Output:
+# Setup Guide
+Follow these steps...
+
+IMPORTANT: If specific instruction is provided above, prioritize those requirements over these general guidelines.
+
+OUTPUT FORMAT: 
+Wrap your response in <content> tags. Use proper markdown throughout.
+<content>
+[Your markdown content here]
+</content>
+
+Begin filtering now."""

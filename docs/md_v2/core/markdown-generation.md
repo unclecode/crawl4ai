@@ -170,6 +170,82 @@ prune_filter = PruningContentFilter(
 - You want a broad cleanup without a user query.  
 - The page has lots of repeated sidebars, footers, or disclaimers that hamper text extraction.
 
+### 4.3 LLMContentFilter
+
+For intelligent content filtering and high-quality markdown generation, you can use the **LLMContentFilter**. This filter leverages LLMs to generate relevant markdown while preserving the original content's meaning and structure:
+
+```python
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
+from crawl4ai.content_filter_strategy import LLMContentFilter
+
+async def main():
+    # Initialize LLM filter with specific instruction
+    filter = LLMContentFilter(
+        provider="openai/gpt-4",  # or your preferred provider
+        api_token="your-api-token",  # or use environment variable
+        instruction="""
+        Focus on extracting the core educational content.
+        Include:
+        - Key concepts and explanations
+        - Important code examples
+        - Essential technical details
+        Exclude:
+        - Navigation elements
+        - Sidebars
+        - Footer content
+        Format the output as clean markdown with proper code blocks and headers.
+        """,
+        chunk_token_threshold=4096,  # Adjust based on your needs
+        verbose=True
+    )
+
+    config = CrawlerRunConfig(
+        content_filter=filter
+    )
+
+    async with AsyncWebCrawler() as crawler:
+        result = await crawler.arun("https://example.com", config=config)
+        print(result.fit_markdown)  # Filtered markdown content
+```
+
+**Key Features:**
+- **Intelligent Filtering**: Uses LLMs to understand and extract relevant content while maintaining context
+- **Customizable Instructions**: Tailor the filtering process with specific instructions
+- **Chunk Processing**: Handles large documents by processing them in chunks (controlled by `chunk_token_threshold`)
+- **Parallel Processing**: For better performance, use smaller `chunk_token_threshold` (e.g., 2048 or 4096) to enable parallel processing of content chunks
+
+**Two Common Use Cases:**
+
+1. **Exact Content Preservation**:
+```python
+filter = LLMContentFilter(
+    instruction="""
+    Extract the main educational content while preserving its original wording and substance completely.
+    1. Maintain the exact language and terminology
+    2. Keep all technical explanations and examples intact
+    3. Preserve the original flow and structure
+    4. Remove only clearly irrelevant elements like navigation menus and ads
+    """,
+    chunk_token_threshold=4096
+)
+```
+
+2. **Focused Content Extraction**:
+```python
+filter = LLMContentFilter(
+    instruction="""
+    Focus on extracting specific types of content:
+    - Technical documentation
+    - Code examples
+    - API references
+    Reformat the content into clear, well-structured markdown
+    """,
+    chunk_token_threshold=4096
+)
+```
+
+> **Performance Tip**: Set a smaller `chunk_token_threshold` (e.g., 2048 or 4096) to enable parallel processing of content chunks. The default value is infinity, which processes the entire content as a single chunk.
+
 ---
 
 ## 5. Using Fit Markdown
