@@ -52,48 +52,8 @@ body:
     id: proposed_approach
     attributes:
       label: Proposed approach
-      description: Share any ideas you have for how this feature could be implemented.
+      description: Share any ideas you have for how this feature could be implemented. Point out any challenges your foresee
+       and the success metrics for this feature
       placeholder: "e.g., Implement a breadth first traversal algorithm for scraper"
-    validations:
-      required: false
-
-  - type: textarea
-    id: potential_challenges
-    attributes:
-      label: Potential challenges
-      description: Are there any obstacles or challenges that might come up while implementing this feature?
-      placeholder: "e.g., Handling large volumes of data efficiently"
-    validations:
-      required: false
-
-  - type: textarea
-    id: success_metrics
-    attributes:
-      label: Success metrics
-      description: What criteria will indicate that this feature is successful?
-      placeholder: "e.g., Decreased crawl time, Increased accuracy"
-    validations:
-      required: false
-
-  - type: markdown
-    attributes:
-      value: |
-        ### 🌟 Additional Context
-
-  - type: textarea
-    id: use_case_examples
-    attributes:
-      label: Use case examples
-      description: Provide real-world examples or scenarios where this feature would be useful.
-      placeholder: "e.g., Users scraping for data from specific financial reports"
-    validations:
-      required: false
-
-  - type: textarea
-    id: related_features_issues
-    attributes:
-      label: Related features/issues
-      description: If this feature is related to any existing discussions or issues, please link them here.
-      placeholder: "e.g., #123 for search enhancements"
     validations:
       required: false
