@@ -76,3 +76,10 @@ else:
     WebCrawler = None
     # import warnings
     # print("Warning: Synchronous WebCrawler is not available. Install crawl4ai[sync] for synchronous support. However, please note that the synchronous version will be deprecated soon.")
+
+import warnings
+from pydantic import warnings as pydantic_warnings
+
+# Disable all Pydantic warnings
+warnings.filterwarnings("ignore", module="pydantic")
+# pydantic_warnings.filter_warnings()
