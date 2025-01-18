@@ -62,6 +62,14 @@ body:
         2. Click on...
         3. Observe the issue...
       render: bash
+  
+  - type: textarea
+    id: code_snippets
+    attributes:
+      label: Code snippets
+      description: Provide code snippets(if any). Add comments as necessary
+      placeholder: print("Hello world")
+      render: python
 
   # Header Section with Title
   - type: markdown
