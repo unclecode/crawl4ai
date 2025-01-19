@@ -132,4 +132,4 @@ Throughout these sections, you’ll find code samples you can **copy-paste** int
 Thank you for joining me on this journey. Let’s keep building an **open, democratic** approach to data extraction and AI together.
 
 Happy Crawling!  
-— *Unclecde, Founder & Maintainer of Crawl4AI*  
+— *Unclecode, Founder & Maintainer of Crawl4AI*  

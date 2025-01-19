@@ -117,6 +117,7 @@ class CrawlResult(BaseModel):
     status_code: Optional[int] = None
     ssl_certificate: Optional[SSLCertificate] = None
     dispatch_result: Optional[DispatchResult] = None
+    redirected_url: Optional[str] = None
 
     class Config:
         arbitrary_types_allowed = True
@@ -131,6 +132,7 @@ class AsyncCrawlResponse(BaseModel):
     get_delayed_content: Optional[Callable[[Optional[float]], Awaitable[str]]] = None
     downloaded_files: Optional[List[str]] = None
     ssl_certificate: Optional[SSLCertificate] = None
+    final_url: Optional[str] = None
 
     class Config:
         arbitrary_types_allowed = True
