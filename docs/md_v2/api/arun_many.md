@@ -10,7 +10,7 @@ async def arun_many(
     config: Optional[CrawlerRunConfig] = None,
     dispatcher: Optional[BaseDispatcher] = None,
     ...
-) -> List[CrawlResult]:
+) -> Union[List[CrawlResult], AsyncGenerator[CrawlResult, None]]:
     """
     Crawl multiple URLs concurrently or in batches.
 
@@ -18,7 +18,7 @@ async def arun_many(
     :param config: (Optional) A default `CrawlerRunConfig` applying to each crawl.
     :param dispatcher: (Optional) A concurrency controller (e.g. MemoryAdaptiveDispatcher).
     ...
-    :return: A list of `CrawlResult` objects, one per URL.
+    :return: Either a list of `CrawlResult` objects, or an async generator if streaming is enabled.
     """
 ```
 
@@ -26,24 +26,29 @@ async def arun_many(
 
 1. **Multiple URLs**:  
    - Instead of crawling a single URL, you pass a list of them (strings or tasks).  
-   - The function returns a **list** of `CrawlResult`, in the same order as `urls`.
+   - The function returns either a **list** of `CrawlResult` or an **async generator** if streaming is enabled.
 
 2. **Concurrency & Dispatchers**:  
    - **`dispatcher`** param allows advanced concurrency control.  
    - If omitted, a default dispatcher (like `MemoryAdaptiveDispatcher`) is used internally.  
    - Dispatchers handle concurrency, rate limiting, and memory-based adaptive throttling (see [Multi-URL Crawling](../advanced/multi-url-crawling.md)).
 
-3. **Parallel** Execution**:  
+3. **Streaming Support**:  
+   - Enable streaming by setting `stream=True` in your `CrawlerRunConfig`.
+   - When streaming, use `async for` to process results as they become available.
+   - Ideal for processing large numbers of URLs without waiting for all to complete.
+
+4. **Parallel** Execution**:  
    - `arun_many()` can run multiple requests concurrently under the hood.  
    - Each `CrawlResult` might also include a **`dispatch_result`** with concurrency details (like memory usage, start/end times).
 
-### Basic Example
+### Basic Example (Batch Mode)
 
 ```python
 # Minimal usage: The default dispatcher will be used
 results = await crawler.arun_many(
     urls=["https://site1.com", "https://site2.com"],
-    config=my_run_config
+    config=CrawlerRunConfig(stream=False)  # Default behavior
 )
 
 for res in results:
@@ -51,6 +56,25 @@ for res in results:
         print(res.url, "crawled OK!")
     else:
         print("Failed:", res.url, "-", res.error_message)
+```
+
+### Streaming Example
+
+```python
+config = CrawlerRunConfig(
+    stream=True,  # Enable streaming mode
+    cache_mode=CacheMode.BYPASS
+)
+
+# Process results as they complete
+async for result in await crawler.arun_many(
+    urls=["https://site1.com", "https://site2.com", "https://site3.com"],
+    config=config
+):
+    if result.success:
+        print(f"Just completed: {result.url}")
+        # Process each result immediately
+        process_result(result)
 ```
 
 ### With a Custom Dispatcher
@@ -74,7 +98,7 @@ results = await crawler.arun_many(
 
 ### Return Value
 
-A **list** of [`CrawlResult`](./crawl-result.md) objects, one per URL. You can iterate to check `result.success` or read each item’s `extracted_content`, `markdown`, or `dispatch_result`.
+Either a **list** of [`CrawlResult`](./crawl-result.md) objects, or an **async generator** if streaming is enabled. You can iterate to check `result.success` or read each item’s `extracted_content`, `markdown`, or `dispatch_result`.
 
 ---
 
