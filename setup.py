@@ -52,7 +52,7 @@ setup(
     license="MIT",
     packages=find_packages(),
     package_data={
-        'crawl4ai': ['js_snippet/*.js']
+        'crawl4ai': ['js_snippet/*.js', 'py.typed']
     },
     classifiers=[
         "Development Status :: 3 - Alpha",
