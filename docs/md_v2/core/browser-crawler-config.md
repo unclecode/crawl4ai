@@ -85,6 +85,25 @@ class BrowserConfig:
     - Additional flags for the underlying browser.  
     - E.g. `["--disable-extensions"]`.
 
+### Helper Methods
+
+Both configuration classes provide a `clone()` method to create modified copies:
+
+```python
+# Create a base browser config
+base_browser = BrowserConfig(
+    browser_type="chromium",
+    headless=True,
+    text_mode=True
+)
+
+# Create a visible browser config for debugging
+debug_browser = base_browser.clone(
+    headless=False,
+    verbose=True
+)
+```
+
 **Minimal Example**:
 
 ```python
@@ -123,6 +142,7 @@ class CrawlerRunConfig:
         max_session_permit=20,
         display_mode=None,
         verbose=True,
+        stream=False,  # Enable streaming for arun_many()
         # ... other advanced parameters omitted
     ):
         ...
@@ -186,6 +206,36 @@ class CrawlerRunConfig:
     - The display mode for progress information (`DETAILED`, `BRIEF`, etc.).  
     - Affects how much information is printed during the crawl.
 
+### Helper Methods
+
+The `clone()` method is particularly useful for creating variations of your crawler configuration:
+
+```python
+# Create a base configuration
+base_config = CrawlerRunConfig(
+    cache_mode=CacheMode.ENABLED,
+    word_count_threshold=200,
+    wait_until="networkidle"
+)
+
+# Create variations for different use cases
+stream_config = base_config.clone(
+    stream=True,  # Enable streaming mode
+    cache_mode=CacheMode.BYPASS
+)
+
+debug_config = base_config.clone(
+    page_timeout=120000,  # Longer timeout for debugging
+    verbose=True
+)
+```
+
+The `clone()` method:
+- Creates a new instance with all the same settings
+- Updates only the specified parameters
+- Leaves the original configuration unchanged
+- Perfect for creating variations without repeating all parameters
+
 ### Rate Limiting & Resource Management
 
 For batch processing with `arun_many()`, you can enable intelligent rate limiting:
@@ -229,7 +279,8 @@ crawl_conf = CrawlerRunConfig(
         max_delay=60.0,
         max_retries=3,
         rate_limit_codes=[429, 503]
-    )
+    ),
+    stream=True  # Enable streaming
 )
 
 async with AsyncWebCrawler() as crawler:

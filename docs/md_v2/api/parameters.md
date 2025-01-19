@@ -56,6 +56,7 @@ run_cfg = CrawlerRunConfig(
     word_count_threshold=15,
     excluded_tags=["nav", "footer"],
     exclude_external_links=True,
+    stream=True,  # Enable streaming for arun_many()
 )
 ```
 
@@ -191,7 +192,28 @@ The `RateLimitConfig` class has these fields:
 
 ---
 
-## 2.2 Example Usage
+## 2.2 Helper Methods
+
+Both `BrowserConfig` and `CrawlerRunConfig` provide a `clone()` method to create modified copies:
+
+```python
+# Create a base configuration
+base_config = CrawlerRunConfig(
+    cache_mode=CacheMode.ENABLED,
+    word_count_threshold=200
+)
+
+# Create variations using clone()
+stream_config = base_config.clone(stream=True)
+no_cache_config = base_config.clone(
+    cache_mode=CacheMode.BYPASS,
+    stream=True
+)
+```
+
+The `clone()` method is particularly useful when you need slightly different configurations for different use cases, without modifying the original config.
+
+## 2.3 Example Usage
 
 ```python
 import asyncio
@@ -226,7 +248,8 @@ async def main():
         memory_threshold_percent=70.0,
         check_interval=1.0,
         max_session_permit=20,
-        display_mode="DETAILED"
+        display_mode="DETAILED",
+        stream=True
     )
 
     async with AsyncWebCrawler(config=browser_cfg) as crawler:
@@ -259,3 +282,10 @@ if __name__ == "__main__":
 - **Use** `BrowserConfig` for **global** browser settings: engine, headless, proxy, user agent.  
 - **Use** `CrawlerRunConfig` for each crawl’s **context**: how to filter content, handle caching, wait for dynamic elements, or run JS.  
 - **Pass** both configs to `AsyncWebCrawler` (the `BrowserConfig`) and then to `arun()` (the `CrawlerRunConfig`).  
+
+```python
+# Create a modified copy with the clone() method
+stream_cfg = run_cfg.clone(
+    stream=True,
+    cache_mode=CacheMode.BYPASS
+)

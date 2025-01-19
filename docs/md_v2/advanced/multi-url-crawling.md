@@ -93,44 +93,75 @@ dispatcher = SemaphoreDispatcher(
 
 ## 4. Usage Examples
 
-### 4.1 Simple Usage (Default MemoryAdaptiveDispatcher)
+### 4.1 Batch Processing (Default)
 
 ```python
-async with AsyncWebCrawler(config=browser_config) as crawler:
-    results = await crawler.arun_many(urls, config=run_config)
-```
-
-### 4.2 Memory Adaptive with Rate Limiting
-
-```python
-async def crawl_with_memory_adaptive(urls):
+async def crawl_batch():
     browser_config = BrowserConfig(headless=True, verbose=False)
-    run_config = CrawlerRunConfig(cache_mode=CacheMode.BYPASS)
+    run_config = CrawlerRunConfig(
+        cache_mode=CacheMode.BYPASS,
+        stream=False  # Default: get all results at once
+    )
     
     dispatcher = MemoryAdaptiveDispatcher(
         memory_threshold_percent=70.0,
+        check_interval=1.0,
         max_session_permit=10,
-        rate_limiter=RateLimiter(
-            base_delay=(1.0, 2.0),
-            max_delay=30.0,
-            max_retries=2
-        ),
         monitor=CrawlerMonitor(
-            max_visible_rows=15,
             display_mode=DisplayMode.DETAILED
         )
     )
-    
+
     async with AsyncWebCrawler(config=browser_config) as crawler:
+        # Get all results at once
         results = await crawler.arun_many(
-            urls,
+            urls=urls,
             config=run_config,
             dispatcher=dispatcher
         )
-        return results
+        
+        # Process all results after completion
+        for result in results:
+            if result.success:
+                await process_result(result)
+            else:
+                print(f"Failed to crawl {result.url}: {result.error_message}")
 ```
 
-### 4.3 Semaphore with Rate Limiting
+### 4.2 Streaming Mode
+
+```python
+async def crawl_streaming():
+    browser_config = BrowserConfig(headless=True, verbose=False)
+    run_config = CrawlerRunConfig(
+        cache_mode=CacheMode.BYPASS,
+        stream=True  # Enable streaming mode
+    )
+    
+    dispatcher = MemoryAdaptiveDispatcher(
+        memory_threshold_percent=70.0,
+        check_interval=1.0,
+        max_session_permit=10,
+        monitor=CrawlerMonitor(
+            display_mode=DisplayMode.DETAILED
+        )
+    )
+
+    async with AsyncWebCrawler(config=browser_config) as crawler:
+        # Process results as they become available
+        async for result in await crawler.arun_many(
+            urls=urls,
+            config=run_config,
+            dispatcher=dispatcher
+        ):
+            if result.success:
+                # Process each result immediately
+                await process_result(result)
+            else:
+                print(f"Failed to crawl {result.url}: {result.error_message}")
+```
+
+### 4.3 Semaphore-based Crawling
 
 ```python
 async def crawl_with_semaphore(urls):
