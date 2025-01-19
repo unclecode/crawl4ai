@@ -433,7 +433,7 @@ class AsyncWebCrawler:
                     )
 
                     # Process the HTML content
-                    crawl_result = await self.aprocess_html(
+                    crawl_result : CrawlResult = await self.aprocess_html(
                         url=url,
                         html=html,
                         extracted_content=extracted_content,
@@ -446,6 +446,7 @@ class AsyncWebCrawler:
                     )
 
                     crawl_result.status_code = async_response.status_code
+                    crawl_result.redirected_url = async_response.final_url or url
                     crawl_result.response_headers = async_response.response_headers
                     crawl_result.downloaded_files = async_response.downloaded_files
                     crawl_result.ssl_certificate = (
@@ -509,6 +510,7 @@ class AsyncWebCrawler:
 
                     cached_result.success = bool(html)
                     cached_result.session_id = getattr(config, "session_id", None)
+                    cached_result.redirected_url = cached_result.redirected_url or url
                     return cached_result
 
             except Exception as e:
