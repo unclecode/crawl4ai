@@ -112,6 +112,9 @@ class BrowserConfig:
         self.user_data_dir = user_data_dir
         self.chrome_channel = chrome_channel or self.browser_type or "chromium"
         self.channel = channel or self.browser_type or "chromium"
+        if self.browser_type in ["firefox", "webkit"]:
+            self.channel = ""
+            self.chrome_channel = ""
         self.proxy = proxy
         self.proxy_config = proxy_config
         self.viewport_width = viewport_width
@@ -239,6 +242,8 @@ class CrawlerRunConfig:
                               Default: False.
         no_cache_write (bool): Legacy parameter, if True acts like CacheMode.READ_ONLY.
                                Default: False.
+        shared_data (dict or None): Shared data to be passed between hooks.
+                                     Default: None.
 
         # Page Navigation and Timing Parameters
         wait_until (str): The condition to wait for when navigating, e.g. "domcontentloaded".
@@ -344,6 +349,7 @@ class CrawlerRunConfig:
         disable_cache: bool = False,
         no_cache_read: bool = False,
         no_cache_write: bool = False,
+        shared_data: dict = None,
         # Page Navigation and Timing Parameters
         wait_until: str = "domcontentloaded",
         page_timeout: int = PAGE_TIMEOUT,
@@ -411,6 +417,7 @@ class CrawlerRunConfig:
         self.disable_cache = disable_cache
         self.no_cache_read = no_cache_read
         self.no_cache_write = no_cache_write
+        self.shared_data = shared_data
 
         # Page Navigation and Timing Parameters
         self.wait_until = wait_until
@@ -501,6 +508,7 @@ class CrawlerRunConfig:
             disable_cache=kwargs.get("disable_cache", False),
             no_cache_read=kwargs.get("no_cache_read", False),
             no_cache_write=kwargs.get("no_cache_write", False),
+            shared_data=kwargs.get("shared_data", None),
             # Page Navigation and Timing Parameters
             wait_until=kwargs.get("wait_until", "domcontentloaded"),
             page_timeout=kwargs.get("page_timeout", 60000),
@@ -574,6 +582,8 @@ class CrawlerRunConfig:
             "disable_cache": self.disable_cache,
             "no_cache_read": self.no_cache_read,
             "no_cache_write": self.no_cache_write,
+            "shared_data": self.shared_data,
+            # Page Navigation and Timing Parameters 
             "wait_until": self.wait_until,
             "page_timeout": self.page_timeout,
             "wait_for": self.wait_for,
