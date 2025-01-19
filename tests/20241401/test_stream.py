@@ -33,9 +33,7 @@ async def test_crawler():
         print("\n=== Testing Streaming Mode ===")
         async for result in await crawler.arun_many(
             urls=urls,
-            config=crawler_config,
-            stream=True,
-            verbose=True
+            config=crawler_config.clone(stream=True),
         ):
             print(f"Received result for: {result.url} - Success: {result.success}")
             
@@ -43,8 +41,6 @@ async def test_crawler():
         results = await crawler.arun_many(
             urls=urls,
             config=crawler_config,
-            stream=False,
-            verbose=True
         )
         print(f"Received all {len(results)} results at once")
         for result in results:

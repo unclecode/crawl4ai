@@ -701,7 +701,6 @@ class AsyncWebCrawler:
         urls: List[str],
         config: Optional[CrawlerRunConfig] = None, 
         dispatcher: Optional[BaseDispatcher] = None,
-        stream: bool = False,
         # Legacy parameters maintained for backwards compatibility
         word_count_threshold=MIN_WORD_THRESHOLD,
         extraction_strategy: ExtractionStrategy = None,
@@ -723,7 +722,6 @@ class AsyncWebCrawler:
         urls: List of URLs to crawl
         config: Configuration object controlling crawl behavior for all URLs
         dispatcher: The dispatcher strategy instance to use. Defaults to MemoryAdaptiveDispatcher
-        stream: If True, returns an AsyncGenerator yielding results as they complete
         [other parameters maintained for backwards compatibility]
 
         Returns:
@@ -743,8 +741,7 @@ class AsyncWebCrawler:
         # Streaming results
         async for result in await crawler.arun_many(
             urls=["https://example1.com", "https://example2.com"],
-            config=CrawlerRunConfig(cache_mode=CacheMode.BYPASS),
-            stream=True
+            config=CrawlerRunConfig(cache_mode=CacheMode.BYPASS, stream=True),
         ):
             print(f"Processed {result.url}: {len(result.markdown)} chars")
         """
@@ -783,6 +780,8 @@ class AsyncWebCrawler:
             ) or task_result.result
         )
 
+        stream = config.stream
+        
         if stream:
             async def result_transformer():
                 async for task_result in dispatcher.run_urls_stream(crawler=self, urls=urls, config=config):
