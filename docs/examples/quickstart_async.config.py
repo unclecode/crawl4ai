@@ -231,7 +231,7 @@ async def extract_structured_data_using_css_extractor():
     print("\n--- Using JsonCssExtractionStrategy for Fast Structured Output ---")
     schema = {
         "name": "KidoCode Courses",
-        "baseSelector": "section.charge-methodology .w-tab-content > div",
+        "baseSelector": "section.charge-methodology .framework-collection-item.w-dyn-item",
         "fields": [
             {
                 "name": "section_title",
@@ -279,6 +279,7 @@ async def extract_structured_data_using_css_extractor():
         cache_mode=CacheMode.BYPASS,
         extraction_strategy=JsonCssExtractionStrategy(schema),
         js_code=[js_click_tabs],
+        delay_before_return_html=1
     )
 
     async with AsyncWebCrawler(config=browser_config) as crawler:
@@ -591,29 +592,26 @@ async def speed_comparison():
 # Main execution
 async def main():
     # Basic examples
-    # await simple_crawl()
-    # await simple_example_with_running_js_code()
-    # await simple_example_with_css_selector()
+    await simple_crawl()
+    await simple_example_with_running_js_code()
+    await simple_example_with_css_selector()
 
     # Advanced examples
-    # await extract_structured_data_using_css_extractor()
+    await extract_structured_data_using_css_extractor()
     await extract_structured_data_using_llm(
         "openai/gpt-4o", os.getenv("OPENAI_API_KEY")
     )
-    # await crawl_dynamic_content_pages_method_1()
-    # await crawl_dynamic_content_pages_method_2()
+    await crawl_dynamic_content_pages_method_1()
+    await crawl_dynamic_content_pages_method_2()
 
     # Browser comparisons
-    # await crawl_custom_browser_type()
-
-    # Performance testing
-    # await speed_comparison()
+    await crawl_custom_browser_type()
 
     # Screenshot example
-    # await capture_and_save_screenshot(
-    #     "https://www.example.com",
-    #     os.path.join(__location__, "tmp/example_screenshot.jpg")
-    # )
+    await capture_and_save_screenshot(
+        "https://www.example.com",
+        os.path.join(__location__, "tmp/example_screenshot.jpg")
+    )
 
 
 if __name__ == "__main__":

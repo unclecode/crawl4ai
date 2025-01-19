@@ -326,6 +326,10 @@ class BrowserManager:
         self.sessions = {}
         self.session_ttl = 1800  # 30 minutes
 
+        # Keep track of contexts by a "config signature," so each unique config reuses a single context
+        self.contexts_by_config = {}
+        self._contexts_lock = asyncio.Lock() 
+
         # Initialize ManagedBrowser if needed
         if self.config.use_managed_browser:
             self.managed_browser = ManagedBrowser(
@@ -642,7 +646,38 @@ class BrowserManager:
                 await context.route(f"**/*.{ext}", lambda route: route.abort())
         return context
 
-    # async def get_page(self, session_id: Optional[str], user_agent: str):
+    def _make_config_signature(self, crawlerRunConfig: CrawlerRunConfig) -> str:
+        """
+        Converts the crawlerRunConfig into a dict, excludes ephemeral fields,
+        then returns a hash of the sorted JSON. This yields a stable signature
+        that identifies configurations requiring a unique browser context.
+        """
+        import json, hashlib
+
+        config_dict = crawlerRunConfig.__dict__.copy()
+        # Exclude items that do not affect browser-level setup.
+        # Expand or adjust as needed, e.g. chunking_strategy is purely for data extraction, not for browser config.
+        ephemeral_keys = [
+            "session_id",
+            "js_code",
+            "scraping_strategy",
+            "extraction_strategy",
+            "chunking_strategy",
+            "cache_mode",
+            "content_filter",
+            "semaphore_count",
+            "url"
+        ]
+        for key in ephemeral_keys:
+            if key in config_dict:
+                del config_dict[key]
+        # Convert to canonical JSON string
+        signature_json = json.dumps(config_dict, sort_keys=True, default=str)
+
+        # Hash the JSON so we get a compact, unique string
+        signature_hash = hashlib.sha256(signature_json.encode("utf-8")).hexdigest()
+        return signature_hash
+
     async def get_page(self, crawlerRunConfig: CrawlerRunConfig):
         """
         Get a page for the given session ID, creating a new one if needed.
@@ -651,24 +686,38 @@ class BrowserManager:
             crawlerRunConfig (CrawlerRunConfig): Configuration object containing all browser settings
 
         Returns:
-            Page: The page object for the given session ID.
-            BrowserContext: The browser context for the given session ID.
+            (page, context): The Page and its BrowserContext
         """
         self._cleanup_expired_sessions()
 
+        # If a session_id is provided and we already have it, reuse that page + context
         if crawlerRunConfig.session_id and crawlerRunConfig.session_id in self.sessions:
             context, page, _ = self.sessions[crawlerRunConfig.session_id]
+            # Update last-used timestamp
             self.sessions[crawlerRunConfig.session_id] = (context, page, time.time())
             return page, context
 
+        # If using a managed browser, just grab the shared default_context
         if self.config.use_managed_browser:
             context = self.default_context
             page = await context.new_page()
         else:
-            context = await self.create_browser_context()
-            await self.setup_context(context, crawlerRunConfig)
+            # Otherwise, check if we have an existing context for this config
+            config_signature = self._make_config_signature(crawlerRunConfig)
+
+            async with self._contexts_lock:
+                if config_signature in self.contexts_by_config:
+                    context = self.contexts_by_config[config_signature]
+                else:
+                    # Create and setup a new context
+                    context = await self.create_browser_context()
+                    await self.setup_context(context, crawlerRunConfig)
+                    self.contexts_by_config[config_signature] = context
+
+            # Create a new page from the chosen context
             page = await context.new_page()
 
+        # If a session_id is specified, store this session so we can reuse later
         if crawlerRunConfig.session_id:
             self.sessions[crawlerRunConfig.session_id] = (context, page, time.time())
 
@@ -707,6 +756,18 @@ class BrowserManager:
         session_ids = list(self.sessions.keys())
         for session_id in session_ids:
             await self.kill_session(session_id)
+
+        # Now close all contexts we created. This reclaims memory from ephemeral contexts.
+        for ctx in self.contexts_by_config.values():
+            try:
+                await ctx.close()
+            except Exception as e:
+                self.logger.error(
+                    message="Error closing context: {error}",
+                    tag="ERROR",
+                    params={"error": str(e)}
+                )
+        self.contexts_by_config.clear()
 
         if self.browser:
             await self.browser.close()
@@ -1204,7 +1265,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             await context.add_init_script(load_js_script("navigator_overrider"))
 
         # Call hook after page creation
-        await self.execute_hook("on_page_context_created", page, context=context)
+        await self.execute_hook("on_page_context_created", page, context=context, config=config)
 
         # Set up console logging if requested
         if config.log_console:
@@ -1245,7 +1306,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
             # Handle page navigation and content loading
             if not config.js_only:
-                await self.execute_hook("before_goto", page, context=context, url=url)
+                await self.execute_hook("before_goto", page, context=context, url=url, config=config)
 
                 try:
                     # Generate a unique nonce for this request
@@ -1265,7 +1326,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     raise RuntimeError(f"Failed on navigating ACS-GOTO:\n{str(e)}")
 
                 await self.execute_hook(
-                    "after_goto", page, context=context, url=url, response=response
+                    "after_goto", page, context=context, url=url, response=response, config=config
                 )
 
                 if response is None:
@@ -1439,7 +1500,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         params={"error": execution_result.get("error")},
                     )
 
-                await self.execute_hook("on_execution_started", page, context=context)
+                await self.execute_hook("on_execution_started", page, context=context, config=config)
 
             # Handle user simulation
             if config.simulate_user or config.magic:
@@ -1482,7 +1543,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 page = await self.process_iframes(page)
 
             # Pre-content retrieval hooks and delay
-            await self.execute_hook("before_retrieve_html", page, context=context)
+            await self.execute_hook("before_retrieve_html", page, context=context, config=config)
             if config.delay_before_return_html:
                 await asyncio.sleep(config.delay_before_return_html)
 
@@ -1493,7 +1554,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             # Get final HTML content
             html = await page.content()
             await self.execute_hook(
-                "before_return_html", page=page, html=html, context=context
+                "before_return_html", page=page, html=html, context=context, config=config
             )
 
             # Handle PDF and screenshot generation
@@ -1989,10 +2050,6 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     t1 = time.time()
                     try:
                         await page.wait_for_load_state("domcontentloaded", timeout=5000)
-                        print(
-                            "DOM content loaded after script execution in",
-                            time.time() - t1,
-                        )
                     except Error as e:
                         self.logger.warning(
                             message="DOM content load timeout: {error}",
@@ -2099,13 +2156,10 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     # Wait for network idle after script execution
                     t1 = time.time()
                     await page.wait_for_load_state("domcontentloaded", timeout=5000)
-                    print(
-                        "DOM content loaded after script execution in", time.time() - t1
-                    )
+
 
                     t1 = time.time()
                     await page.wait_for_load_state("networkidle", timeout=5000)
-                    print("Network idle after script execution in", time.time() - t1)
 
                     results.append(result if result else {"success": True})
 
