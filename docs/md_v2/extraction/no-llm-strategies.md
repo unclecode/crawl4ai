@@ -401,7 +401,92 @@ Then run with `JsonCssExtractionStrategy(schema)` to get an array of blog post o
 
 ---
 
-## 8. Conclusion
+## 8. Schema Generation Utility
+
+While manually crafting schemas is powerful and precise, Crawl4AI now offers a convenient utility to **automatically generate** extraction schemas using LLM. This is particularly useful when:
+
+1. You're dealing with a new website structure and want a quick starting point
+2. You need to extract complex nested data structures
+3. You want to avoid the learning curve of CSS/XPath selector syntax
+
+### Using the Schema Generator
+
+The schema generator is available as a static method on both `JsonCssExtractionStrategy` and `JsonXPathExtractionStrategy`. You can choose between OpenAI's GPT-4 or the open-source Ollama for schema generation:
+
+```python
+from crawl4ai.extraction_strategy import JsonCssExtractionStrategy, JsonXPathExtractionStrategy
+
+# Sample HTML with product information
+html = """
+<div class="product-card">
+    <h2 class="title">Gaming Laptop</h2>
+    <div class="price">$999.99</div>
+    <div class="specs">
+        <ul>
+            <li>16GB RAM</li>
+            <li>1TB SSD</li>
+        </ul>
+    </div>
+</div>
+"""
+
+# Option 1: Using OpenAI (requires API token)
+css_schema = JsonCssExtractionStrategy.generate_schema(
+    html,
+    schema_type="css",  # This is the default
+    llm_provider="openai/gpt-4o",  # Default provider
+    api_token="your-openai-token"  # Required for OpenAI
+)
+
+# Option 2: Using Ollama (open source, no token needed)
+xpath_schema = JsonXPathExtractionStrategy.generate_schema(
+    html,
+    schema_type="xpath",
+    llm_provider="ollama/llama3.3",  # Open source alternative
+    api_token=None  # Not needed for Ollama
+)
+
+# Use the generated schema for fast, repeated extractions
+strategy = JsonCssExtractionStrategy(css_schema)
+```
+
+### LLM Provider Options
+
+1. **OpenAI GPT-4 (`openai/gpt4o`)**
+   - Default provider
+   - Requires an API token
+   - Generally provides more accurate schemas
+   - Set via environment variable: `OPENAI_API_KEY`
+
+2. **Ollama (`ollama/llama3.3`)**
+   - Open source alternative
+   - No API token required
+   - Self-hosted option
+   - Good for development and testing
+
+### Benefits of Schema Generation
+
+1. **One-Time Cost**: While schema generation uses LLM, it's a one-time cost. The generated schema can be reused for unlimited extractions without further LLM calls.
+2. **Smart Pattern Recognition**: The LLM analyzes the HTML structure and identifies common patterns, often producing more robust selectors than manual attempts.
+3. **Automatic Nesting**: Complex nested structures are automatically detected and properly represented in the schema.
+4. **Learning Tool**: The generated schemas serve as excellent examples for learning how to write your own schemas.
+
+### Best Practices
+
+1. **Review Generated Schemas**: While the generator is smart, always review and test the generated schema before using it in production.
+2. **Provide Representative HTML**: The better your sample HTML represents the overall structure, the more accurate the generated schema will be.
+3. **Consider Both CSS and XPath**: Try both schema types and choose the one that works best for your specific case.
+4. **Cache Generated Schemas**: Since generation uses LLM, save successful schemas for reuse.
+5. **API Token Security**: Never hardcode API tokens. Use environment variables or secure configuration management.
+6. **Choose Provider Wisely**: 
+   - Use OpenAI for production-quality schemas
+   - Use Ollama for development, testing, or when you need a self-hosted solution
+
+That's it for **Extracting JSON (No LLM)**! You've seen how schema-based approaches (either CSS or XPath) can handle everything from simple lists to deeply nested product catalogs—instantly, with minimal overhead. Enjoy building robust scrapers that produce consistent, structured JSON for your data pipelines!
+
+---
+
+## 9. Conclusion
 
 With **JsonCssExtractionStrategy** (or **JsonXPathExtractionStrategy**), you can build powerful, **LLM-free** pipelines that:
 

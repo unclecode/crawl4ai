@@ -5,7 +5,7 @@ import json
 import time
 import os
 
-from .prompts import PROMPT_EXTRACT_BLOCKS, PROMPT_EXTRACT_BLOCKS_WITH_INSTRUCTION, PROMPT_EXTRACT_SCHEMA_WITH_INSTRUCTION
+from .prompts import PROMPT_EXTRACT_BLOCKS, PROMPT_EXTRACT_BLOCKS_WITH_INSTRUCTION, PROMPT_EXTRACT_SCHEMA_WITH_INSTRUCTION, JSON_SCHEMA_BUILDER_XPATH
 from .config import (
     DEFAULT_PROVIDER, PROVIDER_MODELS, 
     CHUNK_TOKEN_THRESHOLD,
@@ -1060,6 +1060,72 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
         """Get attribute value from element"""
         pass
 
+    @staticmethod
+    def generate_schema(
+        html: str,
+        schema_type: str = "CSS", # or XPATH
+        query: str = None,
+        provider: str = "gpt-4o",
+        api_token: str = os.getenv("OPENAI_API_KEY"),
+        **kwargs
+    ) -> dict:
+        """
+        Generate extraction schema from HTML content and optional query.
+        
+        Args:
+            html (str): The HTML content to analyze
+            query (str, optional): Natural language description of what data to extract
+            provider (str): LLM provider to use 
+            api_token (str): API token for LLM provider
+            prompt (str, optional): Custom prompt template to use
+            **kwargs: Additional args passed to perform_completion_with_backoff
+            
+        Returns:
+            dict: Generated schema following the JsonElementExtractionStrategy format
+        """
+        from .prompts import JSON_SCHEMA_BUILDER
+        from .utils import perform_completion_with_backoff
+        
+        # Use default or custom prompt
+        prompt_template = JSON_SCHEMA_BUILDER if schema_type == "CSS" else JSON_SCHEMA_BUILDER_XPATH
+        
+        # Build the prompt
+        system_message = {
+            "role": "system", 
+            "content": "You are a specialized HTML schema generator. Analyze the HTML and generate a JSON schema that follows the specified format. Only output valid JSON schema, nothing else."
+        }
+        
+        user_message = {
+            "role": "user",
+            "content": f"""
+                Instructions:
+                {prompt_template}
+
+                HTML to analyze:
+                ```html
+                {html}
+                ```
+
+                {"Extract the following data: " + query if query else "Please analyze the HTML structure and create the most appropriate schema for data extraction."}
+                """
+        }
+
+        try:
+            # Call LLM with backoff handling
+            response = perform_completion_with_backoff(
+                provider=provider,
+                prompt_with_variables="\n\n".join([system_message["content"], user_message["content"]]),
+                json_response = True,                
+                api_token=api_token,
+                **kwargs
+            )
+            
+            # Extract and return schema
+            return json.loads(response.choices[0].message.content)
+            
+        except Exception as e:
+            raise Exception(f"Failed to generate schema: {str(e)}")
+
 
 class JsonCssExtractionStrategy(JsonElementExtractionStrategy):
     """
@@ -1171,3 +1237,4 @@ class JsonXPathExtractionStrategy(JsonElementExtractionStrategy):
 
     def _get_element_attribute(self, element, attribute: str):
         return element.get(attribute)
+

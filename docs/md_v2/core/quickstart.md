@@ -124,6 +124,36 @@ async with AsyncWebCrawler() as crawler:
 
 Crawl4AI can also extract structured data (JSON) using CSS or XPath selectors. Below is a minimal CSS-based example:
 
+> **New!** Crawl4AI now provides a powerful utility to automatically generate extraction schemas using LLM. This is a one-time cost that gives you a reusable schema for fast, LLM-free extractions:
+
+```python
+from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+
+# Generate a schema (one-time cost)
+html = "<div class='product'><h2>Gaming Laptop</h2><span class='price'>$999.99</span></div>"
+
+# Using OpenAI (requires API token)
+schema = JsonCssExtractionStrategy.generate_schema(
+    html,
+    llm_provider="openai/gpt-4o",  # Default provider
+    api_token="your-openai-token"  # Required for OpenAI
+)
+
+# Or using Ollama (open source, no token needed)
+schema = JsonCssExtractionStrategy.generate_schema(
+    html,
+    llm_provider="ollama/llama3.3",  # Open source alternative
+    api_token=None  # Not needed for Ollama
+)
+
+# Use the schema for fast, repeated extractions
+strategy = JsonCssExtractionStrategy(schema)
+```
+
+For a complete guide on schema generation and advanced usage, see [No-LLM Extraction Strategies](../extraction/no-llm-strategies.md).
+
+Here's a basic extraction example:
+
 ```python
 import asyncio
 import json
