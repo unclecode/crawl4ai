@@ -270,6 +270,8 @@ class CrawlerRunConfig:
                            Default: "lxml".
         scraping_strategy (ContentScrapingStrategy): Scraping strategy to use.
                            Default: WebScrapingStrategy.
+        proxy_config (dict or None): Detailed proxy configuration, e.g. {"server": "...", "username": "..."}.
+                                     If None, no additional proxy config. Default: None.
 
         # Caching Parameters
         cache_mode (CacheMode or None): Defines how caching is handled.
@@ -389,6 +391,7 @@ class CrawlerRunConfig:
         prettiify: bool = False,
         parser_type: str = "lxml",
         scraping_strategy: ContentScrapingStrategy = None,
+        proxy_config: dict = None,
         # SSL Parameters
         fetch_ssl_certificate: bool = False,
         # Caching Parameters
@@ -457,6 +460,7 @@ class CrawlerRunConfig:
         self.prettiify = prettiify
         self.parser_type = parser_type
         self.scraping_strategy = scraping_strategy or WebScrapingStrategy()
+        self.proxy_config = proxy_config
 
         # SSL Parameters
         self.fetch_ssl_certificate = fetch_ssl_certificate
@@ -553,6 +557,7 @@ class CrawlerRunConfig:
             prettiify=kwargs.get("prettiify", False),
             parser_type=kwargs.get("parser_type", "lxml"),
             scraping_strategy=kwargs.get("scraping_strategy"),
+            proxy_config=kwargs.get("proxy_config"),
             # SSL Parameters
             fetch_ssl_certificate=kwargs.get("fetch_ssl_certificate", False),
             # Caching Parameters
@@ -631,6 +636,7 @@ class CrawlerRunConfig:
             "prettiify": self.prettiify,
             "parser_type": self.parser_type,
             "scraping_strategy": self.scraping_strategy,
+            "proxy_config": self.proxy_config,
             "fetch_ssl_certificate": self.fetch_ssl_certificate,
             "cache_mode": self.cache_mode,
             "session_id": self.session_id,
