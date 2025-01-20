@@ -36,23 +36,33 @@ async with AsyncWebCrawler(config=browser_config) as crawler:
     result = await crawler.arun(url="https://example.com")
 ```
 
-## Rotating Proxies
+Here's the corrected documentation:
 
-Example using a proxy rotation service and updating `BrowserConfig` dynamically:
+## Rotating Proxies [COMING SOON]
+
+Example using a proxy rotation service dynamically:
 
 ```python
-from crawl4ai.async_configs import BrowserConfig
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
 
 async def get_next_proxy():
     # Your proxy rotation logic here
     return {"server": "http://next.proxy.com:8080"}
 
-browser_config = BrowserConfig()
-async with AsyncWebCrawler(config=browser_config) as crawler:
-    # Update proxy for each request
-    for url in urls:
-        proxy = await get_next_proxy()
-        browser_config.proxy_config = proxy
-        result = await crawler.arun(url=url, config=browser_config)
+async def main():
+    browser_config = BrowserConfig()
+    run_config = CrawlerRunConfig()
+    
+    async with AsyncWebCrawler(config=browser_config) as crawler:
+        # For each URL, create a new run config with different proxy
+        for url in urls:
+            proxy = await get_next_proxy()
+            # Clone the config and update proxy - this creates a new browser context
+            current_config = run_config.clone(proxy_config=proxy)
+            result = await crawler.arun(url=url, config=current_config)
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(main())
 ```
 

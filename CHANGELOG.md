@@ -1,4 +1,8 @@
 ### [Added] 2025-01-20
+- Added proxy configuration support to CrawlerRunConfig allowing dynamic proxy settings per crawl request
+- Updated documentation with examples for using proxy configuration in crawl operations
+
+### [Added] 2025-01-20
 - New LLM-powered schema generation utility for JsonElementExtractionStrategy
 - Support for automatic CSS and XPath schema generation using OpenAI or Ollama
 - Comprehensive documentation and examples for schema generation

@@ -543,9 +543,9 @@ class BrowserManager:
                 or crawlerRunConfig.simulate_user
                 or crawlerRunConfig.magic
             ):
-                await context.add_init_script(load_js_script("navigator_overrider"))
+                await context.add_init_script(load_js_script("navigator_overrider"))        
 
-    async def create_browser_context(self):
+    async def create_browser_context(self, crawlerRunConfig: CrawlerRunConfig = None):
         """
         Creates and returns a new browser context with configured settings.
         Applies text-only mode settings if text_mode is enabled in config.
@@ -627,6 +627,16 @@ class BrowserManager:
             "device_scale_factor": 1.0,
             "java_script_enabled": self.config.java_script_enabled,
         }
+        
+        if crawlerRunConfig:
+            # Check if there is value for crawlerRunConfig.proxy_config set add that to context
+            if crawlerRunConfig.proxy_config:
+                proxy_settings = {
+                    "server": crawlerRunConfig.proxy_config.get("server"),
+                    "username": crawlerRunConfig.proxy_config.get("username"),
+                    "password": crawlerRunConfig.proxy_config.get("password"),
+                }
+                context_settings["proxy"] = proxy_settings
 
         if self.config.text_mode:
             text_mode_settings = {
@@ -710,7 +720,7 @@ class BrowserManager:
                     context = self.contexts_by_config[config_signature]
                 else:
                     # Create and setup a new context
-                    context = await self.create_browser_context()
+                    context = await self.create_browser_context(crawlerRunConfig)
                     await self.setup_context(context, crawlerRunConfig)
                     self.contexts_by_config[config_signature] = context
 
