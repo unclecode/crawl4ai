@@ -2,9 +2,9 @@ import os
 import re
 import sys
 import pytest
-import json
 from bs4 import BeautifulSoup
 import asyncio
+
 # Add the parent directory to the Python path
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parent_dir)
@@ -59,19 +59,21 @@ from crawl4ai.async_webcrawler import AsyncWebCrawler
 #         assert result.success
 #         assert "github" in result.html.lower()
 
+
 # Add this test to your existing test file
 @pytest.mark.asyncio
 async def test_typescript_commits_multi_page():
     first_commit = ""
+
     async def on_execution_started(page):
-        nonlocal first_commit 
+        nonlocal first_commit
         try:
             # Check if the page firct commit h4 text is different from the first commit (use document.querySelector('li.Box-sc-g0xbh4-0 h4'))
             while True:
-                await page.wait_for_selector('li.Box-sc-g0xbh4-0 h4')
-                commit = await page.query_selector('li.Box-sc-g0xbh4-0 h4')
-                commit = await commit.evaluate('(element) => element.textContent')
-                commit = re.sub(r'\s+', '', commit)
+                await page.wait_for_selector("li.Box-sc-g0xbh4-0 h4")
+                commit = await page.query_selector("li.Box-sc-g0xbh4-0 h4")
+                commit = await commit.evaluate("(element) => element.textContent")
+                commit = re.sub(r"\s+", "", commit)
                 if commit and commit != first_commit:
                     first_commit = commit
                     break
@@ -79,9 +81,8 @@ async def test_typescript_commits_multi_page():
         except Exception as e:
             print(f"Warning: New content didn't appear after JavaScript execution: {e}")
 
-
     async with AsyncWebCrawler(verbose=True) as crawler:
-        crawler.crawler_strategy.set_hook('on_execution_started', on_execution_started)
+        crawler.crawler_strategy.set_hook("on_execution_started", on_execution_started)
 
         url = "https://github.com/microsoft/TypeScript/commits/main"
         session_id = "typescript_commits_session"
@@ -97,19 +98,21 @@ async def test_typescript_commits_multi_page():
                 url=url,  # Only use URL for the first page
                 session_id=session_id,
                 css_selector="li.Box-sc-g0xbh4-0",
-                js=js_next_page if page > 0 else None,  # Don't click 'next' on the first page
+                js=js_next_page
+                if page > 0
+                else None,  # Don't click 'next' on the first page
                 bypass_cache=True,
-                js_only=page > 0  # Use js_only for subsequent pages
+                js_only=page > 0,  # Use js_only for subsequent pages
             )
 
             assert result.success, f"Failed to crawl page {page + 1}"
 
             # Parse the HTML and extract commits
-            soup = BeautifulSoup(result.cleaned_html, 'html.parser')
+            soup = BeautifulSoup(result.cleaned_html, "html.parser")
             commits = soup.select("li")
             # Take first commit find h4 extract text
             first_commit = commits[0].find("h4").text
-            first_commit = re.sub(r'\s+', '', first_commit)
+            first_commit = re.sub(r"\s+", "", first_commit)
             all_commits.extend(commits)
 
             print(f"Page {page + 1}: Found {len(commits)} commits")
@@ -118,9 +121,12 @@ async def test_typescript_commits_multi_page():
         await crawler.crawler_strategy.kill_session(session_id)
 
         # Assertions
-        assert len(all_commits) >= 90, f"Expected at least 90 commits, but got {len(all_commits)}"
-        
-        print(f"Successfully crawled {len(all_commits)} commits across 3 pages")                      
+        assert (
+            len(all_commits) >= 90
+        ), f"Expected at least 90 commits, but got {len(all_commits)}"
+
+        print(f"Successfully crawled {len(all_commits)} commits across 3 pages")
+
 
 # Entry point for debugging
 if __name__ == "__main__":

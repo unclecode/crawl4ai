@@ -2,28 +2,27 @@ import asyncio
 import base64
 import time
 from abc import ABC, abstractmethod
-from typing import Callable, Dict, Any, List, Optional, Awaitable, Union
-import os, sys, shutil
-import tempfile, subprocess
-from playwright.async_api import async_playwright, Page, Browser, Error, BrowserContext
+from typing import Callable, Dict, Any, List, Optional, Union
+import os
+import sys
+import shutil
+import tempfile
+import subprocess
+from playwright.async_api import Page, Error, BrowserContext
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
-from pathlib import Path
-from playwright.async_api import ProxySettings
-from pydantic import BaseModel
 import hashlib
-import json
 import uuid
 from .js_snippet import load_js_script
 from .models import AsyncCrawlResponse
-from .utils import get_error_context
 from .user_agent_generator import UserAgentGenerator
 from .config import SCREENSHOT_HEIGHT_TRESHOLD, DOWNLOAD_PAGE_TIMEOUT
 from .async_configs import BrowserConfig, CrawlerRunConfig
 from .async_logger import AsyncLogger
-from playwright_stealth import StealthConfig, stealth_async
+from playwright_stealth import StealthConfig
 from .ssl_certificate import SSLCertificate
+from .utils import get_home_folder, get_chromium_path
 
 stealth_config = StealthConfig(
     webdriver=True,
@@ -66,7 +65,7 @@ BROWSER_DISABLE_OPTIONS = [
 class ManagedBrowser:
     """
     Manages the browser process and context. This class allows to connect to the browser using CDP protocol.
-    
+
     Attributes:
         browser_type (str): The type of browser to launch. Supported values: "chromium", "firefox", "webkit".
                             Default: "chromium".
@@ -75,16 +74,16 @@ class ManagedBrowser:
         headless (bool): Whether to run the browser in headless mode (no visible GUI).
                          Default: True.
         browser_process (subprocess.Popen): The process object for the browser.
-        temp_dir (str): Temporary directory for user data if not provided.  
+        temp_dir (str): Temporary directory for user data if not provided.
         debugging_port (int): Port for debugging the browser.
         host (str): Host for debugging the browser.
-        
+
         Methods:
             start(): Starts the browser process and returns the CDP endpoint URL.
             _get_browser_path(): Returns the browser executable path based on OS and browser type.
             _get_browser_args(): Returns browser-specific command line arguments.
             _get_user_data_dir(): Returns the user data directory path.
-            _cleanup(): Terminates the browser process and removes the temporary directory. 
+            _cleanup(): Terminates the browser process and removes the temporary directory.
     """
 
     browser_type: str
@@ -94,6 +93,7 @@ class ManagedBrowser:
     temp_dir: str
     debugging_port: int
     host: str
+
     def __init__(
         self,
         browser_type: str = "chromium",
@@ -105,7 +105,7 @@ class ManagedBrowser:
     ):
         """
         Initialize the ManagedBrowser instance.
-        
+
         Args:
             browser_type (str): The type of browser to launch. Supported values: "chromium", "firefox", "webkit".
                                 Default: "chromium".
@@ -116,7 +116,7 @@ class ManagedBrowser:
             logger (logging.Logger): Logger instance for logging messages. Default: None.
             host (str): Host for debugging the browser. Default: "localhost".
             debugging_port (int): Port for debugging the browser. Default: 9222.
-        """ 
+        """
         self.browser_type = browser_type
         self.user_data_dir = user_data_dir
         self.headless = headless
@@ -139,8 +139,8 @@ class ManagedBrowser:
             self.user_data_dir = self.temp_dir
 
         # Get browser path and args based on OS and browser type
-        browser_path = self._get_browser_path()
-        args = self._get_browser_args()
+        # browser_path = self._get_browser_path()
+        args = await self._get_browser_args()
 
         # Start browser process
         try:
@@ -158,13 +158,13 @@ class ManagedBrowser:
     async def _monitor_browser_process(self):
         """
         Monitor the browser process for unexpected termination.
-        
+
         How it works:
         1. Read stdout and stderr from the browser process.
         2. If the process has terminated, log the error message and terminate the browser.
         3. If the shutting_down flag is set, log the normal termination message.
         4. If any other error occurs, log the error message.
-        
+
         Note: This method should be called in a separate task to avoid blocking the main event loop.
         """
         if self.browser_process:
@@ -201,7 +201,7 @@ class ManagedBrowser:
                         params={"error": str(e)},
                     )
 
-    def _get_browser_path(self) -> str:
+    def _get_browser_path_WIP(self) -> str:
         """Returns the browser executable path based on OS and browser type"""
         if sys.platform == "darwin":  # macOS
             paths = {
@@ -224,9 +224,13 @@ class ManagedBrowser:
 
         return paths.get(self.browser_type)
 
-    def _get_browser_args(self) -> List[str]:
+    async def _get_browser_path(self) -> str:
+        browser_path = await get_chromium_path(self.browser_type)
+        return browser_path
+
+    async def _get_browser_args(self) -> List[str]:
         """Returns browser-specific command line arguments"""
-        base_args = [self._get_browser_path()]
+        base_args = [await self._get_browser_path()]
 
         if self.browser_type == "chromium":
             args = [
@@ -289,17 +293,18 @@ class ManagedBrowser:
 class BrowserManager:
     """
     Manages the browser instance and context.
-    
-    Attributes: 
+
+    Attributes:
         config (BrowserConfig): Configuration object containing all browser settings
         logger: Logger instance for recording events and errors
         browser (Browser): The browser instance
-        default_context (BrowserContext): The default browser context    
+        default_context (BrowserContext): The default browser context
         managed_browser (ManagedBrowser): The managed browser instance
         playwright (Playwright): The Playwright instance
         sessions (dict): Dictionary to store session information
         session_ttl (int): Session timeout in seconds
     """
+
     def __init__(self, browser_config: BrowserConfig, logger=None):
         """
         Initialize the BrowserManager with a browser configuration.
@@ -321,6 +326,10 @@ class BrowserManager:
         self.sessions = {}
         self.session_ttl = 1800  # 30 minutes
 
+        # Keep track of contexts by a "config signature," so each unique config reuses a single context
+        self.contexts_by_config = {}
+        self._contexts_lock = asyncio.Lock() 
+
         # Initialize ManagedBrowser if needed
         if self.config.use_managed_browser:
             self.managed_browser = ManagedBrowser(
@@ -334,13 +343,13 @@ class BrowserManager:
     async def start(self):
         """
         Start the browser instance and set up the default context.
-        
+
         How it works:
         1. Check if Playwright is already initialized.
         2. If not, initialize Playwright.
         3. If managed browser is used, start it and connect to the CDP endpoint.
         4. If managed browser is not used, launch the browser and set up the default context.
-        
+
         Note: This method should be called in a separate task to avoid blocking the main event loop.
         """
         if self.playwright is None:
@@ -456,7 +465,7 @@ class BrowserManager:
     async def setup_context(
         self,
         context: BrowserContext,
-        crawlerRunConfig: CrawlerRunConfig,
+        crawlerRunConfig: CrawlerRunConfig = None,
         is_default=False,
     ):
         """
@@ -479,11 +488,11 @@ class BrowserManager:
         14. Set default timeouts for navigation and download if enabled.
         15. Set user agent if provided.
         16. Set browser hints if provided.
-        
+
         Args:
             context (BrowserContext): The browser context to set up
             crawlerRunConfig (CrawlerRunConfig): Configuration object containing all browser settings
-            is_default (bool): Flag indicating if this is the default context        
+            is_default (bool): Flag indicating if this is the default context
         Returns:
             None
         """
@@ -501,9 +510,9 @@ class BrowserManager:
             context.set_default_navigation_timeout(DOWNLOAD_PAGE_TIMEOUT)
             if self.config.downloads_path:
                 context._impl_obj._options["accept_downloads"] = True
-                context._impl_obj._options["downloads_path"] = (
-                    self.config.downloads_path
-                )
+                context._impl_obj._options[
+                    "downloads_path"
+                ] = self.config.downloads_path
 
         # Handle user agent and browser hints
         if self.config.user_agent:
@@ -516,22 +525,31 @@ class BrowserManager:
 
         # Add default cookie
         await context.add_cookies(
-            [{"name": "cookiesEnabled", "value": "true", "url": crawlerRunConfig.url}]
+            [
+                {
+                    "name": "cookiesEnabled",
+                    "value": "true",
+                    "url": crawlerRunConfig.url
+                    if crawlerRunConfig
+                    else "https://crawl4ai.com/",
+                }
+            ]
         )
 
         # Handle navigator overrides
-        if (
-            crawlerRunConfig.override_navigator
-            or crawlerRunConfig.simulate_user
-            or crawlerRunConfig.magic
-        ):
-            await context.add_init_script(load_js_script("navigator_overrider"))
+        if crawlerRunConfig:
+            if (
+                crawlerRunConfig.override_navigator
+                or crawlerRunConfig.simulate_user
+                or crawlerRunConfig.magic
+            ):
+                await context.add_init_script(load_js_script("navigator_overrider"))
 
     async def create_browser_context(self):
         """
         Creates and returns a new browser context with configured settings.
         Applies text-only mode settings if text_mode is enabled in config.
-        
+
         Returns:
             Context: Browser context object with the specified configurations
         """
@@ -542,25 +560,62 @@ class BrowserManager:
             "height": self.config.viewport_height,
         }
         proxy_settings = {"server": self.config.proxy} if self.config.proxy else None
-        
+
         blocked_extensions = [
             # Images
-            'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'ico', 'bmp', 'tiff', 'psd',
+            "jpg",
+            "jpeg",
+            "png",
+            "gif",
+            "webp",
+            "svg",
+            "ico",
+            "bmp",
+            "tiff",
+            "psd",
             # Fonts
-            'woff', 'woff2', 'ttf', 'otf', 'eot',
+            "woff",
+            "woff2",
+            "ttf",
+            "otf",
+            "eot",
             # Styles
             # 'css', 'less', 'scss', 'sass',
             # Media
-            'mp4', 'webm', 'ogg', 'avi', 'mov', 'wmv', 'flv', 'm4v',
-            'mp3', 'wav', 'aac', 'm4a', 'opus', 'flac',
+            "mp4",
+            "webm",
+            "ogg",
+            "avi",
+            "mov",
+            "wmv",
+            "flv",
+            "m4v",
+            "mp3",
+            "wav",
+            "aac",
+            "m4a",
+            "opus",
+            "flac",
             # Documents
-            'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
+            "pdf",
+            "doc",
+            "docx",
+            "xls",
+            "xlsx",
+            "ppt",
+            "pptx",
             # Archives
-            'zip', 'rar', '7z', 'tar', 'gz',
+            "zip",
+            "rar",
+            "7z",
+            "tar",
+            "gz",
             # Scripts and data
-            'xml', 'swf', 'wasm'
+            "xml",
+            "swf",
+            "wasm",
         ]
-        
+
         # Common context settings
         context_settings = {
             "user_agent": user_agent,
@@ -572,7 +627,7 @@ class BrowserManager:
             "device_scale_factor": 1.0,
             "java_script_enabled": self.config.java_script_enabled,
         }
-        
+
         if self.config.text_mode:
             text_mode_settings = {
                 "has_touch": False,
@@ -580,44 +635,89 @@ class BrowserManager:
             }
             # Update context settings with text mode settings
             context_settings.update(text_mode_settings)
-            
+
         # Create and return the context with all settings
         context = await self.browser.new_context(**context_settings)
-        
+
         # Apply text mode settings if enabled
         if self.config.text_mode:
             # Create and apply route patterns for each extension
             for ext in blocked_extensions:
                 await context.route(f"**/*.{ext}", lambda route: route.abort())
         return context
-    
-    # async def get_page(self, session_id: Optional[str], user_agent: str):
+
+    def _make_config_signature(self, crawlerRunConfig: CrawlerRunConfig) -> str:
+        """
+        Converts the crawlerRunConfig into a dict, excludes ephemeral fields,
+        then returns a hash of the sorted JSON. This yields a stable signature
+        that identifies configurations requiring a unique browser context.
+        """
+        import json, hashlib
+
+        config_dict = crawlerRunConfig.__dict__.copy()
+        # Exclude items that do not affect browser-level setup.
+        # Expand or adjust as needed, e.g. chunking_strategy is purely for data extraction, not for browser config.
+        ephemeral_keys = [
+            "session_id",
+            "js_code",
+            "scraping_strategy",
+            "extraction_strategy",
+            "chunking_strategy",
+            "cache_mode",
+            "content_filter",
+            "semaphore_count",
+            "url"
+        ]
+        for key in ephemeral_keys:
+            if key in config_dict:
+                del config_dict[key]
+        # Convert to canonical JSON string
+        signature_json = json.dumps(config_dict, sort_keys=True, default=str)
+
+        # Hash the JSON so we get a compact, unique string
+        signature_hash = hashlib.sha256(signature_json.encode("utf-8")).hexdigest()
+        return signature_hash
+
     async def get_page(self, crawlerRunConfig: CrawlerRunConfig):
         """
         Get a page for the given session ID, creating a new one if needed.
-        
+
         Args:
             crawlerRunConfig (CrawlerRunConfig): Configuration object containing all browser settings
 
         Returns:
-            Page: The page object for the given session ID.
-            BrowserContext: The browser context for the given session ID.
+            (page, context): The Page and its BrowserContext
         """
         self._cleanup_expired_sessions()
 
+        # If a session_id is provided and we already have it, reuse that page + context
         if crawlerRunConfig.session_id and crawlerRunConfig.session_id in self.sessions:
             context, page, _ = self.sessions[crawlerRunConfig.session_id]
+            # Update last-used timestamp
             self.sessions[crawlerRunConfig.session_id] = (context, page, time.time())
             return page, context
 
+        # If using a managed browser, just grab the shared default_context
         if self.config.use_managed_browser:
             context = self.default_context
             page = await context.new_page()
         else:
-            context = await self.create_browser_context()
-            await self.setup_context(context, crawlerRunConfig)
+            # Otherwise, check if we have an existing context for this config
+            config_signature = self._make_config_signature(crawlerRunConfig)
+
+            async with self._contexts_lock:
+                if config_signature in self.contexts_by_config:
+                    context = self.contexts_by_config[config_signature]
+                else:
+                    # Create and setup a new context
+                    context = await self.create_browser_context()
+                    await self.setup_context(context, crawlerRunConfig)
+                    self.contexts_by_config[config_signature] = context
+
+            # Create a new page from the chosen context
             page = await context.new_page()
 
+        # If a session_id is specified, store this session so we can reuse later
         if crawlerRunConfig.session_id:
             self.sessions[crawlerRunConfig.session_id] = (context, page, time.time())
 
@@ -625,8 +725,8 @@ class BrowserManager:
 
     async def kill_session(self, session_id: str):
         """
-        Kill a browser session and clean up resources.  
-        
+        Kill a browser session and clean up resources.
+
         Args:
             session_id (str): The session ID to kill.
         """
@@ -657,6 +757,18 @@ class BrowserManager:
         for session_id in session_ids:
             await self.kill_session(session_id)
 
+        # Now close all contexts we created. This reclaims memory from ephemeral contexts.
+        for ctx in self.contexts_by_config.values():
+            try:
+                await ctx.close()
+            except Exception as e:
+                self.logger.error(
+                    message="Error closing context: {error}",
+                    tag="ERROR",
+                    params={"error": str(e)}
+                )
+        self.contexts_by_config.clear()
+
         if self.browser:
             await self.browser.close()
             self.browser = None
@@ -676,20 +788,20 @@ class AsyncCrawlerStrategy(ABC):
     Abstract base class for crawler strategies.
     Subclasses must implement the crawl method.
     """
+
     @abstractmethod
     async def crawl(self, url: str, **kwargs) -> AsyncCrawlResponse:
         pass  # 4 + 3
 
 
-
 class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
     """
     Crawler strategy using Playwright.
-    
+
     Attributes:
         browser_config (BrowserConfig): Configuration object containing browser settings.
         logger (AsyncLogger): Logger instance for recording events and errors.
-        _downloaded_files (List[str]): List of downloaded file paths.   
+        _downloaded_files (List[str]): List of downloaded file paths.
         hooks (Dict[str, Callable]): Dictionary of hooks for custom behavior.
         browser_manager (BrowserManager): Manager for browser creation and management.
 
@@ -708,8 +820,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 Kill a browser session and clean up resources.
             crawl(self, url, **kwargs):
                 Run the crawler for a single URL.
-            
+
     """
+
     def __init__(
         self, browser_config: BrowserConfig = None, logger: AsyncLogger = None, **kwargs
     ):
@@ -773,10 +886,10 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
     async def kill_session(self, session_id: str):
         """
         Kill a browser session and clean up resources.
-        
+
         Args:
             session_id (str): The ID of the session to kill.
-            
+
         Returns:
             None
         """
@@ -791,20 +904,20 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         """
         Set a hook function for a specific hook type. Following are list of hook types:
         - on_browser_created: Called when a new browser instance is created.
-        - on_page_context_created: Called when a new page context is created.    
-        - on_user_agent_updated: Called when the user agent is updated.    
-        - on_execution_started: Called when the execution starts.    
-        - before_goto: Called before a goto operation.    
-        - after_goto: Called after a goto operation.    
-        - before_return_html: Called before returning HTML content.    
-        - before_retrieve_html: Called before retrieving HTML content.  
-        
+        - on_page_context_created: Called when a new page context is created.
+        - on_user_agent_updated: Called when the user agent is updated.
+        - on_execution_started: Called when the execution starts.
+        - before_goto: Called before a goto operation.
+        - after_goto: Called after a goto operation.
+        - before_return_html: Called before returning HTML content.
+        - before_retrieve_html: Called before retrieving HTML content.
+
         All hooks except on_browser_created accepts a context and a page as arguments and **kwargs. However, on_browser_created accepts a browser and a context as arguments and **kwargs.
-        
+
         Args:
             hook_type (str): The type of the hook.
             hook (Callable): The hook function to set.
-            
+
         Returns:
             None
         """
@@ -816,12 +929,12 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
     async def execute_hook(self, hook_type: str, *args, **kwargs):
         """
         Execute a hook function for a specific hook type.
-        
+
         Args:
             hook_type (str): The type of the hook.
             *args: Variable length positional arguments.
             **kwargs: Keyword arguments.
-            
+
         Returns:
             The return value of the hook function, if any.
         """
@@ -836,42 +949,42 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
     def update_user_agent(self, user_agent: str):
         """
         Update the user agent for the browser.
-        
+
         Args:
             user_agent (str): The new user agent string.
-            
+
         Returns:
             None
         """
         self.user_agent = user_agent
 
     def set_custom_headers(self, headers: Dict[str, str]):
-        """ 
-        Set custom headers for the browser. 
-        
+        """
+        Set custom headers for the browser.
+
         Args:
             headers (Dict[str, str]): A dictionary of headers to set.
-            
+
         Returns:
             None
         """
         self.headers = headers
 
     async def smart_wait(self, page: Page, wait_for: str, timeout: float = 30000):
-        """ 
+        """
         Wait for a condition in a smart way. This functions works as below:
-        
+
         1. If wait_for starts with 'js:', it assumes it's a JavaScript function and waits for it to return true.
         2. If wait_for starts with 'css:', it assumes it's a CSS selector and waits for it to be present.
         3. Otherwise, it tries to evaluate wait_for as a JavaScript function and waits for it to return true.
         4. If it's not a JavaScript function, it assumes it's a CSS selector and waits for it to be present.
-        
-        This is a more advanced version of the wait_for parameter in CrawlerStrategy.crawl().        
+
+        This is a more advanced version of the wait_for parameter in CrawlerStrategy.crawl().
         Args:
             page: Playwright page object
             wait_for (str): The condition to wait for. Can be a CSS selector, a JavaScript function, or explicitly prefixed with 'js:' or 'css:'.
             timeout (float): Maximum time to wait in milliseconds
-            
+
         Returns:
             None
         """
@@ -921,18 +1034,20 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                                 "or explicitly prefixed with 'js:' or 'css:'."
                             )
 
-    async def csp_compliant_wait( self, page: Page, user_wait_function: str, timeout: float = 30000 ):
+    async def csp_compliant_wait(
+        self, page: Page, user_wait_function: str, timeout: float = 30000
+    ):
         """
         Wait for a condition in a CSP-compliant way.
-        
+
         Args:
             page: Playwright page object
             user_wait_function: JavaScript function as string that returns boolean
             timeout: Maximum time to wait in milliseconds
-            
+
         Returns:
             bool: True if condition was met, False if timed out
-            
+
         Raises:
             RuntimeError: If there's an error evaluating the condition
         """
@@ -968,10 +1083,10 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
     async def process_iframes(self, page):
         """
         Process iframes on a page. This function will extract the content of each iframe and replace it with a div containing the extracted content.
-        
+
         Args:
             page: Playwright page object
-            
+
         Returns:
             Playwright page object
         """
@@ -1033,10 +1148,10 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         """
         Creates a new browser session and returns its ID. A browse session is a unique openned page can be reused for multiple crawls.
         This function is asynchronous and returns a string representing the session ID.
-        
+
         Args:
             **kwargs: Optional keyword arguments to configure the session.
-        
+
         Returns:
             str: The session ID.
         """
@@ -1049,7 +1164,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         page, context = await self.browser_manager.get_page(session_id, user_agent)
         return session_id
 
-    async def crawl( self, url: str, config: CrawlerRunConfig, **kwargs ) -> AsyncCrawlResponse:
+    async def crawl(
+        self, url: str, config: CrawlerRunConfig, **kwargs
+    ) -> AsyncCrawlResponse:
         """
         Crawls a given URL or processes raw HTML/local file content based on the URL prefix.
 
@@ -1108,7 +1225,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 "URL must start with 'http://', 'https://', 'file://', or 'raw:'"
             )
 
-    async def _crawl_web( self, url: str, config: CrawlerRunConfig ) -> AsyncCrawlResponse:
+    async def _crawl_web(
+        self, url: str, config: CrawlerRunConfig
+    ) -> AsyncCrawlResponse:
         """
         Internal method to crawl web URLs with the specified configuration.
 
@@ -1122,6 +1241,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         config.url = url
         response_headers = {}
         status_code = None
+        final_url = url 
 
         # Reset downloaded files list for new crawl
         self._downloaded_files = []
@@ -1146,7 +1266,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             await context.add_init_script(load_js_script("navigator_overrider"))
 
         # Call hook after page creation
-        await self.execute_hook("on_page_context_created", page, context=context)
+        await self.execute_hook("on_page_context_created", page, context=context, config=config)
 
         # Set up console logging if requested
         if config.log_console:
@@ -1187,24 +1307,29 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
             # Handle page navigation and content loading
             if not config.js_only:
-                await self.execute_hook("before_goto", page, context=context, url=url)
+                await self.execute_hook("before_goto", page, context=context, url=url, config=config)
 
                 try:
                     # Generate a unique nonce for this request
                     nonce = hashlib.sha256(os.urandom(32)).hexdigest()
-                    
+
                     # Add CSP headers to the request
-                    await page.set_extra_http_headers({
-                        'Content-Security-Policy': f"default-src 'self'; script-src 'self' 'nonce-{nonce}' 'strict-dynamic'"
-                    })
+                    await page.set_extra_http_headers(
+                        {
+                            "Content-Security-Policy": f"default-src 'self'; script-src 'self' 'nonce-{nonce}' 'strict-dynamic'"
+                        }
+                    )
 
                     response = await page.goto(
                         url, wait_until=config.wait_until, timeout=config.page_timeout
                     )
+                    final_url = page.url
                 except Error as e:
                     raise RuntimeError(f"Failed on navigating ACS-GOTO:\n{str(e)}")
 
-                await self.execute_hook("after_goto", page, context=context, url=url, response=response)
+                await self.execute_hook(
+                    "after_goto", page, context=context, url=url, response=response, config=config
+                )
 
                 if response is None:
                     status_code = 200
@@ -1220,7 +1345,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             # Wait for body element and visibility
             try:
                 await page.wait_for_selector("body", state="attached", timeout=30000)
-                
+
                 # Use the new check_visibility function with csp_compliant_wait
                 is_visible = await self.csp_compliant_wait(
                     page,
@@ -1233,16 +1358,16 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                                         style.opacity !== '0';
                         return isVisible;
                     }""",
-                    timeout=30000
+                    timeout=30000,
                 )
-                
+
                 if not is_visible and not config.ignore_body_visibility:
                     visibility_info = await self.check_visibility(page)
                     raise Error(f"Body element is hidden: {visibility_info}")
 
-            except Error as e:
+            except Error:
                 visibility_info = await self.check_visibility(page)
-                
+
                 if self.config.verbose:
                     self.logger.debug(
                         message="Body visibility info: {info}",
@@ -1251,19 +1376,18 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     )
 
                 if not config.ignore_body_visibility:
-                    raise Error(f"Body element is hidden: {visibility_info}")            
-            
-            
+                    raise Error(f"Body element is hidden: {visibility_info}")
+
             # try:
             #     await page.wait_for_selector("body", state="attached", timeout=30000)
-                
+
             #     await page.wait_for_function(
             #         """
             #         () => {
             #             const body = document.body;
             #             const style = window.getComputedStyle(body);
-            #             return style.display !== 'none' && 
-            #                 style.visibility !== 'hidden' && 
+            #             return style.display !== 'none' &&
+            #                 style.visibility !== 'hidden' &&
             #                 style.opacity !== '0';
             #         }
             #     """,
@@ -1302,14 +1426,14 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             ):
                 await page.wait_for_load_state("domcontentloaded")
                 await asyncio.sleep(0.1)
-                
+
                 # Check for image loading with improved error handling
                 images_loaded = await self.csp_compliant_wait(
                     page,
                     "() => Array.from(document.getElementsByTagName('img')).every(img => img.complete)",
-                    timeout=1000
+                    timeout=1000,
                 )
-                
+
                 if not images_loaded and self.logger:
                     self.logger.warning(
                         message="Some images failed to load within timeout",
@@ -1320,8 +1444,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             if not self.browser_config.text_mode and config.adjust_viewport_to_content:
                 try:
                     dimensions = await self.get_page_dimensions(page)
-                    page_height = dimensions['height']
-                    page_width = dimensions['width']                    
+                    page_height = dimensions["height"]
+                    page_width = dimensions["width"]
                     # page_width = await page.evaluate(
                     #     "document.documentElement.scrollWidth"
                     # )
@@ -1365,18 +1489,20 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             #     elif isinstance(config.js_code, list):
             #         for js in config.js_code:
             #             await page.evaluate(js)
-                        
+
             if config.js_code:
                 # execution_result = await self.execute_user_script(page, config.js_code)
-                execution_result = await self.robust_execute_user_script(page, config.js_code)
+                execution_result = await self.robust_execute_user_script(
+                    page, config.js_code
+                )
                 if not execution_result["success"]:
                     self.logger.warning(
                         message="User script execution had issues: {error}",
                         tag="JS_EXEC",
-                        params={"error": execution_result.get("error")}
-                    )                        
+                        params={"error": execution_result.get("error")},
+                    )
 
-                await self.execute_hook("on_execution_started", page, context=context)
+                await self.execute_hook("on_execution_started", page, context=context, config=config)
 
             # Handle user simulation
             if config.simulate_user or config.magic:
@@ -1386,6 +1512,10 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 await page.keyboard.press("ArrowDown")
 
             # Handle wait_for condition
+            # Todo: Decide how to handle this
+            if not config.wait_for and config.css_selector and False:
+                config.wait_for = f"css:{config.css_selector}"
+
             if config.wait_for:
                 try:
                     await self.smart_wait(
@@ -1415,7 +1545,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 page = await self.process_iframes(page)
 
             # Pre-content retrieval hooks and delay
-            await self.execute_hook("before_retrieve_html", page, context=context)
+            await self.execute_hook("before_retrieve_html", page, context=context, config=config)
             if config.delay_before_return_html:
                 await asyncio.sleep(config.delay_before_return_html)
 
@@ -1425,7 +1555,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
             # Get final HTML content
             html = await page.content()
-            await self.execute_hook("before_return_html", page = page, html = html, context=context)
+            await self.execute_hook(
+                "before_return_html", page=page, html=html, context=context, config=config
+            )
 
             # Handle PDF and screenshot generation
             start_export_time = time.perf_counter()
@@ -1471,11 +1603,12 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 downloaded_files=(
                     self._downloaded_files if self._downloaded_files else None
                 ),
+                final_url=final_url,
             )
 
         except Exception as e:
             raise e
-        
+
         finally:
             # If no session_id is given we should close the page
             if not config.session_id:
@@ -1483,20 +1616,20 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
     async def _handle_full_page_scan(self, page: Page, scroll_delay: float = 0.1):
         """
-        Helper method to handle full page scanning. 
-        
+        Helper method to handle full page scanning.
+
         How it works:
         1. Get the viewport height.
         2. Scroll to the bottom of the page.
         3. Get the total height of the page.
         4. Scroll back to the top of the page.
-        5. Scroll to the bottom of the page again.  
+        5. Scroll to the bottom of the page again.
         6. Continue scrolling until the bottom of the page is reached.
-        
+
         Args:
             page (Page): The Playwright page object
             scroll_delay (float): The delay between page scrolls
-        
+
         """
         try:
             viewport_height = page.viewport_size.get(
@@ -1511,8 +1644,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
             # total_height = await page.evaluate("document.documentElement.scrollHeight")
             dimensions = await self.get_page_dimensions(page)
-            total_height = dimensions['height']
-            
+            total_height = dimensions["height"]
+
             while current_position < total_height:
                 current_position = min(current_position + viewport_height, total_height)
                 await self.safe_scroll(page, 0, current_position, delay=scroll_delay)
@@ -1521,8 +1654,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
                 # new_height = await page.evaluate("document.documentElement.scrollHeight")
                 dimensions = await self.get_page_dimensions(page)
-                new_height = dimensions['height']
-                
+                new_height = dimensions["height"]
+
                 if new_height > total_height:
                     total_height = new_height
 
@@ -1542,7 +1675,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
     async def _handle_download(self, download):
         """
         Handle file downloads.
-        
+
         How it works:
         1. Get the suggested filename.
         2. Get the download path.
@@ -1550,10 +1683,10 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         4. Start the download.
         5. Save the downloaded file.
         6. Log the completion.
-        
+
         Args:
             download (Download): The Playwright download object
-            
+
         Returns:
             None
         """
@@ -1598,7 +1731,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         remove_overlays_js = load_js_script("remove_overlay_elements")
 
         try:
-            await page.evaluate(f"""
+            await page.evaluate(
+                f"""
                 (() => {{
                     try {{
                         {remove_overlays_js}
@@ -1611,7 +1745,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         }};
                     }}
                 }})()
-            """)
+            """
+            )
             await page.wait_for_timeout(500)  # Wait for any animations to complete
         except Exception as e:
             self.logger.warning(
@@ -1623,10 +1758,10 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
     async def export_pdf(self, page: Page) -> bytes:
         """
         Exports the current page as a PDF.
-        
+
         Args:
             page (Page): The Playwright page object
-            
+
         Returns:
             bytes: The PDF data
         """
@@ -1636,16 +1771,16 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
     async def take_screenshot(self, page, **kwargs) -> str:
         """
         Take a screenshot of the current page.
-        
+
         Args:
             page (Page): The Playwright page object
             kwargs: Additional keyword arguments
-        
+
         Returns:
             str: The base64-encoded screenshot data
         """
         need_scroll = await self.page_need_scroll(page)
-        
+
         if not need_scroll:
             # Page is short enough, just take a screenshot
             return await self.take_screenshot_naive(page)
@@ -1656,13 +1791,13 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
     async def take_screenshot_from_pdf(self, pdf_data: bytes) -> str:
         """
-        Convert the first page of the PDF to a screenshot.     
-        
+        Convert the first page of the PDF to a screenshot.
+
         Requires pdf2image and poppler.
-        
+
         Args:
             pdf_data (bytes): The PDF data
-        
+
         Returns:
             str: The base64-encoded screenshot data
         """
@@ -1694,21 +1829,21 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         """
         Attempt to set a large viewport and take a full-page screenshot.
         If still too large, segment the page as before.
-        
+
         Requires pdf2image and poppler.
-        
+
         Args:
             page (Page): The Playwright page object
             kwargs: Additional keyword arguments
-            
+
         Returns:
             str: The base64-encoded screenshot data
         """
         try:
             # Get page height
             dimensions = await self.get_page_dimensions(page)
-            page_width = dimensions['width']
-            page_height = dimensions['height']            
+            page_width = dimensions["width"]
+            page_height = dimensions["height"]
             # page_height = await page.evaluate("document.documentElement.scrollHeight")
             # page_width = await page.evaluate("document.documentElement.scrollWidth")
 
@@ -1805,10 +1940,10 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         """
         Exports the current storage state (cookies, localStorage, sessionStorage)
         to a JSON file at the specified path.
-        
+
         Args:
             path (str): The path to save the storage state JSON file
-        
+
         Returns:
             dict: The exported storage state
         """
@@ -1826,33 +1961,35 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 tag="WARNING",
             )
 
-    async def robust_execute_user_script(self, page: Page, js_code: Union[str, List[str]]) -> Dict[str, Any]:
+    async def robust_execute_user_script(
+        self, page: Page, js_code: Union[str, List[str]]
+    ) -> Dict[str, Any]:
         """
         Executes user-provided JavaScript code with proper error handling and context,
         supporting both synchronous and async user code, plus navigations.
-        
+
         How it works:
         1. Wait for load state 'domcontentloaded'
         2. If js_code is a string, execute it directly
         3. If js_code is a list, execute each element in sequence
-        4. Wait for load state 'networkidle'        
-        5. Return results   
-        
-        Args:    
+        4. Wait for load state 'networkidle'
+        5. Return results
+
+        Args:
             page (Page): The Playwright page instance
             js_code (Union[str, List[str]]): The JavaScript code to execute
-        
+
         Returns:
             Dict[str, Any]: The results of the execution
         """
         try:
-            await page.wait_for_load_state('domcontentloaded')
-            
+            await page.wait_for_load_state("domcontentloaded")
+
             if isinstance(js_code, str):
                 scripts = [js_code]
             else:
                 scripts = js_code
-            
+
             results = []
             for script in scripts:
                 try:
@@ -1861,7 +1998,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     # then wait for the new page to load before continuing
                     result = None
                     try:
-                        result = await page.evaluate(f"""
+                        result = await page.evaluate(
+                            f"""
                         (async () => {{
                             try {{
                                 {script}
@@ -1870,53 +2008,58 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                                 return {{ success: false, error: err.toString(), stack: err.stack }};
                             }}
                         }})();
-                        """)
+                        """
+                        )
                     except Error as e:
                         # If it's due to navigation destroying the context, handle gracefully
                         if "Execution context was destroyed" in str(e):
-                            self.logger.info("Navigation triggered by script, waiting for load state", tag="JS_EXEC")
+                            self.logger.info(
+                                "Navigation triggered by script, waiting for load state",
+                                tag="JS_EXEC",
+                            )
                             try:
-                                await page.wait_for_load_state('load', timeout=30000)
+                                await page.wait_for_load_state("load", timeout=30000)
                             except Error as nav_err:
                                 self.logger.warning(
                                     message="Navigation wait failed: {error}",
                                     tag="JS_EXEC",
-                                    params={"error": str(nav_err)}
+                                    params={"error": str(nav_err)},
                                 )
                             try:
-                                await page.wait_for_load_state('networkidle', timeout=30000)
+                                await page.wait_for_load_state(
+                                    "networkidle", timeout=30000
+                                )
                             except Error as nav_err:
                                 self.logger.warning(
                                     message="Network idle wait failed: {error}",
                                     tag="JS_EXEC",
-                                    params={"error": str(nav_err)}
+                                    params={"error": str(nav_err)},
                                 )
                             # Return partial success, or adapt as you see fit
                             result = {
                                 "success": True,
-                                "info": "Navigation triggered, ignoring context destroyed error"
+                                "info": "Navigation triggered, ignoring context destroyed error",
                             }
                         else:
                             # It's some other error, log and continue
                             self.logger.error(
                                 message="Playwright execution error: {error}",
                                 tag="JS_EXEC",
-                                params={"error": str(e)}
+                                params={"error": str(e)},
                             )
                             result = {"success": False, "error": str(e)}
-                    
+
                     # If we made it this far with no repeated error, do post-load waits
                     t1 = time.time()
                     try:
-                        await page.wait_for_load_state('domcontentloaded', timeout=5000)
-                        print("DOM content loaded after script execution in", time.time() - t1)
+                        await page.wait_for_load_state("domcontentloaded", timeout=5000)
                     except Error as e:
                         self.logger.warning(
                             message="DOM content load timeout: {error}",
                             tag="JS_EXEC",
-                            params={"error": str(e)}
+                            params={"error": str(e)},
                         )
-                    
+
                     # t1 = time.time()
                     # try:
                     #     await page.wait_for_load_state('networkidle', timeout=5000)
@@ -1935,46 +2078,49 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     self.logger.error(
                         message="Script chunk failed: {error}",
                         tag="JS_EXEC",
-                        params={"error": str(e)}
+                        params={"error": str(e)},
                     )
                     results.append({"success": False, "error": str(e)})
 
             return {"success": True, "results": results}
-        
+
         except Exception as e:
             self.logger.error(
                 message="Script execution failed: {error}",
                 tag="JS_EXEC",
-                params={"error": str(e)}
+                params={"error": str(e)},
             )
             return {"success": False, "error": str(e)}
 
-    async def execute_user_script(self, page: Page, js_code: Union[str, List[str]]) -> Dict[str, Any]:
+    async def execute_user_script(
+        self, page: Page, js_code: Union[str, List[str]]
+    ) -> Dict[str, Any]:
         """
         Executes user-provided JavaScript code with proper error handling and context.
-        
+
         Args:
             page: Playwright page object
             js_code: Single JavaScript string or list of JavaScript code strings
-            
+
         Returns:
             Dict containing execution status and results/errors
         """
         try:
             # Ensure the page is ready for script execution
-            await page.wait_for_load_state('domcontentloaded')
-            
+            await page.wait_for_load_state("domcontentloaded")
+
             # Handle single script or multiple scripts
             if isinstance(js_code, str):
                 scripts = [js_code]
             else:
                 scripts = js_code
-                
+
             results = []
             for script in scripts:
                 try:
                     # Execute the script and wait for network idle
-                    result = await page.evaluate(f"""
+                    result = await page.evaluate(
+                        f"""
                         (() => {{
                             return new Promise((resolve) => {{
                                 try {{
@@ -2007,57 +2153,58 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                                 }}
                             }});
                         }})()
-                    """)
-                    
+                    """
+                    )
+
                     # Wait for network idle after script execution
                     t1 = time.time()
-                    await page.wait_for_load_state('domcontentloaded', timeout=5000)
-                    print("DOM content loaded after script execution in", time.time() - t1)
+                    await page.wait_for_load_state("domcontentloaded", timeout=5000)
+
 
                     t1 = time.time()
-                    await page.wait_for_load_state('networkidle', timeout=5000)
-                    print("Network idle after script execution in", time.time() - t1)
-                    
+                    await page.wait_for_load_state("networkidle", timeout=5000)
+
                     results.append(result if result else {"success": True})
-                    
+
                 except Error as e:
                     # Handle Playwright-specific errors
                     self.logger.error(
                         message="Playwright execution error: {error}",
                         tag="JS_EXEC",
-                        params={"error": str(e)}
+                        params={"error": str(e)},
                     )
                     results.append({"success": False, "error": str(e)})
-                    
+
             return {"success": True, "results": results}
-            
+
         except Exception as e:
             self.logger.error(
                 message="Script execution failed: {error}",
                 tag="JS_EXEC",
-                params={"error": str(e)}
+                params={"error": str(e)},
             )
             return {"success": False, "error": str(e)}
-            
+
         except Exception as e:
             self.logger.error(
                 message="Script execution failed: {error}",
                 tag="JS_EXEC",
-                params={"error": str(e)}
+                params={"error": str(e)},
             )
             return {"success": False, "error": str(e)}
 
     async def check_visibility(self, page):
         """
         Checks if an element is visible on the page.
-        
+
         Args:
             page: Playwright page object
-            
+
         Returns:
             Boolean indicating visibility
         """
-        return await page.evaluate("""
+        return await page.evaluate(
+            """
             () => {
                 const element = document.body;
                 if (!element) return false;
@@ -2067,31 +2214,32 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                                 style.opacity !== '0';
                 return isVisible;
             }
-        """)       
-        
+        """
+        )
+
     async def safe_scroll(self, page: Page, x: int, y: int, delay: float = 0.1):
         """
         Safely scroll the page with rendering time.
-        
+
         Args:
             page: Playwright page object
             x: Horizontal scroll position
             y: Vertical scroll position
         """
         result = await self.csp_scroll_to(page, x, y)
-        if result['success']:
+        if result["success"]:
             await page.wait_for_timeout(delay * 1000)
         return result
-            
+
     async def csp_scroll_to(self, page: Page, x: int, y: int) -> Dict[str, Any]:
         """
         Performs a CSP-compliant scroll operation and returns the result status.
-        
+
         Args:
             page: Playwright page object
             x: Horizontal scroll position
             y: Vertical scroll position
-            
+
         Returns:
             Dict containing scroll status and position information
         """
@@ -2125,67 +2273,68 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     }}
                 }}"""
             )
-            
-            if not result['success']:
+
+            if not result["success"]:
                 self.logger.warning(
                     message="Scroll operation failed: {error}",
                     tag="SCROLL",
-                    params={"error": result.get('error')}
+                    params={"error": result.get("error")},
                 )
-                
+
             return result
-            
+
         except Exception as e:
             self.logger.error(
                 message="Failed to execute scroll: {error}",
                 tag="SCROLL",
-                params={"error": str(e)}
+                params={"error": str(e)},
             )
-            return {
-                "success": False,
-                "error": str(e)
-            }
-        
+            return {"success": False, "error": str(e)}
+
     async def get_page_dimensions(self, page: Page):
         """
         Get the dimensions of the page.
-        
+
         Args:
             page: Playwright page object
-            
+
         Returns:
             Dict containing width and height of the page
         """
-        return await page.evaluate("""
+        return await page.evaluate(
+            """
             () => {
                 const {scrollWidth, scrollHeight} = document.documentElement;
                 return {width: scrollWidth, height: scrollHeight};
             }
-        """)
-    
+        """
+        )
+
     async def page_need_scroll(self, page: Page) -> bool:
         """
         Determine whether the page need to scroll
-        
+
         Args:
             page: Playwright page object
-            
+
         Returns:
             bool: True if page needs scrolling
         """
         try:
-            need_scroll = await page.evaluate("""
+            need_scroll = await page.evaluate(
+                """
             () => {
                 const scrollHeight = document.documentElement.scrollHeight;
                 const viewportHeight = window.innerHeight;
                 return scrollHeight > viewportHeight;
             }
-            """)
+            """
+            )
             return need_scroll
         except Exception as e:
             self.logger.warning(
                 message="Failed to check scroll need: {error}. Defaulting to True for safety.",
                 tag="SCROLL",
-                params={"error": str(e)}
+                params={"error": str(e)},
             )
             return True  # Default to scrolling if check fails

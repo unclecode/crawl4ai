@@ -6,10 +6,8 @@ This example demonstrates optimal browser usage patterns in Crawl4AI:
 """
 
 import asyncio
-import os
 from typing import List
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
-from crawl4ai.content_filter_strategy import PruningContentFilter
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
 

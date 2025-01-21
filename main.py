@@ -1,14 +1,9 @@
 import asyncio, os
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
-from fastapi.responses import JSONResponse
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware  
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
-from fastapi.exceptions import RequestValidationError
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import FileResponse
 from fastapi.responses import RedirectResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi import Depends, Security
@@ -18,13 +13,10 @@ from typing import Optional, List, Dict, Any, Union
 import psutil
 import time
 import uuid
-from collections import defaultdict
-from urllib.parse import urlparse
 import math
 import logging
 from enum import Enum
 from dataclasses import dataclass
-import json
 from crawl4ai import AsyncWebCrawler, CrawlResult, CacheMode
 from crawl4ai.config import MIN_WORD_THRESHOLD
 from crawl4ai.extraction_strategy import (
@@ -35,8 +27,10 @@ from crawl4ai.extraction_strategy import (
 
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
-logging.basicConfig(level=logging.INFO)
+
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
 
 class TaskStatus(str, Enum):
     PENDING = "pending"
@@ -44,23 +38,28 @@ class TaskStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
 
+
 class CrawlerType(str, Enum):
     BASIC = "basic"
     LLM = "llm"
     COSINE = "cosine"
     JSON_CSS = "json_css"
 
+
 class ExtractionConfig(BaseModel):
     type: CrawlerType
     params: Dict[str, Any] = {}
+
 
 class ChunkingStrategy(BaseModel):
     type: str
     params: Dict[str, Any] = {}
 
+
 class ContentFilter(BaseModel):
     type: str = "bm25"
     params: Dict[str, Any] = {}
+
 
 class CrawlRequest(BaseModel):
     urls: Union[HttpUrl, List[HttpUrl]]
@@ -77,8 +76,9 @@ class CrawlRequest(BaseModel):
     session_id: Optional[str] = None
     cache_mode: Optional[CacheMode] = CacheMode.ENABLED
     priority: int = Field(default=5, ge=1, le=10)
-    ttl: Optional[int] = 3600    
+    ttl: Optional[int] = 3600
     crawler_params: Dict[str, Any] = {}
+
 
 @dataclass
 class TaskInfo:
@@ -88,6 +88,7 @@ class TaskInfo:
     error: Optional[str] = None
     created_at: float = time.time()
     ttl: int = 3600
+
 
 class ResourceMonitor:
     def __init__(self, max_concurrent_tasks: int = 10):
@@ -106,7 +107,9 @@ class ResourceMonitor:
         mem_usage = psutil.virtual_memory().percent / 100
         cpu_usage = psutil.cpu_percent() / 100
 
-        memory_factor = max(0, (self.memory_threshold - mem_usage) / self.memory_threshold)
+        memory_factor = max(
+            0, (self.memory_threshold - mem_usage) / self.memory_threshold
+        )
         cpu_factor = max(0, (self.cpu_threshold - cpu_usage) / self.cpu_threshold)
 
         self._last_available_slots = math.floor(
@@ -115,6 +118,7 @@ class ResourceMonitor:
         self._last_check = current_time
 
         return self._last_available_slots
+
 
 class TaskManager:
     def __init__(self, cleanup_interval: int = 300):
@@ -149,12 +153,16 @@ class TaskManager:
         except asyncio.TimeoutError:
             try:
                 # Then try low priority
-                _, task_id = await asyncio.wait_for(self.low_priority.get(), timeout=0.1)
+                _, task_id = await asyncio.wait_for(
+                    self.low_priority.get(), timeout=0.1
+                )
                 return task_id
             except asyncio.TimeoutError:
                 return None
 
-    def update_task(self, task_id: str, status: TaskStatus, result: Any = None, error: str = None):
+    def update_task(
+        self, task_id: str, status: TaskStatus, result: Any = None, error: str = None
+    ):
         if task_id in self.tasks:
             task_info = self.tasks[task_id]
             task_info.status = status
@@ -179,6 +187,7 @@ class TaskManager:
                     del self.tasks[task_id]
             except Exception as e:
                 logger.error(f"Error in cleanup loop: {e}")
+
 
 class CrawlerPool:
     def __init__(self, max_size: int = 10):
@@ -222,6 +231,7 @@ class CrawlerPool:
                 await crawler.__aexit__(None, None, None)
             self.active_crawlers.clear()
 
+
 class CrawlerService:
     def __init__(self, max_concurrent_tasks: int = 10):
         self.resource_monitor = ResourceMonitor(max_concurrent_tasks)
@@ -258,10 +268,10 @@ class CrawlerService:
     async def submit_task(self, request: CrawlRequest) -> str:
         task_id = str(uuid.uuid4())
         await self.task_manager.add_task(task_id, request.priority, request.ttl or 3600)
-        
+
         # Store request data with task
         self.task_manager.tasks[task_id].request = request
-        
+
         return task_id
 
     async def _process_queue(self):
@@ -286,9 +296,11 @@ class CrawlerService:
 
                 try:
                     crawler = await self.crawler_pool.acquire(**request.crawler_params)
-                    
-                    extraction_strategy = self._create_extraction_strategy(request.extraction_config)
-                    
+
+                    extraction_strategy = self._create_extraction_strategy(
+                        request.extraction_config
+                    )
+
                     if isinstance(request.urls, list):
                         results = await crawler.arun_many(
                             urls=[str(url) for url in request.urls],
@@ -318,15 +330,20 @@ class CrawlerService:
                         )
 
                     await self.crawler_pool.release(crawler)
-                    self.task_manager.update_task(task_id, TaskStatus.COMPLETED, results)
+                    self.task_manager.update_task(
+                        task_id, TaskStatus.COMPLETED, results
+                    )
 
                 except Exception as e:
                     logger.error(f"Error processing task {task_id}: {str(e)}")
-                    self.task_manager.update_task(task_id, TaskStatus.FAILED, error=str(e))
+                    self.task_manager.update_task(
+                        task_id, TaskStatus.FAILED, error=str(e)
+                    )
 
             except Exception as e:
                 logger.error(f"Error in queue processing: {str(e)}")
                 await asyncio.sleep(1)
+
 
 app = FastAPI(title="Crawl4AI API")
 
@@ -344,6 +361,7 @@ app.add_middleware(
 security = HTTPBearer()
 CRAWL4AI_API_TOKEN = os.getenv("CRAWL4AI_API_TOKEN")
 
+
 async def verify_token(credentials: HTTPAuthorizationCredentials = Security(security)):
     if not CRAWL4AI_API_TOKEN:
         return credentials  # No token verification if CRAWL4AI_API_TOKEN is not set
@@ -351,9 +369,11 @@ async def verify_token(credentials: HTTPAuthorizationCredentials = Security(secu
         raise HTTPException(status_code=401, detail="Invalid token")
     return credentials
 
+
 def secure_endpoint():
     """Returns security dependency only if CRAWL4AI_API_TOKEN is set"""
     return Depends(verify_token) if CRAWL4AI_API_TOKEN else None
+
 
 # Check if site directory exists
 if os.path.exists(__location__ + "/site"):
@@ -364,13 +384,16 @@ site_templates = Jinja2Templates(directory=__location__ + "/site")
 
 crawler_service = CrawlerService()
 
+
 @app.on_event("startup")
 async def startup_event():
     await crawler_service.start()
 
+
 @app.on_event("shutdown")
 async def shutdown_event():
     await crawler_service.stop()
+
 
 @app.get("/")
 def read_root():
@@ -379,12 +402,16 @@ def read_root():
     # Return a json response
     return {"message": "Crawl4AI API service is running"}
 
+
 @app.post("/crawl", dependencies=[secure_endpoint()] if CRAWL4AI_API_TOKEN else [])
 async def crawl(request: CrawlRequest) -> Dict[str, str]:
     task_id = await crawler_service.submit_task(request)
     return {"task_id": task_id}
 
-@app.get("/task/{task_id}", dependencies=[secure_endpoint()] if CRAWL4AI_API_TOKEN else [])
+
+@app.get(
+    "/task/{task_id}", dependencies=[secure_endpoint()] if CRAWL4AI_API_TOKEN else []
+)
 async def get_task_status(task_id: str):
     task_info = crawler_service.task_manager.get_task(task_id)
     if not task_info:
@@ -406,36 +433,45 @@ async def get_task_status(task_id: str):
 
     return response
 
+
 @app.post("/crawl_sync", dependencies=[secure_endpoint()] if CRAWL4AI_API_TOKEN else [])
 async def crawl_sync(request: CrawlRequest) -> Dict[str, Any]:
     task_id = await crawler_service.submit_task(request)
-    
+
     # Wait up to 60 seconds for task completion
     for _ in range(60):
         task_info = crawler_service.task_manager.get_task(task_id)
         if not task_info:
             raise HTTPException(status_code=404, detail="Task not found")
-            
+
         if task_info.status == TaskStatus.COMPLETED:
             # Return same format as /task/{task_id} endpoint
             if isinstance(task_info.result, list):
-                return {"status": task_info.status, "results": [result.dict() for result in task_info.result]}
+                return {
+                    "status": task_info.status,
+                    "results": [result.dict() for result in task_info.result],
+                }
             return {"status": task_info.status, "result": task_info.result.dict()}
-            
+
         if task_info.status == TaskStatus.FAILED:
             raise HTTPException(status_code=500, detail=task_info.error)
-            
+
         await asyncio.sleep(1)
-    
+
     # If we get here, task didn't complete within timeout
     raise HTTPException(status_code=408, detail="Task timed out")
 
-@app.post("/crawl_direct", dependencies=[secure_endpoint()] if CRAWL4AI_API_TOKEN else [])
+
+@app.post(
+    "/crawl_direct", dependencies=[secure_endpoint()] if CRAWL4AI_API_TOKEN else []
+)
 async def crawl_direct(request: CrawlRequest) -> Dict[str, Any]:
     try:
         crawler = await crawler_service.crawler_pool.acquire(**request.crawler_params)
-        extraction_strategy = crawler_service._create_extraction_strategy(request.extraction_config)
-        
+        extraction_strategy = crawler_service._create_extraction_strategy(
+            request.extraction_config
+        )
+
         try:
             if isinstance(request.urls, list):
                 results = await crawler.arun_many(
@@ -470,7 +506,8 @@ async def crawl_direct(request: CrawlRequest) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Error in direct crawl: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-    
+
+
 @app.get("/health")
 async def health_check():
     available_slots = await crawler_service.resource_monitor.get_available_slots()
@@ -482,6 +519,8 @@ async def health_check():
         "cpu_usage": psutil.cpu_percent(),
     }
 
+
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=11235)
