@@ -22,6 +22,7 @@ async def main():
     run_config = CrawlerRunConfig(
         verbose=True,            # Detailed logging
         cache_mode=CacheMode.ENABLED,  # Use normal read/write cache
+        check_robots_txt=True,   # Respect robots.txt rules
         # ... other parameters
     )
 
@@ -30,8 +31,10 @@ async def main():
             url="https://example.com",
             config=run_config
         )
-        print(result.cleaned_html[:500])
-
+        
+        # Check if blocked by robots.txt
+        if not result.success and result.status_code == 403:
+            print(f"Error: {result.error_message}")
 ```
 
 **Key Fields**:
@@ -226,6 +229,7 @@ async def main():
         # Core
         verbose=True,
         cache_mode=CacheMode.ENABLED,
+        check_robots_txt=True,   # Respect robots.txt rules
         
         # Content
         word_count_threshold=10,

@@ -189,6 +189,44 @@ async def crawl_with_semaphore(urls):
         return results
 ```
 
+### 4.4 Robots.txt Consideration
+
+```python
+import asyncio
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
+
+async def main():
+    urls = [
+        "https://example1.com",
+        "https://example2.com",
+        "https://example3.com"
+    ]
+    
+    config = CrawlerRunConfig(
+        cache_mode=CacheMode.ENABLED,
+        check_robots_txt=True,  # Will respect robots.txt for each URL
+        semaphore_count=3      # Max concurrent requests
+    )
+    
+    async with AsyncWebCrawler() as crawler:
+        async for result in crawler.arun_many(urls, config=config):
+            if result.success:
+                print(f"Successfully crawled {result.url}")
+            elif result.status_code == 403 and "robots.txt" in result.error_message:
+                print(f"Skipped {result.url} - blocked by robots.txt")
+            else:
+                print(f"Failed to crawl {result.url}: {result.error_message}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+**Key Points**:
+- When `check_robots_txt=True`, each URL's robots.txt is checked before crawling
+- Robots.txt files are cached for efficiency
+- Failed robots.txt checks return 403 status code
+- Dispatcher handles robots.txt checks automatically for each URL
+
 ## 5. Dispatch Results
 
 Each crawl result includes dispatch information:

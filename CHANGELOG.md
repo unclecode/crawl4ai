@@ -1,3 +1,9 @@
+### [Added] 2025-01-21
+- Added robots.txt compliance support with efficient SQLite-based caching
+- New `check_robots_txt` parameter in CrawlerRunConfig to enable robots.txt checking
+- Documentation updates for robots.txt compliance features and examples
+- Automated robots.txt checking integrated into AsyncWebCrawler with 403 status codes for blocked URLs
+
 ### [Added] 2025-01-20
 - Added proxy configuration support to CrawlerRunConfig allowing dynamic proxy settings per crawl request
 - Updated documentation with examples for using proxy configuration in crawl operations
