@@ -1,25 +1,143 @@
-### [Added] 2025-01-21
-- Added robots.txt compliance support with efficient SQLite-based caching
-- New `check_robots_txt` parameter in CrawlerRunConfig to enable robots.txt checking
-- Documentation updates for robots.txt compliance features and examples
-- Automated robots.txt checking integrated into AsyncWebCrawler with 403 status codes for blocked URLs
-
-### [Added] 2025-01-20
-- Added proxy configuration support to CrawlerRunConfig allowing dynamic proxy settings per crawl request
-- Updated documentation with examples for using proxy configuration in crawl operations
-
-### [Added] 2025-01-20
-- New LLM-powered schema generation utility for JsonElementExtractionStrategy
-- Support for automatic CSS and XPath schema generation using OpenAI or Ollama
-- Comprehensive documentation and examples for schema generation
-- New prompt templates optimized for HTML schema analysis
-
 # Changelog
 
 All notable changes to Crawl4AI will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+Okay, here's a detailed changelog in Markdown format, generated from the provided git diff and commit history. I've focused on user-facing changes, fixes, and features, and grouped them as requested:
+
+## Version 0.4.3 (2025-01-21)
+
+This release introduces several powerful new features, including robots.txt compliance, dynamic proxy support, LLM-powered schema generation, and improved documentation.
+
+### Features
+
+-   **Robots.txt Compliance:**
+    -   Added robots.txt compliance support with efficient SQLite-based caching.
+    -   New `check_robots_txt` parameter in `CrawlerRunConfig` to enable robots.txt checking before crawling a URL.
+    -   Automated robots.txt checking is now integrated into `AsyncWebCrawler` with 403 status codes for blocked URLs.
+    
+-   **Proxy Configuration:**
+    -   Added proxy configuration support to `CrawlerRunConfig`, allowing dynamic proxy settings per crawl request.
+    -   Updated documentation with examples for using proxy configuration in crawl operations.
+
+-   **LLM-Powered Schema Generation:**
+    -   Introduced a new utility for automatic CSS and XPath schema generation using OpenAI or Ollama models.
+    -   Added comprehensive documentation and examples for schema generation.
+    -   New prompt templates optimized for HTML schema analysis.
+
+-   **URL Redirection Tracking:**
+    -   Added URL redirection tracking to capture the final URL after any redirects.
+    -   The final URL is now available in the `final_url` field of the `AsyncCrawlResponse` object.
+
+-   **Enhanced Streamlined Documentation:**
+    -   Refactored and improved the documentation structure for clarity and ease of use.
+    -   Added detailed explanations of new features and updated examples.
+
+-   **Improved Browser Context Management:**
+    -   Enhanced the management of browser contexts and added shared data support.
+    -   Introduced the `shared_data` parameter in `CrawlerRunConfig` to pass data between hooks.
+
+-   **Memory Dispatcher System:**
+    -   Migrated to a memory dispatcher system with enhanced monitoring capabilities.
+    -   Introduced `MemoryAdaptiveDispatcher` and `SemaphoreDispatcher` for improved resource management.
+    -   Added `RateLimiter` for rate limiting support.
+    -   New `CrawlerMonitor` for real-time monitoring of crawler operations.
+
+-   **Streaming Support:**
+    -   Added streaming support for processing crawled URLs as they are processed.
+    -   Enabled streaming mode with the `stream` parameter in `CrawlerRunConfig`.
+
+-   **Content Scraping Strategy:**
+    -   Introduced a new `LXMLWebScrapingStrategy` for faster content scraping.
+    -   Added support for selecting the scraping strategy via the `scraping_strategy` parameter in `CrawlerRunConfig`.
+
+### Bug Fixes
+
+-   **Browser Path Management:**
+    -   Improved browser path management for consistent behavior across different environments.
+
+-   **Memory Threshold:**
+    -   Adjusted the default memory threshold to improve resource utilization.
+
+-   **Pydantic Model Fields:**
+    -   Made several model fields optional with default values to improve flexibility.
+
+### Refactor
+
+-   **Documentation Structure:**
+    -   Reorganized documentation structure to improve navigation and readability.
+    -   Updated styles and added new sections for advanced features.
+
+-   **Scraping Mode:**
+    -   Replaced the `ScrapingMode` enum with a strategy pattern for more flexible content scraping.
+
+-   **Version Update:**
+    -   Updated the version to `0.4.248`.
+
+-   **Code Cleanup:**
+    -   Removed unused files and improved type hints.
+    -   Applied Ruff corrections for code quality.
+
+-   **Updated dependencies:**
+    -   Updated dependencies to their latest versions to ensure compatibility and security.
+
+-   **Ignored certain patterns and directories:**
+    -   Updated `.gitignore` and `.codeiumignore` to ignore additional patterns and directories, streamlining the development environment.
+
+-   **Simplified Personal Story in README:**
+    -   Streamlined the personal story and project vision in the `README.md` for clarity.
+
+-   **Removed Deprecated Files:**
+    -   Deleted several deprecated files and examples that are no longer relevant.
+
+---
+**Previous Releases:**
+
+### 0.4.24x (2024-12-31)
+-   **Enhanced SSL & Security**: New SSL certificate handling with custom paths and validation options for secure crawling.
+-   **Smart Content Filtering**: Advanced filtering system with regex support and efficient chunking strategies.
+-   **Improved JSON Extraction**: Support for complex JSONPath, JSON-CSS, and Microdata extraction.
+-   **New Field Types**: Added `computed`, `conditional`, `aggregate`, and `template` field types.
+-   **Performance Boost**: Optimized caching, parallel processing, and memory management.
+-   **Better Error Handling**: Enhanced debugging capabilities with detailed error tracking.
+-   **Security Features**: Improved input validation and safe expression evaluation.
+
+### 0.4.247 (2025-01-06)
+
+#### Added
+- **Windows Event Loop Configuration**: Introduced a utility function `configure_windows_event_loop` to resolve `NotImplementedError` for asyncio subprocesses on Windows. ([#utils.py](crawl4ai/utils.py), [#tutorials/async-webcrawler-basics.md](docs/md_v3/tutorials/async-webcrawler-basics.md))
+- **`page_need_scroll` Method**: Added a method to determine if a page requires scrolling before taking actions in `AsyncPlaywrightCrawlerStrategy`. ([#async_crawler_strategy.py](crawl4ai/async_crawler_strategy.py))
+
+#### Changed
+- **Version Bump**: Updated the version from `0.4.246` to `0.4.247`. ([#__version__.py](crawl4ai/__version__.py))
+- **Improved Scrolling Logic**: Enhanced scrolling methods in `AsyncPlaywrightCrawlerStrategy` by adding a `scroll_delay` parameter for better control. ([#async_crawler_strategy.py](crawl4ai/async_crawler_strategy.py))
+- **Markdown Generation Example**: Updated the `hello_world.py` example to reflect the latest API changes and better illustrate features. ([#examples/hello_world.py](docs/examples/hello_world.py))
+- **Documentation Update**: 
+  - Added Windows-specific instructions for handling asyncio event loops. ([#async-webcrawler-basics.md](docs/md_v3/tutorials/async-webcrawler-basics.md))
+
+#### Removed
+- **Legacy Markdown Generation Code**: Removed outdated and unused code for markdown generation in `content_scraping_strategy.py`. ([#content_scraping_strategy.py](crawl4ai/content_scraping_strategy.py))
+
+#### Fixed
+- **Page Closing to Prevent Memory Leaks**:
+  - **Description**: Added a `finally` block to ensure pages are closed when no `session_id` is provided.
+  - **Impact**: Prevents memory leaks caused by lingering pages after a crawl.
+  - **File**: [`async_crawler_strategy.py`](crawl4ai/async_crawler_strategy.py)
+  - **Code**:
+    ```python
+    finally:
+        # If no session_id is given we should close the page
+        if not config.session_id:
+            await page.close()
+    ```
+- **Multiple Element Selection**: Modified `_get_elements` in `JsonCssExtractionStrategy` to return all matching elements instead of just the first one, ensuring comprehensive extraction. ([#extraction_strategy.py](crawl4ai/extraction_strategy.py))
+- **Error Handling in Scrolling**: Added robust error handling to ensure scrolling proceeds safely even if a configuration is missing. ([#async_crawler_strategy.py](crawl4ai/async_crawler_strategy.py))
+
+#### Other
+- **Git Ignore Update**: Added `/plans` to `.gitignore` for better development environment consistency. ([#.gitignore](.gitignore))
+
 
 ## [0.4.24] - 2024-12-31
 

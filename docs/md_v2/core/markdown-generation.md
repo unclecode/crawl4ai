@@ -181,7 +181,7 @@ from crawl4ai.content_filter_strategy import LLMContentFilter
 async def main():
     # Initialize LLM filter with specific instruction
     filter = LLMContentFilter(
-        provider="openai/gpt-4",  # or your preferred provider
+        provider="openai/gpt-4o",  # or your preferred provider
         api_token="your-api-token",  # or use environment variable
         instruction="""
         Focus on extracting the core educational content.
