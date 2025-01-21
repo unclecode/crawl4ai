@@ -38,7 +38,8 @@ Sanitized HTML with unnecessary elements removed. Automatically:
 ```python
 config = CrawlerRunConfig(
     excluded_tags=['form', 'header', 'footer'],  # Additional tags to remove
-    keep_data_attributes=False  # Remove data-* attributes
+    keep_data_attributes=False,  # Remove data-* attributes
+    keep_aria_label_attribute=False, # Remove aria-label attribute
 )
 result = await crawler.arun(url="https://example.com", config=config)
 print(result.cleaned_html)

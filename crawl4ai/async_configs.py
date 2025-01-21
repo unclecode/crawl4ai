@@ -215,6 +215,8 @@ class CrawlerRunConfig:
                                          Default: None.
         keep_data_attributes (bool): If True, retain `data-*` attributes while removing unwanted attributes.
                                      Default: False.
+        keep_aria_label_attribute (bool): If True, retain `aria-label` attributes while removing unwanted attributes.
+                                     Default: False.
         remove_forms (bool): If True, remove all `<form>` elements from the HTML.
                              Default: False.
         prettiify (bool): If True, apply `fast_format_html` to produce prettified HTML output.
@@ -326,6 +328,7 @@ class CrawlerRunConfig:
         excluded_tags: list = None,
         excluded_selector: str = None,
         keep_data_attributes: bool = False,
+        keep_aria_label_attribute: bool = False,
         remove_forms: bool = False,
         prettiify: bool = False,
         parser_type: str = "lxml",
@@ -398,6 +401,7 @@ class CrawlerRunConfig:
         self.excluded_tags = excluded_tags or []
         self.excluded_selector = excluded_selector or ""
         self.keep_data_attributes = keep_data_attributes
+        self.keep_aria_label_attribute = keep_aria_label_attribute
         self.remove_forms = remove_forms
         self.prettiify = prettiify
         self.parser_type = parser_type
@@ -484,6 +488,7 @@ class CrawlerRunConfig:
             excluded_tags=kwargs.get("excluded_tags", []),
             excluded_selector=kwargs.get("excluded_selector", ""),
             keep_data_attributes=kwargs.get("keep_data_attributes", False),
+            keep_aria_label_attribute=kwargs.get("keep_aria_label_attribute", False),
             remove_forms=kwargs.get("remove_forms", False),
             prettiify=kwargs.get("prettiify", False),
             parser_type=kwargs.get("parser_type", "lxml"),
@@ -557,6 +562,7 @@ class CrawlerRunConfig:
             "excluded_tags": self.excluded_tags,
             "excluded_selector": self.excluded_selector,
             "keep_data_attributes": self.keep_data_attributes,
+            "keep_aria_label_attribute": self.keep_aria_label_attribute,
             "remove_forms": self.remove_forms,
             "prettiify": self.prettiify,
             "parser_type": self.parser_type,

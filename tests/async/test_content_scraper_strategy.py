@@ -80,7 +80,8 @@ class StrategyTester:
             }),
             ("HTML Cleaning", {
                 'clean_html': True,
-                'keep_data_attributes': True
+                'keep_data_attributes': True,
+                'keep_aria_label_attribute': True
             }),
             ("HTML2Text Options", {
                 'html2text': {

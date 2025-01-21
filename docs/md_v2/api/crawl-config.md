@@ -13,6 +13,7 @@
 | `css_selector` | str | None | CSS selector to extract a specific portion of the page |
 | `excluded_tags` | list[str] | [] | List of HTML tags to exclude from processing |
 | `keep_data_attributes` | bool | False | If True, retain `data-*` attributes while removing unwanted attributes |
+| `keep_aria_label_attribute` | bool | False | If True, retain `aria-label` attributes while removing unwanted attributes |
 | `remove_forms` | bool | False | If True, remove all `<form>` elements from the HTML |
 | `prettiify` | bool | False | If True, apply `fast_format_html` to produce prettified HTML output |
 
