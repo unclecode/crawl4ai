@@ -183,5 +183,5 @@ if __name__ == "__main__":
     asyncio.run(basic_scraper_example())
 
     # Run advanced example
-    # print("\nRunning advanced scraper example...")
-    # asyncio.run(advanced_scraper_example())
+    print("\nRunning advanced scraper example...")
+    asyncio.run(advanced_scraper_example())
