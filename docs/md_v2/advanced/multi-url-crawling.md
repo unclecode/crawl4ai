@@ -58,7 +58,7 @@ Automatically manages concurrency based on system memory usage:
 
 ```python
 dispatcher = MemoryAdaptiveDispatcher(
-    memory_threshold_percent=70.0,  # Pause if memory exceeds this
+    memory_threshold_percent=90.0,  # Pause if memory exceeds this
     check_interval=1.0,             # How often to check memory
     max_session_permit=10,          # Maximum concurrent tasks
     rate_limiter=RateLimiter(       # Optional rate limiting
@@ -79,7 +79,7 @@ Provides simple concurrency control with a fixed limit:
 
 ```python
 dispatcher = SemaphoreDispatcher(
-    semaphore_count=5,             # Fixed concurrent tasks
+    max_session_permit=5,             # Fixed concurrent tasks
     rate_limiter=RateLimiter(      # Optional rate limiting
         base_delay=(0.5, 1.0),
         max_delay=10.0
