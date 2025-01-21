@@ -7,16 +7,19 @@ from urllib.parse import urlparse
 from urllib.robotparser import RobotFileParser
 import validators
 
-from crawl4ai.async_configs import CrawlerRunConfig
+from ..async_configs import CrawlerRunConfig
 from .models import CrawlResult
 from .filters import FilterChain
 from .scorers import URLScorer
 from ..async_webcrawler import AsyncWebCrawler
 from .scraper_strategy import ScraperStrategy
+from ..config import SCRAPER_BATCH_SIZE
+
 
 @dataclass
 class CrawlStats:
     """Statistics for the crawling process"""
+
     start_time: datetime
     urls_processed: int = 0
     urls_failed: int = 0
@@ -24,6 +27,7 @@ class CrawlStats:
     total_depth_reached: int = 0
     current_depth: int = 0
     robots_blocked: int = 0
+
 
 class BFSScraperStrategy(ScraperStrategy):
     """Breadth-First Search scraping strategy with politeness controls"""
@@ -34,13 +38,13 @@ class BFSScraperStrategy(ScraperStrategy):
         filter_chain: FilterChain,
         url_scorer: URLScorer,
         process_external_links: bool = False,
-        logger: Optional[logging.Logger] = None
+        logger: Optional[logging.Logger] = None,
     ):
         self.max_depth = max_depth
         self.filter_chain = filter_chain
         self.url_scorer = url_scorer
         self.logger = logger or logging.getLogger(__name__)
-        
+
         # Crawl control
         self.stats = CrawlStats(start_time=datetime.now())
         self._cancel_event = asyncio.Event()
@@ -74,11 +78,11 @@ class BFSScraperStrategy(ScraperStrategy):
 
     async def _get_robot_parser(self, url: str) -> Optional[RobotFileParser]:
         """Get or create robots.txt parser for domain.
-            This is our robots.txt manager that:
-                - Uses domain-level caching of robot parsers
-                - Creates and caches new parsers as needed
-                - Handles failed robots.txt fetches gracefully
-                - Returns None if robots.txt can't be fetched, allowing crawling to proceed        
+        This is our robots.txt manager that:
+            - Uses domain-level caching of robot parsers
+            - Creates and caches new parsers as needed
+            - Handles failed robots.txt fetches gracefully
+            - Returns None if robots.txt can't be fetched, allowing crawling to proceed
         """
         domain = urlparse(url).netloc
         if domain not in self.robot_parsers:
@@ -100,7 +104,7 @@ class BFSScraperStrategy(ScraperStrategy):
         depth: int,
         queue: asyncio.PriorityQueue,
         visited: Set[str],
-        depths: Dict[str, int]
+        depths: Dict[str, int],
     ):
         """Process extracted links from crawl result.
         This is our link processor that:
@@ -116,7 +120,7 @@ class BFSScraperStrategy(ScraperStrategy):
         if self.process_external_links:
             links_to_process += result.links["external"]
         for link in links_to_process:
-            url = link['href']
+            url = link["href"]
             if not await self.can_process_url(url, depth):
                 self.stats.urls_skipped += 1
                 continue
@@ -132,8 +136,7 @@ class BFSScraperStrategy(ScraperStrategy):
                     await queue.put((score, new_depth, url))
                     depths[url] = new_depth
                     self.stats.total_depth_reached = max(
-                        self.stats.total_depth_reached, 
-                        new_depth
+                        self.stats.total_depth_reached, new_depth
                     )
 
     async def ascrape(
@@ -142,7 +145,7 @@ class BFSScraperStrategy(ScraperStrategy):
         crawler: AsyncWebCrawler,
     ) -> AsyncGenerator[CrawlResult, None]:
         """Implement BFS crawling strategy"""
-        
+
         # Initialize crawl state
         """
         queue: A priority queue where items are tuples of (score, depth, url)
@@ -151,53 +154,72 @@ class BFSScraperStrategy(ScraperStrategy):
             URL: The actual URL to crawl
         visited: Keeps track of URLs we've already seen to avoid cycles
         depths: Maps URLs to their depths from the start URL
-        pending_tasks: Tracks currently running crawl tasks        
+        active_crawls: Tracks currently running crawl tasks        
         """
         queue = asyncio.PriorityQueue()
         await queue.put((0, 0, start_url))
         visited: Set[str] = set()
         depths = {start_url: 0}
-        
+        active_crawls = set()  # Track URLs currently being processed
         try:
-            while not queue.empty() and not self._cancel_event.is_set():
+            while (
+                not queue.empty() or active_crawls
+            ) and not self._cancel_event.is_set():
                 """
                 This sets up our main control loop which:
                     - Continues while there are URLs to process (not queue.empty())
-                    - Or while there are tasks still running (pending_tasks)
+                    - Or while there are active crawls still running (arun_many)
                     - Can be interrupted via cancellation (not self._cancel_event.is_set())
                 """
-                n = 3
+                # Collect batch of jobs to process
                 jobs = []
-                for _ in range(n):
-                    if self.queue.empty():
-                        break
-                    jobs.append(await self.queue.get())
-                
-                # Filter jobs directly, ensuring uniqueness and checking against visited
-                filtered_jobs = []
-                for job in jobs:
-                    _, depth, url = job
-                    self.stats.current_depth = depth
-                    if url not in visited:
-                        visited.add(url)
-                        filtered_jobs.append(job)
-                
-                crawler_config = CrawlerRunConfig(cache_mode="BYPASS")
-                async for result in await crawler.arun_many(urls=[url for _, _, url in filtered_jobs],
-                                                            config=crawler_config.clone(stream=True)):
-                    print(f"Received result for: {result.url} - Success: {result.success}")
-                    source_url, depth = next((url, depth) for _, depth, url in filtered_jobs if url == result.source_url)
-                    await self._process_links(result, source_url, depth, queue, visited, depths)
-                    yield result
-                            
+                # Fill batch with available jobs
+                while len(jobs) < SCRAPER_BATCH_SIZE and not queue.empty():
+                    score, depth, url = await queue.get()
+                    if url not in active_crawls:  # Only add if not currently processing
+                        jobs.append((score, depth, url))
+                        active_crawls.add(url)
+                        self.stats.current_depth = depth
+
+                if not jobs:
+                    # If no jobs but active crawls exist, wait a bit and continue
+                    if active_crawls:
+                        await asyncio.sleep(0.1)
+                    continue
+
+                # Process batch
+                crawler_config = CrawlerRunConfig(cache_mode="BYPASS", stream=True)
+                try:
+                    async for result in await crawler.arun_many(
+                        urls=[url for _, _, url in jobs], config=crawler_config
+                    ):
+                        source_url, depth = next(
+                            (url, depth) for _, depth, url in jobs if url == result.url
+                        )
+                        active_crawls.remove(source_url)  # Remove from active set
+
+                        if result.success:
+                            await self._process_links(
+                                result, source_url, depth, queue, visited, depths
+                            )
+                            yield result
+                        else:
+                            self.logger.warning(
+                                f"Failed to crawl {result.url}: {result.error_message}"
+                            )
+                except Exception as e:
+                    # Remove failed URLs from active set
+                    for _, _, url in jobs:
+                        active_crawls.discard(url)
+                    self.logger.error(f"Batch processing error: {e}")
+                    # Continue processing other batches
+                    continue
+
         except Exception as e:
             self.logger.error(f"Error in crawl process: {e}")
             raise
-            
+
         finally:
-            # Clean up any remaining tasks
-            # for task in pending_tasks:
-            #     task.cancel()
             self.stats.end_time = datetime.now()
 
     async def shutdown(self):
