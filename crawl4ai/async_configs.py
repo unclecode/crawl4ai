@@ -372,6 +372,7 @@ class CrawlerRunConfig:
         # Optional Parameters
         stream (bool): If True, stream the page content as it is being loaded.
         url: str = None  # This is not a compulsory parameter
+        check_robots_txt (bool): Whether to check robots.txt rules before crawling. Default: False
     """
 
     def __init__(
@@ -442,6 +443,7 @@ class CrawlerRunConfig:
         # Streaming Parameters
         stream: bool = False,
         url: str = None,
+        check_robots_txt: bool = False,
     ):
         self.url = url
 
@@ -520,6 +522,9 @@ class CrawlerRunConfig:
 
         # Streaming Parameters
         self.stream = stream
+
+        # Robots.txt Handling Parameters
+        self.check_robots_txt = check_robots_txt
 
         # Validate type of extraction strategy and chunking strategy if they are provided
         if self.extraction_strategy is not None and not isinstance(
@@ -617,6 +622,7 @@ class CrawlerRunConfig:
             # Streaming Parameters
             stream=kwargs.get("stream", False),
             url=kwargs.get("url"),
+            check_robots_txt=kwargs.get("check_robots_txt", False),
         )
 
     # Create a funciton returns dict of the object
@@ -679,6 +685,7 @@ class CrawlerRunConfig:
             "log_console": self.log_console,
             "stream": self.stream,
             "url": self.url,
+            "check_robots_txt": self.check_robots_txt,
         }
 
     def clone(self, **kwargs):

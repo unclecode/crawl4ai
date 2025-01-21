@@ -8,6 +8,7 @@ Crawl4AI offers multiple power-user features that go beyond simple crawling. Thi
 3. **Handling SSL Certificates**  
 4. **Custom Headers**  
 5. **Session Persistence & Local Storage**
+6. **Robots.txt Compliance**
 
 > **Prerequisites**  
 > - You have a basic grasp of [AsyncWebCrawler Basics](../core/simple-crawling.md)  
@@ -251,6 +252,42 @@ You can sign in once, export the browser context, and reuse it later—without r
 
 ---
 
+## 6. Robots.txt Compliance
+
+Crawl4AI supports respecting robots.txt rules with efficient caching:
+
+```python
+import asyncio
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
+
+async def main():
+    # Enable robots.txt checking in config
+    config = CrawlerRunConfig(
+        check_robots_txt=True  # Will check and respect robots.txt rules
+    )
+
+    async with AsyncWebCrawler() as crawler:
+        result = await crawler.arun(
+            "https://example.com",
+            config=config
+        )
+        
+        if not result.success and result.status_code == 403:
+            print("Access denied by robots.txt")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+**Key Points**
+- Robots.txt files are cached locally for efficiency
+- Cache is stored in `~/.crawl4ai/robots/robots_cache.db`
+- Cache has a default TTL of 7 days
+- If robots.txt can't be fetched, crawling is allowed
+- Returns 403 status code if URL is disallowed
+
+---
+
 ## Putting It All Together
 
 Here’s a snippet that combines multiple “advanced” features (proxy, PDF, screenshot, SSL, custom headers, and session reuse) into one run. Normally, you’d tailor each setting to your project’s needs.
@@ -321,6 +358,7 @@ You’ve now explored several **advanced** features:
 - **SSL Certificate** retrieval & exporting  
 - **Custom Headers** for language or specialized requests  
 - **Session Persistence** via storage state
+- **Robots.txt Compliance**
 
 With these power tools, you can build robust scraping workflows that mimic real user behavior, handle secure sites, capture detailed snapshots, and manage sessions across multiple runs—streamlining your entire data collection pipeline.
 
