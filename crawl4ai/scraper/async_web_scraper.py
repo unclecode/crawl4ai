@@ -57,7 +57,6 @@ class AsyncWebScraper:
     async def ascrape(
         self, 
         url: str, 
-        parallel_processing: bool = True, 
         stream: bool = False
     ) -> Union[AsyncGenerator[CrawlResult, None], ScraperResult]:
         """
@@ -65,7 +64,6 @@ class AsyncWebScraper:
         
         Args:
             url: Starting URL for scraping
-            parallel_processing: Whether to process URLs in parallel
             stream: If True, yield results as they come; if False, collect all results
             
         Returns:
@@ -75,17 +73,16 @@ class AsyncWebScraper:
         
         async with self._error_handling_context(url):
             if stream:
-                return self._ascrape_yielding(url, parallel_processing)
-            return await self._ascrape_collecting(url, parallel_processing)
+                return self._ascrape_yielding(url)
+            return await self._ascrape_collecting(url)
 
     async def _ascrape_yielding(
         self, 
         url: str, 
-        parallel_processing: bool
     ) -> AsyncGenerator[CrawlResult, None]:
         """Stream scraping results as they become available."""
         try:
-            result_generator = self.strategy.ascrape(url, self.crawler, parallel_processing)
+            result_generator = self.strategy.ascrape(url, self.crawler)
             async for res in result_generator:
                 self._progress.processed_urls += 1
                 self._progress.current_url = res.url
@@ -97,13 +94,12 @@ class AsyncWebScraper:
     async def _ascrape_collecting(
         self, 
         url: str, 
-        parallel_processing: bool
     ) -> ScraperResult:
         """Collect all scraping results before returning."""
         extracted_data = {}
         
         try:
-            result_generator = self.strategy.ascrape(url, self.crawler, parallel_processing)
+            result_generator = self.strategy.ascrape(url, self.crawler)
             async for res in result_generator:
                 self._progress.processed_urls += 1
                 self._progress.current_url = res.url
