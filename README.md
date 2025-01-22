@@ -23,9 +23,6 @@ Crawl4AI is the #1 trending GitHub repository, actively maintained by a vibrant 
 
 [✨ Check out latest update v0.4.3bx](#-recent-updates)
 
-<<<<<<< HEAD
-🎉 **Version 0.4.24x is out!** Major improvements in extraction strategies with enhanced JSON handling, SSL security, and Amazon product extraction. Plus, a completely revamped content filtering system! [Read the release notes →](https://docs.crawl4ai.com/blog)
-=======
 🎉 **Version 0.4.3bx is out!** This release brings exciting new features like a Memory Dispatcher System, Streaming Support, LLM-Powered Markdown Generation, Schema Generation, and Robots.txt Compliance! [Read the release notes →](https://docs.crawl4ai.com/blog)
 
 <details>
