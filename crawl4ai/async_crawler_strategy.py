@@ -633,9 +633,12 @@ class BrowserManager:
             if crawlerRunConfig.proxy_config:
                 proxy_settings = {
                     "server": crawlerRunConfig.proxy_config.get("server"),
-                    "username": crawlerRunConfig.proxy_config.get("username"),
-                    "password": crawlerRunConfig.proxy_config.get("password"),
                 }
+                if crawlerRunConfig.proxy_config.get("username"):
+                    proxy_settings.update({
+                        "username": crawlerRunConfig.proxy_config.get("username"),
+                        "password": crawlerRunConfig.proxy_config.get("password"),
+                    })
                 context_settings["proxy"] = proxy_settings
 
         if self.config.text_mode:
