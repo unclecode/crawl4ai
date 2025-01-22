@@ -462,7 +462,7 @@ class AsyncWebCrawler:
                     )
 
                     crawl_result.status_code = async_response.status_code
-                    crawl_result.redirected_url = async_response.final_url or url
+                    crawl_result.redirected_url = async_response.redirected_url or url
                     crawl_result.response_headers = async_response.response_headers
                     crawl_result.downloaded_files = async_response.downloaded_files
                     crawl_result.ssl_certificate = (
