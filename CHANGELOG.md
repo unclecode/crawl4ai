@@ -29,7 +29,7 @@ This release introduces several powerful new features, including robots.txt comp
 
 -   **URL Redirection Tracking:**
     -   Added URL redirection tracking to capture the final URL after any redirects.
-    -   The final URL is now available in the `final_url` field of the `AsyncCrawlResponse` object.
+    -   The final URL is now available in the `redirected_url` field of the `AsyncCrawlResponse` object.
 
 -   **Enhanced Streamlined Documentation:**
     -   Refactored and improved the documentation structure for clarity and ease of use.

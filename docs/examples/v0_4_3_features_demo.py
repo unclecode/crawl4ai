@@ -2,54 +2,96 @@
 Crawl4ai v0.4.3 Features Demo
 ============================
 
-This example demonstrates the major new features introduced in Crawl4ai v0.4.3.
-Each section showcases a specific feature with practical examples and explanations.
+This demonstration showcases three major categories of new features in Crawl4ai v0.4.3:
+
+1. Efficiency & Speed:
+   - Memory-efficient dispatcher strategies
+   - New scraping algorithm
+   - Streaming support for batch crawling
+
+2. LLM Integration:
+   - Automatic schema generation
+   - LLM-powered content filtering
+   - Smart markdown generation
+
+3. Core Improvements:
+   - Robots.txt compliance
+   - Proxy rotation
+   - Enhanced URL handling
+
+Each demo function can be run independently or as part of the full suite.
 """
 
 import asyncio
 import os
-from crawl4ai import *
+import json
+import re
+import random
+from typing import Optional, Dict
+from dotenv import load_dotenv
+
+load_dotenv()
+
+from crawl4ai import (
+    AsyncWebCrawler, 
+    BrowserConfig,
+    CrawlerRunConfig,
+    CacheMode,
+    DisplayMode,
+    MemoryAdaptiveDispatcher,
+    CrawlerMonitor,
+    DefaultMarkdownGenerator,
+    LXMLWebScrapingStrategy,
+    JsonCssExtractionStrategy,
+    LLMContentFilter
+)
 
 
 async def demo_memory_dispatcher():
+    """Demonstrates the new memory-efficient dispatcher system.
+    
+    Key Features:
+    - Adaptive memory management
+    - Real-time performance monitoring
+    - Concurrent session control
     """
-    1. Memory Dispatcher System Demo
-    ===============================
-    Shows how to use the new memory dispatcher with monitoring
-    """
-    print("\n=== 1. Memory Dispatcher System Demo ===")
-
-    # Configure crawler
-    browser_config = BrowserConfig(headless=True, verbose=True)
-    crawler_config = CrawlerRunConfig(
-        cache_mode=CacheMode.BYPASS, markdown_generator=DefaultMarkdownGenerator()
-    )
-
-    # Test URLs
-    urls = ["http://example.com", "http://example.org", "http://example.net"] * 3
-
-    async with AsyncWebCrawler(config=browser_config) as crawler:
-        # Initialize dispatcher with monitoring
-        monitor = CrawlerMonitor(
-            max_visible_rows=10,
-            display_mode=DisplayMode.DETAILED,  # Can be DETAILED or AGGREGATED
+    print("\n=== Memory Dispatcher Demo ===")
+    
+    try:
+        # Configuration
+        browser_config = BrowserConfig(headless=True, verbose=False)
+        crawler_config = CrawlerRunConfig(
+            cache_mode=CacheMode.BYPASS,
+            markdown_generator=DefaultMarkdownGenerator()
         )
 
-        dispatcher = MemoryAdaptiveDispatcher(
-            memory_threshold_percent=80.0,  # Memory usage threshold
-            check_interval=0.5,  # How often to check memory
-            max_session_permit=5,  # Max concurrent crawls
-            monitor=monitor,  # Pass the monitor
-        )
+        # Test URLs
+        urls = ["http://example.com", "http://example.org", "http://example.net"] * 3
 
-        # Run with memory monitoring
-        print("Starting batch crawl with memory monitoring...")
-        results = await dispatcher.run_urls(
-            urls=urls,
-            crawler=crawler,
-            config=crawler_config,
-        )
-        print(f"Completed {len(results)} URLs")
+        print("\n📈 Initializing crawler with memory monitoring...")
+        async with AsyncWebCrawler(config=browser_config) as crawler:
+            monitor = CrawlerMonitor(
+                max_visible_rows=10,
+                display_mode=DisplayMode.DETAILED
+            )
+            
+            dispatcher = MemoryAdaptiveDispatcher(
+                memory_threshold_percent=80.0,
+                check_interval=0.5,
+                max_session_permit=5,
+                monitor=monitor
+            )
+            
+            print("\n🚀 Starting batch crawl...")
+            results = await dispatcher.run_urls(
+                urls=urls,
+                crawler=crawler,
+                config=crawler_config,
+            )
+            print(f"\n✅ Completed {len(results)} URLs successfully")
+            
+    except Exception as e:
+        print(f"\n❌ Error in memory dispatcher demo: {str(e)}")
 
 
 async def demo_streaming_support():
@@ -60,7 +102,7 @@ async def demo_streaming_support():
     """
     print("\n=== 2. Streaming Support Demo ===")
 
-    browser_config = BrowserConfig(headless=True, verbose=True)
+    browser_config = BrowserConfig(headless=True, verbose=False)
     crawler_config = CrawlerRunConfig(cache_mode=CacheMode.BYPASS, stream=True)
 
     # Test URLs
@@ -179,7 +221,7 @@ async def demo_robots_compliance():
 
 
 
-async def demo_llm_schema_generation():
+async def demo_json_schema_generation():
     """
     7. LLM-Powered Schema Generation Demo
     =================================
@@ -233,25 +275,6 @@ async def demo_llm_schema_generation():
             print("Successfully used generated schema for crawling")
 
 
-async def get_next_proxy(proxy_file: str = f"proxies.txt") -> Optional[Dict]:
-    """Get next proxy from local file"""
-    try:
-        with open(proxy_file) as f:
-            proxies = f.read().splitlines()
-            if not proxies:
-                return None
-            
-        ip, port, username, password = random.choice(proxies).split(":")
-        return {
-            "server": f"http://{ip}:{port}",
-            "username": username,
-            "password": password,
-            "ip": ip  # Store original IP for verification
-        }
-    except Exception as e:
-        print(f"Error loading proxy: {e}")
-        return None
-
 async def demo_proxy_rotation():
     """
     8. Proxy Rotation Demo
@@ -259,12 +282,28 @@ async def demo_proxy_rotation():
     Demonstrates how to rotate proxies for each request using Crawl4ai.
     """
     print("\n=== 8. Proxy Rotation Demo ===")
+
+    async def get_next_proxy(proxy_file: str = f"proxies.txt") -> Optional[Dict]:
+        """Get next proxy from local file"""
+        try:
+            proxies = os.getenv("PROXIES", "").split(",")
+                
+            ip, port, username, password = random.choice(proxies).split(":")
+            return {
+                "server": f"http://{ip}:{port}",
+                "username": username,
+                "password": password,
+                "ip": ip  # Store original IP for verification
+            }
+        except Exception as e:
+            print(f"Error loading proxy: {e}")
+            return None
     
     
     # Create 10 test requests to httpbin
-    urls = ["https://httpbin.org/ip"] * 3
+    urls = ["https://httpbin.org/ip"] * 2
     
-    browser_config = BrowserConfig(headless=True)
+    browser_config = BrowserConfig(headless=True, verbose=False)
     run_config = CrawlerRunConfig(cache_mode=CacheMode.BYPASS)
     
     async with AsyncWebCrawler(config=browser_config) as crawler:
@@ -289,24 +328,25 @@ async def demo_proxy_rotation():
             else:
                 print(f"Failed with proxy {proxy['ip']}")
 
-if __name__ == "__main__":
-
 async def main():
     """Run all feature demonstrations."""
-    demo_memory_dispatcher(),
-    print("\n" + "=" * 50 + "\n")
-    demo_streaming_support(),
-    print("\n" + "=" * 50 + "\n")
-    demo_content_scraping(),
-    print("\n" + "=" * 50 + "\n")
-    demo_llm_schema_generation(),
-    print("\n" + "=" * 50 + "\n")
-    demo_llm_markdown(),
-    print("\n" + "=" * 50 + "\n")
-    demo_robots_compliance(),
-    print("\n" + "=" * 50 + "\n")
-    demo_proxy_rotation()
-    print("\n" + "=" * 50 + "\n")
+    print("\n📊 Running Crawl4ai v0.4.3 Feature Demos\n")
+    
+    # Efficiency & Speed Demos
+    # print("\n🚀 EFFICIENCY & SPEED DEMOS")
+    # await demo_memory_dispatcher()
+    # await demo_streaming_support()
+    # await demo_content_scraping()
+    
+    # # LLM Integration Demos
+    # print("\n🤖 LLM INTEGRATION DEMOS")
+    # await demo_json_schema_generation()
+    # await demo_llm_markdown()
+    
+    # # Core Improvements
+    # print("\n🔧 CORE IMPROVEMENT DEMOS")
+    # await demo_robots_compliance()
+    await demo_proxy_rotation()
 
 if __name__ == "__main__":
     asyncio.run(main())

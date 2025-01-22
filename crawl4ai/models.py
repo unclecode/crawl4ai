@@ -132,7 +132,7 @@ class AsyncCrawlResponse(BaseModel):
     get_delayed_content: Optional[Callable[[Optional[float]], Awaitable[str]]] = None
     downloaded_files: Optional[List[str]] = None
     ssl_certificate: Optional[SSLCertificate] = None
-    final_url: Optional[str] = None
+    redirected_url: Optional[str] = None
 
     class Config:
         arbitrary_types_allowed = True
