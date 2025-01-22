@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Feature Requests
+    url: https://github.com/unclecode/crawl4ai/discussions/categories/feature-requests
+    about: "Suggest new features or enhancements for Crawl4AI"
+  - name: Forums - Q&A
+    url: https://github.com/unclecode/crawl4ai/discussions/categories/forums-q-a
+    about: "Ask questions or engage in general discussions about Crawl4AI"
