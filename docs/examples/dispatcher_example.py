@@ -112,19 +112,19 @@ def create_performance_table(results):
 
 
 async def main():
-    urls = [f"https://example.com/page{i}" for i in range(1, 20)]
+    urls = [f"https://example.com/page{i}" for i in range(1, 40)]
     browser_config = BrowserConfig(headless=True, verbose=False)
     run_config = CrawlerRunConfig(cache_mode=CacheMode.BYPASS, scraping_strategy=LXMLWebScrapingStrategy())
 
     results = {
         "Memory Adaptive": await memory_adaptive(urls, browser_config, run_config),
-        "Memory Adaptive + Rate Limit": await memory_adaptive_with_rate_limit(
-            urls, browser_config, run_config
-        ),
-        "Semaphore": await semaphore(urls, browser_config, run_config),
-        "Semaphore + Rate Limit": await semaphore_with_rate_limit(
-            urls, browser_config, run_config
-        ),
+        # "Memory Adaptive + Rate Limit": await memory_adaptive_with_rate_limit(
+        #     urls, browser_config, run_config
+        # ),
+        # "Semaphore": await semaphore(urls, browser_config, run_config),
+        # "Semaphore + Rate Limit": await semaphore_with_rate_limit(
+        #     urls, browser_config, run_config
+        # ),
     }
 
     table = create_performance_table(results)
