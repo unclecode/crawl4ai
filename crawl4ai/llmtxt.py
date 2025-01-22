@@ -11,15 +11,15 @@ from rank_bm25 import BM25Okapi
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
-from litellm import completion, batch_completion
+from litellm import batch_completion
 from .async_logger import AsyncLogger
 import litellm
 import pickle
 import hashlib  # <--- ADDED for file-hash
-from fnmatch import fnmatch
 import glob
 
 litellm.set_verbose = False
+
 
 def _compute_file_hash(file_path: Path) -> str:
     """Compute MD5 hash for the file's entire content."""
@@ -29,13 +29,14 @@ def _compute_file_hash(file_path: Path) -> str:
             hash_md5.update(chunk)
     return hash_md5.hexdigest()
 
+
 class AsyncLLMTextManager:
     def __init__(
         self,
         docs_dir: Path,
         logger: Optional[AsyncLogger] = None,
         max_concurrent_calls: int = 5,
-        batch_size: int = 3
+        batch_size: int = 3,
     ) -> None:
         self.docs_dir = docs_dir
         self.logger = logger
@@ -51,7 +52,7 @@ class AsyncLLMTextManager:
         contents = []
         for file_path in doc_batch:
             try:
-                with open(file_path, 'r', encoding='utf-8') as f:
+                with open(file_path, "r", encoding="utf-8") as f:
                     contents.append(f.read())
             except Exception as e:
                 self.logger.error(f"Error reading {file_path}: {str(e)}")
@@ -77,43 +78,53 @@ Wrap your response in <index>...</index> tags.
         # Prepare messages for batch processing
         messages_list = [
             [
-                {"role": "user", "content": f"{prompt}\n\nGenerate index for this documentation:\n\n{content}"}
+                {
+                    "role": "user",
+                    "content": f"{prompt}\n\nGenerate index for this documentation:\n\n{content}",
+                }
             ]
-            for content in contents if content
+            for content in contents
+            if content
         ]
 
         try:
             responses = batch_completion(
                 model="anthropic/claude-3-5-sonnet-latest",
                 messages=messages_list,
-                logger_fn=None
+                logger_fn=None,
             )
 
             # Process responses and save index files
             for response, file_path in zip(responses, doc_batch):
                 try:
                     index_content_match = re.search(
-                        r'<index>(.*?)</index>',
+                        r"<index>(.*?)</index>",
                         response.choices[0].message.content,
-                        re.DOTALL
+                        re.DOTALL,
                     )
                     if not index_content_match:
-                        self.logger.warning(f"No <index>...</index> content found for {file_path}")
+                        self.logger.warning(
+                            f"No <index>...</index> content found for {file_path}"
+                        )
                         continue
 
                     index_content = re.sub(
                         r"\n\s*\n", "\n", index_content_match.group(1)
                     ).strip()
                     if index_content:
-                        index_file = file_path.with_suffix('.q.md')
-                        with open(index_file, 'w', encoding='utf-8') as f:
+                        index_file = file_path.with_suffix(".q.md")
+                        with open(index_file, "w", encoding="utf-8") as f:
                             f.write(index_content)
                         self.logger.info(f"Created index file: {index_file}")
                     else:
-                        self.logger.warning(f"No index content found in response for {file_path}")
+                        self.logger.warning(
+                            f"No index content found in response for {file_path}"
+                        )
 
                 except Exception as e:
-                    self.logger.error(f"Error processing response for {file_path}: {str(e)}")
+                    self.logger.error(
+                        f"Error processing response for {file_path}: {str(e)}"
+                    )
 
         except Exception as e:
             self.logger.error(f"Error in batch completion: {str(e)}")
@@ -171,7 +182,12 @@ Wrap your response in <index>...</index> tags.
 
         lemmatizer = WordNetLemmatizer()
         stop_words = set(stopwords.words("english")) - {
-            "how", "what", "when", "where", "why", "which",
+            "how",
+            "what",
+            "when",
+            "where",
+            "why",
+            "which",
         }
 
         tokens = []
@@ -222,7 +238,9 @@ Wrap your response in <index>...</index> tags.
         self.logger.info("Checking which .q.md files need (re)indexing...")
 
         # Gather all .q.md files
-        q_files = [self.docs_dir / f for f in os.listdir(self.docs_dir) if f.endswith(".q.md")]
+        q_files = [
+            self.docs_dir / f for f in os.listdir(self.docs_dir) if f.endswith(".q.md")
+        ]
 
         # We'll store known (unchanged) facts in these lists
         existing_facts: List[str] = []
@@ -243,7 +261,9 @@ Wrap your response in <index>...</index> tags.
             # Otherwise, load the existing cache and compare hash
             cache = self._load_or_create_token_cache(qf)
             # If the .q.tokens was out of date (i.e. changed hash), we reindex
-            if len(cache["facts"]) == 0 or cache.get("content_hash") != _compute_file_hash(qf):
+            if len(cache["facts"]) == 0 or cache.get(
+                "content_hash"
+            ) != _compute_file_hash(qf):
                 needSet.append(qf)
             else:
                 # File is unchanged → retrieve cached token data
@@ -255,20 +275,29 @@ Wrap your response in <index>...</index> tags.
         if not needSet and not clear_cache:
             # If no file needs reindexing, try loading existing index
             if self.maybe_load_bm25_index(clear_cache=False):
-                self.logger.info("No new/changed .q.md files found. Using existing BM25 index.")
+                self.logger.info(
+                    "No new/changed .q.md files found. Using existing BM25 index."
+                )
                 return
             else:
                 # If there's no existing index, we must build a fresh index from the old caches
-                self.logger.info("No existing BM25 index found. Building from cached facts.")
+                self.logger.info(
+                    "No existing BM25 index found. Building from cached facts."
+                )
                 if existing_facts:
-                    self.logger.info(f"Building BM25 index with {len(existing_facts)} cached facts.")
+                    self.logger.info(
+                        f"Building BM25 index with {len(existing_facts)} cached facts."
+                    )
                     self.bm25_index = BM25Okapi(existing_tokens)
                     self.tokenized_facts = existing_facts
                     with open(self.bm25_index_file, "wb") as f:
-                        pickle.dump({
-                            "bm25_index": self.bm25_index,
-                            "tokenized_facts": self.tokenized_facts
-                        }, f)
+                        pickle.dump(
+                            {
+                                "bm25_index": self.bm25_index,
+                                "tokenized_facts": self.tokenized_facts,
+                            },
+                            f,
+                        )
                 else:
                     self.logger.warning("No facts found at all. Index remains empty.")
                 return
@@ -311,7 +340,9 @@ Wrap your response in <index>...</index> tags.
                     self._save_token_cache(file, fresh_cache)
 
                     mem_usage = process.memory_info().rss / 1024 / 1024
-                    self.logger.debug(f"Memory usage after {file.name}: {mem_usage:.2f}MB")
+                    self.logger.debug(
+                        f"Memory usage after {file.name}: {mem_usage:.2f}MB"
+                    )
 
                 except Exception as e:
                     self.logger.error(f"Error processing {file}: {str(e)}")
@@ -328,40 +359,49 @@ Wrap your response in <index>...</index> tags.
         all_tokens = existing_tokens + new_tokens
 
         # 3) Build BM25 index from combined facts
-        self.logger.info(f"Building BM25 index with {len(all_facts)} total facts (old + new).")
+        self.logger.info(
+            f"Building BM25 index with {len(all_facts)} total facts (old + new)."
+        )
         self.bm25_index = BM25Okapi(all_tokens)
         self.tokenized_facts = all_facts
 
         # 4) Save the updated BM25 index to disk
         with open(self.bm25_index_file, "wb") as f:
-            pickle.dump({
-                "bm25_index": self.bm25_index,
-                "tokenized_facts": self.tokenized_facts
-            }, f)
+            pickle.dump(
+                {
+                    "bm25_index": self.bm25_index,
+                    "tokenized_facts": self.tokenized_facts,
+                },
+                f,
+            )
 
         final_mem = process.memory_info().rss / 1024 / 1024
         self.logger.info(f"Search index updated. Final memory usage: {final_mem:.2f}MB")
 
-    async def generate_index_files(self, force_generate_facts: bool = False, clear_bm25_cache: bool = False) -> None:
+    async def generate_index_files(
+        self, force_generate_facts: bool = False, clear_bm25_cache: bool = False
+    ) -> None:
         """
         Generate index files for all documents in parallel batches
-        
+
         Args:
             force_generate_facts (bool): If True, regenerate indexes even if they exist
             clear_bm25_cache (bool): If True, clear existing BM25 index cache
         """
         self.logger.info("Starting index generation for documentation files.")
-        
+
         md_files = [
-            self.docs_dir / f for f in os.listdir(self.docs_dir) 
-            if f.endswith('.md') and not any(f.endswith(x) for x in ['.q.md', '.xs.md'])
+            self.docs_dir / f
+            for f in os.listdir(self.docs_dir)
+            if f.endswith(".md") and not any(f.endswith(x) for x in [".q.md", ".xs.md"])
         ]
 
         # Filter out files that already have .q files unless force=True
         if not force_generate_facts:
             md_files = [
-                f for f in md_files 
-                if not (self.docs_dir / f.name.replace('.md', '.q.md')).exists()
+                f
+                for f in md_files
+                if not (self.docs_dir / f.name.replace(".md", ".q.md")).exists()
             ]
 
         if not md_files:
@@ -369,8 +409,10 @@ Wrap your response in <index>...</index> tags.
         else:
             # Process documents in batches
             for i in range(0, len(md_files), self.batch_size):
-                batch = md_files[i:i + self.batch_size]
-                self.logger.info(f"Processing batch {i//self.batch_size + 1}/{(len(md_files)//self.batch_size) + 1}")
+                batch = md_files[i : i + self.batch_size]
+                self.logger.info(
+                    f"Processing batch {i//self.batch_size + 1}/{(len(md_files)//self.batch_size) + 1}"
+                )
                 await self._process_document_batch(batch)
 
         self.logger.info("Index generation complete, building/updating search index.")
@@ -378,21 +420,31 @@ Wrap your response in <index>...</index> tags.
 
     def generate(self, sections: List[str], mode: str = "extended") -> str:
         # Get all markdown files
-        all_files = glob.glob(str(self.docs_dir / "[0-9]*.md")) + \
-                    glob.glob(str(self.docs_dir / "[0-9]*.xs.md"))
-        
+        all_files = glob.glob(str(self.docs_dir / "[0-9]*.md")) + glob.glob(
+            str(self.docs_dir / "[0-9]*.xs.md")
+        )
+
         # Extract base names without extensions
-        base_docs = {Path(f).name.split('.')[0] for f in all_files 
-                        if not Path(f).name.endswith('.q.md')}
-        
+        base_docs = {
+            Path(f).name.split(".")[0]
+            for f in all_files
+            if not Path(f).name.endswith(".q.md")
+        }
+
         # Filter by sections if provided
         if sections:
-            base_docs = {doc for doc in base_docs 
-                        if any(section.lower() in doc.lower() for section in sections)}
-        
+            base_docs = {
+                doc
+                for doc in base_docs
+                if any(section.lower() in doc.lower() for section in sections)
+            }
+
         # Get file paths based on mode
         files = []
-        for doc in sorted(base_docs, key=lambda x: int(x.split('_')[0]) if x.split('_')[0].isdigit() else 999999):
+        for doc in sorted(
+            base_docs,
+            key=lambda x: int(x.split("_")[0]) if x.split("_")[0].isdigit() else 999999,
+        ):
             if mode == "condensed":
                 xs_file = self.docs_dir / f"{doc}.xs.md"
                 regular_file = self.docs_dir / f"{doc}.md"
@@ -404,7 +456,7 @@ Wrap your response in <index>...</index> tags.
         content = []
         for file in files:
             try:
-                with open(file, 'r', encoding='utf-8') as f:
+                with open(file, "r", encoding="utf-8") as f:
                     fname = Path(file).name
                     content.append(f"{'#'*20}\n# {fname}\n{'#'*20}\n\n{f.read()}")
             except Exception as e:
@@ -443,15 +495,9 @@ Wrap your response in <index>...</index> tags.
         for file, _ in ranked_files:
             main_doc = str(file).replace(".q.md", ".md")
             if os.path.exists(self.docs_dir / main_doc):
-                with open(self.docs_dir / main_doc, "r", encoding='utf-8') as f:
+                with open(self.docs_dir / main_doc, "r", encoding="utf-8") as f:
                     only_file_name = main_doc.split("/")[-1]
-                    content = [
-                    "#" * 20,
-                    f"# {only_file_name}",
-                    "#" * 20,
-                    "",
-                    f.read()
-                    ]
+                    content = ["#" * 20, f"# {only_file_name}", "#" * 20, "", f.read()]
                     results.append("\n".join(content))
 
         return "\n\n---\n\n".join(results)
@@ -482,7 +528,9 @@ Wrap your response in <index>...</index> tags.
             if len(components) == 3:
                 code_ref = components[2].strip()
                 code_tokens = self.preprocess_text(code_ref)
-                code_match_score = len(set(query_tokens) & set(code_tokens)) / len(query_tokens)
+                code_match_score = len(set(query_tokens) & set(code_tokens)) / len(
+                    query_tokens
+                )
 
             file_data[file_path]["total_score"] += score
             file_data[file_path]["match_count"] += 1

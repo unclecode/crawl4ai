@@ -1,133 +1,144 @@
-## Chunking Strategies 📚
+# Chunking Strategies
+Chunking strategies are critical for dividing large texts into manageable parts, enabling effective content processing and extraction. These strategies are foundational in cosine similarity-based extraction techniques, which allow users to retrieve only the most relevant chunks of content for a given query. Additionally, they facilitate direct integration into RAG (Retrieval-Augmented Generation) systems for structured and scalable workflows.
 
-Crawl4AI provides several powerful chunking strategies to divide text into manageable parts for further processing. Each strategy has unique characteristics and is suitable for different scenarios. Let's explore them one by one.
+### Why Use Chunking?
+1. **Cosine Similarity and Query Relevance**: Prepares chunks for semantic similarity analysis.
+2. **RAG System Integration**: Seamlessly processes and stores chunks for retrieval.
+3. **Structured Processing**: Allows for diverse segmentation methods, such as sentence-based, topic-based, or windowed approaches.
 
-### RegexChunking
+### Methods of Chunking
 
-`RegexChunking` splits text using regular expressions. This is ideal for creating chunks based on specific patterns like paragraphs or sentences.
+#### 1. Regex-Based Chunking
+Splits text based on regular expression patterns, useful for coarse segmentation.
 
-#### When to Use
-- Great for structured text with consistent delimiters.
-- Suitable for documents where specific patterns (e.g., double newlines, periods) indicate logical chunks.
-
-#### Parameters
-- `patterns` (list, optional): Regular expressions used to split the text. Default is to split by double newlines (`['\n\n']`).
-
-#### Example
+**Code Example**:
 ```python
-from crawl4ai.chunking_strategy import RegexChunking
+class RegexChunking:
+    def __init__(self, patterns=None):
+        self.patterns = patterns or [r'\n\n']  # Default pattern for paragraphs
 
-# Define patterns for splitting text
-patterns = [r'\n\n', r'\. ']
-chunker = RegexChunking(patterns=patterns)
+    def chunk(self, text):
+        paragraphs = [text]
+        for pattern in self.patterns:
+            paragraphs = [seg for p in paragraphs for seg in re.split(pattern, p)]
+        return paragraphs
 
-# Sample text
-text = "This is a sample text. It will be split into chunks.\n\nThis is another paragraph."
+# Example Usage
+text = """This is the first paragraph.
 
-# Chunk the text
-chunks = chunker.chunk(text)
-print(chunks)
+This is the second paragraph."""
+chunker = RegexChunking()
+print(chunker.chunk(text))
 ```
 
-### NlpSentenceChunking
+#### 2. Sentence-Based Chunking
+Divides text into sentences using NLP tools, ideal for extracting meaningful statements.
 
-`NlpSentenceChunking` uses NLP models to split text into sentences, ensuring accurate sentence boundaries.
-
-#### When to Use
-- Ideal for texts where sentence boundaries are crucial.
-- Useful for creating chunks that preserve grammatical structures.
-
-#### Parameters
-- None.
-
-#### Example
+**Code Example**:
 ```python
-from crawl4ai.chunking_strategy import NlpSentenceChunking
+from nltk.tokenize import sent_tokenize
 
+class NlpSentenceChunking:
+    def chunk(self, text):
+        sentences = sent_tokenize(text)
+        return [sentence.strip() for sentence in sentences]
+
+# Example Usage
+text = "This is sentence one. This is sentence two."
 chunker = NlpSentenceChunking()
-
-# Sample text
-text = "This is a sample text. It will be split into sentences. Here's another sentence."
-
-# Chunk the text
-chunks = chunker.chunk(text)
-print(chunks)
+print(chunker.chunk(text))
 ```
 
-### TopicSegmentationChunking
+#### 3. Topic-Based Segmentation
+Uses algorithms like TextTiling to create topic-coherent chunks.
 
-`TopicSegmentationChunking` employs the TextTiling algorithm to segment text into topic-based chunks. This method identifies thematic boundaries.
-
-#### When to Use
-- Perfect for long documents with distinct topics.
-- Useful when preserving topic continuity is more important than maintaining text order.
-
-#### Parameters
-- `num_keywords` (int, optional): Number of keywords for each topic segment. Default is `3`.
-
-#### Example
+**Code Example**:
 ```python
-from crawl4ai.chunking_strategy import TopicSegmentationChunking
+from nltk.tokenize import TextTilingTokenizer
 
-chunker = TopicSegmentationChunking(num_keywords=3)
+class TopicSegmentationChunking:
+    def __init__(self):
+        self.tokenizer = TextTilingTokenizer()
 
-# Sample text
-text = "This document contains several topics. Topic one discusses AI. Topic two covers machine learning."
+    def chunk(self, text):
+        return self.tokenizer.tokenize(text)
 
-# Chunk the text
-chunks = chunker.chunk(text)
-print(chunks)
+# Example Usage
+text = """This is an introduction.
+This is a detailed discussion on the topic."""
+chunker = TopicSegmentationChunking()
+print(chunker.chunk(text))
 ```
 
-### FixedLengthWordChunking
+#### 4. Fixed-Length Word Chunking
+Segments text into chunks of a fixed word count.
 
-`FixedLengthWordChunking` splits text into chunks based on a fixed number of words. This ensures each chunk has approximately the same length.
-
-#### When to Use
-- Suitable for processing large texts where uniform chunk size is important.
-- Useful when the number of words per chunk needs to be controlled.
-
-#### Parameters
-- `chunk_size` (int, optional): Number of words per chunk. Default is `100`.
-
-#### Example
+**Code Example**:
 ```python
-from crawl4ai.chunking_strategy import FixedLengthWordChunking
+class FixedLengthWordChunking:
+    def __init__(self, chunk_size=100):
+        self.chunk_size = chunk_size
 
-chunker = FixedLengthWordChunking(chunk_size=10)
+    def chunk(self, text):
+        words = text.split()
+        return [' '.join(words[i:i + self.chunk_size]) for i in range(0, len(words), self.chunk_size)]
 
-# Sample text
-text = "This is a sample text. It will be split into chunks of fixed length."
-
-# Chunk the text
-chunks = chunker.chunk(text)
-print(chunks)
+# Example Usage
+text = "This is a long text with many words to be chunked into fixed sizes."
+chunker = FixedLengthWordChunking(chunk_size=5)
+print(chunker.chunk(text))
 ```
 
-### SlidingWindowChunking
+#### 5. Sliding Window Chunking
+Generates overlapping chunks for better contextual coherence.
 
-`SlidingWindowChunking` uses a sliding window approach to create overlapping chunks. Each chunk has a fixed length, and the window slides by a specified step size.
-
-#### When to Use
-- Ideal for creating overlapping chunks to preserve context.
-- Useful for tasks where context from adjacent chunks is needed.
-
-#### Parameters
-- `window_size` (int, optional): Number of words in each chunk. Default is `100`.
-- `step` (int, optional): Number of words to slide the window. Default is `50`.
-
-#### Example
+**Code Example**:
 ```python
-from crawl4ai.chunking_strategy import SlidingWindowChunking
+class SlidingWindowChunking:
+    def __init__(self, window_size=100, step=50):
+        self.window_size = window_size
+        self.step = step
 
-chunker = SlidingWindowChunking(window_size=10, step=5)
+    def chunk(self, text):
+        words = text.split()
+        chunks = []
+        for i in range(0, len(words) - self.window_size + 1, self.step):
+            chunks.append(' '.join(words[i:i + self.window_size]))
+        return chunks
 
-# Sample text
-text = "This is a sample text. It will be split using a sliding window approach to preserve context."
-
-# Chunk the text
-chunks = chunker.chunk(text)
-print(chunks)
+# Example Usage
+text = "This is a long text to demonstrate sliding window chunking."
+chunker = SlidingWindowChunking(window_size=5, step=2)
+print(chunker.chunk(text))
 ```
 
-With these chunking strategies, you can choose the best method to divide your text based on your specific needs. Whether you need precise sentence boundaries, topic-based segmentation, or uniform chunk sizes, Crawl4AI has you covered. Happy chunking! 📝✨
+### Combining Chunking with Cosine Similarity
+To enhance the relevance of extracted content, chunking strategies can be paired with cosine similarity techniques. Here’s an example workflow:
+
+**Code Example**:
+```python
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
+class CosineSimilarityExtractor:
+    def __init__(self, query):
+        self.query = query
+        self.vectorizer = TfidfVectorizer()
+
+    def find_relevant_chunks(self, chunks):
+        vectors = self.vectorizer.fit_transform([self.query] + chunks)
+        similarities = cosine_similarity(vectors[0:1], vectors[1:]).flatten()
+        return [(chunks[i], similarities[i]) for i in range(len(chunks))]
+
+# Example Workflow
+text = """This is a sample document. It has multiple sentences. 
+We are testing chunking and similarity."""
+
+chunker = SlidingWindowChunking(window_size=5, step=3)
+chunks = chunker.chunk(text)
+query = "testing chunking"
+extractor = CosineSimilarityExtractor(query)
+relevant_chunks = extractor.find_relevant_chunks(chunks)
+
+print(relevant_chunks)
+```
