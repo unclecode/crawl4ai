@@ -491,6 +491,7 @@ async def test_news_crawl():
     -   **Ollama Support**: Use open-source or self-hosted models for private or cost-effective extraction.
 -   **🏎️ Faster Scraping Option**: New `LXMLWebScrapingStrategy` offers **10-20x speedup** for large, complex pages (experimental).
 -   **🤖 robots.txt Compliance**: Respect website rules with `check_robots_txt=True` and efficient local caching.
+-   **🔄 Proxy Rotation**: Built-in support for dynamic proxy switching and IP verification, with support for authenticated proxies and session persistence.
 -   **➡️ URL Redirection Tracking**: The `final_url` field now captures the final destination after any redirects.
 -   **🪞 Improved Mirroring**: The `LXMLWebScrapingStrategy` now has much greater fidelity, allowing for almost pixel-perfect mirroring of websites.
 -   **📈 Enhanced Monitoring**: Track memory, CPU, and individual crawler status with `CrawlerMonitor`.

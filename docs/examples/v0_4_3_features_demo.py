@@ -233,6 +233,64 @@ async def demo_llm_schema_generation():
             print("Successfully used generated schema for crawling")
 
 
+async def get_next_proxy(proxy_file: str = f"proxies.txt") -> Optional[Dict]:
+    """Get next proxy from local file"""
+    try:
+        with open(proxy_file) as f:
+            proxies = f.read().splitlines()
+            if not proxies:
+                return None
+            
+        ip, port, username, password = random.choice(proxies).split(":")
+        return {
+            "server": f"http://{ip}:{port}",
+            "username": username,
+            "password": password,
+            "ip": ip  # Store original IP for verification
+        }
+    except Exception as e:
+        print(f"Error loading proxy: {e}")
+        return None
+
+async def demo_proxy_rotation():
+    """
+    8. Proxy Rotation Demo
+    ===================
+    Demonstrates how to rotate proxies for each request using Crawl4ai.
+    """
+    print("\n=== 8. Proxy Rotation Demo ===")
+    
+    
+    # Create 10 test requests to httpbin
+    urls = ["https://httpbin.org/ip"] * 3
+    
+    browser_config = BrowserConfig(headless=True)
+    run_config = CrawlerRunConfig(cache_mode=CacheMode.BYPASS)
+    
+    async with AsyncWebCrawler(config=browser_config) as crawler:
+        for url in urls:
+            proxy = await get_next_proxy()
+            if not proxy:
+                print("No proxy available, skipping...")
+                continue
+                
+            # Create new config with proxy
+            current_config = run_config.clone(proxy_config=proxy)
+            result = await crawler.arun(url=url, config=current_config)
+            
+            if result.success:
+                ip_match = re.search(r'(?:[0-9]{1,3}\.){3}[0-9]{1,3}', result.html)
+                print(f"Proxy {proxy['ip']} -> Response IP: {ip_match.group(0) if ip_match else 'Not found'}")
+                verified = ip_match.group(0) == proxy['ip']
+                if verified:
+                    print(f"✅ Proxy working! IP matches: {proxy['ip']}")
+                else:
+                    print(f"❌ Proxy failed or IP mismatch!")
+            else:
+                print(f"Failed with proxy {proxy['ip']}")
+
+if __name__ == "__main__":
+
 async def main():
     """Run all feature demonstrations."""
     demo_memory_dispatcher(),
@@ -246,6 +304,8 @@ async def main():
     demo_llm_markdown(),
     print("\n" + "=" * 50 + "\n")
     demo_robots_compliance(),
+    print("\n" + "=" * 50 + "\n")
+    demo_proxy_rotation()
     print("\n" + "=" * 50 + "\n")
 
 if __name__ == "__main__":

@@ -38,7 +38,7 @@ async with AsyncWebCrawler(config=browser_config) as crawler:
 
 Here's the corrected documentation:
 
-## Rotating Proxies [COMING SOON]
+## Rotating Proxies 
 
 Example using a proxy rotation service dynamically:
 
