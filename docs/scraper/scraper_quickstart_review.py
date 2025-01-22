@@ -8,7 +8,6 @@ from crawl4ai.scraper import (
 )
 from crawl4ai.async_webcrawler import AsyncWebCrawler, BrowserConfig
 import re
-import time
 
 browser_config = BrowserConfig(headless=True, viewport_width=800, viewport_height=600)
 
@@ -56,7 +55,6 @@ async def basic_scraper_example():
 
 # advanced_scraper_example.py
 import logging
-
 from crawl4ai.scraper import (
     AsyncWebScraper,
     BFSScraperStrategy,
@@ -179,15 +177,11 @@ async def advanced_scraper_example():
 
 if __name__ == "__main__":
     import asyncio
-    import time
 
     # Run basic example
-    start_time = time.perf_counter()
     print("Running basic scraper example...")
     asyncio.run(basic_scraper_example())
-    end_time = time.perf_counter()
-    print(f"Basic scraper example completed in {end_time - start_time:.2f} seconds")
 
-    # # Run advanced example
-    # print("\nRunning advanced scraper example...")
-    # asyncio.run(advanced_scraper_example())
+    # Run advanced example
+    print("\nRunning advanced scraper example...")
+    asyncio.run(advanced_scraper_example())

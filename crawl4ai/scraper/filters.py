@@ -36,11 +36,15 @@ class URLFilter(ABC):
 
     def _update_stats(self, passed: bool):
         """Update filter statistics"""
+        # INFO: Old trick to make things faster
         self.stats.total_urls += 1
-        if passed:
-            self.stats.passed_urls += 1
-        else:
-            self.stats.rejected_urls += 1
+        self.stats.passed_urls += passed
+        self.stats.rejected_urls += not passed        
+        # self.stats.total_urls += 1
+        # if passed:
+        #     self.stats.passed_urls += 1
+        # else:
+        #     self.stats.rejected_urls += 1
 
 
 class FilterChain:
@@ -233,3 +237,49 @@ def create_common_filter_chain() -> FilterChain:
             DomainFilter(blocked_domains=["ads.*", "analytics.*"]),
         ]
     )
+
+
+
+def run_performance_test():
+    import time
+    import random
+    
+    # Test URLs
+    test_urls = [
+        'https://example.com/article/123',
+        'https://blog.example.com/post/456',
+        'https://ads.example.com/tracking',
+        'https://example.com/about.html',
+        'https://analytics.example.com/script.js',
+        'https://example.com/products.php',
+        'https://subdomain.example.com/blog/post-123',
+        'https://example.com/path/file.pdf',
+    ] * 100000  # Create 800k URLs to test
+    
+    def benchmark(name: str, func, *args):
+        start = time.perf_counter_ns()
+        result = func(*args) if args[0] else func()
+        elapsed = (time.perf_counter_ns() - start) / 1_000_000  # Convert to ms
+        print(f"{name:<30} {elapsed:>8.3f} ms")
+        return result
+
+    # Test individual filters
+    pattern_filter = URLPatternFilter(["*.html", "*/article/*"])
+    content_filter = ContentTypeFilter(["text/html"])
+    domain_filter = DomainFilter(blocked_domains=["ads.*", "analytics.*"])
+    
+    # Test chain
+    chain = FilterChain([pattern_filter, content_filter, domain_filter])
+    
+    print("\nBenchmarking individual filters...")
+    for url in test_urls[:5]:  # Show first 5 results
+        print(f"\nTesting URL: {url}")
+        benchmark("Pattern Filter", pattern_filter.apply, url)
+        benchmark("Content Filter", content_filter.apply, url)
+        benchmark("Domain Filter", domain_filter.apply, url)
+    
+    print("\nBenchmarking full chain...")
+    benchmark("Full Chain", lambda: [chain.apply(url) for url in test_urls], None)
+
+if __name__ == "__main__":
+    run_performance_test()

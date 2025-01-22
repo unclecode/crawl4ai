@@ -5,7 +5,7 @@ import asyncio
 import logging
 from urllib.parse import urlparse
 from urllib.robotparser import RobotFileParser
-import validators
+# import validators
 
 from ..async_configs import CrawlerRunConfig
 from .models import CrawlResult
@@ -54,14 +54,22 @@ class BFSScraperStrategy(ScraperStrategy):
     async def can_process_url(self, url: str, depth: int) -> bool:
         """Check if URL can be processed based on robots.txt and filters
         This is our gatekeeper method that determines if a URL should be processed. It:
-            - Validates URL format using the validators library
+            - Validates URL format using a robust built-in method
             - Checks robots.txt permissions for the domain
             - Applies custom filters from the filter chain
             - Updates statistics for blocked URLs
             - Returns False early if any check fails
         """
-        if not validators.url(url):
-            self.logger.warning(f"Invalid URL: {url}")
+        try:
+            result = urlparse(url)
+            if not all([result.scheme, result.netloc]):
+                raise ValueError("Invalid URL")
+            if result.scheme not in ('http', 'https'):
+                raise ValueError("URL must be HTTP or HTTPS")
+            if not result.netloc or '.' not in result.netloc:
+                raise ValueError("Invalid domain")
+        except Exception as e:
+            self.logger.warning(f"Invalid URL: {url}. Error: {str(e)}")
             return False
 
         robot_parser = await self._get_robot_parser(url)
@@ -70,7 +78,7 @@ class BFSScraperStrategy(ScraperStrategy):
             self.logger.info(f"Blocked by robots.txt: {url}")
             return False
 
-        # Apply the filter chain it's not start page
+        # Apply the filter chain if it's not start page
         if depth != 0 and not self.filter_chain.apply(url):
             return False
 
