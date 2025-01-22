@@ -1,5 +1,5 @@
 """
-Crawl4ai v0.4.3 Features Demo
+Crawl4ai v0.4.3b2 Features Demo
 ============================
 
 This demonstration showcases three major categories of new features in Crawl4ai v0.4.3:
