@@ -1,121 +1,254 @@
-# Hooks & Auth for AsyncWebCrawler
+# Hooks & Auth in AsyncWebCrawler
 
-Crawl4AI's `AsyncWebCrawler` allows you to customize the behavior of the web crawler using hooks. Hooks are asynchronous functions called at specific points in the crawling process, allowing you to modify the crawler's behavior or perform additional actions. This updated documentation demonstrates how to use hooks, including the new `on_page_context_created` hook, and ensures compatibility with `BrowserConfig` and `CrawlerRunConfig`.
+Crawl4AI’s **hooks** let you customize the crawler at specific points in the pipeline:
 
-## Example: Using Crawler Hooks with AsyncWebCrawler
+1. **`on_browser_created`** – After browser creation.  
+2. **`on_page_context_created`** – After a new context & page are created.  
+3. **`before_goto`** – Just before navigating to a page.  
+4. **`after_goto`** – Right after navigation completes.  
+5. **`on_user_agent_updated`** – Whenever the user agent changes.  
+6. **`on_execution_started`** – Once custom JavaScript execution begins.  
+7. **`before_retrieve_html`** – Just before the crawler retrieves final HTML.  
+8. **`before_return_html`** – Right before returning the HTML content.
 
-In this example, we'll:
+**Important**: Avoid heavy tasks in `on_browser_created` since you don’t yet have a page context. If you need to *log in*, do so in **`on_page_context_created`**.
 
-1. Configure the browser and set up authentication when it's created.
-2. Apply custom routing and initial actions when the page context is created.
-3. Add custom headers before navigating to the URL.
-4. Log the current URL after navigation.
-5. Perform actions after JavaScript execution.
-6. Log the length of the HTML before returning it.
+> note "Important Hook Usage Warning"
+    **Avoid Misusing Hooks**: Do not manipulate page objects in the wrong hook or at the wrong time, as it can crash the pipeline or produce incorrect results. A common mistake is attempting to handle authentication prematurely—such as creating or closing pages in `on_browser_created`. 
 
-### Hook Definitions
+>   **Use the Right Hook for Auth**: If you need to log in or set tokens, use `on_page_context_created`. This ensures you have a valid page/context to work with, without disrupting the main crawling flow.
+
+>    **Identity-Based Crawling**: For robust auth, consider identity-based crawling (or passing a session ID) to preserve state. Run your initial login steps in a separate, well-defined process, then feed that session to your main crawl—rather than shoehorning complex authentication into early hooks. Check out [Identity-Based Crawling](../advanced/identity-based-crawling.md) for more details.
+
+>    **Be Cautious**: Overwriting or removing elements in the wrong hook can compromise the final crawl. Keep hooks focused on smaller tasks (like route filters, custom headers), and let your main logic (crawling, data extraction) proceed normally.
+
+
+Below is an example demonstration.
+
+---
+
+## Example: Using Hooks in AsyncWebCrawler
 
 ```python
 import asyncio
-from crawl4ai import AsyncWebCrawler
-from crawl4ai.async_configs import BrowserConfig, CrawlerRunConfig
-from playwright.async_api import Page, Browser, BrowserContext
+import json
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
+from playwright.async_api import Page, BrowserContext
 
-def log_routing(route):
-    # Example: block loading images
-    if route.request.resource_type == "image":
-        print(f"[HOOK] Blocking image request: {route.request.url}")
-        asyncio.create_task(route.abort())
-    else:
-        asyncio.create_task(route.continue_())
-
-async def on_browser_created(browser: Browser, **kwargs):
-    print("[HOOK] on_browser_created")
-    # Example: Set browser viewport size and log in
-    context = await browser.new_context(viewport={"width": 1920, "height": 1080})
-    page = await context.new_page()
-    await page.goto("https://example.com/login")
-    await page.fill("input[name='username']", "testuser")
-    await page.fill("input[name='password']", "password123")
-    await page.click("button[type='submit']")
-    await page.wait_for_selector("#welcome")
-    await context.add_cookies([{"name": "auth_token", "value": "abc123", "url": "https://example.com"}])
-    await page.close()
-    await context.close()
-
-async def on_page_context_created(context: BrowserContext, page: Page, **kwargs):
-    print("[HOOK] on_page_context_created")
-    await context.route("**", log_routing)
-
-async def before_goto(page: Page, context: BrowserContext, **kwargs):
-    print("[HOOK] before_goto")
-    await page.set_extra_http_headers({"X-Test-Header": "test"})
-
-async def after_goto(page: Page, context: BrowserContext, **kwargs):
-    print("[HOOK] after_goto")
-    print(f"Current URL: {page.url}")
-
-async def on_execution_started(page: Page, context: BrowserContext, **kwargs):
-    print("[HOOK] on_execution_started")
-    await page.evaluate("console.log('Custom JS executed')")
-
-async def before_return_html(page: Page, context: BrowserContext, html: str, **kwargs):
-    print("[HOOK] before_return_html")
-    print(f"HTML length: {len(html)}")
-    return page
-```
-
-### Using the Hooks with AsyncWebCrawler
-
-```python
 async def main():
-    print("\n🔗 Using Crawler Hooks: Customize AsyncWebCrawler with hooks!")
+    print("🔗 Hooks Example: Demonstrating recommended usage")
 
-    # Configure browser and crawler settings
+    # 1) Configure the browser
     browser_config = BrowserConfig(
         headless=True,
-        viewport_width=1920,
-        viewport_height=1080
+        verbose=True
     )
-    
+
+    # 2) Configure the crawler run
     crawler_run_config = CrawlerRunConfig(
         js_code="window.scrollTo(0, document.body.scrollHeight);",
-        wait_for="footer"
+        wait_for="body",
+        cache_mode=CacheMode.BYPASS
     )
 
-    # Initialize crawler
-    async with AsyncWebCrawler(config=browser_config) as crawler:
-        crawler.crawler_strategy.set_hook("on_browser_created", on_browser_created)
-        crawler.crawler_strategy.set_hook("on_page_context_created", on_page_context_created)
-        crawler.crawler_strategy.set_hook("before_goto", before_goto)
-        crawler.crawler_strategy.set_hook("after_goto", after_goto)
-        crawler.crawler_strategy.set_hook("on_execution_started", on_execution_started)
-        crawler.crawler_strategy.set_hook("before_return_html", before_return_html)
+    # 3) Create the crawler instance
+    crawler = AsyncWebCrawler(config=browser_config)
 
-        # Run the crawler
-        result = await crawler.arun(url="https://example.com", config=crawler_run_config)
+    #
+    # Define Hook Functions
+    #
 
-    print("\n📦 Crawler Hooks Result:")
-    print(result)
+    async def on_browser_created(browser, **kwargs):
+        # Called once the browser instance is created (but no pages or contexts yet)
+        print("[HOOK] on_browser_created - Browser created successfully!")
+        # Typically, do minimal setup here if needed
+        return browser
 
-asyncio.run(main())
+    async def on_page_context_created(page: Page, context: BrowserContext, **kwargs):
+        # Called right after a new page + context are created (ideal for auth or route config).
+        print("[HOOK] on_page_context_created - Setting up page & context.")
+        
+        # Example 1: Route filtering (e.g., block images)
+        async def route_filter(route):
+            if route.request.resource_type == "image":
+                print(f"[HOOK] Blocking image request: {route.request.url}")
+                await route.abort()
+            else:
+                await route.continue_()
+
+        await context.route("**", route_filter)
+
+        # Example 2: (Optional) Simulate a login scenario
+        # (We do NOT create or close pages here, just do quick steps if needed)
+        # e.g., await page.goto("https://example.com/login")
+        # e.g., await page.fill("input[name='username']", "testuser")
+        # e.g., await page.fill("input[name='password']", "password123")
+        # e.g., await page.click("button[type='submit']")
+        # e.g., await page.wait_for_selector("#welcome")
+        # e.g., await context.add_cookies([...])
+        # Then continue
+
+        # Example 3: Adjust the viewport
+        await page.set_viewport_size({"width": 1080, "height": 600})
+        return page
+
+    async def before_goto(
+        page: Page, context: BrowserContext, url: str, **kwargs
+    ):
+        # Called before navigating to each URL.
+        print(f"[HOOK] before_goto - About to navigate: {url}")
+        # e.g., inject custom headers
+        await page.set_extra_http_headers({
+            "Custom-Header": "my-value"
+        })
+        return page
+
+    async def after_goto(
+        page: Page, context: BrowserContext, 
+        url: str, response, **kwargs
+    ):
+        # Called after navigation completes.
+        print(f"[HOOK] after_goto - Successfully loaded: {url}")
+        # e.g., wait for a certain element if we want to verify
+        try:
+            await page.wait_for_selector('.content', timeout=1000)
+            print("[HOOK] Found .content element!")
+        except:
+            print("[HOOK] .content not found, continuing anyway.")
+        return page
+
+    async def on_user_agent_updated(
+        page: Page, context: BrowserContext, 
+        user_agent: str, **kwargs
+    ):
+        # Called whenever the user agent updates.
+        print(f"[HOOK] on_user_agent_updated - New user agent: {user_agent}")
+        return page
+
+    async def on_execution_started(page: Page, context: BrowserContext, **kwargs):
+        # Called after custom JavaScript execution begins.
+        print("[HOOK] on_execution_started - JS code is running!")
+        return page
+
+    async def before_retrieve_html(page: Page, context: BrowserContext, **kwargs):
+        # Called before final HTML retrieval.
+        print("[HOOK] before_retrieve_html - We can do final actions")
+        # Example: Scroll again
+        await page.evaluate("window.scrollTo(0, document.body.scrollHeight);")
+        return page
+
+    async def before_return_html(
+        page: Page, context: BrowserContext, html: str, **kwargs
+    ):
+        # Called just before returning the HTML in the result.
+        print(f"[HOOK] before_return_html - HTML length: {len(html)}")
+        return page
+
+    #
+    # Attach Hooks
+    #
+
+    crawler.crawler_strategy.set_hook("on_browser_created", on_browser_created)
+    crawler.crawler_strategy.set_hook(
+        "on_page_context_created", on_page_context_created
+    )
+    crawler.crawler_strategy.set_hook("before_goto", before_goto)
+    crawler.crawler_strategy.set_hook("after_goto", after_goto)
+    crawler.crawler_strategy.set_hook(
+        "on_user_agent_updated", on_user_agent_updated
+    )
+    crawler.crawler_strategy.set_hook(
+        "on_execution_started", on_execution_started
+    )
+    crawler.crawler_strategy.set_hook(
+        "before_retrieve_html", before_retrieve_html
+    )
+    crawler.crawler_strategy.set_hook(
+        "before_return_html", before_return_html
+    )
+
+    await crawler.start()
+
+    # 4) Run the crawler on an example page
+    url = "https://example.com"
+    result = await crawler.arun(url, config=crawler_run_config)
+    
+    if result.success:
+        print("\nCrawled URL:", result.url)
+        print("HTML length:", len(result.html))
+    else:
+        print("Error:", result.error_message)
+
+    await crawler.close()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
-### Explanation of Hooks
+---
 
-- **`on_browser_created`**: Called when the browser is created. Use this to configure the browser or handle authentication (e.g., logging in and setting cookies).
-- **`on_page_context_created`**: Called when a new page context is created. Use this to apply routing, block resources, or inject custom logic before navigating to the URL.
-- **`before_goto`**: Called before navigating to the URL. Use this to add custom headers or perform other pre-navigation actions.
-- **`after_goto`**: Called after navigation. Use this to verify content or log the URL.
-- **`on_execution_started`**: Called after executing custom JavaScript. Use this to perform additional actions.
-- **`before_return_html`**: Called before returning the HTML content. Use this to log details or preprocess the content.
+## Hook Lifecycle Summary
 
-### Additional Customizations
+1. **`on_browser_created`**:  
+   - Browser is up, but **no** pages or contexts yet.  
+   - Light setup only—don’t try to open or close pages here (that belongs in `on_page_context_created`).
 
-- **Resource Management**: Use `on_page_context_created` to block or modify requests (e.g., block images, fonts, or third-party scripts).
-- **Dynamic Headers**: Use `before_goto` to add or modify headers dynamically based on the URL.
-- **Authentication**: Use `on_browser_created` to handle login processes and set authentication cookies or tokens.
-- **Content Analysis**: Use `before_return_html` to analyze or modify the extracted HTML content.
+2. **`on_page_context_created`**:  
+   - Perfect for advanced **auth** or route blocking.  
+   - You have a **page** + **context** ready but haven’t navigated to the target URL yet.
 
-These hooks provide powerful customization options for tailoring the crawling process to your needs.
+3. **`before_goto`**:  
+   - Right before navigation. Typically used for setting **custom headers** or logging the target URL.
+
+4. **`after_goto`**:  
+   - After page navigation is done. Good place for verifying content or waiting on essential elements. 
+
+5. **`on_user_agent_updated`**:  
+   - Whenever the user agent changes (for stealth or different UA modes).
+
+6. **`on_execution_started`**:  
+   - If you set `js_code` or run custom scripts, this runs once your JS is about to start.
+
+7. **`before_retrieve_html`**:  
+   - Just before the final HTML snapshot is taken. Often you do a final scroll or lazy-load triggers here.
+
+8. **`before_return_html`**:  
+   - The last hook before returning HTML to the `CrawlResult`. Good for logging HTML length or minor modifications.
+
+---
+
+## When to Handle Authentication
+
+**Recommended**: Use **`on_page_context_created`** if you need to:
+
+- Navigate to a login page or fill forms
+- Set cookies or localStorage tokens
+- Block resource routes to avoid ads
+
+This ensures the newly created context is under your control **before** `arun()` navigates to the main URL.
+
+---
+
+## Additional Considerations
+
+- **Session Management**: If you want multiple `arun()` calls to reuse a single session, pass `session_id=` in your `CrawlerRunConfig`. Hooks remain the same.  
+- **Performance**: Hooks can slow down crawling if they do heavy tasks. Keep them concise.  
+- **Error Handling**: If a hook fails, the overall crawl might fail. Catch exceptions or handle them gracefully.  
+- **Concurrency**: If you run `arun_many()`, each URL triggers these hooks in parallel. Ensure your hooks are thread/async-safe.
+
+---
+
+## Conclusion
+
+Hooks provide **fine-grained** control over:
+
+- **Browser** creation (light tasks only)
+- **Page** and **context** creation (auth, route blocking)
+- **Navigation** phases
+- **Final HTML** retrieval
+
+Follow the recommended usage:
+- **Login** or advanced tasks in `on_page_context_created`  
+- **Custom headers** or logs in `before_goto` / `after_goto`  
+- **Scrolling** or final checks in `before_retrieve_html` / `before_return_html`
 

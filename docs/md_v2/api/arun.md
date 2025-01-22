@@ -1,244 +1,305 @@
-# Complete Parameter Guide for arun()
+# `arun()` Parameter Guide (New Approach)
 
-The following parameters can be passed to the `arun()` method. They are organized by their primary usage context and functionality.
-
-## Core Parameters
+In Crawl4AI’s **latest** configuration model, nearly all parameters that once went directly to `arun()` are now part of **`CrawlerRunConfig`**. When calling `arun()`, you provide:
 
 ```python
 await crawler.arun(
-    url="https://example.com",   # Required: URL to crawl
-    verbose=True,               # Enable detailed logging
-    cache_mode=CacheMode.ENABLED,  # Control cache behavior
-    warmup=True                # Whether to run warmup check
+    url="https://example.com",  
+    config=my_run_config
 )
 ```
 
-## Cache Control
+Below is an organized look at the parameters that can go inside `CrawlerRunConfig`, divided by their functional areas. For **Browser** settings (e.g., `headless`, `browser_type`), see [BrowserConfig](./parameters.md).
+
+---
+
+## 1. Core Usage
 
 ```python
-from crawl4ai import CacheMode
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
 
-await crawler.arun(
-    cache_mode=CacheMode.ENABLED,    # Normal caching (read/write)
-    # Other cache modes:
-    # cache_mode=CacheMode.DISABLED   # No caching at all
-    # cache_mode=CacheMode.READ_ONLY  # Only read from cache
-    # cache_mode=CacheMode.WRITE_ONLY # Only write to cache
-    # cache_mode=CacheMode.BYPASS     # Skip cache for this operation
+async def main():
+    run_config = CrawlerRunConfig(
+        verbose=True,            # Detailed logging
+        cache_mode=CacheMode.ENABLED,  # Use normal read/write cache
+        check_robots_txt=True,   # Respect robots.txt rules
+        # ... other parameters
+    )
+
+    async with AsyncWebCrawler() as crawler:
+        result = await crawler.arun(
+            url="https://example.com",
+            config=run_config
+        )
+        
+        # Check if blocked by robots.txt
+        if not result.success and result.status_code == 403:
+            print(f"Error: {result.error_message}")
+```
+
+**Key Fields**:
+- `verbose=True` logs each crawl step.  
+- `cache_mode` decides how to read/write the local crawl cache.
+
+---
+
+## 2. Cache Control
+
+**`cache_mode`** (default: `CacheMode.ENABLED`)  
+Use a built-in enum from `CacheMode`:
+- `ENABLED`: Normal caching—reads if available, writes if missing.
+- `DISABLED`: No caching—always refetch pages.
+- `READ_ONLY`: Reads from cache only; no new writes.
+- `WRITE_ONLY`: Writes to cache but doesn’t read existing data.
+- `BYPASS`: Skips reading cache for this crawl (though it might still write if set up that way).
+
+```python
+run_config = CrawlerRunConfig(
+    cache_mode=CacheMode.BYPASS
 )
 ```
 
-## Content Processing Parameters
+**Additional flags**:
+- `bypass_cache=True` acts like `CacheMode.BYPASS`.
+- `disable_cache=True` acts like `CacheMode.DISABLED`.
+- `no_cache_read=True` acts like `CacheMode.WRITE_ONLY`.
+- `no_cache_write=True` acts like `CacheMode.READ_ONLY`.
 
-### Text Processing
+---
+
+## 3. Content Processing & Selection
+
+### 3.1 Text Processing
+
 ```python
-await crawler.arun(
-    word_count_threshold=10,                # Minimum words per content block
-    image_description_min_word_threshold=5,  # Minimum words for image descriptions
-    only_text=False,                        # Extract only text content
-    excluded_tags=['form', 'nav'],          # HTML tags to exclude
-    keep_data_attributes=False,             # Preserve data-* attributes
+run_config = CrawlerRunConfig(
+    word_count_threshold=10,   # Ignore text blocks <10 words
+    only_text=False,           # If True, tries to remove non-text elements
+    keep_data_attributes=False # Keep or discard data-* attributes
 )
 ```
 
-### Content Selection
+### 3.2 Content Selection
+
 ```python
-await crawler.arun(
-    css_selector=".main-content",  # CSS selector for content extraction
-    remove_forms=True,             # Remove all form elements
-    remove_overlay_elements=True,  # Remove popups/modals/overlays
+run_config = CrawlerRunConfig(
+    css_selector=".main-content",  # Focus on .main-content region only
+    excluded_tags=["form", "nav"], # Remove entire tag blocks
+    remove_forms=True,             # Specifically strip <form> elements
+    remove_overlay_elements=True,  # Attempt to remove modals/popups
 )
 ```
 
-### Link Handling
+### 3.3 Link Handling
+
 ```python
-await crawler.arun(
-    exclude_external_links=True,          # Remove external links
-    exclude_social_media_links=True,      # Remove social media links
-    exclude_external_images=True,         # Remove external images
-    exclude_domains=["ads.example.com"],  # Specific domains to exclude
-    social_media_domains=[               # Additional social media domains
-        "facebook.com",
-        "twitter.com",
-        "instagram.com"
-    ]
+run_config = CrawlerRunConfig(
+    exclude_external_links=True,         # Remove external links from final content
+    exclude_social_media_links=True,     # Remove links to known social sites
+    exclude_domains=["ads.example.com"], # Exclude links to these domains
+    exclude_social_media_domains=["facebook.com","twitter.com"], # Extend the default list
 )
 ```
 
-## Browser Control Parameters
+### 3.4 Media Filtering
 
-### Basic Browser Settings
 ```python
-await crawler.arun(
-    headless=True,                # Run browser in headless mode
-    browser_type="chromium",      # Browser engine: "chromium", "firefox", "webkit"
-    page_timeout=60000,          # Page load timeout in milliseconds
-    user_agent="custom-agent",    # Custom user agent
+run_config = CrawlerRunConfig(
+    exclude_external_images=True  # Strip images from other domains
 )
 ```
 
-### Navigation and Waiting
+---
+
+## 4. Page Navigation & Timing
+
+### 4.1 Basic Browser Flow
+
 ```python
-await crawler.arun(
-    wait_for="css:.dynamic-content",  # Wait for element/condition
-    delay_before_return_html=2.0,     # Wait before returning HTML (seconds)
+run_config = CrawlerRunConfig(
+    wait_for="css:.dynamic-content", # Wait for .dynamic-content
+    delay_before_return_html=2.0,    # Wait 2s before capturing final HTML
+    page_timeout=60000,             # Navigation & script timeout (ms)
 )
 ```
 
-### JavaScript Execution
+**Key Fields**:
+- `wait_for`:  
+  - `"css:selector"` or  
+  - `"js:() => boolean"`  
+  e.g. `js:() => document.querySelectorAll('.item').length > 10`.
+
+- `mean_delay` & `max_range`: define random delays for `arun_many()` calls.  
+- `semaphore_count`: concurrency limit when crawling multiple URLs.
+
+### 4.2 JavaScript Execution
+
 ```python
-await crawler.arun(
-    js_code=[                     # JavaScript to execute (string or list)
+run_config = CrawlerRunConfig(
+    js_code=[
         "window.scrollTo(0, document.body.scrollHeight);",
-        "document.querySelector('.load-more').click();"
+        "document.querySelector('.load-more')?.click();"
     ],
-    js_only=False,               # Only execute JavaScript without reloading page
+    js_only=False
 )
 ```
 
-### Anti-Bot Features
+- `js_code` can be a single string or a list of strings.  
+- `js_only=True` means “I’m continuing in the same session with new JS steps, no new full navigation.”
+
+### 4.3 Anti-Bot
+
 ```python
-await crawler.arun(
-    magic=True,              # Enable all anti-detection features
-    simulate_user=True,      # Simulate human behavior
-    override_navigator=True  # Override navigator properties
+run_config = CrawlerRunConfig(
+    magic=True,
+    simulate_user=True,
+    override_navigator=True
+)
+```
+- `magic=True` tries multiple stealth features.  
+- `simulate_user=True` mimics mouse movements or random delays.  
+- `override_navigator=True` fakes some navigator properties (like user agent checks).
+
+---
+
+## 5. Session Management
+
+**`session_id`**: 
+```python
+run_config = CrawlerRunConfig(
+    session_id="my_session123"
+)
+```
+If re-used in subsequent `arun()` calls, the same tab/page context is continued (helpful for multi-step tasks or stateful browsing).
+
+---
+
+## 6. Screenshot, PDF & Media Options
+
+```python
+run_config = CrawlerRunConfig(
+    screenshot=True,             # Grab a screenshot as base64
+    screenshot_wait_for=1.0,     # Wait 1s before capturing
+    pdf=True,                    # Also produce a PDF
+    image_description_min_word_threshold=5,  # If analyzing alt text
+    image_score_threshold=3,                # Filter out low-score images
+)
+```
+**Where they appear**:
+- `result.screenshot` → Base64 screenshot string.
+- `result.pdf` → Byte array with PDF data.
+
+---
+
+## 7. Extraction Strategy
+
+**For advanced data extraction** (CSS/LLM-based), set `extraction_strategy`:
+
+```python
+run_config = CrawlerRunConfig(
+    extraction_strategy=my_css_or_llm_strategy
 )
 ```
 
-### Session Management
-```python
-await crawler.arun(
-    session_id="my_session",  # Session identifier for persistent browsing
-)
-```
+The extracted data will appear in `result.extracted_content`.
 
-### Screenshot Options
-```python
-await crawler.arun(
-    screenshot=True,              # Take page screenshot
-    screenshot_wait_for=2.0,      # Wait before screenshot (seconds)
-)
-```
+---
 
-### Proxy Configuration
+## 8. Comprehensive Example
+
+Below is a snippet combining many parameters:
+
 ```python
-await crawler.arun(
-    proxy="http://proxy.example.com:8080",     # Simple proxy URL
-    proxy_config={                             # Advanced proxy settings
-        "server": "http://proxy.example.com:8080",
-        "username": "user",
-        "password": "pass"
+import asyncio
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
+from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+
+async def main():
+    # Example schema
+    schema = {
+        "name": "Articles",
+        "baseSelector": "article.post",
+        "fields": [
+            {"name": "title", "selector": "h2", "type": "text"},
+            {"name": "link",  "selector": "a",  "type": "attribute", "attribute": "href"}
+        ]
     }
-)
-```
 
-## Content Extraction Parameters
-
-### Extraction Strategy
-```python
-await crawler.arun(
-    extraction_strategy=LLMExtractionStrategy(
-        provider="ollama/llama2",
-        schema=MySchema.schema(),
-        instruction="Extract specific data"
+    run_config = CrawlerRunConfig(
+        # Core
+        verbose=True,
+        cache_mode=CacheMode.ENABLED,
+        check_robots_txt=True,   # Respect robots.txt rules
+        
+        # Content
+        word_count_threshold=10,
+        css_selector="main.content",
+        excluded_tags=["nav", "footer"],
+        exclude_external_links=True,
+        
+        # Page & JS
+        js_code="document.querySelector('.show-more')?.click();",
+        wait_for="css:.loaded-block",
+        page_timeout=30000,
+        
+        # Extraction
+        extraction_strategy=JsonCssExtractionStrategy(schema),
+        
+        # Session
+        session_id="persistent_session",
+        
+        # Media
+        screenshot=True,
+        pdf=True,
+        
+        # Anti-bot
+        simulate_user=True,
+        magic=True,
     )
-)
+
+    async with AsyncWebCrawler() as crawler:
+        result = await crawler.arun("https://example.com/posts", config=run_config)
+        if result.success:
+            print("HTML length:", len(result.cleaned_html))
+            print("Extraction JSON:", result.extracted_content)
+            if result.screenshot:
+                print("Screenshot length:", len(result.screenshot))
+            if result.pdf:
+                print("PDF bytes length:", len(result.pdf))
+        else:
+            print("Error:", result.error_message)
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
-### Chunking Strategy
-```python
-await crawler.arun(
-    chunking_strategy=RegexChunking(
-        patterns=[r'\n\n', r'\.\s+']
-    )
-)
-```
+**What we covered**:
+1. **Crawling** the main content region, ignoring external links.  
+2. Running **JavaScript** to click “.show-more”.  
+3. **Waiting** for “.loaded-block” to appear.  
+4. Generating a **screenshot** & **PDF** of the final page.  
+5. Extracting repeated “article.post” elements with a **CSS-based** extraction strategy.
 
-### HTML to Text Options
-```python
-await crawler.arun(
-    html2text={
-        "ignore_links": False,
-        "ignore_images": False,
-        "escape_dot": False,
-        "body_width": 0,
-        "protect_links": True,
-        "unicode_snob": True
-    }
-)
-```
+---
 
-## Debug Options
-```python
-await crawler.arun(
-    log_console=True,   # Log browser console messages
-)
-```
+## 9. Best Practices
 
-## Parameter Interactions and Notes
+1. **Use `BrowserConfig` for global browser** settings (headless, user agent).  
+2. **Use `CrawlerRunConfig`** to handle the **specific** crawl needs: content filtering, caching, JS, screenshot, extraction, etc.  
+3. Keep your **parameters consistent** in run configs—especially if you’re part of a large codebase with multiple crawls.  
+4. **Limit** large concurrency (`semaphore_count`) if the site or your system can’t handle it.  
+5. For dynamic pages, set `js_code` or `scan_full_page` so you load all content.
 
-1. **Cache and Performance Setup**
-   ```python
-   # Optimal caching for repeated crawls
-   await crawler.arun(
-       cache_mode=CacheMode.ENABLED,
-       word_count_threshold=10,
-       process_iframes=False
-   )
-   ```
+---
 
-2. **Dynamic Content Handling**
-   ```python
-   # Handle lazy-loaded content
-   await crawler.arun(
-       js_code="window.scrollTo(0, document.body.scrollHeight);",
-       wait_for="css:.lazy-content",
-       delay_before_return_html=2.0,
-       cache_mode=CacheMode.WRITE_ONLY  # Cache results after dynamic load
-   )
-   ```
+## 10. Conclusion
 
-3. **Content Extraction Pipeline**
-   ```python
-   # Complete extraction setup
-   await crawler.arun(
-       css_selector=".main-content",
-       word_count_threshold=20,
-       extraction_strategy=my_strategy,
-       chunking_strategy=my_chunking,
-       process_iframes=True,
-       remove_overlay_elements=True,
-       cache_mode=CacheMode.ENABLED
-   )
-   ```
+All parameters that used to be direct arguments to `arun()` now belong in **`CrawlerRunConfig`**. This approach:
 
-## Best Practices
+- Makes code **clearer** and **more maintainable**.  
+- Minimizes confusion about which arguments affect global vs. per-crawl behavior.  
+- Allows you to create **reusable** config objects for different pages or tasks.
 
-1. **Performance Optimization**
-   ```python
-   await crawler.arun(
-       cache_mode=CacheMode.ENABLED,  # Use full caching
-       word_count_threshold=10,      # Filter out noise
-       process_iframes=False         # Skip iframes if not needed
-   )
-   ```
+For a **full** reference, check out the [CrawlerRunConfig Docs](./parameters.md). 
 
-2. **Reliable Scraping**
-   ```python
-   await crawler.arun(
-       magic=True,                   # Enable anti-detection
-       delay_before_return_html=1.0, # Wait for dynamic content
-       page_timeout=60000,          # Longer timeout for slow pages
-       cache_mode=CacheMode.WRITE_ONLY  # Cache results after successful crawl
-   )
-   ```
-
-3. **Clean Content**
-   ```python
-   await crawler.arun(
-       remove_overlay_elements=True,  # Remove popups
-       excluded_tags=['nav', 'aside'],# Remove unnecessary elements
-       keep_data_attributes=False,    # Remove data attributes
-       cache_mode=CacheMode.ENABLED   # Use cache for faster processing
-   )
-   ```
+Happy crawling with your **structured, flexible** config approach!

@@ -1,6 +1,4 @@
-# Proxy & Security
-
-Configure proxy settings and enhance security features in Crawl4AI for reliable data extraction.
+# Proxy 
 
 ## Basic Proxy Setup
 
@@ -38,58 +36,33 @@ async with AsyncWebCrawler(config=browser_config) as crawler:
     result = await crawler.arun(url="https://example.com")
 ```
 
-## Rotating Proxies
+Here's the corrected documentation:
 
-Example using a proxy rotation service and updating `BrowserConfig` dynamically:
+## Rotating Proxies 
+
+Example using a proxy rotation service dynamically:
 
 ```python
-from crawl4ai.async_configs import BrowserConfig
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
 
 async def get_next_proxy():
     # Your proxy rotation logic here
     return {"server": "http://next.proxy.com:8080"}
 
-browser_config = BrowserConfig()
-async with AsyncWebCrawler(config=browser_config) as crawler:
-    # Update proxy for each request
-    for url in urls:
-        proxy = await get_next_proxy()
-        browser_config.proxy_config = proxy
-        result = await crawler.arun(url=url, config=browser_config)
+async def main():
+    browser_config = BrowserConfig()
+    run_config = CrawlerRunConfig()
+    
+    async with AsyncWebCrawler(config=browser_config) as crawler:
+        # For each URL, create a new run config with different proxy
+        for url in urls:
+            proxy = await get_next_proxy()
+            # Clone the config and update proxy - this creates a new browser context
+            current_config = run_config.clone(proxy_config=proxy)
+            result = await crawler.arun(url=url, config=current_config)
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(main())
 ```
 
-## Custom Headers
-
-Add security-related headers via `BrowserConfig`:
-
-```python
-from crawl4ai.async_configs import BrowserConfig
-
-headers = {
-    "X-Forwarded-For": "203.0.113.195",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Cache-Control": "no-cache",
-    "Pragma": "no-cache"
-}
-
-browser_config = BrowserConfig(headers=headers)
-async with AsyncWebCrawler(config=browser_config) as crawler:
-    result = await crawler.arun(url="https://example.com")
-```
-
-## Combining with Magic Mode
-
-For maximum protection, combine proxy with Magic Mode via `CrawlerRunConfig` and `BrowserConfig`:
-
-```python
-from crawl4ai.async_configs import BrowserConfig, CrawlerRunConfig
-
-browser_config = BrowserConfig(
-    proxy="http://proxy.example.com:8080",
-    headers={"Accept-Language": "en-US"}
-)
-crawler_config = CrawlerRunConfig(magic=True)  # Enable all anti-detection features
-
-async with AsyncWebCrawler(config=browser_config) as crawler:
-    result = await crawler.arun(url="https://example.com", config=crawler_config)
-```

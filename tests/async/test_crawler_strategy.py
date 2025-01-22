@@ -1,14 +1,13 @@
 import os
 import sys
 import pytest
-import asyncio
 
 # Add the parent directory to the Python path
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parent_dir)
 
 from crawl4ai.async_webcrawler import AsyncWebCrawler
-from crawl4ai.async_crawler_strategy import AsyncPlaywrightCrawlerStrategy
+
 
 @pytest.mark.asyncio
 async def test_custom_user_agent():
@@ -19,6 +18,7 @@ async def test_custom_user_agent():
         result = await crawler.arun(url=url, bypass_cache=True)
         assert result.success
         assert custom_user_agent in result.html
+
 
 @pytest.mark.asyncio
 async def test_custom_headers():
@@ -31,6 +31,7 @@ async def test_custom_headers():
         assert "X-Test-Header" in result.html
         assert "TestValue" in result.html
 
+
 @pytest.mark.asyncio
 async def test_javascript_execution():
     async with AsyncWebCrawler(verbose=True) as crawler:
@@ -40,18 +41,21 @@ async def test_javascript_execution():
         assert result.success
         assert "<h1>Modified by JS</h1>" in result.html
 
+
 @pytest.mark.asyncio
 async def test_hook_execution():
     async with AsyncWebCrawler(verbose=True) as crawler:
+
         async def test_hook(page):
             await page.evaluate("document.body.style.backgroundColor = 'red';")
             return page
 
-        crawler.crawler_strategy.set_hook('after_goto', test_hook)
+        crawler.crawler_strategy.set_hook("after_goto", test_hook)
         url = "https://www.example.com"
         result = await crawler.arun(url=url, bypass_cache=True)
         assert result.success
         assert "background-color: red" in result.html
+
 
 @pytest.mark.asyncio
 async def test_screenshot():
@@ -62,6 +66,7 @@ async def test_screenshot():
         assert result.screenshot
         assert isinstance(result.screenshot, str)
         assert len(result.screenshot) > 0
+
 
 # Entry point for debugging
 if __name__ == "__main__":

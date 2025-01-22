@@ -34,9 +34,9 @@ sequenceDiagram
 
 **Benefits for Developers and Users**
 
-1. **Fine-Grained Control**: Instead of predefining all logic upfront, you can dynamically guide the crawler in response to actual data and conditions encountered mid-crawl.
-2. **Real-Time Insights**: Monitor progress, errors, or network bottlenecks as they happen, without waiting for the entire crawl to finish.
-3. **Enhanced Collaboration**: Different team members or automated systems can watch the same crawl events and provide input, making the crawling process more adaptive and intelligent.
+1. **Fine-Grained Control**: Instead of predefining all logic upfront, you can dynamically guide the crawler in response to actual data and conditions encountered mid-crawl.
+2. **Real-Time Insights**: Monitor progress, errors, or network bottlenecks as they happen, without waiting for the entire crawl to finish.
+3. **Enhanced Collaboration**: Different team members or automated systems can watch the same crawl events and provide input, making the crawling process more adaptive and intelligent.
 
 **Next Steps**
 
