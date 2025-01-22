@@ -117,17 +117,17 @@ def test_scraping():
     timing_stats.report()
     
     # Print stats of LXML output
-    print("\nLXML Output:")
-    print(f"\nExtracted links: {len(result_selected['links']['internal']) + len(result_selected['links']['external'])}")
-    print(f"Extracted images: {len(result_selected['media']['images'])}")
-    print(f"Clean HTML size: {len(result_selected['cleaned_html'])/1024:.2f} KB")
+    print("\Turbo Output:")
+    print(f"\nExtracted links: {len(result_selected.links.internal) + len(result_selected.links.external)}")
+    print(f"Extracted images: {len(result_selected.media.images)}")
+    print(f"Clean HTML size: {len(result_selected.cleaned_html)/1024:.2f} KB")
     print(f"Scraping time: {t2 - t1:.2f} seconds")
 
     # Print stats of original output
     print("\nOriginal Output:")
-    print(f"\nExtracted links: {len(result_original['links']['internal']) + len(result_original['links']['external'])}")
-    print(f"Extracted images: {len(result_original['media']['images'])}")
-    print(f"Clean HTML size: {len(result_original['cleaned_html'])/1024:.2f} KB")
+    print(f"\nExtracted links: {len(result_original.links.internal) + len(result_original.links.external)}")
+    print(f"Extracted images: {len(result_original.media.images)}")
+    print(f"Clean HTML size: {len(result_original.cleaned_html)/1024:.2f} KB")
     print(f"Scraping time: {t3 - t1:.2f} seconds")
         
         

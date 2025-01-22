@@ -18,6 +18,8 @@ This demonstration showcases three major categories of new features in Crawl4ai 
    - Robots.txt compliance
    - Proxy rotation
    - Enhanced URL handling
+   - Shared data among hooks
+   - add page routes
 
 Each demo function can be run independently or as part of the full suite.
 """
@@ -333,19 +335,19 @@ async def main():
     print("\n📊 Running Crawl4ai v0.4.3 Feature Demos\n")
     
     # Efficiency & Speed Demos
-    # print("\n🚀 EFFICIENCY & SPEED DEMOS")
-    # await demo_memory_dispatcher()
-    # await demo_streaming_support()
-    # await demo_content_scraping()
+    print("\n🚀 EFFICIENCY & SPEED DEMOS")
+    await demo_memory_dispatcher()
+    await demo_streaming_support()
+    await demo_content_scraping()
     
     # # LLM Integration Demos
-    # print("\n🤖 LLM INTEGRATION DEMOS")
-    # await demo_json_schema_generation()
-    # await demo_llm_markdown()
+    print("\n🤖 LLM INTEGRATION DEMOS")
+    await demo_json_schema_generation()
+    await demo_llm_markdown()
     
     # # Core Improvements
-    # print("\n🔧 CORE IMPROVEMENT DEMOS")
-    # await demo_robots_compliance()
+    print("\n🔧 CORE IMPROVEMENT DEMOS")
+    await demo_robots_compliance()
     await demo_proxy_rotation()
 
 if __name__ == "__main__":
