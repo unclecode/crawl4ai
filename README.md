@@ -20,9 +20,9 @@
 
 Crawl4AI is the #1 trending GitHub repository, actively maintained by a vibrant community. It delivers blazing-fast, AI-ready web crawling tailored for LLMs, AI agents, and data pipelines. Open source, flexible, and built for real-time performance, Crawl4AI empowers developers with unmatched speed, precision, and deployment ease.  
 
-[✨ Check out latest update v0.4.3b1x](#-recent-updates)
+[✨ Check out latest update v0.4.3bx](#-recent-updates)
 
-🎉 **Version 0.4.3b1 is out!** This release brings exciting new features like a Memory Dispatcher System, Streaming Support, LLM-Powered Markdown Generation, Schema Generation, and Robots.txt Compliance! [Read the release notes →](https://docs.crawl4ai.com/blog)
+🎉 **Version 0.4.3bx is out!** This release brings exciting new features like a Memory Dispatcher System, Streaming Support, LLM-Powered Markdown Generation, Schema Generation, and Robots.txt Compliance! [Read the release notes →](https://docs.crawl4ai.com/blog)
 
 <details>
 <summary>🤓 <strong>My Personal Story</strong></summary>
@@ -31,7 +31,7 @@ My journey with computers started in childhood when my dad, a computer scientist
 
 Fast forward to 2023, I was working on a tool for a project and needed a crawler to convert a webpage into markdown. While exploring solutions, I found one that claimed to be open-source but required creating an account and generating an API token. Worse, it turned out to be a SaaS model charging $16, and its quality didn’t meet my standards. Frustrated, I realized this was a deeper problem. That frustration turned into turbo anger mode, and I decided to build my own solution. In just a few days, I created Crawl4AI. To my surprise, it went viral, earning thousands of GitHub stars and resonating with a global community.
 
-I made Crawl4AI open-source for two reasons. First, it’s my way of giving back to the open-source community that has supported me throughout my career. Second, I believe data should be accessible to everyone, not locked behind paywalls or monopolized by a few. Open access to data lays the foundation for the democratization of AI—a vision where individuals can train their own models and take ownership of their information. This library is the first step in a larger journey to create the best open-source data extraction and generation tool the world has ever seen, built collaboratively by a passionate community.
+I made Crawl4AI open-source for two reasons. First, it’s my way of giving back to the open-source community that has supported me throughout my career. Second, I believe data should be accessible to everyone, not locked behind paywalls or monopolized by a few. Open access to data lays the foundation for the democratization of AI, a vision where individuals can train their own models and take ownership of their information. This library is the first step in a larger journey to create the best open-source data extraction and generation tool the world has ever seen, built collaboratively by a passionate community.
 
 Thank you to everyone who has supported this project, used it, and shared feedback. Your encouragement motivates me to dream even bigger. Join us, file issues, submit PRs, or spread the word. Together, we can build a tool that truly empowers people to access their own data and reshape the future of AI.
 </details>
@@ -51,6 +51,9 @@ Thank you to everyone who has supported this project, used it, and shared feedba
 ```bash
 # Install the package
 pip install -U crawl4ai
+
+# For pre release versions
+pip install crawl4ai --pre
 
 # Run post-installation setup
 crawl4ai-setup
@@ -497,10 +500,7 @@ async def test_news_crawl():
 -   **📈 Enhanced Monitoring**: Track memory, CPU, and individual crawler status with `CrawlerMonitor`.
 -   **📝 Improved Documentation**: More examples, clearer explanations, and updated tutorials.
 
-Read the full details in our [0.4.248 Release Notes](https://github.com/unclecode/crawl4ai/blob/main/CHANGELOG.md).
-
-Here's a clear markdown explanation for your users about version numbering:
-
+Read the full details in our [0.4.3bx Release Notes](https://github.com/unclecode/crawl4ai/blob/main/CHANGELOG.md).
 
 ## Version Numbering in Crawl4AI
 
@@ -571,7 +571,7 @@ To check our development plans and upcoming features, visit our [Roadmap](https:
 
 ## 🤝 Contributing 
 
-We welcome contributions from the open-source community. Check out our [contribution guidelines](https://github.com/unclecode/crawl4ai/blob/main/CONTRIBUTING.md) for more information.
+We welcome contributions from the open-source community. Check out our [contribution guidelines](https://github.com/unclecode/crawl4ai/blob/main/CONTRIBUTORS.md) for more information.
 
 ## 📄 License 
 
