@@ -21,9 +21,22 @@
 
 Crawl4AI is the #1 trending GitHub repository, actively maintained by a vibrant community. It delivers blazing-fast, AI-ready web crawling tailored for LLMs, AI agents, and data pipelines. Open source, flexible, and built for real-time performance, Crawl4AI empowers developers with unmatched speed, precision, and deployment ease.  
 
-[✨ Check out latest update v0.4.24x](#-recent-updates)
+[✨ Check out latest update v0.4.3bx](#-recent-updates)
 
-🎉 **Version 0.4.24x is out!** Major improvements in extraction strategies with enhanced JSON handling, SSL security, and Amazon product extraction. Plus, a completely revamped content filtering system! [Read the release notes →](https://docs.crawl4ai.com/blog)
+🎉 **Version 0.4.3bx is out!** This release brings exciting new features like a Memory Dispatcher System, Streaming Support, LLM-Powered Markdown Generation, Schema Generation, and Robots.txt Compliance! [Read the release notes →](https://docs.crawl4ai.com/blog)
+
+<details>
+<summary>🤓 <strong>My Personal Story</strong></summary>
+
+My journey with computers started in childhood when my dad, a computer scientist, introduced me to an Amstrad computer. Those early days sparked a fascination with technology, leading me to pursue computer science and specialize in NLP during my postgraduate studies. It was during this time that I first delved into web crawling, building tools to help researchers organize papers and extract information from publications a challenging yet rewarding experience that honed my skills in data extraction.
+
+Fast forward to 2023, I was working on a tool for a project and needed a crawler to convert a webpage into markdown. While exploring solutions, I found one that claimed to be open-source but required creating an account and generating an API token. Worse, it turned out to be a SaaS model charging $16, and its quality didn’t meet my standards. Frustrated, I realized this was a deeper problem. That frustration turned into turbo anger mode, and I decided to build my own solution. In just a few days, I created Crawl4AI. To my surprise, it went viral, earning thousands of GitHub stars and resonating with a global community.
+
+I made Crawl4AI open-source for two reasons. First, it’s my way of giving back to the open-source community that has supported me throughout my career. Second, I believe data should be accessible to everyone, not locked behind paywalls or monopolized by a few. Open access to data lays the foundation for the democratization of AI, a vision where individuals can train their own models and take ownership of their information. This library is the first step in a larger journey to create the best open-source data extraction and generation tool the world has ever seen, built collaboratively by a passionate community.
+
+Thank you to everyone who has supported this project, used it, and shared feedback. Your encouragement motivates me to dream even bigger. Join us, file issues, submit PRs, or spread the word. Together, we can build a tool that truly empowers people to access their own data and reshape the future of AI.
+</details>
+>>>>>>> vr0.4.3b2
 
 ## 🧐 Why Crawl4AI?
 
@@ -40,6 +53,9 @@ Crawl4AI is the #1 trending GitHub repository, actively maintained by a vibrant 
 ```bash
 # Install the package
 pip install -U crawl4ai
+
+# For pre release versions
+pip install crawl4ai --pre
 
 # Run post-installation setup
 crawl4ai-setup
@@ -470,18 +486,64 @@ async def test_news_crawl():
 
 </details>
 
+## ✨ Recent Updates
 
-## ✨ Recent Updates   
+-   **🚀 New Dispatcher System**: Scale to thousands of URLs with intelligent **memory monitoring**, **concurrency control**, and optional **rate limiting**. (See `MemoryAdaptiveDispatcher`, `SemaphoreDispatcher`, `RateLimiter`, `CrawlerMonitor`)
+-   **⚡ Streaming Mode**: Process results **as they arrive** instead of waiting for an entire batch to complete. (Set `stream=True` in `CrawlerRunConfig`)
+-   **🤖 Enhanced LLM Integration**:
+    -   **Automatic schema generation**: Create extraction rules from HTML using OpenAI or Ollama, no manual CSS/XPath needed.
+    -   **LLM-powered Markdown filtering**: Refine your markdown output with a new `LLMContentFilter` that understands content relevance.
+    -   **Ollama Support**: Use open-source or self-hosted models for private or cost-effective extraction.
+-   **🏎️ Faster Scraping Option**: New `LXMLWebScrapingStrategy` offers **10-20x speedup** for large, complex pages (experimental).
+-   **🤖 robots.txt Compliance**: Respect website rules with `check_robots_txt=True` and efficient local caching.
+-   **🔄 Proxy Rotation**: Built-in support for dynamic proxy switching and IP verification, with support for authenticated proxies and session persistence.
+-   **➡️ URL Redirection Tracking**: The `redirected_url` field now captures the final destination after any redirects.
+-   **🪞 Improved Mirroring**: The `LXMLWebScrapingStrategy` now has much greater fidelity, allowing for almost pixel-perfect mirroring of websites.
+-   **📈 Enhanced Monitoring**: Track memory, CPU, and individual crawler status with `CrawlerMonitor`.
+-   **📝 Improved Documentation**: More examples, clearer explanations, and updated tutorials.
 
-- 🔒 **Enhanced SSL & Security**: New SSL certificate handling with custom paths and validation options for secure crawling
-- 🔍 **Smart Content Filtering**: Advanced filtering system with regex support and efficient chunking strategies
-- 📦 **Improved JSON Extraction**: Support for complex JSONPath, JSON-CSS, and Microdata extraction
-- 🏗️ **New Field Types**: Added `computed`, `conditional`, `aggregate`, and `template` field types
-- ⚡ **Performance Boost**: Optimized caching, parallel processing, and memory management
-- 🐛 **Better Error Handling**: Enhanced debugging capabilities with detailed error tracking
-- 🔐 **Security Features**: Improved input validation and safe expression evaluation
+Read the full details in our [0.4.3bx Release Notes](https://github.com/unclecode/crawl4ai/blob/main/CHANGELOG.md).
 
-Read the full details of this release in our [0.4.24 Release Notes](https://github.com/unclecode/crawl4ai/blob/main/CHANGELOG.md).
+## Version Numbering in Crawl4AI
+
+Crawl4AI follows standard Python version numbering conventions (PEP 440) to help users understand the stability and features of each release.
+
+### Version Numbers Explained
+
+Our version numbers follow this pattern: `MAJOR.MINOR.PATCH` (e.g., 0.4.3)
+
+#### Pre-release Versions
+We use different suffixes to indicate development stages:
+
+- `dev` (0.4.3dev1): Development versions, unstable
+- `a` (0.4.3a1): Alpha releases, experimental features
+- `b` (0.4.3b1): Beta releases, feature complete but needs testing
+- `rc` (0.4.3rc1): Release candidates, potential final version
+
+#### Installation
+- Regular installation (stable version):
+  ```bash
+  pip install -U crawl4ai
+  ```
+
+- Install pre-release versions:
+  ```bash
+  pip install crawl4ai --pre
+  ```
+
+- Install specific version:
+  ```bash
+  pip install crawl4ai==0.4.3b1
+  ```
+
+#### Why Pre-releases?
+We use pre-releases to:
+- Test new features in real-world scenarios
+- Gather feedback before final releases
+- Ensure stability for production users
+- Allow early adopters to try new features
+
+For production environments, we recommend using the stable version. For testing new features, you can opt-in to pre-releases using the `--pre` flag.
 
 ## 📖 Documentation & Roadmap 
 

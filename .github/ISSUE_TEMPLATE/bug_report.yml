@@ -1,0 +1,127 @@
+name: Bug Report
+description: Report a bug with the Crawl4AI.
+title: "[Bug]: "
+labels: ["🐞 Bug","🩺 Needs Triage"]
+body:
+  - type: input
+    id: crawl4ai_version
+    attributes:
+      label: crawl4ai version
+      description: Specify the version of crawl4ai you are using.
+      placeholder: "e.g., 2.0.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: Expected Behavior
+      description: Describe what you expected to happen.
+      placeholder: "Provide a detailed explanation of the expected outcome."
+    validations:
+      required: true
+
+  - type: textarea
+    id: current_behavior
+    attributes:
+      label: Current Behavior
+      description: Describe what is happening instead of the expected behavior.
+      placeholder: "Describe the actual result or issue you encountered."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: reproducible
+    attributes:
+      label: Is this reproducible?
+      description: Indicate whether this bug can be reproduced consistently.
+      options:
+        - "Yes"
+        - "No"
+    validations:
+      required: true
+
+  - type: textarea
+    id: inputs
+    attributes:
+      label: Inputs Causing the Bug
+      description: Provide details about the inputs causing the issue.
+      placeholder: |
+        - URL(s): 
+        - Settings used: 
+        - Input data (if applicable): 
+      render: bash
+  
+  - type: textarea
+    id: steps_to_reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: Provide step-by-step instructions to reproduce the issue.
+      placeholder: |
+        1. Go to...
+        2. Click on...
+        3. Observe the issue...
+      render: bash
+  
+  - type: textarea
+    id: code_snippets
+    attributes:
+      label: Code snippets
+      description: Provide code snippets(if any). Add comments as necessary
+      placeholder: print("Hello world")
+      render: python
+
+  # Header Section with Title
+  - type: markdown
+    attributes:
+      value: |
+          ## Supporting Information
+          Please provide the following details to help us understand and resolve your issue. This will assist us in reproducing and diagnosing the problem
+
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      description: Please provide the operating system & distro where the issue occurs.
+      placeholder: "e.g., Windows, macOS, Linux"
+    validations:
+      required: true
+
+  - type: input
+    id: python_version
+    attributes:
+      label: Python version
+      description: Specify the Python version being used.
+      placeholder: "e.g., 3.8.5"
+    validations:
+      required: true
+
+  # Browser Field
+  - type: input
+    id: browser
+    attributes:
+      label: Browser
+      description: Provide the name of the browser you are using.
+      placeholder: "e.g., Chrome, Firefox, Safari"
+    validations:
+      required: false
+
+  # Browser Version Field
+  - type: input
+    id: browser_version
+    attributes:
+      label: Browser version
+      description: Provide the version of the browser you are using.
+      placeholder: "e.g., 91.0.4472.124"
+    validations:
+      required: false
+
+  # Error Logs Field (Text Area)
+  - type: textarea
+    id: error_logs
+    attributes:
+      label: Error logs & Screenshots (if applicable)
+      description: If you encountered any errors, please provide the error logs. Attach any relevant screenshots to help us understand the issue.
+      placeholder: "Paste error logs here and attach your screenshots"
+    validations:
+      required: false

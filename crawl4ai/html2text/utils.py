@@ -210,7 +210,7 @@ def escape_md_section(
     snob: bool = False,
     escape_dot: bool = True,
     escape_plus: bool = True,
-    escape_dash: bool = True
+    escape_dash: bool = True,
 ) -> str:
     """
     Escapes markdown-sensitive characters across whole document sections.
@@ -232,6 +232,7 @@ def escape_md_section(
         text = config.RE_MD_DASH_MATCHER.sub(r"\1\\\2", text)
 
     return text
+
 
 def reformat_table(lines: List[str], right_margin: int) -> List[str]:
     """

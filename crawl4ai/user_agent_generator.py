@@ -6,7 +6,7 @@ import re
 class UserAgentGenerator:
     """
     Generate random user agents with specified constraints.
-    
+
     Attributes:
         desktop_platforms (dict): A dictionary of possible desktop platforms and their corresponding user agent strings.
         mobile_platforms (dict): A dictionary of possible mobile platforms and their corresponding user agent strings.
@@ -18,7 +18,7 @@ class UserAgentGenerator:
         safari_versions (list): A list of possible Safari browser versions.
         ios_versions (list): A list of possible iOS browser versions.
         android_versions (list): A list of possible Android browser versions.
-        
+
         Methods:
             generate_user_agent(
                 platform: Literal["desktop", "mobile"] = "desktop",
@@ -30,8 +30,9 @@ class UserAgentGenerator:
                 safari_version: Optional[str] = None,
                 ios_version: Optional[str] = None,
                 android_version: Optional[str] = None
-            ): Generates a random user agent string based on the specified parameters.    
+            ): Generates a random user agent string based on the specified parameters.
     """
+
     def __init__(self):
         # Previous platform definitions remain the same...
         self.desktop_platforms = {
@@ -47,7 +48,7 @@ class UserAgentGenerator:
                 "generic": "(X11; Linux x86_64)",
                 "ubuntu": "(X11; Ubuntu; Linux x86_64)",
                 "chrome_os": "(X11; CrOS x86_64 14541.0.0)",
-            }
+            },
         }
 
         self.mobile_platforms = {
@@ -60,26 +61,14 @@ class UserAgentGenerator:
             "ios": {
                 "iphone": "(iPhone; CPU iPhone OS 16_5 like Mac OS X)",
                 "ipad": "(iPad; CPU OS 16_5 like Mac OS X)",
-            }
+            },
         }
 
         # Browser Combinations
         self.browser_combinations = {
-            1: [
-                ["chrome"],
-                ["firefox"],
-                ["safari"],
-                ["edge"]
-            ],
-            2: [
-                ["gecko", "firefox"],
-                ["chrome", "safari"],
-                ["webkit", "safari"]
-            ],
-            3: [
-                ["chrome", "safari", "edge"],
-                ["webkit", "chrome", "safari"]
-            ]
+            1: [["chrome"], ["firefox"], ["safari"], ["edge"]],
+            2: [["gecko", "firefox"], ["chrome", "safari"], ["webkit", "safari"]],
+            3: [["chrome", "safari", "edge"], ["webkit", "chrome", "safari"]],
         }
 
         # Rendering Engines with versions
@@ -90,7 +79,7 @@ class UserAgentGenerator:
                 "Gecko/20100101",
                 "Gecko/20100101",  # Firefox usually uses this constant version
                 "Gecko/2010010",
-            ]
+            ],
         }
 
         # Browser Versions
@@ -135,25 +124,25 @@ class UserAgentGenerator:
     def get_browser_stack(self, num_browsers: int = 1) -> List[str]:
         """
         Get a valid combination of browser versions.
-        
+
         How it works:
         1. Check if the number of browsers is supported.
         2. Randomly choose a combination of browsers.
         3. Iterate through the combination and add browser versions.
         4. Return the browser stack.
-        
+
         Args:
             num_browsers: Number of browser specifications (1-3)
-            
+
         Returns:
             List[str]: A list of browser versions.
         """
         if num_browsers not in self.browser_combinations:
             raise ValueError(f"Unsupported number of browsers: {num_browsers}")
-        
+
         combination = random.choice(self.browser_combinations[num_browsers])
         browser_stack = []
-        
+
         for browser in combination:
             if browser == "chrome":
                 browser_stack.append(random.choice(self.chrome_versions))
@@ -167,18 +156,20 @@ class UserAgentGenerator:
                 browser_stack.append(random.choice(self.rendering_engines["gecko"]))
             elif browser == "webkit":
                 browser_stack.append(self.rendering_engines["chrome_webkit"])
-        
+
         return browser_stack
 
-    def generate(self, 
-                device_type: Optional[Literal['desktop', 'mobile']] = None,
-                os_type: Optional[str] = None,
-                device_brand: Optional[str] = None,
-                browser_type: Optional[Literal['chrome', 'edge', 'safari', 'firefox']] = None,
-                num_browsers: int = 3) -> str:
+    def generate(
+        self,
+        device_type: Optional[Literal["desktop", "mobile"]] = None,
+        os_type: Optional[str] = None,
+        device_brand: Optional[str] = None,
+        browser_type: Optional[Literal["chrome", "edge", "safari", "firefox"]] = None,
+        num_browsers: int = 3,
+    ) -> str:
         """
         Generate a random user agent with specified constraints.
-        
+
         Args:
             device_type: 'desktop' or 'mobile'
             os_type: 'windows', 'macos', 'linux', 'android', 'ios'
@@ -188,23 +179,23 @@ class UserAgentGenerator:
         """
         # Get platform string
         platform = self.get_random_platform(device_type, os_type, device_brand)
-        
+
         # Start with Mozilla
         components = ["Mozilla/5.0", platform]
-        
+
         # Add browser stack
         browser_stack = self.get_browser_stack(num_browsers)
-        
+
         # Add appropriate legacy token based on browser stack
         if "Firefox" in str(browser_stack):
             components.append(random.choice(self.rendering_engines["gecko"]))
         elif "Chrome" in str(browser_stack) or "Safari" in str(browser_stack):
             components.append(self.rendering_engines["chrome_webkit"])
             components.append("(KHTML, like Gecko)")
-        
+
         # Add browser versions
         components.extend(browser_stack)
-        
+
         return " ".join(components)
 
     def generate_with_client_hints(self, **kwargs) -> Tuple[str, str]:
@@ -215,16 +206,20 @@ class UserAgentGenerator:
 
     def get_random_platform(self, device_type, os_type, device_brand):
         """Helper method to get random platform based on constraints"""
-        platforms = self.desktop_platforms if device_type == 'desktop' else \
-                   self.mobile_platforms if device_type == 'mobile' else \
-                   {**self.desktop_platforms, **self.mobile_platforms}
-        
+        platforms = (
+            self.desktop_platforms
+            if device_type == "desktop"
+            else self.mobile_platforms
+            if device_type == "mobile"
+            else {**self.desktop_platforms, **self.mobile_platforms}
+        )
+
         if os_type:
             for platform_group in [self.desktop_platforms, self.mobile_platforms]:
                 if os_type in platform_group:
                     platforms = {os_type: platform_group[os_type]}
                     break
-        
+
         os_key = random.choice(list(platforms.keys()))
         if device_brand and device_brand in platforms[os_key]:
             return platforms[os_key][device_brand]
@@ -233,73 +228,72 @@ class UserAgentGenerator:
     def parse_user_agent(self, user_agent: str) -> Dict[str, str]:
         """Parse a user agent string to extract browser and version information"""
         browsers = {
-            'chrome': r'Chrome/(\d+)',
-            'edge': r'Edg/(\d+)',
-            'safari': r'Version/(\d+)',
-            'firefox': r'Firefox/(\d+)'
+            "chrome": r"Chrome/(\d+)",
+            "edge": r"Edg/(\d+)",
+            "safari": r"Version/(\d+)",
+            "firefox": r"Firefox/(\d+)",
         }
-        
+
         result = {}
         for browser, pattern in browsers.items():
             match = re.search(pattern, user_agent)
             if match:
                 result[browser] = match.group(1)
-        
+
         return result
 
     def generate_client_hints(self, user_agent: str) -> str:
         """Generate Sec-CH-UA header value based on user agent string"""
         browsers = self.parse_user_agent(user_agent)
-        
+
         # Client hints components
         hints = []
-        
+
         # Handle different browser combinations
-        if 'chrome' in browsers:
+        if "chrome" in browsers:
             hints.append(f'"Chromium";v="{browsers["chrome"]}"')
             hints.append('"Not_A Brand";v="8"')
-            
-            if 'edge' in browsers:
+
+            if "edge" in browsers:
                 hints.append(f'"Microsoft Edge";v="{browsers["edge"]}"')
             else:
                 hints.append(f'"Google Chrome";v="{browsers["chrome"]}"')
-                
-        elif 'firefox' in browsers:
+
+        elif "firefox" in browsers:
             # Firefox doesn't typically send Sec-CH-UA
             return '""'
-            
-        elif 'safari' in browsers:
+
+        elif "safari" in browsers:
             # Safari's format for client hints
             hints.append(f'"Safari";v="{browsers["safari"]}"')
             hints.append('"Not_A Brand";v="8"')
-        
-        return ', '.join(hints)
+
+        return ", ".join(hints)
+
 
 # Example usage:
 if __name__ == "__main__":
     generator = UserAgentGenerator()
     print(generator.generate())
-    
+
     print("\nSingle browser (Chrome):")
-    print(generator.generate(num_browsers=1, browser_type='chrome'))
-    
+    print(generator.generate(num_browsers=1, browser_type="chrome"))
+
     print("\nTwo browsers (Gecko/Firefox):")
     print(generator.generate(num_browsers=2))
-    
+
     print("\nThree browsers (Chrome/Safari/Edge):")
     print(generator.generate(num_browsers=3))
-    
+
     print("\nFirefox on Linux:")
-    print(generator.generate(
-        device_type='desktop',
-        os_type='linux',
-        browser_type='firefox',
-        num_browsers=2
-    ))
-    
+    print(
+        generator.generate(
+            device_type="desktop",
+            os_type="linux",
+            browser_type="firefox",
+            num_browsers=2,
+        )
+    )
+
     print("\nChrome/Safari/Edge on Windows:")
-    print(generator.generate(
-        device_type='desktop',
-        os_type='windows',
-        num_browsers=3
-    ))
+    print(generator.generate(device_type="desktop", os_type="windows", num_browsers=3))
