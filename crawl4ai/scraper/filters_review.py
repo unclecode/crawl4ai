@@ -761,7 +761,6 @@ def run_performance_test():
     print(f"Original Domain Filter: {sys.getsizeof(domain_filter):,} bytes")
     print(f"Optimized Domain Filter: {sys.getsizeof(fast_domain_filter):,} bytes")
 
-
 def test_pattern_filter():
     import time
     from itertools import chain
