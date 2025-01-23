@@ -95,6 +95,10 @@ strong {
     
 }
 
+div.highlight {
+ margin-bottom: 2em;   
+}
+
 .terminal-card > header {
     color: var(--font-color);
     text-align: center;
@@ -229,6 +233,16 @@ pre {
 
 .terminal h1 {
     font-size: 2em;
+}
+
+.terminal h2 {
+    font-size: 1.5em;
+    margin-bottom: 0.8em;
+}
+
+.terminal h3 {
+    font-size: 1.3em;
+    margin-bottom: 0.8em;
 }
 
 .terminal h1, .terminal h2, .terminal h3, .terminal h4, .terminal h5, .terminal h6 {

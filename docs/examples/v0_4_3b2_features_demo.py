@@ -85,10 +85,10 @@ async def demo_memory_dispatcher():
             )
             
             print("\n🚀 Starting batch crawl...")
-            results = await dispatcher.run_urls(
+            results = await crawler.arun_many(
                 urls=urls,
-                crawler=crawler,
                 config=crawler_config,
+                dispatcher=dispatcher
             )
             print(f"\n✅ Completed {len(results)} URLs successfully")
             
@@ -115,15 +115,17 @@ async def demo_streaming_support():
         dispatcher = MemoryAdaptiveDispatcher(max_session_permit=3, check_interval=0.5)
 
         print("Starting streaming crawl...")
-        async for result in dispatcher.run_urls_stream(
-            urls=urls, crawler=crawler, config=crawler_config
+        async for result in await crawler.arun_many(
+            urls=urls,
+            config=crawler_config,
+            dispatcher=dispatcher
         ):
             # Process each result as it arrives
             print(
-                f"Received result for {result.url} - Success: {result.result.success}"
+                f"Received result for {result.url} - Success: {result.success}"
             )
-            if result.result.success:
-                print(f"Content length: {len(result.result.markdown)}")
+            if result.success:
+                print(f"Content length: {len(result.markdown)}")
 
 
 async def demo_content_scraping():
@@ -145,6 +147,8 @@ async def demo_content_scraping():
         result = await crawler.arun(url, config=config)
         if result.success:
             print("Successfully scraped content using LXML strategy")
+
+
 
 
 async def demo_llm_markdown():
@@ -336,7 +340,7 @@ async def main():
     
     # Efficiency & Speed Demos
     print("\n🚀 EFFICIENCY & SPEED DEMOS")
-    await demo_memory_dispatcher()
+    # await demo_memory_dispatcher()
     await demo_streaming_support()
     await demo_content_scraping()
     
