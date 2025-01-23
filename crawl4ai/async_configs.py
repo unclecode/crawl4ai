@@ -6,12 +6,15 @@ from .config import (
     IMAGE_SCORE_THRESHOLD,
     SOCIAL_MEDIA_DOMAINS,
 )
+
 from .user_agent_generator import UserAgentGenerator
 from .extraction_strategy import ExtractionStrategy
 from .chunking_strategy import ChunkingStrategy, RegexChunking
 from .markdown_generation_strategy import MarkdownGenerationStrategy
+from .content_filter_strategy import RelevantContentFilter, BM25ContentFilter, LLMContentFilter, PruningContentFilter
 from .content_scraping_strategy import ContentScrapingStrategy, WebScrapingStrategy
 from typing import Optional, Union, List
+from .cache_context import CacheMode
 
 
 class BrowserConfig:
@@ -81,13 +84,13 @@ class BrowserConfig:
         user_data_dir: str = None,
         chrome_channel: str = "chromium",
         channel: str = "chromium",
-        proxy: Optional[str] = None,
+        proxy: str = None,
         proxy_config: dict = None,
         viewport_width: int = 1080,
         viewport_height: int = 600,
         accept_downloads: bool = False,
         downloads_path: str = None,
-        storage_state=None,
+        storage_state : Union[str, dict, None]=None,
         ignore_https_errors: bool = True,
         java_script_enabled: bool = True,
         sleep_on_close: bool = False,
@@ -382,7 +385,7 @@ class CrawlerRunConfig:
         extraction_strategy: ExtractionStrategy = None,
         chunking_strategy: ChunkingStrategy = RegexChunking(),
         markdown_generator: MarkdownGenerationStrategy = None,
-        content_filter=None,
+        content_filter : RelevantContentFilter = None,
         only_text: bool = False,
         css_selector: str = None,
         excluded_tags: list = None,
@@ -396,7 +399,7 @@ class CrawlerRunConfig:
         # SSL Parameters
         fetch_ssl_certificate: bool = False,
         # Caching Parameters
-        cache_mode=None,
+        cache_mode: CacheMode =None,
         session_id: str = None,
         bypass_cache: bool = False,
         disable_cache: bool = False,
