@@ -16,7 +16,7 @@ from .extraction_strategy import (
 )
 from .chunking_strategy import ChunkingStrategy, RegexChunking
 from .markdown_generation_strategy import DefaultMarkdownGenerator
-from .content_filter_strategy import PruningContentFilter, BM25ContentFilter, LLMContentFilter
+from .content_filter_strategy import PruningContentFilter, BM25ContentFilter, LLMContentFilter, RelevantContentFilter
 from .models import CrawlResult, MarkdownGenerationResult
 from .async_dispatcher import (
     MemoryAdaptiveDispatcher,
@@ -44,6 +44,7 @@ __all__ = [
     "ChunkingStrategy",
     "RegexChunking",
     "DefaultMarkdownGenerator",
+    "RelevantContentFilter",
     "PruningContentFilter",
     "BM25ContentFilter",
     "LLMContentFilter",
