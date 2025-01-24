@@ -102,6 +102,7 @@ class ManagedBrowser:
         logger=None,
         host: str = "localhost",
         debugging_port: int = 9222,
+        cdp_url: Optional[str] = None, 
     ):
         """
         Initialize the ManagedBrowser instance.
@@ -116,6 +117,7 @@ class ManagedBrowser:
             logger (logging.Logger): Logger instance for logging messages. Default: None.
             host (str): Host for debugging the browser. Default: "localhost".
             debugging_port (int): Port for debugging the browser. Default: 9222.
+            cdp_url (str or None): CDP URL to connect to the browser. Default: None.
         """
         self.browser_type = browser_type
         self.user_data_dir = user_data_dir
@@ -129,9 +131,16 @@ class ManagedBrowser:
 
     async def start(self) -> str:
         """
-        Starts the browser process and returns the CDP endpoint URL.
-        If user_data_dir is not provided, creates a temporary directory.
+        Starts the browser process or returns CDP endpoint URL.
+        If cdp_url is provided, returns it directly.
+        If user_data_dir is not provided for local browser, creates a temporary directory.
+        
+        Returns:
+            str: CDP endpoint URL
         """
+        # If CDP URL provided, just return it
+        if self.cdp_url:
+            return self.cdp_url
 
         # Create temp dir if needed
         if not self.user_data_dir:
