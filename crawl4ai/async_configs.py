@@ -6,12 +6,15 @@ from .config import (
     IMAGE_SCORE_THRESHOLD,
     SOCIAL_MEDIA_DOMAINS,
 )
-from .user_agent_generator import UserAgentGenerator
+
+from .user_agent_generator import UserAgentGenerator, UAGen, ValidUAGenerator, OnlineUAGenerator
 from .extraction_strategy import ExtractionStrategy
 from .chunking_strategy import ChunkingStrategy, RegexChunking
 from .markdown_generation_strategy import MarkdownGenerationStrategy
+from .content_filter_strategy import RelevantContentFilter, BM25ContentFilter, LLMContentFilter, PruningContentFilter
 from .content_scraping_strategy import ContentScrapingStrategy, WebScrapingStrategy
 from typing import Optional, Union, List
+from .cache_context import CacheMode
 
 
 class BrowserConfig:
@@ -29,6 +32,7 @@ class BrowserConfig:
                          Default: True.
         use_managed_browser (bool): Launch the browser using a managed approach (e.g., via CDP), allowing
                                     advanced manipulation. Default: False.
+        cdp_url (str): URL for the Chrome DevTools Protocol (CDP) endpoint. Default: "ws://localhost:9222/devtools/browser/".
         debugging_port (int): Port for the browser debugging protocol. Default: 9222.
         use_persistent_context (bool): Use a persistent browser context (like a persistent profile).
                                        Automatically sets use_managed_browser=True. Default: False.
@@ -77,17 +81,18 @@ class BrowserConfig:
         browser_type: str = "chromium",
         headless: bool = True,
         use_managed_browser: bool = False,
+        cdp_url: str = None,
         use_persistent_context: bool = False,
         user_data_dir: str = None,
         chrome_channel: str = "chromium",
         channel: str = "chromium",
-        proxy: Optional[str] = None,
+        proxy: str = None,
         proxy_config: dict = None,
         viewport_width: int = 1080,
         viewport_height: int = 600,
         accept_downloads: bool = False,
         downloads_path: str = None,
-        storage_state=None,
+        storage_state : Union[str, dict, None]=None,
         ignore_https_errors: bool = True,
         java_script_enabled: bool = True,
         sleep_on_close: bool = False,
@@ -95,19 +100,23 @@ class BrowserConfig:
         cookies: list = None,
         headers: dict = None,
         user_agent: str = (
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) AppleWebKit/537.36 "
-            "(KHTML, like Gecko) Chrome/116.0.5845.187 Safari/604.1 Edg/117.0.2045.47"
+            # "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) AppleWebKit/537.36 "
+            # "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+            # "(KHTML, like Gecko) Chrome/116.0.5845.187 Safari/604.1 Edg/117.0.2045.47"
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/116.0.0.0 Safari/537.36"
         ),
-        user_agent_mode: str = None,
-        user_agent_generator_config: dict = None,
+        user_agent_mode: str = "",
+        user_agent_generator_config: dict = {},
         text_mode: bool = False,
         light_mode: bool = False,
         extra_args: list = None,
         debugging_port: int = 9222,
+        host: str = "localhost",
     ):
         self.browser_type = browser_type
         self.headless = headless
         self.use_managed_browser = use_managed_browser
+        self.cdp_url = cdp_url
         self.use_persistent_context = use_persistent_context
         self.user_data_dir = user_data_dir
         self.chrome_channel = chrome_channel or self.browser_type or "chromium"
@@ -136,17 +145,15 @@ class BrowserConfig:
         self.verbose = verbose
         self.debugging_port = debugging_port
 
-        user_agenr_generator = UserAgentGenerator()
-        if self.user_agent_mode != "random" and self.user_agent_generator_config:
-            self.user_agent = user_agenr_generator.generate(
+        fa_user_agenr_generator = ValidUAGenerator()
+        if self.user_agent_mode == "random":
+            self.user_agent = fa_user_agenr_generator.generate(
                 **(self.user_agent_generator_config or {})
             )
-        elif self.user_agent_mode == "random":
-            self.user_agent = user_agenr_generator.generate()
         else:
             pass
-
-        self.browser_hint = user_agenr_generator.generate_client_hints(self.user_agent)
+        
+        self.browser_hint = UAGen.generate_client_hints(self.user_agent)
         self.headers.setdefault("sec-ch-ua", self.browser_hint)
 
         # If persistent context is requested, ensure managed browser is enabled
@@ -159,6 +166,7 @@ class BrowserConfig:
             browser_type=kwargs.get("browser_type", "chromium"),
             headless=kwargs.get("headless", True),
             use_managed_browser=kwargs.get("use_managed_browser", False),
+            cdp_url=kwargs.get("cdp_url"),
             use_persistent_context=kwargs.get("use_persistent_context", False),
             user_data_dir=kwargs.get("user_data_dir"),
             chrome_channel=kwargs.get("chrome_channel", "chromium"),
@@ -191,6 +199,7 @@ class BrowserConfig:
             "browser_type": self.browser_type,
             "headless": self.headless,
             "use_managed_browser": self.use_managed_browser,
+            "cdp_url": self.cdp_url,
             "use_persistent_context": self.use_persistent_context,
             "user_data_dir": self.user_data_dir,
             "chrome_channel": self.chrome_channel,
@@ -373,6 +382,11 @@ class CrawlerRunConfig:
         stream (bool): If True, stream the page content as it is being loaded.
         url: str = None  # This is not a compulsory parameter
         check_robots_txt (bool): Whether to check robots.txt rules before crawling. Default: False
+        user_agent (str): Custom User-Agent string to use. Default: None
+        user_agent_mode (str or None): Mode for generating the user agent (e.g., "random"). If None, use the provided
+                                       user_agent as-is. Default: None.
+        user_agent_generator_config (dict or None): Configuration for user agent generation if user_agent_mode is set.
+                                                    Default: None.
     """
 
     def __init__(
@@ -382,7 +396,7 @@ class CrawlerRunConfig:
         extraction_strategy: ExtractionStrategy = None,
         chunking_strategy: ChunkingStrategy = RegexChunking(),
         markdown_generator: MarkdownGenerationStrategy = None,
-        content_filter=None,
+        content_filter : RelevantContentFilter = None,
         only_text: bool = False,
         css_selector: str = None,
         excluded_tags: list = None,
@@ -396,7 +410,7 @@ class CrawlerRunConfig:
         # SSL Parameters
         fetch_ssl_certificate: bool = False,
         # Caching Parameters
-        cache_mode=None,
+        cache_mode: CacheMode =None,
         session_id: str = None,
         bypass_cache: bool = False,
         disable_cache: bool = False,
@@ -444,6 +458,9 @@ class CrawlerRunConfig:
         stream: bool = False,
         url: str = None,
         check_robots_txt: bool = False,
+        user_agent: str = None,
+        user_agent_mode: str = None,
+        user_agent_generator_config: dict = {},
     ):
         self.url = url
 
@@ -525,6 +542,11 @@ class CrawlerRunConfig:
 
         # Robots.txt Handling Parameters
         self.check_robots_txt = check_robots_txt
+
+        # User Agent Parameters
+        self.user_agent = user_agent
+        self.user_agent_mode = user_agent_mode
+        self.user_agent_generator_config = user_agent_generator_config
 
         # Validate type of extraction strategy and chunking strategy if they are provided
         if self.extraction_strategy is not None and not isinstance(
@@ -623,6 +645,9 @@ class CrawlerRunConfig:
             stream=kwargs.get("stream", False),
             url=kwargs.get("url"),
             check_robots_txt=kwargs.get("check_robots_txt", False),
+            user_agent=kwargs.get("user_agent"),
+            user_agent_mode=kwargs.get("user_agent_mode"),
+            user_agent_generator_config=kwargs.get("user_agent_generator_config", {}),
         )
 
     # Create a funciton returns dict of the object
@@ -686,6 +711,9 @@ class CrawlerRunConfig:
             "stream": self.stream,
             "url": self.url,
             "check_robots_txt": self.check_robots_txt,
+            "user_agent": self.user_agent,
+            "user_agent_mode": self.user_agent_mode,
+            "user_agent_generator_config": self.user_agent_generator_config,
         }
 
     def clone(self, **kwargs):

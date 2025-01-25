@@ -297,8 +297,7 @@ async def demo_proxy_rotation():
             }
         except Exception as e:
             print(f"Error loading proxy: {e}")
-            return None
-    
+            return None    
     
     # Create 10 test requests to httpbin
     urls = ["https://httpbin.org/ip"] * 2
@@ -314,7 +313,7 @@ async def demo_proxy_rotation():
                 continue
                 
             # Create new config with proxy
-            current_config = run_config.clone(proxy_config=proxy)
+            current_config = run_config.clone(proxy_config=proxy, user_agent="")
             result = await crawler.arun(url=url, config=current_config)
             
             if result.success:
