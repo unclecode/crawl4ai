@@ -1,4 +1,4 @@
-site_name: Crawl4AI Documentation
+site_name: Crawl4AI Documentation (v0.4.3b2)
 site_description:  🚀🤖 Crawl4AI, Open-source LLM-Friendly Web Crawler & Scraper
 site_url: https://docs.crawl4ai.com
 repo_url: https://github.com/unclecode/crawl4ai
@@ -52,6 +52,11 @@ nav:
 theme:
   name: 'terminal'
   palette: 'dark'
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search
 
 markdown_extensions:
   - pymdownx.highlight:
@@ -64,6 +69,9 @@ markdown_extensions:
   - attr_list
   - tables
 
+extra:
+  version: !ENV [CRAWL4AI_VERSION, 'development']
+
 extra_css:
   - assets/styles.css
   - assets/highlight.css
@@ -72,3 +80,4 @@ extra_css:
 extra_javascript:
   - assets/highlight.min.js
   - assets/highlight_init.js
+  - https://buttons.github.io/buttons.js

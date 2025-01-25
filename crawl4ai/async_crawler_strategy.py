@@ -23,6 +23,7 @@ from .async_logger import AsyncLogger
 from playwright_stealth import StealthConfig
 from .ssl_certificate import SSLCertificate
 from .utils import get_home_folder, get_chromium_path
+from .user_agent_generator import ValidUAGenerator, OnlineUAGenerator
 
 stealth_config = StealthConfig(
     webdriver=True,
@@ -102,6 +103,7 @@ class ManagedBrowser:
         logger=None,
         host: str = "localhost",
         debugging_port: int = 9222,
+        cdp_url: Optional[str] = None, 
     ):
         """
         Initialize the ManagedBrowser instance.
@@ -116,6 +118,7 @@ class ManagedBrowser:
             logger (logging.Logger): Logger instance for logging messages. Default: None.
             host (str): Host for debugging the browser. Default: "localhost".
             debugging_port (int): Port for debugging the browser. Default: 9222.
+            cdp_url (str or None): CDP URL to connect to the browser. Default: None.
         """
         self.browser_type = browser_type
         self.user_data_dir = user_data_dir
@@ -126,12 +129,20 @@ class ManagedBrowser:
         self.host = host
         self.logger = logger
         self.shutting_down = False
+        self.cdp_url = cdp_url
 
     async def start(self) -> str:
         """
-        Starts the browser process and returns the CDP endpoint URL.
-        If user_data_dir is not provided, creates a temporary directory.
+        Starts the browser process or returns CDP endpoint URL.
+        If cdp_url is provided, returns it directly.
+        If user_data_dir is not provided for local browser, creates a temporary directory.
+        
+        Returns:
+            str: CDP endpoint URL
         """
+        # If CDP URL provided, just return it
+        if self.cdp_url:
+            return self.cdp_url
 
         # Create temp dir if needed
         if not self.user_data_dir:
@@ -554,7 +565,7 @@ class BrowserManager:
             Context: Browser context object with the specified configurations
         """
         # Base settings
-        user_agent = self.config.headers.get("User-Agent", self.config.user_agent)
+        user_agent = self.config.headers.get("User-Agent", self.config.user_agent) 
         viewport_settings = {
             "width": self.config.viewport_width,
             "height": self.config.viewport_height,
@@ -1260,10 +1271,12 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         self._downloaded_files = []
 
         # Handle user agent with magic mode
-        user_agent = self.browser_config.user_agent
-        if config.magic and self.browser_config.user_agent_mode != "random":
-            self.browser_config.user_agent = UserAgentGenerator().generate(
-                **(self.browser_config.user_agent_generator_config or {})
+        user_agent_to_override = config.user_agent
+        if user_agent_to_override:
+            self.browser_config.user_agent = user_agent_to_override
+        elif config.magic or config.user_agent_mode == "random":
+            self.browser_config.user_agent = ValidUAGenerator().generate(
+                **(config.user_agent_generator_config or {})
             )
 
         # Get page for session
