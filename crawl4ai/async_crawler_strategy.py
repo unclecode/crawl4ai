@@ -23,6 +23,7 @@ from .async_logger import AsyncLogger
 from playwright_stealth import StealthConfig
 from .ssl_certificate import SSLCertificate
 from .utils import get_home_folder, get_chromium_path
+from .user_agent_generator import ValidUAGenerator, OnlineUAGenerator
 
 stealth_config = StealthConfig(
     webdriver=True,
@@ -128,6 +129,7 @@ class ManagedBrowser:
         self.host = host
         self.logger = logger
         self.shutting_down = False
+        self.cdp_url = cdp_url
 
     async def start(self) -> str:
         """
@@ -563,7 +565,7 @@ class BrowserManager:
             Context: Browser context object with the specified configurations
         """
         # Base settings
-        user_agent = self.config.headers.get("User-Agent", self.config.user_agent)
+        user_agent = self.config.headers.get("User-Agent", self.config.user_agent) 
         viewport_settings = {
             "width": self.config.viewport_width,
             "height": self.config.viewport_height,
@@ -1269,10 +1271,12 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         self._downloaded_files = []
 
         # Handle user agent with magic mode
-        user_agent = self.browser_config.user_agent
-        if config.magic and self.browser_config.user_agent_mode != "random":
-            self.browser_config.user_agent = UserAgentGenerator().generate(
-                **(self.browser_config.user_agent_generator_config or {})
+        user_agent_to_override = config.user_agent
+        if user_agent_to_override:
+            self.browser_config.user_agent = user_agent_to_override
+        elif config.magic or config.user_agent_mode == "random":
+            self.browser_config.user_agent = ValidUAGenerator().generate(
+                **(config.user_agent_generator_config or {})
             )
 
         # Get page for session

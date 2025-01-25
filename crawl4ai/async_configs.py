@@ -7,7 +7,7 @@ from .config import (
     SOCIAL_MEDIA_DOMAINS,
 )
 
-from .user_agent_generator import UserAgentGenerator
+from .user_agent_generator import UserAgentGenerator, UAGen, ValidUAGenerator, OnlineUAGenerator
 from .extraction_strategy import ExtractionStrategy
 from .chunking_strategy import ChunkingStrategy, RegexChunking
 from .markdown_generation_strategy import MarkdownGenerationStrategy
@@ -100,11 +100,13 @@ class BrowserConfig:
         cookies: list = None,
         headers: dict = None,
         user_agent: str = (
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) AppleWebKit/537.36 "
-            "(KHTML, like Gecko) Chrome/116.0.5845.187 Safari/604.1 Edg/117.0.2045.47"
+            # "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) AppleWebKit/537.36 "
+            # "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+            # "(KHTML, like Gecko) Chrome/116.0.5845.187 Safari/604.1 Edg/117.0.2045.47"
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/116.0.0.0 Safari/537.36"
         ),
-        user_agent_mode: str = None,
-        user_agent_generator_config: dict = None,
+        user_agent_mode: str = "",
+        user_agent_generator_config: dict = {},
         text_mode: bool = False,
         light_mode: bool = False,
         extra_args: list = None,
@@ -143,17 +145,15 @@ class BrowserConfig:
         self.verbose = verbose
         self.debugging_port = debugging_port
 
-        user_agenr_generator = UserAgentGenerator()
-        if self.user_agent_mode != "random" and self.user_agent_generator_config:
-            self.user_agent = user_agenr_generator.generate(
+        fa_user_agenr_generator = ValidUAGenerator()
+        if self.user_agent_mode == "random":
+            self.user_agent = fa_user_agenr_generator.generate(
                 **(self.user_agent_generator_config or {})
             )
-        elif self.user_agent_mode == "random":
-            self.user_agent = user_agenr_generator.generate()
         else:
             pass
-
-        self.browser_hint = user_agenr_generator.generate_client_hints(self.user_agent)
+        
+        self.browser_hint = UAGen.generate_client_hints(self.user_agent)
         self.headers.setdefault("sec-ch-ua", self.browser_hint)
 
         # If persistent context is requested, ensure managed browser is enabled
@@ -382,6 +382,11 @@ class CrawlerRunConfig:
         stream (bool): If True, stream the page content as it is being loaded.
         url: str = None  # This is not a compulsory parameter
         check_robots_txt (bool): Whether to check robots.txt rules before crawling. Default: False
+        user_agent (str): Custom User-Agent string to use. Default: None
+        user_agent_mode (str or None): Mode for generating the user agent (e.g., "random"). If None, use the provided
+                                       user_agent as-is. Default: None.
+        user_agent_generator_config (dict or None): Configuration for user agent generation if user_agent_mode is set.
+                                                    Default: None.
     """
 
     def __init__(
@@ -453,6 +458,9 @@ class CrawlerRunConfig:
         stream: bool = False,
         url: str = None,
         check_robots_txt: bool = False,
+        user_agent: str = None,
+        user_agent_mode: str = None,
+        user_agent_generator_config: dict = {},
     ):
         self.url = url
 
@@ -534,6 +542,11 @@ class CrawlerRunConfig:
 
         # Robots.txt Handling Parameters
         self.check_robots_txt = check_robots_txt
+
+        # User Agent Parameters
+        self.user_agent = user_agent
+        self.user_agent_mode = user_agent_mode
+        self.user_agent_generator_config = user_agent_generator_config
 
         # Validate type of extraction strategy and chunking strategy if they are provided
         if self.extraction_strategy is not None and not isinstance(
@@ -632,6 +645,9 @@ class CrawlerRunConfig:
             stream=kwargs.get("stream", False),
             url=kwargs.get("url"),
             check_robots_txt=kwargs.get("check_robots_txt", False),
+            user_agent=kwargs.get("user_agent"),
+            user_agent_mode=kwargs.get("user_agent_mode"),
+            user_agent_generator_config=kwargs.get("user_agent_generator_config", {}),
         )
 
     # Create a funciton returns dict of the object
@@ -695,6 +711,9 @@ class CrawlerRunConfig:
             "stream": self.stream,
             "url": self.url,
             "check_robots_txt": self.check_robots_txt,
+            "user_agent": self.user_agent,
+            "user_agent_mode": self.user_agent_mode,
+            "user_agent_generator_config": self.user_agent_generator_config,
         }
 
     def clone(self, **kwargs):
