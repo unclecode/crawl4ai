@@ -297,8 +297,7 @@ async def demo_proxy_rotation():
             }
         except Exception as e:
             print(f"Error loading proxy: {e}")
-            return None
-    
+            return None    
     
     # Create 10 test requests to httpbin
     urls = ["https://httpbin.org/ip"] * 2
@@ -314,7 +313,7 @@ async def demo_proxy_rotation():
                 continue
                 
             # Create new config with proxy
-            current_config = run_config.clone(proxy_config=proxy)
+            current_config = run_config.clone(proxy_config=proxy, user_agent="")
             result = await crawler.arun(url=url, config=current_config)
             
             if result.success:
@@ -334,18 +333,18 @@ async def main():
     
     # Efficiency & Speed Demos
     print("\n🚀 EFFICIENCY & SPEED DEMOS")
-    await demo_memory_dispatcher()
-    await demo_streaming_support()
-    await demo_content_scraping()
+    # await demo_memory_dispatcher()
+    # await demo_streaming_support()
+    # await demo_content_scraping()
     
     # # LLM Integration Demos
     print("\n🤖 LLM INTEGRATION DEMOS")
-    await demo_json_schema_generation()
-    await demo_llm_markdown()
+    # await demo_json_schema_generation()
+    # await demo_llm_markdown()
     
     # # Core Improvements
     print("\n🔧 CORE IMPROVEMENT DEMOS")
-    await demo_robots_compliance()
+    # await demo_robots_compliance()
     await demo_proxy_rotation()
 
 if __name__ == "__main__":
