@@ -2,8 +2,146 @@ import random
 from typing import Optional, Literal, List, Dict, Tuple
 import re
 
+from abc import ABC, abstractmethod
+import random
+from fake_useragent import UserAgent
+import requests
+from lxml import html
+import json
+from typing import Optional, List, Union, Dict
 
-class UserAgentGenerator:
+class UAGen(ABC):
+   @abstractmethod
+   def generate(self, 
+               browsers: Optional[List[str]] = None,
+               os: Optional[Union[str, List[str]]] = None,
+               min_version: float = 0.0,
+               platforms: Optional[Union[str, List[str]]] = None,
+               pct_threshold: Optional[float] = None,
+               fallback: str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/116.0.0.0 Safari/537.36") -> Union[str, Dict]:
+       pass
+   
+   @staticmethod
+   def generate_client_hints( user_agent: str) -> str:
+        """Generate Sec-CH-UA header value based on user agent string"""
+        def _parse_user_agent(user_agent: str) -> Dict[str, str]:
+            """Parse a user agent string to extract browser and version information"""
+            browsers = {
+                "chrome": r"Chrome/(\d+)",
+                "edge": r"Edg/(\d+)",
+                "safari": r"Version/(\d+)",
+                "firefox": r"Firefox/(\d+)",
+            }
+
+            result = {}
+            for browser, pattern in browsers.items():
+                match = re.search(pattern, user_agent)
+                if match:
+                    result[browser] = match.group(1)
+
+            return result
+        browsers = _parse_user_agent(user_agent)
+
+        # Client hints components
+        hints = []
+
+        # Handle different browser combinations
+        if "chrome" in browsers:
+            hints.append(f'"Chromium";v="{browsers["chrome"]}"')
+            hints.append('"Not_A Brand";v="8"')
+
+            if "edge" in browsers:
+                hints.append(f'"Microsoft Edge";v="{browsers["edge"]}"')
+            else:
+                hints.append(f'"Google Chrome";v="{browsers["chrome"]}"')
+
+        elif "firefox" in browsers:
+            # Firefox doesn't typically send Sec-CH-UA
+            return '""'
+
+        elif "safari" in browsers:
+            # Safari's format for client hints
+            hints.append(f'"Safari";v="{browsers["safari"]}"')
+            hints.append('"Not_A Brand";v="8"')
+
+        return ", ".join(hints)
+
+class ValidUAGenerator(UAGen):
+   def __init__(self):
+       self.ua = UserAgent()
+       
+   def generate(self,
+               browsers: Optional[List[str]] = None,
+               os: Optional[Union[str, List[str]]] = None, 
+               min_version: float = 0.0,
+               platforms: Optional[Union[str, List[str]]] = None,
+               pct_threshold: Optional[float] = None,
+               fallback: str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/116.0.0.0 Safari/537.36") -> str:
+       
+       self.ua = UserAgent(
+           browsers=browsers or ['Chrome', 'Firefox', 'Edge'],
+           os=os or ['Windows', 'Mac OS X'],
+           min_version=min_version,
+           platforms=platforms or ['desktop'],
+           fallback=fallback
+       )
+       return self.ua.random
+
+class OnlineUAGenerator(UAGen):
+   def __init__(self):
+       self.agents = []
+       self._fetch_agents()
+       
+   def _fetch_agents(self):
+       try:
+           response = requests.get(
+               'https://www.useragents.me/',
+               timeout=5,
+               headers={'Accept': 'text/html,application/xhtml+xml'}
+           )
+           response.raise_for_status()
+           
+           tree = html.fromstring(response.content)
+           json_text = tree.cssselect('#most-common-desktop-useragents-json-csv > div:nth-child(1) > textarea')[0].text
+           self.agents = json.loads(json_text)
+       except Exception as e:
+           print(f"Error fetching agents: {e}")
+           
+   def generate(self,
+               browsers: Optional[List[str]] = None,
+               os: Optional[Union[str, List[str]]] = None,
+               min_version: float = 0.0,
+               platforms: Optional[Union[str, List[str]]] = None, 
+               pct_threshold: Optional[float] = None,
+               fallback: str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/116.0.0.0 Safari/537.36") -> Dict:
+       
+       if not self.agents:
+           self._fetch_agents()
+           
+       filtered_agents = self.agents
+       
+       if pct_threshold:
+           filtered_agents = [a for a in filtered_agents if a['pct'] >= pct_threshold]
+           
+       if browsers:
+           filtered_agents = [a for a in filtered_agents 
+                            if any(b.lower() in a['ua'].lower() for b in browsers)]
+           
+       if os:
+           os_list = [os] if isinstance(os, str) else os
+           filtered_agents = [a for a in filtered_agents 
+                            if any(o.lower() in a['ua'].lower() for o in os_list)]
+           
+       if platforms:
+           platform_list = [platforms] if isinstance(platforms, str) else platforms
+           filtered_agents = [a for a in filtered_agents 
+                            if any(p.lower() in a['ua'].lower() for p in platform_list)]
+           
+       return filtered_agents[0] if filtered_agents else {'ua': fallback, 'pct': 0}
+
+
+
+class UserAgentGenerator():
     """
     Generate random user agents with specified constraints.
 
@@ -187,9 +325,15 @@ class UserAgentGenerator:
         browser_stack = self.get_browser_stack(num_browsers)
 
         # Add appropriate legacy token based on browser stack
-        if "Firefox" in str(browser_stack):
+        if "Firefox" in str(browser_stack) or browser_type == "firefox":
             components.append(random.choice(self.rendering_engines["gecko"]))
-        elif "Chrome" in str(browser_stack) or "Safari" in str(browser_stack):
+        elif "Chrome" in str(browser_stack) or "Safari" in str(browser_stack) or browser_type == "chrome":
+            components.append(self.rendering_engines["chrome_webkit"])
+            components.append("(KHTML, like Gecko)")
+        elif "Edge" in str(browser_stack) or browser_type == "edge":
+            components.append(self.rendering_engines["safari_webkit"])
+            components.append("(KHTML, like Gecko)")
+        elif "Safari" in str(browser_stack) or browser_type == "safari":
             components.append(self.rendering_engines["chrome_webkit"])
             components.append("(KHTML, like Gecko)")
 
@@ -273,27 +417,13 @@ class UserAgentGenerator:
 
 # Example usage:
 if __name__ == "__main__":
-    generator = UserAgentGenerator()
-    print(generator.generate())
+    
+    # Usage example:
+    generator = ValidUAGenerator()
+    ua = generator.generate()
+    print(ua)
+    
+    generator = OnlineUAGenerator()
+    ua = generator.generate()
+    print(ua)
 
-    print("\nSingle browser (Chrome):")
-    print(generator.generate(num_browsers=1, browser_type="chrome"))
-
-    print("\nTwo browsers (Gecko/Firefox):")
-    print(generator.generate(num_browsers=2))
-
-    print("\nThree browsers (Chrome/Safari/Edge):")
-    print(generator.generate(num_browsers=3))
-
-    print("\nFirefox on Linux:")
-    print(
-        generator.generate(
-            device_type="desktop",
-            os_type="linux",
-            browser_type="firefox",
-            num_browsers=2,
-        )
-    )
-
-    print("\nChrome/Safari/Edge on Windows:")
-    print(generator.generate(device_type="desktop", os_type="windows", num_browsers=3))
