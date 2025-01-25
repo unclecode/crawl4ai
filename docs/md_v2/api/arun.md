@@ -1,6 +1,6 @@
 # `arun()` Parameter Guide (New Approach)
 
-In Crawl4AI’s **latest** configuration model, nearly all parameters that once went directly to `arun()` are now part of **`CrawlerRunConfig`**. When calling `arun()`, you provide:
+In Crawl4AI’s **latest** configuration model, nearly all parameters that once went directly to `arun()` are now part of **`CrawlerRunConfig`**. When calling `arun()`, you provide:
 
 ```python
 await crawler.arun(
@@ -9,11 +9,11 @@ await crawler.arun(
 )
 ```
 
-Below is an organized look at the parameters that can go inside `CrawlerRunConfig`, divided by their functional areas. For **Browser** settings (e.g., `headless`, `browser_type`), see [BrowserConfig](./parameters.md).
+Below is an organized look at the parameters that can go inside `CrawlerRunConfig`, divided by their functional areas. For **Browser** settings (e.g., `headless`, `browser_type`), see [BrowserConfig](./parameters.md).
 
 ---
 
-## 1. Core Usage
+## 1. Core Usage
 
 ```python
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
@@ -23,7 +23,7 @@ async def main():
         verbose=True,            # Detailed logging
         cache_mode=CacheMode.ENABLED,  # Use normal read/write cache
         check_robots_txt=True,   # Respect robots.txt rules
-        # ... other parameters
+        # ... other parameters
     )
 
     async with AsyncWebCrawler() as crawler:
@@ -38,15 +38,16 @@ async def main():
 ```
 
 **Key Fields**:
-- `verbose=True` logs each crawl step.  
+- `verbose=True` logs each crawl step.  
 - `cache_mode` decides how to read/write the local crawl cache.
 
 ---
 
-## 2. Cache Control
+## 2. Cache Control
 
 **`cache_mode`** (default: `CacheMode.ENABLED`)  
 Use a built-in enum from `CacheMode`:
+
 - `ENABLED`: Normal caching—reads if available, writes if missing.
 - `DISABLED`: No caching—always refetch pages.
 - `READ_ONLY`: Reads from cache only; no new writes.
@@ -60,6 +61,7 @@ run_config = CrawlerRunConfig(
 ```
 
 **Additional flags**:
+
 - `bypass_cache=True` acts like `CacheMode.BYPASS`.
 - `disable_cache=True` acts like `CacheMode.DISABLED`.
 - `no_cache_read=True` acts like `CacheMode.WRITE_ONLY`.
@@ -67,7 +69,7 @@ run_config = CrawlerRunConfig(
 
 ---
 
-## 3. Content Processing & Selection
+## 3. Content Processing & Selection
 
 ### 3.1 Text Processing
 
@@ -111,7 +113,7 @@ run_config = CrawlerRunConfig(
 
 ---
 
-## 4. Page Navigation & Timing
+## 4. Page Navigation & Timing
 
 ### 4.1 Basic Browser Flow
 
@@ -124,12 +126,13 @@ run_config = CrawlerRunConfig(
 ```
 
 **Key Fields**:
+
 - `wait_for`:  
   - `"css:selector"` or  
   - `"js:() => boolean"`  
-  e.g. `js:() => document.querySelectorAll('.item').length > 10`.
+  e.g. `js:() => document.querySelectorAll('.item').length > 10`.
 
-- `mean_delay` & `max_range`: define random delays for `arun_many()` calls.  
+- `mean_delay` & `max_range`: define random delays for `arun_many()` calls.  
 - `semaphore_count`: concurrency limit when crawling multiple URLs.
 
 ### 4.2 JavaScript Execution
@@ -144,7 +147,7 @@ run_config = CrawlerRunConfig(
 )
 ```
 
-- `js_code` can be a single string or a list of strings.  
+- `js_code` can be a single string or a list of strings.  
 - `js_only=True` means “I’m continuing in the same session with new JS steps, no new full navigation.”
 
 ### 4.3 Anti-Bot
@@ -156,13 +159,13 @@ run_config = CrawlerRunConfig(
     override_navigator=True
 )
 ```
-- `magic=True` tries multiple stealth features.  
-- `simulate_user=True` mimics mouse movements or random delays.  
+- `magic=True` tries multiple stealth features.  
+- `simulate_user=True` mimics mouse movements or random delays.  
 - `override_navigator=True` fakes some navigator properties (like user agent checks).
 
 ---
 
-## 5. Session Management
+## 5. Session Management
 
 **`session_id`**: 
 ```python
@@ -174,7 +177,7 @@ If re-used in subsequent `arun()` calls, the same tab/page context is continued 
 
 ---
 
-## 6. Screenshot, PDF & Media Options
+## 6. Screenshot, PDF & Media Options
 
 ```python
 run_config = CrawlerRunConfig(
@@ -191,7 +194,7 @@ run_config = CrawlerRunConfig(
 
 ---
 
-## 7. Extraction Strategy
+## 7. Extraction Strategy
 
 **For advanced data extraction** (CSS/LLM-based), set `extraction_strategy`:
 
@@ -205,7 +208,7 @@ The extracted data will appear in `result.extracted_content`.
 
 ---
 
-## 8. Comprehensive Example
+## 8. Comprehensive Example
 
 Below is a snippet combining many parameters:
 
@@ -274,32 +277,33 @@ if __name__ == "__main__":
 ```
 
 **What we covered**:
-1. **Crawling** the main content region, ignoring external links.  
-2. Running **JavaScript** to click “.show-more”.  
-3. **Waiting** for “.loaded-block” to appear.  
-4. Generating a **screenshot** & **PDF** of the final page.  
-5. Extracting repeated “article.post” elements with a **CSS-based** extraction strategy.
+
+1. **Crawling** the main content region, ignoring external links.  
+2. Running **JavaScript** to click “.show-more”.  
+3. **Waiting** for “.loaded-block” to appear.  
+4. Generating a **screenshot** & **PDF** of the final page.  
+5. Extracting repeated “article.post” elements with a **CSS-based** extraction strategy.
 
 ---
 
-## 9. Best Practices
+## 9. Best Practices
 
-1. **Use `BrowserConfig` for global browser** settings (headless, user agent).  
-2. **Use `CrawlerRunConfig`** to handle the **specific** crawl needs: content filtering, caching, JS, screenshot, extraction, etc.  
-3. Keep your **parameters consistent** in run configs—especially if you’re part of a large codebase with multiple crawls.  
-4. **Limit** large concurrency (`semaphore_count`) if the site or your system can’t handle it.  
-5. For dynamic pages, set `js_code` or `scan_full_page` so you load all content.
+1. **Use `BrowserConfig` for global browser** settings (headless, user agent).  
+2. **Use `CrawlerRunConfig`** to handle the **specific** crawl needs: content filtering, caching, JS, screenshot, extraction, etc.  
+3. Keep your **parameters consistent** in run configs—especially if you’re part of a large codebase with multiple crawls.  
+4. **Limit** large concurrency (`semaphore_count`) if the site or your system can’t handle it.  
+5. For dynamic pages, set `js_code` or `scan_full_page` so you load all content.
 
 ---
 
-## 10. Conclusion
+## 10. Conclusion
 
-All parameters that used to be direct arguments to `arun()` now belong in **`CrawlerRunConfig`**. This approach:
+All parameters that used to be direct arguments to `arun()` now belong in **`CrawlerRunConfig`**. This approach:
 
-- Makes code **clearer** and **more maintainable**.  
-- Minimizes confusion about which arguments affect global vs. per-crawl behavior.  
+- Makes code **clearer** and **more maintainable**.  
+- Minimizes confusion about which arguments affect global vs. per-crawl behavior.  
 - Allows you to create **reusable** config objects for different pages or tasks.
 
-For a **full** reference, check out the [CrawlerRunConfig Docs](./parameters.md). 
+For a **full** reference, check out the [CrawlerRunConfig Docs](./parameters.md). 
 
 Happy crawling with your **structured, flexible** config approach!

@@ -294,3 +294,4 @@ stream_cfg = run_cfg.clone(
     stream=True,
     cache_mode=CacheMode.BYPASS
 )
+```
