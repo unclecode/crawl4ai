@@ -36,7 +36,6 @@ I made Crawl4AI open-source for two reasons. First, it’s my way of giving back
 
 Thank you to everyone who has supported this project, used it, and shared feedback. Your encouragement motivates me to dream even bigger. Join us, file issues, submit PRs, or spread the word. Together, we can build a tool that truly empowers people to access their own data and reshape the future of AI.
 </details>
->>>>>>> vr0.4.3b2
 
 ## 🧐 Why Crawl4AI?
 
