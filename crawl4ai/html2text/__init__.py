@@ -1095,7 +1095,8 @@ class CustomHTML2Text(HTML2Text):
         # Handle pre tags
         if tag == "pre":
             if start:
-                self.o("```\n")  # Markdown code block start
+                self.o('\n```\n')  # Markdown code block start
+
                 self.inside_pre = True
             else:
                 self.o("\n```\n")  # Markdown code block end
