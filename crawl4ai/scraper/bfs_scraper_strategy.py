@@ -50,7 +50,7 @@ class BFSScraperStrategy(ScraperStrategy):
         self.process_external_links = process_external_links
 
     async def can_process_url(self, url: str, depth: int) -> bool:
-        """Check if URL can be processed based on robots.txt and filters
+        """Check if URL can be processed based on filters
         This is our gatekeeper method that determines if a URL should be processed. It:
             - Validates URL format using a robust built-in method
             - Applies custom filters from the filter chain
