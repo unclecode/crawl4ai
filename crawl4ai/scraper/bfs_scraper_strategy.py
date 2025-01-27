@@ -4,7 +4,7 @@ from datetime import datetime
 import asyncio
 import logging
 from urllib.parse import urlparse
-from urllib.robotparser import RobotFileParser
+
 # import validators
 
 from ..async_configs import CrawlerRunConfig
@@ -26,7 +26,6 @@ class CrawlStats:
     urls_skipped: int = 0
     total_depth_reached: int = 0
     current_depth: int = 0
-    robots_blocked: int = 0
 
 
 class BFSScraperStrategy(ScraperStrategy):
@@ -49,13 +48,11 @@ class BFSScraperStrategy(ScraperStrategy):
         self.stats = CrawlStats(start_time=datetime.now())
         self._cancel_event = asyncio.Event()
         self.process_external_links = process_external_links
-        self.robot_parsers: Dict[str, RobotFileParser] = {}
 
     async def can_process_url(self, url: str, depth: int) -> bool:
         """Check if URL can be processed based on robots.txt and filters
         This is our gatekeeper method that determines if a URL should be processed. It:
             - Validates URL format using a robust built-in method
-            - Checks robots.txt permissions for the domain
             - Applies custom filters from the filter chain
             - Updates statistics for blocked URLs
             - Returns False early if any check fails
@@ -64,18 +61,12 @@ class BFSScraperStrategy(ScraperStrategy):
             result = urlparse(url)
             if not all([result.scheme, result.netloc]):
                 raise ValueError("Invalid URL")
-            if result.scheme not in ('http', 'https'):
+            if result.scheme not in ("http", "https"):
                 raise ValueError("URL must be HTTP or HTTPS")
-            if not result.netloc or '.' not in result.netloc:
+            if not result.netloc or "." not in result.netloc:
                 raise ValueError("Invalid domain")
         except Exception as e:
             self.logger.warning(f"Invalid URL: {url}. Error: {str(e)}")
-            return False
-
-        robot_parser = await self._get_robot_parser(url)
-        if robot_parser and not robot_parser.can_fetch("*", url):
-            self.stats.robots_blocked += 1
-            self.logger.info(f"Blocked by robots.txt: {url}")
             return False
 
         # Apply the filter chain if it's not start page
@@ -83,27 +74,6 @@ class BFSScraperStrategy(ScraperStrategy):
             return False
 
         return True
-
-    async def _get_robot_parser(self, url: str) -> Optional[RobotFileParser]:
-        """Get or create robots.txt parser for domain.
-        This is our robots.txt manager that:
-            - Uses domain-level caching of robot parsers
-            - Creates and caches new parsers as needed
-            - Handles failed robots.txt fetches gracefully
-            - Returns None if robots.txt can't be fetched, allowing crawling to proceed
-        """
-        domain = urlparse(url).netloc
-        if domain not in self.robot_parsers:
-            parser = RobotFileParser()
-            try:
-                robots_url = f"{urlparse(url).scheme}://{domain}/robots.txt"
-                parser.set_url(robots_url)
-                parser.read()
-                self.robot_parsers[domain] = parser
-            except Exception as e:
-                self.logger.warning(f"Error fetching robots.txt for {domain}: {e}")
-                return None
-        return self.robot_parsers[domain]
 
     async def _process_links(
         self,
@@ -117,7 +87,7 @@ class BFSScraperStrategy(ScraperStrategy):
         """Process extracted links from crawl result.
         This is our link processor that:
             Handles both internal and external links
-            Checks if URL can be processed - validates URL, applies Filters and tests Robots.txt compliance with can_process_url
+            Checks if URL can be processed - validates URL, applies Filters with can_process_url
             Checks depth limits
             Scores URLs for priority
             Updates depth tracking
@@ -233,5 +203,3 @@ class BFSScraperStrategy(ScraperStrategy):
     async def shutdown(self):
         """Clean up resources and stop crawling"""
         self._cancel_event.set()
-        # Clear caches and close connections
-        self.robot_parsers.clear()
