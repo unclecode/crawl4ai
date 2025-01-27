@@ -1098,17 +1098,19 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
         user_message = {
             "role": "user",
             "content": f"""
-                Instructions:
-                {prompt_template}
-
                 HTML to analyze:
                 ```html
                 {html}
                 ```
 
-                {"Extract the following data: " + query if query else "Please analyze the HTML structure and create the most appropriate schema for data extraction."}
+                Instructions to extract schema for the above given HTML:
+                {prompt_template}
+
                 """
         }
+        
+        if query:
+            user_message["content"] += f"\n\nImportant Notes to Consider:\n{query}"
 
         try:
             # Call LLM with backoff handling

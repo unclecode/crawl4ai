@@ -143,6 +143,7 @@ class AsyncCrawlResponse(BaseModel):
 ###############################
 class MediaItem(BaseModel):
     src: Optional[str] = ""
+    data: Optional[str] = ""
     alt: Optional[str] = ""
     desc: Optional[str] = ""
     score: Optional[int] = 0

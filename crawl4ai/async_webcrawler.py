@@ -319,14 +319,6 @@ class AsyncWebCrawler:
             try:
                 # Handle configuration
                 if crawler_config is not None:
-                    # if any(param is not None for param in [
-                    #     word_count_threshold, extraction_strategy, chunking_strategy,
-                    #     content_filter, cache_mode, css_selector, screenshot, pdf
-                    # ]):
-                    #     self.logger.warning(
-                    #         message="Both crawler_config and legacy parameters provided. crawler_config will take precedence.",
-                    #         tag="WARNING"
-                    #     )
                     config = crawler_config
                 else:
                     # Merge all parameters into a single kwargs dict for config creation
@@ -350,14 +342,6 @@ class AsyncWebCrawler:
 
                 # Handle deprecated cache parameters
                 if any([bypass_cache, disable_cache, no_cache_read, no_cache_write]):
-                    if kwargs.get("warning", True):
-                        warnings.warn(
-                            "Cache control boolean flags are deprecated and will be removed in version 0.5.0. "
-                            "Use 'cache_mode' parameter instead.",
-                            DeprecationWarning,
-                            stacklevel=2,
-                        )
-
                     # Convert legacy parameters if cache_mode not provided
                     if config.cache_mode is None:
                         config.cache_mode = _legacy_to_cache_mode(
@@ -430,7 +414,9 @@ class AsyncWebCrawler:
                                 response_headers={"X-Robots-Status": "Blocked by robots.txt"}
                             )
 
-                    # Pass config to crawl method
+                    ##############################
+                    # Call CrawlerStrategy.crawl #
+                    ##############################
                     async_response = await self.crawler_strategy.crawl(
                         url,
                         config=config,  # Pass the entire config object
@@ -448,7 +434,9 @@ class AsyncWebCrawler:
                         tag="FETCH",
                     )
 
-                    # Process the HTML content
+                    ###############################################################
+                    # Process the HTML content, Call CrawlerStrategy.process_html #
+                    ###############################################################
                     crawl_result : CrawlResult = await self.aprocess_html(
                         url=url,
                         html=html,
@@ -468,26 +456,6 @@ class AsyncWebCrawler:
                     crawl_result.ssl_certificate = (
                         async_response.ssl_certificate
                     )  # Add SSL certificate
-
-                    # # Check and set values from async_response to crawl_result
-                    # try:
-                    #     for key in vars(async_response):
-                    #         if hasattr(crawl_result, key):
-                    #             value = getattr(async_response, key, None)
-                    #             current_value = getattr(crawl_result, key, None)
-                    #             if value is not None and not current_value:
-                    #                 try:
-                    #                     setattr(crawl_result, key, value)
-                    #                 except Exception as e:
-                    #                     self.logger.warning(
-                    #                         message=f"Failed to set attribute {key}: {str(e)}",
-                    #                         tag="WARNING"
-                    #                     )
-                    # except Exception as e:
-                    #     self.logger.warning(
-                    #         message=f"Error copying response attributes: {str(e)}",
-                    #         tag="WARNING"
-                    #     )
 
                     crawl_result.success = bool(html)
                     crawl_result.session_id = getattr(config, "session_id", None)
@@ -538,8 +506,6 @@ class AsyncWebCrawler:
                     f"Error: {str(e)}\n\n"
                     f"Code context:\n{error_context['code_context']}"
                 )
-                # if not hasattr(e, "msg"):
-                #     e.msg = str(e)
 
                 self.logger.error_status(
                     url=url,
@@ -578,6 +544,7 @@ class AsyncWebCrawler:
         Returns:
             CrawlResult: Processed result containing extracted and formatted content
         """
+        cleaned_html = ""
         try:
             _url = url if not kwargs.get("is_raw_html", False) else "Raw HTML"
             t1 = time.perf_counter()
@@ -592,6 +559,10 @@ class AsyncWebCrawler:
             # add keys from kwargs to params that doesn't exist in params
             params.update({k: v for k, v in kwargs.items() if k not in params.keys()})
 
+            
+            ################################
+            # Scraping Strategy Execution  #
+            ################################
             result = scraping_strategy.scrap(url, html, **params)
 
             if result is None:
@@ -618,7 +589,9 @@ class AsyncWebCrawler:
             links = result.links.model_dump()
             metadata = result.metadata
 
-        # Markdown Generation
+        ################################
+        # Generate Markdown            #
+        ################################
         markdown_generator: Optional[MarkdownGenerationStrategy] = (
             config.markdown_generator or DefaultMarkdownGenerator()
         )
@@ -644,14 +617,15 @@ class AsyncWebCrawler:
             params={"url": _url, "timing": int((time.perf_counter() - t1) * 1000)},
         )
 
-        # Handle content extraction if needed
+        ################################
+        # Structured Content Extraction           #
+        ################################
         if (
             not bool(extracted_content)
             and config.extraction_strategy
             and not isinstance(config.extraction_strategy, NoExtractionStrategy)
         ):
             t1 = time.perf_counter()
-
             # Choose content based on input_format
             content_format = config.extraction_strategy.input_format
             if content_format == "fit_markdown" and not markdown_result.fit_markdown:
@@ -665,6 +639,7 @@ class AsyncWebCrawler:
             content = {
                 "markdown": markdown,
                 "html": html,
+                "cleaned_html": cleaned_html,
                 "fit_markdown": markdown_result.raw_markdown,
             }.get(content_format, markdown)
 

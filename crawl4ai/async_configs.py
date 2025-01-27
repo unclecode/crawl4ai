@@ -271,6 +271,8 @@ class CrawlerRunConfig:
                                          Default: None.
         keep_data_attributes (bool): If True, retain `data-*` attributes while removing unwanted attributes.
                                      Default: False.
+        keep_attrs (list of str): List of HTML attributes to keep during processing.
+                                      Default: [].
         remove_forms (bool): If True, remove all `<form>` elements from the HTML.
                              Default: False.
         prettiify (bool): If True, apply `fast_format_html` to produce prettified HTML output.
@@ -282,6 +284,8 @@ class CrawlerRunConfig:
         proxy_config (dict or None): Detailed proxy configuration, e.g. {"server": "...", "username": "..."}.
                                      If None, no additional proxy config. Default: None.
 
+        # SSL Parameters
+        fetch_ssl_certificate: bool = False,
         # Caching Parameters
         cache_mode (CacheMode or None): Defines how caching is handled.
                                         If None, defaults to CacheMode.ENABLED internally.
@@ -363,10 +367,14 @@ class CrawlerRunConfig:
                                                     Default: SOCIAL_MEDIA_DOMAINS (from config).
         exclude_external_links (bool): If True, exclude all external links from the results.
                                        Default: False.
+        exclude_internal_links (bool): If True, exclude internal links from the results.
+                                       Default: False.
         exclude_social_media_links (bool): If True, exclude links pointing to social media domains.
                                            Default: False.
         exclude_domains (list of str): List of specific domains to exclude from results.
                                        Default: [].
+        exclude_internal_links (bool): If True, exclude internal links from the results.
+                                       Default: False.
 
         # Debugging and Logging Parameters
         verbose (bool): Enable verbose logging.
@@ -402,6 +410,7 @@ class CrawlerRunConfig:
         excluded_tags: list = None,
         excluded_selector: str = None,
         keep_data_attributes: bool = False,
+        keep_attrs: list = None,
         remove_forms: bool = False,
         prettiify: bool = False,
         parser_type: str = "lxml",
@@ -451,6 +460,7 @@ class CrawlerRunConfig:
         exclude_external_links: bool = False,
         exclude_social_media_links: bool = False,
         exclude_domains: list = None,
+        exclude_internal_links: bool = False,
         # Debugging and Logging Parameters
         verbose: bool = True,
         log_console: bool = False,
@@ -475,6 +485,7 @@ class CrawlerRunConfig:
         self.excluded_tags = excluded_tags or []
         self.excluded_selector = excluded_selector or ""
         self.keep_data_attributes = keep_data_attributes
+        self.keep_attrs = keep_attrs or []
         self.remove_forms = remove_forms
         self.prettiify = prettiify
         self.parser_type = parser_type
@@ -532,6 +543,7 @@ class CrawlerRunConfig:
         self.exclude_external_links = exclude_external_links
         self.exclude_social_media_links = exclude_social_media_links
         self.exclude_domains = exclude_domains or []
+        self.exclude_internal_links = exclude_internal_links
 
         # Debugging and Logging Parameters
         self.verbose = verbose
@@ -580,6 +592,7 @@ class CrawlerRunConfig:
             excluded_tags=kwargs.get("excluded_tags", []),
             excluded_selector=kwargs.get("excluded_selector", ""),
             keep_data_attributes=kwargs.get("keep_data_attributes", False),
+            keep_attrs=kwargs.get("keep_attrs", []),
             remove_forms=kwargs.get("remove_forms", False),
             prettiify=kwargs.get("prettiify", False),
             parser_type=kwargs.get("parser_type", "lxml"),
@@ -638,6 +651,7 @@ class CrawlerRunConfig:
             exclude_external_links=kwargs.get("exclude_external_links", False),
             exclude_social_media_links=kwargs.get("exclude_social_media_links", False),
             exclude_domains=kwargs.get("exclude_domains", []),
+            exclude_internal_links=kwargs.get("exclude_internal_links", False),
             # Debugging and Logging Parameters
             verbose=kwargs.get("verbose", True),
             log_console=kwargs.get("log_console", False),
@@ -663,6 +677,7 @@ class CrawlerRunConfig:
             "excluded_tags": self.excluded_tags,
             "excluded_selector": self.excluded_selector,
             "keep_data_attributes": self.keep_data_attributes,
+            "keep_attrs": self.keep_attrs,
             "remove_forms": self.remove_forms,
             "prettiify": self.prettiify,
             "parser_type": self.parser_type,
@@ -706,6 +721,7 @@ class CrawlerRunConfig:
             "exclude_external_links": self.exclude_external_links,
             "exclude_social_media_links": self.exclude_social_media_links,
             "exclude_domains": self.exclude_domains,
+            "exclude_internal_links": self.exclude_internal_links,
             "verbose": self.verbose,
             "log_console": self.log_console,
             "stream": self.stream,
