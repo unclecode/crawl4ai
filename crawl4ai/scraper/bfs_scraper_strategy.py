@@ -135,36 +135,36 @@ class BFSScraperStrategy(ScraperStrategy):
         visited: Set[str] = set()
         depths = {start_url: 0}
         active_crawls = set()  # Track URLs currently being processed
-        try:
-            while (
-                not queue.empty() or active_crawls
-            ) and not self._cancel_event.is_set():
-                """
-                This sets up our main control loop which:
-                    - Continues while there are URLs to process (not queue.empty())
-                    - Or while there are active crawls still running (arun_many)
-                    - Can be interrupted via cancellation (not self._cancel_event.is_set())
-                """
-                # Collect batch of jobs to process
-                jobs = []
-                # Fill batch with available jobs
-                while len(jobs) < SCRAPER_BATCH_SIZE and not queue.empty():
-                    score, depth, url = await queue.get()
-                    if url not in active_crawls:  # Only add if not currently processing
-                        jobs.append((score, depth, url))
-                        active_crawls.add(url)
-                        self.stats.current_depth = depth
+        async with AsyncWebCrawler(
+            config=browser_config,
+            verbose=True,
+        ) as crawler:
+            try:
+                while (
+                    not queue.empty() or active_crawls
+                ) and not self._cancel_event.is_set():
+                    """
+                    This sets up our main control loop which:
+                        - Continues while there are URLs to process (not queue.empty())
+                        - Or while there are active crawls still running (arun_many)
+                        - Can be interrupted via cancellation (not self._cancel_event.is_set())
+                    """
+                    # Collect batch of jobs to process
+                    jobs = []
+                    # Fill batch with available jobs
+                    while len(jobs) < SCRAPER_BATCH_SIZE and not queue.empty():
+                        score, depth, url = await queue.get()
+                        if url not in active_crawls:  # Only add if not currently processing
+                            jobs.append((score, depth, url))
+                            active_crawls.add(url)
+                            self.stats.current_depth = depth
 
-                if not jobs:
-                    # If no jobs but active crawls exist, wait a bit and continue
-                    if active_crawls:
-                        await asyncio.sleep(0.1)
-                    continue
-                # Process batch
-                async with AsyncWebCrawler(
-                    config=browser_config,
-                    verbose=True,
-                ) as crawler:
+                    if not jobs:
+                        # If no jobs but active crawls exist, wait a bit and continue
+                        if active_crawls:
+                            await asyncio.sleep(0.1)
+                        continue
+                    # Process batch
                     try:
                         async for result in await crawler.arun_many(
                             urls=[url for _, _, url in jobs],
@@ -194,13 +194,13 @@ class BFSScraperStrategy(ScraperStrategy):
                         # Continue processing other batches
                         continue
 
-        except Exception as e:
-            self.logger.error(f"Error in crawl process: {e}")
-            raise
+            except Exception as e:
+                self.logger.error(f"Error in crawl process: {e}")
+                raise
 
-        finally:
-            self.stats.end_time = datetime.now()
-            await crawler.close()
+            finally:
+                self.stats.end_time = datetime.now()
+                await crawler.close()
 
     async def shutdown(self):
         """Clean up resources and stop crawling"""
