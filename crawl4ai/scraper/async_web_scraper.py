@@ -1,10 +1,11 @@
 from typing import Union, AsyncGenerator, Optional
 from .scraper_strategy import ScraperStrategy
 from .models import ScraperResult, CrawlResult
-from ..async_webcrawler import AsyncWebCrawler
+from ..async_configs import BrowserConfig, CrawlerRunConfig
 import logging
 from dataclasses import dataclass
 from contextlib import asynccontextmanager
+from contextlib import AbstractAsyncContextManager
 
 
 @dataclass
@@ -16,28 +17,38 @@ class ScrapingProgress:
     current_url: Optional[str] = None
 
 
-class AsyncWebScraper:
+class AsyncWebScraper(AbstractAsyncContextManager):
     """
     A high-level web scraper that combines an async crawler with a scraping strategy.
 
     Args:
-        crawler (AsyncWebCrawler): The async web crawler implementation
+        crawler_config (CrawlerRunConfig): Configuration for the crawler run
+        browser_config (BrowserConfig): Configuration for the browser
         strategy (ScraperStrategy): The scraping strategy to use
         logger (Optional[logging.Logger]): Custom logger for the scraper
     """
 
+    async def __aenter__(self):
+        # Initialize resources, if any
+        self.logger.info("Starting the async web scraper.")
+        return self
+
     def __init__(
         self,
-        crawler: AsyncWebCrawler,
+        crawler_config: CrawlerRunConfig,
+        browser_config: BrowserConfig,
         strategy: ScraperStrategy,
         logger: Optional[logging.Logger] = None,
     ):
-        if not isinstance(crawler, AsyncWebCrawler):
-            raise TypeError("crawler must be an instance of AsyncWebCrawler")
+        if not isinstance(browser_config, BrowserConfig):
+            raise TypeError("browser_config must be an instance of BrowserConfig")
+        if not isinstance(crawler_config, CrawlerRunConfig):
+            raise TypeError("crawler must be an instance of CrawlerRunConfig")
         if not isinstance(strategy, ScraperStrategy):
             raise TypeError("strategy must be an instance of ScraperStrategy")
 
-        self.crawler = crawler
+        self.crawler_config = crawler_config
+        self.browser_config = browser_config
         self.strategy = strategy
         self.logger = logger or logging.getLogger(__name__)
         self._progress = ScrapingProgress()
@@ -83,7 +94,9 @@ class AsyncWebScraper:
     ) -> AsyncGenerator[CrawlResult, None]:
         """Stream scraping results as they become available."""
         try:
-            result_generator = self.strategy.ascrape(url, self.crawler)
+            result_generator = self.strategy.ascrape(
+                url, self.crawler_config, self.browser_config
+            )
             async for res in result_generator:
                 self._progress.processed_urls += 1
                 self._progress.current_url = res.url
@@ -100,7 +113,9 @@ class AsyncWebScraper:
         extracted_data = {}
 
         try:
-            result_generator = self.strategy.ascrape(url, self.crawler)
+            result_generator = self.strategy.ascrape(
+                url, self.crawler_config, self.browser_config
+            )
             async for res in result_generator:
                 self._progress.processed_urls += 1
                 self._progress.current_url = res.url
@@ -118,3 +133,11 @@ class AsyncWebScraper:
         except Exception as e:
             self.logger.error(f"Error in collecting scrape: {str(e)}")
             raise
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        # Cleanup resources or tasks
+        await self.close()  # Assuming you have a close method to cleanup
+
+    async def close(self):
+        # Perform cleanup tasks
+        pass

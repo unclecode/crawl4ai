@@ -1,23 +1,23 @@
 from abc import ABC, abstractmethod
 from .models import ScraperResult, CrawlResult
 from ..models import CrawlResult
-from ..async_webcrawler import AsyncWebCrawler
+from ..async_configs import BrowserConfig, CrawlerRunConfig
 from typing import Union, AsyncGenerator
-
-
 class ScraperStrategy(ABC):
     @abstractmethod
     async def ascrape(
         self,
         url: str,
-        crawler: AsyncWebCrawler,
+        crawler_config: CrawlerRunConfig,
+        browser_config: BrowserConfig,
         stream: bool = False,
     ) -> Union[AsyncGenerator[CrawlResult, None], ScraperResult]:
         """Scrape the given URL using the specified crawler.
 
         Args:
             url (str): The starting URL for the scrape.
-            crawler (AsyncWebCrawler): The web crawler instance.
+            crawler_config (CrawlerRunConfig): Configuration for the crawler run.
+            browser_config (BrowserConfig): Configuration for the browser.
             stream (bool): If True, yields individual crawl results as they are ready;
                                 if False, accumulates results and returns a final ScraperResult.
 

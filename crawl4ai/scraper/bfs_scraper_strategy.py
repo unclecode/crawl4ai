@@ -5,13 +5,11 @@ import asyncio
 import logging
 from urllib.parse import urlparse
 
-# import validators
-
-from ..async_configs import CrawlerRunConfig
+from ..async_webcrawler import AsyncWebCrawler
+from ..async_configs import BrowserConfig, CrawlerRunConfig
 from .models import CrawlResult
 from .filters import FilterChain
 from .scorers import URLScorer
-from ..async_webcrawler import AsyncWebCrawler
 from .scraper_strategy import ScraperStrategy
 from ..config import SCRAPER_BATCH_SIZE
 
@@ -99,28 +97,26 @@ class BFSScraperStrategy(ScraperStrategy):
             links_to_process += result.links["external"]
         for link in links_to_process:
             url = link["href"]
-            if not await self.can_process_url(url, depth):
+            if url in visited:
+                continue
+            new_depth = depths[source_url] + 1
+            if new_depth > self.max_depth:
+                continue
+            if not await self.can_process_url(url, new_depth):
                 self.stats.urls_skipped += 1
                 continue
-            if url not in visited:
-                new_depth = depths[source_url] + 1
-                if new_depth <= self.max_depth:
-                    if self.url_scorer:
-                        score = self.url_scorer.score(url)
-                    else:
-                        # When no url_scorer is provided all urls will have same score of 0.
-                        # Therefore will be process in FIFO order as per URL depth
-                        score = 0
-                    await queue.put((score, new_depth, url))
-                    depths[url] = new_depth
-                    self.stats.total_depth_reached = max(
-                        self.stats.total_depth_reached, new_depth
-                    )
+            score = self.url_scorer.score(url) if self.url_scorer else 0
+            await queue.put((score, new_depth, url))
+            depths[url] = new_depth
+            self.stats.total_depth_reached = max(
+                self.stats.total_depth_reached, new_depth
+            )
 
     async def ascrape(
         self,
         start_url: str,
-        crawler: AsyncWebCrawler,
+        crawler_config: CrawlerRunConfig,
+        browser_config: BrowserConfig,
     ) -> AsyncGenerator[CrawlResult, None]:
         """Implement BFS crawling strategy"""
 
@@ -164,34 +160,39 @@ class BFSScraperStrategy(ScraperStrategy):
                     if active_crawls:
                         await asyncio.sleep(0.1)
                     continue
-
                 # Process batch
-                crawler_config = CrawlerRunConfig(cache_mode="BYPASS", stream=True)
-                try:
-                    async for result in await crawler.arun_many(
-                        urls=[url for _, _, url in jobs], config=crawler_config
-                    ):
-                        source_url, depth = next(
-                            (url, depth) for _, depth, url in jobs if url == result.url
-                        )
-                        active_crawls.remove(source_url)  # Remove from active set
+                async with AsyncWebCrawler(
+                    config=browser_config,
+                    verbose=True,
+                ) as crawler:
+                    try:
+                        async for result in await crawler.arun_many(
+                            urls=[url for _, _, url in jobs],
+                            config=crawler_config.clone(stream=True),
+                        ):
+                            source_url, depth = next(
+                                (url, depth)
+                                for _, depth, url in jobs
+                                if url == result.url
+                            )
+                            active_crawls.remove(source_url)  # Remove from active set
 
-                        if result.success:
-                            await self._process_links(
-                                result, source_url, depth, queue, visited, depths
-                            )
-                            yield result
-                        else:
-                            self.logger.warning(
-                                f"Failed to crawl {result.url}: {result.error_message}"
-                            )
-                except Exception as e:
-                    # Remove failed URLs from active set
-                    for _, _, url in jobs:
-                        active_crawls.discard(url)
-                    self.logger.error(f"Batch processing error: {e}")
-                    # Continue processing other batches
-                    continue
+                            if result.success:
+                                await self._process_links(
+                                    result, source_url, depth, queue, visited, depths
+                                )
+                                yield result
+                            else:
+                                self.logger.warning(
+                                    f"Failed to crawl {result.url}: {result.error_message}"
+                                )
+                    except Exception as e:
+                        # Remove failed URLs from active set
+                        for _, _, url in jobs:
+                            active_crawls.discard(url)
+                        self.logger.error(f"Batch processing error: {e}")
+                        # Continue processing other batches
+                        continue
 
         except Exception as e:
             self.logger.error(f"Error in crawl process: {e}")
@@ -199,6 +200,7 @@ class BFSScraperStrategy(ScraperStrategy):
 
         finally:
             self.stats.end_time = datetime.now()
+            await crawler.close()
 
     async def shutdown(self):
         """Clean up resources and stop crawling"""

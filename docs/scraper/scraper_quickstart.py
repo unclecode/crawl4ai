@@ -1,4 +1,5 @@
 # basic_scraper_example.py
+from crawl4ai.async_configs import CrawlerRunConfig
 from crawl4ai.scraper import (
     AsyncWebScraper,
     BFSScraperStrategy,
@@ -24,14 +25,14 @@ async def basic_scraper_example():
     filter_chain = FilterChain(
         [
             # Only crawl pages within the blog section
-            URLPatternFilter("*/tutorial/*"),
+            URLPatternFilter("*/basic/*"),
             # Only process HTML pages
             ContentTypeFilter(["text/html"]),
         ]
     )
 
     # Initialize the strategy with basic configuration
-    strategy = BFSScraperStrategy(
+    bfs_strategy = BFSScraperStrategy(
         max_depth=2,  # Only go 2 levels deep
         filter_chain=filter_chain,
         url_scorer=None,  # Use default scoring
@@ -39,8 +40,11 @@ async def basic_scraper_example():
     )
 
     # Create the crawler and scraper
-    async with AsyncWebCrawler(config=browser_config, verbose=True) as crawler:
-        scraper = AsyncWebScraper(crawler, strategy)
+    async with AsyncWebScraper(
+        crawler_config=CrawlerRunConfig(bypass_cache=True),
+        browser_config=browser_config,
+        strategy=bfs_strategy,
+    ) as scraper:
         # Start scraping
         try:
             result = await scraper.ascrape("https://crawl4ai.com/mkdocs")
@@ -69,7 +73,6 @@ from crawl4ai.scraper import (
     FreshnessScorer,
     CompositeScorer,
 )
-from crawl4ai.async_webcrawler import AsyncWebCrawler
 
 
 async def advanced_scraper_example():
@@ -121,13 +124,14 @@ async def advanced_scraper_example():
     )
 
     # Initialize strategy with advanced configuration
-    strategy = BFSScraperStrategy(
+    bfs_strategy = BFSScraperStrategy(
         max_depth=2, filter_chain=filter_chain, url_scorer=scorer
     )
 
     # Create crawler and scraper
-    async with AsyncWebCrawler(verbose=True, config=browser_config) as crawler:
-        scraper = AsyncWebScraper(crawler, strategy)
+    async with AsyncWebScraper(crawler_config=CrawlerRunConfig(bypass_cache=True),
+                                browser_config=browser_config,
+                                strategy=bfs_strategy) as scraper:
 
         # Track statistics
         stats = {"processed": 0, "errors": 0, "total_size": 0}
@@ -182,12 +186,12 @@ if __name__ == "__main__":
     import time
 
     # Run basic example
-    start_time = time.perf_counter()
-    print("Running basic scraper example...")
-    asyncio.run(basic_scraper_example())
-    end_time = time.perf_counter()
-    print(f"Basic scraper example completed in {end_time - start_time:.2f} seconds")
+    # start_time = time.perf_counter()
+    # print("Running basic scraper example...")
+    # asyncio.run(basic_scraper_example())
+    # end_time = time.perf_counter()
+    # print(f"Basic scraper example completed in {end_time - start_time:.2f} seconds")
 
     # # Run advanced example
-    # print("\nRunning advanced scraper example...")
-    # asyncio.run(advanced_scraper_example())
+    print("\nRunning advanced scraper example...")
+    asyncio.run(advanced_scraper_example())
