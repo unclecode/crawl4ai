@@ -188,11 +188,11 @@ if __name__ == "__main__":
     import time
 
     # Run basic example
-    # start_time = time.perf_counter()
-    # print("Running basic scraper example...")
-    # asyncio.run(basic_scraper_example())
-    # end_time = time.perf_counter()
-    # print(f"Basic scraper example completed in {end_time - start_time:.2f} seconds")
+    start_time = time.perf_counter()
+    print("Running basic scraper example...")
+    asyncio.run(basic_scraper_example())
+    end_time = time.perf_counter()
+    print(f"Basic scraper example completed in {end_time - start_time:.2f} seconds")
 
     # # Run advanced example
     print("\nRunning advanced scraper example...")
