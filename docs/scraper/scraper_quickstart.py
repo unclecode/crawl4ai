@@ -1,5 +1,6 @@
 # basic_scraper_example.py
 from crawl4ai.async_configs import CrawlerRunConfig
+from crawl4ai.content_scraping_strategy import LXMLWebScrapingStrategy
 from crawl4ai.scraper import (
     AsyncWebScraper,
     BFSScraperStrategy,
@@ -7,7 +8,7 @@ from crawl4ai.scraper import (
     URLPatternFilter,
     ContentTypeFilter,
 )
-from crawl4ai.async_webcrawler import AsyncWebCrawler, BrowserConfig
+from crawl4ai.async_webcrawler import BrowserConfig
 import re
 import time
 
@@ -41,8 +42,6 @@ async def basic_scraper_example():
 
     # Create the crawler and scraper
     async with AsyncWebScraper(
-        crawler_config=CrawlerRunConfig(bypass_cache=True),
-        browser_config=browser_config,
         strategy=bfs_strategy,
     ) as scraper:
         # Start scraping
@@ -51,8 +50,8 @@ async def basic_scraper_example():
 
             # Process results
             print(f"Crawled {len(result.crawled_urls)} pages:")
-            for url, data in result.extracted_data.items():
-                print(f"- {url}: {len(data.html)} bytes")
+            for url, page_result in result.extracted_data.items():
+                print(f"- {url}: {len(page_result.result.html)} bytes")
 
         except Exception as e:
             print(f"Error during scraping: {e}")
@@ -130,9 +129,9 @@ async def advanced_scraper_example():
 
     # Create crawler and scraper
     async with AsyncWebScraper(
-        crawler_config=CrawlerRunConfig(bypass_cache=True),
-        browser_config=browser_config,
         strategy=bfs_strategy,
+        crawler_config=CrawlerRunConfig(bypass_cache=True, scraping_strategy=LXMLWebScrapingStrategy(),),
+        browser_config=browser_config,
     ) as scraper:
 
         # Track statistics
@@ -143,12 +142,15 @@ async def advanced_scraper_example():
             result_generator = await scraper.ascrape(
                 "https://techcrunch.com", stream=True
             )
-            async for result in result_generator:
+            async for page_result in result_generator:
+                result = page_result.result
+                score = page_result.score
+                depth = page_result.depth
                 stats["processed"] += 1
 
                 if result.success:
                     stats["total_size"] += len(result.html)
-                    logger.info(f"Processed: {result.url}")
+                    logger.info(f"Processed at depth: {depth} with score: {score:.3f} : \n {result.url}")
                 else:
                     stats["errors"] += 1
                     logger.error(

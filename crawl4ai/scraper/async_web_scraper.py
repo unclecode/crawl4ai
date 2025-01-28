@@ -1,6 +1,6 @@
 from typing import Union, AsyncGenerator, Optional
 from .scraper_strategy import ScraperStrategy
-from .models import ScraperResult, CrawlResult
+from .models import ScraperResult, CrawlResult, ScraperPageResult
 from ..async_configs import BrowserConfig, CrawlerRunConfig
 import logging
 from dataclasses import dataclass
@@ -35,17 +35,23 @@ class AsyncWebScraper(AbstractAsyncContextManager):
 
     def __init__(
         self,
-        crawler_config: CrawlerRunConfig,
-        browser_config: BrowserConfig,
         strategy: ScraperStrategy,
+        crawler_config: Optional[CrawlerRunConfig] = None,
+        browser_config: Optional[BrowserConfig] = None,
         logger: Optional[logging.Logger] = None,
     ):
-        if not isinstance(browser_config, BrowserConfig):
-            raise TypeError("browser_config must be an instance of BrowserConfig")
-        if not isinstance(crawler_config, CrawlerRunConfig):
-            raise TypeError("crawler must be an instance of CrawlerRunConfig")
         if not isinstance(strategy, ScraperStrategy):
             raise TypeError("strategy must be an instance of ScraperStrategy")
+        if browser_config is not None and not isinstance(browser_config, BrowserConfig):
+            raise TypeError(
+                "browser_config must be None or an instance of BrowserConfig"
+            )
+        if crawler_config is not None and not isinstance(
+            crawler_config, CrawlerRunConfig
+        ):
+            raise TypeError(
+                "crawler_config must be None or an instance of CrawlerRunConfig"
+            )
 
         self.crawler_config = crawler_config
         self.browser_config = browser_config
@@ -70,7 +76,7 @@ class AsyncWebScraper(AbstractAsyncContextManager):
 
     async def ascrape(
         self, url: str, stream: bool = False
-    ) -> Union[AsyncGenerator[CrawlResult, None], ScraperResult]:
+    ) -> Union[AsyncGenerator[ScraperPageResult, None], ScraperResult]:
         """
         Scrape a website starting from the given URL.
 
@@ -82,7 +88,6 @@ class AsyncWebScraper(AbstractAsyncContextManager):
             Either an async generator yielding CrawlResults or a final ScraperResult
         """
         self._progress = ScrapingProgress()  # Reset progress
-
         async with self._error_handling_context(url):
             if stream:
                 return self._ascrape_yielding(url)
@@ -91,16 +96,16 @@ class AsyncWebScraper(AbstractAsyncContextManager):
     async def _ascrape_yielding(
         self,
         url: str,
-    ) -> AsyncGenerator[CrawlResult, None]:
+    ) -> AsyncGenerator[ScraperPageResult, None]:
         """Stream scraping results as they become available."""
         try:
             result_generator = self.strategy.ascrape(
                 url, self.crawler_config, self.browser_config
             )
-            async for res in result_generator:
+            async for page_result in result_generator:
                 self._progress.processed_urls += 1
-                self._progress.current_url = res.url
-                yield res
+                self._progress.current_url = page_result.result.url
+                yield page_result
         except Exception as e:
             self.logger.error(f"Error in streaming scrape: {str(e)}")
             raise
@@ -117,9 +122,10 @@ class AsyncWebScraper(AbstractAsyncContextManager):
                 url, self.crawler_config, self.browser_config
             )
             async for res in result_generator:
+                url = res.result.url
                 self._progress.processed_urls += 1
-                self._progress.current_url = res.url
-                extracted_data[res.url] = res
+                self._progress.current_url = url
+                extracted_data[url] = res
 
             return ScraperResult(
                 url=url,

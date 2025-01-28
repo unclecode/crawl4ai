@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
-from .models import ScraperResult, CrawlResult
-from ..models import CrawlResult
+from .models import ScraperResult, ScraperPageResult
 from ..async_configs import BrowserConfig, CrawlerRunConfig
 from typing import Union, AsyncGenerator
 class ScraperStrategy(ABC):
@@ -11,7 +10,7 @@ class ScraperStrategy(ABC):
         crawler_config: CrawlerRunConfig,
         browser_config: BrowserConfig,
         stream: bool = False,
-    ) -> Union[AsyncGenerator[CrawlResult, None], ScraperResult]:
+    ) -> Union[AsyncGenerator[ScraperPageResult, None], ScraperResult]:
         """Scrape the given URL using the specified crawler.
 
         Args:
@@ -22,7 +21,7 @@ class ScraperStrategy(ABC):
                                 if False, accumulates results and returns a final ScraperResult.
 
         Yields:
-            CrawlResult: Individual crawl results if stream is True.
+            ScraperPageResult: Individual page results if stream is True.
 
         Returns:
             ScraperResult: A summary of the scrape results containing the final extracted data

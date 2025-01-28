@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 
 from ..async_webcrawler import AsyncWebCrawler
 from ..async_configs import BrowserConfig, CrawlerRunConfig
-from .models import CrawlResult
+from .models import CrawlResult, ScraperPageResult
 from .filters import FilterChain
 from .scorers import URLScorer
 from .scraper_strategy import ScraperStrategy
@@ -46,7 +46,6 @@ class BFSScraperStrategy(ScraperStrategy):
         self.stats = CrawlStats(start_time=datetime.now())
         self._cancel_event = asyncio.Event()
         self.process_external_links = process_external_links
-        self._active_crawls_lock = asyncio.Lock()
 
     async def can_process_url(self, url: str, depth: int) -> bool:
         """Check if URL can be processed based on filters
@@ -117,8 +116,8 @@ class BFSScraperStrategy(ScraperStrategy):
     async def ascrape(
         self,
         start_url: str,
-        crawler_config: CrawlerRunConfig,
-        browser_config: BrowserConfig,
+        crawler_config: Optional[CrawlerRunConfig] = None,
+        browser_config: Optional[BrowserConfig] = None,
     ) -> AsyncGenerator[CrawlResult, None]:
         """Implement BFS crawling strategy"""
 
@@ -137,6 +136,11 @@ class BFSScraperStrategy(ScraperStrategy):
         visited: Set[str] = set()
         depths = {start_url: 0}
         active_crawls = {}  # Track URLs currently being processed with depth and score
+        active_crawls_lock = asyncio.Lock()  # Create the lock within the same event loop
+
+        # Update crawler_config to stream back results to scraper
+        crawler_config = crawler_config.clone(stream=True) if crawler_config else CrawlerRunConfig(stream=True)
+
         async with AsyncWebCrawler(
             config=browser_config,
             verbose=True,
@@ -152,7 +156,7 @@ class BFSScraperStrategy(ScraperStrategy):
                         - Can be interrupted via cancellation (not self._cancel_event.is_set())
                     """
                     # Collect batch of URLs into active_crawls to process
-                    async with self._active_crawls_lock:
+                    async with active_crawls_lock:
                         while len(active_crawls) < SCRAPER_BATCH_SIZE and not queue.empty():
                             score, depth, url = await queue.get()
                             active_crawls[url] = {"depth": depth, "score": score}
@@ -170,14 +174,19 @@ class BFSScraperStrategy(ScraperStrategy):
                         ):
                             source_url = result.url
                             depth = active_crawls[source_url]["depth"]
-                            async with self._active_crawls_lock:
+                            score=active_crawls[source_url]["score"]
+                            async with active_crawls_lock:
                                 active_crawls.pop(source_url, None)
 
                             if result.success:
                                 await self._process_links(
                                     result, source_url, queue, visited, depths
                                 )
-                                yield result
+                                yield ScraperPageResult(
+                                    result = result,
+                                    depth=depth,
+                                    score=score,
+                                )
                             else:
                                 self.logger.warning(
                                     f"Failed to crawl {result.url}: {result.error_message}"
