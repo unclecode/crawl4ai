@@ -154,7 +154,9 @@ class BFSScraperStrategy(ScraperStrategy):
                     # Fill batch with available jobs
                     while len(jobs) < SCRAPER_BATCH_SIZE and not queue.empty():
                         score, depth, url = await queue.get()
-                        if url not in active_crawls:  # Only add if not currently processing
+                        if (
+                            url not in active_crawls
+                        ):  # Only add if not currently processing
                             jobs.append((score, depth, url))
                             active_crawls.add(url)
                             self.stats.current_depth = depth

@@ -129,9 +129,11 @@ async def advanced_scraper_example():
     )
 
     # Create crawler and scraper
-    async with AsyncWebScraper(crawler_config=CrawlerRunConfig(bypass_cache=True),
-                                browser_config=browser_config,
-                                strategy=bfs_strategy) as scraper:
+    async with AsyncWebScraper(
+        crawler_config=CrawlerRunConfig(bypass_cache=True),
+        browser_config=browser_config,
+        strategy=bfs_strategy,
+    ) as scraper:
 
         # Track statistics
         stats = {"processed": 0, "errors": 0, "total_size": 0}
