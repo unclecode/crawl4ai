@@ -23,6 +23,7 @@ from .async_logger import AsyncLogger
 from playwright_stealth import StealthConfig
 from .ssl_certificate import SSLCertificate
 from .utils import get_home_folder, get_chromium_path
+from .user_agent_generator import ValidUAGenerator, OnlineUAGenerator
 
 stealth_config = StealthConfig(
     webdriver=True,
@@ -102,6 +103,7 @@ class ManagedBrowser:
         logger=None,
         host: str = "localhost",
         debugging_port: int = 9222,
+        cdp_url: Optional[str] = None, 
     ):
         """
         Initialize the ManagedBrowser instance.
@@ -116,6 +118,7 @@ class ManagedBrowser:
             logger (logging.Logger): Logger instance for logging messages. Default: None.
             host (str): Host for debugging the browser. Default: "localhost".
             debugging_port (int): Port for debugging the browser. Default: 9222.
+            cdp_url (str or None): CDP URL to connect to the browser. Default: None.
         """
         self.browser_type = browser_type
         self.user_data_dir = user_data_dir
@@ -126,12 +129,20 @@ class ManagedBrowser:
         self.host = host
         self.logger = logger
         self.shutting_down = False
+        self.cdp_url = cdp_url
 
     async def start(self) -> str:
         """
-        Starts the browser process and returns the CDP endpoint URL.
-        If user_data_dir is not provided, creates a temporary directory.
+        Starts the browser process or returns CDP endpoint URL.
+        If cdp_url is provided, returns it directly.
+        If user_data_dir is not provided for local browser, creates a temporary directory.
+        
+        Returns:
+            str: CDP endpoint URL
         """
+        # If CDP URL provided, just return it
+        if self.cdp_url:
+            return self.cdp_url
 
         # Create temp dir if needed
         if not self.user_data_dir:
@@ -543,9 +554,9 @@ class BrowserManager:
                 or crawlerRunConfig.simulate_user
                 or crawlerRunConfig.magic
             ):
-                await context.add_init_script(load_js_script("navigator_overrider"))
+                await context.add_init_script(load_js_script("navigator_overrider"))        
 
-    async def create_browser_context(self):
+    async def create_browser_context(self, crawlerRunConfig: CrawlerRunConfig = None):
         """
         Creates and returns a new browser context with configured settings.
         Applies text-only mode settings if text_mode is enabled in config.
@@ -554,7 +565,7 @@ class BrowserManager:
             Context: Browser context object with the specified configurations
         """
         # Base settings
-        user_agent = self.config.headers.get("User-Agent", self.config.user_agent)
+        user_agent = self.config.headers.get("User-Agent", self.config.user_agent) 
         viewport_settings = {
             "width": self.config.viewport_width,
             "height": self.config.viewport_height,
@@ -627,6 +638,19 @@ class BrowserManager:
             "device_scale_factor": 1.0,
             "java_script_enabled": self.config.java_script_enabled,
         }
+        
+        if crawlerRunConfig:
+            # Check if there is value for crawlerRunConfig.proxy_config set add that to context
+            if crawlerRunConfig.proxy_config:
+                proxy_settings = {
+                    "server": crawlerRunConfig.proxy_config.get("server"),
+                }
+                if crawlerRunConfig.proxy_config.get("username"):
+                    proxy_settings.update({
+                        "username": crawlerRunConfig.proxy_config.get("username"),
+                        "password": crawlerRunConfig.proxy_config.get("password"),
+                    })
+                context_settings["proxy"] = proxy_settings
 
         if self.config.text_mode:
             text_mode_settings = {
@@ -710,7 +734,7 @@ class BrowserManager:
                     context = self.contexts_by_config[config_signature]
                 else:
                     # Create and setup a new context
-                    context = await self.create_browser_context()
+                    context = await self.create_browser_context(crawlerRunConfig)
                     await self.setup_context(context, crawlerRunConfig)
                     self.contexts_by_config[config_signature] = context
 
@@ -1241,16 +1265,18 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         config.url = url
         response_headers = {}
         status_code = None
-        final_url = url 
+        redirected_url = url 
 
         # Reset downloaded files list for new crawl
         self._downloaded_files = []
 
         # Handle user agent with magic mode
-        user_agent = self.browser_config.user_agent
-        if config.magic and self.browser_config.user_agent_mode != "random":
-            self.browser_config.user_agent = UserAgentGenerator().generate(
-                **(self.browser_config.user_agent_generator_config or {})
+        user_agent_to_override = config.user_agent
+        if user_agent_to_override:
+            self.browser_config.user_agent = user_agent_to_override
+        elif config.magic or config.user_agent_mode == "random":
+            self.browser_config.user_agent = ValidUAGenerator().generate(
+                **(config.user_agent_generator_config or {})
             )
 
         # Get page for session
@@ -1323,7 +1349,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     response = await page.goto(
                         url, wait_until=config.wait_until, timeout=config.page_timeout
                     )
-                    final_url = page.url
+                    redirected_url = page.url
                 except Error as e:
                     raise RuntimeError(f"Failed on navigating ACS-GOTO:\n{str(e)}")
 
@@ -1603,7 +1629,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 downloaded_files=(
                     self._downloaded_files if self._downloaded_files else None
                 ),
-                final_url=final_url,
+                redirected_url=redirected_url,
             )
 
         except Exception as e:

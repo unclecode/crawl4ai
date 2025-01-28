@@ -106,6 +106,7 @@ Use these for controlling whether you read or write from a local content cache. 
 | **`wait_for`**             | `str or None`           | Wait for a CSS (`"css:selector"`) or JS (`"js:() => bool"`) condition before content extraction.                     |
 | **`wait_for_images`**      | `bool` (False)          | Wait for images to load before finishing. Slows down if you only want text.                                          |
 | **`delay_before_return_html`** | `float` (0.1)       | Additional pause (seconds) before final HTML is captured. Good for last-second updates.                               |
+| **`check_robots_txt`**     | `bool` (False)          | Whether to check and respect robots.txt rules before crawling. If True, caches robots.txt for efficiency.            |
 | **`mean_delay`** and **`max_range`** | `float` (0.1, 0.3) | If you call `arun_many()`, these define random delay intervals between crawls, helping avoid detection or rate limits. |
 | **`semaphore_count`**      | `int` (5)               | Max concurrency for `arun_many()`. Increase if you have resources for parallel crawls.                                |
 
@@ -266,16 +267,20 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
+## 2.4 Compliance & Ethics
+
+| **Parameter**          | **Type / Default**      | **What It Does**                                                                                                    |
+|-----------------------|-------------------------|----------------------------------------------------------------------------------------------------------------------|
+| **`check_robots_txt`**| `bool` (False)          | When True, checks and respects robots.txt rules before crawling. Uses efficient caching with SQLite backend.          |
+| **`user_agent`**      | `str` (None)            | User agent string to identify your crawler. Used for robots.txt checking when enabled.                                |
+
+```python
+run_config = CrawlerRunConfig(
+    check_robots_txt=True,  # Enable robots.txt compliance
+    user_agent="MyBot/1.0"  # Identify your crawler
+)
 ```
-
-**What’s Happening**:
-- **`text_mode=True`** avoids loading images and other heavy resources, speeding up the crawl.  
-- We disable caching (`cache_mode=CacheMode.BYPASS`) to always fetch fresh content.  
-- We only keep `main.article` content by specifying `css_selector="main.article"`.  
-- We exclude external links (`exclude_external_links=True`).  
-- We do a quick screenshot (`screenshot=True`) before finishing.
-
----
 
 ## 3. Putting It All Together
 

@@ -226,8 +226,15 @@ tree.md
 .local
 .do
 /plans
+plans/
+
+# Codeium
 .codeiumignore
 todo/
+
+# windsurf rules
+.windsurfrules
+
 
 # windsurf rules
 .windsurfrules

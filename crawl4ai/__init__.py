@@ -12,10 +12,11 @@ from .extraction_strategy import (
     LLMExtractionStrategy,
     CosineStrategy,
     JsonCssExtractionStrategy,
+    JsonXPathExtractionStrategy
 )
 from .chunking_strategy import ChunkingStrategy, RegexChunking
 from .markdown_generation_strategy import DefaultMarkdownGenerator
-from .content_filter_strategy import PruningContentFilter, BM25ContentFilter
+from .content_filter_strategy import PruningContentFilter, BM25ContentFilter, LLMContentFilter, RelevantContentFilter
 from .models import CrawlResult, MarkdownGenerationResult
 from .async_dispatcher import (
     MemoryAdaptiveDispatcher,
@@ -39,11 +40,14 @@ __all__ = [
     "LLMExtractionStrategy",
     "CosineStrategy",
     "JsonCssExtractionStrategy",
+    "JsonXPathExtractionStrategy",
     "ChunkingStrategy",
     "RegexChunking",
     "DefaultMarkdownGenerator",
+    "RelevantContentFilter",
     "PruningContentFilter",
     "BM25ContentFilter",
+    "LLMContentFilter",
     "BaseDispatcher",
     "MemoryAdaptiveDispatcher",
     "SemaphoreDispatcher",

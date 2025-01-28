@@ -6,7 +6,7 @@ We would like to thank the following people for their contributions to Crawl4AI:
 
 - [Unclecode](https://github.com/unclecode) - Project Creator and Main Developer
 - [Nasrin](https://github.com/ntohidi) - Project Manager and Developer
-- [Aravind Karnam](https://github.com/aravindkarnam) - Developer
+- [Aravind Karnam](https://github.com/aravindkarnam) - Head of Community and Product 
 
 ## Community Contributors
 

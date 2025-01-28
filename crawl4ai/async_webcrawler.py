@@ -40,6 +40,7 @@ from .utils import (
     fast_format_html,
     create_box_message,
     get_error_context,
+    RobotsParser,
 )
 
 from typing import Union, AsyncGenerator, List, TypeVar
@@ -202,6 +203,9 @@ class AsyncWebCrawler:
         self.crawl4ai_folder = os.path.join(base_directory, ".crawl4ai")
         os.makedirs(self.crawl4ai_folder, exist_ok=True)
         os.makedirs(f"{self.crawl4ai_folder}/cache", exist_ok=True)
+
+        # Initialize robots parser
+        self.robots_parser = RobotsParser()
 
         self.ready = False
 
@@ -414,6 +418,18 @@ class AsyncWebCrawler:
                     if user_agent:
                         self.crawler_strategy.update_user_agent(user_agent)
 
+                    # Check robots.txt if enabled
+                    if config and config.check_robots_txt:
+                        if not await self.robots_parser.can_fetch(url, self.browser_config.user_agent):
+                            return CrawlResult(
+                                url=url,
+                                html="",
+                                success=False,
+                                status_code=403,
+                                error_message="Access denied by robots.txt",
+                                response_headers={"X-Robots-Status": "Blocked by robots.txt"}
+                            )
+
                     # Pass config to crawl method
                     async_response = await self.crawler_strategy.crawl(
                         url,
@@ -446,7 +462,7 @@ class AsyncWebCrawler:
                     )
 
                     crawl_result.status_code = async_response.status_code
-                    crawl_result.redirected_url = async_response.final_url or url
+                    crawl_result.redirected_url = async_response.redirected_url or url
                     crawl_result.response_headers = async_response.response_headers
                     crawl_result.downloaded_files = async_response.downloaded_files
                     crawl_result.ssl_certificate = (
