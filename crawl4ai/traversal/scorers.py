@@ -1,9 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import List, Dict, Optional, Union
+from typing import List, Dict, Optional
 from dataclasses import dataclass
 from urllib.parse import urlparse, unquote
 import re
-from collections import defaultdict
 import math
 import logging
 from functools import lru_cache

@@ -1,3 +1,4 @@
+from __future__ import annotations
 from pydantic import BaseModel, HttpUrl
 from typing import List, Dict, Optional, Callable, Awaitable, Union, Any
 from enum import Enum
@@ -5,6 +6,7 @@ from dataclasses import dataclass
 from .ssl_certificate import SSLCertificate
 from datetime import datetime
 from datetime import timedelta
+from math import inf
 
 
 ###############################
@@ -95,6 +97,18 @@ class DispatchResult(BaseModel):
     error_message: str = ""
 
 
+@dataclass
+class TraversalStats:
+    """Statistics for the traversal process"""
+
+    start_time: datetime
+    urls_processed: int = 0
+    urls_failed: int = 0
+    urls_skipped: int = 0
+    total_depth_reached: int = 0
+    current_depth: int = 0
+
+
 class CrawlResult(BaseModel):
     url: str
     html: str
@@ -118,6 +132,12 @@ class CrawlResult(BaseModel):
     ssl_certificate: Optional[SSLCertificate] = None
     dispatch_result: Optional[DispatchResult] = None
     redirected_url: Optional[str] = None
+    # Attributes for position
+    depth: Optional[int] = None
+    score: Optional[float] = -inf
+    # For referencing children and parents from a flattened list of CrawlResult elements
+    parent_url: Optional[str] = None
+    child_urls: Optional[List[str]] = None
 
     class Config:
         arbitrary_types_allowed = True
@@ -161,12 +181,12 @@ class Link(BaseModel):
 
 class Media(BaseModel):
     images: List[MediaItem] = []
-    videos: List[
-        MediaItem
-    ] = []  # Using MediaItem model for now, can be extended with Video model if needed
-    audios: List[
-        MediaItem
-    ] = []  # Using MediaItem model for now, can be extended with Audio model if needed
+    videos: List[MediaItem] = (
+        []
+    )  # Using MediaItem model for now, can be extended with Video model if needed
+    audios: List[MediaItem] = (
+        []
+    )  # Using MediaItem model for now, can be extended with Audio model if needed
 
 
 class Links(BaseModel):

@@ -10,13 +10,20 @@ import asyncio
 
 # from contextlib import nullcontext, asynccontextmanager
 from contextlib import asynccontextmanager
-from .models import CrawlResult, MarkdownGenerationResult, CrawlerTaskResult, DispatchResult
+
+from .models import (
+    CrawlResult,
+    MarkdownGenerationResult,
+    CrawlerTaskResult,
+    DispatchResult,
+    DeepCrawlingProgress,
+)
 from .async_database import async_db_manager
 from .chunking_strategy import *  # noqa: F403
 from .chunking_strategy import RegexChunking, ChunkingStrategy, IdentityChunking
 from .content_filter_strategy import *  # noqa: F403
 from .content_filter_strategy import RelevantContentFilter
-from .extraction_strategy import * # noqa: F403
+from .extraction_strategy import *  # noqa: F403
 from .extraction_strategy import NoExtractionStrategy, ExtractionStrategy
 from .async_crawler_strategy import (
     AsyncCrawlerStrategy,
@@ -30,8 +37,9 @@ from .markdown_generation_strategy import (
 )
 from .async_logger import AsyncLogger
 from .async_configs import BrowserConfig, CrawlerRunConfig
-from .async_dispatcher import * # noqa: F403
+from .async_dispatcher import *  # noqa: F403
 from .async_dispatcher import BaseDispatcher, MemoryAdaptiveDispatcher, RateLimiter
+from .traversal import TraversalStrategy
 
 from .config import MIN_WORD_THRESHOLD
 from .utils import (
@@ -46,7 +54,7 @@ from .utils import (
 from typing import Union, AsyncGenerator, List, TypeVar
 from collections.abc import AsyncGenerator
 
-CrawlResultT = TypeVar('CrawlResultT', bound=CrawlResult)
+CrawlResultT = TypeVar("CrawlResultT", bound=CrawlResult)
 RunManyReturn = Union[List[CrawlResultT], AsyncGenerator[CrawlResultT, None]]
 
 from .__version__ import __version__ as crawl4ai_version
@@ -257,7 +265,7 @@ class AsyncWebCrawler:
 
     @asynccontextmanager
     async def nullcontext(self):
-        """异步空上下文管理器"""
+        """Asynchronous null context manager"""
         yield
 
     async def arun(
@@ -420,14 +428,18 @@ class AsyncWebCrawler:
 
                     # Check robots.txt if enabled
                     if config and config.check_robots_txt:
-                        if not await self.robots_parser.can_fetch(url, self.browser_config.user_agent):
+                        if not await self.robots_parser.can_fetch(
+                            url, self.browser_config.user_agent
+                        ):
                             return CrawlResult(
                                 url=url,
                                 html="",
                                 success=False,
                                 status_code=403,
                                 error_message="Access denied by robots.txt",
-                                response_headers={"X-Robots-Status": "Blocked by robots.txt"}
+                                response_headers={
+                                    "X-Robots-Status": "Blocked by robots.txt"
+                                },
                             )
 
                     # Pass config to crawl method
@@ -449,7 +461,7 @@ class AsyncWebCrawler:
                     )
 
                     # Process the HTML content
-                    crawl_result : CrawlResult = await self.aprocess_html(
+                    crawl_result: CrawlResult = await self.aprocess_html(
                         url=url,
                         html=html,
                         extracted_content=extracted_content,
@@ -717,7 +729,7 @@ class AsyncWebCrawler:
     async def arun_many(
         self,
         urls: List[str],
-        config: Optional[CrawlerRunConfig] = None, 
+        config: Optional[CrawlerRunConfig] = None,
         dispatcher: Optional[BaseDispatcher] = None,
         # Legacy parameters maintained for backwards compatibility
         word_count_threshold=MIN_WORD_THRESHOLD,
@@ -731,8 +743,8 @@ class AsyncWebCrawler:
         pdf: bool = False,
         user_agent: str = None,
         verbose=True,
-        **kwargs
-        ) -> RunManyReturn:
+        **kwargs,
+    ) -> RunManyReturn:
         """
         Runs the crawler for multiple URLs concurrently using a configurable dispatcher strategy.
 
@@ -786,7 +798,9 @@ class AsyncWebCrawler:
             )
 
         transform_result = lambda task_result: (
-            setattr(task_result.result, 'dispatch_result', 
+            setattr(
+                task_result.result,
+                "dispatch_result",
                 DispatchResult(
                     task_id=task_result.task_id,
                     memory_usage=task_result.memory_usage,
@@ -794,20 +808,59 @@ class AsyncWebCrawler:
                     start_time=task_result.start_time,
                     end_time=task_result.end_time,
                     error_message=task_result.error_message,
-                )
-            ) or task_result.result
+                ),
+            )
+            or task_result.result
         )
 
         stream = config.stream
-        
+
         if stream:
+
             async def result_transformer():
-                async for task_result in dispatcher.run_urls_stream(crawler=self, urls=urls, config=config):
+                async for task_result in dispatcher.run_urls_stream(
+                    crawler=self, urls=urls, config=config
+                ):
                     yield transform_result(task_result)
+
             return result_transformer()
         else:
             _results = await dispatcher.run_urls(crawler=self, urls=urls, config=config)
-            return [transform_result(res) for res in _results]    
+            return [transform_result(res) for res in _results]
+
+    async def adeep_crawl(
+        self,
+        url: str,
+        strategy: TraversalStrategy,
+        crawler_run_config: Optional[CrawlerRunConfig] = None,
+        stream: Optional[bool] = False,
+    ) -> Union[AsyncGenerator[CrawlResult,None],List[CrawlResult]]:
+        """
+        Traverse child URLs starting from the given URL, based on Traversal strategy
+
+        Args:
+            url: Starting URL for scraping
+            strategy: Traversal strategy to use
+            crawler_config: Configuration object controlling crawl behavior
+            stream (bool, optional): Whether to stream the results. Defaults to False.
+
+        Returns:
+            List of CrawlResults
+        """
+        try:
+            result_generator = strategy.deep_crawl(
+                url, crawler=self, crawler_run_config=crawler_run_config
+            )
+            if stream:
+               return result_generator
+            else:
+                results = []
+                async for result in result_generator:
+                    results.append(result)
+                return results
+        except Exception as e:
+            self.logger.error(f"Error in streaming Deep Crawl: {str(e)}")
+            raise
 
     async def aclear_cache(self):
         """Clear the cache database."""
