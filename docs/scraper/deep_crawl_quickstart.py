@@ -135,6 +135,7 @@ async def advanced_scraper_example():
 
         try:
             # Use streaming mode
+            results = []
             result_generator = await crawler.adeep_crawl(
                 "https://techcrunch.com",
                 strategy=bfs_strategy,
@@ -151,6 +152,7 @@ async def advanced_scraper_example():
                     logger.info(
                         f"Processed at depth: {result.depth} with score: {result.score:.3f} : \n {result.url}"
                     )
+                    results.append(result)
                 else:
                     stats["errors"] += 1
                     logger.error(

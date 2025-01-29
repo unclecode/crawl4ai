@@ -16,7 +16,6 @@ from .models import (
     MarkdownGenerationResult,
     CrawlerTaskResult,
     DispatchResult,
-    DeepCrawlingProgress,
 )
 from .async_database import async_db_manager
 from .chunking_strategy import *  # noqa: F403
