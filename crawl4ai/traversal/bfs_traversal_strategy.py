@@ -8,7 +8,7 @@ from ..models import CrawlResult, TraversalStats
 from .filters import FilterChain
 from .scorers import URLScorer
 from .traversal_strategy import TraversalStrategy
-from ..config import SCRAPER_BATCH_SIZE
+from ..config import DEEP_CRAWL_BATCH_SIZE
 
 
 class BFSTraversalStrategy(TraversalStrategy):
@@ -139,7 +139,7 @@ class BFSTraversalStrategy(TraversalStrategy):
                 """
                 # Collect batch of URLs into active_crawls to process
                 async with active_crawls_lock:
-                    while len(active_crawls) < SCRAPER_BATCH_SIZE and not queue.empty():
+                    while len(active_crawls) < DEEP_CRAWL_BATCH_SIZE and not queue.empty():
                         score, depth, url, parent_url = await queue.get()
                         active_crawls[url] = {
                             "depth": depth,
