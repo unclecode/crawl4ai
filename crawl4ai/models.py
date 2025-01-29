@@ -135,9 +135,7 @@ class CrawlResult(BaseModel):
     # Attributes for position
     depth: Optional[int] = None
     score: Optional[float] = -inf
-    # For referencing children and parents from a flattened list of CrawlResult elements
     parent_url: Optional[str] = None
-    child_urls: Optional[List[str]] = None
 
     class Config:
         arbitrary_types_allowed = True

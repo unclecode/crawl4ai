@@ -84,7 +84,6 @@ class BFSTraversalStrategy(TraversalStrategy):
         links_to_process = result.links["internal"]
         if self.process_external_links:
             links_to_process += result.links["external"]
-        child_urls = []
         for link in links_to_process:
             url = link["href"]
             if url in visited:
@@ -93,13 +92,11 @@ class BFSTraversalStrategy(TraversalStrategy):
                 self.stats.urls_skipped += 1
                 continue
             score = self.url_scorer.score(url) if self.url_scorer else 0
-            child_urls.append(url)
             await queue.put((score, next_depth, url, source_url))
             depths[url] = next_depth
             self.stats.total_depth_reached = max(
                 self.stats.total_depth_reached, next_depth
             )
-        return child_urls
 
     async def deep_crawl(
         self,
@@ -167,13 +164,12 @@ class BFSTraversalStrategy(TraversalStrategy):
                             crawl_info = active_crawls.pop(result.url, None)
 
                         if crawl_info and result.success:
-                            child_urls = await self._process_links(
+                            await self._process_links(
                                 result, result.url, queue, visited, depths
                             )
                             result.depth = crawl_info["depth"]
                             result.score = crawl_info["score"]
                             result.parent_url = crawl_info["parent_url"]
-                            result.child_urls = child_urls
                             yield result
                         else:
                             self.logger.warning(
