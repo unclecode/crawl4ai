@@ -503,8 +503,7 @@ class HTML2Text(html.parser.HTMLParser):
                 self.o(self.close_quote)
             self.quote = not self.quote
 
-        def link_url(self: HTML2Text, link: str, title: str = "") -> None:
-            url = urlparse.urljoin(self.baseurl, link)
+        def format_markdown_link(self: HTML2Text, url: str, title: str = "") -> None:
             title = ' "{}"'.format(title) if title.strip() else ""
             self.o("]({url}{title})".format(url=escape_md(url), title=title))
 
@@ -521,8 +520,6 @@ class HTML2Text(html.parser.HTMLParser):
                     self.astack.append(attrs)
                     self.maybe_automatic_link = attrs["href"]
                     self.empty_link = True
-                    if self.protect_links:
-                        attrs["href"] = "<" + attrs["href"] + ">"
                 else:
                     self.astack.append(None)
             else:
@@ -540,7 +537,10 @@ class HTML2Text(html.parser.HTMLParser):
                             self.p_p = 0
                             title = a.get("title") or ""
                             title = escape_md(title)
-                            link_url(self, a["href"], title)
+                            joined_url = urlparse.urljoin(self.baseurl, a["href"])
+                            if self.protect_links:
+                                joined_url = "<" + joined_url + ">"
+                            format_markdown_link(self, joined_url, title)
                         else:
                             i = self.previousIndex(a)
                             if i is not None:
@@ -838,11 +838,14 @@ class HTML2Text(html.parser.HTMLParser):
                 newa = []
                 for link in self.a:
                     if self.outcount > link.outcount:
+                        joined_url = urlparse.urljoin(self.baseurl, link.attrs["href"])
+                        if self.protect_links:
+                            joined_url = "<" + joined_url + ">"
                         self.out(
                             "   ["
                             + str(link.count)
                             + "]: "
-                            + urlparse.urljoin(self.baseurl, link.attrs["href"])
+                            + joined_url
                         )
                         if "title" in link.attrs and link.attrs["title"] is not None:
                             self.out(" (" + link.attrs["title"] + ")")

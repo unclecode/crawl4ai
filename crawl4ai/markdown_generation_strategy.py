@@ -14,11 +14,6 @@ def fast_urljoin(base: str, url: str) -> str:
     """Fast URL joining for common cases."""
     if url.startswith(("http://", "https://", "mailto:", "//")):
         return url
-    if url.startswith("/"):
-        # Handle absolute paths
-        if base.endswith("/"):
-            return base[:-1] + url
-        return base + url
     return urljoin(base, url)
 
 
@@ -103,6 +98,9 @@ class DefaultMarkdownGenerator(MarkdownGenerationStrategy):
             parts.append(markdown[last_end : match.start()])
             text, url, title = match.groups()
 
+            # Strip <> protection if present
+            url = url.strip('<>')
+
             # Use cached URL if available, otherwise compute and cache
             if base_url and not url.startswith(("http://", "https://", "mailto:")):
                 if url not in url_cache:
@@ -115,7 +113,7 @@ class DefaultMarkdownGenerator(MarkdownGenerationStrategy):
                     desc.append(title)
                 if text and text != title:
                     desc.append(text)
-                link_map[url] = (counter, ": " + " - ".join(desc) if desc else "")
+                link_map[url] = (counter, " : " + " - ".join(desc) if desc else "")
                 counter += 1
 
             num = link_map[url][0]
@@ -132,7 +130,7 @@ class DefaultMarkdownGenerator(MarkdownGenerationStrategy):
         # Pre-build reference strings
         references = ["\n\n## References\n\n"]
         references.extend(
-            f"⟨{num}⟩ {url}{desc}\n"
+            f"⟨{num}⟩ {url}{desc}  \n"
             for url, (num, desc) in sorted(link_map.items(), key=lambda x: x[1][0])
         )
 
