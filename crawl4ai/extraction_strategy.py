@@ -1065,6 +1065,7 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
         html: str,
         schema_type: str = "CSS", # or XPATH
         query: str = None,
+        target_json_example: str = None,
         provider: str = "gpt-4o",
         api_token: str = os.getenv("OPENAI_API_KEY"),
         **kwargs
@@ -1092,7 +1093,26 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
         # Build the prompt
         system_message = {
             "role": "system", 
-            "content": "You are a specialized HTML schema generator. Analyze the HTML and generate a JSON schema that follows the specified format. Only output valid JSON schema, nothing else."
+            "content": f"""You specialize in generating special JSON schemas for web scraping. This schema uses CSS or XPATH selectors to present a repetitive pattern in crawled HTML, such as a product in a product list or a search result item in a list of search results. You use this JSON schema to pass to a language model along with the HTML content to extract structured data from the HTML. The language model uses the JSON schema to extract data from the HTML and retrieve values for fields in the JSON schema, following the schema.
+
+Generating this HTML manually is not feasible, so you need to generate the JSON schema using the HTML content. The HTML copied from the crawled website is provided below, which we believe contains the repetitive pattern.
+
+# Schema main keys:
+- name: This is the name of the schema.
+- baseSelector: This is the CSS or XPATH selector that identifies the base element that contains all the repetitive patterns.
+- baseFields: This is a list of fields that you extract from the base element itself.
+- fields: This is a list of fields that you extract from the children of the base element. {{name, selector, type}} based on the type, you may have extra keys such as "attribute" when the type is "attribute".
+
+# Extra Context:
+In this context, the following items may or may not be present:
+- Example of target JSON object: This is a sample of the final JSON object that we hope to extract from the HTML using the schema you are generating.
+- Extra Instructions: This is optional instructions to consider when generating the schema provided by the user.
+
+# What if there is no example of target JSON object?
+In this scenario, use your best judgment to generate the schema. Try to maximize the number of fields that you can extract from the HTML.
+
+# What are the instructions and details for this schema generation?
+{prompt_template}"""
         }
         
         user_message = {
@@ -1102,15 +1122,18 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
                 ```html
                 {html}
                 ```
-
-                Instructions to extract schema for the above given HTML:
-                {prompt_template}
-
                 """
         }
-        
+
         if query:
             user_message["content"] += f"\n\nImportant Notes to Consider:\n{query}"
+        if target_json_example:
+            user_message["content"] += f"\n\nExample of target JSON object:\n{target_json_example}"
+        
+        user_message["content"] += """IMPORTANT: Ensure your schema is reliable, meaning do not use selectors that seem to generate dynamically and are not reliable. A reliable schema is what you want, as it consistently returns the same data even after many reloads of the page.
+
+        Analyze the HTML and generate a JSON schema that follows the specified format. Only output valid JSON schema, nothing else.
+        """
 
         try:
             # Call LLM with backoff handling

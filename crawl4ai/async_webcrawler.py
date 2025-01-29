@@ -425,6 +425,7 @@ class AsyncWebCrawler:
                     html = sanitize_input_encode(async_response.html)
                     screenshot_data = async_response.screenshot
                     pdf_data = async_response.pdf_data
+                    js_execution_result = async_response.js_execution_result
 
                     t2 = time.perf_counter()
                     self.logger.url_status(
@@ -453,6 +454,7 @@ class AsyncWebCrawler:
                     crawl_result.redirected_url = async_response.redirected_url or url
                     crawl_result.response_headers = async_response.response_headers
                     crawl_result.downloaded_files = async_response.downloaded_files
+                    crawl_result.js_execution_result = js_execution_result
                     crawl_result.ssl_certificate = (
                         async_response.ssl_certificate
                     )  # Add SSL certificate
@@ -646,7 +648,7 @@ class AsyncWebCrawler:
             # Use IdentityChunking for HTML input, otherwise use provided chunking strategy
             chunking = (
                 IdentityChunking()
-                if content_format == "html"
+                if content_format in ["html", "cleaned_html"]
                 else config.chunking_strategy
             )
             sections = chunking.chunk(content)

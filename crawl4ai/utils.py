@@ -22,7 +22,7 @@ import cProfile
 import pstats
 from functools import wraps
 import asyncio
-
+from lxml import html, etree
 import sqlite3
 import hashlib
 from urllib.parse import urljoin, urlparse
@@ -2207,3 +2207,26 @@ def get_error_context(exc_info, context_lines: int = 5):
         "function": func_name,
         "code_context": code_context,
     }
+
+def truncate(value, threshold):
+    if len(value) > threshold:
+        return value[:threshold] + '...'  # Add ellipsis to indicate truncation
+    return value
+
+def optimize_html(html_str, threshold=200):
+    root = html.fromstring(html_str)
+    
+    for element in root.iter():
+        # Process attributes
+        for attr in list(element.attrib):
+            element.attrib[attr] = truncate(element.attrib[attr], threshold)
+        
+        # Process text content
+        if element.text and len(element.text) > threshold:
+            element.text = truncate(element.text, threshold)
+            
+        # Process tail text
+        if element.tail and len(element.tail) > threshold:
+            element.tail = truncate(element.tail, threshold)
+    
+    return html.tostring(root, encoding='unicode', pretty_print=False)

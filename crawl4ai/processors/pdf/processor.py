@@ -55,13 +55,14 @@ class PDFProcessorStrategy(ABC):
 
 class NaivePDFProcessorStrategy(PDFProcessorStrategy):
     def __init__(self, image_dpi: int = 144, image_quality: int = 85, extract_images: bool = True, 
-                 save_images_locally: bool = False, image_save_dir: Optional[Path] = None):
+                 save_images_locally: bool = False, image_save_dir: Optional[Path] = None, batch_size: int = 4):
         self.image_dpi = image_dpi
         self.image_quality = image_quality
         self.current_page_number = 0
         self.extract_images = extract_images
         self.save_images_locally = save_images_locally
         self.image_save_dir = image_save_dir
+        self.batch_size = batch_size
         self._temp_dir = None
 
     def process(self, pdf_path: Path) -> PDFProcessResult:
@@ -89,7 +90,7 @@ class NaivePDFProcessorStrategy(PDFProcessorStrategy):
 
                 for page_num, page in enumerate(reader.pages):
                     self.current_page_number = page_num + 1
-                    pdf_page = self._process_page(page, image_dir, reader)
+                    pdf_page = self._process_page(page, image_dir)
                     result.pages.append(pdf_page)
 
         except Exception as e:
@@ -107,7 +108,80 @@ class NaivePDFProcessorStrategy(PDFProcessorStrategy):
         result.processing_time = time() - start_time
         return result
 
-    def _process_page(self, page, image_dir: Optional[Path], reader) -> PDFPage:
+    def process_batch(self, pdf_path: Path) -> PDFProcessResult:
+        """Like process() but processes PDF pages in parallel batches"""
+        import concurrent.futures
+        import threading
+        
+        # Initialize PyPDF2 thread support
+        if not hasattr(threading.current_thread(), "_children"): 
+            threading.current_thread()._children = set()
+        
+        start_time = time()
+        result = PDFProcessResult(
+            metadata=PDFMetadata(),
+            pages=[],
+            version="1.1" 
+        )
+
+        try:
+            # Get metadata and page count from main thread
+            with pdf_path.open('rb') as file:
+                reader = PdfReader(file)
+                result.metadata = self._extract_metadata(pdf_path, reader)
+                total_pages = len(reader.pages)
+
+            # Handle image directory setup
+            image_dir = None
+            if self.extract_images and self.save_images_locally:
+                if self.image_save_dir:
+                    image_dir = Path(self.image_save_dir)
+                    image_dir.mkdir(exist_ok=True, parents=True)
+                else:
+                    self._temp_dir = tempfile.mkdtemp(prefix='pdf_images_')
+                    image_dir = Path(self._temp_dir)
+
+            def process_page_safely(page_num: int):
+                # Each thread opens its own file handle
+                with pdf_path.open('rb') as file:
+                    thread_reader = PdfReader(file)
+                    page = thread_reader.pages[page_num]
+                    self.current_page_number = page_num + 1
+                    return self._process_page(page, image_dir)
+
+            # Process pages in parallel batches
+            with concurrent.futures.ThreadPoolExecutor(max_workers=self.batch_size) as executor:
+                futures = []
+                for page_num in range(total_pages):
+                    future = executor.submit(process_page_safely, page_num)
+                    futures.append((page_num + 1, future))
+
+                # Collect results in order
+                result.pages = [None] * total_pages
+                for page_num, future in futures:
+                    try:
+                        pdf_page = future.result()
+                        result.pages[page_num - 1] = pdf_page
+                    except Exception as e:
+                        logger.error(f"Failed to process page {page_num}: {str(e)}")
+                        raise
+
+        except Exception as e:
+            logger.error(f"Failed to process PDF: {str(e)}")
+            raise
+        finally:
+            # Cleanup temp directory if it was created
+            if self._temp_dir and not self.image_save_dir:
+                import shutil
+                try:
+                    shutil.rmtree(self._temp_dir)
+                except Exception as e:
+                    logger.error(f"Failed to cleanup temp directory: {str(e)}")
+
+        result.processing_time = time() - start_time
+        return result
+
+    def _process_page(self, page, image_dir: Optional[Path]) -> PDFPage:
         pdf_page = PDFPage(
             page_number=self.current_page_number,
         )

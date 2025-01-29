@@ -56,15 +56,17 @@ class PDFContentScrapingStrategy(ContentScrapingStrategy):
         
     """
     def __init__(self, 
-                 save_images_locally=False,
-                 extract_images=False,
-                 image_save_dir=None,
+                 save_images_locally : bool = False,
+                 extract_images : bool = False,
+                 image_save_dir : str = None,
+                 batch_size: int = 4,
                  logger: AsyncLogger = None):
         self.logger = logger
         self.pdf_processor = NaivePDFProcessorStrategy(
-            save_images_locally=False,
-            extract_images=False,
-            image_save_dir=None
+            save_images_locally=save_images_locally,
+            extract_images=extract_images,
+            image_save_dir=image_save_dir,
+            batch_size=batch_size
         )
 
     def scrap(self, url: str, html: str, **params) -> ScrapingResult:
@@ -83,7 +85,8 @@ class PDFContentScrapingStrategy(ContentScrapingStrategy):
         pdf_path = self._get_pdf_path(url)
         try:
             # Process PDF
-            result = self.pdf_processor.process(Path(pdf_path))
+            # result = self.pdf_processor.process(Path(pdf_path))
+            result = self.pdf_processor.process_batch(Path(pdf_path))
             
             # Combine page HTML
             cleaned_html = f"""

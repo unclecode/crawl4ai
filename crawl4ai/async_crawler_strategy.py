@@ -872,6 +872,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             "on_page_context_created": None,
             "on_user_agent_updated": None,
             "on_execution_started": None,
+            "on_execution_ended": None,
             "before_goto": None,
             "after_goto": None,
             "before_return_html": None,
@@ -1529,6 +1530,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     )
 
                 await self.execute_hook("on_execution_started", page, context=context, config=config)
+                await self.execute_hook("on_execution_ended", page, context=context, config=config, result=execution_result)
 
             # Handle user simulation
             if config.simulate_user or config.magic:
@@ -1621,6 +1623,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             return AsyncCrawlResponse(
                 html=html,
                 response_headers=response_headers,
+                js_execution_result=execution_result,
                 status_code=status_code,
                 screenshot=screenshot_data,
                 pdf_data=pdf_data,
@@ -2028,8 +2031,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                             f"""
                         (async () => {{
                             try {{
-                                {script}
-                                return {{ success: true }};
+                                const script_result = {script};
+                                return {{ success: true, result: script_result }};
                             }} catch (err) {{
                                 return {{ success: false, error: err.toString(), stack: err.stack }};
                             }}
