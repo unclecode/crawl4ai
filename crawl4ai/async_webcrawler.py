@@ -65,6 +65,7 @@ DeepCrawlManyReturn = Union[
     AsyncGenerator[CrawlResultT, None],
 ]
 
+
 class AsyncWebCrawler:
     """
     Asynchronous web crawler with flexible caching capabilities.
@@ -849,40 +850,6 @@ class AsyncWebCrawler:
         else:
             _results = await dispatcher.run_urls(crawler=self, urls=urls, config=config)
             return [transform_result(res) for res in _results]
-
-    async def adeep_crawl(
-        self,
-        url: str,
-        strategy: DeepCrawlStrategy,
-        crawler_run_config: Optional[CrawlerRunConfig] = None,
-        stream: Optional[bool] = False,
-    ) -> Union[AsyncGenerator[CrawlResult,None],List[CrawlResult]]:
-        """
-        Traverse child URLs starting from the given URL, based on Traversal strategy
-
-        Args:
-            url: Starting URL for scraping
-            strategy: Traversal strategy to use
-            crawler_config: Configuration object controlling crawl behavior
-            stream (bool, optional): Whether to stream the results. Defaults to False.
-
-        Returns:
-            List of CrawlResults
-        """
-        try:
-            result_generator = strategy.deep_crawl(
-                url, crawler=self, crawler_run_config=crawler_run_config
-            )
-            if stream:
-               return result_generator
-            else:
-                results = []
-                async for result in result_generator:
-                    results.append(result)
-                return results
-        except Exception as e:
-            self.logger.error(f"Error in streaming Deep Crawl: {str(e)}")
-            raise
 
     async def aclear_cache(self):
         """Clear the cache database."""
