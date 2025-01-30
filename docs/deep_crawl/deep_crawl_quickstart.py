@@ -1,17 +1,24 @@
 # basic_scraper_example.py
 from crawl4ai.async_configs import CrawlerRunConfig, BrowserConfig
 from crawl4ai.content_scraping_strategy import LXMLWebScrapingStrategy
-from crawl4ai.traversal import (
-    BFSTraversalStrategy,
+from crawl4ai.deep_crawl import (
+    BFSDeepCrawlStrategy,
     FilterChain,
     URLPatternFilter,
     ContentTypeFilter,
+    DomainFilter,
+    KeywordRelevanceScorer,
+    PathDepthScorer,
+    FreshnessScorer,
+    CompositeScorer,
 )
 from crawl4ai.async_webcrawler import AsyncWebCrawler
 import re
 import time
+import logging
 
 browser_config = BrowserConfig(headless=True, viewport_width=800, viewport_height=600)
+
 
 async def basic_scraper_example():
     """
@@ -31,7 +38,7 @@ async def basic_scraper_example():
     )
 
     # Initialize the strategy with basic configuration
-    bfs_strategy = BFSTraversalStrategy(
+    bfs_strategy = BFSDeepCrawlStrategy(
         max_depth=2,  # Only go 2 levels deep
         filter_chain=filter_chain,
         url_scorer=None,  # Use default scoring
@@ -44,8 +51,8 @@ async def basic_scraper_example():
     ) as crawler:
         # Start scraping
         try:
-            results = await crawler.adeep_crawl(
-                "https://crawl4ai.com/mkdocs", strategy=bfs_strategy
+            results = await crawler.arun(
+                "https://crawl4ai.com/mkdocs", CrawlerRunConfig(deep_crawl_strategy=bfs_strategy)
             )
             # Process results
             print(f"Crawled {len(results)} pages:")
@@ -54,23 +61,6 @@ async def basic_scraper_example():
 
         except Exception as e:
             print(f"Error during scraping: {e}")
-
-
-# advanced_scraper_example.py
-import logging
-
-from crawl4ai.traversal import (
-    BFSTraversalStrategy,
-    FilterChain,
-    URLPatternFilter,
-    ContentTypeFilter,
-    DomainFilter,
-    KeywordRelevanceScorer,
-    PathDepthScorer,
-    FreshnessScorer,
-    CompositeScorer,
-)
-
 
 async def advanced_scraper_example():
     """
@@ -121,7 +111,7 @@ async def advanced_scraper_example():
     )
 
     # Initialize strategy with advanced configuration
-    bfs_strategy = BFSTraversalStrategy(
+    bfs_strategy = BFSDeepCrawlStrategy(
         max_depth=2, filter_chain=filter_chain, url_scorer=scorer
     )
 
@@ -136,13 +126,10 @@ async def advanced_scraper_example():
         try:
             # Use streaming mode
             results = []
-            result_generator = await crawler.adeep_crawl(
+            result_generator = await crawler.arun(
                 "https://techcrunch.com",
-                strategy=bfs_strategy,
-                crawler_run_config=CrawlerRunConfig(
-                    scraping_strategy=LXMLWebScrapingStrategy()
-                ),
-                stream=True,
+                config=CrawlerRunConfig(deep_crawl_strategy=bfs_strategy,
+                stream=True)
             )
             async for result in result_generator:
                 stats["processed"] += 1

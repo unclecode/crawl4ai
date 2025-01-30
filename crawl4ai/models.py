@@ -140,7 +140,6 @@ class CrawlResult(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-
 class AsyncCrawlResponse(BaseModel):
     html: str
     response_headers: Dict[str, str]

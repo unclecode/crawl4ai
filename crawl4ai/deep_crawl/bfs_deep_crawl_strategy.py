@@ -3,15 +3,14 @@ from datetime import datetime
 import asyncio
 import logging
 from urllib.parse import urlparse
-from ..async_configs import CrawlerRunConfig
 from ..models import CrawlResult, TraversalStats
 from .filters import FilterChain
 from .scorers import URLScorer
-from .traversal_strategy import TraversalStrategy
+from .deep_crawl_strategty import DeepCrawlStrategy
 from ..config import DEEP_CRAWL_BATCH_SIZE
 
 
-class BFSTraversalStrategy(TraversalStrategy):
+class BFSDeepCrawlStrategy(DeepCrawlStrategy):
     """Best-First Search traversal strategy with filtering and scoring."""
 
     def __init__(
@@ -98,11 +97,11 @@ class BFSTraversalStrategy(TraversalStrategy):
                 self.stats.total_depth_reached, next_depth
             )
 
-    async def deep_crawl(
+    async def arun(
         self,
         start_url: str,
         crawler: "AsyncWebCrawler",
-        crawler_run_config: Optional[CrawlerRunConfig] = None,
+        crawler_run_config: Optional["CrawlerRunConfig"] = None,
     ) -> AsyncGenerator[CrawlResult, None]:
         """Implement BFS traversal strategy"""
 
@@ -136,7 +135,9 @@ class BFSTraversalStrategy(TraversalStrategy):
                 """
                 # Collect batch of URLs into active_crawls to process
                 async with active_crawls_lock:
-                    while len(active_crawls) < DEEP_CRAWL_BATCH_SIZE and not queue.empty():
+                    while (
+                        len(active_crawls) < DEEP_CRAWL_BATCH_SIZE and not queue.empty()
+                    ):
                         score, depth, url, parent_url = await queue.get()
                         active_crawls[url] = {
                             "depth": depth,
@@ -151,14 +152,14 @@ class BFSTraversalStrategy(TraversalStrategy):
                     continue
                 # Process batch
                 try:
-                    stream_config = (
-                        crawler_run_config.clone(stream=True)
-                        if crawler_run_config
-                        else CrawlerRunConfig(stream=True)
-                    )
+                    # This is very important to ensure recursively you don't deep_crawl down the children.
+                    if crawler_run_config:
+                        crawler_run_config = crawler_run_config.clone(
+                            deep_crawl_strategy=None, stream=True
+                        )
                     async for result in await crawler.arun_many(
                         urls=list(active_crawls.keys()),
-                        config=stream_config,
+                        config=crawler_run_config
                     ):
                         async with active_crawls_lock:
                             crawl_info = active_crawls.pop(result.url, None)

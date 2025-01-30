@@ -1,4 +1,4 @@
-from .bfs_traversal_strategy import BFSTraversalStrategy
+from .bfs_deep_crawl_strategy import BFSDeepCrawlStrategy
 from .filters import (
     URLFilter,
     FilterChain,
@@ -12,10 +12,10 @@ from .scorers import (
     FreshnessScorer,
     CompositeScorer,
 )
-from .traversal_strategy import TraversalStrategy
+from .deep_crawl_strategty import DeepCrawlStrategy
 
 __all__ = [
-    "BFSTraversalStrategy",
+    "BFSDeepCrawlStrategy",
     "FilterChain",
     "URLFilter",
     "URLPatternFilter",
@@ -25,5 +25,5 @@ __all__ = [
     "PathDepthScorer",
     "FreshnessScorer",
     "CompositeScorer",
-    "TraversalStrategy",
+    "DeepCrawlStrategy",
 ]

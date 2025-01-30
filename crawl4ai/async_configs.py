@@ -10,6 +10,7 @@ from .config import (
 from .user_agent_generator import UserAgentGenerator, UAGen, ValidUAGenerator, OnlineUAGenerator
 from .extraction_strategy import ExtractionStrategy
 from .chunking_strategy import ChunkingStrategy, RegexChunking
+from .deep_crawl import DeepCrawlStrategy
 from .markdown_generation_strategy import MarkdownGenerationStrategy
 from .content_filter_strategy import RelevantContentFilter, BM25ContentFilter, LLMContentFilter, PruningContentFilter
 from .content_scraping_strategy import ContentScrapingStrategy, WebScrapingStrategy
@@ -395,6 +396,7 @@ class CrawlerRunConfig:
         word_count_threshold: int = MIN_WORD_THRESHOLD,
         extraction_strategy: ExtractionStrategy = None,
         chunking_strategy: ChunkingStrategy = RegexChunking(),
+        deep_crawl_strategy: DeepCrawlStrategy = None,
         markdown_generator: MarkdownGenerationStrategy = None,
         content_filter : RelevantContentFilter = None,
         only_text: bool = False,
@@ -468,6 +470,7 @@ class CrawlerRunConfig:
         self.word_count_threshold = word_count_threshold
         self.extraction_strategy = extraction_strategy
         self.chunking_strategy = chunking_strategy
+        self.deep_crawl_strategy = deep_crawl_strategy
         self.markdown_generator = markdown_generator
         self.content_filter = content_filter
         self.only_text = only_text
@@ -555,6 +558,14 @@ class CrawlerRunConfig:
             raise ValueError(
                 "extraction_strategy must be an instance of ExtractionStrategy"
             )
+        
+        if self.deep_crawl_strategy is not None and not isinstance(
+            self.deep_crawl_strategy, DeepCrawlStrategy
+        ):
+            raise ValueError(
+            "deep_crawl_strategy must be an instance of DeepCrawlStrategy"
+            )
+
         if self.chunking_strategy is not None and not isinstance(
             self.chunking_strategy, ChunkingStrategy
         ):
@@ -573,6 +584,7 @@ class CrawlerRunConfig:
             word_count_threshold=kwargs.get("word_count_threshold", 200),
             extraction_strategy=kwargs.get("extraction_strategy"),
             chunking_strategy=kwargs.get("chunking_strategy", RegexChunking()),
+            deep_crawl_strategy=kwargs.get("deep_crawl_strategy"),
             markdown_generator=kwargs.get("markdown_generator"),
             content_filter=kwargs.get("content_filter"),
             only_text=kwargs.get("only_text", False),
@@ -656,6 +668,7 @@ class CrawlerRunConfig:
             "word_count_threshold": self.word_count_threshold,
             "extraction_strategy": self.extraction_strategy,
             "chunking_strategy": self.chunking_strategy,
+            "deep_crawl_strategy": self.deep_crawl_strategy,
             "markdown_generator": self.markdown_generator,
             "content_filter": self.content_filter,
             "only_text": self.only_text,

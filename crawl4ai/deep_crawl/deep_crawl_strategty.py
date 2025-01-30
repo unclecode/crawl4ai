@@ -1,17 +1,16 @@
 from abc import ABC, abstractmethod
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
 
-from ..async_configs import CrawlerRunConfig
 from ..models import CrawlResult
 
 
-class TraversalStrategy(ABC):
+class DeepCrawlStrategy(ABC):
     @abstractmethod
-    async def deep_crawl(
+    async def arun(
         self,
         url: str,
         crawler: "AsyncWebCrawler",
-        crawler_run_config: CrawlerRunConfig = None,
+        crawler_run_config: Optional["CrawlerRunConfig"] = None,
     ) -> AsyncGenerator[CrawlResult, None]:
         """Traverse the given URL using the specified crawler.
 

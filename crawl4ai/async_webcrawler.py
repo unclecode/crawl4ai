@@ -38,7 +38,7 @@ from .async_logger import AsyncLogger
 from .async_configs import BrowserConfig, CrawlerRunConfig
 from .async_dispatcher import *  # noqa: F403
 from .async_dispatcher import BaseDispatcher, MemoryAdaptiveDispatcher, RateLimiter
-from .traversal import TraversalStrategy
+from .deep_crawl import DeepCrawlStrategy
 
 from .config import MIN_WORD_THRESHOLD
 from .utils import (
@@ -53,11 +53,17 @@ from .utils import (
 from typing import Union, AsyncGenerator, List, TypeVar
 from collections.abc import AsyncGenerator
 
-CrawlResultT = TypeVar("CrawlResultT", bound=CrawlResult)
-RunManyReturn = Union[List[CrawlResultT], AsyncGenerator[CrawlResultT, None]]
 
 from .__version__ import __version__ as crawl4ai_version
 
+CrawlResultT = TypeVar("CrawlResultT", bound=CrawlResult)
+RunManyReturn = Union[List[CrawlResultT], AsyncGenerator[CrawlResultT, None]]
+
+DeepCrawlSingleReturn = Union[List[CrawlResultT], AsyncGenerator[CrawlResultT, None]]
+DeepCrawlManyReturn = Union[
+    List[List[CrawlResultT]],
+    AsyncGenerator[CrawlResultT, None],
+]
 
 class AsyncWebCrawler:
     """
@@ -289,7 +295,7 @@ class AsyncWebCrawler:
         user_agent: str = None,
         verbose=True,
         **kwargs,
-    ) -> CrawlResult:
+    ) -> Union[CrawlResult, DeepCrawlSingleReturn]:
         """
         Runs the crawler for a single source: URL (web, local file, or raw HTML).
 
@@ -390,6 +396,23 @@ class AsyncWebCrawler:
                 pdf_data = None
                 extracted_content = None
                 start_time = time.perf_counter()
+
+                if crawler_config.deep_crawl_strategy:
+                    if crawler_config.stream:
+                        return crawler_config.deep_crawl_strategy.arun(
+                            start_url=url,
+                            crawler=self,
+                            crawler_run_config=crawler_config,
+                        )
+                    else:
+                        results = []
+                        async for result in crawler_config.deep_crawl_strategy.arun(
+                            start_url=url,
+                            crawler=self,
+                            crawler_run_config=crawler_config,
+                        ):
+                            results.append(result)
+                        return results
 
                 # Try to get cached result if appropriate
                 if cache_context.should_read():
@@ -743,7 +766,7 @@ class AsyncWebCrawler:
         user_agent: str = None,
         verbose=True,
         **kwargs,
-    ) -> RunManyReturn:
+    ) -> Union[RunManyReturn, DeepCrawlManyReturn]:
         """
         Runs the crawler for multiple URLs concurrently using a configurable dispatcher strategy.
 
@@ -830,7 +853,7 @@ class AsyncWebCrawler:
     async def adeep_crawl(
         self,
         url: str,
-        strategy: TraversalStrategy,
+        strategy: DeepCrawlStrategy,
         crawler_run_config: Optional[CrawlerRunConfig] = None,
         stream: Optional[bool] = False,
     ) -> Union[AsyncGenerator[CrawlResult,None],List[CrawlResult]]:
