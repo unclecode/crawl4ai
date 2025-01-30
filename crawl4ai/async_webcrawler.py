@@ -798,6 +798,22 @@ class AsyncWebCrawler:
         ):
             print(f"Processed {result.url}: {len(result.markdown)} chars")
         """
+
+        async def merge_async_generators(generators):
+            tasks = {asyncio.create_task(gen.__anext__()): gen for gen in generators}
+            while tasks:
+                done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+                
+                for task in done:
+                    gen = tasks.pop(task)  # Get the generator associated with this task
+                    
+                    try:
+                        result = task.result()
+                        yield result  # Yield the result
+                        tasks[asyncio.create_task(gen.__anext__())] = gen  # Fetch next item
+                    except StopAsyncIteration:
+                        pass  # Generator is exhausted, don't add it back to the tasks
+
         if config is None:
             config = CrawlerRunConfig(
                 word_count_threshold=word_count_threshold,
@@ -837,6 +853,27 @@ class AsyncWebCrawler:
         )
 
         stream = config.stream
+
+        if config.deep_crawl_strategy:
+            if config.stream:
+                generators = []
+                for url in urls:
+                    generators.append(
+                        config.deep_crawl_strategy.arun(
+                            start_url=url, crawler=self, crawler_run_config=config
+                        )
+                    )
+                return merge_async_generators(generators)
+            else:
+                results = []
+                for url in urls:
+                    url_results = []
+                    async for result in config.deep_crawl_strategy.arun(
+                        start_url=url, crawler=self, crawler_run_config=config
+                    ):
+                        url_results.append(result)
+                    results.append(url_results)
+                return results
 
         if stream:
 

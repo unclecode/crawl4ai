@@ -187,7 +187,6 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
 
         finally:
             self.stats.end_time = datetime.now()
-            await crawler.close()
 
     async def shutdown(self):
         """Clean up resources and stop crawling"""
