@@ -14,6 +14,8 @@ from .extraction_strategy import (
     JsonCssExtractionStrategy,
     JsonXPathExtractionStrategy
 )
+
+
 from .chunking_strategy import ChunkingStrategy, RegexChunking
 from .markdown_generation_strategy import DefaultMarkdownGenerator
 from .content_filter_strategy import PruningContentFilter, BM25ContentFilter, LLMContentFilter, RelevantContentFilter
@@ -26,10 +28,12 @@ from .async_dispatcher import (
     DisplayMode,
     BaseDispatcher
 )
+from .hub import CrawlerHub
 
 __all__ = [
     "AsyncWebCrawler",
     "CrawlResult",
+    "CrawlerHub",
     "CacheMode",
     "ContentScrapingStrategy",
     "WebScrapingStrategy",

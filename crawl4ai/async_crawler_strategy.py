@@ -1265,6 +1265,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         """
         config.url = url
         response_headers = {}
+        execution_result = None
         status_code = None
         redirected_url = url 
 
@@ -1522,6 +1523,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 execution_result = await self.robust_execute_user_script(
                     page, config.js_code
                 )
+
                 if not execution_result["success"]:
                     self.logger.warning(
                         message="User script execution had issues: {error}",

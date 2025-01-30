@@ -49,6 +49,12 @@ from collections.abc import AsyncGenerator
 CrawlResultT = TypeVar('CrawlResultT', bound=CrawlResult)
 RunManyReturn = Union[List[CrawlResultT], AsyncGenerator[CrawlResultT, None]]
 
+DeepCrawlSingleReturn = Union[List[CrawlResultT], AsyncGenerator[CrawlResultT, None]]
+DeepCrawlManyReturn = Union[
+    List[List[CrawlResultT]],
+    AsyncGenerator[CrawlResultT, None],
+]
+
 from .__version__ import __version__ as crawl4ai_version
 
 
@@ -282,7 +288,7 @@ class AsyncWebCrawler:
         user_agent: str = None,
         verbose=True,
         **kwargs,
-    ) -> CrawlResult:
+    ) -> Union[CrawlResult, DeepCrawlSingleReturn]:
         """
         Runs the crawler for a single source: URL (web, local file, or raw HTML).
 
@@ -709,7 +715,7 @@ class AsyncWebCrawler:
         user_agent: str = None,
         verbose=True,
         **kwargs
-        ) -> RunManyReturn:
+        ) -> Union[RunManyReturn, DeepCrawlManyReturn]:
         """
         Runs the crawler for multiple URLs concurrently using a configurable dispatcher strategy.
 
