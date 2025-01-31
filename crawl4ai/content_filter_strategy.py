@@ -9,16 +9,16 @@ from .utils import clean_tokens, perform_completion_with_backoff, escape_json_st
 from abc import ABC, abstractmethod
 import math
 from snowballstemmer import stemmer
-from .config import DEFAULT_PROVIDER, OVERLAP_RATE, WORD_TOKEN_RATE
+from .config import DEFAULT_PROVIDER, OVERLAP_RATE, WORD_TOKEN_RATE, PROVIDER_MODELS
 from .models import TokenUsage
 from .prompts import PROMPT_FILTER_CONTENT
 import os
 import json
 import hashlib
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from .async_logger import AsyncLogger, LogLevel
-from colorama import Fore, Style, init
+from colorama import Fore, Style
 
 class RelevantContentFilter(ABC):
     """Abstract base class for content filtering strategies"""
@@ -879,7 +879,6 @@ class LLMContentFilter(RelevantContentFilter):
                 colors={"chunk_count": Fore.YELLOW}
             )
         
-        extracted_content = []
         start_time = time.time()
         
         # Process chunks in parallel

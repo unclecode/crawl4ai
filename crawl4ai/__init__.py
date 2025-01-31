@@ -1,4 +1,5 @@
 # __init__.py
+import warnings
 
 from .async_webcrawler import AsyncWebCrawler, CacheMode
 from .async_configs import BrowserConfig, CrawlerRunConfig
@@ -28,6 +29,7 @@ from .async_dispatcher import (
     DisplayMode,
     BaseDispatcher
 )
+from .docker_client import Crawl4aiDockerClient
 from .hub import CrawlerHub
 
 __all__ = [
@@ -59,12 +61,13 @@ __all__ = [
     "CrawlerMonitor",
     "DisplayMode",
     "MarkdownGenerationResult",
+    "Crawl4aiDockerClient",
 ]
 
 
 def is_sync_version_installed():
     try:
-        import selenium
+        import selenium # noqa
 
         return True
     except ImportError:
@@ -84,9 +87,6 @@ else:
     WebCrawler = None
     # import warnings
     # print("Warning: Synchronous WebCrawler is not available. Install crawl4ai[sync] for synchronous support. However, please note that the synchronous version will be deprecated soon.")
-
-import warnings
-from pydantic import warnings as pydantic_warnings
 
 # Disable all Pydantic warnings
 warnings.filterwarnings("ignore", module="pydantic")

@@ -1,3 +1,4 @@
+from .__version__ import __version__ as crawl4ai_version
 import os
 import sys
 import time
@@ -10,7 +11,7 @@ import asyncio
 
 # from contextlib import nullcontext, asynccontextmanager
 from contextlib import asynccontextmanager
-from .models import CrawlResult, MarkdownGenerationResult, CrawlerTaskResult, DispatchResult
+from .models import CrawlResult, MarkdownGenerationResult,DispatchResult
 from .async_database import async_db_manager
 from .chunking_strategy import *  # noqa: F403
 from .chunking_strategy import RegexChunking, ChunkingStrategy, IdentityChunking
@@ -43,8 +44,7 @@ from .utils import (
     RobotsParser,
 )
 
-from typing import Union, AsyncGenerator, List, TypeVar
-from collections.abc import AsyncGenerator
+from typing import Union, AsyncGenerator, TypeVar
 
 CrawlResultT = TypeVar('CrawlResultT', bound=CrawlResult)
 RunManyReturn = Union[List[CrawlResultT], AsyncGenerator[CrawlResultT, None]]
@@ -55,7 +55,7 @@ DeepCrawlManyReturn = Union[
     AsyncGenerator[CrawlResultT, None],
 ]
 
-from .__version__ import __version__ as crawl4ai_version
+
 
 
 class AsyncWebCrawler:
@@ -768,18 +768,19 @@ class AsyncWebCrawler:
                 ),
             )
 
-        transform_result = lambda task_result: (
-            setattr(task_result.result, 'dispatch_result', 
-                DispatchResult(
-                    task_id=task_result.task_id,
-                    memory_usage=task_result.memory_usage,
-                    peak_memory=task_result.peak_memory,
-                    start_time=task_result.start_time,
-                    end_time=task_result.end_time,
-                    error_message=task_result.error_message,
+        def transform_result(task_result):
+            return (
+                    setattr(task_result.result, 'dispatch_result', 
+                        DispatchResult(
+                            task_id=task_result.task_id,
+                            memory_usage=task_result.memory_usage,
+                            peak_memory=task_result.peak_memory,
+                            start_time=task_result.start_time,
+                            end_time=task_result.end_time,
+                            error_message=task_result.error_message,
+                        )
+                    ) or task_result.result
                 )
-            ) or task_result.result
-        )
 
         stream = config.stream
         
