@@ -229,5 +229,24 @@ tree.md
 .codeiumignore
 todo/
 
-# windsurf rules
-.windsurfrules
+# Continue development files
+.continue/
+.continuerc.json
+continue.lock
+continue_core.log
+contextProviders/
+continue_workspace/
+.continue-cache/
+continue_config.json
+
+# Continue temporary files
+.continue-temp/
+.continue-logs/
+.continue-downloads/
+
+# Continue VS Code specific
+.vscode-continue/
+.vscode-continue-cache/
+
+.prompts/
+
