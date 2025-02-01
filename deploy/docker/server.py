@@ -13,7 +13,21 @@ from crawl4ai import (
     MemoryAdaptiveDispatcher,
     RateLimiter,
 )
-from models import CrawlRequest, CrawlResponse
+
+from typing import List, Optional
+from pydantic import BaseModel
+
+class CrawlRequest(BaseModel):
+    urls: List[str]
+    browser_config: Optional[dict] = None
+    crawler_config: Optional[dict] = None
+
+class CrawlResponse(BaseModel):
+    success: bool
+    results: List[dict]  
+
+    class Config:
+        arbitrary_types_allowed = True
 
 app = FastAPI(title="Crawl4AI API")
 
