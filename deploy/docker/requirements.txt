@@ -1,3 +1,4 @@
 crawl4ai
 fastapi
 uvicorn
+gunicorn>=23.0.0

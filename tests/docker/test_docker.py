@@ -164,7 +164,7 @@ async def main():
     """Run all tests"""
     # Test direct API
     print("Testing direct API calls...")
-    # await test_direct_api()
+    await test_direct_api()
 
     # Test client SDK
     print("\nTesting client SDK...")

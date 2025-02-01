@@ -1,3 +1,4 @@
+from regex import B
 from .config import (
     MIN_WORD_THRESHOLD,
     IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
@@ -359,7 +360,7 @@ class BrowserConfig():
     @staticmethod
     def load( data: dict) -> "BrowserConfig":
         # Deserialize the object from a dictionary
-        return from_serializable_dict(data)
+        return from_serializable_dict(data) if data else BrowserConfig()
 
 
 class CrawlerRunConfig():
@@ -794,7 +795,7 @@ class CrawlerRunConfig():
     @staticmethod
     def load(data: dict) -> "CrawlerRunConfig":
         # Deserialize the object from a dictionary
-        return from_serializable_dict(data)
+        return from_serializable_dict(data) if data else CrawlerRunConfig()
 
     def to_dict(self):
         return {
