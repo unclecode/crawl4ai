@@ -2,3 +2,6 @@ crawl4ai
 fastapi
 uvicorn
 gunicorn>=23.0.0
+slowapi>=0.1.9
+prometheus-fastapi-instrumentator>=7.0.2
+redis>=5.2.1

@@ -206,17 +206,6 @@ Output the final list of JSON objects, wrapped in <blocks>...</blocks> XML tags.
 
 PROMPT_FILTER_CONTENT = """Your task is to filter and convert HTML content into clean, focused markdown that's optimized for use with LLMs and information retrieval systems.
 
-INPUT HTML: 
-<|HTML_CONTENT_START|>
-{HTML}
-<|HTML_CONTENT_END|>
-
-
-SPECIFIC INSTRUCTION: 
-<|USER_INSTRUCTION_START|>
-{REQUEST}
-<|USER_INSTRUCTION_END|>
-
 TASK DETAILS:
 1. Content Selection
 - DO: Keep essential information, main content, key details
@@ -240,15 +229,7 @@ TASK DETAILS:
 - DON'T: Fragment related content
 - DON'T: Duplicate information
 
-Example Input:
-<div class="main-content"><h1>Setup Guide</h1><p>Follow these steps...</p></div>
-<div class="sidebar">Related articles...</div>
-
-Example Output:
-# Setup Guide
-Follow these steps...
-
-IMPORTANT: If specific instruction is provided above, prioritize those requirements over these general guidelines.
+IMPORTANT: If user specific instruction is provided, ignore above guideline and prioritize those requirements over these general guidelines.
 
 OUTPUT FORMAT: 
 Wrap your response in <content> tags. Use proper markdown throughout.
@@ -256,7 +237,18 @@ Wrap your response in <content> tags. Use proper markdown throughout.
 [Your markdown content here]
 </content>
 
-Begin filtering now."""
+Begin filtering now.
+
+--------------------------------------------
+
+<|HTML_CONTENT_START|>
+{HTML}
+<|HTML_CONTENT_END|>
+
+<|USER_INSTRUCTION_START|>
+{REQUEST}
+<|USER_INSTRUCTION_END|>
+"""
 
 JSON_SCHEMA_BUILDER= """
 # HTML Schema Generation Instructions

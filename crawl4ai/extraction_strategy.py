@@ -21,6 +21,9 @@ from .utils import (
     extract_xml_data,
     split_and_parse_json_objects,
     sanitize_input_encode,
+    chunk_documents,
+    merge_chunks,
+    advanced_split,
 )
 from .models import * # noqa: F403
 
@@ -501,6 +504,10 @@ class LLMExtractionStrategy(ExtractionStrategy):
         instruction: str = None,
         schema: Dict = None,
         extraction_type="block",
+        chunk_token_threshold=CHUNK_TOKEN_THRESHOLD,
+        overlap_rate=OVERLAP_RATE,
+        word_token_rate=WORD_TOKEN_RATE,
+        apply_chunking=True,
         **kwargs,
     ):
         """
@@ -652,53 +659,16 @@ class LLMExtractionStrategy(ExtractionStrategy):
             )
         return blocks
 
-    def _merge(self, documents, chunk_token_threshold, overlap):
+    def _merge(self, documents, chunk_token_threshold, overlap) -> List[str]:
         """
         Merge documents into sections based on chunk_token_threshold and overlap.
         """
-        # chunks = []
-        sections = []
-        total_tokens = 0
-
-        # Calculate the total tokens across all documents
-        for document in documents:
-            total_tokens += len(document.split(" ")) * self.word_token_rate
-
-        # Calculate the number of sections needed
-        num_sections = math.floor(total_tokens / chunk_token_threshold)
-        if num_sections < 1:
-            num_sections = 1  # Ensure there is at least one section
-        adjusted_chunk_threshold = total_tokens / num_sections
-
-        total_token_so_far = 0
-        current_chunk = []
-
-        for document in documents:
-            tokens = document.split(" ")
-            token_count = len(tokens) * self.word_token_rate
-
-            if total_token_so_far + token_count <= adjusted_chunk_threshold:
-                current_chunk.extend(tokens)
-                total_token_so_far += token_count
-            else:
-                # Ensure to handle the last section properly
-                if len(sections) == num_sections - 1:
-                    current_chunk.extend(tokens)
-                    continue
-
-                # Add overlap if specified
-                if overlap > 0 and current_chunk:
-                    overlap_tokens = current_chunk[-overlap:]
-                    current_chunk.extend(overlap_tokens)
-
-                sections.append(" ".join(current_chunk))
-                current_chunk = tokens
-                total_token_so_far = token_count
-
-        # Add the last chunk
-        if current_chunk:
-            sections.append(" ".join(current_chunk))
-
+        sections =  merge_chunks(
+            docs = documents,
+            target_size= chunk_token_threshold,
+            overlap=overlap,
+            word_token_ratio=self.word_token_rate
+        )
         return sections
 
     def run(self, url: str, sections: List[str]) -> List[Dict[str, Any]]:

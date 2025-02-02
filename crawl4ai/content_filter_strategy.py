@@ -5,7 +5,7 @@ from typing import List, Tuple, Dict, Optional
 from rank_bm25 import BM25Okapi
 from collections import deque
 from bs4 import NavigableString, Comment
-from .utils import clean_tokens, perform_completion_with_backoff, escape_json_string, sanitize_html, get_home_folder, extract_xml_data
+from .utils import clean_tokens, perform_completion_with_backoff, escape_json_string, sanitize_html, get_home_folder, extract_xml_data, merge_chunks
 from abc import ABC, abstractmethod
 import math
 from snowballstemmer import stemmer
@@ -23,7 +23,14 @@ from colorama import Fore, Style
 class RelevantContentFilter(ABC):
     """Abstract base class for content filtering strategies"""
 
-    def __init__(self, user_query: str = None):
+    def __init__(self, user_query: str = None, verbose: bool = False, logger: Optional[AsyncLogger] = None):
+        """
+        Initializes the RelevantContentFilter class with optional user query.
+
+        Args:
+            user_query (str): User query for filtering (optional).
+            verbose (bool): Enable verbose logging (default: False).
+        """
         self.user_query = user_query
         self.included_tags = {
             # Primary structure
@@ -92,6 +99,8 @@ class RelevantContentFilter(ABC):
             r"nav|footer|header|sidebar|ads|comment|promo|advert|social|share", re.I
         )
         self.min_word_count = 2
+        self.verbose = False
+        self.logger = logger
 
     @abstractmethod
     def filter_content(self, html: str) -> List[str]:
@@ -755,8 +764,11 @@ class LLMContentFilter(RelevantContentFilter):
         base_url: Optional[str] = None,
         api_base: Optional[str] = None,
         extra_args: Dict = None,
+        # char_token_rate: float = WORD_TOKEN_RATE * 5,
+        # chunk_mode: str = "char",
         verbose: bool = False,
         logger: Optional[AsyncLogger] = None,
+        ignore_cache: bool = False,
     ):
         super().__init__(None)
         self.provider = provider
@@ -768,10 +780,15 @@ class LLMContentFilter(RelevantContentFilter):
         self.instruction = instruction
         self.chunk_token_threshold = chunk_token_threshold
         self.overlap_rate = overlap_rate
-        self.word_token_rate = word_token_rate
+        self.word_token_rate = word_token_rate or WORD_TOKEN_RATE
+        # self.chunk_mode: str = chunk_mode
+        # self.char_token_rate = char_token_rate or word_token_rate / 5
+        # self.token_rate = word_token_rate if chunk_mode == "word" else self.char_token_rate
+        self.token_rate = word_token_rate or WORD_TOKEN_RATE
         self.base_url = base_url
         self.api_base = api_base or base_url
         self.extra_args = extra_args or {}
+        self.ignore_cache = ignore_cache
         self.verbose = verbose
         
         # Setup logger with custom styling for LLM operations
@@ -779,7 +796,7 @@ class LLMContentFilter(RelevantContentFilter):
             self.logger = logger
         elif verbose:
             self.logger = AsyncLogger(
-                verbose=True,
+                verbose=verbose,
                 icons={
                     **AsyncLogger.DEFAULT_ICONS,
                     "LLM": "★",  # Star for LLM operations
@@ -803,45 +820,25 @@ class LLMContentFilter(RelevantContentFilter):
         return hashlib.md5(content.encode()).hexdigest()
 
     def _merge_chunks(self, text: str) -> List[str]:
-        """Split text into chunks with overlap"""
-        # Calculate tokens and sections
-        total_tokens = len(text.split()) * self.word_token_rate
-        num_sections = max(1, math.floor(total_tokens / self.chunk_token_threshold))
-        adjusted_chunk_threshold = total_tokens / num_sections
+        """Split text into chunks with overlap using char or word mode."""
+        ov = int(self.chunk_token_threshold * self.overlap_rate)
+        sections = merge_chunks(
+            docs = [text],
+            target_size= self.chunk_token_threshold,
+            overlap=ov,
+            word_token_ratio=self.word_token_rate
+        )
+        return sections
+    
+        
 
-        # Split into words
-        words = text.split()
-        chunks = []
-        current_chunk = []
-        current_token_count = 0
-
-        for word in words:
-            word_tokens = len(word) * self.word_token_rate
-            if current_token_count + word_tokens <= adjusted_chunk_threshold:
-                current_chunk.append(word)
-                current_token_count += word_tokens
-            else:
-                # Add overlap if not the last chunk
-                if chunks and self.overlap_rate > 0:
-                    overlap_size = int(len(current_chunk) * self.overlap_rate)
-                    current_chunk.extend(current_chunk[-overlap_size:])
-                
-                chunks.append(" ".join(current_chunk))
-                current_chunk = [word]
-                current_token_count = word_tokens
-
-        if current_chunk:
-            chunks.append(" ".join(current_chunk))
-
-        return chunks
-
-    def filter_content(self, html: str, ignore_cache: bool = False) -> List[str]:
+    def filter_content(self, html: str, ignore_cache: bool = True) -> List[str]:
         if not html or not isinstance(html, str):
             return []
 
         if self.logger:
             self.logger.info(
-                "Starting LLM content filtering process", 
+                "Starting LLM markdown content filtering process", 
                 tag="LLM",
                 params={"provider": self.provider},
                 colors={"provider": Fore.CYAN}
@@ -853,9 +850,12 @@ class LLMContentFilter(RelevantContentFilter):
         cache_key = self._get_cache_key(html, self.instruction or "")
         cache_file = cache_dir / f"{cache_key}.json"
 
+        # if ignore_cache == None:
+        ignore_cache = self.ignore_cache
+
         if not ignore_cache and cache_file.exists():
             if self.logger:
-                self.logger.info("Found cached result", tag="CACHE")
+                self.logger.info("Found  cached markdown result", tag="CACHE")
             try:
                 with cache_file.open('r') as f:
                     cached_data = json.load(f)
@@ -867,13 +867,13 @@ class LLMContentFilter(RelevantContentFilter):
                     return cached_data['blocks']
             except Exception as e:
                 if self.logger:
-                    self.logger.error(f"Cache read error: {str(e)}", tag="CACHE")
+                    self.logger.error(f"LLM markdown: Cache read error: {str(e)}", tag="CACHE")
 
         # Split into chunks
         html_chunks = self._merge_chunks(html)
         if self.logger:
             self.logger.info(
-                "Split content into {chunk_count} chunks", 
+                "LLM markdown: Split content into {chunk_count} chunks", 
                 tag="CHUNK",
                 params={"chunk_count": len(html_chunks)},
                 colors={"chunk_count": Fore.YELLOW}
@@ -887,7 +887,7 @@ class LLMContentFilter(RelevantContentFilter):
             for i, chunk in enumerate(html_chunks):
                 if self.logger:
                     self.logger.debug(
-                        "Processing chunk {chunk_num}/{total_chunks}", 
+                        "LLM markdown: Processing chunk {chunk_num}/{total_chunks}", 
                         tag="CHUNK",
                         params={
                             "chunk_num": i + 1,
@@ -904,15 +904,37 @@ class LLMContentFilter(RelevantContentFilter):
                 for var, value in prompt_variables.items():
                     prompt = prompt.replace("{" + var + "}", value)
 
+                def _proceed_with_chunk(
+                        provider: str,
+                        prompt: str,
+                        api_token: str,
+                        base_url: Optional[str] = None,
+                        extra_args: Dict = {}
+                    ) -> List[str]:
+                    if self.logger:
+                        self.logger.info(
+                            "LLM Markdown: Processing chunk {chunk_num}", 
+                            tag="CHUNK",
+                            params={"chunk_num": i + 1}
+                        )
+                    return perform_completion_with_backoff(
+                        provider,
+                        prompt,
+                        api_token,
+                        base_url=base_url,
+                        extra_args=extra_args
+                    )
+
                 future = executor.submit(
-                    perform_completion_with_backoff,
+                    _proceed_with_chunk,
                     self.provider,
                     prompt,
                     self.api_token,
-                    base_url=self.api_base,
-                    extra_args=self.extra_args
+                    self.api_base,
+                    self.extra_args
                 )
                 futures.append((i, future))
+
 
             # Collect results in order
             ordered_results = []
@@ -940,14 +962,14 @@ class LLMContentFilter(RelevantContentFilter):
                         ordered_results.append(blocks)
                         if self.logger:
                             self.logger.success(
-                                "Successfully processed chunk {chunk_num}", 
+                                "LLM markdown: Successfully processed chunk {chunk_num}", 
                                 tag="CHUNK",
                                 params={"chunk_num": i + 1}
                             )
                 except Exception as e:
                     if self.logger:
                         self.logger.error(
-                            "Error processing chunk {chunk_num}: {error}", 
+                            "LLM markdown: Error processing chunk {chunk_num}: {error}", 
                             tag="CHUNK",
                             params={
                                 "chunk_num": i + 1,
@@ -958,7 +980,7 @@ class LLMContentFilter(RelevantContentFilter):
         end_time = time.time()
         if self.logger:
             self.logger.success(
-                "Completed processing in {time:.2f}s", 
+                "LLM markdown: Completed processing in {time:.2f}s", 
                 tag="LLM",
                 params={"time": end_time - start_time},
                 colors={"time": Fore.YELLOW}

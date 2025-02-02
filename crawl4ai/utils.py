@@ -1,3 +1,4 @@
+from ast import Call
 import time
 from urllib.parse import urlparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -8,9 +9,10 @@ import re
 import os
 import platform
 from .prompts import PROMPT_EXTRACT_BLOCKS
+from array import array
 from .config import *
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List, Tuple, Union, Optional, Callable
 from urllib.parse import urljoin
 import requests
 from requests.exceptions import InvalidSchema
@@ -31,6 +33,154 @@ import aiohttp
 from pathlib import Path
 from packaging import version
 from . import __version__
+from typing import Sequence, List
+from array import array
+from itertools import chain
+from collections import deque
+from typing import Callable, Generator, Iterable, List, Optional
+
+def chunk_documents(
+    documents: Iterable[str],
+    chunk_token_threshold: int,
+    overlap: int,
+    word_token_rate: float = 0.75,
+    tokenizer: Optional[Callable[[str], List[str]]] = None,
+) -> Generator[str, None, None]:
+    """
+    Efficiently chunks documents into token-limited sections with overlap between chunks.
+
+    Args:
+        documents: Iterable of document strings
+        chunk_token_threshold: Maximum tokens per chunk
+        overlap: Number of tokens to overlap between chunks
+        word_token_rate: Token estimate per word when not using a tokenizer
+        tokenizer: Function that splits text into tokens (if available)
+
+    Yields:
+        Text chunks as strings
+    """
+    token_queue = deque()
+    contribution_queue = deque()
+    current_token_count = 0.0
+
+    for doc in documents:
+        # Tokenize document
+        if tokenizer:
+            tokens = tokenizer(doc)
+            contributions = [1.0] * len(tokens)
+        else:
+            tokens = doc.split()
+            contributions = [word_token_rate] * len(tokens)
+
+        # Add to processing queues
+        token_queue.extend(tokens)
+        contribution_queue.extend(contributions)
+        current_token_count += sum(contributions)
+
+        # Process full chunks
+        while current_token_count >= chunk_token_threshold:
+            # Find chunk split point
+            chunk_tokens = []
+            chunk_contrib = []
+            chunk_total = 0.0
+            
+            # Build chunk up to threshold
+            while contribution_queue:
+                next_contrib = contribution_queue[0]
+                if chunk_total + next_contrib > chunk_token_threshold:
+                    break
+                
+                chunk_total += next_contrib
+                chunk_contrib.append(contribution_queue.popleft())
+                chunk_tokens.append(token_queue.popleft())
+
+            # Handle edge case where first token exceeds threshold
+            if not chunk_contrib:  # Single token exceeds threshold
+                chunk_contrib.append(contribution_queue.popleft())
+                chunk_tokens.append(token_queue.popleft())
+
+            # Calculate overlap
+            overlap_total = 0.0
+            overlap_idx = 0
+            for contrib in reversed(chunk_contrib):
+                if overlap_total + contrib > overlap:
+                    break
+                overlap_total += contrib
+                overlap_idx += 1
+
+            # Prepend overlap to queues
+            if overlap_idx > 0:
+                overlap_tokens = chunk_tokens[-overlap_idx:]
+                overlap_contrib = chunk_contrib[-overlap_idx:]
+                
+                token_queue.extendleft(reversed(overlap_tokens))
+                contribution_queue.extendleft(reversed(overlap_contrib))
+                current_token_count += overlap_total
+
+            # Update current token count and yield chunk
+            current_token_count -= sum(chunk_contrib)
+            yield " ".join(chunk_tokens[:len(chunk_tokens)-overlap_idx] if overlap_idx else chunk_tokens)
+
+    # Yield remaining tokens
+    if token_queue:
+        yield " ".join(token_queue)
+
+def merge_chunks(
+    docs: Sequence[str], 
+    target_size: int,
+    overlap: int = 0,
+    word_token_ratio: float = 1.0,
+    splitter: Callable = None
+) -> List[str]:
+    """Merges documents into chunks of specified token size.
+    
+    Args:
+        docs: Input documents
+        target_size: Desired token count per chunk
+        overlap: Number of tokens to overlap between chunks
+        word_token_ratio: Multiplier for word->token conversion
+    """
+    # Pre-tokenize all docs and store token counts
+    splitter = splitter or str.split
+    token_counts = array('I')
+    all_tokens: List[List[str]] = []
+    total_tokens = 0
+    
+    for doc in docs:
+        tokens = doc.split()
+        count = int(len(tokens) * word_token_ratio)
+        if count:  # Skip empty docs
+            token_counts.append(count)
+            all_tokens.append(tokens)
+            total_tokens += count
+    
+    if not total_tokens:
+        return []
+
+    # Pre-allocate chunks
+    num_chunks = max(1, (total_tokens + target_size - 1) // target_size)
+    chunks: List[List[str]] = [[] for _ in range(num_chunks)]
+    
+    curr_chunk = 0
+    curr_size = 0
+    
+    # Distribute tokens
+    for tokens in chain.from_iterable(all_tokens):
+        if curr_size >= target_size and curr_chunk < num_chunks - 1:
+            if overlap > 0:
+                overlap_tokens = chunks[curr_chunk][-overlap:]
+                curr_chunk += 1
+                chunks[curr_chunk].extend(overlap_tokens)
+                curr_size = len(overlap_tokens)
+            else:
+                curr_chunk += 1
+                curr_size = 0
+                
+        chunks[curr_chunk].append(tokens)
+        curr_size += 1
+
+    # Return only non-empty chunks
+    return [' '.join(chunk) for chunk in chunks if chunk]
 
 
 class VersionManager:
@@ -188,6 +338,77 @@ class RobotsParser:
 class InvalidCSSSelectorError(Exception):
     pass
 
+
+SPLITS = bytearray([
+    # Control chars (0-31) + space (32)
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    # Special chars (33-47): ! " # $ % & ' ( ) * + , - . /
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    # Numbers (48-57): Treat as non-splits
+    0,0,0,0,0,0,0,0,0,0,
+    # More special chars (58-64): : ; < = > ? @
+    1,1,1,1,1,1,1,
+    # Uppercase (65-90): Keep
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    # More special chars (91-96): [ \ ] ^ _ `
+    1,1,1,1,1,1,
+    # Lowercase (97-122): Keep
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    # Special chars (123-126): { | } ~
+    1,1,1,1,
+    # Extended ASCII
+    *([1] * 128)
+])
+
+# Additional split chars for HTML/code
+HTML_CODE_CHARS = {
+    # HTML specific
+    '•', '►', '▼', '©', '®', '™', '→', '⇒', '≈', '≤', '≥',
+    # Programming symbols  
+    '+=', '-=', '*=', '/=', '=>', '<=>', '!=', '==', '===',
+    '++', '--', '<<', '>>', '&&', '||', '??', '?:', '?.', 
+    # Common Unicode
+    '…', '"', '"', ''', ''', '«', '»', '—', '–',
+    # Additional splits
+    '+', '=', '~', '@', '#', '$', '%', '^', '&', '*',
+    '(', ')', '{', '}', '[', ']', '|', '\\', '/', '`',
+    '<', '>', ',', '.', '?', '!', ':', ';', '-', '_'
+}
+
+def advanced_split(text: str) -> list[str]:
+    result = []
+    word = array('u')
+    
+    i = 0
+    text_len = len(text)
+    
+    while i < text_len:
+        char = text[i]
+        o = ord(char)
+        
+        # Fast path for ASCII
+        if o < 256 and SPLITS[o]:
+            if word:
+                result.append(word.tounicode())
+                word = array('u')
+        # Check for multi-char symbols
+        elif i < text_len - 1:
+            two_chars = char + text[i + 1]
+            if two_chars in HTML_CODE_CHARS:
+                if word:
+                    result.append(word.tounicode())
+                    word = array('u')
+                i += 1  # Skip next char since we used it
+            else:
+                word.append(char)
+        else:
+            word.append(char)
+        i += 1
+            
+    if word:
+        result.append(word.tounicode())
+        
+    return result
 
 def create_box_message(
     message: str,
