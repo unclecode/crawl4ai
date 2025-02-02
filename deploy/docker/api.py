@@ -51,7 +51,7 @@ async def process_llm_extraction(
             schema=json.loads(schema) if schema else None,
         )
 
-        cache_mode = CacheMode.ENABLED if cache == "1" else CacheMode.BYPASS
+        cache_mode = CacheMode.ENABLED if cache == "1" else CacheMode.WRITE_ONLY
 
         async with AsyncWebCrawler() as crawler:
             result = await crawler.arun(
@@ -70,7 +70,10 @@ async def process_llm_extraction(
             })
             return
 
-        content = json.loads(result.extracted_content)
+        try:
+            content = json.loads(result.extracted_content)
+        except json.JSONDecodeError:
+            content = result.extracted_content
         await redis.hset(f"task:{task_id}", mapping={
             "status": TaskStatus.COMPLETED,
             "result": json.dumps(content)
@@ -110,7 +113,7 @@ async def handle_markdown_request(
             }[filter_type]
             md_generator = DefaultMarkdownGenerator(content_filter=content_filter)
 
-        cache_mode = CacheMode.ENABLED if cache == "1" else CacheMode.BYPASS
+        cache_mode = CacheMode.ENABLED if cache == "1" else CacheMode.WRITE_ONLY
 
         async with AsyncWebCrawler() as crawler:
             result = await crawler.arun(
