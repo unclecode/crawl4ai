@@ -159,21 +159,7 @@ Use these for link-level content filtering (often to keep crawls “internal” 
 
 ---
 
-### G) **Rate Limiting & Resource Management**
-
-| **Parameter**                | **Type / Default**                     | **What It Does**                                                                                                           |
-|------------------------------|----------------------------------------|---------------------------------------------------------------------------------------------------------------------------|
-| **`enable_rate_limiting`**  | `bool` (default: `False`)              | Enable intelligent rate limiting for multiple URLs                                                                          |
-| **`rate_limit_config`**     | `RateLimitConfig` (default: `None`)    | Configuration for rate limiting behavior                                                                                   |
-
-The `RateLimitConfig` class has these fields:
-
-| **Field**           | **Type / Default**                     | **What It Does**                                                                                                           |
-|--------------------|----------------------------------------|---------------------------------------------------------------------------------------------------------------------------|
-| **`base_delay`**   | `Tuple[float, float]` (1.0, 3.0)      | Random delay range between requests to the same domain                                                                      |
-| **`max_delay`**    | `float` (60.0)                        | Maximum delay after rate limit detection                                                                                    |
-| **`max_retries`**  | `int` (3)                             | Number of retries before giving up on rate-limited requests                                                                 |
-| **`rate_limit_codes`** | `List[int]` ([429, 503])          | HTTP status codes that trigger rate limiting behavior                                                                       |
+### G) **Resource Management**
 
 | **Parameter**                  | **Type / Default**                     | **What It Does**                                                                                                           |
 |-------------------------------|----------------------------------------|---------------------------------------------------------------------------------------------------------------------------|
@@ -218,7 +204,7 @@ The `clone()` method is particularly useful when you need slightly different con
 
 ```python
 import asyncio
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, RateLimitConfig
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
 
 async def main():
     # Configure the browser
@@ -239,13 +225,9 @@ async def main():
         exclude_external_links=True,
         wait_for="css:.article-loaded",
         screenshot=True,
-        enable_rate_limiting=True,
-        rate_limit_config=RateLimitConfig(
-            base_delay=(1.0, 3.0),
-            max_delay=60.0,
-            max_retries=3,
-            rate_limit_codes=[429, 503]
-        ),
+        semaphore_count=2,
+        mean_delay=2.0,
+        max_range=3.0,
         memory_threshold_percent=70.0,
         check_interval=1.0,
         max_session_permit=20,
