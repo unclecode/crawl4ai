@@ -155,7 +155,7 @@ The `arun_many()` method now uses an intelligent dispatcher that:
 ### 4.2 Example Usage
 
 ```python
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, RateLimitConfig
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
 from crawl4ai.dispatcher import DisplayMode
 
 # Configure browser
@@ -163,14 +163,10 @@ browser_cfg = BrowserConfig(headless=True)
 
 # Configure crawler with rate limiting
 run_cfg = CrawlerRunConfig(
-    # Enable rate limiting
-    enable_rate_limiting=True,
-    rate_limit_config=RateLimitConfig(
-        base_delay=(1.0, 2.0),  # Random delay between 1-2 seconds
-        max_delay=30.0,         # Maximum delay after rate limit hits
-        max_retries=2,          # Number of retries before giving up
-        rate_limit_codes=[429, 503]  # Status codes that trigger rate limiting
-    ),
+    # Rate limiting
+    semaphore_count=2,   # 2 concurrent crawls
+    mean_delay=2.0,      # 2s between requests
+    max_range=3.0,       # Max 3s delay
     # Resource monitoring
     memory_threshold_percent=70.0,  # Pause if memory exceeds this
     check_interval=0.5,            # How often to check resources
@@ -193,10 +189,9 @@ async with AsyncWebCrawler(config=browser_cfg) as crawler:
 ### 4.3 Key Features
 
 1. **Rate Limiting**
-   - Automatic delay between requests
-   - Exponential backoff on rate limit detection
-   - Domain-specific rate limiting
-   - Configurable retry strategy
+    - Adaptive rate limiting
+    - Intelligent concurrency management
+    - Customizable delays and concurrency
 
 2. **Resource Monitoring**
    - Memory usage tracking
@@ -209,7 +204,6 @@ async with AsyncWebCrawler(config=browser_cfg) as crawler:
    - Memory usage statistics
 
 4. **Error Handling**
-   - Graceful handling of rate limits
    - Automatic retries with backoff
    - Detailed error reporting
 
