@@ -1,4 +1,3 @@
-from regex import B
 from .config import (
     MIN_WORD_THRESHOLD,
     IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
@@ -14,11 +13,12 @@ from .chunking_strategy import ChunkingStrategy, RegexChunking
 from .markdown_generation_strategy import MarkdownGenerationStrategy
 from .content_filter_strategy import RelevantContentFilter # , BM25ContentFilter, LLMContentFilter, PruningContentFilter
 from .content_scraping_strategy import ContentScrapingStrategy, WebScrapingStrategy
+from .async_deep_crawl import DeepCrawlStrategy
 from typing import Union, List
 from .cache_context import CacheMode
 
 import inspect
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from enum import Enum 
 
 def to_serializable_dict(obj: Any) -> Dict:
@@ -373,6 +373,9 @@ class CrawlerRunConfig():
     By using this class, you have a single place to understand and adjust the crawling options.
 
     Attributes:
+        # Deep Crawl Parameters
+        deep_crawl_strategy (DeepCrawlStrategy or None): Strategy to use for deep crawling.
+    
         # Content Processing Parameters
         word_count_threshold (int): Minimum word count threshold before processing content.
                                     Default: MIN_WORD_THRESHOLD (typically 200).
@@ -594,6 +597,9 @@ class CrawlerRunConfig():
         user_agent: str = None,
         user_agent_mode: str = None,
         user_agent_generator_config: dict = {},
+        # Deep Crawl Parameters
+        deep_crawl_strategy: Optional[DeepCrawlStrategy] = None,
+
     ):
         self.url = url
 
@@ -701,6 +707,10 @@ class CrawlerRunConfig():
         if self.chunking_strategy is None:
             self.chunking_strategy = RegexChunking()
 
+
+        # Deep Crawl Parameters
+        self.deep_crawl_strategy = deep_crawl_strategy
+
     @staticmethod
     def from_kwargs(kwargs: dict) -> "CrawlerRunConfig":
         return CrawlerRunConfig(
@@ -785,6 +795,8 @@ class CrawlerRunConfig():
             user_agent=kwargs.get("user_agent"),
             user_agent_mode=kwargs.get("user_agent_mode"),
             user_agent_generator_config=kwargs.get("user_agent_generator_config", {}),
+            # Deep Crawl Parameters
+            deep_crawl_strategy=kwargs.get("deep_crawl_strategy"),
         )
 
     # Create a funciton returns dict of the object
@@ -862,6 +874,7 @@ class CrawlerRunConfig():
             "user_agent": self.user_agent,
             "user_agent_mode": self.user_agent_mode,
             "user_agent_generator_config": self.user_agent_generator_config,
+            "deep_crawl_strategy": self.deep_crawl_strategy,
         }
 
     def clone(self, **kwargs):

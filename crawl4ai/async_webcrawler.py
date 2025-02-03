@@ -29,6 +29,7 @@ from .markdown_generation_strategy import (
     DefaultMarkdownGenerator,
     MarkdownGenerationStrategy,
 )
+from .async_deep_crawl import DeepCrawlHandler
 from .async_logger import AsyncLogger
 from .async_configs import BrowserConfig, CrawlerRunConfig
 from .async_dispatcher import * # noqa: F403
@@ -47,7 +48,7 @@ from .utils import (
 from typing import Union, AsyncGenerator, TypeVar
 
 CrawlResultT = TypeVar('CrawlResultT', bound=CrawlResult)
-RunManyReturn = Union[List[CrawlResultT], AsyncGenerator[CrawlResultT, None]]
+RunManyReturn = Union[CrawlResultT, List[CrawlResultT], AsyncGenerator[CrawlResultT, None]]
 
 DeepCrawlSingleReturn = Union[List[CrawlResultT], AsyncGenerator[CrawlResultT, None]]
 DeepCrawlManyReturn = Union[
@@ -215,6 +216,10 @@ class AsyncWebCrawler:
 
         self.ready = False
 
+        # Decorate arun method with deep crawling capabilities
+        self._deep_handler = DeepCrawlHandler(self)
+        self.arun = self._deep_handler(self.arun)  
+
     async def start(self):
         """
         Start the crawler explicitly without using context manager.
@@ -288,7 +293,7 @@ class AsyncWebCrawler:
         user_agent: str = None,
         verbose=True,
         **kwargs,
-    ) -> Union[CrawlResult, DeepCrawlSingleReturn]:
+    ) -> RunManyReturn:
         """
         Runs the crawler for a single source: URL (web, local file, or raw HTML).
 
@@ -715,7 +720,7 @@ class AsyncWebCrawler:
         user_agent: str = None,
         verbose=True,
         **kwargs
-        ) -> Union[RunManyReturn, DeepCrawlManyReturn]:
+        ) -> RunManyReturn:
         """
         Runs the crawler for multiple URLs concurrently using a configurable dispatcher strategy.
 

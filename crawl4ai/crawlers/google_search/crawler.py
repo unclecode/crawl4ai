@@ -5,8 +5,7 @@ from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
 from pathlib import Path
 import json
 import os
-import asyncio
-from typing import Dict, Any
+from typing import Dict
 
 
 class GoogleSearchCrawler(BaseCrawler):
@@ -25,6 +24,11 @@ class GoogleSearchCrawler(BaseCrawler):
     async def run(self, url="", query: str = "", search_type: str = "text", schema_cache_path = None, **kwargs) -> str:
         """Crawl Google Search results for a query"""
         url = f"https://www.google.com/search?q={query}&gl=sg&hl=en" if search_type == "text" else f"https://www.google.com/search?q={query}&gl=sg&hl=en&tbs=qdr:d&udm=2"
+        if kwargs.get("page_start", 1) > 1:
+            url = f"{url}&start={kwargs['page_start'] * 10}"
+        if kwargs.get("page_length", 1) > 1:
+            url = f"{url}&num={kwargs['page_length']}"
+            
         browser_config = BrowserConfig(headless=True, verbose=True)
         async with AsyncWebCrawler(config=browser_config) as crawler:
             config = CrawlerRunConfig(
@@ -70,7 +74,7 @@ class GoogleSearchCrawler(BaseCrawler):
                 organic_schema = json.load(f)
         else:
             organic_schema = JsonCssExtractionStrategy.generate_schema(
-                html=_html,
+                html=cleaned_html,
                 target_json_example="""{
             "title": "...",
             "link": "...",
@@ -89,7 +93,7 @@ class GoogleSearchCrawler(BaseCrawler):
                 top_stories_schema = json.load(f)
         else:
             top_stories_schema = JsonCssExtractionStrategy.generate_schema(
-                html=_html,
+                html=cleaned_html,
                 target_json_example="""{
             "title": "...",
             "link": "...",
@@ -109,7 +113,7 @@ class GoogleSearchCrawler(BaseCrawler):
                 suggested_query_schema = json.load(f)
         else:
             suggested_query_schema = JsonCssExtractionStrategy.generate_schema(
-                html=_html,
+                html=cleaned_html,
                 target_json_example="""{
             "query": "A for Apple",
         }""",

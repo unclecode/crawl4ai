@@ -16,7 +16,7 @@ from .extraction_strategy import (
     JsonXPathExtractionStrategy
 )
 
-
+from .async_deep_crawl import DeepCrawlStrategy, BreadthFirstSearchStrategy
 from .chunking_strategy import ChunkingStrategy, RegexChunking
 from .markdown_generation_strategy import DefaultMarkdownGenerator
 from .content_filter_strategy import PruningContentFilter, BM25ContentFilter, LLMContentFilter, RelevantContentFilter
@@ -33,6 +33,8 @@ from .docker_client import Crawl4aiDockerClient
 from .hub import CrawlerHub
 
 __all__ = [
+    "DeepCrawlStrategy",
+    "BreadthFirstSearchStrategy",
     "AsyncWebCrawler",
     "CrawlResult",
     "CrawlerHub",
