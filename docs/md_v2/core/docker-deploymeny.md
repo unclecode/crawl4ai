@@ -504,9 +504,10 @@ request = {
     "extra": {
         "word_count_threshold": 10,          # Min words per block
         "only_text": True,                   # Extract only text
-        "bypass_cache": True,                # Force fresh crawl
+        # "bypass_cache": True,              # Force fresh craw (Deprecated)
         "process_iframes": True,             # Include iframe content
-    }
+    },
+    "cache_mode": "bypass"                   # Force fresh craw ("bypass" | "enabled" | "disabled" | "read_only" | "write_only") See more at docs: https://crawl4ai.com/mkdocs/core/cache-modes/
 }
 ```
 
@@ -523,9 +524,10 @@ request = {
     },
     "extra": {
         "word_count_threshold": 50,          # Longer content blocks
-        "bypass_cache": True                 # Fresh content
+        # "bypass_cache": True               # Fresh content (Deprecated)
     },
-    "css_selector": ".article-body"
+    "css_selector": ".article-body",
+    "cache_mode": "bypass"                   # Force fresh craw ("bypass" | "enabled" | "disabled" | "read_only" | "write_only") See more at docs: https://crawl4ai.com/mkdocs/core/cache-modes/
 }
 ```
 
