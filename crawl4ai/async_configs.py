@@ -13,7 +13,7 @@ from .chunking_strategy import ChunkingStrategy, RegexChunking
 from .markdown_generation_strategy import MarkdownGenerationStrategy
 from .content_filter_strategy import RelevantContentFilter # , BM25ContentFilter, LLMContentFilter, PruningContentFilter
 from .content_scraping_strategy import ContentScrapingStrategy, WebScrapingStrategy
-from .async_deep_crawl import DeepCrawlStrategy
+from .deep_crawling import DeepCrawlStrategy
 from typing import Union, List
 from .cache_context import CacheMode
 

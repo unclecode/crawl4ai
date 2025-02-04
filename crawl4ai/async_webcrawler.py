@@ -29,7 +29,7 @@ from .markdown_generation_strategy import (
     DefaultMarkdownGenerator,
     MarkdownGenerationStrategy,
 )
-from .async_deep_crawl import DeepCrawlHandler
+from .deep_crawling import DeepCrawlDecorator
 from .async_logger import AsyncLogger
 from .async_configs import BrowserConfig, CrawlerRunConfig
 from .async_dispatcher import * # noqa: F403
@@ -56,9 +56,6 @@ DeepCrawlManyReturn = Union[
     AsyncGenerator[CrawlResultT, None],
 ]
 
-
-
-
 class AsyncWebCrawler:
     """
     Asynchronous web crawler with flexible caching capabilities.
@@ -83,16 +80,7 @@ class AsyncWebCrawler:
         await crawler.close()
         ```
 
-    Migration Guide:
-    Old way (deprecated):
-        crawler = AsyncWebCrawler(always_by_pass_cache=True, browser_type="chromium", headless=True)
-
-    New way (recommended):
-        browser_config = BrowserConfig(browser_type="chromium", headless=True)
-        crawler = AsyncWebCrawler(config=browser_config)
-
-
-    Attributes:
+            Attributes:
         browser_config (BrowserConfig): Configuration object for browser settings.
         crawler_strategy (AsyncCrawlerStrategy): Strategy for crawling web pages.
         logger (AsyncLogger): Logger instance for recording events and errors.
@@ -217,7 +205,7 @@ class AsyncWebCrawler:
         self.ready = False
 
         # Decorate arun method with deep crawling capabilities
-        self._deep_handler = DeepCrawlHandler(self)
+        self._deep_handler = DeepCrawlDecorator(self)
         self.arun = self._deep_handler(self.arun)  
 
     async def start(self):
