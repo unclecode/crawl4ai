@@ -1718,7 +1718,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         """
         try:
             suggested_filename = download.suggested_filename
-            download_path = os.path.join(self.downloads_path, suggested_filename)
+            download_path = os.path.join(self.browser_config.downloads_path, suggested_filename)
 
             self.logger.info(
                 message="Downloading {filename} to {path}",
