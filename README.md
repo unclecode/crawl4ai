@@ -39,12 +39,12 @@ Thank you to everyone who has supported this project, used it, and shared feedba
 
 ## 🧐 Why Crawl4AI?
 
-1. **Built for LLMs**: Creates smart, concise Markdown optimized for RAG and fine-tuning applications.  
-2. **Lightning Fast**: Delivers results 6x faster with real-time, cost-efficient performance.  
-3. **Flexible Browser Control**: Offers session management, proxies, and custom hooks for seamless data access.  
-4. **Heuristic Intelligence**: Uses advanced algorithms for efficient extraction, reducing reliance on costly models.  
-5. **Open Source & Deployable**: Fully open-source with no API keys—ready for Docker and cloud integration.  
-6. **Thriving Community**: Actively maintained by a vibrant community and the #1 trending GitHub repository.
+1. 🔨 **Built for LLMs**: Creates smart, concise Markdown optimized for RAG and fine-tuning applications.  
+2. ⚡ **Lightning Fast**: Delivers results 6x faster with real-time, cost-efficient performance.  
+3. 🎛️ **Flexible Browser Control**: Offers session management, proxies, and custom hooks for seamless data access.  
+4. 🧠 **Heuristic Intelligence**: Uses advanced algorithms for efficient extraction, reducing reliance on costly models.  
+5. 📦 **Open Source & Deployable**: Fully open-source with no API keys—ready for Docker and cloud integration.  
+6. 💬 **Thriving Community**: Actively maintained by a vibrant community and the #1 trending GitHub repository.
 
 ## 🚀 Quick Start 
 
@@ -71,14 +71,14 @@ python -m playwright install --with-deps chromium
 2. Run a simple web crawl:
 ```python
 import asyncio
-from crawl4ai import *
+from crawl4ai import *                               # Import the crawler
 
 async def main():
-    async with AsyncWebCrawler() as crawler:
-        result = await crawler.arun(
-            url="https://www.nbcnews.com/business",
+    async with AsyncWebCrawler() as crawler:         # create the crawler
+        result = await crawler.arun(               
+            url="https://www.nbcnews.com/business",  # crawl a website
         )
-        print(result.markdown)
+        print(result.markdown)                       # print the results as a markdown file
 
 if __name__ == "__main__":
     asyncio.run(main())
