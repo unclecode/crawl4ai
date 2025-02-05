@@ -2,8 +2,10 @@ import asyncio
 import time
 
 
-from crawl4ai import CrawlerRunConfig, AsyncWebCrawler,     CacheMode
-from crawl4ai.deep_crawling.bfs_strategy import BFSDeepCrawlStrategy
+from crawl4ai import CrawlerRunConfig, AsyncWebCrawler, CacheMode
+from crawl4ai.content_scraping_strategy import LXMLWebScrapingStrategy
+from crawl4ai.deep_crawling import BFSDeepCrawlStrategy
+# from crawl4ai.deep_crawling import BFSDeepCrawlStrategy, BestFirstCrawlingStrategy
 
 
 async def main():
@@ -15,7 +17,8 @@ async def main():
         ),
         stream=False,
         verbose=True,
-        cache_mode=CacheMode.BYPASS
+        cache_mode=CacheMode.BYPASS,
+        scraping_strategy=LXMLWebScrapingStrategy()
     )
 
     async with AsyncWebCrawler() as crawler:

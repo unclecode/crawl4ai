@@ -1,12 +1,12 @@
 from __future__ import annotations
 # I just got crazy, trying to wrute K&R C but in Python. Right now I feel like I'm in a quantum state.
+# I probably won't use this; I just want to leave it here. A century later, the future human race will be like, "WTF?"
 
-# from typing import TYPE_CHECKING
+# ------ Imports That Will Make You Question Reality ------ #
 from functools import wraps
 from contextvars import ContextVar
 import inspect
 
-from httpx import get
 from crawl4ai import CacheMode
 from crawl4ai.async_configs import CrawlerRunConfig
 from crawl4ai.models import CrawlResult, TraversalStats

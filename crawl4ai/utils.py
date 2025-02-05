@@ -1,22 +1,25 @@
-from ast import Call
 import time
 from urllib.parse import urlparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from bs4 import BeautifulSoup, Comment, element, Tag, NavigableString
 import json
 import html
+import lxml
 import re
 import os
 import platform
 from .prompts import PROMPT_EXTRACT_BLOCKS
 from array import array
-from .config import *
+from .html2text import html2text, CustomHTML2Text
+# from .config import *
+from .config import MIN_WORD_THRESHOLD, IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD, IMAGE_SCORE_THRESHOLD, DEFAULT_PROVIDER, PROVIDER_MODELS
+import httpx
+from socket import gaierror
 from pathlib import Path
-from typing import Dict, Any, List, Tuple, Union, Optional, Callable
+from typing import Dict, Any, List, Optional, Callable
 from urllib.parse import urljoin
 import requests
 from requests.exceptions import InvalidSchema
-from typing import Dict, Any
 import xxhash
 from colorama import Fore, Style, init
 import textwrap
@@ -24,20 +27,20 @@ import cProfile
 import pstats
 from functools import wraps
 import asyncio
-from lxml import html, etree
+
 import sqlite3
 import hashlib
-from urllib.parse import urljoin, urlparse
+
 from urllib.robotparser import RobotFileParser
 import aiohttp
-from pathlib import Path
+
 from packaging import version
 from . import __version__
-from typing import Sequence, List
-from array import array
+from typing import Sequence
+
 from itertools import chain
 from collections import deque
-from typing import Callable, Generator, Iterable, List, Optional
+from typing import  Generator, Iterable
 
 def chunk_documents(
     documents: Iterable[str],
@@ -194,7 +197,7 @@ class VersionManager:
             return None
         try:
             return version.parse(self.version_file.read_text().strip())
-        except:
+        except Exception as _ex:
             return None
 
     def update_version(self):
@@ -286,7 +289,7 @@ class RobotsParser:
             domain = parsed.netloc
             if not domain:
                 return True
-        except:
+        except Exception as _ex:
             return True
 
         # Fast path - check cache first
@@ -306,7 +309,7 @@ class RobotsParser:
                             self._cache_rules(domain, rules)
                         else:
                             return True
-            except:
+            except Exception as _ex:
                 # On any error (timeout, connection failed, etc), allow access
                 return True
 
@@ -1374,7 +1377,7 @@ def get_content_of_website_optimized(
             src = img.get("src", "")
             if base64_pattern.match(src):
                 img["src"] = base64_pattern.sub("", src)
-        except:
+        except Exception as _ex:
             pass
 
     cleaned_html = str(body).replace("\n\n", "\n").replace("  ", " ")
@@ -1412,7 +1415,7 @@ def extract_metadata_using_lxml(html, doc=None):
 
     if doc is None:
         try:
-            doc = lhtml.document_fromstring(html)
+            doc = lxml.html.document_fromstring(html)
         except Exception:
             return {}
 
@@ -1728,10 +1731,10 @@ def extract_blocks_batch(batch_data, provider="groq/llama3-70b-8192", api_token=
 
     messages = []
 
-    for url, html in batch_data:
+    for url, _html in batch_data:
         variable_values = {
             "URL": url,
-            "HTML": html,
+            "HTML": _html,
         }
 
         prompt_with_variables = PROMPT_EXTRACT_BLOCKS
@@ -1913,7 +1916,7 @@ def fast_format_html(html_string):
     indent = 0
     indent_str = "  "  # Two spaces for indentation
     formatted = []
-    in_content = False
+    # in_content = False
 
     # Split by < and > to separate tags and content
     parts = html_string.replace(">", ">\n").replace("<", "\n<").split("\n")
@@ -2466,17 +2469,74 @@ def truncate(value, threshold):
 def optimize_html(html_str, threshold=200):
     root = html.fromstring(html_str)
     
-    for element in root.iter():
+    for _element in root.iter():
         # Process attributes
-        for attr in list(element.attrib):
-            element.attrib[attr] = truncate(element.attrib[attr], threshold)
+        for attr in list(_element.attrib):
+            _element.attrib[attr] = truncate(_element.attrib[attr], threshold)
         
         # Process text content
-        if element.text and len(element.text) > threshold:
-            element.text = truncate(element.text, threshold)
+        if _element.text and len(_element.text) > threshold:
+            _element.text = truncate(_element.text, threshold)
             
         # Process tail text
-        if element.tail and len(element.tail) > threshold:
-            element.tail = truncate(element.tail, threshold)
+        if _element.tail and len(_element.tail) > threshold:
+            _element.tail = truncate(_element.tail, threshold)
     
     return html.tostring(root, encoding='unicode', pretty_print=False)
+
+class HeadPeekr:
+    @staticmethod
+    async def fetch_head_section(url, timeout=0.3):
+        headers = {
+            "User-Agent": "Mozilla/5.0 (compatible; CrawlBot/1.0)",
+            "Accept": "text/html",
+            "Connection": "close"  # Force close after response
+        }
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.get(url, headers=headers, follow_redirects=True)
+                
+                # Handle redirects explicitly by using the final URL
+                if response.url != url:
+                    url = str(response.url)
+                    response = await client.get(url, headers=headers)
+                
+                content = b""
+                async for chunk in response.aiter_bytes():
+                    content += chunk
+                    if b"</head>" in content:
+                        break  # Stop after detecting </head>
+                return content.split(b"</head>")[0] + b"</head>"
+        except (httpx.HTTPError, gaierror) :
+            return None
+
+    @staticmethod
+    async def peek_html(url, timeout=0.3):
+        head_section = await HeadPeekr.fetch_head_section(url, timeout=timeout)
+        if head_section:
+            return head_section.decode("utf-8", errors="ignore")
+        return None
+
+    @staticmethod
+    def extract_meta_tags(head_content: str):
+        meta_tags = {}
+        
+        # Find all meta tags
+        meta_pattern = r'<meta[^>]+>'
+        for meta_tag in re.finditer(meta_pattern, head_content):
+            tag = meta_tag.group(0)
+            
+            # Extract name/property and content
+            name_match = re.search(r'name=["\'](.*?)["\']', tag)
+            property_match = re.search(r'property=["\'](.*?)["\']', tag)
+            content_match = re.search(r'content=["\'](.*?)["\']', tag)
+            
+            if content_match and (name_match or property_match):
+                key = name_match.group(1) if name_match else property_match.group(1)
+                meta_tags[key] = content_match.group(1)
+                
+        return meta_tags
+
+    def get_title(head_content: str):
+        title_match = re.search(r'<title>(.*?)</title>', head_content, re.IGNORECASE | re.DOTALL)
+        return title_match.group(1) if title_match else None

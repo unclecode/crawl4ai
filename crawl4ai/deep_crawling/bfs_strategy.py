@@ -5,15 +5,11 @@ from datetime import datetime
 from typing import AsyncGenerator, Optional, Set, Dict, List, Tuple
 from urllib.parse import urlparse
 
-from ..models import CrawlResult, TraversalStats
+from ..models import TraversalStats
 from .filters import FastFilterChain
 from .scorers import FastURLScorer
-
-from typing import TYPE_CHECKING
 from . import DeepCrawlStrategy  
-if TYPE_CHECKING:
-    from ..async_configs import CrawlerRunConfig
-    from ..async_webcrawler import AsyncWebCrawler
+from ..types import AsyncWebCrawler, CrawlerRunConfig, CrawlResult
 
 class BFSDeepCrawlStrategy(DeepCrawlStrategy):
     """
@@ -107,8 +103,8 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
     async def _arun_batch(
         self,
         start_url: str,
-        crawler: "AsyncWebCrawler",
-        config: "CrawlerRunConfig",
+        crawler: AsyncWebCrawler,
+        config: CrawlerRunConfig,
     ) -> List[CrawlResult]:
         """
         Batch (non-streaming) mode:
@@ -148,8 +144,8 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
     async def _arun_stream(
         self,
         start_url: str,
-        crawler: "AsyncWebCrawler",
-        config: "CrawlerRunConfig",
+        crawler: AsyncWebCrawler,
+        config: CrawlerRunConfig,
     ) -> AsyncGenerator[CrawlResult, None]:
         """
         Streaming mode:

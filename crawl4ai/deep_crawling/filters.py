@@ -1,16 +1,18 @@
 from abc import ABC, abstractmethod
-from typing import List, Pattern, Set, Union, FrozenSet
-import re, time
+from typing import List, Pattern, Set, Union
 from urllib.parse import urlparse
 from array import array
+import re
 import logging
 from functools import lru_cache
 import fnmatch
 from dataclasses import dataclass
-from typing import ClassVar
 import weakref
 import mimetypes
-
+import math
+from collections import defaultdict
+from typing import Dict
+from ..utils import HeadPeekr
 
 @dataclass
 class FilterStats:
@@ -624,6 +626,163 @@ class FastDomainFilter(FastURLFilter):
         return result
 
 
+
+class ContentRelevanceFilter(URLFilter):
+    """BM25-based relevance filter using head section content"""
+    
+    __slots__ = ('query_terms', 'threshold', 'k1', 'b', 'avgdl')
+    
+    def __init__(self, query: str, threshold: float, 
+                 k1: float = 1.2, b: float = 0.75, avgdl: int = 1000):
+        super().__init__(name="BM25RelevanceFilter")
+        self.query_terms = self._tokenize(query)
+        self.threshold = threshold
+        self.k1 = k1  # TF saturation parameter
+        self.b = b    # Length normalization parameter
+        self.avgdl = avgdl  # Average document length (empirical value)
+
+    async def apply(self, url: str) -> bool:
+        head_content = await HeadPeekr.peek_html(url)
+        if not head_content:
+            self._update_stats(False)
+            return False
+
+        # Field extraction with weighting
+        fields = {
+            'title': HeadPeekr.get_title(head_content) or "",
+            'meta': HeadPeekr.extract_meta_tags(head_content)
+        }
+        doc_text = self._build_document(fields)
+        
+        score = self._bm25(doc_text)
+        decision = score >= self.threshold
+        self._update_stats(decision)
+        return decision
+
+    def _build_document(self, fields: Dict) -> str:
+        """Weighted document construction"""
+        return ' '.join([
+            fields['title'] * 3,          # Title weight
+            fields['meta'].get('description', '') * 2,
+            fields['meta'].get('keywords', ''),
+            ' '.join(fields['meta'].values())
+        ])
+
+    def _tokenize(self, text: str) -> List[str]:
+        """Fast case-insensitive tokenization"""
+        return text.lower().split()
+
+    def _bm25(self, document: str) -> float:
+        """Optimized BM25 implementation for head sections"""
+        doc_terms = self._tokenize(document)
+        doc_len = len(doc_terms)
+        tf = defaultdict(int)
+        
+        for term in doc_terms:
+            tf[term] += 1
+
+        score = 0.0
+        for term in set(self.query_terms):
+            term_freq = tf[term]
+            idf = math.log((1 + 1) / (term_freq + 0.5) + 1)  # Simplified IDF
+            numerator = term_freq * (self.k1 + 1)
+            denominator = term_freq + self.k1 * (1 - self.b + 
+                        self.b * (doc_len / self.avgdl))
+            score += idf * (numerator / denominator)
+
+        return score
+
+
+class SEOFilter(URLFilter):
+    """Quantitative SEO quality assessment filter using head section analysis"""
+    
+    __slots__ = ('threshold', '_weights', '_kw_patterns')
+    
+    # Based on SEMrush/Google ranking factors research
+    DEFAULT_WEIGHTS = {
+        'title_length': 0.15,
+        'title_kw': 0.18,
+        'meta_description': 0.12,
+        'canonical': 0.10,
+        'robot_ok': 0.20,  # Most critical factor
+        'schema_org': 0.10,
+        'url_quality': 0.15
+    }
+
+    def __init__(self, threshold: float = 0.65, 
+                 keywords: List[str] = None,
+                 weights: Dict[str, float] = None):
+        super().__init__(name="SEOFilter")
+        self.threshold = threshold
+        self._weights = weights or self.DEFAULT_WEIGHTS
+        self._kw_patterns = re.compile(
+            r'\b({})\b'.format('|'.join(map(re.escape, keywords or []))),
+            re.I
+        ) if keywords else None
+
+    async def apply(self, url: str) -> bool:
+        head_content = await HeadPeekr.peek_html(url)
+        if not head_content:
+            self._update_stats(False)
+            return False
+
+        meta = HeadPeekr.extract_meta_tags(head_content)
+        title = HeadPeekr.get_title(head_content) or ''
+        parsed_url = urlparse(url)
+        
+        scores = {
+            'title_length': self._score_title_length(title),
+            'title_kw': self._score_keyword_presence(title),
+            'meta_description': self._score_meta_description(meta.get('description', '')),
+            'canonical': self._score_canonical(meta.get('canonical'), url),
+            'robot_ok': 1.0 if 'noindex' not in meta.get('robots', '') else 0.0,
+            'schema_org': self._score_schema_org(head_content),
+            'url_quality': self._score_url_quality(parsed_url)
+        }
+
+        total_score = sum(weight * scores[factor] 
+                        for factor, weight in self._weights.items())
+        
+        decision = total_score >= self.threshold
+        self._update_stats(decision)
+        return decision
+
+    def _score_title_length(self, title: str) -> float:
+        length = len(title)
+        if 50 <= length <= 60: return 1.0
+        if 40 <= length < 50 or 60 < length <= 70: return 0.7
+        return 0.3  # Poor length
+
+    def _score_keyword_presence(self, text: str) -> float:
+        if not self._kw_patterns: return 0.0
+        matches = len(self._kw_patterns.findall(text))
+        return min(matches * 0.3, 1.0)  # Max 3 matches
+
+    def _score_meta_description(self, desc: str) -> float:
+        length = len(desc)
+        if 140 <= length <= 160: return 1.0
+        return 0.5 if 120 <= length <= 200 else 0.2
+
+    def _score_canonical(self, canonical: str, original: str) -> float:
+        if not canonical: return 0.5  # Neutral score
+        return 1.0 if canonical == original else 0.2
+
+    def _score_schema_org(self, html: str) -> float:
+        # Detect any schema.org markup in head
+        return 1.0 if re.search(r'<script[^>]+type=["\']application/ld\+json', html) else 0.0
+
+    def _score_url_quality(self, parsed_url) -> float:
+        score = 1.0
+        path = parsed_url.path.lower()
+        
+        # Penalty factors
+        if len(path) > 80: score *= 0.7
+        if re.search(r'\d{4}', path): score *= 0.8  # Numbers in path
+        if parsed_url.query: score *= 0.6  # URL parameters
+        if '_' in path: score *= 0.9  # Underscores vs hyphens
+        
+        return score
+
 def create_fast_filter_chain() -> FastFilterChain:
     """Create an optimized filter chain with filters ordered by rejection rate"""
     return FastFilterChain(
@@ -647,8 +806,6 @@ def create_fast_filter_chain() -> FastFilterChain:
 
 def run_performance_test():
     import time
-    import random
-    from itertools import cycle
 
     # Generate test URLs
     base_urls = [
@@ -862,6 +1019,20 @@ def test_pattern_filter():
         run_speed_test()
     else:
         print("\n❌ Some accuracy tests failed!")
+
+async def test_content_relevancy_filter():
+    # Initialize with query and threshold (tune based on your corpus)
+    relevance_filter = ContentRelevanceFilter(
+        query="machine learning", 
+        threshold=2.5
+    )
+
+    # In your crawler loop
+    for url in ["https://example.com", "https://example.com/blog/post-123"]:
+        if await relevance_filter.apply(url):
+            print(f"✅ Relevant: {url}")
+        else:
+            print(f"❌ Not Relevant: {url}")
 
 if __name__ == "__main__":
     run_performance_test()
