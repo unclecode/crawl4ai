@@ -33,6 +33,8 @@ class GoogleSearchCrawler(BaseCrawler):
         async with AsyncWebCrawler(config=browser_config) as crawler:
             config = CrawlerRunConfig(
                 cache_mode=kwargs.get("cache_mode", CacheMode.BYPASS),
+                keep_attrs=["id", "class"],
+                keep_data_attributes=True,
                 delay_before_return_html=kwargs.get(
                     "delay", 2 if search_type == "image" else 1),
                 js_code=self.js_script if search_type == "image" else None,
@@ -99,7 +101,6 @@ class GoogleSearchCrawler(BaseCrawler):
             "link": "...",
             "source": "Insider Monkey",
             "date": "1 hour ago",
-            "imageUrl": "..."
         }""",
                 query="""The given html is the crawled html from Google search result. Please find the schema for Top Story item int he given html, I am interested in title, link, source. date and imageUrl."""
             )

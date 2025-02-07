@@ -2467,7 +2467,7 @@ def truncate(value, threshold):
     return value
 
 def optimize_html(html_str, threshold=200):
-    root = html.fromstring(html_str)
+    root = lxml.html.fromstring(html_str)
     
     for _element in root.iter():
         # Process attributes
@@ -2482,7 +2482,7 @@ def optimize_html(html_str, threshold=200):
         if _element.tail and len(_element.tail) > threshold:
             _element.tail = truncate(_element.tail, threshold)
     
-    return html.tostring(root, encoding='unicode', pretty_print=False)
+    return lxml.html.tostring(root, encoding='unicode', pretty_print=False)
 
 class HeadPeekr:
     @staticmethod

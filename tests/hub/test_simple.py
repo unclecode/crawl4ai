@@ -17,12 +17,16 @@ async def google_example():
     crawler = crawler_cls()
 
     # Text search
-    text_results = await crawler.run(query="apple inc", search_type="text",  schema_cache_path="/Users/unclecode/.crawl4ai")
-    print(json.loads(text_results))
+    text_results = await crawler.run(
+        query="apple inc", 
+        search_type="text",  
+        schema_cache_path="/Users/unclecode/.crawl4ai"
+    )
+    print(json.dumps(json.loads(text_results), indent=4))
 
     # Image search
-    image_results = await crawler.run(query="apple inc", search_type="image")
-    print(image_results)
+    # image_results = await crawler.run(query="apple inc", search_type="image")
+    # print(image_results)
 
 if __name__ == "__main__":
     import asyncio

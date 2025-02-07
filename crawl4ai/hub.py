@@ -1,17 +1,13 @@
-import importlib
-import pkgutil
-from pathlib import Path
-import logging
+# crawl4ai/hub.py
+from abc import ABC, abstractmethod
 from typing import Dict, Type
+import logging
+import importlib
+from pathlib import Path
 import inspect
 
 logger = logging.getLogger(__name__)
 
-# crawl4ai/base.py
-from abc import ABC, abstractmethod
-from typing import Optional, Dict, Any
-import json
-import logging
 
 class BaseCrawler(ABC):
     def __init__(self):
