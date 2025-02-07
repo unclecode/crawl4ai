@@ -94,7 +94,7 @@ class DeepCrawlStrategy(ABC):
             crawler_run_config (Optional[CrawlerRunConfig]): Crawler configuration.
         
         Returns:
-            AsyncGenerator[CrawlResult, None]: An async generator yielding crawl results.
+            Union[CrawlResultT, List[CrawlResultT], AsyncGenerator[CrawlResultT, None]]
         """
         if config is None:
             raise ValueError("CrawlerRunConfig must be provided")
@@ -103,6 +103,9 @@ class DeepCrawlStrategy(ABC):
             return self._arun_stream(start_url, crawler, config)
         else:
             return await self._arun_batch(start_url, crawler, config)
+
+    def __call__(self, start_url: str, crawler: AsyncWebCrawler, config: CrawlerRunConfig):
+        return self.arun(start_url, crawler, config)
 
     @abstractmethod
     async def shutdown(self) -> None:

@@ -131,7 +131,6 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
                 depth = depths.get(url, 0)
                 result.metadata = result.metadata or {}
                 result.metadata["depth"] = depth
-                # Retrieve parent_url from current_level.
                 parent_url = next((parent for (u, parent) in current_level if u == url), None)
                 result.metadata["parent_url"] = parent_url
                 results.append(result)
@@ -173,8 +172,6 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
                 await self.link_discovery(result, url, depth, visited, next_level, depths)
 
             current_level = next_level
-
-
 
     async def shutdown(self) -> None:
         """

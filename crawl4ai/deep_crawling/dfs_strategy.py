@@ -2,13 +2,8 @@
 from typing import AsyncGenerator, Optional, Set, Dict, List, Tuple
 
 from ..models import CrawlResult
-from .bfs_strategy import BFSDeepCrawlStrategy  # Inherit common logic: can_process_url, link_discovery, etc.
-
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    from ..async_configs import CrawlerRunConfig
-    from ..async_webcrawler import AsyncWebCrawler
-
+from .bfs_strategy import BFSDeepCrawlStrategy  # noqa
+from ..types import AsyncWebCrawler, CrawlerRunConfig
 
 class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
     """
@@ -20,8 +15,8 @@ class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
     async def _arun_batch(
         self,
         start_url: str,
-        crawler: "AsyncWebCrawler",
-        config: "CrawlerRunConfig",
+        crawler: AsyncWebCrawler,
+        config: CrawlerRunConfig,
     ) -> List[CrawlResult]:
         """
         Batch (non-streaming) DFS mode.
@@ -61,8 +56,8 @@ class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
     async def _arun_stream(
         self,
         start_url: str,
-        crawler: "AsyncWebCrawler",
-        config: "CrawlerRunConfig",
+        crawler: AsyncWebCrawler,
+        config: CrawlerRunConfig,
     ) -> AsyncGenerator[CrawlResult, None]:
         """
         Streaming DFS mode.

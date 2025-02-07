@@ -251,3 +251,4 @@ continue_config.json
 .prompts/
 
 .llm.env
+.private/
