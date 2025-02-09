@@ -31,9 +31,6 @@ import re
 import random
 from typing import Optional, Dict
 from dotenv import load_dotenv
-
-load_dotenv()
-
 from crawl4ai import (
     AsyncWebCrawler, 
     BrowserConfig,
@@ -48,6 +45,7 @@ from crawl4ai import (
     LLMContentFilter
 )
 
+load_dotenv()
 
 async def demo_memory_dispatcher():
     """Demonstrates the new memory-efficient dispatcher system.
@@ -283,7 +281,7 @@ async def demo_proxy_rotation():
     """
     print("\n=== 8. Proxy Rotation Demo ===")
 
-    async def get_next_proxy(proxy_file: str = f"proxies.txt") -> Optional[Dict]:
+    async def get_next_proxy(proxy_file: str = "proxies.txt") -> Optional[Dict]:
         """Get next proxy from local file"""
         try:
             proxies = os.getenv("PROXIES", "").split(",")
@@ -323,7 +321,7 @@ async def demo_proxy_rotation():
                 if verified:
                     print(f"✅ Proxy working! IP matches: {proxy['ip']}")
                 else:
-                    print(f"❌ Proxy failed or IP mismatch!")
+                    print("❌ Proxy failed or IP mismatch!")
             else:
                 print(f"Failed with proxy {proxy['ip']}")
 

@@ -16,6 +16,7 @@ from .content_scraping_strategy import ContentScrapingStrategy, WebScrapingStrat
 from .deep_crawling import DeepCrawlStrategy
 from typing import Union, List
 from .cache_context import CacheMode
+from .proxy_strategy import ProxyRotationStrategy
 
 import inspect
 from typing import Any, Dict, Optional
@@ -542,6 +543,7 @@ class CrawlerRunConfig():
         parser_type: str = "lxml",
         scraping_strategy: ContentScrapingStrategy = None,
         proxy_config: dict = None,
+        proxy_rotation_strategy: Optional[ProxyRotationStrategy] = None,
         # SSL Parameters
         fetch_ssl_certificate: bool = False,
         # Caching Parameters
@@ -620,6 +622,7 @@ class CrawlerRunConfig():
         self.parser_type = parser_type
         self.scraping_strategy = scraping_strategy or WebScrapingStrategy()
         self.proxy_config = proxy_config
+        self.proxy_rotation_strategy = proxy_rotation_strategy
 
         # SSL Parameters
         self.fetch_ssl_certificate = fetch_ssl_certificate
@@ -731,6 +734,7 @@ class CrawlerRunConfig():
             parser_type=kwargs.get("parser_type", "lxml"),
             scraping_strategy=kwargs.get("scraping_strategy"),
             proxy_config=kwargs.get("proxy_config"),
+            proxy_rotation_strategy=kwargs.get("proxy_rotation_strategy"),
             # SSL Parameters
             fetch_ssl_certificate=kwargs.get("fetch_ssl_certificate", False),
             # Caching Parameters
@@ -827,6 +831,7 @@ class CrawlerRunConfig():
             "parser_type": self.parser_type,
             "scraping_strategy": self.scraping_strategy,
             "proxy_config": self.proxy_config,
+            "proxy_rotation_strategy": self.proxy_rotation_strategy,
             "fetch_ssl_certificate": self.fetch_ssl_certificate,
             "cache_mode": self.cache_mode,
             "session_id": self.session_id,

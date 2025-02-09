@@ -160,41 +160,9 @@ The `arun_many()` method now uses an intelligent dispatcher that:
 
 ### 4.2 Example Usage
 
+Check page [Multi-url Crawling](../advanced/multi-url-crawling.md) for a detailed example of how to use `arun_many()`.
+
 ```python
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, RateLimitConfig
-from crawl4ai.dispatcher import DisplayMode
-
-# Configure browser
-browser_cfg = BrowserConfig(headless=True)
-
-# Configure crawler with rate limiting
-run_cfg = CrawlerRunConfig(
-    # Enable rate limiting
-    enable_rate_limiting=True,
-    rate_limit_config=RateLimitConfig(
-        base_delay=(1.0, 2.0),  # Random delay between 1-2 seconds
-        max_delay=30.0,         # Maximum delay after rate limit hits
-        max_retries=2,          # Number of retries before giving up
-        rate_limit_codes=[429, 503]  # Status codes that trigger rate limiting
-    ),
-    # Resource monitoring
-    memory_threshold_percent=70.0,  # Pause if memory exceeds this
-    check_interval=0.5,            # How often to check resources
-    max_session_permit=3,          # Maximum concurrent crawls
-    display_mode=DisplayMode.DETAILED.value  # Show detailed progress
-)
-
-urls = [
-    "https://example.com/page1",
-    "https://example.com/page2",
-    "https://example.com/page3"
-]
-
-async with AsyncWebCrawler(config=browser_cfg) as crawler:
-    results = await crawler.arun_many(urls, config=run_cfg)
-    for result in results:
-        print(f"URL: {result.url}, Success: {result.success}")
-```
 
 ### 4.3 Key Features
 

@@ -394,6 +394,19 @@ class AsyncWebCrawler:
                         tag="FETCH",
                     )
 
+                # Update proxy configuration from rotation strategy if available
+                if config and config.proxy_rotation_strategy:
+                    next_proxy = await config.proxy_rotation_strategy.get_next_proxy()
+                    if next_proxy:
+                        if verbose:
+                            self.logger.info(
+                                message="Switch proxy: {proxy}",
+                                tag="PROXY",
+                                params={"proxy": next_proxy.get("server")},
+                            )
+                        config.proxy_config = next_proxy
+                        # config = config.clone(proxy_config=next_proxy)
+
                 # Fetch fresh content if needed
                 if not cached_result or not html:
                     t1 = time.perf_counter()
