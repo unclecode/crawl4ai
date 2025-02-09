@@ -33,9 +33,10 @@ from .async_dispatcher import (
 )
 from .docker_client import Crawl4aiDockerClient
 from .hub import CrawlerHub
-
+from .deep_crawling import DeepCrawlStrategy
 __all__ = [
     "AsyncWebCrawler",
+    "DeepCrawlStrategy",
     "CrawlResult",
     "CrawlerHub",
     "CacheMode",

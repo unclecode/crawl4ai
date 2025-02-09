@@ -224,6 +224,7 @@ def create_common_filter_chain() -> FilterChain:
 
 
 # Use __slots__ and array for maximum memory/speed efficiency
+@dataclass
 class FastFilterStats:
     __slots__ = ("_counters",)
 
