@@ -2,14 +2,47 @@ import subprocess
 import sys
 import asyncio
 from .async_logger import AsyncLogger, LogLevel
+from pathlib import Path
+import os
+import shutil
 
 # Initialize logger
 logger = AsyncLogger(log_level=LogLevel.DEBUG, verbose=True)
 
+def setup_home_directory():
+    """Set up the .crawl4ai folder structure in the user's home directory."""
+    base_dir = os.getenv("CRAWL4_AI_BASE_DIRECTORY")
+    crawl4ai_folder = Path(base_dir) if base_dir else Path.home()
+    crawl4ai_config = crawl4ai_folder / "global.yml"
+    crawl4ai_folder = crawl4ai_folder / ".crawl4ai"
+    cache_folder = crawl4ai_folder / "cache"
+    content_folders = [
+        "html_content",
+        "cleaned_html",
+        "markdown_content",
+        "extracted_content",
+        "screenshots",
+    ]
+
+    # Clean up old cache if exists
+    if cache_folder.exists():
+        shutil.rmtree(cache_folder)
+
+    # Create new folder structure
+    crawl4ai_folder.mkdir(exist_ok=True)
+    cache_folder.mkdir(exist_ok=True)
+    for folder in content_folders:
+        (crawl4ai_folder / folder).mkdir(exist_ok=True)
+    
+    # If config file does not exist, create it
+    if not crawl4ai_config.exists():
+        with open(crawl4ai_config, "w") as f:
+            f.write("")
 
 def post_install():
     """Run all post-installation tasks"""
     logger.info("Running post-installation setup...", tag="INIT")
+    setup_home_directory()
     install_playwright()
     run_migration()
     logger.success("Post-installation setup completed!", tag="COMPLETE")

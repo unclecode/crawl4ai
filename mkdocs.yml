@@ -15,6 +15,7 @@ nav:
     - "Blog Home": "blog/index.md"
     - "Changelog": "https://github.com/unclecode/crawl4ai/blob/main/CHANGELOG.md"
   - Core:
+    - "Command Line Interface": "core/cli.md"
     - "Simple Crawling": "core/simple-crawling.md"
     - "Crawler Result": "core/crawler-result.md"
     - "Browser & Crawler Config": "core/browser-crawler-config.md"

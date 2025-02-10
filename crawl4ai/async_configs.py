@@ -361,7 +361,8 @@ class BrowserConfig():
     @staticmethod
     def load( data: dict) -> "BrowserConfig":
         # Deserialize the object from a dictionary
-        return from_serializable_dict(data) if data else BrowserConfig()
+        config = from_serializable_dict(data) 
+        return BrowserConfig.from_kwargs(config)
 
 
 class CrawlerRunConfig():
@@ -811,7 +812,8 @@ class CrawlerRunConfig():
     @staticmethod
     def load(data: dict) -> "CrawlerRunConfig":
         # Deserialize the object from a dictionary
-        return from_serializable_dict(data) if data else CrawlerRunConfig()
+        config = from_serializable_dict(data) 
+        return CrawlerRunConfig.from_kwargs(config)
 
     def to_dict(self):
         return {
