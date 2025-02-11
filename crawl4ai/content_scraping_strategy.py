@@ -529,6 +529,9 @@ class WebScrapingStrategy(ContentScrapingStrategy):
                         if normalized_href not in external_links_dict:
                             external_links_dict[normalized_href] = link_data
                     else:
+                        if kwargs.get("exclude_internal_links", False):
+                            element.decompose()
+                            return False
                         if normalized_href not in internal_links_dict:
                             internal_links_dict[normalized_href] = link_data
 
@@ -629,7 +632,7 @@ class WebScrapingStrategy(ContentScrapingStrategy):
 
             try:
                 self.remove_unwanted_attributes(
-                    element, IMPORTANT_ATTRS, kwargs.get("keep_data_attributes", False)
+                    element, IMPORTANT_ATTRS + kwargs.get("keep_attrs", []) , kwargs.get("keep_data_attributes", False)
                 )
             except Exception as e:
                 # print('Error removing unwanted attributes:', str(e))

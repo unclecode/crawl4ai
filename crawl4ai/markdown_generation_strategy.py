@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from tabnanny import verbose
 from typing import Optional, Dict, Any, Tuple
 from .models import MarkdownGenerationResult
 from .html2text import CustomHTML2Text
@@ -29,9 +30,11 @@ class MarkdownGenerationStrategy(ABC):
         self,
         content_filter: Optional[RelevantContentFilter] = None,
         options: Optional[Dict[str, Any]] = None,
+        verbose: bool = False,
     ):
         self.content_filter = content_filter
         self.options = options or {}
+        self.verbose = verbose
 
     @abstractmethod
     def generate_markdown(

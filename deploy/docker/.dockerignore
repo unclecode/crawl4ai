@@ -1,0 +1,31 @@
+# .dockerignore
+*
+
+# Allow specific files and directories when using local installation
+!crawl4ai/
+!docs/
+!deploy/docker/
+!setup.py
+!pyproject.toml
+!README.md
+!LICENSE
+!MANIFEST.in
+!setup.cfg
+!mkdocs.yml
+
+.git/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.DS_Store
+.env
+.venv
+venv/
+tests/
+coverage.xml
+*.log
+*.swp
+*.egg-info/
+dist/
+build/

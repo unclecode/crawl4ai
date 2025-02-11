@@ -7,17 +7,131 @@ from .config import (
     SOCIAL_MEDIA_DOMAINS,
 )
 
-from .user_agent_generator import UserAgentGenerator, UAGen, ValidUAGenerator, OnlineUAGenerator
+from .user_agent_generator import UAGen, ValidUAGenerator # , OnlineUAGenerator
 from .extraction_strategy import ExtractionStrategy
 from .chunking_strategy import ChunkingStrategy, RegexChunking
 from .markdown_generation_strategy import MarkdownGenerationStrategy
-from .content_filter_strategy import RelevantContentFilter, BM25ContentFilter, LLMContentFilter, PruningContentFilter
+from .content_filter_strategy import RelevantContentFilter # , BM25ContentFilter, LLMContentFilter, PruningContentFilter
 from .content_scraping_strategy import ContentScrapingStrategy, WebScrapingStrategy
-from typing import Optional, Union, List
+from .deep_crawling import DeepCrawlStrategy
+from typing import Union, List
 from .cache_context import CacheMode
+from .proxy_strategy import ProxyRotationStrategy
 
+import inspect
+from typing import Any, Dict, Optional
+from enum import Enum 
 
-class BrowserConfig:
+def to_serializable_dict(obj: Any) -> Dict:
+    """
+    Recursively convert an object to a serializable dictionary using {type, params} structure
+    for complex objects.
+    """
+    if obj is None:
+        return None
+        
+    # Handle basic types
+    if isinstance(obj, (str, int, float, bool)):
+        return obj
+        
+    # Handle Enum
+    if isinstance(obj, Enum):
+        return {
+            "type": obj.__class__.__name__,
+            "params": obj.value
+        }
+        
+    # Handle datetime objects
+    if hasattr(obj, 'isoformat'):
+        return obj.isoformat()
+        
+    # Handle lists, tuples, and sets
+    if isinstance(obj, (list, tuple, set)):
+        return [to_serializable_dict(item) for item in obj]
+        
+    # Handle dictionaries - preserve them as-is
+    if isinstance(obj, dict):
+        return {
+            "type": "dict",  # Mark as plain dictionary
+            "value": {str(k): to_serializable_dict(v) for k, v in obj.items()}
+        }
+    
+    # Handle class instances
+    if hasattr(obj, '__class__'):
+        # Get constructor signature
+        sig = inspect.signature(obj.__class__.__init__)
+        params = sig.parameters
+        
+        # Get current values
+        current_values = {}
+        for name, param in params.items():
+            if name == 'self':
+                continue
+                
+            value = getattr(obj, name, param.default)
+            
+            # Only include if different from default, considering empty values
+            if not (is_empty_value(value) and is_empty_value(param.default)):
+                if value != param.default:
+                    current_values[name] = to_serializable_dict(value)
+        
+        return {
+            "type": obj.__class__.__name__,
+            "params": current_values
+        }
+        
+    return str(obj)
+
+def from_serializable_dict(data: Any) -> Any:
+    """
+    Recursively convert a serializable dictionary back to an object instance.
+    """
+    if data is None:
+        return None
+        
+    # Handle basic types
+    if isinstance(data, (str, int, float, bool)):
+        return data
+        
+    # Handle typed data
+    if isinstance(data, dict) and "type" in data:
+        # Handle plain dictionaries
+        if data["type"] == "dict":
+            return {k: from_serializable_dict(v) for k, v in data["value"].items()}
+            
+        # Import from crawl4ai for class instances
+        import crawl4ai
+        cls = getattr(crawl4ai, data["type"])
+        
+        # Handle Enum
+        if issubclass(cls, Enum):
+            return cls(data["params"])
+            
+        # Handle class instances
+        constructor_args = {
+            k: from_serializable_dict(v) for k, v in data["params"].items()
+        }
+        return cls(**constructor_args)
+        
+    # Handle lists
+    if isinstance(data, list):
+        return [from_serializable_dict(item) for item in data]
+        
+    # Handle raw dictionaries (legacy support)
+    if isinstance(data, dict):
+        return {k: from_serializable_dict(v) for k, v in data.items()}
+        
+    return data
+    
+def is_empty_value(value: Any) -> bool:
+    """Check if a value is effectively empty/null."""
+    if value is None:
+        return True
+    if isinstance(value, (list, tuple, set, dict, str)) and len(value) == 0:
+        return True
+    return False
+
+class BrowserConfig():
     """
     Configuration class for setting up a browser instance and its context in AsyncPlaywrightCrawlerStrategy.
 
@@ -239,8 +353,19 @@ class BrowserConfig:
         config_dict.update(kwargs)
         return BrowserConfig.from_kwargs(config_dict)
 
+    # Create a funciton returns dict of the object
+    def dump(self) -> dict:
+        # Serialize the object to a dictionary
+        return to_serializable_dict(self)
 
-class CrawlerRunConfig:
+    @staticmethod
+    def load( data: dict) -> "BrowserConfig":
+        # Deserialize the object from a dictionary
+        config = from_serializable_dict(data) 
+        return BrowserConfig.from_kwargs(config)
+
+
+class CrawlerRunConfig():
     """
     Configuration class for controlling how the crawler runs each crawl operation.
     This includes parameters for content extraction, page manipulation, waiting conditions,
@@ -250,6 +375,9 @@ class CrawlerRunConfig:
     By using this class, you have a single place to understand and adjust the crawling options.
 
     Attributes:
+        # Deep Crawl Parameters
+        deep_crawl_strategy (DeepCrawlStrategy or None): Strategy to use for deep crawling.
+    
         # Content Processing Parameters
         word_count_threshold (int): Minimum word count threshold before processing content.
                                     Default: MIN_WORD_THRESHOLD (typically 200).
@@ -271,6 +399,8 @@ class CrawlerRunConfig:
                                          Default: None.
         keep_data_attributes (bool): If True, retain `data-*` attributes while removing unwanted attributes.
                                      Default: False.
+        keep_attrs (list of str): List of HTML attributes to keep during processing.
+                                      Default: [].
         remove_forms (bool): If True, remove all `<form>` elements from the HTML.
                              Default: False.
         prettiify (bool): If True, apply `fast_format_html` to produce prettified HTML output.
@@ -282,6 +412,8 @@ class CrawlerRunConfig:
         proxy_config (dict or None): Detailed proxy configuration, e.g. {"server": "...", "username": "..."}.
                                      If None, no additional proxy config. Default: None.
 
+        # SSL Parameters
+        fetch_ssl_certificate: bool = False,
         # Caching Parameters
         cache_mode (CacheMode or None): Defines how caching is handled.
                                         If None, defaults to CacheMode.ENABLED internally.
@@ -363,10 +495,14 @@ class CrawlerRunConfig:
                                                     Default: SOCIAL_MEDIA_DOMAINS (from config).
         exclude_external_links (bool): If True, exclude all external links from the results.
                                        Default: False.
+        exclude_internal_links (bool): If True, exclude internal links from the results.
+                                       Default: False.
         exclude_social_media_links (bool): If True, exclude links pointing to social media domains.
                                            Default: False.
         exclude_domains (list of str): List of specific domains to exclude from results.
                                        Default: [].
+        exclude_internal_links (bool): If True, exclude internal links from the results.
+                                       Default: False.
 
         # Debugging and Logging Parameters
         verbose (bool): Enable verbose logging.
@@ -402,11 +538,13 @@ class CrawlerRunConfig:
         excluded_tags: list = None,
         excluded_selector: str = None,
         keep_data_attributes: bool = False,
+        keep_attrs: list = None,
         remove_forms: bool = False,
         prettiify: bool = False,
         parser_type: str = "lxml",
         scraping_strategy: ContentScrapingStrategy = None,
         proxy_config: dict = None,
+        proxy_rotation_strategy: Optional[ProxyRotationStrategy] = None,
         # SSL Parameters
         fetch_ssl_certificate: bool = False,
         # Caching Parameters
@@ -451,6 +589,7 @@ class CrawlerRunConfig:
         exclude_external_links: bool = False,
         exclude_social_media_links: bool = False,
         exclude_domains: list = None,
+        exclude_internal_links: bool = False,
         # Debugging and Logging Parameters
         verbose: bool = True,
         log_console: bool = False,
@@ -461,6 +600,9 @@ class CrawlerRunConfig:
         user_agent: str = None,
         user_agent_mode: str = None,
         user_agent_generator_config: dict = {},
+        # Deep Crawl Parameters
+        deep_crawl_strategy: Optional[DeepCrawlStrategy] = None,
+
     ):
         self.url = url
 
@@ -475,11 +617,13 @@ class CrawlerRunConfig:
         self.excluded_tags = excluded_tags or []
         self.excluded_selector = excluded_selector or ""
         self.keep_data_attributes = keep_data_attributes
+        self.keep_attrs = keep_attrs or []
         self.remove_forms = remove_forms
         self.prettiify = prettiify
         self.parser_type = parser_type
         self.scraping_strategy = scraping_strategy or WebScrapingStrategy()
         self.proxy_config = proxy_config
+        self.proxy_rotation_strategy = proxy_rotation_strategy
 
         # SSL Parameters
         self.fetch_ssl_certificate = fetch_ssl_certificate
@@ -532,6 +676,7 @@ class CrawlerRunConfig:
         self.exclude_external_links = exclude_external_links
         self.exclude_social_media_links = exclude_social_media_links
         self.exclude_domains = exclude_domains or []
+        self.exclude_internal_links = exclude_internal_links
 
         # Debugging and Logging Parameters
         self.verbose = verbose
@@ -566,6 +711,10 @@ class CrawlerRunConfig:
         if self.chunking_strategy is None:
             self.chunking_strategy = RegexChunking()
 
+
+        # Deep Crawl Parameters
+        self.deep_crawl_strategy = deep_crawl_strategy
+
     @staticmethod
     def from_kwargs(kwargs: dict) -> "CrawlerRunConfig":
         return CrawlerRunConfig(
@@ -580,11 +729,13 @@ class CrawlerRunConfig:
             excluded_tags=kwargs.get("excluded_tags", []),
             excluded_selector=kwargs.get("excluded_selector", ""),
             keep_data_attributes=kwargs.get("keep_data_attributes", False),
+            keep_attrs=kwargs.get("keep_attrs", []),
             remove_forms=kwargs.get("remove_forms", False),
             prettiify=kwargs.get("prettiify", False),
             parser_type=kwargs.get("parser_type", "lxml"),
             scraping_strategy=kwargs.get("scraping_strategy"),
             proxy_config=kwargs.get("proxy_config"),
+            proxy_rotation_strategy=kwargs.get("proxy_rotation_strategy"),
             # SSL Parameters
             fetch_ssl_certificate=kwargs.get("fetch_ssl_certificate", False),
             # Caching Parameters
@@ -638,6 +789,7 @@ class CrawlerRunConfig:
             exclude_external_links=kwargs.get("exclude_external_links", False),
             exclude_social_media_links=kwargs.get("exclude_social_media_links", False),
             exclude_domains=kwargs.get("exclude_domains", []),
+            exclude_internal_links=kwargs.get("exclude_internal_links", False),
             # Debugging and Logging Parameters
             verbose=kwargs.get("verbose", True),
             log_console=kwargs.get("log_console", False),
@@ -648,9 +800,21 @@ class CrawlerRunConfig:
             user_agent=kwargs.get("user_agent"),
             user_agent_mode=kwargs.get("user_agent_mode"),
             user_agent_generator_config=kwargs.get("user_agent_generator_config", {}),
+            # Deep Crawl Parameters
+            deep_crawl_strategy=kwargs.get("deep_crawl_strategy"),
         )
 
     # Create a funciton returns dict of the object
+    def dump(self) -> dict:
+        # Serialize the object to a dictionary
+        return to_serializable_dict(self)
+
+    @staticmethod
+    def load(data: dict) -> "CrawlerRunConfig":
+        # Deserialize the object from a dictionary
+        config = from_serializable_dict(data) 
+        return CrawlerRunConfig.from_kwargs(config)
+
     def to_dict(self):
         return {
             "word_count_threshold": self.word_count_threshold,
@@ -663,11 +827,13 @@ class CrawlerRunConfig:
             "excluded_tags": self.excluded_tags,
             "excluded_selector": self.excluded_selector,
             "keep_data_attributes": self.keep_data_attributes,
+            "keep_attrs": self.keep_attrs,
             "remove_forms": self.remove_forms,
             "prettiify": self.prettiify,
             "parser_type": self.parser_type,
             "scraping_strategy": self.scraping_strategy,
             "proxy_config": self.proxy_config,
+            "proxy_rotation_strategy": self.proxy_rotation_strategy,
             "fetch_ssl_certificate": self.fetch_ssl_certificate,
             "cache_mode": self.cache_mode,
             "session_id": self.session_id,
@@ -706,6 +872,7 @@ class CrawlerRunConfig:
             "exclude_external_links": self.exclude_external_links,
             "exclude_social_media_links": self.exclude_social_media_links,
             "exclude_domains": self.exclude_domains,
+            "exclude_internal_links": self.exclude_internal_links,
             "verbose": self.verbose,
             "log_console": self.log_console,
             "stream": self.stream,
@@ -714,6 +881,7 @@ class CrawlerRunConfig:
             "user_agent": self.user_agent,
             "user_agent_mode": self.user_agent_mode,
             "user_agent_generator_config": self.user_agent_generator_config,
+            "deep_crawl_strategy": self.deep_crawl_strategy,
         }
 
     def clone(self, **kwargs):

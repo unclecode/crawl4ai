@@ -21,6 +21,9 @@ from .utils import (
     extract_xml_data,
     split_and_parse_json_objects,
     sanitize_input_encode,
+    chunk_documents,
+    merge_chunks,
+    advanced_split,
 )
 from .models import * # noqa: F403
 
@@ -501,6 +504,10 @@ class LLMExtractionStrategy(ExtractionStrategy):
         instruction: str = None,
         schema: Dict = None,
         extraction_type="block",
+        chunk_token_threshold=CHUNK_TOKEN_THRESHOLD,
+        overlap_rate=OVERLAP_RATE,
+        word_token_rate=WORD_TOKEN_RATE,
+        apply_chunking=True,
         **kwargs,
     ):
         """
@@ -526,11 +533,15 @@ class LLMExtractionStrategy(ExtractionStrategy):
         """
         super().__init__(**kwargs)
         self.provider = provider
-        self.api_token = (
-            api_token
-            or PROVIDER_MODELS.get(provider, "no-token")
-            or os.getenv("OPENAI_API_KEY")
-        )
+        if api_token and not api_token.startswith("env:"):
+            self.api_token = api_token
+        elif api_token and api_token.startswith("env:"):
+            self.api_token = os.getenv(api_token[4:])
+        else:
+            self.api_token = (
+                PROVIDER_MODELS.get(provider, "no-token")
+                or os.getenv("OPENAI_API_KEY")
+            )
         self.instruction = instruction
         self.extract_type = extraction_type
         self.schema = schema
@@ -652,53 +663,16 @@ class LLMExtractionStrategy(ExtractionStrategy):
             )
         return blocks
 
-    def _merge(self, documents, chunk_token_threshold, overlap):
+    def _merge(self, documents, chunk_token_threshold, overlap) -> List[str]:
         """
         Merge documents into sections based on chunk_token_threshold and overlap.
         """
-        # chunks = []
-        sections = []
-        total_tokens = 0
-
-        # Calculate the total tokens across all documents
-        for document in documents:
-            total_tokens += len(document.split(" ")) * self.word_token_rate
-
-        # Calculate the number of sections needed
-        num_sections = math.floor(total_tokens / chunk_token_threshold)
-        if num_sections < 1:
-            num_sections = 1  # Ensure there is at least one section
-        adjusted_chunk_threshold = total_tokens / num_sections
-
-        total_token_so_far = 0
-        current_chunk = []
-
-        for document in documents:
-            tokens = document.split(" ")
-            token_count = len(tokens) * self.word_token_rate
-
-            if total_token_so_far + token_count <= adjusted_chunk_threshold:
-                current_chunk.extend(tokens)
-                total_token_so_far += token_count
-            else:
-                # Ensure to handle the last section properly
-                if len(sections) == num_sections - 1:
-                    current_chunk.extend(tokens)
-                    continue
-
-                # Add overlap if specified
-                if overlap > 0 and current_chunk:
-                    overlap_tokens = current_chunk[-overlap:]
-                    current_chunk.extend(overlap_tokens)
-
-                sections.append(" ".join(current_chunk))
-                current_chunk = tokens
-                total_token_so_far = token_count
-
-        # Add the last chunk
-        if current_chunk:
-            sections.append(" ".join(current_chunk))
-
+        sections =  merge_chunks(
+            docs = documents,
+            target_size= chunk_token_threshold,
+            overlap=overlap,
+            word_token_ratio=self.word_token_rate
+        )
         return sections
 
     def run(self, url: str, sections: List[str]) -> List[Dict[str, Any]]:
@@ -1065,6 +1039,7 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
         html: str,
         schema_type: str = "CSS", # or XPATH
         query: str = None,
+        target_json_example: str = None,
         provider: str = "gpt-4o",
         api_token: str = os.getenv("OPENAI_API_KEY"),
         **kwargs
@@ -1092,23 +1067,47 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
         # Build the prompt
         system_message = {
             "role": "system", 
-            "content": "You are a specialized HTML schema generator. Analyze the HTML and generate a JSON schema that follows the specified format. Only output valid JSON schema, nothing else."
+            "content": f"""You specialize in generating special JSON schemas for web scraping. This schema uses CSS or XPATH selectors to present a repetitive pattern in crawled HTML, such as a product in a product list or a search result item in a list of search results. You use this JSON schema to pass to a language model along with the HTML content to extract structured data from the HTML. The language model uses the JSON schema to extract data from the HTML and retrieve values for fields in the JSON schema, following the schema.
+
+Generating this HTML manually is not feasible, so you need to generate the JSON schema using the HTML content. The HTML copied from the crawled website is provided below, which we believe contains the repetitive pattern.
+
+# Schema main keys:
+- name: This is the name of the schema.
+- baseSelector: This is the CSS or XPATH selector that identifies the base element that contains all the repetitive patterns.
+- baseFields: This is a list of fields that you extract from the base element itself.
+- fields: This is a list of fields that you extract from the children of the base element. {{name, selector, type}} based on the type, you may have extra keys such as "attribute" when the type is "attribute".
+
+# Extra Context:
+In this context, the following items may or may not be present:
+- Example of target JSON object: This is a sample of the final JSON object that we hope to extract from the HTML using the schema you are generating.
+- Extra Instructions: This is optional instructions to consider when generating the schema provided by the user.
+
+# What if there is no example of target JSON object?
+In this scenario, use your best judgment to generate the schema. Try to maximize the number of fields that you can extract from the HTML.
+
+# What are the instructions and details for this schema generation?
+{prompt_template}"""
         }
         
         user_message = {
             "role": "user",
             "content": f"""
-                Instructions:
-                {prompt_template}
-
                 HTML to analyze:
                 ```html
                 {html}
                 ```
-
-                {"Extract the following data: " + query if query else "Please analyze the HTML structure and create the most appropriate schema for data extraction."}
                 """
         }
+
+        if query:
+            user_message["content"] += f"\n\nImportant Notes to Consider:\n{query}"
+        if target_json_example:
+            user_message["content"] += f"\n\nExample of target JSON object:\n{target_json_example}"
+        
+        user_message["content"] += """IMPORTANT: Ensure your schema is reliable, meaning do not use selectors that seem to generate dynamically and are not reliable. A reliable schema is what you want, as it consistently returns the same data even after many reloads of the page.
+
+        Analyze the HTML and generate a JSON schema that follows the specified format. Only output valid JSON schema, nothing else.
+        """
 
         try:
             # Call LLM with backoff handling

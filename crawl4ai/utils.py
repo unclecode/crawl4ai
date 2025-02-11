@@ -4,17 +4,22 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from bs4 import BeautifulSoup, Comment, element, Tag, NavigableString
 import json
 import html
+import lxml
 import re
 import os
 import platform
 from .prompts import PROMPT_EXTRACT_BLOCKS
-from .config import *
+from array import array
+from .html2text import html2text, CustomHTML2Text
+# from .config import *
+from .config import MIN_WORD_THRESHOLD, IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD, IMAGE_SCORE_THRESHOLD, DEFAULT_PROVIDER, PROVIDER_MODELS
+import httpx
+from socket import gaierror
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional, Callable
 from urllib.parse import urljoin
 import requests
 from requests.exceptions import InvalidSchema
-from typing import Dict, Any
 import xxhash
 from colorama import Fore, Style, init
 import textwrap
@@ -25,9 +30,186 @@ import asyncio
 
 import sqlite3
 import hashlib
-from urllib.parse import urljoin, urlparse
+
 from urllib.robotparser import RobotFileParser
 import aiohttp
+
+from packaging import version
+from . import __version__
+from typing import Sequence
+
+from itertools import chain
+from collections import deque
+from typing import  Generator, Iterable
+
+def chunk_documents(
+    documents: Iterable[str],
+    chunk_token_threshold: int,
+    overlap: int,
+    word_token_rate: float = 0.75,
+    tokenizer: Optional[Callable[[str], List[str]]] = None,
+) -> Generator[str, None, None]:
+    """
+    Efficiently chunks documents into token-limited sections with overlap between chunks.
+
+    Args:
+        documents: Iterable of document strings
+        chunk_token_threshold: Maximum tokens per chunk
+        overlap: Number of tokens to overlap between chunks
+        word_token_rate: Token estimate per word when not using a tokenizer
+        tokenizer: Function that splits text into tokens (if available)
+
+    Yields:
+        Text chunks as strings
+    """
+    token_queue = deque()
+    contribution_queue = deque()
+    current_token_count = 0.0
+
+    for doc in documents:
+        # Tokenize document
+        if tokenizer:
+            tokens = tokenizer(doc)
+            contributions = [1.0] * len(tokens)
+        else:
+            tokens = doc.split()
+            contributions = [word_token_rate] * len(tokens)
+
+        # Add to processing queues
+        token_queue.extend(tokens)
+        contribution_queue.extend(contributions)
+        current_token_count += sum(contributions)
+
+        # Process full chunks
+        while current_token_count >= chunk_token_threshold:
+            # Find chunk split point
+            chunk_tokens = []
+            chunk_contrib = []
+            chunk_total = 0.0
+            
+            # Build chunk up to threshold
+            while contribution_queue:
+                next_contrib = contribution_queue[0]
+                if chunk_total + next_contrib > chunk_token_threshold:
+                    break
+                
+                chunk_total += next_contrib
+                chunk_contrib.append(contribution_queue.popleft())
+                chunk_tokens.append(token_queue.popleft())
+
+            # Handle edge case where first token exceeds threshold
+            if not chunk_contrib:  # Single token exceeds threshold
+                chunk_contrib.append(contribution_queue.popleft())
+                chunk_tokens.append(token_queue.popleft())
+
+            # Calculate overlap
+            overlap_total = 0.0
+            overlap_idx = 0
+            for contrib in reversed(chunk_contrib):
+                if overlap_total + contrib > overlap:
+                    break
+                overlap_total += contrib
+                overlap_idx += 1
+
+            # Prepend overlap to queues
+            if overlap_idx > 0:
+                overlap_tokens = chunk_tokens[-overlap_idx:]
+                overlap_contrib = chunk_contrib[-overlap_idx:]
+                
+                token_queue.extendleft(reversed(overlap_tokens))
+                contribution_queue.extendleft(reversed(overlap_contrib))
+                current_token_count += overlap_total
+
+            # Update current token count and yield chunk
+            current_token_count -= sum(chunk_contrib)
+            yield " ".join(chunk_tokens[:len(chunk_tokens)-overlap_idx] if overlap_idx else chunk_tokens)
+
+    # Yield remaining tokens
+    if token_queue:
+        yield " ".join(token_queue)
+
+def merge_chunks(
+    docs: Sequence[str], 
+    target_size: int,
+    overlap: int = 0,
+    word_token_ratio: float = 1.0,
+    splitter: Callable = None
+) -> List[str]:
+    """Merges documents into chunks of specified token size.
+    
+    Args:
+        docs: Input documents
+        target_size: Desired token count per chunk
+        overlap: Number of tokens to overlap between chunks
+        word_token_ratio: Multiplier for word->token conversion
+    """
+    # Pre-tokenize all docs and store token counts
+    splitter = splitter or str.split
+    token_counts = array('I')
+    all_tokens: List[List[str]] = []
+    total_tokens = 0
+    
+    for doc in docs:
+        tokens = doc.split()
+        count = int(len(tokens) * word_token_ratio)
+        if count:  # Skip empty docs
+            token_counts.append(count)
+            all_tokens.append(tokens)
+            total_tokens += count
+    
+    if not total_tokens:
+        return []
+
+    # Pre-allocate chunks
+    num_chunks = max(1, (total_tokens + target_size - 1) // target_size)
+    chunks: List[List[str]] = [[] for _ in range(num_chunks)]
+    
+    curr_chunk = 0
+    curr_size = 0
+    
+    # Distribute tokens
+    for tokens in chain.from_iterable(all_tokens):
+        if curr_size >= target_size and curr_chunk < num_chunks - 1:
+            if overlap > 0:
+                overlap_tokens = chunks[curr_chunk][-overlap:]
+                curr_chunk += 1
+                chunks[curr_chunk].extend(overlap_tokens)
+                curr_size = len(overlap_tokens)
+            else:
+                curr_chunk += 1
+                curr_size = 0
+                
+        chunks[curr_chunk].append(tokens)
+        curr_size += 1
+
+    # Return only non-empty chunks
+    return [' '.join(chunk) for chunk in chunks if chunk]
+
+
+class VersionManager:
+    def __init__(self):
+        self.home_dir = Path.home() / ".crawl4ai"
+        self.version_file = self.home_dir / "version.txt"
+
+    def get_installed_version(self):
+        """Get the version recorded in home directory"""
+        if not self.version_file.exists():
+            return None
+        try:
+            return version.parse(self.version_file.read_text().strip())
+        except Exception as _ex:
+            return None
+
+    def update_version(self):
+        """Update the version file to current library version"""
+        self.version_file.write_text(__version__.__version__)
+
+    def needs_update(self):
+        """Check if database needs update based on version"""
+        installed = self.get_installed_version()
+        current = version.parse(__version__.__version__)
+        return installed is None or installed < current
+
 
 class RobotsParser:
     # Default 7 days cache TTL
@@ -107,7 +289,7 @@ class RobotsParser:
             domain = parsed.netloc
             if not domain:
                 return True
-        except:
+        except Exception as _ex:
             return True
 
         # Fast path - check cache first
@@ -127,7 +309,7 @@ class RobotsParser:
                             self._cache_rules(domain, rules)
                         else:
                             return True
-            except:
+            except Exception as _ex:
                 # On any error (timeout, connection failed, etc), allow access
                 return True
 
@@ -159,6 +341,77 @@ class RobotsParser:
 class InvalidCSSSelectorError(Exception):
     pass
 
+
+SPLITS = bytearray([
+    # Control chars (0-31) + space (32)
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    # Special chars (33-47): ! " # $ % & ' ( ) * + , - . /
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    # Numbers (48-57): Treat as non-splits
+    0,0,0,0,0,0,0,0,0,0,
+    # More special chars (58-64): : ; < = > ? @
+    1,1,1,1,1,1,1,
+    # Uppercase (65-90): Keep
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    # More special chars (91-96): [ \ ] ^ _ `
+    1,1,1,1,1,1,
+    # Lowercase (97-122): Keep
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    # Special chars (123-126): { | } ~
+    1,1,1,1,
+    # Extended ASCII
+    *([1] * 128)
+])
+
+# Additional split chars for HTML/code
+HTML_CODE_CHARS = {
+    # HTML specific
+    '•', '►', '▼', '©', '®', '™', '→', '⇒', '≈', '≤', '≥',
+    # Programming symbols  
+    '+=', '-=', '*=', '/=', '=>', '<=>', '!=', '==', '===',
+    '++', '--', '<<', '>>', '&&', '||', '??', '?:', '?.', 
+    # Common Unicode
+    '…', '"', '"', ''', ''', '«', '»', '—', '–',
+    # Additional splits
+    '+', '=', '~', '@', '#', '$', '%', '^', '&', '*',
+    '(', ')', '{', '}', '[', ']', '|', '\\', '/', '`',
+    '<', '>', ',', '.', '?', '!', ':', ';', '-', '_'
+}
+
+def advanced_split(text: str) -> list[str]:
+    result = []
+    word = array('u')
+    
+    i = 0
+    text_len = len(text)
+    
+    while i < text_len:
+        char = text[i]
+        o = ord(char)
+        
+        # Fast path for ASCII
+        if o < 256 and SPLITS[o]:
+            if word:
+                result.append(word.tounicode())
+                word = array('u')
+        # Check for multi-char symbols
+        elif i < text_len - 1:
+            two_chars = char + text[i + 1]
+            if two_chars in HTML_CODE_CHARS:
+                if word:
+                    result.append(word.tounicode())
+                    word = array('u')
+                i += 1  # Skip next char since we used it
+            else:
+                word.append(char)
+        else:
+            word.append(char)
+        i += 1
+            
+    if word:
+        result.append(word.tounicode())
+        
+    return result
 
 def create_box_message(
     message: str,
@@ -1124,7 +1377,7 @@ def get_content_of_website_optimized(
             src = img.get("src", "")
             if base64_pattern.match(src):
                 img["src"] = base64_pattern.sub("", src)
-        except:
+        except Exception as _ex:
             pass
 
     cleaned_html = str(body).replace("\n\n", "\n").replace("  ", " ")
@@ -1162,7 +1415,7 @@ def extract_metadata_using_lxml(html, doc=None):
 
     if doc is None:
         try:
-            doc = lhtml.document_fromstring(html)
+            doc = lxml.html.document_fromstring(html)
         except Exception:
             return {}
 
@@ -1478,10 +1731,10 @@ def extract_blocks_batch(batch_data, provider="groq/llama3-70b-8192", api_token=
 
     messages = []
 
-    for url, html in batch_data:
+    for url, _html in batch_data:
         variable_values = {
             "URL": url,
-            "HTML": html,
+            "HTML": _html,
         }
 
         prompt_with_variables = PROMPT_EXTRACT_BLOCKS
@@ -1663,7 +1916,7 @@ def fast_format_html(html_string):
     indent = 0
     indent_str = "  "  # Two spaces for indentation
     formatted = []
-    in_content = False
+    # in_content = False
 
     # Split by < and > to separate tags and content
     parts = html_string.replace(">", ">\n").replace("<", "\n<").split("\n")
@@ -2207,3 +2460,83 @@ def get_error_context(exc_info, context_lines: int = 5):
         "function": func_name,
         "code_context": code_context,
     }
+
+def truncate(value, threshold):
+    if len(value) > threshold:
+        return value[:threshold] + '...'  # Add ellipsis to indicate truncation
+    return value
+
+def optimize_html(html_str, threshold=200):
+    root = lxml.html.fromstring(html_str)
+    
+    for _element in root.iter():
+        # Process attributes
+        for attr in list(_element.attrib):
+            _element.attrib[attr] = truncate(_element.attrib[attr], threshold)
+        
+        # Process text content
+        if _element.text and len(_element.text) > threshold:
+            _element.text = truncate(_element.text, threshold)
+            
+        # Process tail text
+        if _element.tail and len(_element.tail) > threshold:
+            _element.tail = truncate(_element.tail, threshold)
+    
+    return lxml.html.tostring(root, encoding='unicode', pretty_print=False)
+
+class HeadPeekr:
+    @staticmethod
+    async def fetch_head_section(url, timeout=0.3):
+        headers = {
+            "User-Agent": "Mozilla/5.0 (compatible; CrawlBot/1.0)",
+            "Accept": "text/html",
+            "Connection": "close"  # Force close after response
+        }
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.get(url, headers=headers, follow_redirects=True)
+                
+                # Handle redirects explicitly by using the final URL
+                if response.url != url:
+                    url = str(response.url)
+                    response = await client.get(url, headers=headers)
+                
+                content = b""
+                async for chunk in response.aiter_bytes():
+                    content += chunk
+                    if b"</head>" in content:
+                        break  # Stop after detecting </head>
+                return content.split(b"</head>")[0] + b"</head>"
+        except (httpx.HTTPError, gaierror) :
+            return None
+
+    @staticmethod
+    async def peek_html(url, timeout=0.3):
+        head_section = await HeadPeekr.fetch_head_section(url, timeout=timeout)
+        if head_section:
+            return head_section.decode("utf-8", errors="ignore")
+        return None
+
+    @staticmethod
+    def extract_meta_tags(head_content: str):
+        meta_tags = {}
+        
+        # Find all meta tags
+        meta_pattern = r'<meta[^>]+>'
+        for meta_tag in re.finditer(meta_pattern, head_content):
+            tag = meta_tag.group(0)
+            
+            # Extract name/property and content
+            name_match = re.search(r'name=["\'](.*?)["\']', tag)
+            property_match = re.search(r'property=["\'](.*?)["\']', tag)
+            content_match = re.search(r'content=["\'](.*?)["\']', tag)
+            
+            if content_match and (name_match or property_match):
+                key = name_match.group(1) if name_match else property_match.group(1)
+                meta_tags[key] = content_match.group(1)
+                
+        return meta_tags
+
+    def get_title(head_content: str):
+        title_match = re.search(r'<title>(.*?)</title>', head_content, re.IGNORECASE | re.DOTALL)
+        return title_match.group(1) if title_match else None

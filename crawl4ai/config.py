@@ -15,6 +15,8 @@ PROVIDER_MODELS = {
     "openai/gpt-4o": os.getenv("OPENAI_API_KEY"),
     "openai/o1-mini": os.getenv("OPENAI_API_KEY"),
     "openai/o1-preview": os.getenv("OPENAI_API_KEY"),
+    "openai/o3-mini": os.getenv("OPENAI_API_KEY"),
+    "openai/o3-mini-high": os.getenv("OPENAI_API_KEY"),
     "anthropic/claude-3-haiku-20240307": os.getenv("ANTHROPIC_API_KEY"),
     "anthropic/claude-3-opus-20240229": os.getenv("ANTHROPIC_API_KEY"),
     "anthropic/claude-3-sonnet-20240229": os.getenv("ANTHROPIC_API_KEY"),

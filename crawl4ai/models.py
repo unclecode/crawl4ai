@@ -85,6 +85,16 @@ class MarkdownGenerationResult(BaseModel):
     fit_markdown: Optional[str] = None
     fit_html: Optional[str] = None
 
+@dataclass
+class TraversalStats:
+    """Statistics for the traversal process"""
+
+    start_time: datetime = datetime.now()
+    urls_processed: int = 0
+    urls_failed: int = 0
+    urls_skipped: int = 0
+    total_depth_reached: int = 0
+    current_depth: int = 0
 
 class DispatchResult(BaseModel):
     task_id: str
@@ -103,6 +113,7 @@ class CrawlResult(BaseModel):
     media: Dict[str, List[Dict]] = {}
     links: Dict[str, List[Dict]] = {}
     downloaded_files: Optional[List[str]] = None
+    js_execution_result: Optional[Dict[str, Any]] = None
     screenshot: Optional[str] = None
     pdf: Optional[bytes] = None
     markdown: Optional[Union[str, MarkdownGenerationResult]] = None
@@ -126,6 +137,7 @@ class CrawlResult(BaseModel):
 class AsyncCrawlResponse(BaseModel):
     html: str
     response_headers: Dict[str, str]
+    js_execution_result: Optional[Dict[str, Any]] = None
     status_code: int
     screenshot: Optional[str] = None
     pdf_data: Optional[bytes] = None
@@ -143,6 +155,7 @@ class AsyncCrawlResponse(BaseModel):
 ###############################
 class MediaItem(BaseModel):
     src: Optional[str] = ""
+    data: Optional[str] = ""
     alt: Optional[str] = ""
     desc: Optional[str] = ""
     score: Optional[int] = 0

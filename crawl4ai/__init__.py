@@ -1,4 +1,5 @@
 # __init__.py
+import warnings
 
 from .async_webcrawler import AsyncWebCrawler, CacheMode
 from .async_configs import BrowserConfig, CrawlerRunConfig
@@ -6,6 +7,10 @@ from .content_scraping_strategy import (
     ContentScrapingStrategy,
     WebScrapingStrategy,
     LXMLWebScrapingStrategy,
+)
+from .proxy_strategy import (
+    ProxyRotationStrategy,
+    RoundRobinProxyStrategy,
 )
 from .extraction_strategy import (
     ExtractionStrategy,
@@ -26,10 +31,14 @@ from .async_dispatcher import (
     DisplayMode,
     BaseDispatcher
 )
-
+from .docker_client import Crawl4aiDockerClient
+from .hub import CrawlerHub
+from .deep_crawling import DeepCrawlStrategy
 __all__ = [
     "AsyncWebCrawler",
+    "DeepCrawlStrategy",
     "CrawlResult",
+    "CrawlerHub",
     "CacheMode",
     "ContentScrapingStrategy",
     "WebScrapingStrategy",
@@ -55,34 +64,34 @@ __all__ = [
     "CrawlerMonitor",
     "DisplayMode",
     "MarkdownGenerationResult",
+    "Crawl4aiDockerClient",
+    "ProxyRotationStrategy",
+    "RoundRobinProxyStrategy",
 ]
 
 
-def is_sync_version_installed():
-    try:
-        import selenium
+# def is_sync_version_installed():
+#     try:
+#         import selenium # noqa
 
-        return True
-    except ImportError:
-        return False
+#         return True
+#     except ImportError:
+#         return False
 
 
-if is_sync_version_installed():
-    try:
-        from .web_crawler import WebCrawler
+# if is_sync_version_installed():
+#     try:
+#         from .web_crawler import WebCrawler
 
-        __all__.append("WebCrawler")
-    except ImportError:
-        print(
-            "Warning: Failed to import WebCrawler even though selenium is installed. This might be due to other missing dependencies."
-        )
-else:
-    WebCrawler = None
-    # import warnings
-    # print("Warning: Synchronous WebCrawler is not available. Install crawl4ai[sync] for synchronous support. However, please note that the synchronous version will be deprecated soon.")
-
-import warnings
-from pydantic import warnings as pydantic_warnings
+#         __all__.append("WebCrawler")
+#     except ImportError:
+#         print(
+#             "Warning: Failed to import WebCrawler even though selenium is installed. This might be due to other missing dependencies."
+#         )
+# else:
+#     WebCrawler = None
+#     # import warnings
+#     # print("Warning: Synchronous WebCrawler is not available. Install crawl4ai[sync] for synchronous support. However, please note that the synchronous version will be deprecated soon.")
 
 # Disable all Pydantic warnings
 warnings.filterwarnings("ignore", module="pydantic")
