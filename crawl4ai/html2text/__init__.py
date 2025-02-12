@@ -610,13 +610,22 @@ class HTML2Text(html.parser.HTMLParser):
                         self.o("[" + str(a_props.count) + "]")
 
         if tag == "dl" and start:
-            self.p()
-        if tag == "dt" and not start:
-            self.pbr()
-        if tag == "dd" and start:
-            self.o("    ")
-        if tag == "dd" and not start:
-            self.pbr()
+            self.p()  # Add paragraph break before list starts
+            self.p_p = 0  # Reset paragraph state
+        
+        elif tag == "dt" and start:
+            if self.p_p == 0:  # If not first term
+                self.o("\n\n")  # Add spacing before new term-definition pair
+            self.p_p = 0  # Reset paragraph state
+        
+        elif tag == "dt" and not start:
+            self.o("\n")  # Single newline between term and definition
+        
+        elif tag == "dd" and start:
+            self.o("    ")  # Indent definition
+        
+        elif tag == "dd" and not start:
+            self.p_p = 0
 
         if tag in ["ol", "ul"]:
             # Google Docs create sub lists as top level lists
