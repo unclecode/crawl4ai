@@ -1,36 +1,78 @@
-site_name: Crawl4AI Documentation
-docs_dir: docs/md
+site_name: Crawl4AI Documentation (v0.4.3b2)
+site_description:  🚀🤖 Crawl4AI, Open-source LLM-Friendly Web Crawler & Scraper
+site_url: https://docs.crawl4ai.com
+repo_url: https://github.com/unclecode/crawl4ai
+repo_name: unclecode/crawl4ai
+docs_dir: docs/md_v2
+
 nav:
-  - Home: index.md
-  - First Steps:
-      - Introduction: introduction.md
-      - Installation: installation.md
-      - Quick Start: quickstart.md
-  - Examples:
-      - Intro: examples/index.md
-      - Structured Data Extraction: examples/json_css_extraction.md
-      - LLM Extraction: examples/llm_extraction.md
-      - JS Execution & CSS Filtering: examples/js_execution_css_filtering.md
-      - Hooks & Auth: examples/hooks_auth.md
-      - Summarization: examples/summarization.md
-      - Research Assistant: examples/research_assistant.md
-  - Full Details of Using Crawler:
-      - Crawl Request Parameters: full_details/crawl_request_parameters.md
-      - Crawl Result Class: full_details/crawl_result_class.md
-      - Session Based Crawling: full_details/session_based_crawling.md
-      - Advanced Features: full_details/advanced_features.md
-      - Advanced JsonCssExtraction: full_details/advanced_jsoncss_extraction.md
-      - Chunking Strategies: full_details/chunking_strategies.md
-      - Extraction Strategies: full_details/extraction_strategies.md
-  - Miscellaneous:
-      - Change Log: changelog.md
-      - Contact: contact.md
+  - Home: 'index.md'
+  - Setup & Installation:
+    - "Installation": "core/installation.md"
+    - "Docker Deployment": "core/docker-deploymeny.md"
+  - "Quick Start": "core/quickstart.md"
+  - "Blog & Changelog":
+    - "Blog Home": "blog/index.md"
+    - "Changelog": "https://github.com/unclecode/crawl4ai/blob/main/CHANGELOG.md"
+  - Core:
+    - "Command Line Interface": "core/cli.md"
+    - "Simple Crawling": "core/simple-crawling.md"
+    - "Crawler Result": "core/crawler-result.md"
+    - "Browser & Crawler Config": "core/browser-crawler-config.md"
+    - "Markdown Generation": "core/markdown-generation.md"
+    - "Fit Markdown": "core/fit-markdown.md"
+    - "Page Interaction": "core/page-interaction.md"
+    - "Content Selection": "core/content-selection.md"
+    - "Cache Modes": "core/cache-modes.md"
+    - "Local Files & Raw HTML": "core/local-files.md"
+    - "Link & Media": "core/link-media.md"
+  - Advanced:
+    - "Overview": "advanced/advanced-features.md"
+    - "File Downloading": "advanced/file-downloading.md"
+    - "Lazy Loading": "advanced/lazy-loading.md"
+    - "Hooks & Auth": "advanced/hooks-auth.md"
+    - "Proxy & Security": "advanced/proxy-security.md"
+    - "Session Management": "advanced/session-management.md"
+    - "Multi-URL Crawling": "advanced/multi-url-crawling.md"
+    - "Crawl Dispatcher": "advanced/crawl-dispatcher.md"
+    - "Identity Based Crawling": "advanced/identity-based-crawling.md"
+    - "SSL Certificate": "advanced/ssl-certificate.md"
+  - Extraction:
+    - "LLM-Free Strategies": "extraction/no-llm-strategies.md"
+    - "LLM Strategies": "extraction/llm-strategies.md"
+    - "Clustering Strategies": "extraction/clustring-strategies.md"
+    - "Chunking": "extraction/chunking.md"
+  - API Reference:
+    - "AsyncWebCrawler": "api/async-webcrawler.md"
+    - "arun()": "api/arun.md"
+    - "arun_many()": "api/arun_many.md"
+    - "Browser & Crawler Config": "api/parameters.md"
+    - "CrawlResult": "api/crawl-result.md"
+    - "Strategies": "api/strategies.md"
 
 theme:
-  name: terminal
-  palette: dark
+  name: 'terminal'
+  palette: 'dark'
+  icon:
+    repo: fontawesome/brands/github
 
-# Add the css/extra.css
+plugins:
+  - search
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - admonition
+  - pymdownx.details
+  - attr_list
+  - tables
+
+extra:
+  version: !ENV [CRAWL4AI_VERSION, 'development']
+
 extra_css:
   - assets/styles.css
   - assets/highlight.css
@@ -39,3 +81,4 @@ extra_css:
 extra_javascript:
   - assets/highlight.min.js
   - assets/highlight_init.js
+  - https://buttons.github.io/buttons.js

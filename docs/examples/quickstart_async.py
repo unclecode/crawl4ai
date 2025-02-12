@@ -1,6 +1,10 @@
 import os, sys
+
 # append parent directory to system path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))); os.environ['FIRECRAWL_API_KEY'] = "fc-84b370ccfad44beabc686b38f1769692";
+sys.path.append(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
+os.environ["FIRECRAWL_API_KEY"] = "fc-84b370ccfad44beabc686b38f1769692"
 
 import asyncio
 # import nest_asyncio
@@ -10,13 +14,18 @@ import time
 import json
 import os
 import re
+from typing import Dict, List
 from bs4 import BeautifulSoup
 from pydantic import BaseModel, Field
-from crawl4ai import AsyncWebCrawler
+from crawl4ai import AsyncWebCrawler, CacheMode
+from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
+from crawl4ai.content_filter_strategy import PruningContentFilter
 from crawl4ai.extraction_strategy import (
     JsonCssExtractionStrategy,
     LLMExtractionStrategy,
 )
+
+__location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
 print("Crawl4AI: Advanced Web Crawling and Data Extraction")
 print("GitHub Repository: https://github.com/unclecode/crawl4ai")
@@ -27,10 +36,13 @@ print("Website: https://crawl4ai.com")
 async def simple_crawl():
     print("\n--- Basic Usage ---")
     async with AsyncWebCrawler(verbose=True) as crawler:
-        result = await crawler.arun(url="https://www.nbcnews.com/business")
+        result = await crawler.arun(
+            url="https://www.nbcnews.com/business", cache_mode=CacheMode.BYPASS
+        )
         print(result.markdown[:500])  # Print first 500 characters
 
-async def js_and_css():
+
+async def simple_example_with_running_js_code():
     print("\n--- Executing JavaScript and Using CSS Selectors ---")
     # New code to handle the wait_for parameter
     wait_for = """() => {
@@ -47,11 +59,22 @@ async def js_and_css():
         result = await crawler.arun(
             url="https://www.nbcnews.com/business",
             js_code=js_code,
-            # css_selector="article.tease-card",
             # wait_for=wait_for,
-            bypass_cache=True,
+            cache_mode=CacheMode.BYPASS,
         )
         print(result.markdown[:500])  # Print first 500 characters
+
+
+async def simple_example_with_css_selector():
+    print("\n--- Using CSS Selectors ---")
+    async with AsyncWebCrawler(verbose=True) as crawler:
+        result = await crawler.arun(
+            url="https://www.nbcnews.com/business",
+            css_selector=".wide-tease-item__description",
+            cache_mode=CacheMode.BYPASS,
+        )
+        print(result.markdown[:500])  # Print first 500 characters
+
 
 async def use_proxy():
     print("\n--- Using a Proxy ---")
@@ -59,12 +82,36 @@ async def use_proxy():
         "Note: Replace 'http://your-proxy-url:port' with a working proxy to run this example."
     )
     # Uncomment and modify the following lines to use a proxy
-    # async with AsyncWebCrawler(verbose=True, proxy="http://your-proxy-url:port") as crawler:
-    #     result = await crawler.arun(
-    #         url="https://www.nbcnews.com/business",
-    #         bypass_cache=True
-    #     )
-    #     print(result.markdown[:500])  # Print first 500 characters
+    async with AsyncWebCrawler(
+        verbose=True, proxy="http://your-proxy-url:port"
+    ) as crawler:
+        result = await crawler.arun(
+            url="https://www.nbcnews.com/business", cache_mode=CacheMode.BYPASS
+        )
+        if result.success:
+            print(result.markdown[:500])  # Print first 500 characters
+
+
+async def capture_and_save_screenshot(url: str, output_path: str):
+    async with AsyncWebCrawler(verbose=True) as crawler:
+        result = await crawler.arun(
+            url=url, screenshot=True, cache_mode=CacheMode.BYPASS
+        )
+
+        if result.success and result.screenshot:
+            import base64
+
+            # Decode the base64 screenshot data
+            screenshot_data = base64.b64decode(result.screenshot)
+
+            # Save the screenshot as a JPEG file
+            with open(output_path, "wb") as f:
+                f.write(screenshot_data)
+
+            print(f"Screenshot saved successfully to {output_path}")
+        else:
+            print("Failed to capture screenshot")
+
 
 class OpenAIModelFee(BaseModel):
     model_name: str = Field(..., description="Name of the OpenAI model.")
@@ -73,70 +120,107 @@ class OpenAIModelFee(BaseModel):
         ..., description="Fee for output token for the OpenAI model."
     )
 
-async def extract_structured_data_using_llm():
-    print("\n--- Extracting Structured Data with OpenAI ---")
-    print(
-        "Note: Set your OpenAI API key as an environment variable to run this example."
-    )
-    if not os.getenv("OPENAI_API_KEY"):
-        print("OpenAI API key not found. Skipping this example.")
+
+async def extract_structured_data_using_llm(
+    provider: str, api_token: str = None, extra_headers: Dict[str, str] = None
+):
+    print(f"\n--- Extracting Structured Data with {provider} ---")
+
+    if api_token is None and provider != "ollama":
+        print(f"API token is required for {provider}. Skipping this example.")
         return
+
+    # extra_args = {}
+    extra_args = {
+        "temperature": 0,
+        "top_p": 0.9,
+        "max_tokens": 2000,
+        # any other supported parameters for litellm
+    }
+    if extra_headers:
+        extra_args["extra_headers"] = extra_headers
 
     async with AsyncWebCrawler(verbose=True) as crawler:
         result = await crawler.arun(
             url="https://openai.com/api/pricing/",
             word_count_threshold=1,
             extraction_strategy=LLMExtractionStrategy(
-                provider="openai/gpt-4o",
-                api_token=os.getenv("OPENAI_API_KEY"),
-                schema=OpenAIModelFee.schema(),
+                provider=provider,
+                api_token=api_token,
+                schema=OpenAIModelFee.model_json_schema(),
                 extraction_type="schema",
                 instruction="""From the crawled content, extract all mentioned model names along with their fees for input and output tokens. 
                 Do not miss any models in the entire content. One extracted model JSON format should look like this: 
                 {"model_name": "GPT-4", "input_fee": "US$10.00 / 1M tokens", "output_fee": "US$30.00 / 1M tokens"}.""",
+                extra_args=extra_args,
             ),
-            bypass_cache=True,
+            cache_mode=CacheMode.BYPASS,
         )
         print(result.extracted_content)
+
 
 async def extract_structured_data_using_css_extractor():
     print("\n--- Using JsonCssExtractionStrategy for Fast Structured Output ---")
     schema = {
-        "name": "Coinbase Crypto Prices",
-        "baseSelector": ".cds-tableRow-t45thuk",
+        "name": "KidoCode Courses",
+        "baseSelector": "section.charge-methodology .w-tab-content > div",
         "fields": [
             {
-                "name": "crypto",
-                "selector": "td:nth-child(1) h2",
+                "name": "section_title",
+                "selector": "h3.heading-50",
                 "type": "text",
             },
             {
-                "name": "symbol",
-                "selector": "td:nth-child(1) p",
+                "name": "section_description",
+                "selector": ".charge-content",
                 "type": "text",
             },
             {
-                "name": "price",
-                "selector": "td:nth-child(2)",
+                "name": "course_name",
+                "selector": ".text-block-93",
                 "type": "text",
-            }
+            },
+            {
+                "name": "course_description",
+                "selector": ".course-content-text",
+                "type": "text",
+            },
+            {
+                "name": "course_icon",
+                "selector": ".image-92",
+                "type": "attribute",
+                "attribute": "src",
+            },
         ],
     }
 
-    extraction_strategy = JsonCssExtractionStrategy(schema, verbose=True)
+    async with AsyncWebCrawler(headless=True, verbose=True) as crawler:
+        # Create the JavaScript that handles clicking multiple times
+        js_click_tabs = """
+        (async () => {
+            const tabs = document.querySelectorAll("section.charge-methodology .tabs-menu-3 > div");
+            
+            for(let tab of tabs) {
+                // scroll to the tab
+                tab.scrollIntoView();
+                tab.click();
+                // Wait for content to load and animations to complete
+                await new Promise(r => setTimeout(r, 500));
+            }
+        })();
+        """
 
-    async with AsyncWebCrawler(verbose=True) as crawler:
         result = await crawler.arun(
-            url="https://www.coinbase.com/explore",
-            extraction_strategy=extraction_strategy,
-            bypass_cache=True,
+            url="https://www.kidocode.com/degrees/technology",
+            extraction_strategy=JsonCssExtractionStrategy(schema, verbose=True),
+            js_code=[js_click_tabs],
+            cache_mode=CacheMode.BYPASS,
         )
 
-        assert result.success, "Failed to crawl the page"
+        companies = json.loads(result.extracted_content)
+        print(f"Successfully extracted {len(companies)} companies")
+        print(json.dumps(companies[0], indent=2))
 
-        news_teasers = json.loads(result.extracted_content)
-        print(f"Successfully extracted {len(news_teasers)} news teasers")
-        print(json.dumps(news_teasers[0], indent=2))
 
 # Advanced Session-Based Crawling with Dynamic Content 🔄
 async def crawl_dynamic_content_pages_method_1():
@@ -166,8 +250,10 @@ async def crawl_dynamic_content_pages_method_1():
         all_commits = []
 
         js_next_page = """
-        const button = document.querySelector('a[data-testid="pagination-next-button"]');
-        if (button) button.click();
+        (() => {
+            const button = document.querySelector('a[data-testid="pagination-next-button"]');
+            if (button) button.click();
+        })();
         """
 
         for page in range(3):  # Crawl 3 pages
@@ -176,7 +262,7 @@ async def crawl_dynamic_content_pages_method_1():
                 session_id=session_id,
                 css_selector="li.Box-sc-g0xbh4-0",
                 js=js_next_page if page > 0 else None,
-                bypass_cache=True,
+                cache_mode=CacheMode.BYPASS,
                 js_only=page > 0,
                 headless=False,
             )
@@ -191,6 +277,7 @@ async def crawl_dynamic_content_pages_method_1():
 
         await crawler.crawler_strategy.kill_session(session_id)
         print(f"Successfully crawled {len(all_commits)} commits across 3 pages")
+
 
 async def crawl_dynamic_content_pages_method_2():
     print("\n--- Advanced Multi-Page Crawling with JavaScript Execution ---")
@@ -245,7 +332,7 @@ async def crawl_dynamic_content_pages_method_2():
                 extraction_strategy=extraction_strategy,
                 js_code=js_next_page_and_wait if page > 0 else None,
                 js_only=page > 0,
-                bypass_cache=True,
+                cache_mode=CacheMode.BYPASS,
                 headless=False,
             )
 
@@ -259,8 +346,11 @@ async def crawl_dynamic_content_pages_method_2():
         await crawler.crawler_strategy.kill_session(session_id)
         print(f"Successfully crawled {len(all_commits)} commits across 3 pages")
 
+
 async def crawl_dynamic_content_pages_method_3():
-    print("\n--- Advanced Multi-Page Crawling with JavaScript Execution using `wait_for` ---")
+    print(
+        "\n--- Advanced Multi-Page Crawling with JavaScript Execution using `wait_for` ---"
+    )
 
     async with AsyncWebCrawler(verbose=True) as crawler:
         url = "https://github.com/microsoft/TypeScript/commits/main"
@@ -282,7 +372,7 @@ async def crawl_dynamic_content_pages_method_3():
             const firstCommit = commits[0].textContent.trim();
             return firstCommit !== window.firstCommit;
         }"""
-        
+
         schema = {
             "name": "Commit Extractor",
             "baseSelector": "li.Box-sc-g0xbh4-0",
@@ -306,7 +396,7 @@ async def crawl_dynamic_content_pages_method_3():
                 js_code=js_next_page if page > 0 else None,
                 wait_for=wait_for if page > 0 else None,
                 js_only=page > 0,
-                bypass_cache=True,
+                cache_mode=CacheMode.BYPASS,
                 headless=False,
             )
 
@@ -320,6 +410,54 @@ async def crawl_dynamic_content_pages_method_3():
         await crawler.crawler_strategy.kill_session(session_id)
         print(f"Successfully crawled {len(all_commits)} commits across 3 pages")
 
+
+async def crawl_custom_browser_type():
+    # Use Firefox
+    start = time.time()
+    async with AsyncWebCrawler(
+        browser_type="firefox", verbose=True, headless=True
+    ) as crawler:
+        result = await crawler.arun(
+            url="https://www.example.com", cache_mode=CacheMode.BYPASS
+        )
+        print(result.markdown[:500])
+        print("Time taken: ", time.time() - start)
+
+    # Use WebKit
+    start = time.time()
+    async with AsyncWebCrawler(
+        browser_type="webkit", verbose=True, headless=True
+    ) as crawler:
+        result = await crawler.arun(
+            url="https://www.example.com", cache_mode=CacheMode.BYPASS
+        )
+        print(result.markdown[:500])
+        print("Time taken: ", time.time() - start)
+
+    # Use Chromium (default)
+    start = time.time()
+    async with AsyncWebCrawler(verbose=True, headless=True) as crawler:
+        result = await crawler.arun(
+            url="https://www.example.com", cache_mode=CacheMode.BYPASS
+        )
+        print(result.markdown[:500])
+        print("Time taken: ", time.time() - start)
+
+
+async def crawl_with_user_simultion():
+    async with AsyncWebCrawler(verbose=True, headless=True) as crawler:
+        url = "YOUR-URL-HERE"
+        result = await crawler.arun(
+            url=url,
+            cache_mode=CacheMode.BYPASS,
+            magic=True,  # Automatically detects and removes overlays, popups, and other elements that block content
+            # simulate_user = True,# Causes a series of random mouse movements and clicks to simulate user interaction
+            # override_navigator = True # Overrides the navigator object to make it look like a real user
+        )
+
+        print(result.markdown)
+
+
 async def speed_comparison():
     # print("\n--- Speed Comparison ---")
     # print("Firecrawl (simulated):")
@@ -329,18 +467,18 @@ async def speed_comparison():
     # print()
     # Simulated Firecrawl performance
     from firecrawl import FirecrawlApp
-    app = FirecrawlApp(api_key=os.environ['FIRECRAWL_API_KEY'])
+
+    app = FirecrawlApp(api_key=os.environ["FIRECRAWL_API_KEY"])
     start = time.time()
     scrape_status = app.scrape_url(
-    'https://www.nbcnews.com/business',
-    params={'formats': ['markdown', 'html']}
+        "https://www.nbcnews.com/business", params={"formats": ["markdown", "html"]}
     )
     end = time.time()
-    print("Firecrawl (simulated):")
+    print("Firecrawl:")
     print(f"Time taken: {end - start:.2f} seconds")
     print(f"Content length: {len(scrape_status['markdown'])} characters")
     print(f"Images found: {scrape_status['markdown'].count('cldnry.s-nbcnews.com')}")
-    print()    
+    print()
 
     async with AsyncWebCrawler() as crawler:
         # Crawl4AI simple crawl
@@ -348,13 +486,35 @@ async def speed_comparison():
         result = await crawler.arun(
             url="https://www.nbcnews.com/business",
             word_count_threshold=0,
-            bypass_cache=True,
+            cache_mode=CacheMode.BYPASS,
             verbose=False,
         )
         end = time.time()
         print("Crawl4AI (simple crawl):")
         print(f"Time taken: {end - start:.2f} seconds")
         print(f"Content length: {len(result.markdown)} characters")
+        print(f"Images found: {result.markdown.count('cldnry.s-nbcnews.com')}")
+        print()
+
+        # Crawl4AI with advanced content filtering
+        start = time.time()
+        result = await crawler.arun(
+            url="https://www.nbcnews.com/business",
+            word_count_threshold=0,
+            markdown_generator=DefaultMarkdownGenerator(
+                content_filter=PruningContentFilter(
+                    threshold=0.48, threshold_type="fixed", min_word_threshold=0
+                )
+                # content_filter=BM25ContentFilter(user_query=None, bm25_threshold=1.0)
+            ),
+            cache_mode=CacheMode.BYPASS,
+            verbose=False,
+        )
+        end = time.time()
+        print("Crawl4AI (Markdown Plus):")
+        print(f"Time taken: {end - start:.2f} seconds")
+        print(f"Content length: {len(result.markdown_v2.raw_markdown)} characters")
+        print(f"Fit Markdown: {len(result.markdown_v2.fit_markdown)} characters")
         print(f"Images found: {result.markdown.count('cldnry.s-nbcnews.com')}")
         print()
 
@@ -366,13 +526,20 @@ async def speed_comparison():
                 "const loadMoreButton = Array.from(document.querySelectorAll('button')).find(button => button.textContent.includes('Load More')); loadMoreButton && loadMoreButton.click();"
             ],
             word_count_threshold=0,
-            bypass_cache=True,
+            cache_mode=CacheMode.BYPASS,
+            markdown_generator=DefaultMarkdownGenerator(
+                content_filter=PruningContentFilter(
+                    threshold=0.48, threshold_type="fixed", min_word_threshold=0
+                )
+                # content_filter=BM25ContentFilter(user_query=None, bm25_threshold=1.0)
+            ),
             verbose=False,
         )
         end = time.time()
         print("Crawl4AI (with JavaScript execution):")
         print(f"Time taken: {end - start:.2f} seconds")
         print(f"Content length: {len(result.markdown)} characters")
+        print(f"Fit Markdown: {len(result.markdown_v2.fit_markdown)} characters")
         print(f"Images found: {result.markdown.count('cldnry.s-nbcnews.com')}")
 
     print("\nNote on Speed Comparison:")
@@ -385,16 +552,123 @@ async def speed_comparison():
     print("If you run these tests in an environment with better network conditions,")
     print("you may observe an even more significant speed advantage for Crawl4AI.")
 
+
+async def generate_knowledge_graph():
+    class Entity(BaseModel):
+        name: str
+        description: str
+
+    class Relationship(BaseModel):
+        entity1: Entity
+        entity2: Entity
+        description: str
+        relation_type: str
+
+    class KnowledgeGraph(BaseModel):
+        entities: List[Entity]
+        relationships: List[Relationship]
+
+    extraction_strategy = LLMExtractionStrategy(
+        provider="openai/gpt-4o-mini",  # Or any other provider, including Ollama and open source models
+        api_token=os.getenv("OPENAI_API_KEY"),  # In case of Ollama just pass "no-token"
+        schema=KnowledgeGraph.model_json_schema(),
+        extraction_type="schema",
+        instruction="""Extract entities and relationships from the given text.""",
+    )
+    async with AsyncWebCrawler() as crawler:
+        url = "https://paulgraham.com/love.html"
+        result = await crawler.arun(
+            url=url,
+            cache_mode=CacheMode.BYPASS,
+            extraction_strategy=extraction_strategy,
+            # magic=True
+        )
+        # print(result.extracted_content)
+        with open(os.path.join(__location__, "kb.json"), "w") as f:
+            f.write(result.extracted_content)
+
+
+async def fit_markdown_remove_overlay():
+    async with AsyncWebCrawler(
+        headless=True,  # Set to False to see what is happening
+        verbose=True,
+        user_agent_mode="random",
+        user_agent_generator_config={"device_type": "mobile", "os_type": "android"},
+    ) as crawler:
+        result = await crawler.arun(
+            url="https://www.kidocode.com/degrees/technology",
+            cache_mode=CacheMode.BYPASS,
+            markdown_generator=DefaultMarkdownGenerator(
+                content_filter=PruningContentFilter(
+                    threshold=0.48, threshold_type="fixed", min_word_threshold=0
+                ),
+                options={"ignore_links": True},
+            ),
+            # markdown_generator=DefaultMarkdownGenerator(
+            #     content_filter=BM25ContentFilter(user_query="", bm25_threshold=1.0),
+            #     options={
+            #         "ignore_links": True
+            #     }
+            # ),
+        )
+
+        if result.success:
+            print(len(result.markdown_v2.raw_markdown))
+            print(len(result.markdown_v2.markdown_with_citations))
+            print(len(result.markdown_v2.fit_markdown))
+
+            # Save clean html
+            with open(os.path.join(__location__, "output/cleaned_html.html"), "w") as f:
+                f.write(result.cleaned_html)
+
+            with open(
+                os.path.join(__location__, "output/output_raw_markdown.md"), "w"
+            ) as f:
+                f.write(result.markdown_v2.raw_markdown)
+
+            with open(
+                os.path.join(__location__, "output/output_markdown_with_citations.md"),
+                "w",
+            ) as f:
+                f.write(result.markdown_v2.markdown_with_citations)
+
+            with open(
+                os.path.join(__location__, "output/output_fit_markdown.md"), "w"
+            ) as f:
+                f.write(result.markdown_v2.fit_markdown)
+
+    print("Done")
+
+
 async def main():
-    await simple_crawl()
-    await js_and_css()
-    await use_proxy()
-    await extract_structured_data_using_css_extractor()
-    await extract_structured_data_using_llm()
+    # await extract_structured_data_using_llm("openai/gpt-4o", os.getenv("OPENAI_API_KEY"))
+
+    # await simple_crawl()
+    # await simple_example_with_running_js_code()
+    # await simple_example_with_css_selector()
+    # # await use_proxy()
+    # await capture_and_save_screenshot("https://www.example.com", os.path.join(__location__, "tmp/example_screenshot.jpg"))
+    # await extract_structured_data_using_css_extractor()
+
+    # LLM extraction examples
+    # await extract_structured_data_using_llm()
+    # await extract_structured_data_using_llm("huggingface/meta-llama/Meta-Llama-3.1-8B-Instruct", os.getenv("HUGGINGFACE_API_KEY"))
+    # await extract_structured_data_using_llm("ollama/llama3.2")
+
+    # You always can pass custom headers to the extraction strategy
+    # custom_headers = {
+    #     "Authorization": "Bearer your-custom-token",
+    #     "X-Custom-Header": "Some-Value"
+    # }
+    # await extract_structured_data_using_llm(extra_headers=custom_headers)
+
     # await crawl_dynamic_content_pages_method_1()
     # await crawl_dynamic_content_pages_method_2()
     await crawl_dynamic_content_pages_method_3()
-    await speed_comparison()
+
+    # await crawl_custom_browser_type()
+
+    # await speed_comparison()
 
 
 if __name__ == "__main__":

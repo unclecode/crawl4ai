@@ -1,10 +1,23 @@
-aiosqlite==0.20.0
-html2text==2024.2.26
-lxml==5.3.0
-litellm==1.48.0
-numpy>=1.26.0,<2.1.1
-pillow==10.4.0
-playwright==1.47.0
-python-dotenv==1.0.1
-requests>=2.26.0,<2.32.3
-beautifulsoup4==4.12.3
+# Note: These requirements are also specified in pyproject.toml
+# This file is kept for development environment setup and compatibility
+aiosqlite~=0.20
+lxml~=5.3
+litellm>=1.53.1
+numpy>=1.26.0,<3
+pillow~=10.4
+playwright>=1.49.0
+python-dotenv~=1.0
+requests~=2.26
+beautifulsoup4~=4.12
+tf-playwright-stealth>=1.1.0
+xxhash~=3.4
+rank-bm25~=0.2
+aiofiles>=24.1.0
+colorama~=0.4
+snowballstemmer~=2.2
+pydantic>=2.10
+pyOpenSSL>=24.3.0
+psutil>=6.1.1
+nltk>=3.9.1
+rich>=13.9.4
+cssselect>=1.2.0

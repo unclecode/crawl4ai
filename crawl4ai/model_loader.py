@@ -2,101 +2,125 @@ from functools import lru_cache
 from pathlib import Path
 import subprocess, os
 import shutil
-import tarfile
 from .model_loader import *
 import argparse
-import urllib.request
 from crawl4ai.config import MODEL_REPO_BRANCH
+
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
+
 
 @lru_cache()
 def get_available_memory(device):
     import torch
-    if device.type == 'cuda':
+
+    if device.type == "cuda":
         return torch.cuda.get_device_properties(device).total_memory
-    elif device.type == 'mps':      
-        return 48 * 1024 ** 3  # Assuming 8GB for MPS, as a conservative estimate
+    elif device.type == "mps":
+        return 48 * 1024**3  # Assuming 8GB for MPS, as a conservative estimate
     else:
         return 0
+
 
 @lru_cache()
 def calculate_batch_size(device):
     available_memory = get_available_memory(device)
-    
-    if device.type == 'cpu':
+
+    if device.type == "cpu":
         return 16
-    elif device.type in ['cuda', 'mps']:
+    elif device.type in ["cuda", "mps"]:
         # Adjust these thresholds based on your model size and available memory
-        if available_memory >= 31 * 1024 ** 3:  # > 32GB
+        if available_memory >= 31 * 1024**3:  # > 32GB
             return 256
-        elif available_memory >= 15 * 1024 ** 3:  # > 16GB to 32GB
+        elif available_memory >= 15 * 1024**3:  # > 16GB to 32GB
             return 128
-        elif available_memory >= 8 * 1024 ** 3:  # 8GB to 16GB
+        elif available_memory >= 8 * 1024**3:  # 8GB to 16GB
             return 64
         else:
             return 32
     else:
-        return 16  # Default batch size   
-    
+        return 16  # Default batch size
+
+
 @lru_cache()
 def get_device():
     import torch
+
     if torch.cuda.is_available():
-        device = torch.device('cuda')
+        device = torch.device("cuda")
     elif torch.backends.mps.is_available():
-        device = torch.device('mps')
+        device = torch.device("mps")
     else:
-        device = torch.device('cpu')
-    return device   
-    
+        device = torch.device("cpu")
+    return device
+
+
 def set_model_device(model):
     device = get_device()
-    model.to(device)    
+    model.to(device)
     return model, device
+
 
 @lru_cache()
 def get_home_folder():
-    home_folder = os.path.join(Path.home(), ".crawl4ai")
+    home_folder = os.path.join(
+        os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home()), ".crawl4ai"
+    )
     os.makedirs(home_folder, exist_ok=True)
     os.makedirs(f"{home_folder}/cache", exist_ok=True)
     os.makedirs(f"{home_folder}/models", exist_ok=True)
-    return home_folder 
+    return home_folder
+
 
 @lru_cache()
 def load_bert_base_uncased():
-    from transformers import BertTokenizer, BertModel, AutoTokenizer, AutoModel
-    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', resume_download=None)
-    model = BertModel.from_pretrained('bert-base-uncased', resume_download=None)
+    from transformers import BertTokenizer, BertModel
+
+    tokenizer = BertTokenizer.from_pretrained("bert-base-uncased", resume_download=None)
+    model = BertModel.from_pretrained("bert-base-uncased", resume_download=None)
     model.eval()
     model, device = set_model_device(model)
     return tokenizer, model
 
+
 @lru_cache()
-def load_bge_small_en_v1_5():
-    from transformers import BertTokenizer, BertModel, AutoTokenizer, AutoModel
-    tokenizer = AutoTokenizer.from_pretrained('BAAI/bge-small-en-v1.5', resume_download=None)
-    model = AutoModel.from_pretrained('BAAI/bge-small-en-v1.5', resume_download=None)
+def load_HF_embedding_model(model_name="BAAI/bge-small-en-v1.5") -> tuple:
+    """Load the Hugging Face model for embedding.
+
+    Args:
+        model_name (str, optional): The model name to load. Defaults to "BAAI/bge-small-en-v1.5".
+
+    Returns:
+        tuple: The tokenizer and model.
+    """
+    from transformers import AutoTokenizer, AutoModel
+
+    tokenizer = AutoTokenizer.from_pretrained(model_name, resume_download=None)
+    model = AutoModel.from_pretrained(model_name, resume_download=None)
     model.eval()
     model, device = set_model_device(model)
     return tokenizer, model
+
 
 @lru_cache()
 def load_text_classifier():
     from transformers import AutoTokenizer, AutoModelForSequenceClassification
     from transformers import pipeline
-    import torch
 
-    tokenizer = AutoTokenizer.from_pretrained("dstefa/roberta-base_topic_classification_nyt_news")
-    model = AutoModelForSequenceClassification.from_pretrained("dstefa/roberta-base_topic_classification_nyt_news")
+    tokenizer = AutoTokenizer.from_pretrained(
+        "dstefa/roberta-base_topic_classification_nyt_news"
+    )
+    model = AutoModelForSequenceClassification.from_pretrained(
+        "dstefa/roberta-base_topic_classification_nyt_news"
+    )
     model.eval()
     model, device = set_model_device(model)
     pipe = pipeline("text-classification", model=model, tokenizer=tokenizer)
     return pipe
 
+
 @lru_cache()
 def load_text_multilabel_classifier():
     from transformers import AutoModelForSequenceClassification, AutoTokenizer
-    import numpy as np
     from scipy.special import expit
     import torch
 
@@ -108,18 +132,27 @@ def load_text_multilabel_classifier():
     # else:
     #     device = torch.device("cpu")
     #     # return load_spacy_model(), torch.device("cpu")
-    
 
     MODEL = "cardiffnlp/tweet-topic-21-multi"
     tokenizer = AutoTokenizer.from_pretrained(MODEL, resume_download=None)
-    model = AutoModelForSequenceClassification.from_pretrained(MODEL, resume_download=None)
+    model = AutoModelForSequenceClassification.from_pretrained(
+        MODEL, resume_download=None
+    )
     model.eval()
     model, device = set_model_device(model)
     class_mapping = model.config.id2label
 
     def _classifier(texts, threshold=0.5, max_length=64):
-        tokens = tokenizer(texts, return_tensors='pt', padding=True, truncation=True, max_length=max_length)
-        tokens = {key: val.to(device) for key, val in tokens.items()}  # Move tokens to the selected device
+        tokens = tokenizer(
+            texts,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=max_length,
+        )
+        tokens = {
+            key: val.to(device) for key, val in tokens.items()
+        }  # Move tokens to the selected device
 
         with torch.no_grad():
             output = model(**tokens)
@@ -130,35 +163,41 @@ def load_text_multilabel_classifier():
 
         batch_labels = []
         for prediction in predictions:
-            labels = [class_mapping[i] for i, value in enumerate(prediction) if value == 1]
+            labels = [
+                class_mapping[i] for i, value in enumerate(prediction) if value == 1
+            ]
             batch_labels.append(labels)
 
         return batch_labels
 
     return _classifier, device
 
+
 @lru_cache()
 def load_nltk_punkt():
     import nltk
+
     try:
-        nltk.data.find('tokenizers/punkt')
+        nltk.data.find("tokenizers/punkt")
     except LookupError:
-        nltk.download('punkt')
-    return nltk.data.find('tokenizers/punkt')
+        nltk.download("punkt")
+    return nltk.data.find("tokenizers/punkt")
+
 
 @lru_cache()
 def load_spacy_model():
     import spacy
+
     name = "models/reuters"
     home_folder = get_home_folder()
     model_folder = Path(home_folder) / name
-    
+
     # Check if the model directory already exists
     if not (model_folder.exists() and any(model_folder.iterdir())):
         repo_url = "https://github.com/unclecode/crawl4ai.git"
-        branch = MODEL_REPO_BRANCH 
+        branch = MODEL_REPO_BRANCH
         repo_folder = Path(home_folder) / "crawl4ai"
-        
+
         print("[LOG] ⏬ Downloading Spacy model for the first time...")
 
         # Remove existing repo folder if it exists
@@ -168,7 +207,9 @@ def load_spacy_model():
                 if model_folder.exists():
                     shutil.rmtree(model_folder)
             except PermissionError:
-                print("[WARNING] Unable to remove existing folders. Please manually delete the following folders and try again:")
+                print(
+                    "[WARNING] Unable to remove existing folders. Please manually delete the following folders and try again:"
+                )
                 print(f"- {repo_folder}")
                 print(f"- {model_folder}")
                 return None
@@ -179,7 +220,7 @@ def load_spacy_model():
                 ["git", "clone", "-b", branch, repo_url, str(repo_folder)],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
-                check=True
+                check=True,
             )
 
             # Create the models directory if it doesn't exist
@@ -206,6 +247,7 @@ def load_spacy_model():
     except Exception as e:
         print(f"Error loading spacy model: {e}")
         return None
+
 
 def download_all_models(remove_existing=False):
     """Download all models required for Crawl4AI."""
@@ -235,14 +277,20 @@ def download_all_models(remove_existing=False):
     load_nltk_punkt()
     print("[LOG] ✅ All models downloaded successfully.")
 
+
 def main():
     print("[LOG] Welcome to the Crawl4AI Model Downloader!")
     print("[LOG] This script will download all the models required for Crawl4AI.")
     parser = argparse.ArgumentParser(description="Crawl4AI Model Downloader")
-    parser.add_argument('--remove-existing', action='store_true', help="Remove existing models before downloading")
+    parser.add_argument(
+        "--remove-existing",
+        action="store_true",
+        help="Remove existing models before downloading",
+    )
     args = parser.parse_args()
-    
+
     download_all_models(remove_existing=args.remove_existing)
+
 
 if __name__ == "__main__":
     main()

@@ -199,5 +199,59 @@ test_env/
 **/.DS_Store
 
 todo.md
+todo_executor.md
 git_changes.py
 git_changes.md
+pypi_build.sh
+git_issues.py
+git_issues.md
+
+.next/
+.tests/
+# .issues/
+.docs/
+.issues/
+.gitboss/
+todo_executor.md
+protect-all-except-feature.sh
+manage-collab.sh
+publish.sh
+combine.sh
+combined_output.txt
+.local
+.scripts
+tree.md
+tree.md
+.scripts
+.local
+.do
+/plans
+plans/
+
+# Codeium
+.codeiumignore
+todo/
+
+# Continue development files
+.continue/
+.continuerc.json
+continue.lock
+continue_core.log
+contextProviders/
+continue_workspace/
+.continue-cache/
+continue_config.json
+
+# Continue temporary files
+.continue-temp/
+.continue-logs/
+.continue-downloads/
+
+# Continue VS Code specific
+.vscode-continue/
+.vscode-continue-cache/
+
+.prompts/
+
+.llm.env
+.private/
