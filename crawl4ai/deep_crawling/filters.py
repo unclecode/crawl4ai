@@ -522,7 +522,7 @@ class FastContentTypeFilter(FastURLFilter):
         return path.rpartition(".")[-1].lower()
 
     def __init__(
-        self, allowed_types: Union[str, List[str]], check_extension: bool = True
+        self, allowed_types: Union[str, List[str]], check_extension: bool = True, ext_map: Dict[str, str] = _MIME_MAP
     ):
         super().__init__()
         # Normalize and store as frozenset for fast lookup
