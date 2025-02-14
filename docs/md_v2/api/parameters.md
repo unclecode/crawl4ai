@@ -71,7 +71,6 @@ We group them by category.
 | **`word_count_threshold`**   | `int` (default: ~200)                | Skips text blocks below X words. Helps ignore trivial sections.                                 |
 | **`extraction_strategy`**    | `ExtractionStrategy` (default: None) | If set, extracts structured data (CSS-based, LLM-based, etc.).                                  |
 | **`markdown_generator`**     | `MarkdownGenerationStrategy` (None)  | If you want specialized markdown output (citations, filtering, chunking, etc.).                 |
-| **`content_filter`**         | `RelevantContentFilter` (None)       | Filters out irrelevant text blocks. E.g., `PruningContentFilter` or `BM25ContentFilter`.        |
 | **`css_selector`**           | `str` (None)                         | Retains only the part of the page matching this selector.                                       |
 | **`excluded_tags`**          | `list` (None)                        | Removes entire tags (e.g. `["script", "style"]`).                                               |
 | **`excluded_selector`**      | `str` (None)                         | Like `css_selector` but to exclude. E.g. `"#ads, .tracker"`.                                    |

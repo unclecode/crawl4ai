@@ -33,10 +33,35 @@ from .async_dispatcher import (
 )
 from .docker_client import Crawl4aiDockerClient
 from .hub import CrawlerHub
-from .deep_crawling import DeepCrawlStrategy
+from .deep_crawling import (
+    DeepCrawlStrategy,
+    BFSDeepCrawlStrategy,
+    FastFilterChain,
+    FastContentTypeFilter,
+    FastDomainFilter,
+    FastURLFilter,
+    FastFilterStats,
+    FastKeywordRelevanceScorer,
+    FastURLScorer,
+    BestFirstCrawlingStrategy,
+    DFSDeepCrawlStrategy,
+    DeepCrawlDecorator,
+)
+
 __all__ = [
     "AsyncWebCrawler",
     "DeepCrawlStrategy",
+    "BFSDeepCrawlStrategy",
+    "BestFirstCrawlingStrategy",
+    "DFSDeepCrawlStrategy",
+    "FastFilterChain",
+    "FastContentTypeFilter",
+    "FastDomainFilter",
+    "FastFilterStats",
+    "FastURLFilter",
+    "FastKeywordRelevanceScorer",
+    "FastURLScorer",
+    "DeepCrawlDecorator",
     "CrawlResult",
     "CrawlerHub",
     "CacheMode",

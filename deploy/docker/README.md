@@ -213,7 +213,37 @@ Configure your build with these parameters:
 
 ## Using the API
 
-### Understanding Request Schema
+In the following sections, we discuss two ways to communicate with the Docker server. One option is to use the client SDK that I developed for Python, and I will soon develop one for Node.js. I highly recommend this approach to avoid mistakes. Alternatively, you can take a more technical route by using the JSON structure and passing it to all the URLs, which I will explain in detail.
+
+### Python SDK
+
+The SDK makes things easier! Here's how to use it:
+
+```python
+from crawl4ai.docker_client import Crawl4aiDockerClient
+from crawl4ai import BrowserConfig, CrawlerRunConfig
+
+async with Crawl4aiDockerClient() as client:
+    # The SDK handles serialization for you!
+    result = await client.crawl(
+        urls=["https://example.com"],
+        browser_config=BrowserConfig(headless=True),
+        crawler_config=CrawlerRunConfig(stream=False)
+    )
+    print(result.markdown)
+```
+
+`Crawl4aiDockerClient` is an async context manager that handles the connection for you. You can pass in optional parameters for more control:
+
+- `base_url` (str): Base URL of the Crawl4AI Docker server
+- `timeout` (float): Default timeout for requests in seconds
+- `verify_ssl` (bool): Whether to verify SSL certificates
+- `verbose` (bool): Whether to show logging output
+- `log_file` (str, optional): Path to log file if file logging is desired
+
+This client SDK generates a properly structured JSON request for the server's HTTP API.
+
+### Second Approach: Direct API Calls
 
 This is super important! The API expects a specific structure that matches our Python classes. Let me show you how it works.
 
@@ -247,10 +277,34 @@ This will output something like:
 }
 ```
 
-#### Making API Requests
 
-So when making a request, your JSON should look like this:
+#### Structuring Your Requests
 
+1. Basic Request Structure
+Every request must include URLs and may include configuration objects:
+
+```json
+{
+    "urls": ["https://example.com"],
+    "browser_config": {...},
+    "crawler_config": {...}
+}
+```
+
+2. Understanding Type-Params Pattern
+All complex objects follow this pattern:
+```json
+{
+    "type": "ClassName",
+    "params": {
+        "param1": value1,
+        "param2": value2
+    }
+}
+```
+> 💡 **Note**: Simple types (strings, numbers, booleans) are passed directly without the type-params wrapper.
+
+3. Browser Configuration
 ```json
 {
     "urls": ["https://example.com"],
@@ -258,9 +312,37 @@ So when making a request, your JSON should look like this:
         "type": "BrowserConfig",
         "params": {
             "headless": true,
-            "viewport": {"width": 1200, "height": 800}
+            "viewport": {
+                "type": "dict",
+                "value": {
+                    "width": 1200,
+                    "height": 800
+                }
+            }
         }
-    },
+    }
+}
+```
+
+4. Simple Crawler Configuration
+```json
+{
+    "urls": ["https://example.com"],
+    "crawler_config": {
+        "type": "CrawlerRunConfig",
+        "params": {
+            "word_count_threshold": 200,
+            "stream": true,
+            "verbose": true
+        }
+    }
+}
+```
+
+5. Advanced Crawler Configuration
+```json
+{
+    "urls": ["https://example.com"],
     "crawler_config": {
         "type": "CrawlerRunConfig",
         "params": {
@@ -283,7 +365,175 @@ So when making a request, your JSON should look like this:
 }
 ```
 
-> 💡 **Pro tip**: Look at the class names in the library documentation - they map directly to the "type" fields in your requests!
+6. Adding Strategies
+
+**Chunking Strategy**:
+```json
+{
+    "crawler_config": {
+        "type": "CrawlerRunConfig",
+        "params": {
+            "chunking_strategy": {
+                "type": "RegexChunking",
+                "params": {
+                    "patterns": ["\n\n", "\\.\\s+"]
+                }
+            }
+        }
+    }
+}
+```
+
+**Extraction Strategy**:
+```json
+{
+    "crawler_config": {
+        "type": "CrawlerRunConfig",
+        "params": {
+            "extraction_strategy": {
+                "type": "JsonCssExtractionStrategy",
+                "params": {
+                    "schema": {
+                        "baseSelector": "article.post",
+                        "fields": [
+                            {"name": "title", "selector": "h1", "type": "text"},
+                            {"name": "content", "selector": ".content", "type": "html"}
+                        ]
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+**LLM Extraction Strategy**
+```json
+{
+  "crawler_config": {
+    "type": "CrawlerRunConfig",
+    "params": {
+      "extraction_strategy": {
+        "type": "LLMExtractionStrategy",
+        "params": {
+          "instruction": "Extract article title, author, publication date and main content",
+          "provider": "openai/gpt-4",
+          "api_token": "your-api-token",
+          "schema": {
+            "type": "dict",
+            "value": {
+              "title": "Article Schema",
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "description": "The article's headline"
+                },
+                "author": {
+                  "type": "string",
+                  "description": "The author's name"
+                },
+                "published_date": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Publication date and time"
+                },
+                "content": {
+                  "type": "string",
+                  "description": "The main article content"
+                }
+              },
+              "required": ["title", "content"]
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+**Deep Crawler Exampler**
+```json
+{
+  "crawler_config": {
+    "type": "CrawlerRunConfig",
+    "params": {
+      "deep_crawl_strategy": {
+        "type": "BFSDeepCrawlStrategy",
+        "params": {
+          "max_depth": 3,
+          "max_pages": 100,
+          "filter_chain": {
+            "type": "FastFilterChain",
+            "params": {
+              "filters": [
+                {
+                  "type": "FastContentTypeFilter",
+                  "params": {
+                    "allowed_types": ["text/html", "application/xhtml+xml"]
+                  }
+                },
+                {
+                  "type": "FastDomainFilter",
+                  "params": {
+                    "allowed_domains": ["blog.*", "docs.*"],
+                    "blocked_domains": ["ads.*", "analytics.*"]
+                  }
+                },
+                {
+                  "type": "FastURLPatternFilter",
+                  "params": {
+                    "allowed_patterns": ["^/blog/", "^/docs/"],
+                    "blocked_patterns": [".*/ads/", ".*/sponsored/"]
+                  }
+                }
+              ]
+            }
+          },
+          "url_scorer": {
+            "type": "FastCompositeScorer",
+            "params": {
+              "scorers": [
+                {
+                  "type": "FastKeywordRelevanceScorer",
+                  "params": {
+                    "keywords": ["tutorial", "guide", "documentation"],
+                    "weight": 1.0
+                  }
+                },
+                {
+                  "type": "FastPathDepthScorer",
+                  "params": {
+                    "weight": 0.5,
+                    "preferred_depth": 2
+                  }
+                },
+                {
+                  "type": "FastFreshnessScorer",
+                  "params": {
+                    "weight": 0.8,
+                    "max_age_days": 365
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+**Important Rules**:
+
+- Always use the type-params pattern for class instances
+- Use direct values for primitives (numbers, strings, booleans)
+- Wrap dictionaries with {"type": "dict", "value": {...}}
+- Arrays/lists are passed directly without type-params
+- All parameters are optional unless specifically required
+
 
 ### REST API Examples
 
@@ -327,24 +577,6 @@ response = requests.post(
 for line in response.iter_lines():
     if line:
         print(line.decode())
-```
-
-### Python SDK
-
-The SDK makes things even easier! Here's how to use it:
-
-```python
-from crawl4ai.docker_client import Crawl4aiDockerClient
-from crawl4ai import BrowserConfig, CrawlerRunConfig
-
-async with Crawl4aiDockerClient() as client:
-    # The SDK handles serialization for you!
-    result = await client.crawl(
-        urls=["https://example.com"],
-        browser_config=BrowserConfig(headless=True),
-        crawler_config=CrawlerRunConfig(stream=False)
-    )
-    print(result.markdown)
 ```
 
 ## Metrics & Monitoring

@@ -1,3 +1,5 @@
+import re
+from attr import has
 from .config import (
     MIN_WORD_THRESHOLD,
     IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
@@ -11,12 +13,12 @@ from .user_agent_generator import UAGen, ValidUAGenerator # , OnlineUAGenerator
 from .extraction_strategy import ExtractionStrategy
 from .chunking_strategy import ChunkingStrategy, RegexChunking
 from .markdown_generation_strategy import MarkdownGenerationStrategy
-from .content_filter_strategy import RelevantContentFilter # , BM25ContentFilter, LLMContentFilter, PruningContentFilter
 from .content_scraping_strategy import ContentScrapingStrategy, WebScrapingStrategy
 from .deep_crawling import DeepCrawlStrategy
 from typing import Union, List
 from .cache_context import CacheMode
 from .proxy_strategy import ProxyRotationStrategy
+
 
 import inspect
 from typing import Any, Dict, Optional
@@ -48,7 +50,11 @@ def to_serializable_dict(obj: Any) -> Dict:
     # Handle lists, tuples, and sets
     if isinstance(obj, (list, tuple, set)):
         return [to_serializable_dict(item) for item in obj]
-        
+    
+    # Handle frozensets, which are not iterable
+    if isinstance(obj, frozenset):
+        return [to_serializable_dict(item) for item in list(obj)]
+
     # Handle dictionaries - preserve them as-is
     if isinstance(obj, dict):
         return {
@@ -61,6 +67,7 @@ def to_serializable_dict(obj: Any) -> Dict:
         # Get constructor signature
         sig = inspect.signature(obj.__class__.__init__)
         params = sig.parameters
+        _type = obj.__class__.__name__
         
         # Get current values
         current_values = {}
@@ -74,6 +81,24 @@ def to_serializable_dict(obj: Any) -> Dict:
             if not (is_empty_value(value) and is_empty_value(param.default)):
                 if value != param.default:
                     current_values[name] = to_serializable_dict(value)
+                elif hasattr(obj.__class__, '__slots__') and f"_{name}" in obj.__slots__:
+                    slot = f"_{name}"
+                    slot_value = getattr(obj, slot, None)
+                    if not is_empty_value(slot_value):
+                        current_values[name] = to_serializable_dict(slot_value)
+
+        
+        # # Then handle slots if present
+        # if hasattr(obj.__class__, '__slots__'):
+        #     for slot in obj.__class__.__slots__:
+        #         # Remove leading underscore if present
+        #         param_name = slot[1:] if slot.startswith('_') else slot
+                
+        #         # Get the slot value if it exists
+        #         if hasattr(obj, slot):
+        #             value = getattr(obj, slot)
+        #             if not is_empty_value(value):
+        #                 current_values[param_name] = to_serializable_dict(value)
         
         return {
             "type": obj.__class__.__name__,
@@ -101,7 +126,10 @@ def from_serializable_dict(data: Any) -> Any:
             
         # Import from crawl4ai for class instances
         import crawl4ai
-        cls = getattr(crawl4ai, data["type"])
+        if not hasattr(crawl4ai, data["type"]):
+            return None
+        else:
+            cls = getattr(crawl4ai, data["type"])
         
         # Handle Enum
         if issubclass(cls, Enum):
@@ -362,7 +390,14 @@ class BrowserConfig():
     def load( data: dict) -> "BrowserConfig":
         # Deserialize the object from a dictionary
         config = from_serializable_dict(data) 
-        return BrowserConfig.from_kwargs(config)
+
+        # check if the deserialized object is an instance of BrowserConfig
+        if isinstance(config, BrowserConfig):
+            return config
+        elif isinstance(config, dict):
+            return BrowserConfig.from_kwargs(config)
+        else:
+            raise ValueError("Invalid data type for BrowserConfig")
 
 
 class CrawlerRunConfig():
@@ -387,8 +422,6 @@ class CrawlerRunConfig():
                                               Default: RegexChunking().
         markdown_generator (MarkdownGenerationStrategy): Strategy for generating markdown.
                                                          Default: None.
-        content_filter (RelevantContentFilter or None): Optional filter to prune irrelevant content.
-                                                        Default: None.
         only_text (bool): If True, attempt to extract text-only content where applicable.
                           Default: False.
         css_selector (str or None): CSS selector to extract a specific portion of the page.
@@ -532,7 +565,6 @@ class CrawlerRunConfig():
         extraction_strategy: ExtractionStrategy = None,
         chunking_strategy: ChunkingStrategy = RegexChunking(),
         markdown_generator: MarkdownGenerationStrategy = None,
-        content_filter : RelevantContentFilter = None,
         only_text: bool = False,
         css_selector: str = None,
         excluded_tags: list = None,
@@ -611,7 +643,6 @@ class CrawlerRunConfig():
         self.extraction_strategy = extraction_strategy
         self.chunking_strategy = chunking_strategy
         self.markdown_generator = markdown_generator
-        self.content_filter = content_filter
         self.only_text = only_text
         self.css_selector = css_selector
         self.excluded_tags = excluded_tags or []
@@ -723,7 +754,6 @@ class CrawlerRunConfig():
             extraction_strategy=kwargs.get("extraction_strategy"),
             chunking_strategy=kwargs.get("chunking_strategy", RegexChunking()),
             markdown_generator=kwargs.get("markdown_generator"),
-            content_filter=kwargs.get("content_filter"),
             only_text=kwargs.get("only_text", False),
             css_selector=kwargs.get("css_selector"),
             excluded_tags=kwargs.get("excluded_tags", []),
@@ -813,7 +843,13 @@ class CrawlerRunConfig():
     def load(data: dict) -> "CrawlerRunConfig":
         # Deserialize the object from a dictionary
         config = from_serializable_dict(data) 
-        return CrawlerRunConfig.from_kwargs(config)
+        # If config type is alread instant of CrawleRunConfig, return it
+        if isinstance(config, CrawlerRunConfig):
+            return config
+        elif isinstance(config, dict):
+            return CrawlerRunConfig.from_kwargs(config)
+        else:
+            raise ValueError("Invalid data type")
 
     def to_dict(self):
         return {
@@ -821,7 +857,6 @@ class CrawlerRunConfig():
             "extraction_strategy": self.extraction_strategy,
             "chunking_strategy": self.chunking_strategy,
             "markdown_generator": self.markdown_generator,
-            "content_filter": self.content_filter,
             "only_text": self.only_text,
             "css_selector": self.css_selector,
             "excluded_tags": self.excluded_tags,

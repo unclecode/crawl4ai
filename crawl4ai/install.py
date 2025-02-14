@@ -139,4 +139,5 @@ def doctor():
     """Entry point for the doctor command"""
     import asyncio
 
-    return asyncio.run(run_doctor())
+    asyncio.run(run_doctor())
+    sys.exit(0)

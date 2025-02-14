@@ -508,6 +508,10 @@ class LLMExtractionStrategy(ExtractionStrategy):
         overlap_rate=OVERLAP_RATE,
         word_token_rate=WORD_TOKEN_RATE,
         apply_chunking=True,
+        api_base: str =None,
+        base_url: str =None,
+        input_format: str = "markdown",
+        verbose=False,
         **kwargs,
     ):
         """
@@ -531,7 +535,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
             total_usage: Accumulated token usage.
 
         """
-        super().__init__(**kwargs)
+        super().__init__( input_format=input_format, **kwargs)
         self.provider = provider
         if api_token and not api_token.startswith("env:"):
             self.api_token = api_token
@@ -548,19 +552,17 @@ class LLMExtractionStrategy(ExtractionStrategy):
         if schema:
             self.extract_type = "schema"
 
-        self.chunk_token_threshold = kwargs.get(
-            "chunk_token_threshold", CHUNK_TOKEN_THRESHOLD
-        )
-        self.overlap_rate = kwargs.get("overlap_rate", OVERLAP_RATE)
-        self.word_token_rate = kwargs.get("word_token_rate", WORD_TOKEN_RATE)
-        self.apply_chunking = kwargs.get("apply_chunking", True)
-        self.base_url = kwargs.get("base_url", None)
-        self.api_base = kwargs.get("api_base", kwargs.get("base_url", None))
+        self.chunk_token_threshold = chunk_token_threshold or CHUNK_TOKEN_THRESHOLD
+        self.overlap_rate = overlap_rate
+        self.word_token_rate = word_token_rate
+        self.apply_chunking = apply_chunking
+        self.base_url = base_url
+        self.api_base = api_base or base_url
         self.extra_args = kwargs.get("extra_args", {})
         if not self.apply_chunking:
             self.chunk_token_threshold = 1e9
 
-        self.verbose = kwargs.get("verbose", False)
+        self.verbose = verbose
         self.usages = []  # Store individual usages
         self.total_usage = TokenUsage()  # Accumulated usage
 
