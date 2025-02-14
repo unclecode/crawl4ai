@@ -510,6 +510,7 @@ class HTML2Text(html.parser.HTMLParser):
 
         if tag == "a" and not self.ignore_links:
             if start:
+                self.inside_link = True
                 if (
                     "href" in attrs
                     and attrs["href"] is not None
@@ -526,6 +527,7 @@ class HTML2Text(html.parser.HTMLParser):
                 else:
                     self.astack.append(None)
             else:
+                self.inside_link = False
                 if self.astack:
                     a = self.astack.pop()
                     if self.maybe_automatic_link and not self.empty_link:
@@ -1035,6 +1037,7 @@ class CustomHTML2Text(HTML2Text):
         super().__init__(*args, **kwargs)
         self.inside_pre = False
         self.inside_code = False
+        self.inside_link = False
         self.preserve_tags = set()  # Set of tags to preserve
         self.current_preserved_tag = None
         self.preserved_content = []
@@ -1114,11 +1117,17 @@ class CustomHTML2Text(HTML2Text):
                 # Ignore code tags inside pre blocks if handle_code_in_pre is False
                 return
             if start:
-                self.o("`")  # Markdown inline code start
+                if not self.inside_link:
+                    self.o("`")  # Only output backtick if not inside a link
                 self.inside_code = True
             else:
-                self.o("`")  # Markdown inline code end
+                if not self.inside_link:
+                    self.o("`")  # Only output backtick if not inside a link
                 self.inside_code = False
+
+            # If inside a link, let the parent class handle the content
+            if self.inside_link:
+                super().handle_tag(tag, attrs, start) 
         else:
             super().handle_tag(tag, attrs, start)
 
