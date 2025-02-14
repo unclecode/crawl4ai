@@ -84,6 +84,26 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
+## 🍀 [New!] Quickstart with Cloud API (no installation or hosting needed)
+If you prefer a simple out-of-the-box solution without configuring or hosting crawl4ai yourself, you may want to try the REST API below: 
+
+```python
+import requests
+
+response = requests.post(
+    'https://www.crawl4ai-cloud.com/query',
+    json={
+        'url': 'https://www.kidocode.com/degrees/technology',
+        'apikey': 'YOUR_API_KEY'
+    }
+)
+print(response.json())
+```
+
+Please visit [https://www.crawl4ai-cloud.com/](https://www.crawl4ai-cloud.com/) to obtain your free API key + full API documentation. 
+
+*Disclaimer: the cloud API is a separate (unofficial) service maintained by Alpha Vantage Inc, a Y Combinator company and supporter of the crawl4ai project.*
+
 ## ✨ Features 
 
 <details>
