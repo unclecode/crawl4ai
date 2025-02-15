@@ -17,11 +17,16 @@ from .extraction_strategy import (
     LLMExtractionStrategy,
     CosineStrategy,
     JsonCssExtractionStrategy,
-    JsonXPathExtractionStrategy
+    JsonXPathExtractionStrategy,
 )
 from .chunking_strategy import ChunkingStrategy, RegexChunking
 from .markdown_generation_strategy import DefaultMarkdownGenerator
-from .content_filter_strategy import PruningContentFilter, BM25ContentFilter, LLMContentFilter, RelevantContentFilter
+from .content_filter_strategy import (
+    PruningContentFilter,
+    BM25ContentFilter,
+    LLMContentFilter,
+    RelevantContentFilter,
+)
 from .models import CrawlResult, MarkdownGenerationResult
 from .async_dispatcher import (
     MemoryAdaptiveDispatcher,
@@ -29,18 +34,18 @@ from .async_dispatcher import (
     RateLimiter,
     CrawlerMonitor,
     DisplayMode,
-    BaseDispatcher
+    BaseDispatcher,
 )
 from .docker_client import Crawl4aiDockerClient
 from .hub import CrawlerHub
 from .deep_crawling import (
     DeepCrawlStrategy,
     BFSDeepCrawlStrategy,
-    FastFilterChain,
-    FastContentTypeFilter,
-    FastDomainFilter,
-    FastURLFilter,
-    FastFilterStats,
+    FilterChain,
+    ContentTypeFilter,
+    DomainFilter,
+    URLFilter,
+    FilterStats,
     FastKeywordRelevanceScorer,
     FastURLScorer,
     BestFirstCrawlingStrategy,
@@ -54,11 +59,11 @@ __all__ = [
     "BFSDeepCrawlStrategy",
     "BestFirstCrawlingStrategy",
     "DFSDeepCrawlStrategy",
-    "FastFilterChain",
-    "FastContentTypeFilter",
-    "FastDomainFilter",
-    "FastFilterStats",
-    "FastURLFilter",
+    "FilterChain",
+    "ContentTypeFilter",
+    "DomainFilter",
+    "FilterStats",
+    "URLFilter",
     "FastKeywordRelevanceScorer",
     "FastURLScorer",
     "DeepCrawlDecorator",

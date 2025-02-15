@@ -6,7 +6,7 @@ from typing import AsyncGenerator, Optional, Set, Dict, List, Tuple
 from urllib.parse import urlparse
 
 from ..models import TraversalStats
-from .filters import FastFilterChain
+from .filters import FilterChain
 from .scorers import FastURLScorer
 from . import DeepCrawlStrategy  
 from ..types import AsyncWebCrawler, CrawlerRunConfig, CrawlResult
@@ -23,7 +23,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
     def __init__(
         self,
         max_depth: int,
-        filter_chain: FastFilterChain = FastFilterChain(),
+        filter_chain: FilterChain = FilterChain(),
         url_scorer: Optional[FastURLScorer] = None,
         include_external: bool = False,
         logger: Optional[logging.Logger] = None,

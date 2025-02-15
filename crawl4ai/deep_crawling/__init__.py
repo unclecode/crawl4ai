@@ -4,11 +4,12 @@ from .bfs_strategy import BFSDeepCrawlStrategy
 from .bff_strategy import BestFirstCrawlingStrategy
 from .dfs_strategy import DFSDeepCrawlStrategy
 from .filters import (
-    FastFilterChain,
-    FastContentTypeFilter,
-    FastDomainFilter,
-    FastURLFilter,
-    FastFilterStats,
+    FilterChain,
+    ContentTypeFilter,
+    DomainFilter,
+    URLFilter,
+    FilterStats,
+    ContentRelevanceFilter
 )
 from .scorers import (
     FastKeywordRelevanceScorer,
@@ -21,11 +22,12 @@ __all__ = [
     "BFSDeepCrawlStrategy",
     "BestFirstCrawlingStrategy",
     "DFSDeepCrawlStrategy",
-    "FastFilterChain",
-    "FastContentTypeFilter",
-    "FastDomainFilter",
-    "FastURLFilter",
-    "FastFilterStats",
+    "FilterChain",
+    "ContentTypeFilter",
+    "DomainFilter",
+    "URLFilter",
+    "FilterStats",
+    "ContentRelevanceFilter",
     "FastKeywordRelevanceScorer",
     "FastURLScorer",
 ]
