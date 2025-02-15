@@ -9,11 +9,17 @@ from .filters import (
     DomainFilter,
     URLFilter,
     FilterStats,
-    ContentRelevanceFilter
+    ContentRelevanceFilter,
+    SEOFilter
 )
 from .scorers import (
-    FastKeywordRelevanceScorer,
-    FastURLScorer,
+    KeywordRelevanceScorer,
+    URLScorer,
+    CompositeScorer,
+    DomainAuthorityScorer,
+    FreshnessScorer,
+    PathDepthScorer,
+    ContentTypeScorer
 )
 
 __all__ = [
@@ -28,6 +34,12 @@ __all__ = [
     "URLFilter",
     "FilterStats",
     "ContentRelevanceFilter",
-    "FastKeywordRelevanceScorer",
-    "FastURLScorer",
+    "SEOFilter",
+    "KeywordRelevanceScorer",
+    "URLScorer",
+    "CompositeScorer",
+    "DomainAuthorityScorer",
+    "FreshnessScorer",
+    "PathDepthScorer",
+    "ContentTypeScorer",
 ]

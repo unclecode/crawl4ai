@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 
 from ..models import TraversalStats
 from .filters import FilterChain
-from .scorers import FastURLScorer
+from .scorers import URLScorer
 from . import DeepCrawlStrategy
 
 from ..types import AsyncWebCrawler, CrawlerRunConfig, CrawlResult, RunManyReturn
@@ -35,7 +35,7 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
         self,
         max_depth: int,
         filter_chain: FilterChain = FilterChain(),
-        url_scorer: Optional[FastURLScorer] = None,
+        url_scorer: Optional[URLScorer] = None,
         include_external: bool = False,
         logger: Optional[logging.Logger] = None,
     ):

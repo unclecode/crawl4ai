@@ -8,7 +8,6 @@ from functools import lru_cache
 import fnmatch
 from dataclasses import dataclass
 import weakref
-import mimetypes
 import math
 from collections import defaultdict
 from typing import Dict
