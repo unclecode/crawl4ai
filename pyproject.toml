@@ -39,7 +39,9 @@ dependencies = [
     "httpx==0.27.2",
     "fake-useragent>=2.0.3",
     "click>=8.1.7",
-    "pyperclip>=1.8.2"
+    "pyperclip>=1.8.2",
+    "cchardet>=2.1.7",
+    "aiohttp>=3.11.11"
 ]
 classifiers = [
     "Development Status :: 4 - Beta",

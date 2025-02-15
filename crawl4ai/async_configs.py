@@ -1,5 +1,5 @@
-import re
-from attr import has
+from email import header
+from re import I
 from .config import (
     MIN_WORD_THRESHOLD,
     IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
@@ -18,7 +18,6 @@ from .deep_crawling import DeepCrawlStrategy
 from typing import Union, List
 from .cache_context import CacheMode
 from .proxy_strategy import ProxyRotationStrategy
-
 
 import inspect
 from typing import Any, Dict, Optional
@@ -47,8 +46,8 @@ def to_serializable_dict(obj: Any) -> Dict:
     if hasattr(obj, 'isoformat'):
         return obj.isoformat()
         
-    # Handle lists, tuples, and sets
-    if isinstance(obj, (list, tuple, set)):
+    # Handle lists, tuples, and sets, and basically any iterable
+    if isinstance(obj, (list, tuple, set)) or hasattr(obj, '__iter__'):
         return [to_serializable_dict(item) for item in obj]
     
     # Handle frozensets, which are not iterable
@@ -67,7 +66,6 @@ def to_serializable_dict(obj: Any) -> Dict:
         # Get constructor signature
         sig = inspect.signature(obj.__class__.__init__)
         params = sig.parameters
-        _type = obj.__class__.__name__
         
         # Get current values
         current_values = {}
@@ -81,24 +79,8 @@ def to_serializable_dict(obj: Any) -> Dict:
             if not (is_empty_value(value) and is_empty_value(param.default)):
                 if value != param.default:
                     current_values[name] = to_serializable_dict(value)
-                elif hasattr(obj.__class__, '__slots__') and f"_{name}" in obj.__slots__:
-                    slot = f"_{name}"
-                    slot_value = getattr(obj, slot, None)
-                    if not is_empty_value(slot_value):
-                        current_values[name] = to_serializable_dict(slot_value)
-
         
-        # # Then handle slots if present
-        # if hasattr(obj.__class__, '__slots__'):
-        #     for slot in obj.__class__.__slots__:
-        #         # Remove leading underscore if present
-        #         param_name = slot[1:] if slot.startswith('_') else slot
-                
-        #         # Get the slot value if it exists
-        #         if hasattr(obj, slot):
-        #             value = getattr(obj, slot)
-        #             if not is_empty_value(value):
-        #                 current_values[param_name] = to_serializable_dict(value)
+        _type = obj.__class__.__name__
         
         return {
             "type": obj.__class__.__name__,
@@ -126,10 +108,7 @@ def from_serializable_dict(data: Any) -> Any:
             
         # Import from crawl4ai for class instances
         import crawl4ai
-        if not hasattr(crawl4ai, data["type"]):
-            return None
-        else:
-            cls = getattr(crawl4ai, data["type"])
+        cls = getattr(crawl4ai, data["type"])
         
         # Handle Enum
         if issubclass(cls, Enum):
@@ -390,15 +369,71 @@ class BrowserConfig():
     def load( data: dict) -> "BrowserConfig":
         # Deserialize the object from a dictionary
         config = from_serializable_dict(data) 
-
-        # check if the deserialized object is an instance of BrowserConfig
         if isinstance(config, BrowserConfig):
             return config
-        elif isinstance(config, dict):
-            return BrowserConfig.from_kwargs(config)
-        else:
-            raise ValueError("Invalid data type for BrowserConfig")
+        return BrowserConfig.from_kwargs(config)
 
+
+class HTTPCrawlerConfig():
+    """HTTP-specific crawler configuration"""
+    method: str = "GET"
+    headers: Optional[Dict[str, str]] = None
+    data: Optional[Dict[str, Any]] = None
+    json: Optional[Dict[str, Any]] = None 
+    follow_redirects: bool = True
+    verify_ssl: bool = True
+
+    def __init__(self, method: str = "GET", headers: Optional[Dict[str, str]] = None, data: Optional[Dict[str, Any]] = None, json: Optional[Dict[str, Any]] = None, follow_redirects: bool = True, verify_ssl: bool = True):
+        self.method = method
+        self.headers = headers
+        self.data = data
+        self.json = json
+        self.follow_redirects = follow_redirects
+        self.verify_ssl = verify_ssl
+
+    @staticmethod
+    def from_kwargs(kwargs: dict) -> "HTTPCrawlerConfig":
+        return HTTPCrawlerConfig(
+            method=kwargs.get("method", "GET"),
+            headers=kwargs.get("headers"),
+            data=kwargs.get("data"),
+            json=kwargs.get("json"),
+            follow_redirects=kwargs.get("follow_redirects", True),
+            verify_ssl=kwargs.get("verify_ssl", True),
+        )
+
+    def to_dict(self):
+        return {
+            "method": self.method,
+            "headers": self.headers,
+            "data": self.data,
+            "json": self.json,
+            "follow_redirects": self.follow_redirects,
+            "verify_ssl": self.verify_ssl,
+        }
+    
+    def clone(self, **kwargs):
+        """Create a copy of this configuration with updated values.
+        
+        Args:
+            **kwargs: Key-value pairs of configuration options to update
+            
+        Returns:
+            HTTPCrawlerConfig: A new instance with the specified updates
+        """
+        config_dict = self.to_dict()
+        config_dict.update(kwargs)
+        return HTTPCrawlerConfig.from_kwargs(config_dict)
+    
+    def dump(self) -> dict:
+        return to_serializable_dict(self)
+    
+    @staticmethod
+    def load(data: dict) -> "HTTPCrawlerConfig":
+        config = from_serializable_dict(data)
+        if isinstance(config, HTTPCrawlerConfig):
+            return config
+        return HTTPCrawlerConfig.from_kwargs(config)
 
 class CrawlerRunConfig():
     """
@@ -450,7 +485,7 @@ class CrawlerRunConfig():
         # Caching Parameters
         cache_mode (CacheMode or None): Defines how caching is handled.
                                         If None, defaults to CacheMode.ENABLED internally.
-                                        Default: None.
+                                        Default: CacheMode.BYPASS.
         session_id (str or None): Optional session ID to persist the browser context and the created
                                   page instance. If the ID already exists, the crawler does not
                                   create a new page and uses the current page to preserve the state.
@@ -543,19 +578,27 @@ class CrawlerRunConfig():
         log_console (bool): If True, log console messages from the page.
                             Default: False.
 
-        # Streaming Parameters
+        # HTTP Crwler Strategy Parameters
+        method (str): HTTP method to use for the request, when using AsyncHTTPCrwalerStrategy.
+                        Default: "GET".
+        data (dict): Data to send in the request body, when using AsyncHTTPCrwalerStrategy.
+                        Default: None.
+        json (dict): JSON data to send in the request body, when using AsyncHTTPCrwalerStrategy.
+                            
+        # Connection Parameters
         stream (bool): If True, enables streaming of crawled URLs as they are processed when used with arun_many.
                       Default: False.
-
-        # Optional Parameters
-        stream (bool): If True, stream the page content as it is being loaded.
-        url: str = None  # This is not a compulsory parameter
+        
         check_robots_txt (bool): Whether to check robots.txt rules before crawling. Default: False
-        user_agent (str): Custom User-Agent string to use. Default: None
-        user_agent_mode (str or None): Mode for generating the user agent (e.g., "random"). If None, use the provided
-                                       user_agent as-is. Default: None.
+                                 Default: False.                                
+        user_agent (str): Custom User-Agent string to use. 
+                          Default: None.
+        user_agent_mode (str or None): Mode for generating the user agent (e.g., "random"). If None, use the provided user_agent as-is. 
+                                       Default: None.
         user_agent_generator_config (dict or None): Configuration for user agent generation if user_agent_mode is set.
                                                     Default: None.
+        
+        url: str = None  # This is not a compulsory parameter
     """
 
     def __init__(
@@ -580,7 +623,7 @@ class CrawlerRunConfig():
         # SSL Parameters
         fetch_ssl_certificate: bool = False,
         # Caching Parameters
-        cache_mode: CacheMode =None,
+        cache_mode: CacheMode = CacheMode.BYPASS,
         session_id: str = None,
         bypass_cache: bool = False,
         disable_cache: bool = False,
@@ -625,7 +668,8 @@ class CrawlerRunConfig():
         # Debugging and Logging Parameters
         verbose: bool = True,
         log_console: bool = False,
-        # Streaming Parameters
+        # Connection Parameters
+        method: str = "GET",
         stream: bool = False,
         url: str = None,
         check_robots_txt: bool = False,
@@ -713,8 +757,9 @@ class CrawlerRunConfig():
         self.verbose = verbose
         self.log_console = log_console
 
-        # Streaming Parameters
+        # Connection Parameters
         self.stream = stream
+        self.method = method
 
         # Robots.txt Handling Parameters
         self.check_robots_txt = check_robots_txt
@@ -769,7 +814,7 @@ class CrawlerRunConfig():
             # SSL Parameters
             fetch_ssl_certificate=kwargs.get("fetch_ssl_certificate", False),
             # Caching Parameters
-            cache_mode=kwargs.get("cache_mode"),
+            cache_mode=kwargs.get("cache_mode", CacheMode.BYPASS),
             session_id=kwargs.get("session_id"),
             bypass_cache=kwargs.get("bypass_cache", False),
             disable_cache=kwargs.get("disable_cache", False),
@@ -823,15 +868,17 @@ class CrawlerRunConfig():
             # Debugging and Logging Parameters
             verbose=kwargs.get("verbose", True),
             log_console=kwargs.get("log_console", False),
-            # Streaming Parameters
+            # Connection Parameters
+            method=kwargs.get("method", "GET"),
             stream=kwargs.get("stream", False),
-            url=kwargs.get("url"),
             check_robots_txt=kwargs.get("check_robots_txt", False),
             user_agent=kwargs.get("user_agent"),
             user_agent_mode=kwargs.get("user_agent_mode"),
             user_agent_generator_config=kwargs.get("user_agent_generator_config", {}),
             # Deep Crawl Parameters
             deep_crawl_strategy=kwargs.get("deep_crawl_strategy"),
+
+            url=kwargs.get("url"),
         )
 
     # Create a funciton returns dict of the object
@@ -843,13 +890,9 @@ class CrawlerRunConfig():
     def load(data: dict) -> "CrawlerRunConfig":
         # Deserialize the object from a dictionary
         config = from_serializable_dict(data) 
-        # If config type is alread instant of CrawleRunConfig, return it
         if isinstance(config, CrawlerRunConfig):
             return config
-        elif isinstance(config, dict):
-            return CrawlerRunConfig.from_kwargs(config)
-        else:
-            raise ValueError("Invalid data type")
+        return CrawlerRunConfig.from_kwargs(config)
 
     def to_dict(self):
         return {
@@ -910,13 +953,14 @@ class CrawlerRunConfig():
             "exclude_internal_links": self.exclude_internal_links,
             "verbose": self.verbose,
             "log_console": self.log_console,
+            "method": self.method,
             "stream": self.stream,
-            "url": self.url,
             "check_robots_txt": self.check_robots_txt,
             "user_agent": self.user_agent,
             "user_agent_mode": self.user_agent_mode,
             "user_agent_generator_config": self.user_agent_generator_config,
             "deep_crawl_strategy": self.deep_crawl_strategy,
+            "url": self.url,
         }
 
     def clone(self, **kwargs):
