@@ -53,7 +53,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
             self.logger.warning(f"Invalid URL: {url}, error: {e}")
             return False
 
-        if depth != 0 and not self.filter_chain.apply(url):
+        if depth != 0 and not await self.filter_chain.apply(url):
             return False
 
         return True

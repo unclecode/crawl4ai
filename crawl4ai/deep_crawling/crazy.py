@@ -374,7 +374,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
             parsed = urlparse(url)
             return (parsed.scheme in {'http', 'https'}
                     and '.' in parsed.netloc
-                    and self.filter_chain.apply(url))
+                    and await self.filter_chain.apply(url))
         except Exception:
             return False
 

@@ -12,6 +12,8 @@ import math
 from collections import defaultdict
 from typing import Dict
 from ..utils import HeadPeekr
+import asyncio
+import inspect
 
 
 @dataclass
@@ -86,17 +88,31 @@ class FilterChain:
         self.filters.append(filter_)
         return self  # Enable method chaining
 
-    def apply(self, url: str) -> bool:
-        """Optimized apply with minimal operations"""
-        self.stats._counters[0] += 1  # total
+    async def apply(self, url: str) -> bool:
+        """Apply all filters concurrently when possible"""
+        self.stats._counters[0] += 1  # Total processed URLs
 
-        # Direct tuple iteration is faster than list
+        tasks = []
         for f in self.filters:
-            if not f.apply(url):
-                self.stats._counters[2] += 1  # rejected
+            result = f.apply(url)
+
+            if inspect.isawaitable(result):
+                tasks.append(result)  # Collect async tasks
+            elif not result:  # Sync rejection
+                self.stats._counters[2] += 1  # Sync rejected
                 return False
 
-        self.stats._counters[1] += 1  # passed
+        if tasks:
+            results = await asyncio.gather(*tasks)
+
+            # Count how many filters rejected
+            rejections = results.count(False)
+            self.stats._counters[2] += rejections
+
+            if not all(results):
+                return False  # Stop early if any filter rejected
+
+        self.stats._counters[1] += 1  # Passed
         return True
 
 
