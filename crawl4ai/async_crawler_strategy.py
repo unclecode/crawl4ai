@@ -1664,11 +1664,11 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         """
         try:
             viewport_size = page.viewport_size
-            # if viewport_size is None:
-            #     await page.set_viewport_size(
-            #         {"width": self.browser_config.viewport_width, "height": self.browser_config.viewport_height}
-            #     )
-            #     viewport_size = page.viewport_size
+            if viewport_size is None:
+                await page.set_viewport_size(
+                    {"width": self.browser_config.viewport_width, "height": self.browser_config.viewport_height}
+                )
+                viewport_size = page.viewport_size
 
             viewport_height = viewport_size.get(
                 "height", self.browser_config.viewport_height
