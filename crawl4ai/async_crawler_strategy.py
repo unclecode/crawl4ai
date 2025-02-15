@@ -1508,28 +1508,6 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             if config.scan_full_page:
                 await self._handle_full_page_scan(page, config.scroll_delay)
 
-            # Execute JavaScript if provided
-            # if config.js_code:
-            #     if isinstance(config.js_code, str):
-            #         await page.evaluate(config.js_code)
-            #     elif isinstance(config.js_code, list):
-            #         for js in config.js_code:
-            #             await page.evaluate(js)
-
-            if config.js_code:
-                # execution_result = await self.execute_user_script(page, config.js_code)
-                execution_result = await self.robust_execute_user_script(
-                    page, config.js_code
-                )
-                if not execution_result["success"]:
-                    self.logger.warning(
-                        message="User script execution had issues: {error}",
-                        tag="JS_EXEC",
-                        params={"error": execution_result.get("error")},
-                    )
-
-                await self.execute_hook("on_execution_started", page, context=context, config=config)
-
             # Handle user simulation
             if config.simulate_user or config.magic:
                 await page.mouse.move(100, 100)
@@ -1578,6 +1556,28 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             # Handle overlay removal
             if config.remove_overlay_elements:
                 await self.remove_overlay_elements(page)
+
+            # Execute JavaScript if provided
+            # if config.js_code:
+            #     if isinstance(config.js_code, str):
+            #         await page.evaluate(config.js_code)
+            #     elif isinstance(config.js_code, list):
+            #         for js in config.js_code:
+            #             await page.evaluate(js)
+
+            if config.js_code:
+                # execution_result = await self.execute_user_script(page, config.js_code)
+                execution_result = await self.robust_execute_user_script(
+                    page, config.js_code
+                )
+                if not execution_result["success"]:
+                    self.logger.warning(
+                        message="User script execution had issues: {error}",
+                        tag="JS_EXEC",
+                        params={"error": execution_result.get("error")},
+                    )
+
+                await self.execute_hook("on_execution_started", page, context=context, config=config)
 
             # Get final HTML content
             html = await page.content()
