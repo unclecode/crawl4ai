@@ -2,7 +2,7 @@ FROM python:3.10-slim
 
 # Set build arguments
 ARG APP_HOME=/app
-ARG GITHUB_REPO=https://github.com/yourusername/crawl4ai.git
+ARG GITHUB_REPO=https://github.com/unclecode/crawl4ai.git
 ARG GITHUB_BRANCH=main
 ARG USE_LOCAL=true
 
@@ -37,6 +37,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-dev \
     libjpeg-dev \
     redis-server \
+    supervisor \
     && rm -rf /var/lib/apt/lists/*
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -102,6 +103,8 @@ fi' > /tmp/install.sh && chmod +x /tmp/install.sh
 
 COPY . /tmp/project/
 
+COPY deploy/docker/supervisord.conf .
+
 COPY deploy/docker/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
@@ -148,19 +151,24 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     redis-cli ping > /dev/null && \
     curl -f http://localhost:8000/health || exit 1'
 
-COPY deploy/docker/docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+# COPY deploy/docker/docker-entrypoint.sh /usr/local/bin/
+# RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 EXPOSE 6379
 
-ENTRYPOINT ["docker-entrypoint.sh"]
+# ENTRYPOINT ["docker-entrypoint.sh"]
 
-CMD service redis-server start && gunicorn \
-    --bind 0.0.0.0:8000 \
-    --workers 4 \
-    --threads 2 \
-    --timeout 120 \
-    --graceful-timeout 30 \
-    --log-level info \
-    --worker-class uvicorn.workers.UvicornWorker \
-    server:app
+# CMD service redis-server start && gunicorn \
+#     --bind 0.0.0.0:8000 \
+#     --workers 4 \
+#     --threads 2 \
+#     --timeout 120 \
+#     --graceful-timeout 30 \
+#     --log-level info \
+#     --worker-class uvicorn.workers.UvicornWorker \
+#     server:app
+
+# ENTRYPOINT ["docker-entrypoint.sh"]
+
+CMD ["supervisord", "-c", "supervisord.conf"]
+    

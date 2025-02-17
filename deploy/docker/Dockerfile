@@ -2,11 +2,10 @@ FROM python:3.10-slim
 
 # Set build arguments
 ARG APP_HOME=/app
-ARG GITHUB_REPO=https://github.com/yourusername/crawl4ai.git
-ARG GITHUB_BRANCH=main
-ARG USE_LOCAL=false
+ARG GITHUB_REPO=https://github.com/unclecode/crawl4ai.git
+ARG GITHUB_BRANCH=next
+ARG USE_LOCAL=true
 
-# 🤓 Environment variables - because who doesn't love a good ENV party?
 ENV PYTHONFAULTHANDLER=1 \
     PYTHONHASHSEED=random \
     PYTHONUNBUFFERED=1 \
@@ -14,20 +13,19 @@ ENV PYTHONFAULTHANDLER=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_DEFAULT_TIMEOUT=100 \
-    DEBIAN_FRONTEND=noninteractive
+    DEBIAN_FRONTEND=noninteractive \
+    REDIS_HOST=localhost \
+    REDIS_PORT=6379
 
-# Other build arguments
 ARG PYTHON_VERSION=3.10
 ARG INSTALL_TYPE=default
 ARG ENABLE_GPU=false
 ARG TARGETARCH
 
-# 🎯 Platform-specific labels - because even containers need ID badges
 LABEL maintainer="unclecode"
 LABEL description="🔥🕷️ Crawl4AI: Open-source LLM Friendly Web Crawler & scraper"
 LABEL version="1.0"    
 
-# 📦 Installing system dependencies... please hold, your package is being delivered
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
@@ -38,9 +36,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     python3-dev \
     libjpeg-dev \
+    redis-server \
+    supervisor \
     && rm -rf /var/lib/apt/lists/*
 
-# 🎭 Playwright dependencies - because browsers need their vitamins too
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
     libnss3 \
@@ -65,7 +64,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libatspi2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# 🎮 GPU support - because sometimes CPU just doesn't cut it
 RUN if [ "$ENABLE_GPU" = "true" ] && [ "$TARGETARCH" = "amd64" ] ; then \
     apt-get update && apt-get install -y --no-install-recommends \
     nvidia-cuda-toolkit \
@@ -74,7 +72,6 @@ else \
     echo "Skipping NVIDIA CUDA Toolkit installation (unsupported platform or GPU disabled)"; \
 fi
 
-# 🏗️ Platform-specific optimizations - because one size doesn't fit all
 RUN if [ "$TARGETARCH" = "arm64" ]; then \
     echo "🦾 Installing ARM-specific optimizations"; \
     apt-get update && apt-get install -y --no-install-recommends \
@@ -85,11 +82,12 @@ elif [ "$TARGETARCH" = "amd64" ]; then \
     apt-get update && apt-get install -y --no-install-recommends \
     libomp-dev \
     && rm -rf /var/lib/apt/lists/*; \
+else \
+    echo "Skipping platform-specific optimizations (unsupported platform)"; \
 fi
 
 WORKDIR ${APP_HOME}
 
-# 🔄 Installation script - now with retry logic because sometimes Git needs a coffee break
 RUN echo '#!/bin/bash\n\
 if [ "$USE_LOCAL" = "true" ]; then\n\
     echo "📦 Installing from local source..."\n\
@@ -103,14 +101,13 @@ else\n\
     pip install --no-cache-dir /tmp/crawl4ai\n\
 fi' > /tmp/install.sh && chmod +x /tmp/install.sh
 
-# Copy local project if USE_LOCAL is true
 COPY . /tmp/project/
 
-# Copy and install other requirements
+COPY deploy/docker/supervisord.conf .
+
 COPY deploy/docker/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install ML dependencies first for better layer caching
 RUN if [ "$INSTALL_TYPE" = "all" ] ; then \
         pip install --no-cache-dir \
             torch \
@@ -123,7 +120,6 @@ RUN if [ "$INSTALL_TYPE" = "all" ] ; then \
         python -m nltk.downloader punkt stopwords ; \
     fi
 
-# Install the package
 RUN if [ "$INSTALL_TYPE" = "all" ] ; then \
         pip install "/tmp/project/[all]" && \
         python -m crawl4ai.model_loader ; \
@@ -136,7 +132,6 @@ RUN if [ "$INSTALL_TYPE" = "all" ] ; then \
         pip install "/tmp/project" ; \
     fi
     
-    # 🚀 Installation validation - trust but verify!
 RUN pip install --no-cache-dir --upgrade pip && \
     /tmp/install.sh && \
     python -c "import crawl4ai; print('✅ crawl4ai is ready to rock!')" && \
@@ -144,10 +139,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
     
 RUN playwright install --with-deps chromium
 
-# Copy application files
 COPY deploy/docker/* ${APP_HOME}/
 
-# 🏥 Health check - now with memory validation!
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD bash -c '\
     MEM=$(free -m | awk "/^Mem:/{print \$2}"); \
@@ -155,20 +148,27 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
         echo "⚠️ Warning: Less than 2GB RAM available! Your container might need a memory boost! 🚀"; \
         exit 1; \
     fi && \
+    redis-cli ping > /dev/null && \
     curl -f http://localhost:8000/health || exit 1'
 
-# Entrypoint script
-COPY deploy/docker/docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
-ENTRYPOINT ["docker-entrypoint.sh"]
+# COPY deploy/docker/docker-entrypoint.sh /usr/local/bin/
+# RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Default command - may the server be with you! 🚀
-CMD ["gunicorn", \
-    "--bind", "0.0.0.0:8000", \
-    "--workers", "4", \
-    "--threads", "2", \
-    "--timeout", "120", \
-    "--graceful-timeout", "30", \
-    "--log-level", "info", \
-    "--worker-class", "uvicorn.workers.UvicornWorker", \
-    "server:app"]
+EXPOSE 6379
+
+# ENTRYPOINT ["docker-entrypoint.sh"]
+
+# CMD service redis-server start && gunicorn \
+#     --bind 0.0.0.0:8000 \
+#     --workers 4 \
+#     --threads 2 \
+#     --timeout 120 \
+#     --graceful-timeout 30 \
+#     --log-level info \
+#     --worker-class uvicorn.workers.UvicornWorker \
+#     server:app
+
+# ENTRYPOINT ["docker-entrypoint.sh"]
+
+CMD ["supervisord", "-c", "supervisord.conf"]
+    

@@ -13,7 +13,7 @@ from rich.live import Live
 from rich.table import Table
 from rich.console import Console
 from rich import box
-from datetime import datetime, timedelta
+from datetime import timedelta
 from collections.abc import AsyncGenerator
 import time
 import psutil
@@ -96,7 +96,7 @@ class CrawlerMonitor:
         self.display_mode = display_mode
         self.stats: Dict[str, CrawlStats] = {}
         self.process = psutil.Process()
-        self.start_time = datetime.now()
+        self.start_time = time.time()
         self.live = Live(self._create_table(), refresh_per_second=2)
 
     def start(self):
@@ -150,7 +150,7 @@ class CrawlerMonitor:
         )
 
         # Duration
-        duration = datetime.now() - self.start_time
+        duration = time.time() - self.start_time
 
         # Create status row
         table.add_column("Status", style="bold cyan")
@@ -192,7 +192,7 @@ class CrawlerMonitor:
         )
         table.add_row(
             "[yellow]Runtime[/yellow]",
-            str(timedelta(seconds=int(duration.total_seconds()))),
+            str(timedelta(seconds=int(duration))),
             "",
         )
 
@@ -235,7 +235,7 @@ class CrawlerMonitor:
             f"{self.process.memory_info().rss / (1024 * 1024):.1f}",
             str(
                 timedelta(
-                    seconds=int((datetime.now() - self.start_time).total_seconds())
+                    seconds=int(time.time() - self.start_time)
                 )
             ),
             f"✓{completed_count} ✗{failed_count}",
@@ -250,7 +250,7 @@ class CrawlerMonitor:
             key=lambda x: (
                 x.status != CrawlStatus.IN_PROGRESS,
                 x.status != CrawlStatus.QUEUED,
-                x.end_time or datetime.max,
+                x.end_time or float('inf'),
             ),
         )[: self.max_visible_rows]
 
@@ -337,7 +337,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
         config: CrawlerRunConfig,
         task_id: str,
     ) -> CrawlerTaskResult:
-        start_time = datetime.now()
+        start_time = time.time()
         error_message = ""
         memory_usage = peak_memory = 0.0
 
@@ -370,7 +370,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
                         memory_usage=memory_usage,
                         peak_memory=peak_memory,
                         start_time=start_time,
-                        end_time=datetime.now(),
+                        end_time=time.time(),
                         error_message=error_message,
                     )
                     await self.result_queue.put(result)
@@ -392,7 +392,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
             )
 
         finally:
-            end_time = datetime.now()
+            end_time = time.time()
             if self.monitor:
                 self.monitor.update_task(
                     task_id,
@@ -542,7 +542,7 @@ class SemaphoreDispatcher(BaseDispatcher):
         task_id: str,
         semaphore: asyncio.Semaphore = None,
     ) -> CrawlerTaskResult:
-        start_time = datetime.now()
+        start_time = time.time()
         error_message = ""
         memory_usage = peak_memory = 0.0
 
@@ -575,7 +575,7 @@ class SemaphoreDispatcher(BaseDispatcher):
                             memory_usage=memory_usage,
                             peak_memory=peak_memory,
                             start_time=start_time,
-                            end_time=datetime.now(),
+                            end_time=time.time(),
                             error_message=error_message,
                         )
 
@@ -595,7 +595,7 @@ class SemaphoreDispatcher(BaseDispatcher):
             )
 
         finally:
-            end_time = datetime.now()
+            end_time = time.time()
             if self.monitor:
                 self.monitor.update_task(
                     task_id,

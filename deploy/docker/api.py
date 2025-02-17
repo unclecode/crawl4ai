@@ -1,3 +1,4 @@
+from math import e
 import os
 import json
 import logging
@@ -14,6 +15,7 @@ from crawl4ai import (
     LLMExtractionStrategy,
     CacheMode
 )
+from crawl4ai.utils import perform_completion_with_backoff
 from crawl4ai.content_filter_strategy import (
     PruningContentFilter,
     BM25ContentFilter,
@@ -33,6 +35,51 @@ from utils import (
 
 logger = logging.getLogger(__name__)
 
+async def handle_llm_qa(
+    url: str,
+    query: str,
+    config: dict
+) -> str:
+    """Process QA using LLM with crawled content as context."""
+    try:
+        # Extract base URL by finding last '?q=' occurrence
+        last_q_index = url.rfind('?q=')
+        if last_q_index != -1:
+            url = url[:last_q_index]
+
+        # Get markdown content
+        async with AsyncWebCrawler() as crawler:
+            result = await crawler.arun(url)
+            if not result.success:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=result.error_message
+                )
+            content = result.markdown_v2.fit_markdown
+
+        # Create prompt and get LLM response
+        prompt = f"""Use the following content as context to answer the question.
+    Content:
+    {content}
+
+    Question: {query}
+
+    Answer:"""
+
+        response = perform_completion_with_backoff(
+            provider=config["llm"]["provider"],
+            prompt_with_variables=prompt,
+            api_token=os.environ.get(config["llm"].get("api_key_env", ""))
+        )
+
+        return response.choices[0].message.content
+    except Exception as e:
+        logger.error(f"QA processing error: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
 async def process_llm_extraction(
     redis: aioredis.Redis,
     config: dict,
@@ -44,9 +91,15 @@ async def process_llm_extraction(
 ) -> None:
     """Process LLM extraction in background."""
     try:
+        # If config['llm'] has api_key then ignore the api_key_env
+        api_key = ""
+        if "api_key" in config["llm"]:
+            api_key = config["llm"]["api_key"]
+        else:
+            api_key = os.environ.get(config["llm"].get("api_key_env", None), "")
         llm_strategy = LLMExtractionStrategy(
             provider=config["llm"]["provider"],
-            api_token=os.environ.get(config["llm"].get("api_key_env", None), ""),
+            api_token=api_key,
             instruction=instruction,
             schema=json.loads(schema) if schema else None,
         )

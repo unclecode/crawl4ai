@@ -1,36 +1,48 @@
 import os
 import sys
 import time
-from typing import  List, Optional
-
-sys.path.append(os.path.dirname(os.path.realpath(__file__)))
-
-from redis import asyncio as aioredis
-from fastapi import FastAPI, HTTPException, Request, status
-from fastapi.responses import StreamingResponse, RedirectResponse
+import base64
+from typing import List, Optional, Dict
+from datetime import datetime, timedelta, timezone
+from jwt import JWT, jwk_from_dict
+from jwt.utils import get_int_from_datetime
+from fastapi import FastAPI, HTTPException, Request, status, Depends, Query, Path
+from fastapi.responses import StreamingResponse, RedirectResponse, PlainTextResponse, JSONResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel, Field
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from prometheus_fastapi_instrumentator import Instrumentator
-from fastapi.responses import PlainTextResponse
-from fastapi.responses import JSONResponse
-from fastapi.background import BackgroundTasks
-from typing import Dict
-from fastapi import Query, Path
-import os
+from redis import asyncio as aioredis
+from pydantic import EmailStr
 
-from utils import (
-    FilterType,
-    load_config,
-    setup_logging
-)
+sys.path.append(os.path.dirname(os.path.realpath(__file__)))
+from utils import FilterType, load_config, setup_logging, verify_email_domain
 from api import (
     handle_markdown_request,
-    handle_llm_request,
     handle_llm_qa
 )
+
+__version__ = "0.1.2"
+
+class CrawlRequest(BaseModel):
+    urls: List[str] = Field(
+        min_length=1, 
+        max_length=100,
+        json_schema_extra={
+            "items": {"type": "string", "maxLength": 2000, "pattern": "\\S"}
+        }
+    )
+    browser_config: Optional[Dict] = Field(
+        default_factory=dict,
+        example={"headless": True, "viewport": {"width": 1200}}
+    )
+    crawler_config: Optional[Dict] = Field(
+        default_factory=dict,
+        example={"stream": True, "cache_mode": "aggressive"}
+    )
 
 # Load configuration and setup
 config = load_config()
@@ -65,22 +77,57 @@ if config["security"]["enabled"]:
 if config["observability"]["prometheus"]["enabled"]:
     Instrumentator().instrument(app).expose(app)
 
-class CrawlRequest(BaseModel):
-    urls: List[str] = Field(
-        min_length=1, 
-        max_length=100,
-        json_schema_extra={
-            "items": {"type": "string", "maxLength": 2000, "pattern": "\\S"}
-        }
-    )
-    browser_config: Optional[Dict] = Field(
-        default_factory=dict,
-        example={"headless": True, "viewport": {"width": 1200}}
-    )
-    crawler_config: Optional[Dict] = Field(
-        default_factory=dict,
-        example={"stream": True, "cache_mode": "aggressive"}
-    )
+# -------------------------------
+# JWT Token Authentication Setup
+# -------------------------------
+
+instance = JWT()
+
+# Use a secret key for symmetric signing (HS256)
+SECRET_KEY = os.environ.get("SECRET_KEY", "mysecret")
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
+
+# FastAPI security scheme for extracting the Authorization header
+security = HTTPBearer()
+
+def get_jwk_from_secret(secret: str):
+    """
+    Convert a simple secret string into a JWK object.
+    The secret is base64 URL-safe encoded (without padding) as required.
+    """
+    secret_bytes = secret.encode('utf-8')
+    b64_secret = base64.urlsafe_b64encode(secret_bytes).rstrip(b'=').decode('utf-8')
+    return jwk_from_dict({"kty": "oct", "k": b64_secret})
+
+def create_access_token(data: dict, expires_delta: timedelta = None):
+    """
+    Create a JWT access token with an expiration.
+    """
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + (expires_delta if expires_delta else timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({"exp": get_int_from_datetime(expire)})
+    # Convert the secret into a JWK object
+    signing_key = get_jwk_from_secret(SECRET_KEY)
+    encoded_jwt = instance.encode(to_encode, signing_key, alg='HS256')
+    return encoded_jwt
+
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """
+    Verify the JWT token extracted from the Authorization header.
+    """
+    token = credentials.credentials
+    # Convert the secret into a JWK object for verification
+    verifying_key = get_jwk_from_secret(SECRET_KEY)
+    try:
+        payload = instance.decode(token, verifying_key, do_time_check=True, algorithms='HS256')
+        return payload
+    except Exception as e:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+
+# -------------------------------
+# Endpoints
+# -------------------------------
 
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
@@ -89,6 +136,27 @@ async def add_security_headers(request: Request, call_next):
         response.headers.update(config["security"]["headers"])
     return response
 
+
+class TokenRequest(BaseModel):
+    email: EmailStr
+
+@app.post("/token")
+async def get_token(request_data: TokenRequest):
+    """
+    Minimal endpoint to generate a JWT token.
+    In a real-world scenario, you'd validate credentials here.
+    """
+    # token = create_access_token({"sub": "user1"})
+    # return {"access_token": token, "token_type": "bearer"}
+    # Verify that the email domain likely exists (has MX records)   
+    if not verify_email_domain(request_data.email):
+         raise HTTPException(
+             status_code=400, 
+             detail="Email domain verification failed. Please use a valid email address."
+         )
+    token = create_access_token({"sub": request_data.email})
+    return {"email": request_data.email, "access_token": token, "token_type": "bearer"}
+
 @app.get("/md/{url:path}")
 @limiter.limit(config["rate_limiting"]["default_limit"])
 async def get_markdown(
@@ -96,7 +164,8 @@ async def get_markdown(
     url: str,
     f: FilterType = FilterType.FIT,
     q: Optional[str] = None,
-    c: Optional[str] = "0"
+    c: Optional[str] = "0",
+    token_data: dict = Depends(verify_token)
 ):
     """Get markdown from URL with optional filtering."""
     result = await handle_markdown_request(url, f, q, c, config)
@@ -107,6 +176,7 @@ async def llm_endpoint(
     request: Request,
     url: str = Path(..., description="Domain and path without protocol"),
     q: Optional[str] = Query(None, description="Question to ask about the page content"),
+    token_data: dict = Depends(verify_token)
 ):
     """QA endpoint that uses LLM with crawled content as context."""
     if not q:
@@ -128,46 +198,32 @@ async def llm_endpoint(
             detail=str(e)
         )
 
-# @app.get("/llm/{input:path}")
-# @limiter.limit(config["rate_limiting"]["default_limit"])
-# async def llm_endpoint(
-#     request: Request,
-#     background_tasks: BackgroundTasks,
-#     input: str,
-#     q: Optional[str] = None,
-#     s: Optional[str] = None,
-#     c: Optional[str] = "0"
-# ):
-#     """Handle LLM extraction requests."""
-#     return await handle_llm_request(
-#         redis, background_tasks, request, input, q, s, c, config
-#     )
-
-
-    
 @app.get("/schema")
 async def get_schema():
     """Endpoint for client-side validation schema."""
     from crawl4ai import BrowserConfig, CrawlerRunConfig
     return {
-        "browser": BrowserConfig().dump(),
-        "crawler": CrawlerRunConfig().dump()
+        "browser": BrowserConfig.model_json_schema(),
+        "crawler": CrawlerRunConfig.model_json_schema()
     }
 
 @app.get(config["observability"]["health_check"]["endpoint"])
 async def health():
     """Health check endpoint."""
-    return {"status": "ok", "timestamp": time.time()}
+    return {"status": "ok", "timestamp": time.time(), "version": __version__}
 
 @app.get(config["observability"]["prometheus"]["endpoint"])
 async def metrics():
     """Prometheus metrics endpoint."""
     return RedirectResponse(url=config["observability"]["prometheus"]["endpoint"])
 
+# -------------------------------
+# Protected Endpoint Example: /crawl
+# -------------------------------
 @app.post("/crawl")
 @limiter.limit(config["rate_limiting"]["default_limit"])
-async def crawl(request: Request, crawl_request: CrawlRequest):
-    """Handle crawl requests."""
+async def crawl(request: Request, crawl_request: CrawlRequest, token_data: dict = Depends(verify_token)):
+    """Handle crawl requests. Protected by JWT authentication."""
     from crawl4ai import (
         AsyncWebCrawler,
         BrowserConfig,
@@ -256,10 +312,11 @@ async def crawl(request: Request, crawl_request: CrawlRequest):
             except Exception as e:
                 logger.error(f"Final crawler cleanup error: {e}")
 
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
-        "server:app",
+        "server-secure:app",
         host=config["app"]["host"],
         port=config["app"]["port"],
         reload=config["app"]["reload"],
