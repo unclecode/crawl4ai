@@ -37,7 +37,8 @@ dependencies = [
     "rich>=13.9.4",
     "cssselect>=1.2.0",
     "httpx==0.27.2",
-    "fake-useragent>=2.0.3"
+    "fake-useragent>=2.0.3",
+    "protego>=0.4.0"
 ]
 classifiers = [
     "Development Status :: 4 - Beta",

@@ -21,3 +21,4 @@ psutil>=6.1.1
 nltk>=3.9.1
 rich>=13.9.4
 cssselect>=1.2.0
+protego>=0.4.0
