@@ -150,6 +150,16 @@ class RobotsParser:
             expire_time = int(time.time()) - self.cache_ttl
             conn.execute("DELETE FROM robots_cache WHERE fetch_time < ?", (expire_time,))
       
+    def close(self):
+        """Close any open database connections"""
+        # Force close any open WAL files by running VACUUM
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                conn.execute("VACUUM")
+        except sqlite3.Error:
+            pass
+
 
 class InvalidCSSSelectorError(Exception):
     pass
