@@ -1,6 +1,8 @@
-from math import e
 import os
 import json
+import asyncio
+from typing import List, Tuple
+
 import logging
 from typing import Optional, AsyncGenerator
 from urllib.parse import unquote
@@ -13,7 +15,10 @@ from crawl4ai import (
     AsyncWebCrawler,
     CrawlerRunConfig,
     LLMExtractionStrategy,
-    CacheMode
+    CacheMode,
+    BrowserConfig,
+    MemoryAdaptiveDispatcher,
+    RateLimiter
 )
 from crawl4ai.utils import perform_completion_with_backoff
 from crawl4ai.content_filter_strategy import (
@@ -334,7 +339,6 @@ def create_task_response(task: dict, task_id: str, base_url: str) -> dict:
 
 async def stream_results(crawler: AsyncWebCrawler, results_gen: AsyncGenerator) -> AsyncGenerator[bytes, None]:
     """Stream results with heartbeats and completion markers."""
-    import asyncio
     import json
     from utils import datetime_handler
 
@@ -359,3 +363,80 @@ async def stream_results(crawler: AsyncWebCrawler, results_gen: AsyncGenerator) 
             await crawler.close()
         except Exception as e:
             logger.error(f"Crawler cleanup error: {e}")
+
+async def handle_crawl_request(
+    urls: List[str],
+    browser_config: dict,
+    crawler_config: dict,
+    config: dict
+) -> dict:
+    """Handle non-streaming crawl requests."""
+    try:
+        browser_config = BrowserConfig.load(browser_config)
+        crawler_config = CrawlerRunConfig.load(crawler_config)
+
+        dispatcher = MemoryAdaptiveDispatcher(
+            memory_threshold_percent=config["crawler"]["memory_threshold_percent"],
+            rate_limiter=RateLimiter(
+                base_delay=tuple(config["crawler"]["rate_limiter"]["base_delay"])
+            )
+        )
+
+        async with AsyncWebCrawler(config=browser_config) as crawler:
+            results = await crawler.arun_many(
+                urls=urls,
+                config=crawler_config,
+                dispatcher=dispatcher
+            )
+            
+            return {
+                "success": True,
+                "results": [result.model_dump() for result in results]
+            }
+
+    except Exception as e:
+        logger.error(f"Crawl error: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+async def handle_stream_crawl_request(
+    urls: List[str],
+    browser_config: dict,
+    crawler_config: dict,
+    config: dict
+) -> Tuple[AsyncWebCrawler, AsyncGenerator]:
+    """Handle streaming crawl requests."""
+    try:
+        browser_config = BrowserConfig.load(browser_config)
+        browser_config.verbose = True
+        crawler_config = CrawlerRunConfig.load(crawler_config)
+        crawler_config.scraping_strategy = LXMLWebScrapingStrategy()
+
+        dispatcher = MemoryAdaptiveDispatcher(
+            memory_threshold_percent=config["crawler"]["memory_threshold_percent"],
+            rate_limiter=RateLimiter(
+                base_delay=tuple(config["crawler"]["rate_limiter"]["base_delay"])
+            )
+        )
+
+        crawler = AsyncWebCrawler(config=browser_config)
+        await crawler.start()
+
+        results_gen = await crawler.arun_many(
+            urls=urls,
+            config=crawler_config,
+            dispatcher=dispatcher
+        )
+
+        return crawler, results_gen
+
+    except Exception as e:
+        if 'crawler' in locals():
+            await crawler.close()
+        logger.error(f"Stream crawl error: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )

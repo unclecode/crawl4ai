@@ -38,8 +38,9 @@ rate_limiting:
 
 # Security Configuration
 security:
-  enabled: false 
-  https_redirect: True
+  enabled: true 
+  jwt_enabled: true 
+  https_redirect: false
   trusted_hosts: ["*"]
   headers:
     x_content_type_options: "nosniff"

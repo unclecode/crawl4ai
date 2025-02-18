@@ -47,7 +47,7 @@ def to_serializable_dict(obj: Any) -> Dict:
         return obj.isoformat()
         
     # Handle lists, tuples, and sets, and basically any iterable
-    if isinstance(obj, (list, tuple, set)) or hasattr(obj, '__iter__'):
+    if isinstance(obj, (list, tuple, set)) or hasattr(obj, '__iter__') and not isinstance(obj, dict):
         return [to_serializable_dict(item) for item in obj]
     
     # Handle frozensets, which are not iterable

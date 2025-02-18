@@ -38,14 +38,13 @@ First, clone the repository and build the Docker image:
 ```bash
 # Clone the repository
 git clone https://github.com/unclecode/crawl4ai.git
-cd crawl4ai
+cd crawl4ai/deploy
 
 # Build the Docker image
-docker build -t crawl4ai-server:prod \
-  --build-arg PYTHON_VERSION=3.10 \
-  --build-arg INSTALL_TYPE=all \
-  --build-arg ENABLE_GPU=false \
-  deploy/docker/
+docker build --platform=linux/amd64 --no-cache -t crawl4ai .
+
+# Or build for arm64
+docker build --platform=linux/arm64 --no-cache -t crawl4ai .
 ```
 
 #### 2. Environment Setup
@@ -73,7 +72,7 @@ You have several options for running the container:
 
 Basic run (no LLM support):
 ```bash
-docker run -d -p 8000:8000 --name crawl4ai crawl4ai-server:prod
+docker run -d -p 8000:8000 --name crawl4ai crawl4ai
 ```
 
 With LLM support:
@@ -81,51 +80,16 @@ With LLM support:
 docker run -d -p 8000:8000 \
   --env-file .llm.env \
   --name crawl4ai \
-  crawl4ai-server:prod
+  crawl4ai
 ```
 
 Using host environment variables (Not a good practice, but works for local testing):
 ```bash
 docker run -d -p 8000:8000 \
   --env-file .llm.env \
-  --env-from "$(env)" \
+  --env "$(env)" \
   --name crawl4ai \
-  crawl4ai-server:prod
-```
-
-### More on Building
-
-You have several options for building the Docker image based on your needs:
-
-#### Basic Build
-```bash
-# Clone the repository
-git clone https://github.com/unclecode/crawl4ai.git
-cd crawl4ai
-
-# Simple build with defaults
-docker build -t crawl4ai-server:prod deploy/docker/
-```
-
-#### Advanced Build Options
-```bash
-# Build with custom parameters
-docker build -t crawl4ai-server:prod \
-  --build-arg PYTHON_VERSION=3.10 \
-  --build-arg INSTALL_TYPE=all \
-  --build-arg ENABLE_GPU=false \
-  deploy/docker/
-```
-
-#### Platform-Specific Builds
-The Dockerfile includes optimizations for different architectures (ARM64 and AMD64). Docker automatically detects your platform, but you can specify it explicitly:
-
-```bash
-# Build for ARM64
-docker build --platform linux/arm64 -t crawl4ai-server:arm64 deploy/docker/
-
-# Build for AMD64
-docker build --platform linux/amd64 -t crawl4ai-server:amd64 deploy/docker/
+  crawl4ai
 ```
 
 #### Multi-Platform Build
@@ -138,9 +102,9 @@ docker buildx create --use
 # Build for multiple platforms
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
-  -t yourusername/crawl4ai-server:multi \
+  -t crawl4ai \
   --push \
-  deploy/docker/
+  .
 ```
 
 > 💡 **Note**: Multi-platform builds require Docker Buildx and need to be pushed to a registry.
@@ -149,18 +113,18 @@ docker buildx build \
 For development, you might want to enable all features:
 
 ```bash
-docker build -t crawl4ai-server:dev \
+docker build -t crawl4ai
   --build-arg INSTALL_TYPE=all \
   --build-arg PYTHON_VERSION=3.10 \
   --build-arg ENABLE_GPU=true \
-  deploy/docker/
+  .
 ```
 
 #### GPU-Enabled Build
 If you plan to use GPU acceleration:
 
 ```bash
-docker build -t crawl4ai-server:gpu \
+docker build -t crawl4ai
   --build-arg ENABLE_GPU=true \
   deploy/docker/
 ```
@@ -185,31 +149,14 @@ docker build -t crawl4ai-server:gpu \
    - Use --platform for specific architecture requirements
    - Consider buildx for multi-architecture distribution
 
-3. **Development vs Production**
-   - Use `INSTALL_TYPE=all` for development
-   - Stick to `default` for production if you don't need extra features
-   - Enable GPU only if you have compatible hardware
-
-4. **Performance Optimization**
+3. **Performance Optimization**
    - The image automatically includes platform-specific optimizations
    - AMD64 gets OpenMP optimizations
    - ARM64 gets OpenBLAS optimizations
 
 ### Docker Hub
 
-> 🚧 Coming soon! The image will be available at `crawl4ai/server`. Stay tuned!
-
-## Dockerfile Parameters
-
-Configure your build with these parameters:
-
-| Parameter | Description | Default | Options |
-|-----------|-------------|---------|----------|
-| PYTHON_VERSION | Python version to use | 3.10 | 3.8, 3.9, 3.10 |
-| INSTALL_TYPE | Installation profile | default | default, all, torch, transformer |
-| ENABLE_GPU | Enable GPU support | false | true, false |
-| APP_HOME | Application directory | /app | any valid path |
-| TARGETARCH | Target architecture | auto-detected | amd64, arm64 |
+> 🚧 Coming soon! The image will be available at `crawl4ai`. Stay tuned!
 
 ## Using the API
 
@@ -223,14 +170,34 @@ The SDK makes things easier! Here's how to use it:
 from crawl4ai.docker_client import Crawl4aiDockerClient
 from crawl4ai import BrowserConfig, CrawlerRunConfig
 
-async with Crawl4aiDockerClient() as client:
-    # The SDK handles serialization for you!
-    result = await client.crawl(
-        urls=["https://example.com"],
-        browser_config=BrowserConfig(headless=True),
-        crawler_config=CrawlerRunConfig(stream=False)
-    )
-    print(result.markdown)
+async def main():
+    async with Crawl4aiDockerClient(base_url="http://localhost:8000", verbose=True) as client:
+      # If JWT is enabled, you can authenticate like this: (more on this later)
+        # await client.authenticate("test@example.com")
+        
+        # Non-streaming crawl
+        results = await client.crawl(
+            ["https://example.com", "https://python.org"],
+            browser_config=BrowserConfig(headless=True),
+            crawler_config=CrawlerRunConfig()
+        )
+        print(f"Non-streaming results: {results}")
+        
+        # Streaming crawl
+        crawler_config = CrawlerRunConfig(stream=True)
+        async for result in await client.crawl(
+            ["https://example.com", "https://python.org"],
+            browser_config=BrowserConfig(headless=True),
+            crawler_config=crawler_config
+        ):
+            print(f"Streamed result: {result}")
+        
+        # Get schema
+        schema = await client.get_schema()
+        print(f"Schema: {schema}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 `Crawl4aiDockerClient` is an async context manager that handles the connection for you. You can pass in optional parameters for more control:
@@ -243,76 +210,49 @@ async with Crawl4aiDockerClient() as client:
 
 This client SDK generates a properly structured JSON request for the server's HTTP API.
 
-### Second Approach: Direct API Calls
+## Second Approach: Direct API Calls
 
 This is super important! The API expects a specific structure that matches our Python classes. Let me show you how it works.
 
-#### The Magic of Type Matching
+### Understanding Configuration Structure
 
-When you send a request, each configuration object needs a "type" field that matches the exact class name from the library. Here's an example:
+Let's dive deep into how configurations work in Crawl4AI. Every configuration object follows a consistent pattern of `type` and `params`. This structure enables complex, nested configurations while maintaining clarity.
 
+#### The Basic Pattern
+
+Try this in Python to understand the structure:
 ```python
-# First, let's create objects the normal way
-from crawl4ai import BrowserConfig, CrawlerRunConfig, PruningContentFilter
+from crawl4ai import BrowserConfig
 
-# Create some config objects
-browser_config = BrowserConfig(headless=True, viewport={"width": 1200, "height": 800})
-content_filter = PruningContentFilter(threshold=0.48, threshold_type="fixed")
-
-# Use dump() to see the serialized format
-print(browser_config.dump())
+# Create a config and see its structure
+config = BrowserConfig(headless=True)
+print(config.dump())
 ```
 
-This will output something like:
+This outputs:
 ```json
 {
     "type": "BrowserConfig",
     "params": {
-        "headless": true,
-        "viewport": {
-            "width": 1200,
-            "height": 800
-        }
+        "headless": true
     }
 }
 ```
 
+#### Simple vs Complex Values
 
-#### Structuring Your Requests
+The structure follows these rules:
+- Simple values (strings, numbers, booleans, lists) are passed directly
+- Complex values (classes, dictionaries) use the type-params pattern
 
-1. Basic Request Structure
-Every request must include URLs and may include configuration objects:
-
+For example, with dictionaries:
 ```json
 {
-    "urls": ["https://example.com"],
-    "browser_config": {...},
-    "crawler_config": {...}
-}
-```
-
-2. Understanding Type-Params Pattern
-All complex objects follow this pattern:
-```json
-{
-    "type": "ClassName",
-    "params": {
-        "param1": value1,
-        "param2": value2
-    }
-}
-```
-> 💡 **Note**: Simple types (strings, numbers, booleans) are passed directly without the type-params wrapper.
-
-3. Browser Configuration
-```json
-{
-    "urls": ["https://example.com"],
     "browser_config": {
         "type": "BrowserConfig",
         "params": {
-            "headless": true,
-            "viewport": {
+            "headless": true,           // Simple boolean - direct value
+            "viewport": {               // Complex dictionary - needs type-params
                 "type": "dict",
                 "value": {
                     "width": 1200,
@@ -324,22 +264,104 @@ All complex objects follow this pattern:
 }
 ```
 
-4. Simple Crawler Configuration
+#### Strategy Pattern and Nesting
+
+Strategies (like chunking or content filtering) demonstrate why we need this structure. Consider this chunking configuration:
+
 ```json
 {
-    "urls": ["https://example.com"],
     "crawler_config": {
         "type": "CrawlerRunConfig",
         "params": {
-            "word_count_threshold": 200,
-            "stream": true,
-            "verbose": true
+            "chunking_strategy": {
+                "type": "RegexChunking",      // Strategy implementation
+                "params": {
+                    "patterns": ["\n\n", "\\.\\s+"]
+                }
+            }
         }
     }
 }
 ```
 
-5. Advanced Crawler Configuration
+Here, `chunking_strategy` accepts any chunking implementation. The `type` field tells the system which strategy to use, and `params` configures that specific strategy.
+
+#### Complex Nested Example
+
+Let's look at a more complex example with content filtering:
+
+```json
+{
+    "crawler_config": {
+        "type": "CrawlerRunConfig",
+        "params": {
+            "markdown_generator": {
+                "type": "DefaultMarkdownGenerator",
+                "params": {
+                    "content_filter": {
+                        "type": "PruningContentFilter",
+                        "params": {
+                            "threshold": 0.48,
+                            "threshold_type": "fixed"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+This shows how deeply configurations can nest while maintaining a consistent structure.
+
+#### Quick Grammar Overview
+```
+config := {
+    "type": string,
+    "params": {
+        key: simple_value | complex_value
+    }
+}
+
+simple_value := string | number | boolean | [simple_value]
+complex_value := config | dict_value
+
+dict_value := {
+    "type": "dict",
+    "value": object
+}
+```
+
+#### Important Rules 🚨
+
+- Always use the type-params pattern for class instances
+- Use direct values for primitives (numbers, strings, booleans)
+- Wrap dictionaries with {"type": "dict", "value": {...}}
+- Arrays/lists are passed directly without type-params
+- All parameters are optional unless specifically required
+
+#### Pro Tip 💡
+
+The easiest way to get the correct structure is to:
+1. Create configuration objects in Python
+2. Use the `dump()` method to see their JSON representation
+3. Use that JSON in your API calls
+
+Example:
+```python
+from crawl4ai import CrawlerRunConfig, PruningContentFilter
+
+config = CrawlerRunConfig(
+    content_filter=PruningContentFilter(threshold=0.48)
+)
+print(config.dump())  # Use this JSON in your API calls
+```
+
+
+#### More Examples
+
+**Advanced Crawler Configuration**
+
 ```json
 {
     "urls": ["https://example.com"],
@@ -365,26 +387,8 @@ All complex objects follow this pattern:
 }
 ```
 
-6. Adding Strategies
-
-**Chunking Strategy**:
-```json
-{
-    "crawler_config": {
-        "type": "CrawlerRunConfig",
-        "params": {
-            "chunking_strategy": {
-                "type": "RegexChunking",
-                "params": {
-                    "patterns": ["\n\n", "\\.\\s+"]
-                }
-            }
-        }
-    }
-}
-```
-
 **Extraction Strategy**:
+
 ```json
 {
     "crawler_config": {
@@ -408,6 +412,7 @@ All complex objects follow this pattern:
 ```
 
 **LLM Extraction Strategy**
+
 ```json
 {
   "crawler_config": {
@@ -453,7 +458,8 @@ All complex objects follow this pattern:
 }
 ```
 
-**Deep Crawler Exampler**
+**Deep Crawler Example**
+
 ```json
 {
   "crawler_config": {
@@ -526,15 +532,6 @@ All complex objects follow this pattern:
 }
 ```
 
-**Important Rules**:
-
-- Always use the type-params pattern for class instances
-- Use direct values for primitives (numbers, strings, booleans)
-- Wrap dictionaries with {"type": "dict", "value": {...}}
-- Arrays/lists are passed directly without type-params
-- All parameters are optional unless specifically required
-
-
 ### REST API Examples
 
 Let's look at some practical examples:
@@ -544,39 +541,51 @@ Let's look at some practical examples:
 ```python
 import requests
 
+crawl_payload = {
+    "urls": ["https://example.com"],
+    "browser_config": {"headless": True},
+    "crawler_config": {"stream": False}
+}
 response = requests.post(
     "http://localhost:8000/crawl",
-    json={
-        "urls": ["https://example.com"],
-        "browser_config": {
-            "type": "BrowserConfig",
-            "params": {"headless": True}
-        }
-    }
+    # headers={"Authorization": f"Bearer {token}"},  # If JWT is enabled, more on this later
+    json=crawl_payload
 )
-print(response.json())
+print(response.json())  # Print the response for debugging
 ```
 
 #### Streaming Results
 
 ```python
-import requests
+async def test_stream_crawl(session, token: str):
+    """Test the /crawl/stream endpoint with multiple URLs."""
+    url = "http://localhost:8000/crawl/stream"
+    payload = {
+        "urls": [
+            "https://example.com",
+            "https://example.com/page1",  
+            "https://example.com/page2",  
+            "https://example.com/page3",  
+        ],
+        "browser_config": {"headless": True, "viewport": {"width": 1200}},
+        "crawler_config": {"stream": True, "cache_mode": "aggressive"}
+    }
 
-response = requests.post(
-    "http://localhost:8000/crawl",
-    json={
-        "urls": ["https://example.com"],
-        "crawler_config": {
-            "type": "CrawlerRunConfig",
-            "params": {"stream": True}
-        }
-    },
-    stream=True
-)
-
-for line in response.iter_lines():
-    if line:
-        print(line.decode())
+    # headers = {"Authorization": f"Bearer {token}"} # If JWT is enabled, more on this later
+    
+    try:
+        async with session.post(url, json=payload, headers=headers) as response:
+            status = response.status
+            print(f"Status: {status} (Expected: 200)")
+            assert status == 200, f"Expected 200, got {status}"
+            
+            # Read streaming response line-by-line (NDJSON)
+            async for line in response.content:
+                if line:
+                    data = json.loads(line.decode('utf-8').strip())
+                    print(f"Streamed Result: {json.dumps(data, indent=2)}")
+    except Exception as e:
+        print(f"Error in streaming crawl test: {str(e)}")
 ```
 
 ## Metrics & Monitoring
@@ -602,184 +611,9 @@ curl http://localhost:8000/health
 
 ## Complete Examples
 
-Check out the `examples` folder in our repository for full working examples! Here's one to get you started:
-
-```python
-import requests
-import time
-import httpx
-import asyncio
-from typing import Dict, Any
-from crawl4ai import (
-    BrowserConfig, CrawlerRunConfig, DefaultMarkdownGenerator,
-    PruningContentFilter, JsonCssExtractionStrategy, LLMContentFilter, CacheMode
-)
-from crawl4ai.docker_client import Crawl4aiDockerClient
-
-class Crawl4AiTester:
-    def __init__(self, base_url: str = "http://localhost:11235"):
-        self.base_url = base_url
-
-    def submit_and_wait(
-        self, request_data: Dict[str, Any], timeout: int = 300
-    ) -> Dict[str, Any]:
-        # Submit crawl job
-        response = requests.post(f"{self.base_url}/crawl", json=request_data)
-        task_id = response.json()["task_id"]
-        print(f"Task ID: {task_id}")
-
-        # Poll for result
-        start_time = time.time()
-        while True:
-            if time.time() - start_time > timeout:
-                raise TimeoutError(
-                    f"Task {task_id} did not complete within {timeout} seconds"
-                )
-
-            result = requests.get(f"{self.base_url}/task/{task_id}")
-            status = result.json()
-
-            if status["status"] == "failed":
-                print("Task failed:", status.get("error"))
-                raise Exception(f"Task failed: {status.get('error')}")
-
-            if status["status"] == "completed":
-                return status
-
-            time.sleep(2)
-
-async def test_direct_api():
-    """Test direct API endpoints without using the client SDK"""
-    print("\n=== Testing Direct API Calls ===")
-    
-    # Test 1: Basic crawl with content filtering
-    browser_config = BrowserConfig(
-        headless=True,
-        viewport_width=1200,
-        viewport_height=800
-    )
-    
-    crawler_config = CrawlerRunConfig(
-        cache_mode=CacheMode.BYPASS,
-        markdown_generator=DefaultMarkdownGenerator(
-            content_filter=PruningContentFilter(
-                threshold=0.48,
-                threshold_type="fixed",
-                min_word_threshold=0
-            ),
-            options={"ignore_links": True}
-        )
-    )
-
-    request_data = {
-        "urls": ["https://example.com"],
-        "browser_config": browser_config.dump(),
-        "crawler_config": crawler_config.dump()
-    }
-
-    # Make direct API call
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            "http://localhost:8000/crawl",
-            json=request_data,
-            timeout=300
-        )
-        assert response.status_code == 200
-        result = response.json()
-        print("Basic crawl result:", result["success"])
-
-    # Test 2: Structured extraction with JSON CSS
-    schema = {
-        "baseSelector": "article.post",
-        "fields": [
-            {"name": "title", "selector": "h1", "type": "text"},
-            {"name": "content", "selector": ".content", "type": "html"}
-        ]
-    }
-
-    crawler_config = CrawlerRunConfig(
-        cache_mode=CacheMode.BYPASS,
-        extraction_strategy=JsonCssExtractionStrategy(schema=schema)
-    )
-
-    request_data["crawler_config"] = crawler_config.dump()
-
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            "http://localhost:8000/crawl",
-            json=request_data
-        )
-        assert response.status_code == 200
-        result = response.json()
-        print("Structured extraction result:", result["success"])
-
-    # Test 3: Get schema
-    # async with httpx.AsyncClient() as client:
-    #     response = await client.get("http://localhost:8000/schema")
-    #     assert response.status_code == 200
-    #     schemas = response.json()
-    #     print("Retrieved schemas for:", list(schemas.keys()))
-
-async def test_with_client():
-    """Test using the Crawl4AI Docker client SDK"""
-    print("\n=== Testing Client SDK ===")
-    
-    async with Crawl4aiDockerClient(verbose=True) as client:
-        # Test 1: Basic crawl
-        browser_config = BrowserConfig(headless=True)
-        crawler_config = CrawlerRunConfig(
-            cache_mode=CacheMode.BYPASS,
-            markdown_generator=DefaultMarkdownGenerator(
-                content_filter=PruningContentFilter(
-                    threshold=0.48,
-                    threshold_type="fixed"
-                )
-            )
-        )
-
-        result = await client.crawl(
-            urls=["https://example.com"],
-            browser_config=browser_config,
-            crawler_config=crawler_config
-        )
-        print("Client SDK basic crawl:", result.success)
-
-        # Test 2: LLM extraction with streaming
-        crawler_config = CrawlerRunConfig(
-            cache_mode=CacheMode.BYPASS,
-            markdown_generator=DefaultMarkdownGenerator(
-                content_filter=LLMContentFilter(
-                    provider="openai/gpt-40",
-                    instruction="Extract key technical concepts"
-                )
-            ),
-            stream=True
-        )
-
-        async for result in await client.crawl(
-            urls=["https://example.com"],
-            browser_config=browser_config,
-            crawler_config=crawler_config
-        ):
-            print(f"Streaming result for: {result.url}")
-
-        # # Test 3: Get schema
-        # schemas = await client.get_schema()
-        # print("Retrieved client schemas for:", list(schemas.keys()))
-
-async def main():
-    """Run all tests"""
-    # Test direct API
-    print("Testing direct API calls...")
-    await test_direct_api()
-
-    # Test client SDK
-    print("\nTesting client SDK...")
-    await test_with_client()
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
+Check out the `examples` folder in our repository for full working examples! Here are two to get you started:
+[Using Client SDK](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/docker_python_sdk_example.py)
+[Using REST API](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/docker_python_rest_api_example.py)
 
 ## Server Configuration
 
@@ -811,8 +645,9 @@ rate_limiting:
 # Security Configuration
 security:
   enabled: false               # Master toggle for security features
+  jwt_enabled: true            # Enable JWT authentication
   https_redirect: True         # Force HTTPS
-  trusted_hosts: ["*"]        # Allowed hosts (use specific domains in production)
+  trusted_hosts: ["*"]         # Allowed hosts (use specific domains in production)
   headers:                     # Security headers
     x_content_type_options: "nosniff"
     x_frame_options: "DENY"
@@ -842,9 +677,59 @@ observability:
     endpoint: "/health"        # Health check endpoint
 ```
 
+### JWT Authentication
+
+When `security.jwt_enabled` is set to `true` in your config.yml, all endpoints require JWT authentication via bearer tokens. Here's how it works:
+
+#### Getting a Token
+```python
+POST /token
+Content-Type: application/json
+
+{
+    "email": "user@example.com"
+}
+```
+
+The endpoint returns:
+```json
+{
+    "email": "user@example.com",
+    "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOi...",
+    "token_type": "bearer"
+}
+```
+
+#### Using the Token
+Add the token to your requests:
+```bash
+curl -H "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGci..." http://localhost:8000/crawl
+```
+
+Using the Python SDK:
+```python
+from crawl4ai.docker_client import Crawl4aiDockerClient
+
+async with Crawl4aiDockerClient() as client:
+    # Authenticate first
+    await client.authenticate("user@example.com")
+    
+    # Now all requests will include the token automatically
+    result = await client.crawl(urls=["https://example.com"])
+```
+
+#### Production Considerations 💡
+The default implementation uses a simple email verification. For production use, consider:
+- Email verification via OTP/magic links
+- OAuth2 integration
+- Rate limiting token generation
+- Token expiration and refresh mechanisms
+- IP-based restrictions
+
 ### Configuration Tips and Best Practices
 
 1. **Production Settings** 🏭
+
    ```yaml
    app:
      reload: False              # Disable reload in production
@@ -860,6 +745,7 @@ observability:
    ```
 
 2. **Development Settings** 🛠️
+
    ```yaml
    app:
      reload: True               # Enable hot reloading
@@ -870,6 +756,7 @@ observability:
    ```
 
 3. **High-Traffic Settings** 🚦
+
    ```yaml
    crawler:
      memory_threshold_percent: 85.0  # More conservative memory limit
@@ -880,23 +767,37 @@ observability:
 ### Customizing Your Configuration
 
 #### Method 1: Pre-build Configuration
+
 ```bash
 # Copy and modify config before building
-cp deploy/docker/config.yml custom-config.yml
-vim custom-config.yml
+cd crawl4ai/deploy
+vim custom-config.yml # Or use any editor
 
 # Build with custom config
-docker build -t crawl4ai-server:prod \
-  --build-arg CONFIG_PATH=custom-config.yml .
+docker build --platform=linux/amd64 --no-cache -t crawl4ai:latest .
 ```
 
-#### Method 2: Runtime Configuration
+#### Method 2: Build-time Configuration
+
+Use a custom config during build:
+
+```bash
+# Build with custom config
+docker build --platform=linux/amd64 --no-cache \
+  --build-arg CONFIG_PATH=/path/to/custom-config.yml \ 
+  -t crawl4ai:latest .
+```
+
+#### Method 3: Runtime Configuration
 ```bash
 # Mount custom config at runtime
 docker run -d -p 8000:8000 \
   -v $(pwd)/custom-config.yml:/app/config.yml \
   crawl4ai-server:prod
 ```
+
+> 💡 Note: When using Method 2, `/path/to/custom-config.yml` is relative to deploy directory.
+> 💡 Note: When using Method 3, ensure your custom config file has all required fields as the container will use this instead of the built-in config.
 
 ### Configuration Recommendations
 
@@ -920,56 +821,6 @@ docker run -d -p 8000:8000 \
    - Start with conservative rate limiter delays
    - Increase batch_process timeout for large content
    - Adjust stream_init timeout based on initial response times
-
-### Configuration Migration
-
-When upgrading Crawl4AI, follow these steps:
-
-1. Back up your current config:
-   ```bash
-   cp /app/config.yml /app/config.yml.backup
-   ```
-
-2. Use version control:
-   ```bash
-   git add config.yml
-   git commit -m "Save current server configuration"
-   ```
-
-3. Test in staging first:
-   ```bash
-   docker run -d -p 8001:8000 \  # Use different port
-     -v $(pwd)/new-config.yml:/app/config.yml \
-     crawl4ai-server:prod
-   ```
-
-### Common Configuration Scenarios
-
-1. **Basic Development Setup**
-   ```yaml
-   security:
-     enabled: false
-   logging:
-     level: "DEBUG"
-   ```
-
-2. **Production API Server**
-   ```yaml
-   security:
-     enabled: true
-     trusted_hosts: ["api.yourdomain.com"]
-   rate_limiting:
-     enabled: true
-     default_limit: "50/minute"
-   ```
-
-3. **High-Performance Crawler**
-   ```yaml
-   crawler:
-     memory_threshold_percent: 90.0
-     timeouts:
-       batch_process: 600.0
-   ```
 
 ## Getting Help
 

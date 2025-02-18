@@ -4,7 +4,8 @@ FROM python:3.10-slim
 ARG APP_HOME=/app
 ARG GITHUB_REPO=https://github.com/unclecode/crawl4ai.git
 ARG GITHUB_BRANCH=next
-ARG USE_LOCAL=true
+ARG USE_LOCAL=False
+ARG CONFIG_PATH=""
 
 ENV PYTHONFAULTHANDLER=1 \
     PYTHONHASHSEED=random \
@@ -88,58 +89,37 @@ fi
 
 WORKDIR ${APP_HOME}
 
-RUN echo '#!/bin/bash\n\
-if [ "$USE_LOCAL" = "true" ]; then\n\
-    echo "📦 Installing from local source..."\n\
-    pip install --no-cache-dir /tmp/project/\n\
-else\n\
-    echo "🌐 Installing from GitHub..."\n\
-    for i in {1..3}; do \n\
-        git clone --branch ${GITHUB_BRANCH} ${GITHUB_REPO} /tmp/crawl4ai && break || \n\
-        { echo "Attempt $i/3 failed! Taking a short break... ☕"; sleep 5; }; \n\
-    done\n\
-    pip install --no-cache-dir /tmp/crawl4ai\n\
-fi' > /tmp/install.sh && chmod +x /tmp/install.sh
+RUN git clone --branch ${GITHUB_BRANCH} ${GITHUB_REPO} /tmp/crawl4ai
 
-COPY . /tmp/project/
+COPY docker/supervisord.conf .
+COPY docker/requirements.txt .
 
-COPY deploy/docker/supervisord.conf .
-
-COPY deploy/docker/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 RUN if [ "$INSTALL_TYPE" = "all" ] ; then \
-        pip install --no-cache-dir \
-            torch \
-            torchvision \
-            torchaudio \
-            scikit-learn \
-            nltk \
-            transformers \
-            tokenizers && \
-        python -m nltk.downloader punkt stopwords ; \
-    fi
-
-RUN if [ "$INSTALL_TYPE" = "all" ] ; then \
-        pip install "/tmp/project/[all]" && \
+        pip install "/tmp/crawl4ai/[all]" && \
+        python -m nltk.downloader punkt stopwords && \
         python -m crawl4ai.model_loader ; \
     elif [ "$INSTALL_TYPE" = "torch" ] ; then \
-        pip install "/tmp/project/[torch]" ; \
+        pip install "/tmp/crawl4ai/[torch]" ; \
     elif [ "$INSTALL_TYPE" = "transformer" ] ; then \
-        pip install "/tmp/project/[transformer]" && \
+        pip install "/tmp/crawl4ai/[transformer]" && \
         python -m crawl4ai.model_loader ; \
     else \
-        pip install "/tmp/project" ; \
+        pip install "/tmp/crawl4ai" ; \
     fi
     
 RUN pip install --no-cache-dir --upgrade pip && \
-    /tmp/install.sh && \
     python -c "import crawl4ai; print('✅ crawl4ai is ready to rock!')" && \
     python -c "from playwright.sync_api import sync_playwright; print('✅ Playwright is feeling dramatic!')"
     
 RUN playwright install --with-deps chromium
 
-COPY deploy/docker/* ${APP_HOME}/
+COPY docker/* ${APP_HOME}/
+RUN if [ -n "$CONFIG_PATH" ] && [ -f "$CONFIG_PATH" ]; then \
+    echo "Using custom config from $CONFIG_PATH" && \
+    cp $CONFIG_PATH /app/config.yml; \
+fi
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD bash -c '\
@@ -151,24 +131,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     redis-cli ping > /dev/null && \
     curl -f http://localhost:8000/health || exit 1'
 
-# COPY deploy/docker/docker-entrypoint.sh /usr/local/bin/
-# RUN chmod +x /usr/local/bin/docker-entrypoint.sh
-
-EXPOSE 6379
-
-# ENTRYPOINT ["docker-entrypoint.sh"]
-
-# CMD service redis-server start && gunicorn \
-#     --bind 0.0.0.0:8000 \
-#     --workers 4 \
-#     --threads 2 \
-#     --timeout 120 \
-#     --graceful-timeout 30 \
-#     --log-level info \
-#     --worker-class uvicorn.workers.UvicornWorker \
-#     server:app
-
-# ENTRYPOINT ["docker-entrypoint.sh"]
+# EXPOSE 6379
 
 CMD ["supervisord", "-c", "supervisord.conf"]
     
