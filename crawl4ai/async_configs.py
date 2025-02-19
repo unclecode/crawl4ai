@@ -1,5 +1,3 @@
-from email import header
-from re import I
 from .config import (
     MIN_WORD_THRESHOLD,
     IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
@@ -23,7 +21,7 @@ import inspect
 from typing import Any, Dict, Optional
 from enum import Enum 
 
-def to_serializable_dict(obj: Any) -> Dict:
+def to_serializable_dict(obj: Any, ignore_default_value : bool = False) -> Dict:
     """
     Recursively convert an object to a serializable dictionary using {type, params} structure
     for complex objects.
@@ -60,7 +58,9 @@ def to_serializable_dict(obj: Any) -> Dict:
             "type": "dict",  # Mark as plain dictionary
             "value": {str(k): to_serializable_dict(v) for k, v in obj.items()}
         }
-    
+
+    _type = obj.__class__.__name__
+
     # Handle class instances
     if hasattr(obj, '__class__'):
         # Get constructor signature
@@ -77,10 +77,18 @@ def to_serializable_dict(obj: Any) -> Dict:
             
             # Only include if different from default, considering empty values
             if not (is_empty_value(value) and is_empty_value(param.default)):
-                if value != param.default:
+                if value != param.default and not ignore_default_value:
                     current_values[name] = to_serializable_dict(value)
         
-        _type = obj.__class__.__name__
+        if hasattr(obj, '__slots__'):
+            for slot in obj.__slots__:
+                if slot.startswith('_'):  # Handle private slots
+                    attr_name = slot[1:]  # Remove leading '_'
+                    value = getattr(obj, slot, None)
+                    if value is not None:
+                        current_values[attr_name] = to_serializable_dict(value)
+
+            
         
         return {
             "type": obj.__class__.__name__,
@@ -169,6 +177,8 @@ class BrowserConfig():
                                      If None, no additional proxy config. Default: None.
         viewport_width (int): Default viewport width for pages. Default: 1080.
         viewport_height (int): Default viewport height for pages. Default: 600.
+        viewport (dict): Default viewport dimensions for pages. If set, overrides viewport_width and viewport_height.
+                         Default: None.
         verbose (bool): Enable verbose logging.
                         Default: True.
         accept_downloads (bool): Whether to allow file downloads. If True, requires a downloads_path.
@@ -211,6 +221,7 @@ class BrowserConfig():
         proxy_config: dict = None,
         viewport_width: int = 1080,
         viewport_height: int = 600,
+        viewport: dict = None,
         accept_downloads: bool = False,
         downloads_path: str = None,
         storage_state : Union[str, dict, None]=None,
@@ -249,6 +260,10 @@ class BrowserConfig():
         self.proxy_config = proxy_config
         self.viewport_width = viewport_width
         self.viewport_height = viewport_height
+        self.viewport = viewport
+        if self.viewport is not None:
+            self.viewport_width = self.viewport.get("width", 1080)
+            self.viewport_height = self.viewport.get("height", 600)
         self.accept_downloads = accept_downloads
         self.downloads_path = downloads_path
         self.storage_state = storage_state
@@ -436,6 +451,13 @@ class HTTPCrawlerConfig():
         return HTTPCrawlerConfig.from_kwargs(config)
 
 class CrawlerRunConfig():
+    _UNWANTED_PROPS = {
+        'disable_cache' : 'Instead, use cache_mode=CacheMode.DISABLED',
+        'bypass_cache' : 'Instead, use cache_mode=CacheMode.BYPASS',
+        'no_cache_read' : 'Instead, use cache_mode=CacheMode.WRITE_ONLY',
+        'no_cache_write' : 'Instead, use cache_mode=CacheMode.READ_ONLY',
+    }
+
     """
     Configuration class for controlling how the crawler runs each crawl operation.
     This includes parameters for content extraction, page manipulation, waiting conditions,
@@ -680,6 +702,7 @@ class CrawlerRunConfig():
         deep_crawl_strategy: Optional[DeepCrawlStrategy] = None,
 
     ):
+        # TODO: Planning to set properties dynamically based on the __init__ signature
         self.url = url
 
         # Content Processing Parameters
@@ -790,6 +813,24 @@ class CrawlerRunConfig():
 
         # Deep Crawl Parameters
         self.deep_crawl_strategy = deep_crawl_strategy
+
+
+    def __getattr__(self, name):
+        """Handle attribute access."""
+        if name in self._UNWANTED_PROPS:
+            raise AttributeError(f"Getting '{name}' is deprecated. {self._UNWANTED_PROPS[name]}")
+        raise AttributeError(f"'{self.__class__.__name__}' has no attribute '{name}'")
+
+    def __setattr__(self, name, value):
+        """Handle attribute setting."""
+        # TODO: Planning to set properties dynamically based on the __init__ signature
+        sig = inspect.signature(self.__init__)
+        all_params = sig.parameters  # Dictionary of parameter names and their details
+
+        if name in self._UNWANTED_PROPS and value is not all_params[name].default:
+            raise AttributeError(f"Setting '{name}' is deprecated. {self._UNWANTED_PROPS[name]}")
+        
+        super().__setattr__(name, value)
 
     @staticmethod
     def from_kwargs(kwargs: dict) -> "CrawlerRunConfig":
@@ -988,3 +1029,5 @@ class CrawlerRunConfig():
         config_dict = self.to_dict()
         config_dict.update(kwargs)
         return CrawlerRunConfig.from_kwargs(config_dict)
+
+

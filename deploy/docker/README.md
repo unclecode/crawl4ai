@@ -469,57 +469,40 @@ print(config.dump())  # Use this JSON in your API calls
         "type": "BFSDeepCrawlStrategy",
         "params": {
           "max_depth": 3,
-          "max_pages": 100,
           "filter_chain": {
-            "type": "FastFilterChain",
+            "type": "FilterChain",
             "params": {
               "filters": [
                 {
-                  "type": "FastContentTypeFilter",
+                  "type": "ContentTypeFilter",
                   "params": {
                     "allowed_types": ["text/html", "application/xhtml+xml"]
                   }
                 },
                 {
-                  "type": "FastDomainFilter",
+                  "type": "DomainFilter",
                   "params": {
                     "allowed_domains": ["blog.*", "docs.*"],
-                    "blocked_domains": ["ads.*", "analytics.*"]
-                  }
-                },
-                {
-                  "type": "FastURLPatternFilter",
-                  "params": {
-                    "allowed_patterns": ["^/blog/", "^/docs/"],
-                    "blocked_patterns": [".*/ads/", ".*/sponsored/"]
                   }
                 }
               ]
             }
           },
           "url_scorer": {
-            "type": "FastCompositeScorer",
+            "type": "CompositeScorer",
             "params": {
               "scorers": [
                 {
-                  "type": "FastKeywordRelevanceScorer",
+                  "type": "KeywordRelevanceScorer",
                   "params": {
                     "keywords": ["tutorial", "guide", "documentation"],
-                    "weight": 1.0
                   }
                 },
                 {
-                  "type": "FastPathDepthScorer",
+                  "type": "PathDepthScorer",
                   "params": {
                     "weight": 0.5,
-                    "preferred_depth": 2
-                  }
-                },
-                {
-                  "type": "FastFreshnessScorer",
-                  "params": {
-                    "weight": 0.8,
-                    "max_age_days": 365
+                    "optimal_depth": 3  
                   }
                 }
               ]

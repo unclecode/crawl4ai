@@ -10,7 +10,7 @@ import inspect
 from crawl4ai import CacheMode
 from crawl4ai.async_configs import CrawlerRunConfig
 from crawl4ai.models import CrawlResult, TraversalStats
-from crawl4ai.deep_crawling.filters import FastFilterChain
+from crawl4ai.deep_crawling.filters import FilterChain
 from crawl4ai.async_webcrawler import AsyncWebCrawler
 import time
 import logging
@@ -313,7 +313,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
 
     def __init__(self,
                  max_depth: int,
-                 filter_chain: FastFilterChain = FastFilterChain(),
+                 filter_chain: FilterChain = FilterChain(),
                  priority_fn: Callable[[str], Awaitable[float]] = lambda url: 1.0,
                  logger: logging.Logger = None):
         self.max_depth = max_depth
@@ -408,7 +408,7 @@ async def main():
     strategy = BFSDeepCrawlStrategy(
         max_depth=2,
         priority_fn=lambda url: 1.0 / (len(url) + 1e-9),  # Inverse length priority
-        # filter_chain=FastFilterChain(...)
+        # filter_chain=FilterChain(...)
     )
 
     config: CrawlerRunConfig = CrawlerRunConfig(
