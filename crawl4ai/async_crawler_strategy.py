@@ -886,7 +886,14 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
         """
         try:
-            viewport_height = page.viewport_size.get(
+            viewport_size = page.viewport_size
+            if viewport_size is None:
+                await page.set_viewport_size(
+                    {"width": self.browser_config.viewport_width, "height": self.browser_config.viewport_height}
+                )
+                viewport_size = page.viewport_size
+
+            viewport_height = viewport_size.get(
                 "height", self.browser_config.viewport_height
             )
             current_position = viewport_height
@@ -946,7 +953,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         """
         try:
             suggested_filename = download.suggested_filename
-            download_path = os.path.join(self.downloads_path, suggested_filename)
+            download_path = os.path.join(self.browser_config.downloads_path, suggested_filename)
 
             self.logger.info(
                 message="Downloading {filename} to {path}",

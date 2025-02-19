@@ -168,10 +168,10 @@ async def main():
         "name": "News Items",
         "baseSelector": "tr.athing",
         "fields": [
-            {"name": "title", "selector": "a.storylink", "type": "text"},
+            {"name": "title", "selector": "span.titleline a", "type": "text"},
             {
                 "name": "link", 
-                "selector": "a.storylink", 
+                "selector": "span.titleline a", 
                 "type": "attribute", 
                 "attribute": "href"
             }

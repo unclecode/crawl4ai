@@ -7,8 +7,8 @@ Crawl4AI offers multiple power-user features that go beyond simple crawling. Thi
 2. **Capturing PDFs & Screenshots**  
 3. **Handling SSL Certificates**  
 4. **Custom Headers**  
-5. **Session Persistence & Local Storage**
-6. **Robots.txt Compliance**
+5. **Session Persistence & Local Storage**  
+6. **Robots.txt Compliance**  
 
 > **Prerequisites**  
 > - You have a basic grasp of [AsyncWebCrawler Basics](../core/simple-crawling.md)  
