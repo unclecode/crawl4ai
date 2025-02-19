@@ -515,6 +515,8 @@ class LLMExtractionStrategy(ExtractionStrategy):
         base_url: str =None,
         input_format: str = "markdown",
         verbose=False,
+        concurrency: int = None,
+        delay: float = None,
         **kwargs,
     ):
         """
@@ -549,6 +551,9 @@ class LLMExtractionStrategy(ExtractionStrategy):
                 PROVIDER_MODELS.get(provider, "no-token")
                 or os.getenv("OPENAI_API_KEY")
             )
+        self.concurrency = concurrency or 1 if self.provider.startswith("groq/") else 10
+        self.delay = delay or 0.5 if self.provider.startswith("groq/") else 0
+        self.semaphore = asyncio.Semaphore(self.concurrency)
         self.instruction = instruction
         self.extract_type = extraction_type
         self.schema = schema
@@ -690,17 +695,22 @@ class LLMExtractionStrategy(ExtractionStrategy):
         return blocks
 
     async def aextract(self, url: str, ix: int, html: str):
-        if self.verbose:
-            print(f"[LOG] Call LLM for {url} - block index: {ix}")
-
         prompt_with_variables = self._prompt(url, html)
-        response = await aperform_completion_with_backoff(
-            self.provider,
-            prompt_with_variables,
-            self.api_token,
-            base_url=self.api_base or self.base_url,
-            extra_args=self.extra_args,
-        )
+        async with self.semaphore:
+            if self.verbose:
+                print(f"[LOG] Call LLM for {url} - block index: {ix}")
+
+            response = await aperform_completion_with_backoff(
+                self.provider,
+                prompt_with_variables,
+                self.api_token,
+                base_url=self.api_base or self.base_url,
+                extra_args=self.extra_args,
+            )
+
+            if ix > 0 and self.delay > 0:
+                await asyncio.sleep(self.delay)
+
         self._usage(response.usage)
         blocks = self._blocks(response)
         if self.verbose:
@@ -739,14 +749,14 @@ class LLMExtractionStrategy(ExtractionStrategy):
                 extracted_content.extend(
                     extract_func(ix, sanitize_input_encode(section))
                 )
-                time.sleep(0.5)  # 500 ms delay between each processing
+                time.sleep(self.delay)  # 500 ms delay between each processing
         else:
             # Parallel processing using ThreadPoolExecutor
             # extract_func = partial(self.extract, url)
             # for ix, section in enumerate(merged_sections):
             #     extracted_content.append(extract_func(ix, section))
 
-            with ThreadPoolExecutor(max_workers=4) as executor:
+            with ThreadPoolExecutor(max_workers=self.concurrency) as executor:
                 extract_func = partial(self.extract, url)
                 futures = [
                     executor.submit(extract_func, ix, sanitize_input_encode(section))
@@ -788,45 +798,19 @@ class LLMExtractionStrategy(ExtractionStrategy):
             self.chunk_token_threshold,
             overlap=int(self.chunk_token_threshold * self.overlap_rate),
         )
-        if self.provider.startswith("groq/"):
-            concurrency = 1
-            delay = 0.5
-        else:
-            concurrency = 4
-            delay = 0
-
-        todo = []
-        for ix, section in enumerate(merged_sections):
-            todo.append((ix, section))
 
         extracted_content = []
         try:
-            active_tasks = []
-            while todo or active_tasks:
-                while len(active_tasks) < concurrency and todo:
-                    ix, html = todo.pop(0)
-                    if ix > 0 and delay > 0:
-                        await asyncio.sleep(delay)
-                    task = asyncio.create_task(self.aextract(url, ix, sanitize_input_encode(html)))
-                    active_tasks.append(task)
-
-                # Wait for any task to complete and yield results
-                if active_tasks:
-                    done, pending = await asyncio.wait(
-                        active_tasks, timeout=0.1, return_when=asyncio.FIRST_COMPLETED
-                    )
-                    for completed_task in done:
-                        result = await completed_task
-                        extracted_content.extend(result)
-                    active_tasks = list(pending)
-                elif not todo:
-                    break
-                else:
-                    await asyncio.sleep(0.5)
+            tasks = []
+            async with asyncio.TaskGroup() as tg:
+                for ix, section in enumerate(merged_sections):
+                    tasks.append(tg.create_task(self.aextract(url, ix, sanitize_input_encode(section))))
+            for task in tasks:
+                extracted_content.extend(task.result())
 
         except Exception as e:
             if self.verbose:
-                print(f"Error in thread execution: {e}")
+                print(f"Error in llm extraction: {e}")
             # Add error information to extracted_content
             extracted_content.append(
                 {
