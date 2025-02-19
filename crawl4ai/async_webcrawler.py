@@ -166,7 +166,7 @@ class AsyncWebCrawler:
         )
 
         # Initialize crawler strategy
-        params = {k: v for k, v in kwargs.items() if k in ["browser_congig", "logger"]}
+        params = {k: v for k, v in kwargs.items() if k in ["browser_config", "logger"]}
         self.crawler_strategy = crawler_strategy or AsyncPlaywrightCrawlerStrategy(
             browser_config=browser_config,
             logger=self.logger,
