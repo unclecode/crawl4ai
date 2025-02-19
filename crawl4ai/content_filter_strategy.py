@@ -5,7 +5,16 @@ from typing import List, Tuple, Dict, Optional
 from rank_bm25 import BM25Okapi
 from collections import deque
 from bs4 import NavigableString, Comment
-from .utils import clean_tokens, perform_completion_with_backoff, escape_json_string, sanitize_html, get_home_folder, extract_xml_data, merge_chunks
+
+from .utils import (
+    clean_tokens,
+    perform_completion_with_backoff,
+    escape_json_string,
+    sanitize_html,
+    get_home_folder,
+    extract_xml_data,
+    merge_chunks,
+)
 from abc import ABC, abstractmethod
 import math
 from snowballstemmer import stemmer
@@ -20,10 +29,16 @@ from concurrent.futures import ThreadPoolExecutor
 from .async_logger import AsyncLogger, LogLevel
 from colorama import Fore, Style
 
+
 class RelevantContentFilter(ABC):
     """Abstract base class for content filtering strategies"""
 
-    def __init__(self, user_query: str = None, verbose: bool = False, logger: Optional[AsyncLogger] = None):
+    def __init__(
+        self,
+        user_query: str = None,
+        verbose: bool = False,
+        logger: Optional[AsyncLogger] = None,
+    ):
         """
         Initializes the RelevantContentFilter class with optional user query.
 
@@ -362,6 +377,7 @@ class RelevantContentFilter(ABC):
         except Exception:
             return str(tag)  # Fallback to original if anything fails
 
+
 class BM25ContentFilter(RelevantContentFilter):
     """
     Content filtering using BM25 algorithm with priority tag handling.
@@ -503,6 +519,7 @@ class BM25ContentFilter(RelevantContentFilter):
         selected_candidates.sort(key=lambda x: x[0])
 
         return [self.clean_element(tag) for _, _, tag in selected_candidates]
+
 
 class PruningContentFilter(RelevantContentFilter):
     """
@@ -750,11 +767,13 @@ class PruningContentFilter(RelevantContentFilter):
                 class_id_score -= 0.5
         return class_id_score
 
+
 class LLMContentFilter(RelevantContentFilter):
     """Content filtering using LLMs to generate relevant markdown."""
 
     def __init__(
         self,
+        llmConfig: "LlmConfig" = None,
         provider: str = DEFAULT_PROVIDER,
         api_token: Optional[str] = None,
         instruction: str = None,
@@ -771,12 +790,18 @@ class LLMContentFilter(RelevantContentFilter):
         ignore_cache: bool = False,
     ):
         super().__init__(None)
-        self.provider = provider
-        self.api_token = (
-            api_token
-            or PROVIDER_MODELS.get(provider, "no-token")
-            or os.getenv("OPENAI_API_KEY")
-        )
+        if llmConfig is None:
+            self.llmConfig(
+                provider=provider,
+                api_token=(
+                    api_token
+                    or PROVIDER_MODELS.get(provider, "no-token")
+                    or os.getenv("OPENAI_API_KEY")
+                ),
+                **locals(),
+            )
+        else:
+            self.llmConfig = llmConfig
         self.instruction = instruction
         self.chunk_token_threshold = chunk_token_threshold
         self.overlap_rate = overlap_rate
@@ -790,7 +815,7 @@ class LLMContentFilter(RelevantContentFilter):
         self.extra_args = extra_args or {}
         self.ignore_cache = ignore_cache
         self.verbose = verbose
-        
+
         # Setup logger with custom styling for LLM operations
         if logger:
             self.logger = logger
@@ -801,16 +826,17 @@ class LLMContentFilter(RelevantContentFilter):
                     **AsyncLogger.DEFAULT_ICONS,
                     "LLM": "★",  # Star for LLM operations
                     "CHUNK": "◈",  # Diamond for chunks
-                    "CACHE": "⚡", # Lightning for cache operations
+                    "CACHE": "⚡",  # Lightning for cache operations
                 },
                 colors={
                     **AsyncLogger.DEFAULT_COLORS,
-                    LogLevel.INFO: Fore.MAGENTA + Style.DIM,  # Dimmed purple for LLM ops
-                }
+                    LogLevel.INFO: Fore.MAGENTA
+                    + Style.DIM,  # Dimmed purple for LLM ops
+                },
             )
         else:
             self.logger = None
-        
+
         self.usages = []
         self.total_usage = TokenUsage()
 
@@ -823,14 +849,12 @@ class LLMContentFilter(RelevantContentFilter):
         """Split text into chunks with overlap using char or word mode."""
         ov = int(self.chunk_token_threshold * self.overlap_rate)
         sections = merge_chunks(
-            docs = [text],
-            target_size= self.chunk_token_threshold,
+            docs=[text],
+            target_size=self.chunk_token_threshold,
             overlap=ov,
-            word_token_ratio=self.word_token_rate
+            word_token_ratio=self.word_token_rate,
         )
         return sections
-    
-        
 
     def filter_content(self, html: str, ignore_cache: bool = True) -> List[str]:
         if not html or not isinstance(html, str):
@@ -838,10 +862,10 @@ class LLMContentFilter(RelevantContentFilter):
 
         if self.logger:
             self.logger.info(
-                "Starting LLM markdown content filtering process", 
+                "Starting LLM markdown content filtering process",
                 tag="LLM",
-                params={"provider": self.provider},
-                colors={"provider": Fore.CYAN}
+                params={"provider": self.llmConfig.provider},
+                colors={"provider": Fore.CYAN},
             )
 
         # Cache handling
@@ -857,47 +881,47 @@ class LLMContentFilter(RelevantContentFilter):
             if self.logger:
                 self.logger.info("Found  cached markdown result", tag="CACHE")
             try:
-                with cache_file.open('r') as f:
+                with cache_file.open("r") as f:
                     cached_data = json.load(f)
-                    usage = TokenUsage(**cached_data['usage'])
+                    usage = TokenUsage(**cached_data["usage"])
                     self.usages.append(usage)
                     self.total_usage.completion_tokens += usage.completion_tokens
                     self.total_usage.prompt_tokens += usage.prompt_tokens
                     self.total_usage.total_tokens += usage.total_tokens
-                    return cached_data['blocks']
+                    return cached_data["blocks"]
             except Exception as e:
                 if self.logger:
-                    self.logger.error(f"LLM markdown: Cache read error: {str(e)}", tag="CACHE")
+                    self.logger.error(
+                        f"LLM markdown: Cache read error: {str(e)}", tag="CACHE"
+                    )
 
         # Split into chunks
         html_chunks = self._merge_chunks(html)
         if self.logger:
             self.logger.info(
-                "LLM markdown: Split content into {chunk_count} chunks", 
+                "LLM markdown: Split content into {chunk_count} chunks",
                 tag="CHUNK",
                 params={"chunk_count": len(html_chunks)},
-                colors={"chunk_count": Fore.YELLOW}
+                colors={"chunk_count": Fore.YELLOW},
             )
-        
+
         start_time = time.time()
-        
+
         # Process chunks in parallel
         with ThreadPoolExecutor(max_workers=4) as executor:
             futures = []
             for i, chunk in enumerate(html_chunks):
                 if self.logger:
                     self.logger.debug(
-                        "LLM markdown: Processing chunk {chunk_num}/{total_chunks}", 
+                        "LLM markdown: Processing chunk {chunk_num}/{total_chunks}",
                         tag="CHUNK",
-                        params={
-                            "chunk_num": i + 1,
-                            "total_chunks": len(html_chunks)
-                        }
+                        params={"chunk_num": i + 1, "total_chunks": len(html_chunks)},
                     )
 
                 prompt_variables = {
                     "HTML": escape_json_string(sanitize_html(chunk)),
-                    "REQUEST": self.instruction or "Convert this HTML into clean, relevant markdown, removing any noise or irrelevant content."
+                    "REQUEST": self.instruction
+                    or "Convert this HTML into clean, relevant markdown, removing any noise or irrelevant content.",
                 }
 
                 prompt = PROMPT_FILTER_CONTENT
@@ -905,95 +929,96 @@ class LLMContentFilter(RelevantContentFilter):
                     prompt = prompt.replace("{" + var + "}", value)
 
                 def _proceed_with_chunk(
-                        provider: str,
-                        prompt: str,
-                        api_token: str,
-                        base_url: Optional[str] = None,
-                        extra_args: Dict = {}
-                    ) -> List[str]:
+                    provider: str,
+                    prompt: str,
+                    api_token: str,
+                    base_url: Optional[str] = None,
+                    extra_args: Dict = {},
+                ) -> List[str]:
                     if self.logger:
                         self.logger.info(
-                            "LLM Markdown: Processing chunk {chunk_num}", 
+                            "LLM Markdown: Processing chunk {chunk_num}",
                             tag="CHUNK",
-                            params={"chunk_num": i + 1}
+                            params={"chunk_num": i + 1},
                         )
                     return perform_completion_with_backoff(
                         provider,
                         prompt,
                         api_token,
                         base_url=base_url,
-                        extra_args=extra_args
+                        extra_args=extra_args,
                     )
 
                 future = executor.submit(
                     _proceed_with_chunk,
-                    self.provider,
+                    self.llmConfig.provider,
                     prompt,
-                    self.api_token,
+                    self.llmConfig.api_token,
                     self.api_base,
-                    self.extra_args
+                    self.extra_args,
                 )
                 futures.append((i, future))
-
 
             # Collect results in order
             ordered_results = []
             for i, future in sorted(futures):
                 try:
                     response = future.result()
-                    
+
                     # Track usage
                     usage = TokenUsage(
                         completion_tokens=response.usage.completion_tokens,
                         prompt_tokens=response.usage.prompt_tokens,
                         total_tokens=response.usage.total_tokens,
-                        completion_tokens_details=response.usage.completion_tokens_details.__dict__ 
-                        if response.usage.completion_tokens_details else {},
-                        prompt_tokens_details=response.usage.prompt_tokens_details.__dict__
-                        if response.usage.prompt_tokens_details else {},
+                        completion_tokens_details=(
+                            response.usage.completion_tokens_details.__dict__
+                            if response.usage.completion_tokens_details
+                            else {}
+                        ),
+                        prompt_tokens_details=(
+                            response.usage.prompt_tokens_details.__dict__
+                            if response.usage.prompt_tokens_details
+                            else {}
+                        ),
                     )
                     self.usages.append(usage)
                     self.total_usage.completion_tokens += usage.completion_tokens
                     self.total_usage.prompt_tokens += usage.prompt_tokens
                     self.total_usage.total_tokens += usage.total_tokens
 
-                    blocks = extract_xml_data(["content"], response.choices[0].message.content)["content"]
+                    blocks = extract_xml_data(
+                        ["content"], response.choices[0].message.content
+                    )["content"]
                     if blocks:
                         ordered_results.append(blocks)
                         if self.logger:
                             self.logger.success(
-                                "LLM markdown: Successfully processed chunk {chunk_num}", 
+                                "LLM markdown: Successfully processed chunk {chunk_num}",
                                 tag="CHUNK",
-                                params={"chunk_num": i + 1}
+                                params={"chunk_num": i + 1},
                             )
                 except Exception as e:
                     if self.logger:
                         self.logger.error(
-                            "LLM markdown: Error processing chunk {chunk_num}: {error}", 
+                            "LLM markdown: Error processing chunk {chunk_num}: {error}",
                             tag="CHUNK",
-                            params={
-                                "chunk_num": i + 1,
-                                "error": str(e)
-                            }
+                            params={"chunk_num": i + 1, "error": str(e)},
                         )
 
         end_time = time.time()
         if self.logger:
             self.logger.success(
-                "LLM markdown: Completed processing in {time:.2f}s", 
+                "LLM markdown: Completed processing in {time:.2f}s",
                 tag="LLM",
                 params={"time": end_time - start_time},
-                colors={"time": Fore.YELLOW}
+                colors={"time": Fore.YELLOW},
             )
 
         result = ordered_results if ordered_results else []
 
         # Cache the final result
-        cache_data = {
-            'blocks': result,
-            'usage': self.total_usage.__dict__
-        }
-        with cache_file.open('w') as f:
+        cache_data = {"blocks": result, "usage": self.total_usage.__dict__}
+        with cache_file.open("w") as f:
             json.dump(cache_data, f)
             if self.logger:
                 self.logger.info("Cached results for future use", tag="CACHE")

@@ -499,6 +499,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
 
     def __init__(
         self,
+        llmConfig: 'LLMConfig' = None,
         provider: str = DEFAULT_PROVIDER,
         api_token: Optional[str] = None,
         instruction: str = None,
@@ -536,22 +537,15 @@ class LLMExtractionStrategy(ExtractionStrategy):
 
         """
         super().__init__( input_format=input_format, **kwargs)
-        self.provider = provider
-        if api_token and not api_token.startswith("env:"):
-            self.api_token = api_token
-        elif api_token and api_token.startswith("env:"):
-            self.api_token = os.getenv(api_token[4:])
+        if llmConfig is None:
+            self.llmConfig = LLMConfig(provider=provider,api_token=api_token)
         else:
-            self.api_token = (
-                PROVIDER_MODELS.get(provider, "no-token")
-                or os.getenv("OPENAI_API_KEY")
-            )
+            self.llmConfig = llmConfig
         self.instruction = instruction
         self.extract_type = extraction_type
         self.schema = schema
         if schema:
             self.extract_type = "schema"
-
         self.chunk_token_threshold = chunk_token_threshold or CHUNK_TOKEN_THRESHOLD
         self.overlap_rate = overlap_rate
         self.word_token_rate = word_token_rate
@@ -603,7 +597,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
             prompt_with_variables = PROMPT_EXTRACT_BLOCKS_WITH_INSTRUCTION
 
         if self.extract_type == "schema" and self.schema:
-            variable_values["SCHEMA"] = json.dumps(self.schema, indent=2)
+            variable_values["SCHEMA"] = json.dumps(self.schema, indent=2) # if type of self.schema is dict else self.schema
             prompt_with_variables = PROMPT_EXTRACT_SCHEMA_WITH_INSTRUCTION
 
         for variable in variable_values:
@@ -612,7 +606,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
             )
 
         response = perform_completion_with_backoff(
-            self.provider,
+            self.llmConfig.provider,
             prompt_with_variables,
             self.api_token,
             base_url=self.api_base or self.base_url,
@@ -695,7 +689,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
             overlap=int(self.chunk_token_threshold * self.overlap_rate),
         )
         extracted_content = []
-        if self.provider.startswith("groq/"):
+        if self.llmConfig.provider.startswith("groq/"):
             # Sequential processing with a delay
             for ix, section in enumerate(merged_sections):
                 extract_func = partial(self.extract, url)
@@ -1042,6 +1036,7 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
         schema_type: str = "CSS", # or XPATH
         query: str = None,
         target_json_example: str = None,
+        llmConfig: 'LLMConfig' = None,
         provider: str = "gpt-4o",
         api_token: str = os.getenv("OPENAI_API_KEY"),
         **kwargs
@@ -1062,6 +1057,8 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
         """
         from .prompts import JSON_SCHEMA_BUILDER
         from .utils import perform_completion_with_backoff
+        if llmConfig is None:
+            llmConfig = LLMConfig(provider=provider, api_token=api_token)
         
         # Use default or custom prompt
         prompt_template = JSON_SCHEMA_BUILDER if schema_type == "CSS" else JSON_SCHEMA_BUILDER_XPATH
@@ -1114,10 +1111,10 @@ In this scenario, use your best judgment to generate the schema. Try to maximize
         try:
             # Call LLM with backoff handling
             response = perform_completion_with_backoff(
-                provider=provider,
+                provider=llmConfig.provider,
                 prompt_with_variables="\n\n".join([system_message["content"], user_message["content"]]),
                 json_response = True,                
-                api_token=api_token,
+                api_token=llmConfig.api_token,
                 **kwargs
             )
             
