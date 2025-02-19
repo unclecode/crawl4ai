@@ -616,3 +616,10 @@ For more details, see our [full mission statement](./MISSION.md).
 ## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=unclecode/crawl4ai&type=Date)](https://star-history.com/#unclecode/crawl4ai&Date)
+
+
+# My steps
+1. uv sync
+2. uv pip install -U crawl4ai
+3. uv venv
+4. source .venv/bin/activate
