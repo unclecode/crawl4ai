@@ -45,11 +45,7 @@ def to_serializable_dict(obj: Any, ignore_default_value : bool = False) -> Dict:
         return obj.isoformat()
 
     # Handle lists, tuples, and sets, and basically any iterable
-<<<<<<< HEAD
-    if isinstance(obj, (list, tuple, set)) or hasattr(obj, "__iter__"):
-=======
     if isinstance(obj, (list, tuple, set)) or hasattr(obj, '__iter__') and not isinstance(obj, dict):
->>>>>>> next
         return [to_serializable_dict(item) for item in obj]
 
     # Handle frozensets, which are not iterable
@@ -63,11 +59,8 @@ def to_serializable_dict(obj: Any, ignore_default_value : bool = False) -> Dict:
             "value": {str(k): to_serializable_dict(v) for k, v in obj.items()},
         }
 
-<<<<<<< HEAD
-=======
     _type = obj.__class__.__name__
 
->>>>>>> next
     # Handle class instances
     if hasattr(obj, "__class__"):
         # Get constructor signature
@@ -86,13 +79,6 @@ def to_serializable_dict(obj: Any, ignore_default_value : bool = False) -> Dict:
             if not (is_empty_value(value) and is_empty_value(param.default)):
                 if value != param.default and not ignore_default_value:
                     current_values[name] = to_serializable_dict(value)
-<<<<<<< HEAD
-
-        _type = obj.__class__.__name__
-
-        return {"type": obj.__class__.__name__, "params": current_values}
-
-=======
         
         if hasattr(obj, '__slots__'):
             for slot in obj.__slots__:
@@ -109,7 +95,6 @@ def to_serializable_dict(obj: Any, ignore_default_value : bool = False) -> Dict:
             "params": current_values
         }
         
->>>>>>> next
     return str(obj)
 
 
@@ -478,10 +463,6 @@ class HTTPCrawlerConfig:
             return config
         return HTTPCrawlerConfig.from_kwargs(config)
 
-<<<<<<< HEAD
-
-class CrawlerRunConfig:
-=======
 class CrawlerRunConfig():
     _UNWANTED_PROPS = {
         'disable_cache' : 'Instead, use cache_mode=CacheMode.DISABLED',
@@ -490,7 +471,6 @@ class CrawlerRunConfig():
         'no_cache_write' : 'Instead, use cache_mode=CacheMode.READ_ONLY',
     }
 
->>>>>>> next
     """
     Configuration class for controlling how the crawler runs each crawl operation.
     This includes parameters for content extraction, page manipulation, waiting conditions,
@@ -1061,7 +1041,6 @@ class CrawlerRunConfig():
         return CrawlerRunConfig.from_kwargs(config_dict)
 
 
-<<<<<<< HEAD
 class LlmConfig:
     def __init__(
         self,
@@ -1138,5 +1117,3 @@ class LlmConfig:
         config_dict = self.to_dict()
         config_dict.update(kwargs)
         return LlmConfig.from_kwargs(config_dict)
-=======
->>>>>>> next
