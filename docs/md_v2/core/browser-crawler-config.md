@@ -177,6 +177,7 @@ class CrawlerRunConfig:
 7. **`screenshot`** & **`pdf`**:  
    - If `True`, captures a screenshot or PDF after the page is fully loaded.  
    - The results go to `result.screenshot` (base64) or `result.pdf` (bytes).
+   - Use `close_after_screenshot=True` to automatically close the page after taking a screenshot.
 
 8. **`verbose`**:  
    - Logs additional runtime details.  
@@ -273,6 +274,7 @@ crawl_conf = CrawlerRunConfig(
     js_code="document.querySelector('button#loadMore')?.click()",
     wait_for="css:.loaded-content",
     screenshot=True,
+    close_after_screenshot=True,
     enable_rate_limiting=True,
     rate_limit_config=RateLimitConfig(
         base_delay=(1.0, 3.0),
