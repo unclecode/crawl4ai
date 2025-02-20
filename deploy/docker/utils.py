@@ -1,3 +1,4 @@
+import dns.resolver
 import logging
 import yaml
 from datetime import datetime
@@ -52,3 +53,14 @@ def should_cleanup_task(created_at: str) -> bool:
 def decode_redis_hash(hash_data: Dict[bytes, bytes]) -> Dict[str, str]:
     """Decode Redis hash data from bytes to strings."""
     return {k.decode('utf-8'): v.decode('utf-8') for k, v in hash_data.items()}
+
+
+
+def verify_email_domain(email: str) -> bool:
+    try:
+        domain = email.split('@')[1]
+        # Try to resolve MX records for the domain.
+        records = dns.resolver.resolve(domain, 'MX')
+        return True if records else False
+    except Exception as e:
+        return False

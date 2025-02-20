@@ -1,3 +1,4 @@
+from re import U
 from pydantic import BaseModel, HttpUrl
 from typing import List, Dict, Optional, Callable, Awaitable, Union, Any
 from enum import Enum
@@ -24,8 +25,8 @@ class CrawlerTaskResult:
     result: "CrawlResult"
     memory_usage: float
     peak_memory: float
-    start_time: datetime
-    end_time: datetime
+    start_time: Union[datetime, float]
+    end_time: Union[datetime, float]
     error_message: str = ""
 
 
@@ -100,8 +101,8 @@ class DispatchResult(BaseModel):
     task_id: str
     memory_usage: float
     peak_memory: float
-    start_time: datetime
-    end_time: datetime
+    start_time: Union[datetime, float]
+    end_time: Union[datetime, float]
     error_message: str = ""
 
 

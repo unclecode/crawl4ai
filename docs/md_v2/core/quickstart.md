@@ -135,14 +135,14 @@ html = "<div class='product'><h2>Gaming Laptop</h2><span class='price'>$999.99</
 # Using OpenAI (requires API token)
 schema = JsonCssExtractionStrategy.generate_schema(
     html,
-    llm_provider="openai/gpt-4o",  # Default provider
+    provider="openai/gpt-4o",  # Default provider
     api_token="your-openai-token"  # Required for OpenAI
 )
 
 # Or using Ollama (open source, no token needed)
 schema = JsonCssExtractionStrategy.generate_schema(
     html,
-    llm_provider="ollama/llama3.3",  # Open source alternative
+    provider="ollama/llama3.3",  # Open source alternative
     api_token=None  # Not needed for Ollama
 )
 

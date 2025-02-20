@@ -6,8 +6,8 @@ from typing import AsyncGenerator, Optional, Set, Dict, List, Tuple
 from urllib.parse import urlparse
 
 from ..models import TraversalStats
-from .filters import FastFilterChain
-from .scorers import FastURLScorer
+from .filters import FilterChain
+from .scorers import URLScorer
 from . import DeepCrawlStrategy
 
 from ..types import AsyncWebCrawler, CrawlerRunConfig, CrawlResult, RunManyReturn
@@ -34,8 +34,8 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
     def __init__(
         self,
         max_depth: int,
-        filter_chain: FastFilterChain = FastFilterChain(),
-        url_scorer: Optional[FastURLScorer] = None,
+        filter_chain: FilterChain = FilterChain(),
+        url_scorer: Optional[URLScorer] = None,
         include_external: bool = False,
         logger: Optional[logging.Logger] = None,
     ):
@@ -64,7 +64,7 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
             self.logger.warning(f"Invalid URL: {url}, error: {e}")
             return False
 
-        if depth != 0 and not self.filter_chain.apply(url):
+        if depth != 0 and not await self.filter_chain.apply(url):
             return False
 
         return True

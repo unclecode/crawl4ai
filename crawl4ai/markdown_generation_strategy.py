@@ -179,7 +179,7 @@ class DefaultMarkdownGenerator(MarkdownGenerationStrategy):
                 "ignore_emphasis": False,
                 "ignore_links": False,
                 "ignore_images": False,
-                "protect_links": True,
+                "protect_links": False,
                 "single_line_break": True,
                 "mark_code": True,
                 "escape_snob": False,
