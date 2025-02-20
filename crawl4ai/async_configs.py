@@ -442,6 +442,7 @@ class CrawlerRunConfig:
         screenshot: bool = False,
         screenshot_wait_for: float = None,
         screenshot_height_threshold: int = SCREENSHOT_HEIGHT_TRESHOLD,
+        close_after_screenshot: bool = False,
         pdf: bool = False,
         image_description_min_word_threshold: int = IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
         image_score_threshold: int = IMAGE_SCORE_THRESHOLD,
@@ -520,6 +521,7 @@ class CrawlerRunConfig:
         self.screenshot = screenshot
         self.screenshot_wait_for = screenshot_wait_for
         self.screenshot_height_threshold = screenshot_height_threshold
+        self.close_after_screenshot = close_after_screenshot
         self.pdf = pdf
         self.image_description_min_word_threshold = image_description_min_word_threshold
         self.image_score_threshold = image_score_threshold
@@ -622,6 +624,7 @@ class CrawlerRunConfig:
             screenshot_height_threshold=kwargs.get(
                 "screenshot_height_threshold", SCREENSHOT_HEIGHT_TRESHOLD
             ),
+            close_after_screenshot=kwargs.get("close_after_screenshot", False),
             pdf=kwargs.get("pdf", False),
             image_description_min_word_threshold=kwargs.get(
                 "image_description_min_word_threshold",
@@ -698,6 +701,7 @@ class CrawlerRunConfig:
             "screenshot": self.screenshot,
             "screenshot_wait_for": self.screenshot_wait_for,
             "screenshot_height_threshold": self.screenshot_height_threshold,
+            "close_after_screenshot": self.close_after_screenshot,
             "pdf": self.pdf,
             "image_description_min_word_threshold": self.image_description_min_word_threshold,
             "image_score_threshold": self.image_score_threshold,
