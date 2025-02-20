@@ -1,5 +1,7 @@
 import os, sys
 
+from crawl4ai.async_configs import LlmConfig
+
 # append parent directory to system path
 sys.path.append(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -145,8 +147,7 @@ async def extract_structured_data_using_llm(
             url="https://openai.com/api/pricing/",
             word_count_threshold=1,
             extraction_strategy=LLMExtractionStrategy(
-                provider=provider,
-                api_token=api_token,
+                llmConfig=LlmConfig(provider=provider,api_token=api_token),
                 schema=OpenAIModelFee.model_json_schema(),
                 extraction_type="schema",
                 instruction="""From the crawled content, extract all mentioned model names along with their fees for input and output tokens. 
@@ -569,8 +570,7 @@ async def generate_knowledge_graph():
         relationships: List[Relationship]
 
     extraction_strategy = LLMExtractionStrategy(
-        provider="openai/gpt-4o-mini",  # Or any other provider, including Ollama and open source models
-        api_token=os.getenv("OPENAI_API_KEY"),  # In case of Ollama just pass "no-token"
+        llmConfig=LlmConfig(provider="openai/gpt-4o-mini",  api_token=os.getenv("OPENAI_API_KEY")),  # In case of Ollama just pass "no-token"
         schema=KnowledgeGraph.model_json_schema(),
         extraction_type="schema",
         instruction="""Extract entities and relationships from the given text.""",

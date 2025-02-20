@@ -509,6 +509,8 @@ class LLMExtractionStrategy(ExtractionStrategy):
         instruction: str = None,
         provider: str = DEFAULT_PROVIDER,
         api_token: Optional[str] = None,
+        base_url: str = None,
+        api_base: str = None,
         schema: Dict = None,
         extraction_type="block",
         chunk_token_threshold=CHUNK_TOKEN_THRESHOLD,
@@ -523,6 +525,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
         Initialize the strategy with clustering parameters.
 
         Args:
+            llmConfig: The LLM configuration object.
             provider: The provider to use for extraction. It follows the format <provider_name>/<model_name>, e.g., "ollama/llama3.3".
             api_token: The API token for the provider.
             instruction: The instruction to use for the LLM model.
@@ -542,6 +545,10 @@ class LLMExtractionStrategy(ExtractionStrategy):
         """
         super().__init__( input_format=input_format, **kwargs)
         self.llmConfig = llmConfig
+        self.provider = provider
+        self.api_token = api_token
+        self.base_url = base_url
+        self.api_base = api_base
         self.instruction = instruction
         self.extract_type = extraction_type
         self.schema = schema

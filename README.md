@@ -407,7 +407,7 @@ if __name__ == "__main__":
 ```python
 import os
 import asyncio
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, LlmConfig
 from crawl4ai.extraction_strategy import LLMExtractionStrategy
 from pydantic import BaseModel, Field
 
@@ -423,7 +423,7 @@ async def main():
         extraction_strategy=LLMExtractionStrategy(
             # Here you can use any provider that Litellm library supports, for instance: ollama/qwen2
             # provider="ollama/qwen2", api_token="no-token", 
-            provider="openai/gpt-4o", api_token=os.getenv('OPENAI_API_KEY'), 
+            llmConfig = LlmConfig(provider="openai/gpt-4o", api_token=os.getenv('OPENAI_API_KEY')), 
             schema=OpenAIModelFee.schema(),
             extraction_type="schema",
             instruction="""From the crawled content, extract all mentioned model names along with their fees for input and output tokens. 

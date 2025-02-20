@@ -2,6 +2,8 @@ import inspect
 from typing import Any, Dict
 from enum import Enum
 
+from crawl4ai.async_configs import LlmConfig
+
 def to_serializable_dict(obj: Any) -> Dict:
     """
     Recursively convert an object to a serializable dictionary using {type, params} structure
@@ -222,7 +224,7 @@ if __name__ == "__main__":
     config3 = CrawlerRunConfig(
         markdown_generator=DefaultMarkdownGenerator(
             content_filter=LLMContentFilter(
-                provider="openai/gpt-4",
+                llmConfig = LlmConfig(provider="openai/gpt-4"),
                 instruction="Extract key technical concepts",
                 chunk_token_threshold=2000,
                 overlap_rate=0.1
