@@ -1597,7 +1597,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 if config.screenshot_wait_for:
                     await asyncio.sleep(config.screenshot_wait_for)
                 screenshot_data = await self.take_screenshot(
-                    page, screenshot_height_threshold=config.screenshot_height_threshold
+                    page,
+                    screenshot_height_threshold=config.screenshot_height_threshold,
+                    close_after_screenshot=config.close_after_screenshot
                 )
 
             if screenshot_data or pdf_data:
@@ -1809,7 +1811,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
         if not need_scroll:
             # Page is short enough, just take a screenshot
-            return await self.take_screenshot_naive(page)
+            return await self.take_screenshot_naive(page, **kwargs)
         else:
             # Page is too long, try to take a full-page screenshot
             return await self.take_screenshot_scroller(page, **kwargs)
@@ -1926,14 +1928,16 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             img.save(buffered, format="JPEG")
             return base64.b64encode(buffered.getvalue()).decode("utf-8")
         finally:
-            await page.close()
+            if kwargs.get("close_after_screenshot", False):
+                await page.close()
 
-    async def take_screenshot_naive(self, page: Page) -> str:
+    async def take_screenshot_naive(self, page: Page, **kwargs) -> str:
         """
         Takes a screenshot of the current page.
 
         Args:
             page (Page): The Playwright page instance
+            kwargs: Additional keyword arguments
 
         Returns:
             str: Base64-encoded screenshot image
@@ -1960,7 +1964,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             img.save(buffered, format="JPEG")
             return base64.b64encode(buffered.getvalue()).decode("utf-8")
         finally:
-            await page.close()
+            if kwargs.get("close_after_screenshot", False):
+                await page.close()
 
     async def export_storage_state(self, path: str = None) -> dict:
         """
