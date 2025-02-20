@@ -1,3 +1,4 @@
+import inspect
 import re
 import time
 from bs4 import BeautifulSoup, Tag
@@ -770,12 +771,18 @@ class PruningContentFilter(RelevantContentFilter):
 
 class LLMContentFilter(RelevantContentFilter):
     """Content filtering using LLMs to generate relevant markdown."""
+    _UNWANTED_PROPS = {
+        'provider' : 'Instead, use llmConfig=LlmConfig(provider="...")',
+        'api_token' : 'Instead, use llmConfig=LlMConfig(api_token="...")',
+        'base_url' : 'Instead, use llmConfig=LlmConfig(base_url="...")',
+        'api_base' : 'Instead, use llmConfig=LlmConfig(base_url="...")',
+    }
 
     def __init__(
         self,
-        llmConfig: "LlmConfig" = None,
         provider: str = DEFAULT_PROVIDER,
         api_token: Optional[str] = None,
+        llmConfig: "LlmConfig" = None,
         instruction: str = None,
         chunk_token_threshold: int = int(1e9),
         overlap_rate: float = OVERLAP_RATE,
@@ -787,21 +794,13 @@ class LLMContentFilter(RelevantContentFilter):
         # chunk_mode: str = "char",
         verbose: bool = False,
         logger: Optional[AsyncLogger] = None,
-        ignore_cache: bool = False,
+        ignore_cache: bool = True,
     ):
         super().__init__(None)
-        if llmConfig is None:
-            self.llmConfig(
-                provider=provider,
-                api_token=(
-                    api_token
-                    or PROVIDER_MODELS.get(provider, "no-token")
-                    or os.getenv("OPENAI_API_KEY")
-                ),
-                **locals(),
-            )
-        else:
-            self.llmConfig = llmConfig
+        self.provider = provider
+        self.api_token = api_token
+        self.base_url = base_url or api_base
+        self.llmConfig = llmConfig
         self.instruction = instruction
         self.chunk_token_threshold = chunk_token_threshold
         self.overlap_rate = overlap_rate
@@ -810,8 +809,6 @@ class LLMContentFilter(RelevantContentFilter):
         # self.char_token_rate = char_token_rate or word_token_rate / 5
         # self.token_rate = word_token_rate if chunk_mode == "word" else self.char_token_rate
         self.token_rate = word_token_rate or WORD_TOKEN_RATE
-        self.base_url = base_url
-        self.api_base = api_base or base_url
         self.extra_args = extra_args or {}
         self.ignore_cache = ignore_cache
         self.verbose = verbose
@@ -839,7 +836,18 @@ class LLMContentFilter(RelevantContentFilter):
 
         self.usages = []
         self.total_usage = TokenUsage()
+    
+    def __setattr__(self, name, value):
+        """Handle attribute setting."""
+        # TODO: Planning to set properties dynamically based on the __init__ signature
+        sig = inspect.signature(self.__init__)
+        all_params = sig.parameters  # Dictionary of parameter names and their details
 
+        if name in self._UNWANTED_PROPS and value is not all_params[name].default:
+            raise AttributeError(f"Setting '{name}' is deprecated. {self._UNWANTED_PROPS[name]}")
+        
+        super().__setattr__(name, value)  
+        
     def _get_cache_key(self, html: str, instruction: str) -> str:
         """Generate a unique cache key based on HTML and instruction"""
         content = f"{html}{instruction}"
@@ -954,7 +962,7 @@ class LLMContentFilter(RelevantContentFilter):
                     self.llmConfig.provider,
                     prompt,
                     self.llmConfig.api_token,
-                    self.api_base,
+                    self.llmConfig.base_url,
                     self.extra_args,
                 )
                 futures.append((i, future))

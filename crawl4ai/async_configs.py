@@ -1,3 +1,4 @@
+import os
 from .config import (
     DEFAULT_PROVIDER,
     MIN_WORD_THRESHOLD,
@@ -1047,9 +1048,6 @@ class LlmConfig:
         provider: str = DEFAULT_PROVIDER,
         api_token: Optional[str] = None,
         base_url: Optional[str] = None,
-        api_base: Optional[str] = None,
-        verbose: bool = False,
-        logger: Optional[AsyncLogger] = None,
     ):
         """Configuaration class for LLM provider and API token."""
         self.provider = provider
@@ -1062,28 +1060,7 @@ class LlmConfig:
                 "OPENAI_API_KEY"
             )
         self.base_url = base_url
-        self.api_base = api_base or base_url
-        self.verbose = verbose
-        # Setup logger with custom styling for LLM operations
-        if logger:
-            self.logger = logger
-        elif verbose:
-            self.logger = AsyncLogger(
-                verbose=verbose,
-                icons={
-                    **AsyncLogger.DEFAULT_ICONS,
-                    "LLM": "★",  # Star for LLM operations
-                    "CHUNK": "◈",  # Diamond for chunks
-                    "CACHE": "⚡",  # Lightning for cache operations
-                },
-                colors={
-                    **AsyncLogger.DEFAULT_COLORS,
-                    LogLevel.INFO: Fore.MAGENTA
-                    + Style.DIM,  # Dimmed purple for LLM ops
-                },
-            )
-        else:
-            self.logger = None
+
 
     @staticmethod
     def from_kwargs(kwargs: dict) -> "LlmConfig":
@@ -1091,18 +1068,13 @@ class LlmConfig:
             provider=kwargs.get("provider", DEFAULT_PROVIDER),
             api_token=kwargs.get("api_token"),
             base_url=kwargs.get("base_url"),
-            api_base=kwargs.get("api_base"),
-            logger=kwargs.get("logger"),
-            verbose=kwargs.get("verbose", False),
         )
 
     def to_dict(self):
         return {
             "provider": self.provider,
             "api_token": self.api_token,
-            "base_url": self.base_url,
-            "api_base": self.api_base,
-            "verbose": self.verbose,
+            "base_url": self.base_url
         }
 
     def clone(self, **kwargs):
