@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import inspect
 from typing import Any, List, Dict, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
@@ -496,21 +497,24 @@ class LLMExtractionStrategy(ExtractionStrategy):
         usages: List of individual token usages.
         total_usage: Accumulated token usage.
     """
-
+    _UNWANTED_PROPS = {
+            'provider' : 'Instead, use llmConfig=LlmConfig(provider="...")',
+            'api_token' : 'Instead, use llmConfig=LlMConfig(api_token="...")',
+            'base_url' : 'Instead, use llmConfig=LlmConfig(base_url="...")',
+            'api_base' : 'Instead, use llmConfig=LlmConfig(base_url="...")',
+        }
     def __init__(
         self,
         llmConfig: 'LLMConfig' = None,
+        instruction: str = None,
         provider: str = DEFAULT_PROVIDER,
         api_token: Optional[str] = None,
-        instruction: str = None,
         schema: Dict = None,
         extraction_type="block",
         chunk_token_threshold=CHUNK_TOKEN_THRESHOLD,
         overlap_rate=OVERLAP_RATE,
         word_token_rate=WORD_TOKEN_RATE,
         apply_chunking=True,
-        api_base: str =None,
-        base_url: str =None,
         input_format: str = "markdown",
         verbose=False,
         **kwargs,
@@ -537,10 +541,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
 
         """
         super().__init__( input_format=input_format, **kwargs)
-        if llmConfig is None:
-            self.llmConfig = LLMConfig(provider=provider,api_token=api_token)
-        else:
-            self.llmConfig = llmConfig
+        self.llmConfig = llmConfig
         self.instruction = instruction
         self.extract_type = extraction_type
         self.schema = schema
@@ -550,21 +551,25 @@ class LLMExtractionStrategy(ExtractionStrategy):
         self.overlap_rate = overlap_rate
         self.word_token_rate = word_token_rate
         self.apply_chunking = apply_chunking
-        self.base_url = base_url
-        self.api_base = api_base or base_url
         self.extra_args = kwargs.get("extra_args", {})
         if not self.apply_chunking:
             self.chunk_token_threshold = 1e9
-
         self.verbose = verbose
         self.usages = []  # Store individual usages
         self.total_usage = TokenUsage()  # Accumulated usage
 
-        if not self.api_token:
-            raise ValueError(
-                "API token must be provided for LLMExtractionStrategy. Update the config.py or set OPENAI_API_KEY environment variable."
-            )
+    
+    def __setattr__(self, name, value):
+        """Handle attribute setting."""
+        # TODO: Planning to set properties dynamically based on the __init__ signature
+        sig = inspect.signature(self.__init__)
+        all_params = sig.parameters  # Dictionary of parameter names and their details
 
+        if name in self._UNWANTED_PROPS and value is not all_params[name].default:
+            raise AttributeError(f"Setting '{name}' is deprecated. {self._UNWANTED_PROPS[name]}")
+        
+        super().__setattr__(name, value)  
+        
     def extract(self, url: str, ix: int, html: str) -> List[Dict[str, Any]]:
         """
         Extract meaningful blocks or chunks from the given HTML using an LLM.
@@ -608,8 +613,8 @@ class LLMExtractionStrategy(ExtractionStrategy):
         response = perform_completion_with_backoff(
             self.llmConfig.provider,
             prompt_with_variables,
-            self.api_token,
-            base_url=self.api_base or self.base_url,
+            self.llmConfig.api_token,
+            base_url=self.llmConfig.base_url,
             extra_args=self.extra_args,
         )  # , json_response=self.extract_type == "schema")
         # Track usage
@@ -1030,6 +1035,11 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
         """Get attribute value from element"""
         pass
 
+    _GENERATE_SCHEMA_UNWANTED_PROPS = {
+        'provider': 'Instead, use llmConfig=LlmConfig(provider="...")',
+        'api_token': 'Instead, use llmConfig=LlMConfig(api_token="...")',
+    }
+
     @staticmethod
     def generate_schema(
         html: str,
@@ -1037,8 +1047,8 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
         query: str = None,
         target_json_example: str = None,
         llmConfig: 'LLMConfig' = None,
-        provider: str = "gpt-4o",
-        api_token: str = os.getenv("OPENAI_API_KEY"),
+        provider: str = None,
+        api_token: str = None,
         **kwargs
     ) -> dict:
         """
@@ -1047,8 +1057,9 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
         Args:
             html (str): The HTML content to analyze
             query (str, optional): Natural language description of what data to extract
-            provider (str): LLM provider to use 
-            api_token (str): API token for LLM provider
+            provider (str): Legacy Parameter. LLM provider to use 
+            api_token (str): Legacy Parameter. API token for LLM provider
+            llmConfig (LlmConfig): LLM configuration object
             prompt (str, optional): Custom prompt template to use
             **kwargs: Additional args passed to perform_completion_with_backoff
             
@@ -1057,8 +1068,9 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
         """
         from .prompts import JSON_SCHEMA_BUILDER
         from .utils import perform_completion_with_backoff
-        if llmConfig is None:
-            llmConfig = LLMConfig(provider=provider, api_token=api_token)
+        for name, message in JsonElementExtractionStrategy._GENERATE_SCHEMA_UNWANTED_PROPS.items():
+            if locals()[name] is not None:
+                raise AttributeError(f"Setting '{name}' is deprecated. {message}")
         
         # Use default or custom prompt
         prompt_template = JSON_SCHEMA_BUILDER if schema_type == "CSS" else JSON_SCHEMA_BUILDER_XPATH
