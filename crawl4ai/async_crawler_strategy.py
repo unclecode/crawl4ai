@@ -1304,7 +1304,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     self.logger.error(
                         message=f"Console error: {msg}",  # Use f-string for variable interpolation
                         tag="CONSOLE",
-                        params={"msg": msg.text},
+                        params={"msg": msg},
                     )
                 elif console_log_type == "debug":
                     self.logger.debug(
