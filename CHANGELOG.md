@@ -5,10 +5,109 @@ All notable changes to Crawl4AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
----
+
+## Version 0.5.0 (2025-02-21)
+
+### Added
+
+- *(crawler)* [**breaking**] Add memory-adaptive dispatcher with rate limiting
+- *(scraping)* [**breaking**] Add LXML-based scraping mode for improved performance
+- *(content-filter)* Add LLMContentFilter for intelligent markdown generation
+- *(dispatcher)* [**breaking**] Add streaming support for URL processing
+- *(browser)* [**breaking**] Improve browser context management and add shared data support
+- *(config)* [**breaking**] Add streaming support and config cloning
+- *(crawler)* Add URL redirection tracking
+- *(extraction)* Add LLM-powered schema generation utility
+- *(proxy)* Add proxy configuration support to CrawlerRunConfig
+- *(robots)* Add robots.txt compliance support
+- *(release)* [**breaking**] Prepare v0.4.3 beta release
+- *(proxy)* Add proxy rotation support and documentation
+- *(browser)* Add CDP URL configuration support
+- *(demo)* Uncomment feature demos and add fake-useragent dependency
+- *(pdf)* Add PDF processing capabilities
+- *(crawler)* [**breaking**] Enhance JavaScript execution and PDF processing
+- *(docker)* Add Docker deployment configuration and API server
+- *(docker)* Add Docker service integration and config serialization
+- *(docker)* [**breaking**] Enhance Docker deployment setup and configuration
+- *(api)* Improve cache handling and add API tests
+- *(crawler)* [**breaking**] Add deep crawling capabilities with BFS strategy
+- *(proxy)* [**breaking**] Add proxy rotation strategy
+- *(deep-crawling)* Add DFS strategy and update exports; refactor CLI entry point
+- *(cli)* Add command line interface with comprehensive features
+- *(config)* Enhance serialization and add deep crawling exports
+- *(crawler)* Add HTTP crawler strategy for lightweight web scraping
+- *(docker)* [**breaking**] Implement supervisor and secure API endpoints
+- *(docker)* [**breaking**] Add JWT authentication and improve server architecture
 
 ### Changed
-Okay, here's a detailed changelog in Markdown format, generated from the provided git diff and commit history. I've focused on user-facing changes, fixes, and features, and grouped them as requested:
+
+- *(browser)* Update browser channel default to 'chromium' in BrowserConfig.from_args method
+- *(crawler)* Optimize response handling and default settings
+- *(crawler)* - Update hello_world example with proper content filtering
+- - Update hello_world.py example
+- *(docs)* [**breaking**] Reorganize documentation structure and update styles
+- *(dispatcher)* [**breaking**] Migrate to modular dispatcher system with enhanced monitoring
+- *(scraping)* [**breaking**] Replace ScrapingMode enum with strategy pattern
+- *(browser)* Improve browser path management
+- *(models)* Rename final_url to redirected_url for consistency
+- *(core)* [**breaking**] Improve type hints and remove unused file
+- *(docs)* Improve code formatting in features demo
+- *(user-agent)* Improve user agent generation system
+- *(core)* [**breaking**] Reorganize project structure and remove legacy code
+- *(docker)* Clean up import statements in server.py
+- *(docker)* Remove unused models and utilities for cleaner codebase
+- *(docker)* [**breaking**] Improve server architecture and configuration
+- *(deep-crawl)* [**breaking**] Reorganize deep crawling functionality into dedicated module
+- *(deep-crawling)* [**breaking**] Reorganize deep crawling strategies and add new implementations
+- *(crawling)* [**breaking**] Improve type hints and code cleanup
+- *(crawler)* [**breaking**] Improve HTML handling and cleanup codebase
+- *(crawler)* [**breaking**] Remove content filter functionality
+- *(examples)* Update API usage in features demo
+- *(config)* [**breaking**] Enhance serialization and config handling
+
+### Docs
+
+- Add Code of Conduct for the project (#410)
+
+### Documentation
+
+- *(extraction)* Add clarifying comments for CSS selector behavior
+- *(readme)* Update personal story and project vision
+- *(urls)* [**breaking**] Update documentation URLs to new domain
+- *(api)* Add streaming mode documentation and examples
+- *(readme)* Update version and feature announcements for v0.4.3b1
+- *(examples)* Update demo scripts and fix output formats
+- *(examples)* Update v0.4.3 features demo to v0.4.3b2
+- *(readme)* Update version references and fix links
+- *(multi-url)* [**breaking**] Improve documentation clarity and update examples
+- *(examples)* Update proxy rotation demo and disable other demos
+- *(api)* Improve formatting and readability of API documentation
+- *(examples)* Add SERP API project example
+- *(urls)* Update documentation URLs to new domain
+- *(readme)* Resolve merge conflict and update version info
+
+### Fixed
+
+- *(browser)* Update default browser channel to chromium and simplify channel selection logic
+- *(browser)* [**breaking**] Default to Chromium channel for new headless mode (#387)
+- *(browser)* Resolve merge conflicts in browser channel configuration
+- Prevent memory leaks by ensuring proper closure of Playwright pages
+- Not working long page screenshot (#403)
+- *(extraction)* JsonCss selector and crawler improvements
+- *(models)* [**breaking**] Make model fields optional with default values
+- *(dispatcher)* Adjust memory threshold and fix dispatcher initialization
+- *(install)* Ensure proper exit after running doctor command
+
+### Miscellaneous Tasks
+
+- *(cleanup)* Remove unused files and improve type hints
+- Add .gitattributes file
+
+## License Update
+
+Crawl4AI v0.5.0 updates the license to Apache 2.0 *with a required attribution clause*.  This means you are free to use, modify, and distribute Crawl4AI (even commercially), but you *must* clearly attribute the project in any public use or distribution.  See the updated `LICENSE` file for the full legal text and specific requirements.
+
+---
 
 ## Version 0.4.3b2 (2025-01-21)
 
@@ -285,12 +384,6 @@ This release introduces several powerful new features, including robots.txt comp
 ### **Bug Fixes**
 - Fixed potential viewport mismatches by ensuring consistent use of `self.viewport_width` and `self.viewport_height` throughout the code.
 - Improved robustness of dynamic content loading to avoid timeouts and failed evaluations.
-
-
-
-
-
-
 
 ## [0.3.75] December 1, 2024
 

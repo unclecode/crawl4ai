@@ -574,9 +574,83 @@ To check our development plans and upcoming features, visit our [Roadmap](https:
 
 We welcome contributions from the open-source community. Check out our [contribution guidelines](https://github.com/unclecode/crawl4ai/blob/main/CONTRIBUTORS.md) for more information.
 
-## 📄 License 
+I'll help modify the license section with badges. For the halftone effect, here's a version with it:
 
-Crawl4AI is released under the [Apache 2.0 License](https://github.com/unclecode/crawl4ai/blob/main/LICENSE).
+Here's the updated license section:
+
+## 📄 License & Attribution
+
+This project is licensed under the Apache License 2.0 with a required attribution clause. See the [Apache 2.0 License](https://github.com/unclecode/crawl4ai/blob/main/LICENSE) file for details.
+
+### Attribution Requirements
+When using Crawl4AI, you must include one of the following attribution methods:
+
+#### 1. Badge Attribution (Recommended)
+Add one of these badges to your README, documentation, or website:
+
+| Theme | Badge |
+|-------|-------|
+| **Disco Theme (Animated)** | <a href="https://github.com/unclecode/crawl4ai"><img src="./docs/assets/powered-by-disco.svg" alt="Powered by Crawl4AI" width="200"/></a> |
+| **Night Theme (Dark with Neon)** | <a href="https://github.com/unclecode/crawl4ai"><img src="./docs/assets/powered-by-night.svg" alt="Powered by Crawl4AI" width="200"/></a> |
+| **Dark Theme (Classic)** | <a href="https://github.com/unclecode/crawl4ai"><img src="./docs/assets/powered-by-dark.svg" alt="Powered by Crawl4AI" width="200"/></a> |
+| **Light Theme (Classic)** | <a href="https://github.com/unclecode/crawl4ai"><img src="./docs/assets/powered-by-light.svg" alt="Powered by Crawl4AI" width="200"/></a> |
+ 
+
+HTML code for adding the badges:
+```html
+<!-- Disco Theme (Animated) -->
+<a href="https://github.com/unclecode/crawl4ai">
+  <img src="https://raw.githubusercontent.com/unclecode/crawl4ai/main/docs/assets/powered-by-disco.svg" alt="Powered by Crawl4AI" width="200"/>
+</a>
+
+<!-- Night Theme (Dark with Neon) -->
+<a href="https://github.com/unclecode/crawl4ai">
+  <img src="https://raw.githubusercontent.com/unclecode/crawl4ai/main/docs/assets/powered-by-night.svg" alt="Powered by Crawl4AI" width="200"/>
+</a>
+
+<!-- Dark Theme (Classic) -->
+<a href="https://github.com/unclecode/crawl4ai">
+  <img src="https://raw.githubusercontent.com/unclecode/crawl4ai/main/docs/assets/powered-by-dark.svg" alt="Powered by Crawl4AI" width="200"/>
+</a>
+
+<!-- Light Theme (Classic) -->
+<a href="https://github.com/unclecode/crawl4ai">
+  <img src="https://raw.githubusercontent.com/unclecode/crawl4ai/main/docs/assets/powered-by-light.svg" alt="Powered by Crawl4AI" width="200"/>
+</a>
+
+<!-- Simple Shield Badge -->
+<a href="https://github.com/unclecode/crawl4ai">
+  <img src="https://img.shields.io/badge/Powered%20by-Crawl4AI-blue?style=flat-square" alt="Powered by Crawl4AI"/>
+</a>
+```
+
+#### 2. Text Attribution
+Add this line to your documentation:
+```
+This project uses Crawl4AI (https://github.com/unclecode/crawl4ai) for web data extraction.
+```
+
+## 📚 Citation
+
+If you use Crawl4AI in your research or project, please cite:
+
+```bibtex
+@software{crawl4ai2024,
+  author = {UncleCode},
+  title = {Crawl4AI: Open-source LLM Friendly Web Crawler & Scraper},
+  year = {2024},
+  publisher = {GitHub},
+  journal = {GitHub Repository},
+  howpublished = {\url{https://github.com/unclecode/crawl4ai}},
+  commit = {Please use the commit hash you're working with}
+}
+```
+
+Text citation format:
+```
+UncleCode. (2024). Crawl4AI: Open-source LLM Friendly Web Crawler & Scraper [Computer software]. 
+GitHub. https://github.com/unclecode/crawl4ai
+```
 
 ## 📧 Contact 
 
