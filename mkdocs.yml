@@ -18,7 +18,7 @@ nav:
     - "Command Line Interface": "core/cli.md"
     - "Simple Crawling": "core/simple-crawling.md"
     - "Crawler Result": "core/crawler-result.md"
-    - "Browser & Crawler Config": "core/browser-crawler-config.md"
+    - "Browser, Crawler & LLM Config": "core/browser-crawler-config.md"
     - "Markdown Generation": "core/markdown-generation.md"
     - "Fit Markdown": "core/fit-markdown.md"
     - "Page Interaction": "core/page-interaction.md"
@@ -46,7 +46,7 @@ nav:
     - "AsyncWebCrawler": "api/async-webcrawler.md"
     - "arun()": "api/arun.md"
     - "arun_many()": "api/arun_many.md"
-    - "Browser & Crawler Config": "api/parameters.md"
+    - "Browser, Crawler & LLM Config": "api/parameters.md"
     - "CrawlResult": "api/crawl-result.md"
     - "Strategies": "api/strategies.md"
 

@@ -1,6 +1,7 @@
 import os
 import asyncio
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
+from crawl4ai.async_configs import LlmConfig
 from crawl4ai.content_filter_strategy import LLMContentFilter
 
 async def test_llm_filter():
@@ -22,8 +23,7 @@ async def test_llm_filter():
 
         # Initialize LLM filter with focused instruction
         filter = LLMContentFilter(
-            provider="openai/gpt-4o",
-            api_token=os.getenv('OPENAI_API_KEY'),
+            llmConfig=LlmConfig(provider="openai/gpt-4o", api_token=os.getenv('OPENAI_API_KEY')),
             instruction="""
             Focus on extracting the core educational content about Python classes.
             Include:
@@ -43,8 +43,7 @@ async def test_llm_filter():
         )
         
         filter = LLMContentFilter(
-            provider="openai/gpt-4o",
-            api_token=os.getenv('OPENAI_API_KEY'),
+            llmConfig=LlmConfig(provider="openai/gpt-4o",api_token=os.getenv('OPENAI_API_KEY')),
             chunk_token_threshold=2 ** 12 * 2, # 2048 * 2
             ignore_cache = True,
             instruction="""

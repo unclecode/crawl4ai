@@ -1,13 +1,16 @@
+import os
 from .config import (
+    DEFAULT_PROVIDER,
     MIN_WORD_THRESHOLD,
     IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
+    PROVIDER_MODELS,
     SCREENSHOT_HEIGHT_TRESHOLD,
     PAGE_TIMEOUT,
     IMAGE_SCORE_THRESHOLD,
     SOCIAL_MEDIA_DOMAINS,
 )
 
-from .user_agent_generator import UAGen, ValidUAGenerator # , OnlineUAGenerator
+from .user_agent_generator import UAGen, ValidUAGenerator  # , OnlineUAGenerator
 from .extraction_strategy import ExtractionStrategy
 from .chunking_strategy import ChunkingStrategy, RegexChunking
 from .markdown_generation_strategy import MarkdownGenerationStrategy
@@ -19,7 +22,8 @@ from .proxy_strategy import ProxyRotationStrategy
 
 import inspect
 from typing import Any, Dict, Optional
-from enum import Enum 
+from enum import Enum
+
 
 def to_serializable_dict(obj: Any, ignore_default_value : bool = False) -> Dict:
     """
@@ -28,26 +32,23 @@ def to_serializable_dict(obj: Any, ignore_default_value : bool = False) -> Dict:
     """
     if obj is None:
         return None
-        
+
     # Handle basic types
     if isinstance(obj, (str, int, float, bool)):
         return obj
-        
+
     # Handle Enum
     if isinstance(obj, Enum):
-        return {
-            "type": obj.__class__.__name__,
-            "params": obj.value
-        }
-        
+        return {"type": obj.__class__.__name__, "params": obj.value}
+
     # Handle datetime objects
-    if hasattr(obj, 'isoformat'):
+    if hasattr(obj, "isoformat"):
         return obj.isoformat()
-        
+
     # Handle lists, tuples, and sets, and basically any iterable
     if isinstance(obj, (list, tuple, set)) or hasattr(obj, '__iter__') and not isinstance(obj, dict):
         return [to_serializable_dict(item) for item in obj]
-    
+
     # Handle frozensets, which are not iterable
     if isinstance(obj, frozenset):
         return [to_serializable_dict(item) for item in list(obj)]
@@ -56,25 +57,25 @@ def to_serializable_dict(obj: Any, ignore_default_value : bool = False) -> Dict:
     if isinstance(obj, dict):
         return {
             "type": "dict",  # Mark as plain dictionary
-            "value": {str(k): to_serializable_dict(v) for k, v in obj.items()}
+            "value": {str(k): to_serializable_dict(v) for k, v in obj.items()},
         }
 
     _type = obj.__class__.__name__
 
     # Handle class instances
-    if hasattr(obj, '__class__'):
+    if hasattr(obj, "__class__"):
         # Get constructor signature
         sig = inspect.signature(obj.__class__.__init__)
         params = sig.parameters
-        
+
         # Get current values
         current_values = {}
         for name, param in params.items():
-            if name == 'self':
+            if name == "self":
                 continue
-                
+
             value = getattr(obj, name, param.default)
-            
+
             # Only include if different from default, considering empty values
             if not (is_empty_value(value) and is_empty_value(param.default)):
                 if value != param.default and not ignore_default_value:
@@ -97,47 +98,50 @@ def to_serializable_dict(obj: Any, ignore_default_value : bool = False) -> Dict:
         
     return str(obj)
 
+
 def from_serializable_dict(data: Any) -> Any:
     """
     Recursively convert a serializable dictionary back to an object instance.
     """
     if data is None:
         return None
-        
+
     # Handle basic types
     if isinstance(data, (str, int, float, bool)):
         return data
-        
+
     # Handle typed data
     if isinstance(data, dict) and "type" in data:
         # Handle plain dictionaries
         if data["type"] == "dict":
             return {k: from_serializable_dict(v) for k, v in data["value"].items()}
-            
+
         # Import from crawl4ai for class instances
         import crawl4ai
+
         cls = getattr(crawl4ai, data["type"])
-        
+
         # Handle Enum
         if issubclass(cls, Enum):
             return cls(data["params"])
-            
+
         # Handle class instances
         constructor_args = {
             k: from_serializable_dict(v) for k, v in data["params"].items()
         }
         return cls(**constructor_args)
-        
+
     # Handle lists
     if isinstance(data, list):
         return [from_serializable_dict(item) for item in data]
-        
+
     # Handle raw dictionaries (legacy support)
     if isinstance(data, dict):
         return {k: from_serializable_dict(v) for k, v in data.items()}
-        
+
     return data
-    
+
+
 def is_empty_value(value: Any) -> bool:
     """Check if a value is effectively empty/null."""
     if value is None:
@@ -146,7 +150,8 @@ def is_empty_value(value: Any) -> bool:
         return True
     return False
 
-class BrowserConfig():
+
+class BrowserConfig:
     """
     Configuration class for setting up a browser instance and its context in AsyncPlaywrightCrawlerStrategy.
 
@@ -224,7 +229,7 @@ class BrowserConfig():
         viewport: dict = None,
         accept_downloads: bool = False,
         downloads_path: str = None,
-        storage_state : Union[str, dict, None]=None,
+        storage_state: Union[str, dict, None] = None,
         ignore_https_errors: bool = True,
         java_script_enabled: bool = True,
         sleep_on_close: bool = False,
@@ -288,7 +293,7 @@ class BrowserConfig():
             )
         else:
             pass
-        
+
         self.browser_hint = UAGen.generate_client_hints(self.user_agent)
         self.headers.setdefault("sec-ch-ua", self.browser_hint)
 
@@ -364,10 +369,10 @@ class BrowserConfig():
 
     def clone(self, **kwargs):
         """Create a copy of this configuration with updated values.
-        
+
         Args:
             **kwargs: Key-value pairs of configuration options to update
-            
+
         Returns:
             BrowserConfig: A new instance with the specified updates
         """
@@ -381,24 +386,33 @@ class BrowserConfig():
         return to_serializable_dict(self)
 
     @staticmethod
-    def load( data: dict) -> "BrowserConfig":
+    def load(data: dict) -> "BrowserConfig":
         # Deserialize the object from a dictionary
-        config = from_serializable_dict(data) 
+        config = from_serializable_dict(data)
         if isinstance(config, BrowserConfig):
             return config
         return BrowserConfig.from_kwargs(config)
 
 
-class HTTPCrawlerConfig():
+class HTTPCrawlerConfig:
     """HTTP-specific crawler configuration"""
+
     method: str = "GET"
     headers: Optional[Dict[str, str]] = None
     data: Optional[Dict[str, Any]] = None
-    json: Optional[Dict[str, Any]] = None 
+    json: Optional[Dict[str, Any]] = None
     follow_redirects: bool = True
     verify_ssl: bool = True
 
-    def __init__(self, method: str = "GET", headers: Optional[Dict[str, str]] = None, data: Optional[Dict[str, Any]] = None, json: Optional[Dict[str, Any]] = None, follow_redirects: bool = True, verify_ssl: bool = True):
+    def __init__(
+        self,
+        method: str = "GET",
+        headers: Optional[Dict[str, str]] = None,
+        data: Optional[Dict[str, Any]] = None,
+        json: Optional[Dict[str, Any]] = None,
+        follow_redirects: bool = True,
+        verify_ssl: bool = True,
+    ):
         self.method = method
         self.headers = headers
         self.data = data
@@ -426,23 +440,23 @@ class HTTPCrawlerConfig():
             "follow_redirects": self.follow_redirects,
             "verify_ssl": self.verify_ssl,
         }
-    
+
     def clone(self, **kwargs):
         """Create a copy of this configuration with updated values.
-        
+
         Args:
             **kwargs: Key-value pairs of configuration options to update
-            
+
         Returns:
             HTTPCrawlerConfig: A new instance with the specified updates
         """
         config_dict = self.to_dict()
         config_dict.update(kwargs)
         return HTTPCrawlerConfig.from_kwargs(config_dict)
-    
+
     def dump(self) -> dict:
         return to_serializable_dict(self)
-    
+
     @staticmethod
     def load(data: dict) -> "HTTPCrawlerConfig":
         config = from_serializable_dict(data)
@@ -469,7 +483,7 @@ class CrawlerRunConfig():
     Attributes:
         # Deep Crawl Parameters
         deep_crawl_strategy (DeepCrawlStrategy or None): Strategy to use for deep crawling.
-    
+
         # Content Processing Parameters
         word_count_threshold (int): Minimum word count threshold before processing content.
                                     Default: MIN_WORD_THRESHOLD (typically 200).
@@ -606,20 +620,20 @@ class CrawlerRunConfig():
         data (dict): Data to send in the request body, when using AsyncHTTPCrwalerStrategy.
                         Default: None.
         json (dict): JSON data to send in the request body, when using AsyncHTTPCrwalerStrategy.
-                            
+
         # Connection Parameters
         stream (bool): If True, enables streaming of crawled URLs as they are processed when used with arun_many.
                       Default: False.
-        
+
         check_robots_txt (bool): Whether to check robots.txt rules before crawling. Default: False
-                                 Default: False.                                
-        user_agent (str): Custom User-Agent string to use. 
+                                 Default: False.
+        user_agent (str): Custom User-Agent string to use.
                           Default: None.
-        user_agent_mode (str or None): Mode for generating the user agent (e.g., "random"). If None, use the provided user_agent as-is. 
+        user_agent_mode (str or None): Mode for generating the user agent (e.g., "random"). If None, use the provided user_agent as-is.
                                        Default: None.
         user_agent_generator_config (dict or None): Configuration for user agent generation if user_agent_mode is set.
                                                     Default: None.
-        
+
         url: str = None  # This is not a compulsory parameter
     """
 
@@ -700,7 +714,6 @@ class CrawlerRunConfig():
         user_agent_generator_config: dict = {},
         # Deep Crawl Parameters
         deep_crawl_strategy: Optional[DeepCrawlStrategy] = None,
-
     ):
         # TODO: Planning to set properties dynamically based on the __init__ signature
         self.url = url
@@ -810,7 +823,6 @@ class CrawlerRunConfig():
         if self.chunking_strategy is None:
             self.chunking_strategy = RegexChunking()
 
-
         # Deep Crawl Parameters
         self.deep_crawl_strategy = deep_crawl_strategy
 
@@ -918,7 +930,6 @@ class CrawlerRunConfig():
             user_agent_generator_config=kwargs.get("user_agent_generator_config", {}),
             # Deep Crawl Parameters
             deep_crawl_strategy=kwargs.get("deep_crawl_strategy"),
-
             url=kwargs.get("url"),
         )
 
@@ -930,7 +941,7 @@ class CrawlerRunConfig():
     @staticmethod
     def load(data: dict) -> "CrawlerRunConfig":
         # Deserialize the object from a dictionary
-        config = from_serializable_dict(data) 
+        config = from_serializable_dict(data)
         if isinstance(config, CrawlerRunConfig):
             return config
         return CrawlerRunConfig.from_kwargs(config)
@@ -1006,18 +1017,18 @@ class CrawlerRunConfig():
 
     def clone(self, **kwargs):
         """Create a copy of this configuration with updated values.
-        
+
         Args:
             **kwargs: Key-value pairs of configuration options to update
-            
+
         Returns:
             CrawlerRunConfig: A new instance with the specified updates
-            
+
         Example:
             ```python
             # Create a new config with streaming enabled
             stream_config = config.clone(stream=True)
-            
+
             # Create a new config with multiple updates
             new_config = config.clone(
                 stream=True,
@@ -1031,3 +1042,50 @@ class CrawlerRunConfig():
         return CrawlerRunConfig.from_kwargs(config_dict)
 
 
+class LlmConfig:
+    def __init__(
+        self,
+        provider: str = DEFAULT_PROVIDER,
+        api_token: Optional[str] = None,
+        base_url: Optional[str] = None,
+    ):
+        """Configuaration class for LLM provider and API token."""
+        self.provider = provider
+        if api_token and not api_token.startswith("env:"):
+            self.api_token = api_token
+        elif api_token and api_token.startswith("env:"):
+            self.api_token = os.getenv(api_token[4:])
+        else:
+            self.api_token = PROVIDER_MODELS.get(provider, "no-token") or os.getenv(
+                "OPENAI_API_KEY"
+            )
+        self.base_url = base_url
+
+
+    @staticmethod
+    def from_kwargs(kwargs: dict) -> "LlmConfig":
+        return LlmConfig(
+            provider=kwargs.get("provider", DEFAULT_PROVIDER),
+            api_token=kwargs.get("api_token"),
+            base_url=kwargs.get("base_url"),
+        )
+
+    def to_dict(self):
+        return {
+            "provider": self.provider,
+            "api_token": self.api_token,
+            "base_url": self.base_url
+        }
+
+    def clone(self, **kwargs):
+        """Create a copy of this configuration with updated values.
+
+        Args:
+            **kwargs: Key-value pairs of configuration options to update
+
+        Returns:
+            LLMConfig: A new instance with the specified updates
+        """
+        config_dict = self.to_dict()
+        config_dict.update(kwargs)
+        return LlmConfig.from_kwargs(config_dict)
