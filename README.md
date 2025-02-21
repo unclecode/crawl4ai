@@ -623,3 +623,6 @@ For more details, see our [full mission statement](./MISSION.md).
 2. uv pip install -U crawl4ai
 3. uv venv
 4. source .venv/bin/activate
+5. setup vector db (qdrant)
+    uv add -U sentence-transformers
+    uv add -U qdrant-client
