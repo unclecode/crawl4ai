@@ -450,7 +450,7 @@ class AsyncWebCrawler:
 
                     # Process the HTML content
                     crawl_result : CrawlResult = await self.aprocess_html(
-                        url=url,
+                        url=async_response.redirected_url or url,
                         html=html,
                         extracted_content=extracted_content,
                         config=config,  # Pass the config object instead of individual parameters
@@ -461,6 +461,7 @@ class AsyncWebCrawler:
                         **kwargs,
                     )
 
+                    crawl_result.url = url
                     crawl_result.status_code = async_response.status_code
                     crawl_result.redirected_url = async_response.redirected_url or url
                     crawl_result.response_headers = async_response.response_headers
