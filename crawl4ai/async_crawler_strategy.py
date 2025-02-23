@@ -1339,12 +1339,13 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     # Generate a unique nonce for this request
                     nonce = hashlib.sha256(os.urandom(32)).hexdigest()
 
-                    # Add CSP headers to the request
-                    await page.set_extra_http_headers(
-                        {
-                            "Content-Security-Policy": f"default-src 'self'; script-src 'self' 'nonce-{nonce}' 'strict-dynamic'"
-                        }
-                    )
+                    # Add CSP headers to the request if enabled in config
+                    if config.add_content_security_policy:
+                        await page.set_extra_http_headers(
+                            {
+                                "Content-Security-Policy": f"default-src 'self'; script-src 'self' 'nonce-{nonce}' 'strict-dynamic'"
+                            }
+                        )
 
                     response = await page.goto(
                         url, wait_until=config.wait_until, timeout=config.page_timeout

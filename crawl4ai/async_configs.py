@@ -253,6 +253,9 @@ class CrawlerRunConfig:
         # Content Processing Parameters
         word_count_threshold (int): Minimum word count threshold before processing content.
                                     Default: MIN_WORD_THRESHOLD (typically 200).
+        add_content_security_policy (bool): Whether to add Content-Security-Policy header in requests.
+                                            When enabled, adds CSP header with nonce and strict-dynamic policy.
+                                            Default: True.
         extraction_strategy (ExtractionStrategy or None): Strategy to extract structured data from crawled pages.
                                                           Default: None (NoExtractionStrategy is used if None).
         chunking_strategy (ChunkingStrategy): Strategy to chunk content before extraction.
@@ -409,6 +412,8 @@ class CrawlerRunConfig:
         proxy_config: dict = None,
         # SSL Parameters
         fetch_ssl_certificate: bool = False,
+        # Security Headers
+        add_content_security_policy: bool = True,
         # Caching Parameters
         cache_mode: CacheMode =None,
         session_id: str = None,
@@ -483,6 +488,9 @@ class CrawlerRunConfig:
 
         # SSL Parameters
         self.fetch_ssl_certificate = fetch_ssl_certificate
+
+        # Security Headers
+        self.add_content_security_policy = add_content_security_policy
 
         # Caching Parameters
         self.cache_mode = cache_mode
