@@ -2,7 +2,6 @@ from .__version__ import __version__ as crawl4ai_version
 import os
 import sys
 import time
-import warnings
 from colorama import Fore
 from pathlib import Path
 from typing import Optional, List
@@ -30,7 +29,7 @@ from .markdown_generation_strategy import (
     MarkdownGenerationStrategy,
 )
 from .deep_crawling import DeepCrawlDecorator
-from .async_logger import AsyncLogger
+from .async_logger import AsyncLogger, AsyncLoggerBase
 from .async_configs import BrowserConfig, CrawlerRunConfig
 from .async_dispatcher import * # noqa: F403
 from .async_dispatcher import BaseDispatcher, MemoryAdaptiveDispatcher, RateLimiter
@@ -80,22 +79,21 @@ class AsyncWebCrawler:
         await crawler.close()
         ```
 
-            Attributes:
+    Attributes:
         browser_config (BrowserConfig): Configuration object for browser settings.
         crawler_strategy (AsyncCrawlerStrategy): Strategy for crawling web pages.
         logger (AsyncLogger): Logger instance for recording events and errors.
-        always_bypass_cache (bool): Whether to always bypass cache.
         crawl4ai_folder (str): Directory for storing cache.
         base_directory (str): Base directory for storing cache.
         ready (bool): Whether the crawler is ready for use.
 
-        Methods:
-            start(): Start the crawler explicitly without using context manager.
-            close(): Close the crawler explicitly without using context manager.
-            arun(): Run the crawler for a single source: URL (web, local file, or raw HTML).
-            awarmup(): Perform warmup sequence.
-            arun_many(): Run the crawler for multiple sources.
-            aprocess_html(): Process HTML content.
+    Methods:
+        start(): Start the crawler explicitly without using context manager.
+        close(): Close the crawler explicitly without using context manager.
+        arun(): Run the crawler for a single source: URL (web, local file, or raw HTML).
+        awarmup(): Perform warmup sequence.
+        arun_many(): Run the crawler for multiple sources.
+        aprocess_html(): Process HTML content.
 
     Typical Usage:
         async with AsyncWebCrawler() as crawler:
@@ -116,50 +114,30 @@ class AsyncWebCrawler:
 
     def __init__(
         self,
-        crawler_strategy: Optional[AsyncCrawlerStrategy] = None,
-        config: Optional[BrowserConfig] = None,
-        always_bypass_cache: bool = False,
-        always_by_pass_cache: Optional[bool] = None,  # Deprecated parameter
+        crawler_strategy: AsyncCrawlerStrategy = None,
+        config: BrowserConfig = None,
         base_directory: str = str(os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home())),
         thread_safe: bool = False,
+        logger: AsyncLoggerBase = None,
         **kwargs,
     ):
         """
         Initialize the AsyncWebCrawler.
 
         Args:
-            crawler_strategy: Strategy for crawling web pages. If None, will create AsyncPlaywrightCrawlerStrategy
-            config: Configuration object for browser settings. If None, will be created from kwargs
-            always_bypass_cache: Whether to always bypass cache (new parameter)
-            always_by_pass_cache: Deprecated, use always_bypass_cache instead
+            crawler_strategy: Strategy for crawling web pages. Default AsyncPlaywrightCrawlerStrategy
+            config: Configuration object for browser settings. Default BrowserConfig()
             base_directory: Base directory for storing cache
             thread_safe: Whether to use thread-safe operations
             **kwargs: Additional arguments for backwards compatibility
         """
         # Handle browser configuration
-        browser_config = config
-        if browser_config is not None:
-            if any(
-                k in kwargs
-                for k in [
-                    "browser_type",
-                    "headless",
-                    "viewport_width",
-                    "viewport_height",
-                ]
-            ):
-                self.logger.warning(
-                    message="Both browser_config and legacy browser parameters provided. browser_config will take precedence.",
-                    tag="WARNING",
-                )
-        else:
-            # Create browser config from kwargs for backwards compatibility
-            browser_config = BrowserConfig.from_kwargs(kwargs)
+        browser_config = config or BrowserConfig()
 
         self.browser_config = browser_config
 
         # Initialize logger first since other components may need it
-        self.logger = AsyncLogger(
+        self.logger = logger or AsyncLogger(
             log_file=os.path.join(base_directory, ".crawl4ai", "crawler.log"),
             verbose=self.browser_config.verbose,
             tag_width=10,
@@ -172,24 +150,6 @@ class AsyncWebCrawler:
             logger=self.logger,
             **params,  # Pass remaining kwargs for backwards compatibility
         )
-
-        # If craweler strategy doesnt have logger, use crawler logger
-        if not self.crawler_strategy.logger:
-            self.crawler_strategy.logger = self.logger
-
-        # Handle deprecated cache parameter
-        if always_by_pass_cache is not None:
-            if kwargs.get("warning", True):
-                warnings.warn(
-                    "'always_by_pass_cache' is deprecated and will be removed in version 0.5.0. "
-                    "Use 'always_bypass_cache' instead. "
-                    "Pass warning=False to suppress this warning.",
-                    DeprecationWarning,
-                    stacklevel=2,
-                )
-            self.always_bypass_cache = always_by_pass_cache
-        else:
-            self.always_bypass_cache = always_bypass_cache
 
         # Thread safety setup
         self._lock = asyncio.Lock() if thread_safe else None
@@ -356,7 +316,7 @@ class AsyncWebCrawler:
 
                 # Create cache context
                 cache_context = CacheContext(
-                    url, config.cache_mode, self.always_bypass_cache
+                    url, config.cache_mode, False
                 )
 
                 # Initialize processing variables

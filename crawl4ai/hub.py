@@ -1,6 +1,6 @@
 # crawl4ai/hub.py
 from abc import ABC, abstractmethod
-from typing import Dict, Type
+from typing import Dict, Type, Union
 import logging
 import importlib
 from pathlib import Path
@@ -63,7 +63,7 @@ class CrawlerHub:
             cls._crawlers[name] = obj
 
     @classmethod
-    def get(cls, name: str) -> Type[BaseCrawler] | None:
+    def get(cls, name: str) -> Union[Type[BaseCrawler], None]:
         if not cls._crawlers:
             cls._discover_crawlers()
         return cls._crawlers.get(name)

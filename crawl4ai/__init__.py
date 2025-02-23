@@ -8,6 +8,10 @@ from .content_scraping_strategy import (
     WebScrapingStrategy,
     LXMLWebScrapingStrategy,
 )
+from .async_logger import (
+    AsyncLoggerBase,
+    AsyncLogger,
+)
 from .proxy_strategy import (
     ProxyRotationStrategy,
     RoundRobinProxyStrategy,
@@ -59,6 +63,8 @@ from .deep_crawling import (
 )
 
 __all__ = [
+    "AsyncLoggerBase",
+    "AsyncLogger",
     "AsyncWebCrawler",
     "DeepCrawlStrategy",
     "BFSDeepCrawlStrategy",

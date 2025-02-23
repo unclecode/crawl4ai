@@ -1,5 +1,12 @@
 import asyncio
-from crawl4ai import *
+from crawl4ai import (
+    AsyncWebCrawler,
+    BrowserConfig,
+    CrawlerRunConfig,
+    CacheMode,
+    DefaultMarkdownGenerator,
+    PruningContentFilter,
+)
 
 
 async def main():
