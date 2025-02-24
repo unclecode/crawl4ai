@@ -338,6 +338,7 @@ class BrowserManager:
                 headless=self.config.headless,
                 logger=self.logger,
                 debugging_port=self.config.debugging_port,
+                cdp_url=self.config.cdp_url,
             )
 
     async def start(self):
