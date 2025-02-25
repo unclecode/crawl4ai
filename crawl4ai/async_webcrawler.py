@@ -362,7 +362,7 @@ class AsyncWebCrawler:
                             self.logger.info(
                                 message="Switch proxy: {proxy}",
                                 tag="PROXY",
-                                params={"proxy": next_proxy.get("server")},
+                                params={"proxy": next_proxy.server},
                             )
                         config.proxy_config = next_proxy
                         # config = config.clone(proxy_config=next_proxy)

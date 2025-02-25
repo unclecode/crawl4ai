@@ -633,12 +633,12 @@ class BrowserManager:
             # Check if there is value for crawlerRunConfig.proxy_config set add that to context
             if crawlerRunConfig.proxy_config:
                 proxy_settings = {
-                    "server": crawlerRunConfig.proxy_config.get("server"),
+                    "server": crawlerRunConfig.proxy_config.server,
                 }
-                if crawlerRunConfig.proxy_config.get("username"):
+                if crawlerRunConfig.proxy_config.username:
                     proxy_settings.update({
-                        "username": crawlerRunConfig.proxy_config.get("username"),
-                        "password": crawlerRunConfig.proxy_config.get("password"),
+                        "username": crawlerRunConfig.proxy_config.username,
+                        "password": crawlerRunConfig.proxy_config.password,
                     })
                 context_settings["proxy"] = proxy_settings
 
