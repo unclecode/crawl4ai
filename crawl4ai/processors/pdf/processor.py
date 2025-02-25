@@ -5,20 +5,17 @@ from datetime import datetime
 from pathlib import Path
 from time import time
 from dataclasses import dataclass, asdict, field
-from typing import Dict, List, Optional, Tuple
-import PyPDF2
-from PIL import Image
-from PyPDF2 import PdfReader
-from .utils import *
+from typing import Dict, List, Optional, Any, Union
 import base64
 import tempfile
+from .utils import *
+from .utils import (
+    apply_png_predictor,
+    clean_pdf_text,
+    clean_pdf_text_to_html,
+)
 
 logger = logging.getLogger(__name__)
-
-from dataclasses import dataclass, field
-from datetime import datetime
-from typing import List, Optional, Dict, Any
-from pathlib import Path
 
 @dataclass
 class PDFMetadata:
@@ -35,8 +32,8 @@ class PDFMetadata:
 class PDFPage:
     page_number: int
     raw_text: str = ""
-    markdown: str = ""  # Added per your request
-    html: str = ""  # Added per your request
+    markdown: str = ""
+    html: str = ""
     images: List[Dict] = field(default_factory=list)
     links: List[str] = field(default_factory=list)
     layout: List[Dict] = field(default_factory=list)
@@ -56,6 +53,12 @@ class PDFProcessorStrategy(ABC):
 class NaivePDFProcessorStrategy(PDFProcessorStrategy):
     def __init__(self, image_dpi: int = 144, image_quality: int = 85, extract_images: bool = True, 
                  save_images_locally: bool = False, image_save_dir: Optional[Path] = None, batch_size: int = 4):
+        # Import check at initialization time
+        try:
+            import PyPDF2
+        except ImportError:
+            raise ImportError("PyPDF2 is required for PDF processing. Install with 'pip install crawl4ai[pdf]'")
+            
         self.image_dpi = image_dpi
         self.image_quality = image_quality
         self.current_page_number = 0
@@ -66,6 +69,12 @@ class NaivePDFProcessorStrategy(PDFProcessorStrategy):
         self._temp_dir = None
 
     def process(self, pdf_path: Path) -> PDFProcessResult:
+        # Import inside method to allow dependency to be optional
+        try:
+            from PyPDF2 import PdfReader
+        except ImportError:
+            raise ImportError("PyPDF2 is required for PDF processing. Install with 'pip install crawl4ai[pdf]'")
+            
         start_time = time()
         result = PDFProcessResult(
             metadata=PDFMetadata(),
@@ -110,6 +119,13 @@ class NaivePDFProcessorStrategy(PDFProcessorStrategy):
 
     def process_batch(self, pdf_path: Path) -> PDFProcessResult:
         """Like process() but processes PDF pages in parallel batches"""
+        # Import inside method to allow dependency to be optional
+        try:
+            from PyPDF2 import PdfReader
+            import PyPDF2  # For type checking
+        except ImportError:
+            raise ImportError("PyPDF2 is required for PDF processing. Install with 'pip install crawl4ai[pdf]'")
+            
         import concurrent.futures
         import threading
         
@@ -212,6 +228,12 @@ class NaivePDFProcessorStrategy(PDFProcessorStrategy):
         return pdf_page
 
     def _extract_images(self, page, image_dir: Optional[Path]) -> List[Dict]:
+        # Import PyPDF2 for type checking only when needed
+        try:
+            import PyPDF2
+        except ImportError:
+            raise ImportError("PyPDF2 is required for PDF processing. Install with 'pip install crawl4ai[pdf]'")
+            
         if not self.extract_images:
             return []
 
@@ -262,6 +284,7 @@ class NaivePDFProcessorStrategy(PDFProcessorStrategy):
                                                 data = apply_png_predictor(data, width, bits, colors)
 
                                             # Create PIL Image
+                                            from PIL import Image
                                             mode = 'RGB' if color_space == '/DeviceRGB' else 'L'
                                             img = Image.frombytes(mode, (width, height), data)
                                             
@@ -385,9 +408,14 @@ class NaivePDFProcessorStrategy(PDFProcessorStrategy):
                 print(f"Link error: {str(e)}")
         return links
 
-    def _extract_metadata(self, pdf_path: Path, reader: PdfReader = None) -> PDFMetadata:
-        if not reader:
-            reader = PdfReader(pdf_path)
+    def _extract_metadata(self, pdf_path: Path, reader = None) -> PDFMetadata:
+        # Import inside method to allow dependency to be optional 
+        if reader is None:
+            try:
+                from PyPDF2 import PdfReader
+                reader = PdfReader(pdf_path)
+            except ImportError:
+                raise ImportError("PyPDF2 is required for PDF processing. Install with 'pip install crawl4ai[pdf]'")
 
         meta = reader.metadata or {}
         created = self._parse_pdf_date(meta.get('/CreationDate', ''))
@@ -425,6 +453,15 @@ class NaivePDFProcessorStrategy(PDFProcessorStrategy):
 if __name__ == "__main__":
     import json
     from pathlib import Path
+    
+    try:
+        # Import PyPDF2 only when running the file directly
+        import PyPDF2
+        from PyPDF2 import PdfReader
+    except ImportError:
+        print("PyPDF2 is required for PDF processing. Install with 'pip install crawl4ai[pdf]'")
+        exit(1)
+        
     current_dir = Path(__file__).resolve().parent
     pdf_path = f'{current_dir}/test.pdf'
     
