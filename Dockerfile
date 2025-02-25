@@ -151,24 +151,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     redis-cli ping > /dev/null && \
     curl -f http://localhost:8000/health || exit 1'
 
-# COPY deploy/docker/docker-entrypoint.sh /usr/local/bin/
-# RUN chmod +x /usr/local/bin/docker-entrypoint.sh
-
 EXPOSE 6379
-
-# ENTRYPOINT ["docker-entrypoint.sh"]
-
-# CMD service redis-server start && gunicorn \
-#     --bind 0.0.0.0:8000 \
-#     --workers 4 \
-#     --threads 2 \
-#     --timeout 120 \
-#     --graceful-timeout 30 \
-#     --log-level info \
-#     --worker-class uvicorn.workers.UvicornWorker \
-#     server:app
-
-# ENTRYPOINT ["docker-entrypoint.sh"]
-
 CMD ["supervisord", "-c", "supervisord.conf"]
     
