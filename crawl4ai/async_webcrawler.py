@@ -10,7 +10,7 @@ import asyncio
 
 # from contextlib import nullcontext, asynccontextmanager
 from contextlib import asynccontextmanager
-from .models import CrawlResult, MarkdownGenerationResult,DispatchResult
+from .models import CrawlResult, MarkdownGenerationResult, DispatchResult, ScrapingResult
 from .async_database import async_db_manager
 from .chunking_strategy import *  # noqa: F403
 from .chunking_strategy import RegexChunking, ChunkingStrategy, IdentityChunking
@@ -537,7 +537,7 @@ class AsyncWebCrawler:
             ################################
             # Scraping Strategy Execution  #
             ################################
-            result = scraping_strategy.scrap(url, html, **params)
+            result : ScrapingResult = scraping_strategy.scrap(url, html, **params)
 
             if result is None:
                 raise ValueError(

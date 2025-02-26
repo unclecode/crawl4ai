@@ -56,7 +56,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-pdf = ["PyPDF2"]
+pdf = ["PyPDF2"]  
 torch = ["torch", "nltk", "scikit-learn"]
 transformer = ["transformers", "tokenizers"]
 cosine = ["torch", "transformers", "nltk"]
@@ -68,7 +68,8 @@ all = [
     "scikit-learn",
     "transformers",
     "tokenizers",
-    "selenium"
+    "selenium",
+    "PyPDF2"  
 ]
 
 [project.scripts]

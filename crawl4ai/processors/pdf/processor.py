@@ -15,6 +15,10 @@ from .utils import (
     clean_pdf_text_to_html,
 )
 
+# Remove direct PyPDF2 imports from the top
+# import PyPDF2
+# from PyPDF2 import PdfReader
+
 logger = logging.getLogger(__name__)
 
 @dataclass

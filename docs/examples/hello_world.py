@@ -6,6 +6,7 @@ from crawl4ai import (
     CacheMode,
     DefaultMarkdownGenerator,
     PruningContentFilter,
+    CrawlResult
 )
 
 
@@ -20,10 +21,12 @@ async def main():
                 )
             ),
         )
-        result = await crawler.arun(
-            url="https://www.helloworld.org", config=crawler_config
+        result : CrawlResult = await crawler.arun(
+            # url="https://www.helloworld.org", config=crawler_config
+            url="https://www.kidocode.com", config=crawler_config
         )
         print(result.markdown_v2.raw_markdown[:500])
+        # print(result.model_dump())
 
 
 if __name__ == "__main__":

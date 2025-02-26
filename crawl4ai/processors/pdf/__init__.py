@@ -1,8 +1,6 @@
-from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Dict, List, Optional
+import asyncio
 from dataclasses import asdict
-
 from crawl4ai.async_logger import AsyncLogger
 from crawl4ai.async_crawler_strategy import AsyncCrawlerStrategy
 from crawl4ai.models import AsyncCrawlResponse, ScrapingResult 
