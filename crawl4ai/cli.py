@@ -19,6 +19,8 @@ from crawl4ai import (
 from litellm import completion
 from pathlib import Path
 
+from crawl4ai.async_configs import LlmConfig
+
 def get_global_config() -> dict:
     config_dir = Path.home() / ".crawl4ai"
     config_file = config_dir / "global.yml"
@@ -288,7 +290,7 @@ For more documentation visit: https://github.com/unclecode/crawl4ai
 @click.option("--schema", "-s", type=click.Path(exists=True), help="JSON schema for extraction")
 @click.option("--browser", "-b", type=str, callback=parse_key_values, help="Browser parameters as key1=value1,key2=value2")
 @click.option("--crawler", "-c", type=str, callback=parse_key_values, help="Crawler parameters as key1=value1,key2=value2")
-@click.option("--output", "-o", type=click.Choice(["all", "json", "markdown", "markdown-v2", "md", "md-fit"]), default="all")
+@click.option("--output", "-o", type=click.Choice(["all", "json", "markdown", "md", "markdown-fit", "md-fit"]), default="all")
 @click.option("--bypass-cache", is_flag=True, default = True,  help="Bypass cache when crawling")
 @click.option("--question", "-q", help="Ask a question about the crawled content")
 @click.option("--verbose", "-v", is_flag=True)
@@ -351,9 +353,8 @@ def cli(url: str, example: bool, browser_config: str, crawler_config: str, filte
                     raise click.ClickException("LLM provider and API token are required for LLM extraction")
 
                 crawler_cfg.extraction_strategy = LLMExtractionStrategy(
-                    provider=extract_conf["provider"],
+                    llmConfig=LlmConfig(provider=extract_conf["provider"], api_token=extract_conf["api_token"]),
                     instruction=extract_conf["instruction"],
-                    api_token=extract_conf.get("api_token", extract_conf.get("api_key")),
                     schema=schema_data,
                     **extract_conf.get("params", {})
                 )
@@ -383,7 +384,7 @@ def cli(url: str, example: bool, browser_config: str, crawler_config: str, filte
         # Handle question
         if question:
             provider, token = setup_llm_config()
-            markdown = result.markdown_v2.raw_markdown
+            markdown = result.markdown.raw_markdown
             anyio.run(stream_llm_response, url, markdown, question, provider, token)
             return
         
@@ -393,9 +394,9 @@ def cli(url: str, example: bool, browser_config: str, crawler_config: str, filte
         elif output == "json":
             click.echo(json.dumps(json.loads(result.extracted_content), indent=2))
         elif output in ["markdown", "md"]:
-            click.echo(result.markdown_v2.raw_markdown)
+            click.echo(result.markdown.raw_markdown)
         elif output in ["markdown-fit", "md-fit"]:
-            click.echo(result.markdown_v2.fit_markdown)
+            click.echo(result.markdown.fit_markdown)
             
     except Exception as e:
         raise click.ClickException(str(e))

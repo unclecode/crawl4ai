@@ -320,7 +320,7 @@ async def main():
         )
         print(len(result.markdown))
         print(len(result.fit_markdown))
-        print(len(result.markdown_v2.fit_markdown))
+        print(len(result.fit_markdown))
 
 if __name__ == "__main__":
     asyncio.run(main())

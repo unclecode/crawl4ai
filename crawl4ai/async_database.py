@@ -341,7 +341,6 @@ class AsyncDatabaseManager:
                             row_dict[field] = {}
 
                 if isinstance(row_dict["markdown"], Dict):
-                    row_dict["markdown_v2"] = row_dict["markdown"]
                     if row_dict["markdown"].get("raw_markdown"):
                         row_dict["markdown"] = row_dict["markdown"]["raw_markdown"]
 
@@ -387,11 +386,6 @@ class AsyncDatabaseManager:
             if isinstance(result.markdown, MarkdownGenerationResult):
                 content_map["markdown"] = (
                     result.markdown.model_dump_json(),
-                    "markdown",
-                )
-            elif hasattr(result, "markdown_v2"):
-                content_map["markdown"] = (
-                    result.markdown_v2.model_dump_json(),
                     "markdown",
                 )
             elif isinstance(result.markdown, str):

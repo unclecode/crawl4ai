@@ -581,8 +581,6 @@ class AsyncWebCrawler:
                 # html2text_options=kwargs.get('html2text', {})
             )
         )
-        markdown_v2 = markdown_result
-        markdown = sanitize_input_encode(markdown_result.raw_markdown)
 
         # Log processing completion
         self.logger.info(
@@ -611,11 +609,11 @@ class AsyncWebCrawler:
                 content_format = "markdown"
 
             content = {
-                "markdown": markdown,
+                "markdown": markdown_result.raw_markdown,
                 "html": html,
                 "cleaned_html": cleaned_html,
-                "fit_markdown": markdown_result.raw_markdown,
-            }.get(content_format, markdown)
+                "fit_markdown": markdown_result.fit_markdown,
+            }.get(content_format, markdown_result.raw_markdown)
 
             # Use IdentityChunking for HTML input, otherwise use provided chunking strategy
             chunking = (
@@ -649,8 +647,7 @@ class AsyncWebCrawler:
             url=url,
             html=html,
             cleaned_html=cleaned_html,
-            markdown_v2=markdown_v2,
-            markdown=markdown,
+            markdown=markdown_result,
             fit_markdown=markdown_result.fit_markdown,
             fit_html=markdown_result.fit_html,
             media=media,
