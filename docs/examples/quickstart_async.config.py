@@ -59,8 +59,8 @@ async def clean_content():
             url="https://en.wikipedia.org/wiki/Apple",
             config=crawler_config,
         )
-        full_markdown_length = len(result.markdown_v2.raw_markdown)
-        fit_markdown_length = len(result.markdown_v2.fit_markdown)
+        full_markdown_length = len(result.markdown.raw_markdown)
+        fit_markdown_length = len(result.markdown.fit_markdown)
         print(f"Full Markdown Length: {full_markdown_length}")
         print(f"Fit Markdown Length: {fit_markdown_length}")
 
@@ -139,7 +139,7 @@ async def custom_hook_workflow(verbose=True):
 
         # Perform the crawl operation
         result = await crawler.arun(url="https://crawl4ai.com")
-        print(result.markdown_v2.raw_markdown[:500].replace("\n", " -- "))
+        print(result.markdown.raw_markdown[:500].replace("\n", " -- "))
 
 
 # Proxy Example
@@ -584,9 +584,9 @@ async def speed_comparison():
         end = time.time()
         print("Crawl4AI (Markdown Plus):")
         print(f"Time taken: {end - start:.2f} seconds")
-        print(f"Content length: {len(result.markdown_v2.raw_markdown)} characters")
-        print(f"Fit Markdown: {len(result.markdown_v2.fit_markdown)} characters")
-        print(f"Images found: {result.markdown.count('cldnry.s-nbcnews.com')}")
+        print(f"Content length: {len(result.markdown.raw_markdown)} characters")
+        print(f"Fit Markdown: {len(result.markdown.fit_markdown)} characters")
+        print(f"Images found: {result.markdown.raw_markdown.count('cldnry.s-nbcnews.com')}")
         print()
 
 

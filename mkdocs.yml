@@ -9,7 +9,7 @@ nav:
   - Home: 'index.md'
   - Setup & Installation:
     - "Installation": "core/installation.md"
-    - "Docker Deployment": "core/docker-deploymeny.md"
+    - "Docker Deployment": "core/docker-deployment.md"
   - "Quick Start": "core/quickstart.md"
   - "Blog & Changelog":
     - "Blog Home": "blog/index.md"
@@ -17,6 +17,7 @@ nav:
   - Core:
     - "Command Line Interface": "core/cli.md"
     - "Simple Crawling": "core/simple-crawling.md"
+    - "Deep Crawling": "core/deep-crawling.md"
     - "Crawler Result": "core/crawler-result.md"
     - "Browser, Crawler & LLM Config": "core/browser-crawler-config.md"
     - "Markdown Generation": "core/markdown-generation.md"

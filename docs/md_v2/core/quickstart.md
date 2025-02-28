@@ -296,7 +296,7 @@ async def quick_parallel_example():
         # Stream results as they complete
         async for result in await crawler.arun_many(urls, config=run_conf):
             if result.success:
-                print(f"[OK] {result.url}, length: {len(result.markdown_v2.raw_markdown)}")
+                print(f"[OK] {result.url}, length: {len(result.markdown.raw_markdown)}")
             else:
                 print(f"[ERROR] {result.url} => {result.error_message}")
 
@@ -305,7 +305,7 @@ async def quick_parallel_example():
         results = await crawler.arun_many(urls, config=run_conf)
         for res in results:
             if res.success:
-                print(f"[OK] {res.url}, length: {len(res.markdown_v2.raw_markdown)}")
+                print(f"[OK] {res.url}, length: {len(res.markdown.raw_markdown)}")
             else:
                 print(f"[ERROR] {res.url} => {res.error_message}")
 

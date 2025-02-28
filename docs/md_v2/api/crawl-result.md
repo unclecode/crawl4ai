@@ -16,9 +16,6 @@ class CrawlResult(BaseModel):
     screenshot: Optional[str] = None
     pdf : Optional[bytes] = None
     markdown: Optional[Union[str, MarkdownGenerationResult]] = None
-    markdown_v2: Optional[MarkdownGenerationResult] = None
-    fit_markdown: Optional[str] = None
-    fit_html: Optional[str] = None
     extracted_content: Optional[str] = None
     metadata: Optional[dict] = None
     error_message: Optional[str] = None
@@ -116,8 +113,8 @@ print(result.cleaned_html[:500])  # Show a snippet
 **When**: This is **only** present if your `markdown_generator` or `content_filter` produces it.  
 **Usage**:
 ```python
-if result.fit_html:
-    print("High-value HTML content:", result.fit_html[:300])
+if result.markdown.fit_html:
+    print("High-value HTML content:", result.markdown.fit_html[:300])
 ```
 
 ---
@@ -132,8 +129,6 @@ Crawl4AI can convert HTML→Markdown, optionally including:
 - **Links as citations** (with a references section)  
 - **Fit** markdown if a **content filter** is used (like Pruning or BM25)
 
-### 3.2 **`markdown_v2`** *(Optional[MarkdownGenerationResult])*  
-**What**: The **structured** object holding multiple markdown variants. Soon to be consolidated into `markdown`.  
 
 **`MarkdownGenerationResult`** includes:
 - **`raw_markdown`** *(str)*: The full HTML→Markdown conversion.  
@@ -144,8 +139,8 @@ Crawl4AI can convert HTML→Markdown, optionally including:
 
 **Usage**:
 ```python
-if result.markdown_v2:
-    md_res = result.markdown_v2
+if result.markdown:
+    md_res = result.markdown
     print("Raw MD:", md_res.raw_markdown[:300])
     print("Citations MD:", md_res.markdown_with_citations[:300])
     print("References:", md_res.references_markdown)
@@ -153,26 +148,15 @@ if result.markdown_v2:
         print("Pruned text:", md_res.fit_markdown[:300])
 ```
 
-### 3.3 **`markdown`** *(Optional[Union[str, MarkdownGenerationResult]])*  
-**What**: In future versions, `markdown` will fully replace `markdown_v2`. Right now, it might be a `str` or a `MarkdownGenerationResult`.  
+### 3.2 **`markdown`** *(Optional[Union[str, MarkdownGenerationResult]])*  
+**What**: Holds the `MarkdownGenerationResult`.  
 **Usage**:
 ```python
-# Soon, you might see:
-if isinstance(result.markdown, MarkdownGenerationResult):
-    print(result.markdown.raw_markdown[:200])
-else:
-    print(result.markdown)
+print(result.markdown.raw_markdown[:200])
+print(result.markdown.fit_markdown)
+print(result.markdown.fit_html)
 ```
-
-### 3.4 **`fit_markdown`** *(Optional[str])*  
-**What**: A direct reference to the final filtered markdown (legacy approach).  
-**When**: This is set if a filter or content strategy explicitly writes there. Usually overshadowed by `markdown_v2.fit_markdown`.  
-**Usage**:
-```python
-print(result.fit_markdown)  # Legacy field, prefer result.markdown_v2.fit_markdown
-```
-
-**Important**: “Fit” content (in `fit_markdown`/`fit_html`) only exists if you used a **filter** (like **PruningContentFilter** or **BM25ContentFilter**) within a `MarkdownGenerationStrategy`.
+**Important**: “Fit” content (in `fit_markdown`/`fit_html`) exists in result.markdown, only if you used a **filter** (like **PruningContentFilter** or **BM25ContentFilter**) within a `MarkdownGenerationStrategy`.
 
 ---
 
@@ -304,13 +288,11 @@ async def handle_result(result: CrawlResult):
     print("Cleaned HTML size:", len(result.cleaned_html or ""))
 
     # Markdown output
-    if result.markdown_v2:
-        print("Raw Markdown:", result.markdown_v2.raw_markdown[:300])
-        print("Citations Markdown:", result.markdown_v2.markdown_with_citations[:300])
-        if result.markdown_v2.fit_markdown:
-            print("Fit Markdown:", result.markdown_v2.fit_markdown[:200])
-    else:
-        print("Raw Markdown (legacy):", result.markdown[:200] if result.markdown else "N/A")
+    if result.markdown:
+        print("Raw Markdown:", result.markdown.raw_markdown[:300])
+        print("Citations Markdown:", result.markdown.markdown_with_citations[:300])
+        if result.markdown.fit_markdown:
+            print("Fit Markdown:", result.markdown.fit_markdown[:200])
 
     # Media & Links
     if "images" in result.media:
@@ -333,12 +315,12 @@ async def handle_result(result: CrawlResult):
 
 ## 8. Key Points & Future
 
-1. **`markdown_v2` vs `markdown`**  
-   - Right now, `markdown_v2` is the more robust container (`MarkdownGenerationResult`), providing **raw_markdown**, **markdown_with_citations**, references, plus possible **fit_markdown**.  
-   - In future versions, everything will unify under **`markdown`**. If you rely on advanced features (citations, fit content), check `markdown_v2`.
+1. **Deprecated legacy properties of CrawlResult**  
+   - `markdown_v2` - Deprecated in v0.5. Just use `markdown`. It holds the `MarkdownGenerationResult` now!
+   - `fit_markdown` and `fit_html` - Deprecated in v0.5. They can now be accessed via `MarkdownGenerationResult` in `result.markdown`. eg: `result.markdown.fit_markdown` and `result.markdown.fit_html`
 
 2. **Fit Content**  
-   - **`fit_markdown`** and **`fit_html`** appear only if you used a content filter (like **PruningContentFilter** or **BM25ContentFilter**) inside your **MarkdownGenerationStrategy** or set them directly.  
+   - **`fit_markdown`** and **`fit_html`** appear in MarkdownGenerationResult, only if you used a content filter (like **PruningContentFilter** or **BM25ContentFilter**) inside your **MarkdownGenerationStrategy** or set them directly.  
    - If no filter is used, they remain `None`.
 
 3. **References & Citations**  

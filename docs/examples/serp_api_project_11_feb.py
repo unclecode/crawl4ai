@@ -26,7 +26,7 @@ async def little_hello_web():
         result : CrawlResult = await crawler.arun(
             url="https://www.helloworld.org"
         )
-        print(result.markdown_v2.raw_markdown[:500])
+        print(result.markdown.raw_markdown[:500])
 
 async def hello_web():
     browser_config = BrowserConfig(headless=True, verbose=True)
@@ -42,7 +42,7 @@ async def hello_web():
         result : CrawlResult = await crawler.arun(
             url="https://www.helloworld.org", config=crawler_config
         )
-        print(result.markdown_v2.fit_markdown[:500])
+        print(result.markdown.fit_markdown[:500])
 
 # Naive Approach Using Large Language Models
 async def extract_using_llm():

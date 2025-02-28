@@ -25,7 +25,7 @@ async def main():
             # url="https://www.helloworld.org", config=crawler_config
             url="https://www.kidocode.com", config=crawler_config
         )
-        print(result.markdown_v2.raw_markdown[:500])
+        print(result.markdown.raw_markdown[:500])
         # print(result.model_dump())
 
 

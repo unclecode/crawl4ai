@@ -70,7 +70,7 @@ async def main():
             config=crawl_config
         )
         if result.success:
-            print("First crawl - Raw Markdown Length:", len(result.markdown_v2.raw_markdown))
+            print("First crawl - Raw Markdown Length:", len(result.markdown.raw_markdown))
             
     finally:
         # Always ensure we close the crawler

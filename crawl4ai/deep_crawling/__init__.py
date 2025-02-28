@@ -8,6 +8,7 @@ from .filters import (
     ContentTypeFilter,
     DomainFilter,
     URLFilter,
+    URLPatternFilter,
     FilterStats,
     ContentRelevanceFilter,
     SEOFilter
@@ -32,6 +33,7 @@ __all__ = [
     "ContentTypeFilter",
     "DomainFilter",
     "URLFilter",
+    "URLPatternFilter",
     "FilterStats",
     "ContentRelevanceFilter",
     "SEOFilter",

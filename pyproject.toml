@@ -62,6 +62,7 @@ transformer = ["transformers", "tokenizers"]
 cosine = ["torch", "transformers", "nltk"]
 sync = ["selenium"]
 all = [
+    "PyPDF2",
     "torch",
     "nltk",
     "scikit-learn",
