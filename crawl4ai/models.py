@@ -120,8 +120,6 @@ class CrawlResult(BaseModel):
     screenshot: Optional[str] = None
     pdf: Optional[bytes] = None
     _markdown: Optional[MarkdownGenerationResult] = PrivateAttr(default=None)
-    fit_markdown: Optional[str] = None
-    fit_html: Optional[str] = None
     extracted_content: Optional[str] = None
     metadata: Optional[dict] = None
     error_message: Optional[str] = None
@@ -190,6 +188,26 @@ class CrawlResult(BaseModel):
             - references_markdown: The markdown string with references
             - fit_markdown: The markdown string with fit text
             """
+        )
+    
+    @property
+    def fit_markdown(self):
+        """
+        Deprecated property that raises an AttributeError when accessed.
+        """
+        raise AttributeError(
+            "The 'fit_markdown' attribute is deprecated and has been removed. "
+            "Please use 'markdown.fit_markdown' instead."
+        )
+    
+    @property
+    def fit_html(self):
+        """
+        Deprecated property that raises an AttributeError when accessed.
+        """
+        raise AttributeError(
+            "The 'fit_html' attribute is deprecated and has been removed. "
+            "Please use 'markdown.fit_html' instead."
         )
 
     def model_dump(self, *args, **kwargs):
