@@ -648,8 +648,6 @@ class AsyncWebCrawler:
             html=html,
             cleaned_html=cleaned_html,
             markdown=markdown_result,
-            fit_markdown=markdown_result.fit_markdown,
-            fit_html=markdown_result.fit_html,
             media=media,
             links=links,
             metadata=metadata,
