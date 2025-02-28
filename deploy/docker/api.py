@@ -60,7 +60,7 @@ async def handle_llm_qa(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=result.error_message
                 )
-            content = result.markdown_v2.fit_markdown
+            content = result.markdown.fit_markdown
 
         # Create prompt and get LLM response
         prompt = f"""Use the following content as context to answer the question.
@@ -189,9 +189,9 @@ async def handle_markdown_request(
                     detail=result.error_message
                 )
 
-            return (result.markdown_v2.raw_markdown 
+            return (result.markdown.raw_markdown 
                    if filter_type == FilterType.RAW 
-                   else result.markdown_v2.fit_markdown)
+                   else result.markdown.fit_markdown)
 
     except Exception as e:
         logger.error(f"Markdown error: {str(e)}", exc_info=True)
