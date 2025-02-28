@@ -336,7 +336,13 @@ class AsyncDatabaseManager:
                     except json.JSONDecodeError:
                         # Very UGLY, never mention it to me please
                         if field == "markdown" and isinstance(row_dict[field], str):
-                            row_dict[field] = row_dict[field]
+                            row_dict[field] = MarkdownGenerationResult(
+                                raw_markdown=row_dict[field] or "",
+                                markdown_with_citations="",
+                                references_markdown="",
+                                fit_markdown="",
+                                fit_html="",
+                            )
                         else:
                             row_dict[field] = {}
 
@@ -357,7 +363,7 @@ class AsyncDatabaseManager:
                 # Remove any fields not in CrawlResult model
                 valid_fields = CrawlResult.__annotations__.keys()
                 filtered_dict = {k: v for k, v in row_dict.items() if k in valid_fields}
-
+                filtered_dict["markdown"] = row_dict["markdown"]
                 return CrawlResult(**filtered_dict)
 
         try:
