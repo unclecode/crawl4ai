@@ -514,9 +514,9 @@ async def speed_comparison():
         end = time.time()
         print("Crawl4AI (Markdown Plus):")
         print(f"Time taken: {end - start:.2f} seconds")
-        print(f"Content length: {len(result.markdown_v2.raw_markdown)} characters")
-        print(f"Fit Markdown: {len(result.markdown_v2.fit_markdown)} characters")
-        print(f"Images found: {result.markdown.count('cldnry.s-nbcnews.com')}")
+        print(f"Content length: {len(result.markdown.raw_markdown)} characters")
+        print(f"Fit Markdown: {len(result.markdown.fit_markdown)} characters")
+        print(f"Images found: {result.markdown.raw_markdown.count('cldnry.s-nbcnews.com')}")
         print()
 
         # Crawl4AI with JavaScript execution
@@ -539,9 +539,9 @@ async def speed_comparison():
         end = time.time()
         print("Crawl4AI (with JavaScript execution):")
         print(f"Time taken: {end - start:.2f} seconds")
-        print(f"Content length: {len(result.markdown)} characters")
-        print(f"Fit Markdown: {len(result.markdown_v2.fit_markdown)} characters")
-        print(f"Images found: {result.markdown.count('cldnry.s-nbcnews.com')}")
+        print(f"Content length: {len(result.markdown.raw_markdown)} characters")
+        print(f"Fit Markdown: {len(result.markdown.fit_markdown)} characters")
+        print(f"Images found: {result.markdown.raw_markdown.count('cldnry.s-nbcnews.com')}")
 
     print("\nNote on Speed Comparison:")
     print("The speed test conducted here may not reflect optimal conditions.")
@@ -613,9 +613,9 @@ async def fit_markdown_remove_overlay():
         )
 
         if result.success:
-            print(len(result.markdown_v2.raw_markdown))
-            print(len(result.markdown_v2.markdown_with_citations))
-            print(len(result.markdown_v2.fit_markdown))
+            print(len(result.markdown.raw_markdown))
+            print(len(result.markdown.markdown_with_citations))
+            print(len(result.markdown.fit_markdown))
 
             # Save clean html
             with open(os.path.join(__location__, "output/cleaned_html.html"), "w") as f:
@@ -624,18 +624,18 @@ async def fit_markdown_remove_overlay():
             with open(
                 os.path.join(__location__, "output/output_raw_markdown.md"), "w"
             ) as f:
-                f.write(result.markdown_v2.raw_markdown)
+                f.write(result.markdown.raw_markdown)
 
             with open(
                 os.path.join(__location__, "output/output_markdown_with_citations.md"),
                 "w",
             ) as f:
-                f.write(result.markdown_v2.markdown_with_citations)
+                f.write(result.markdown.markdown_with_citations)
 
             with open(
                 os.path.join(__location__, "output/output_fit_markdown.md"), "w"
             ) as f:
-                f.write(result.markdown_v2.fit_markdown)
+                f.write(result.markdown.fit_markdown)
 
     print("Done")
 

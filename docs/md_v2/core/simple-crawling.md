@@ -39,8 +39,8 @@ result = await crawler.arun(
 # Different content formats
 print(result.html)         # Raw HTML
 print(result.cleaned_html) # Cleaned HTML
-print(result.markdown)     # Markdown version
-print(result.fit_markdown) # Most relevant content in markdown
+print(result.markdown.raw_markdown) # Raw markdown from cleaned html
+print(result.markdown.fit_markdown) # Most relevant content in markdown
 
 # Check success status
 print(result.success)      # True if crawl succeeded

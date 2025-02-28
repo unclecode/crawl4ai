@@ -39,9 +39,9 @@ async def run_extraction(crawler: AsyncWebCrawler, url: str, strategy, name: str
         if result.success:
             print(f"\n=== {name} Results ===")
             print(f"Extracted Content: {result.extracted_content}")
-            print(f"Raw Markdown Length: {len(result.markdown_v2.raw_markdown)}")
+            print(f"Raw Markdown Length: {len(result.markdown.raw_markdown)}")
             print(
-                f"Citations Markdown Length: {len(result.markdown_v2.markdown_with_citations)}"
+                f"Citations Markdown Length: {len(result.markdown.markdown_with_citations)}"
             )
         else:
             print(f"Error in {name}: Crawl failed")

@@ -317,7 +317,7 @@ async def llm_content_filter():
     config = CrawlerRunConfig(markdown_generator=markdown_generator)
     async with AsyncWebCrawler() as crawler:
         result = await crawler.arun("https://docs.crawl4ai.com", config=config)
-        pprint(result.fit_markdown)
+        pprint(result.markdown.fit_markdown)
         print("\n✅ Generated focused markdown:")
 
 

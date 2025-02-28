@@ -10,11 +10,10 @@
 
 In **`CrawlerRunConfig`**, you can specify a **`content_filter`** to shape how content is pruned or ranked before final markdown generation. A filter’s logic is applied **before** or **during** the HTML→Markdown process, producing:
 
-- **`result.markdown_v2.raw_markdown`** (unfiltered)
-- **`result.markdown_v2.fit_markdown`** (filtered or “fit” version)
-- **`result.markdown_v2.fit_html`** (the corresponding HTML snippet that produced `fit_markdown`)
+- **`result.markdown.raw_markdown`** (unfiltered)
+- **`result.markdown.fit_markdown`** (filtered or “fit” version)
+- **`result.markdown.fit_html`** (the corresponding HTML snippet that produced `fit_markdown`)
 
-> **Note**: We’re currently storing the result in `markdown_v2`, but eventually we’ll unify it as `result.markdown`.
 
 ### 1.2 Common Filters
 
@@ -62,8 +61,8 @@ async def main():
         
         if result.success:
             # 'fit_markdown' is your pruned content, focusing on "denser" text
-            print("Raw Markdown length:", len(result.markdown_v2.raw_markdown))
-            print("Fit Markdown length:", len(result.markdown_v2.fit_markdown))
+            print("Raw Markdown length:", len(result.markdown.raw_markdown))
+            print("Fit Markdown length:", len(result.markdown.fit_markdown))
         else:
             print("Error:", result.error_message)
 
@@ -123,7 +122,7 @@ async def main():
         )
         if result.success:
             print("Fit Markdown (BM25 query-based):")
-            print(result.markdown_v2.fit_markdown)
+            print(result.markdown.fit_markdown)
         else:
             print("Error:", result.error_message)
 
@@ -144,11 +143,11 @@ if __name__ == "__main__":
 
 ## 4. Accessing the “Fit” Output
 
-After the crawl, your “fit” content is found in **`result.markdown_v2.fit_markdown`**. In future versions, it will be **`result.markdown.fit_markdown`**. Meanwhile:
+After the crawl, your “fit” content is found in **`result.markdown.fit_markdown`**. 
 
 ```python
-fit_md = result.markdown_v2.fit_markdown
-fit_html = result.markdown_v2.fit_html
+fit_md = result.markdown.fit_markdown
+fit_html = result.markdown.fit_html
 ```
 
 If the content filter is **BM25**, you might see additional logic or references in `fit_markdown` that highlight relevant segments. If it’s **Pruning**, the text is typically well-cleaned but not necessarily matched to a query.
@@ -167,7 +166,6 @@ prune_filter = PruningContentFilter(
 )
 md_generator = DefaultMarkdownGenerator(content_filter=prune_filter)
 config = CrawlerRunConfig(markdown_generator=md_generator)
-# => result.markdown_v2.fit_markdown
 ```
 
 ### 5.2 BM25
@@ -179,7 +177,6 @@ bm25_filter = BM25ContentFilter(
 )
 md_generator = DefaultMarkdownGenerator(content_filter=bm25_filter)
 config = CrawlerRunConfig(markdown_generator=md_generator)
-# => result.markdown_v2.fit_markdown
 ```
 
 ---
@@ -203,7 +200,7 @@ Thus, **multi-level** filtering occurs:
 
 1. The crawler’s `excluded_tags` are removed from the HTML first.  
 2. The content filter (Pruning, BM25, or custom) prunes or ranks the remaining text blocks.  
-3. The final “fit” content is generated in `result.markdown_v2.fit_markdown`.
+3. The final “fit” content is generated in `result.markdown.fit_markdown`.
 
 ---
 
@@ -241,7 +238,7 @@ class MyCustomFilter(RelevantContentFilter):
 - **PruningContentFilter**: Great if you just want the “meatiest” text without a user query.  
 - **BM25ContentFilter**: Perfect for query-based extraction or searching.  
 - Combine with **`excluded_tags`, `exclude_external_links`, `word_count_threshold`** to refine your final “fit” text.  
-- Fit markdown ends up in **`result.markdown_v2.fit_markdown`**; eventually **`result.markdown.fit_markdown`** in future versions.
+- Fit markdown ends up in **`result.markdown.fit_markdown`**; eventually **`result.markdown.fit_markdown`** in future versions.
 
 With these tools, you can **zero in** on the text that truly matters, ignoring spammy or boilerplate content, and produce a concise, relevant “fit markdown” for your AI or data pipelines. Happy pruning and searching!
 

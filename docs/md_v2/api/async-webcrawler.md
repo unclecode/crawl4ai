@@ -200,7 +200,7 @@ Each `arun()` returns a **`CrawlResult`** containing:
 - `url`: Final URL (if redirected).
 - `html`: Original HTML.
 - `cleaned_html`: Sanitized HTML.
-- `markdown_v2` (or future `markdown`): Markdown outputs (raw, fit, etc.).
+- `markdown_v2`: Deprecated. Instead just use regular `markdown`
 - `extracted_content`: If an extraction strategy was used (JSON for CSS/LLM strategies).
 - `screenshot`, `pdf`: If screenshots/PDF requested.
 - `media`, `links`: Information about discovered images/links.

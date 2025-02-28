@@ -47,8 +47,8 @@ async def main():
                 result = await crawler.arun(url=url, config=crawler_config)
                 print(f"Status: {result.status_code}")
                 print(f"Raw HTML length: {len(result.html)}")
-                if hasattr(result, 'markdown_v2'):
-                    print(f"Markdown length: {len(result.markdown_v2.raw_markdown)}")
+                if hasattr(result, 'markdown'):
+                    print(f"Markdown length: {len(result.markdown.raw_markdown)}")
             except Exception as e:
                 print(f"Error: {e}")
 

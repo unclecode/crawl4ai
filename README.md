@@ -318,9 +318,8 @@ async def main():
             url="https://docs.micronaut.io/4.7.6/guide/",
             config=run_config
         )
-        print(len(result.markdown))
-        print(len(result.fit_markdown))
-        print(len(result.fit_markdown))
+        print(len(result.markdown.raw_markdown))
+        print(len(result.markdown.fit_markdown))
 
 if __name__ == "__main__":
     asyncio.run(main())
