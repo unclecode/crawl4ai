@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 import logging
 import json  # Added for serialization/deserialization
 from .utils import ensure_content_dirs, generate_content_hash
-from .models import CrawlResult, MarkdownGenerationResult
+from .models import CrawlResult, MarkdownGenerationResult, StringCompatibleMarkdown
 import aiofiles
 from .utils import VersionManager
 from .async_logger import AsyncLogger
@@ -383,7 +383,12 @@ class AsyncDatabaseManager:
         }
 
         try:
-            if isinstance(result.markdown, MarkdownGenerationResult):
+            if isinstance(result.markdown, StringCompatibleMarkdown):
+                content_map["markdown"] = (
+                    result.markdown,
+                    "markdown",
+                )
+            elif isinstance(result.markdown, MarkdownGenerationResult):
                 content_map["markdown"] = (
                     result.markdown.model_dump_json(),
                     "markdown",
