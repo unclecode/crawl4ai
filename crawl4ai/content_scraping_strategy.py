@@ -471,6 +471,9 @@ class WebScrapingStrategy(ContentScrapingStrategy):
                 return False
 
             keep_element = False
+            # Special case for table elements - always preserve structure
+            if element.name in ["tr", "td", "th"]:
+                keep_element = True
 
             exclude_domains = kwargs.get("exclude_domains", [])
             # exclude_social_media_domains = kwargs.get('exclude_social_media_domains', set(SOCIAL_MEDIA_DOMAINS))
@@ -1130,6 +1133,9 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
             "source",
             "track",
             "wbr",
+            "tr",
+            "td",
+            "th",
         }
 
         for el in reversed(list(root.iterdescendants())):
