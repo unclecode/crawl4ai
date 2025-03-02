@@ -41,7 +41,8 @@ dependencies = [
     "click>=8.1.7",
     "pyperclip>=1.8.2",
     "faust-cchardet>=2.1.19",
-    "aiohttp>=3.11.11"
+    "aiohttp>=3.11.11",
+    "humanize>=4.10.0"
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
