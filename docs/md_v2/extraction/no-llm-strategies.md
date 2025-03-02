@@ -434,7 +434,7 @@ html = """
 css_schema = JsonCssExtractionStrategy.generate_schema(
     html,
     schema_type="css",  # This is the default
-    llm_provider="openai/gpt-4o",  # Default provider
+    provider="openai/gpt-4o",  # Default provider
     api_token="your-openai-token"  # Required for OpenAI
 )
 
@@ -442,7 +442,7 @@ css_schema = JsonCssExtractionStrategy.generate_schema(
 xpath_schema = JsonXPathExtractionStrategy.generate_schema(
     html,
     schema_type="xpath",
-    llm_provider="ollama/llama3.3",  # Open source alternative
+    provider="ollama/llama3.3",  # Open source alternative
     api_token=None  # Not needed for Ollama
 )
 
