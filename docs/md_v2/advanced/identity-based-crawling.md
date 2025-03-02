@@ -167,13 +167,114 @@ async with AsyncWebCrawler() as crawler:
 
 ---
 
-## 6. Summary
+## 6. Using the BrowserProfiler Class
 
-- **Create** your user-data directory by launching Chrome/Chromium externally with `--user-data-dir=/some/path`.  
-- **Log in** or configure sites as needed, then close the browser.  
-- **Reference** that folder in `BrowserConfig(user_data_dir="...")` + `use_managed_browser=True`.  
-- Enjoy **persistent** sessions that reflect your real identity.  
-- If you only need quick, ephemeral automation, **Magic Mode** might suffice.
+Crawl4AI provides a dedicated `BrowserProfiler` class for managing browser profiles, making it easy to create, list, and delete profiles for identity-based browsing.
+
+### Creating and Managing Profiles with BrowserProfiler
+
+The `BrowserProfiler` class offers a comprehensive API for browser profile management:
+
+```python
+import asyncio
+from crawl4ai import BrowserProfiler
+
+async def manage_profiles():
+    # Create a profiler instance
+    profiler = BrowserProfiler()
+    
+    # Create a profile interactively - opens a browser window
+    profile_path = await profiler.create_profile(
+        profile_name="my-login-profile"  # Optional: name your profile
+    )
+    
+    print(f"Profile saved at: {profile_path}")
+    
+    # List all available profiles
+    profiles = profiler.list_profiles()
+    
+    for profile in profiles:
+        print(f"Profile: {profile['name']}")
+        print(f"  Path: {profile['path']}")
+        print(f"  Created: {profile['created']}")
+        print(f"  Browser type: {profile['type']}")
+    
+    # Get a specific profile path by name
+    specific_profile = profiler.get_profile_path("my-login-profile")
+    
+    # Delete a profile when no longer needed
+    success = profiler.delete_profile("old-profile-name")
+    
+asyncio.run(manage_profiles())
+```
+
+**How profile creation works:**
+1. A browser window opens for you to interact with
+2. You log in to websites, set preferences, etc.
+3. When you're done, press 'q' in the terminal to close the browser
+4. The profile is saved in the Crawl4AI profiles directory
+5. You can use the returned path with `BrowserConfig.user_data_dir`
+
+### Interactive Profile Management
+
+The `BrowserProfiler` also offers an interactive management console that guides you through profile creation, listing, and deletion:
+
+```python
+import asyncio
+from crawl4ai import BrowserProfiler, AsyncWebCrawler, BrowserConfig
+
+# Define a function to use a profile for crawling
+async def crawl_with_profile(profile_path, url):
+    browser_config = BrowserConfig(
+        headless=True,
+        use_managed_browser=True,
+        user_data_dir=profile_path
+    )
+    
+    async with AsyncWebCrawler(config=browser_config) as crawler:
+        result = await crawler.arun(url)
+        return result
+
+async def main():
+    # Create a profiler instance
+    profiler = BrowserProfiler()
+    
+    # Launch the interactive profile manager
+    # Passing the crawl function as a callback adds a "crawl with profile" option
+    await profiler.interactive_manager(crawl_callback=crawl_with_profile)
+    
+asyncio.run(main())
+```
+
+### Legacy Methods
+
+For backward compatibility, the previous methods on `ManagedBrowser` are still available, but they delegate to the new `BrowserProfiler` class:
+
+```python
+from crawl4ai.browser_manager import ManagedBrowser
+
+# These methods still work but use BrowserProfiler internally
+profiles = ManagedBrowser.list_profiles()
+```
+
+### Complete Example
+
+See the full example in `docs/examples/identity_based_browsing.py` for a complete demonstration of creating and using profiles for authenticated browsing using the new `BrowserProfiler` class.
+
+---
+
+## 7. Summary
+
+- **Create** your user-data directory either:
+  - By launching Chrome/Chromium externally with `--user-data-dir=/some/path` 
+  - Or by using the built-in `BrowserProfiler.create_profile()` method
+  - Or through the interactive interface with `profiler.interactive_manager()`
+- **Log in** or configure sites as needed, then close the browser
+- **Reference** that folder in `BrowserConfig(user_data_dir="...")` + `use_managed_browser=True`
+- **List and reuse** profiles with `BrowserProfiler.list_profiles()`
+- **Manage** your profiles with the dedicated `BrowserProfiler` class
+- Enjoy **persistent** sessions that reflect your real identity
+- If you only need quick, ephemeral automation, **Magic Mode** might suffice
 
 **Recommended**: Always prefer a **Managed Browser** for robust, identity-based crawling and simpler interactions with complex sites. Use **Magic Mode** for quick tasks or prototypes where persistent data is unnecessary.
 

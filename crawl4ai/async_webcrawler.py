@@ -584,9 +584,9 @@ class AsyncWebCrawler:
 
         # Log processing completion
         self.logger.info(
-            message="Processed {url:.50}... | Time: {timing}ms",
+            message="{url:.50}... | Time: {timing}s",
             tag="SCRAPE",
-            params={"url": _url, "timing": int((time.perf_counter() - t1) * 1000)},
+            params={"url": _url, "timing": int((time.perf_counter() - t1) * 1000) / 1000},
         )
 
         ################################

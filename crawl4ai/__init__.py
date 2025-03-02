@@ -42,6 +42,7 @@ from .async_dispatcher import (
 )
 from .docker_client import Crawl4aiDockerClient
 from .hub import CrawlerHub
+from .browser_profiler import BrowserProfiler
 from .deep_crawling import (
     DeepCrawlStrategy,
     BFSDeepCrawlStrategy,
@@ -66,6 +67,7 @@ __all__ = [
     "AsyncLoggerBase",
     "AsyncLogger",
     "AsyncWebCrawler",
+    "BrowserProfiler",
     "DeepCrawlStrategy",
     "BFSDeepCrawlStrategy",
     "BestFirstCrawlingStrategy",

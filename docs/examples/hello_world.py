@@ -16,9 +16,9 @@ async def main():
         crawler_config = CrawlerRunConfig(
             cache_mode=CacheMode.BYPASS,
             markdown_generator=DefaultMarkdownGenerator(
-                content_filter=PruningContentFilter(
-                    threshold=0.48, threshold_type="fixed", min_word_threshold=0
-                )
+                # content_filter=PruningContentFilter(
+                #     threshold=0.48, threshold_type="fixed", min_word_threshold=0
+                # )
             ),
         )
         result : CrawlResult = await crawler.arun(
