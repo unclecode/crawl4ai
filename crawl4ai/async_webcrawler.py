@@ -222,7 +222,7 @@ class AsyncWebCrawler:
     async def arun(
         self,
         url: str,
-        config: Optional[CrawlerRunConfig] = None,
+        config: CrawlerRunConfig = None,
         # Legacy parameters maintained for backwards compatibility
         word_count_threshold=MIN_WORD_THRESHOLD,
         extraction_strategy: ExtractionStrategy = None,
@@ -270,7 +270,7 @@ class AsyncWebCrawler:
         Returns:
             CrawlResult: The result of crawling and processing
         """
-        crawler_config = config
+        crawler_config = config or CrawlerRunConfig()
         if not isinstance(url, str) or not url:
             raise ValueError("Invalid URL, make sure the URL is a non-empty string")
 

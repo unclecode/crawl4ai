@@ -431,6 +431,81 @@ def delete_profile_interactive(profiler: BrowserProfiler):
     except (ValueError, IndexError):
         console.print("[red]Invalid selection.[/red]")
         
+async def crawl_with_profile_cli(profile_path, url):
+    """Use a profile to crawl a website via CLI"""
+    console.print(f"[cyan]Crawling [bold]{url}[/bold] using profile at [bold]{profile_path}[/bold][/cyan]")
+    
+    # Create browser config with the profile
+    browser_cfg = BrowserConfig(
+        headless=False,  # Set to False to see the browser in action
+        use_managed_browser=True,
+        user_data_dir=profile_path
+    )
+    
+    # Default crawler config
+    crawler_cfg = CrawlerRunConfig()
+    
+    # Ask for output format
+    output_format = Prompt.ask(
+        "[cyan]Output format[/cyan]",
+        choices=["all", "json", "markdown", "md", "title"],
+        default="markdown"
+    )
+    
+    try:
+        # Run the crawler
+        result = await run_crawler(url, browser_cfg, crawler_cfg, True)
+        
+        # Handle output
+        if output_format == "all":
+            console.print(json.dumps(result.model_dump(), indent=2))
+        elif output_format == "json":
+            console.print(json.dumps(json.loads(result.extracted_content), indent=2))
+        elif output_format in ["markdown", "md"]:
+            console.print(result.markdown.raw_markdown)
+        elif output_format == "title":
+            console.print(result.metadata.get("title", "No title found"))
+        
+        console.print(f"[green]Successfully crawled[/green] {url}")
+        return result
+    except Exception as e:
+        console.print(f"[red]Error crawling:[/red] {str(e)}")
+        return None
+        
+async def use_profile_to_crawl():
+    """Interactive profile selection for crawling"""
+    profiler = BrowserProfiler()
+    profiles = profiler.list_profiles()
+    
+    if not profiles:
+        console.print("[yellow]No profiles found. Create one first.[/yellow]")
+        return
+        
+    # Display profiles
+    display_profiles_table(profiles)
+    
+    # Get profile selection
+    idx = Prompt.ask(
+        "[cyan]Enter number of profile to use[/cyan]", 
+        console=console,
+        choices=[str(i+1) for i in range(len(profiles))],
+        show_choices=False
+    )
+    
+    try:
+        idx = int(idx) - 1
+        profile = profiles[idx]
+        
+        # Get URL
+        url = Prompt.ask("[cyan]Enter URL to crawl[/cyan]")
+        if url:
+            # Crawl with the selected profile
+            await crawl_with_profile_cli(profile["path"], url)
+        else:
+            console.print("[red]No URL provided[/red]")
+    except (ValueError, IndexError):
+        console.print("[red]Invalid selection[/red]")
+
 async def manage_profiles():
     """Interactive profile management menu"""
     profiler = BrowserProfiler()
@@ -439,14 +514,15 @@ async def manage_profiles():
         "1": "List profiles",
         "2": "Create new profile",
         "3": "Delete profile",
-        "4": "Exit",
+        "4": "Use a profile to crawl a website",
+        "5": "Exit",
     }
     
     while True:
         console.print(Panel("[bold cyan]Browser Profile Manager[/bold cyan]", border_style="cyan"))
         
         for key, value in options.items():
-            color = "green" if key == "1" else "yellow" if key == "2" else "red" if key == "3" else "cyan"
+            color = "green" if key == "1" else "yellow" if key == "2" else "red" if key == "3" else "blue" if key == "4" else "cyan"
             console.print(f"[{color}]{key}[/{color}]. {value}")
         
         choice = Prompt.ask("Enter choice", choices=list(options.keys()), default="1")
@@ -463,8 +539,12 @@ async def manage_profiles():
         elif choice == "3":
             # Delete profile
             delete_profile_interactive(profiler)
-        
+            
         elif choice == "4":
+            # Use profile to crawl
+            await use_profile_to_crawl()
+        
+        elif choice == "5":
             # Exit
             console.print("[cyan]Exiting profile manager.[/cyan]")
             break

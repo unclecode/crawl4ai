@@ -32,7 +32,7 @@ async def crawl_with_profile(profile_path, url):
     
     # Create browser config with the profile path
     browser_config = BrowserConfig(
-        headless=True,  # Set to False if you want to see the browser window
+        headless=False,  # Set to False if you want to see the browser window
         use_managed_browser=True,  # Required for persistent profiles
         user_data_dir=profile_path
     )
