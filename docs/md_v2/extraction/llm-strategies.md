@@ -2,7 +2,7 @@
 
 In some cases, you need to extract **complex or unstructured** information from a webpage that a simple CSS/XPath schema cannot easily parse. Or you want **AI**-driven insights, classification, or summarization. For these scenarios, Crawl4AI provides an **LLM-based extraction strategy** that:
 
-1. Works with **any** large language model supported by [LightLLM](https://github.com/LightLLM) (Ollama, OpenAI, Claude, and more).  
+1. Works with **any** large language model supported by [LiteLLM](https://github.com/BerriAI/litellm) (Ollama, OpenAI, Claude, and more).  
 2. Automatically splits content into chunks (if desired) to handle token limits, then combines results.  
 3. Lets you define a **schema** (like a Pydantic model) or a simpler “block” extraction approach.
 
@@ -18,9 +18,9 @@ In some cases, you need to extract **complex or unstructured** information from 
 
 ---
 
-## 2. Provider-Agnostic via LightLLM
+## 2. Provider-Agnostic via LiteLLM
 
-Crawl4AI uses a “provider string” (e.g., `"openai/gpt-4o"`, `"ollama/llama2.0"`, `"aws/titan"`) to identify your LLM. **Any** model that LightLLM supports is fair game. You just provide:
+Crawl4AI uses a “provider string” (e.g., `"openai/gpt-4o"`, `"ollama/llama2.0"`, `"aws/titan"`) to identify your LLM. **Any** model that LiteLLM supports is fair game. You just provide:
 
 - **`provider`**: The `<provider>/<model_name>` identifier (e.g., `"openai/gpt-4"`, `"ollama/llama2"`, `"huggingface/google-flan"`, etc.).  
 - **`api_token`**: If needed (for OpenAI, HuggingFace, etc.); local models or Ollama might not require it.  
@@ -286,7 +286,7 @@ if __name__ == "__main__":
 
 ## 11. Conclusion
 
-**LLM-based extraction** in Crawl4AI is **provider-agnostic**, letting you choose from hundreds of models via LightLLM. It’s perfect for **semantically complex** tasks or generating advanced structures like knowledge graphs. However, it’s **slower** and potentially costlier than schema-based approaches. Keep these tips in mind:
+**LLM-based extraction** in Crawl4AI is **provider-agnostic**, letting you choose from hundreds of models via LiteLLM. It’s perfect for **semantically complex** tasks or generating advanced structures like knowledge graphs. However, it’s **slower** and potentially costlier than schema-based approaches. Keep these tips in mind:
 
 - Put your LLM strategy **in `CrawlerRunConfig`**.  
 - Use **`input_format`** to pick which form (markdown, HTML, fit_markdown) the LLM sees.  
