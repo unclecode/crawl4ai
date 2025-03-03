@@ -224,22 +224,22 @@ class AsyncWebCrawler:
         url: str,
         config: CrawlerRunConfig = None,
         # Legacy parameters maintained for backwards compatibility
-        word_count_threshold=MIN_WORD_THRESHOLD,
-        extraction_strategy: ExtractionStrategy = None,
-        chunking_strategy: ChunkingStrategy = RegexChunking(),
-        content_filter: RelevantContentFilter = None,
-        cache_mode: Optional[CacheMode] = None,
+        # word_count_threshold=MIN_WORD_THRESHOLD,
+        # extraction_strategy: ExtractionStrategy = None,
+        # chunking_strategy: ChunkingStrategy = RegexChunking(),
+        # content_filter: RelevantContentFilter = None,
+        # cache_mode: Optional[CacheMode] = None,
         # Deprecated cache parameters
-        bypass_cache: bool = False,
-        disable_cache: bool = False,
-        no_cache_read: bool = False,
-        no_cache_write: bool = False,
+        # bypass_cache: bool = False,
+        # disable_cache: bool = False,
+        # no_cache_read: bool = False,
+        # no_cache_write: bool = False,
         # Other legacy parameters
-        css_selector: str = None,
-        screenshot: bool = False,
-        pdf: bool = False,
-        user_agent: str = None,
-        verbose=True,
+        # css_selector: str = None,
+        # screenshot: bool = False,
+        # pdf: bool = False,
+        # user_agent: str = None,
+        # verbose=True,
         **kwargs,
     ) -> RunManyReturn:
         """
@@ -276,39 +276,41 @@ class AsyncWebCrawler:
 
         async with self._lock or self.nullcontext():
             try:
+                self.logger.verbose = crawler_config.verbose
                 # Handle configuration
                 if crawler_config is not None:
                     config = crawler_config
                 else:
                     # Merge all parameters into a single kwargs dict for config creation
-                    config_kwargs = {
-                        "word_count_threshold": word_count_threshold,
-                        "extraction_strategy": extraction_strategy,
-                        "chunking_strategy": chunking_strategy,
-                        "content_filter": content_filter,
-                        "cache_mode": cache_mode,
-                        "bypass_cache": bypass_cache,
-                        "disable_cache": disable_cache,
-                        "no_cache_read": no_cache_read,
-                        "no_cache_write": no_cache_write,
-                        "css_selector": css_selector,
-                        "screenshot": screenshot,
-                        "pdf": pdf,
-                        "verbose": verbose,
-                        **kwargs,
-                    }
-                    config = CrawlerRunConfig.from_kwargs(config_kwargs)
+                    # config_kwargs = {
+                    #     "word_count_threshold": word_count_threshold,
+                    #     "extraction_strategy": extraction_strategy,
+                    #     "chunking_strategy": chunking_strategy,
+                    #     "content_filter": content_filter,
+                    #     "cache_mode": cache_mode,
+                    #     "bypass_cache": bypass_cache,
+                    #     "disable_cache": disable_cache,
+                    #     "no_cache_read": no_cache_read,
+                    #     "no_cache_write": no_cache_write,
+                    #     "css_selector": css_selector,
+                    #     "screenshot": screenshot,
+                    #     "pdf": pdf,
+                    #     "verbose": verbose,
+                    #     **kwargs,
+                    # }
+                    # config = CrawlerRunConfig.from_kwargs(config_kwargs)
+                    pass
 
                 # Handle deprecated cache parameters
-                if any([bypass_cache, disable_cache, no_cache_read, no_cache_write]):
-                    # Convert legacy parameters if cache_mode not provided
-                    if config.cache_mode is None:
-                        config.cache_mode = _legacy_to_cache_mode(
-                            disable_cache=disable_cache,
-                            bypass_cache=bypass_cache,
-                            no_cache_read=no_cache_read,
-                            no_cache_write=no_cache_write,
-                        )
+                # if any([bypass_cache, disable_cache, no_cache_read, no_cache_write]):
+                #     # Convert legacy parameters if cache_mode not provided
+                #     if config.cache_mode is None:
+                #         config.cache_mode = _legacy_to_cache_mode(
+                #             disable_cache=disable_cache,
+                #             bypass_cache=bypass_cache,
+                #             no_cache_read=no_cache_read,
+                #             no_cache_write=no_cache_write,
+                #         )
 
                 # Default to ENABLED if no cache mode specified
                 if config.cache_mode is None:
@@ -344,7 +346,11 @@ class AsyncWebCrawler:
                     # If screenshot is requested but its not in cache, then set cache_result to None
                     screenshot_data = cached_result.screenshot
                     pdf_data = cached_result.pdf
-                    if config.screenshot and not screenshot or config.pdf and not pdf:
+                    # if config.screenshot and not screenshot or config.pdf and not pdf:
+                    if config.screenshot and not screenshot_data:
+                        cached_result = None
+                    
+                    if config.pdf and not pdf_data:
                         cached_result = None
 
                     self.logger.url_status(
@@ -358,12 +364,11 @@ class AsyncWebCrawler:
                 if config and config.proxy_rotation_strategy:
                     next_proxy = await config.proxy_rotation_strategy.get_next_proxy()
                     if next_proxy:
-                        if verbose:
-                            self.logger.info(
-                                message="Switch proxy: {proxy}",
-                                tag="PROXY",
-                                params={"proxy": next_proxy.server},
-                            )
+                        self.logger.info(
+                            message="Switch proxy: {proxy}",
+                            tag="PROXY",
+                            params={"proxy": next_proxy.server},
+                        )
                         config.proxy_config = next_proxy
                         # config = config.clone(proxy_config=next_proxy)
 
@@ -371,8 +376,8 @@ class AsyncWebCrawler:
                 if not cached_result or not html:
                     t1 = time.perf_counter()
 
-                    if user_agent:
-                        self.crawler_strategy.update_user_agent(user_agent)
+                    if config.user_agent:
+                        self.crawler_strategy.update_user_agent(config.user_agent)
 
                     # Check robots.txt if enabled
                     if config and config.check_robots_txt:

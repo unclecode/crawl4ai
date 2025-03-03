@@ -5,6 +5,27 @@ All notable changes to Crawl4AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Version 0.5.0 (2025-03-02)
+
+### Added
+
+- *(profiles)* Add BrowserProfiler class for dedicated browser profile management
+- *(cli)* Add interactive profile management to CLI with rich UI
+- *(profiles)* Add ability to crawl directly from profile management interface
+- *(browser)* Support identity-based browsing with persistent profiles
+
+### Changed
+
+- *(browser)* Refactor profile management from ManagedBrowser to BrowserProfiler class
+- *(cli)* Enhance CLI with profile selection and status display for crawling
+- *(examples)* Update identity-based browsing example to use BrowserProfiler class
+- *(docs)* Update identity-based crawling documentation
+
+### Fixed
+
+- *(browser)* Fix profile detection and management on different platforms
+- *(cli)* Fix CLI command structure for better user experience
+
 
 ## Version 0.5.0 (2025-02-21)
 

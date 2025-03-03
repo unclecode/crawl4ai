@@ -37,15 +37,18 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
         filter_chain: FilterChain = FilterChain(),
         url_scorer: Optional[URLScorer] = None,
         include_external: bool = False,
+        max_pages: int = float('inf'),
         logger: Optional[logging.Logger] = None,
     ):
         self.max_depth = max_depth
         self.filter_chain = filter_chain
         self.url_scorer = url_scorer
         self.include_external = include_external
+        self.max_pages = max_pages
         self.logger = logger or logging.getLogger(__name__)
         self.stats = TraversalStats(start_time=datetime.now())
         self._cancel_event = asyncio.Event()
+        self._pages_crawled = 0
 
     async def can_process_url(self, url: str, depth: int) -> bool:
         """
@@ -86,12 +89,20 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
         new_depth = current_depth + 1
         if new_depth > self.max_depth:
             return
+            
+        # If we've reached the max pages limit, don't discover new links
+        remaining_capacity = self.max_pages - self._pages_crawled
+        if remaining_capacity <= 0:
+            self.logger.info(f"Max pages limit ({self.max_pages}) reached, stopping link discovery")
+            return
 
         # Retrieve internal links; include external links if enabled.
         links = result.links.get("internal", [])
         if self.include_external:
             links += result.links.get("external", [])
 
+        # If we have more links than remaining capacity, limit how many we'll process
+        valid_links = []
         for link in links:
             url = link.get("href")
             if url in visited:
@@ -99,8 +110,16 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
             if not await self.can_process_url(url, new_depth):
                 self.stats.urls_skipped += 1
                 continue
-
-            # Record the new depth.
+                
+            valid_links.append(url)
+            
+        # If we have more valid links than capacity, limit them
+        if len(valid_links) > remaining_capacity:
+            valid_links = valid_links[:remaining_capacity]
+            self.logger.info(f"Limiting to {remaining_capacity} URLs due to max_pages limit")
+            
+        # Record the new depths and add to next_links
+        for url in valid_links:
             depths[url] = new_depth
             next_links.append((url, source_url))
 
@@ -123,6 +142,11 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
         depths: Dict[str, int] = {start_url: 0}
 
         while not queue.empty() and not self._cancel_event.is_set():
+            # Stop if we've reached the max pages limit
+            if self._pages_crawled >= self.max_pages:
+                self.logger.info(f"Max pages limit ({self.max_pages}) reached, stopping crawl")
+                break
+                
             batch: List[Tuple[float, int, str, Optional[str]]] = []
             # Retrieve up to BATCH_SIZE items from the priority queue.
             for _ in range(BATCH_SIZE):
@@ -153,14 +177,23 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
                 result.metadata["depth"] = depth
                 result.metadata["parent_url"] = parent_url
                 result.metadata["score"] = score
+                
+                # Count only successful crawls toward max_pages limit
+                if result.success:
+                    self._pages_crawled += 1
+                
                 yield result
-                # Discover new links from this result.
-                new_links: List[Tuple[str, Optional[str]]] = []
-                await self.link_discovery(result, result_url, depth, visited, new_links, depths)
-                for new_url, new_parent in new_links:
-                    new_depth = depths.get(new_url, depth + 1)
-                    new_score = self.url_scorer.score(new_url) if self.url_scorer else 0
-                    await queue.put((new_score, new_depth, new_url, new_parent))
+                
+                # Only discover links from successful crawls
+                if result.success:
+                    # Discover new links from this result
+                    new_links: List[Tuple[str, Optional[str]]] = []
+                    await self.link_discovery(result, result_url, depth, visited, new_links, depths)
+                    
+                    for new_url, new_parent in new_links:
+                        new_depth = depths.get(new_url, depth + 1)
+                        new_score = self.url_scorer.score(new_url) if self.url_scorer else 0
+                        await queue.put((new_score, new_depth, new_url, new_parent))
 
         # End of crawl.
 
