@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - *(cli)* Add interactive profile management to CLI with rich UI
 - *(profiles)* Add ability to crawl directly from profile management interface
 - *(browser)* Support identity-based browsing with persistent profiles
+- *(deep-crawling)* Add max_pages parameter to limit the number of pages crawled in all deep crawling strategies
+- *(deep-crawling)* Add score_threshold parameter to BFS and DFS strategies to filter URLs by score
 
 ### Changed
 
@@ -20,11 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - *(cli)* Enhance CLI with profile selection and status display for crawling
 - *(examples)* Update identity-based browsing example to use BrowserProfiler class
 - *(docs)* Update identity-based crawling documentation
+- *(docs)* Update deep crawling documentation with max_pages and score_threshold parameters
+- *(examples)* Add example demonstrating the use of max_pages and score_threshold parameters
 
 ### Fixed
 
 - *(browser)* Fix profile detection and management on different platforms
 - *(cli)* Fix CLI command structure for better user experience
+- *(deep-crawling)* Improve BFS and DFS strategies to handle page count limits more efficiently
 
 
 ## Version 0.5.0 (2025-02-21)
