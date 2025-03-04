@@ -12,6 +12,7 @@ from . import DeepCrawlStrategy
 
 from ..types import AsyncWebCrawler, CrawlerRunConfig, CrawlResult, RunManyReturn
 
+from math import inf as infinity
 
 # Configurable batch size for processing items from the priority queue
 BATCH_SIZE = 10
@@ -37,7 +38,7 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
         filter_chain: FilterChain = FilterChain(),
         url_scorer: Optional[URLScorer] = None,
         include_external: bool = False,
-        max_pages: int = float('inf'),
+        max_pages: int = infinity,
         logger: Optional[logging.Logger] = None,
     ):
         self.max_depth = max_depth

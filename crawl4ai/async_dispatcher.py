@@ -24,6 +24,8 @@ from urllib.parse import urlparse
 import random
 from abc import ABC, abstractmethod
 
+from math import inf as infinity
+
 
 class RateLimiter:
     def __init__(
@@ -250,7 +252,7 @@ class CrawlerMonitor:
             key=lambda x: (
                 x.status != CrawlStatus.IN_PROGRESS,
                 x.status != CrawlStatus.QUEUED,
-                x.end_time or float('inf'),
+                x.end_time or infinity,
             ),
         )[: self.max_visible_rows]
 

@@ -10,6 +10,7 @@ from .filters import FilterChain
 from .scorers import URLScorer
 from . import DeepCrawlStrategy  
 from ..types import AsyncWebCrawler, CrawlerRunConfig, CrawlResult
+from math import inf as infinity
 
 class BFSDeepCrawlStrategy(DeepCrawlStrategy):
     """
@@ -26,8 +27,8 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
         filter_chain: FilterChain = FilterChain(),
         url_scorer: Optional[URLScorer] = None,        
         include_external: bool = False,
-        score_threshold: float = float('-inf'),
-        max_pages: int = float('inf'),
+        score_threshold: float = -infinity,
+        max_pages: int = infinity,
         logger: Optional[logging.Logger] = None,
     ):
         self.max_depth = max_depth

@@ -416,6 +416,7 @@ async def crawl_dynamic_content_pages_method_2():
 
 
 async def cosine_similarity_extraction():
+    from crawl4ai.extraction_strategy import CosineStrategy
     crawl_config = CrawlerRunConfig(
         cache_mode=CacheMode.BYPASS,
         extraction_strategy=CosineStrategy(
@@ -507,6 +508,9 @@ async def ssl_certification():
         if result.success and result.ssl_certificate:
             cert = result.ssl_certificate
 
+            tmp_dir = os.path.join(__location__, "tmp")
+            os.makedirs(tmp_dir, exist_ok=True)
+
             # 1. Access certificate properties directly
             print("\nCertificate Information:")
             print(f"Issuer: {cert.issuer.get('CN', '')}")
@@ -527,67 +531,6 @@ async def ssl_certification():
                 os.path.join(tmp_dir, "certificate.der")
             )  # For Java apps
             print(f"- DER: {os.path.join(tmp_dir, 'certificate.der')}")
-
-
-# Speed Comparison
-async def speed_comparison():
-    print("\n--- Speed Comparison ---")
-
-    # Firecrawl comparison
-    from firecrawl import FirecrawlApp
-
-    app = FirecrawlApp(api_key=os.environ["FIRECRAWL_API_KEY"])
-    start = time.time()
-    scrape_status = app.scrape_url(
-        "https://www.nbcnews.com/business", params={"formats": ["markdown", "html"]}
-    )
-    end = time.time()
-    print("Firecrawl:")
-    print(f"Time taken: {end - start:.2f} seconds")
-    print(f"Content length: {len(scrape_status['markdown'])} characters")
-    print(f"Images found: {scrape_status['markdown'].count('cldnry.s-nbcnews.com')}")
-    print()
-
-    # Crawl4AI comparisons
-    browser_config = BrowserConfig(headless=True)
-
-    # Simple crawl
-    async with AsyncWebCrawler(config=browser_config) as crawler:
-        start = time.time()
-        result = await crawler.arun(
-            url="https://www.nbcnews.com/business",
-            config=CrawlerRunConfig(
-                cache_mode=CacheMode.BYPASS, word_count_threshold=0
-            ),
-        )
-        end = time.time()
-        print("Crawl4AI (simple crawl):")
-        print(f"Time taken: {end - start:.2f} seconds")
-        print(f"Content length: {len(result.markdown)} characters")
-        print(f"Images found: {result.markdown.count('cldnry.s-nbcnews.com')}")
-        print()
-
-        # Advanced filtering
-        start = time.time()
-        result = await crawler.arun(
-            url="https://www.nbcnews.com/business",
-            config=CrawlerRunConfig(
-                cache_mode=CacheMode.BYPASS,
-                word_count_threshold=0,
-                markdown_generator=DefaultMarkdownGenerator(
-                    content_filter=PruningContentFilter(
-                        threshold=0.48, threshold_type="fixed", min_word_threshold=0
-                    )
-                ),
-            ),
-        )
-        end = time.time()
-        print("Crawl4AI (Markdown Plus):")
-        print(f"Time taken: {end - start:.2f} seconds")
-        print(f"Content length: {len(result.markdown.raw_markdown)} characters")
-        print(f"Fit Markdown: {len(result.markdown.fit_markdown)} characters")
-        print(f"Images found: {result.markdown.raw_markdown.count('cldnry.s-nbcnews.com')}")
-        print()
 
 
 # Main execution

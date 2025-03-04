@@ -1,10 +1,11 @@
 from crawl4ai.async_configs import LlmConfig
-from crawl4ai.extraction_strategy import *
-from crawl4ai.crawler_strategy import *
+from crawl4ai import AsyncWebCrawler, LLMExtractionStrategy
 import asyncio
+import os
+import json
 from pydantic import BaseModel, Field
 
-url = r"https://openai.com/api/pricing/"
+url = "https://openai.com/api/pricing/"
 
 
 class OpenAIModelFee(BaseModel):
@@ -13,10 +14,6 @@ class OpenAIModelFee(BaseModel):
     output_fee: str = Field(
         ..., description="Fee for output token for the OpenAI model."
     )
-
-
-from crawl4ai import AsyncWebCrawler
-
 
 async def main():
     # Use AsyncWebCrawler
