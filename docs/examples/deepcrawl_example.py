@@ -234,77 +234,7 @@ async def filters_and_scorers():
         print(f"  ✅ Crawler prioritized {len(results)} pages by relevance score")
         print("  🔍 Note: BestFirstCrawlingStrategy visits highest-scoring pages first")
 
-# 4️⃣ Wrap-Up and Key Takeaways
-async def wrap_up():
-    """
-    PART 4: Wrap-Up and Key Takeaways
-
-    Summarize the key concepts learned in this tutorial.
-    """
-    print("\n===== COMPLETE CRAWLER EXAMPLE =====")
-    print("Combining filters, scorers, and streaming for an optimized crawl")
-
-    # Create a sophisticated filter chain
-    filter_chain = FilterChain(
-        [
-            DomainFilter(
-                allowed_domains=["docs.crawl4ai.com"],
-                blocked_domains=["old.docs.crawl4ai.com"],
-            ),
-            URLPatternFilter(patterns=["*core*", "*advanced*", "*blog*"]),
-            ContentTypeFilter(allowed_types=["text/html"]),
-        ]
-    )
-
-    # Create a composite scorer that combines multiple scoring strategies
-    keyword_scorer = KeywordRelevanceScorer(
-        keywords=["crawl", "example", "async", "configuration"], weight=0.7
-    )
-    # Set up the configuration
-    config = CrawlerRunConfig(
-        deep_crawl_strategy=BestFirstCrawlingStrategy(
-            max_depth=1,
-            include_external=False,
-            filter_chain=filter_chain,
-            url_scorer=keyword_scorer,
-        ),
-        scraping_strategy=LXMLWebScrapingStrategy(),
-        stream=True,
-        verbose=True,
-    )
-
-    # Execute the crawl
-    results = []
-    start_time = time.perf_counter()
-
-    async with AsyncWebCrawler() as crawler:
-        async for result in await crawler.arun(
-            url="https://docs.crawl4ai.com", config=config
-        ):
-            results.append(result)
-            score = result.metadata.get("score", 0)
-            depth = result.metadata.get("depth", 0)
-            print(f"→ Depth: {depth} | Score: {score:.2f} | {result.url}")
-
-    duration = time.perf_counter() - start_time
-
-    # Summarize the results
-    print(f"\n✅ Crawled {len(results)} high-value pages in {duration:.2f} seconds")
-    print(
-        f"✅ Average score: {sum(r.metadata.get('score', 0) for r in results) / len(results):.2f}"
-    )
-
-    # Group by depth
-    depth_counts = {}
-    for result in results:
-        depth = result.metadata.get("depth", 0)
-        depth_counts[depth] = depth_counts.get(depth, 0) + 1
-
-    print("\n📊 Pages crawled by depth:")
-    for depth, count in sorted(depth_counts.items()):
-        print(f"  Depth {depth}: {count} pages")
-
-# 5️⃣ Advanced Filters
+# 4️⃣ Advanced Filters
 async def advanced_filters():
     """
     PART 5: Demonstrates advanced filtering techniques for specialized crawling.
@@ -367,7 +297,7 @@ async def advanced_filters():
             relevance_score = result.metadata.get("relevance_score", 0)
             print(f"  → Score: {relevance_score:.2f} | {result.url}")
 
-# Main function to run the entire tutorial
+# 5️⃣ Max Pages and Score Thresholds
 async def max_pages_and_thresholds():
     """
     PART 6: Demonstrates using max_pages and score_threshold parameters with different strategies.
@@ -465,6 +395,77 @@ async def max_pages_and_thresholds():
             avg_score = sum(r.metadata.get('score', 0) for r in results) / len(results)
             print(f"  ✅ Average score: {avg_score:.2f}")
             print("  🔍 Note: BestFirstCrawlingStrategy visited highest-scoring pages first")
+
+# 6️⃣ Wrap-Up and Key Takeaways
+async def wrap_up():
+    """
+    PART 4: Wrap-Up and Key Takeaways
+
+    Summarize the key concepts learned in this tutorial.
+    """
+    print("\n===== COMPLETE CRAWLER EXAMPLE =====")
+    print("Combining filters, scorers, and streaming for an optimized crawl")
+
+    # Create a sophisticated filter chain
+    filter_chain = FilterChain(
+        [
+            DomainFilter(
+                allowed_domains=["docs.crawl4ai.com"],
+                blocked_domains=["old.docs.crawl4ai.com"],
+            ),
+            URLPatternFilter(patterns=["*core*", "*advanced*", "*blog*"]),
+            ContentTypeFilter(allowed_types=["text/html"]),
+        ]
+    )
+
+    # Create a composite scorer that combines multiple scoring strategies
+    keyword_scorer = KeywordRelevanceScorer(
+        keywords=["crawl", "example", "async", "configuration"], weight=0.7
+    )
+    # Set up the configuration
+    config = CrawlerRunConfig(
+        deep_crawl_strategy=BestFirstCrawlingStrategy(
+            max_depth=1,
+            include_external=False,
+            filter_chain=filter_chain,
+            url_scorer=keyword_scorer,
+        ),
+        scraping_strategy=LXMLWebScrapingStrategy(),
+        stream=True,
+        verbose=True,
+    )
+
+    # Execute the crawl
+    results = []
+    start_time = time.perf_counter()
+
+    async with AsyncWebCrawler() as crawler:
+        async for result in await crawler.arun(
+            url="https://docs.crawl4ai.com", config=config
+        ):
+            results.append(result)
+            score = result.metadata.get("score", 0)
+            depth = result.metadata.get("depth", 0)
+            print(f"→ Depth: {depth} | Score: {score:.2f} | {result.url}")
+
+    duration = time.perf_counter() - start_time
+
+    # Summarize the results
+    print(f"\n✅ Crawled {len(results)} high-value pages in {duration:.2f} seconds")
+    print(
+        f"✅ Average score: {sum(r.metadata.get('score', 0) for r in results) / len(results):.2f}"
+    )
+
+    # Group by depth
+    depth_counts = {}
+    for result in results:
+        depth = result.metadata.get("depth", 0)
+        depth_counts[depth] = depth_counts.get(depth, 0) + 1
+
+    print("\n📊 Pages crawled by depth:")
+    for depth, count in sorted(depth_counts.items()):
+        print(f"  Depth {depth}: {count} pages")
+
 
 async def run_tutorial():
     """
