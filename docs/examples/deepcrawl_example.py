@@ -237,7 +237,7 @@ async def filters_and_scorers():
 # 4️⃣ Advanced Filters
 async def advanced_filters():
     """
-    PART 5: Demonstrates advanced filtering techniques for specialized crawling.
+    PART 4: Demonstrates advanced filtering techniques for specialized crawling.
 
     This function covers:
     - SEO filters
@@ -300,7 +300,7 @@ async def advanced_filters():
 # 5️⃣ Max Pages and Score Thresholds
 async def max_pages_and_thresholds():
     """
-    PART 6: Demonstrates using max_pages and score_threshold parameters with different strategies.
+    PART 5: Demonstrates using max_pages and score_threshold parameters with different strategies.
     
     This function shows:
     - How to limit the number of pages crawled
@@ -399,7 +399,7 @@ async def max_pages_and_thresholds():
 # 6️⃣ Wrap-Up and Key Takeaways
 async def wrap_up():
     """
-    PART 4: Wrap-Up and Key Takeaways
+    PART 6: Wrap-Up and Key Takeaways
 
     Summarize the key concepts learned in this tutorial.
     """
@@ -478,12 +478,12 @@ async def run_tutorial():
 
     # Define sections - uncomment to run specific parts during development
     tutorial_sections = [
-        # basic_deep_crawl,
-        # stream_vs_nonstream,
-        # filters_and_scorers,
-        max_pages_and_thresholds,  # Added new section
-        wrap_up,
+        basic_deep_crawl,
+        stream_vs_nonstream,
+        filters_and_scorers,
+        max_pages_and_thresholds, 
         advanced_filters,
+        wrap_up,
     ]
 
     for section in tutorial_sections:
