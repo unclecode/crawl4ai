@@ -712,7 +712,7 @@ def profiles_cmd():
     # Run interactive profile manager
     anyio.run(manage_profiles)
 
-@cli.command()
+@cli.command(name="")
 @click.argument("url", required=False)
 @click.option("--example", is_flag=True, help="Show usage examples")
 @click.option("--browser-config", "-B", type=click.Path(exists=True), help="Browser config file (YAML/JSON)")
@@ -772,5 +772,11 @@ def default(url: str, example: bool, browser_config: str, crawler_config: str, f
         profile=profile
     )
 
-if __name__ == "__main__":
+def main():
+    import sys
+    if len(sys.argv) < 2 or sys.argv[1] not in cli.commands:
+        sys.argv.insert(1, "crawl")
     cli()
+
+if __name__ == "__main__":
+    main()

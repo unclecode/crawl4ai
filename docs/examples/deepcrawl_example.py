@@ -65,7 +65,6 @@ async def basic_deep_crawl():
             f"\n✅ Performance: {len(results)} pages in {time.perf_counter() - start_time:.2f} seconds"
         )
 
-
 # 2️⃣ Stream vs. Non-Stream Execution
 async def stream_vs_nonstream():
     """
@@ -126,7 +125,6 @@ async def stream_vs_nonstream():
         print(f"  ✅ First result: {first_result_time:.2f} seconds")
         print(f"  ✅ All results: {time.perf_counter() - start_time:.2f} seconds")
         print("\n🔍 Key Takeaway: Streaming allows processing results immediately")
-
 
 # 3️⃣ Introduce Filters & Scorers
 async def filters_and_scorers():
@@ -236,7 +234,6 @@ async def filters_and_scorers():
         print(f"  ✅ Crawler prioritized {len(results)} pages by relevance score")
         print("  🔍 Note: BestFirstCrawlingStrategy visits highest-scoring pages first")
 
-
 # 4️⃣ Wrap-Up and Key Takeaways
 async def wrap_up():
     """
@@ -307,7 +304,6 @@ async def wrap_up():
     for depth, count in sorted(depth_counts.items()):
         print(f"  Depth {depth}: {count} pages")
 
-
 # 5️⃣ Advanced Filters
 async def advanced_filters():
     """
@@ -370,7 +366,6 @@ async def advanced_filters():
         for result in results:
             relevance_score = result.metadata.get("relevance_score", 0)
             print(f"  → Score: {relevance_score:.2f} | {result.url}")
-
 
 # Main function to run the entire tutorial
 async def max_pages_and_thresholds():
@@ -496,7 +491,6 @@ async def run_tutorial():
     print("\n🎉 TUTORIAL COMPLETE! 🎉")
     print("You now have a comprehensive understanding of deep crawling with Crawl4AI.")
     print("For more information, check out https://docs.crawl4ai.com")
-
 
 # Execute the tutorial when run directly
 if __name__ == "__main__":
