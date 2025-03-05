@@ -1,13 +1,16 @@
 """SSL Certificate class for handling certificate operations."""
 
 import ssl
+import socks
 import socket
 import base64
+from datetime import datetime
 import json
 from typing import Dict, Any, Optional
 from urllib.parse import urlparse
 import OpenSSL.crypto
 from pathlib import Path
+from .configs.proxy_config import ProxyConfig
 
 
 class SSLCertificate:
@@ -31,13 +34,16 @@ class SSLCertificate:
         self._cert_info = self._decode_cert_data(cert_info)
 
     @staticmethod
-    def from_url(url: str, timeout: int = 10) -> Optional["SSLCertificate"]:
+    def from_url(
+        url: str, timeout: int = 10, proxy_config: Optional[ProxyConfig] = None
+    ) -> Optional["SSLCertificate"]:
         """
         Create SSLCertificate instance from a URL.
 
         Args:
             url (str): URL of the website.
             timeout (int): Timeout for the connection (default: 10).
+            proxy_config (Optional[ProxyConfig]]): Proxy configuration (default: None).
 
         Returns:
             Optional[SSLCertificate]: SSLCertificate instance if successful, None otherwise.
@@ -47,9 +53,60 @@ class SSLCertificate:
             if ":" in hostname:
                 hostname = hostname.split(":")[0]
 
-            context = ssl.create_default_context()
-            with socket.create_connection((hostname, 443), timeout=timeout) as sock:
+            proxy_host = proxy_port = proxy_username = proxy_password = None
+            proxy_schema = "socks"
+
+            # Setup proxy if configuration is provided
+            if proxy_config:
+                proxy_server = proxy_config.server
+                if proxy_server:
+                    parsed = urlparse(proxy_server)
+                    proxy_host = parsed.hostname
+                    proxy_port = parsed.port or 80
+                    proxy_schema = parsed.scheme or "http"
+                    proxy_username = proxy_config.username
+                    proxy_password = proxy_config.password
+
+            # Create socket based on proxy settings
+            sock = None
+            try:
+                if proxy_host and proxy_port:
+                    # Create a socks socket if proxy settings are provided
+                    sock = socks.socksocket()
+                    if "http" in proxy_schema.lower():
+                        proxy_type = (
+                            socks.HTTPS
+                            if "https" in proxy_schema.lower()
+                            else socks.HTTP
+                        )
+                        sock.set_proxy(
+                            proxy_type,
+                            proxy_host,
+                            proxy_port,
+                            username=proxy_username,
+                            password=proxy_password,
+                        )
+                    else:
+                        proxy_type = socks.SOCKS5
+                        sock.set_proxy(
+                            proxy_type,
+                            proxy_host,
+                            proxy_port,
+                            username=proxy_username,
+                            password=proxy_password,
+                        )
+
+                    sock.settimeout(timeout)
+                    sock.connect((hostname, 443))
+                else:
+                    # Use regular socket without proxy
+                    sock = socket.create_connection((hostname, 443), timeout=timeout)
+
+                context = ssl.create_default_context()
                 with context.wrap_socket(sock, server_hostname=hostname) as ssock:
+                    # Transfer ownership of sock to ssock, so we don't need to close sock separately
+                    sock = None
+
                     cert_binary = ssock.getpeercert(binary_form=True)
                     x509 = OpenSSL.crypto.load_certificate(
                         OpenSSL.crypto.FILETYPE_ASN1, cert_binary
@@ -77,7 +134,18 @@ class SSLCertificate:
                     cert_info["extensions"] = extensions
 
                     return SSLCertificate(cert_info)
+            finally:
+                # Ensure sock is closed if it wasn't transferred to the SSL context
+                if sock:
+                    try:
+                        sock.close()
+                    except Exception:
+                        pass  # Ignore any errors during closing
 
+        except (socket.gaierror, socket.timeout):
+            return None
+        except socks.ProxyError:
+            return None
         except Exception:
             return None
 
@@ -96,6 +164,15 @@ class SSLCertificate:
         elif isinstance(data, list):
             return [SSLCertificate._decode_cert_data(item) for item in data]
         return data
+
+    @staticmethod
+    def _parse_certificate_time(time_str: str) -> int:
+        """Parse certificate time."""
+        if time_str.endswith("Z"):
+            time_str = time_str[:-1]
+
+        dt = datetime.strptime(time_str, "%Y%m%d%H%M%S")
+        return int(dt.timestamp())
 
     def to_json(self, filepath: Optional[str] = None) -> Optional[str]:
         """
@@ -157,6 +234,20 @@ class SSLCertificate:
             return der_data
         except Exception:
             return None
+
+    def to_playwright_format(self) -> Dict[str, Any]:
+        """
+        Export certificate as Playwright format.
+        """
+        return {
+            "issuer": self.issuer.get("CN"),
+            "subject": self.subject.get("CN"),
+            "valid_from": self._parse_certificate_time(self.valid_from),
+            "valid_until": self._parse_certificate_time(self.valid_until),
+        }
+
+    def __str__(self) -> str:
+        return self.to_json()
 
     @property
     def issuer(self) -> Dict[str, str]:

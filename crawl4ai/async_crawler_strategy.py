@@ -31,6 +31,7 @@ from types import MappingProxyType
 import contextlib
 from functools import partial
 
+
 class AsyncCrawlerStrategy(ABC):
     """
     Abstract base class for crawler strategies.
@@ -40,6 +41,7 @@ class AsyncCrawlerStrategy(ABC):
     @abstractmethod
     async def crawl(self, url: str, **kwargs) -> AsyncCrawlResponse:
         pass  # 4 + 3
+
 
 class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
     """
@@ -490,7 +492,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         response_headers = {}
         execution_result = None
         status_code = None
-        redirected_url = url 
+        redirected_url = url
 
         # Reset downloaded files list for new crawl
         self._downloaded_files = []
@@ -517,7 +519,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             await context.add_init_script(load_js_script("navigator_overrider"))
 
         # Call hook after page creation
-        await self.execute_hook("on_page_context_created", page, context=context, config=config)
+        await self.execute_hook(
+            "on_page_context_created", page, context=context, config=config
+        )
 
         # Set up console logging if requested
         if config.log_console:
@@ -545,7 +549,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             # Get SSL certificate information if requested and URL is HTTPS
             ssl_cert = None
             if config.fetch_ssl_certificate:
-                ssl_cert = SSLCertificate.from_url(url)
+                ssl_cert = SSLCertificate.from_url(
+                    url, proxy_config=config.proxy_config
+                )
 
             # Set up download handling
             if self.browser_config.accept_downloads:
@@ -558,7 +564,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
             # Handle page navigation and content loading
             if not config.js_only:
-                await self.execute_hook("before_goto", page, context=context, url=url, config=config)
+                await self.execute_hook(
+                    "before_goto", page, context=context, url=url, config=config
+                )
 
                 try:
                     # Generate a unique nonce for this request
@@ -579,7 +587,12 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     raise RuntimeError(f"Failed on navigating ACS-GOTO:\n{str(e)}")
 
                 await self.execute_hook(
-                    "after_goto", page, context=context, url=url, response=response, config=config
+                    "after_goto",
+                    page,
+                    context=context,
+                    url=url,
+                    response=response,
+                    config=config,
                 )
 
                 if response is None:
@@ -754,8 +767,16 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         params={"error": execution_result.get("error")},
                     )
 
-                await self.execute_hook("on_execution_started", page, context=context, config=config)
-                await self.execute_hook("on_execution_ended", page, context=context, config=config, result=execution_result)
+                await self.execute_hook(
+                    "on_execution_started", page, context=context, config=config
+                )
+                await self.execute_hook(
+                    "on_execution_ended",
+                    page,
+                    context=context,
+                    config=config,
+                    result=execution_result,
+                )
 
             # Handle user simulation
             if config.simulate_user or config.magic:
@@ -798,7 +819,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 page = await self.process_iframes(page)
 
             # Pre-content retrieval hooks and delay
-            await self.execute_hook("before_retrieve_html", page, context=context, config=config)
+            await self.execute_hook(
+                "before_retrieve_html", page, context=context, config=config
+            )
             if config.delay_before_return_html:
                 await asyncio.sleep(config.delay_before_return_html)
 
@@ -809,7 +832,11 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             # Get final HTML content
             html = await page.content()
             await self.execute_hook(
-                "before_return_html", page=page, html=html, context=context, config=config
+                "before_return_html",
+                page=page,
+                html=html,
+                context=context,
+                config=config,
             )
 
             # Handle PDF and screenshot generation
@@ -889,7 +916,10 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             viewport_size = page.viewport_size
             if viewport_size is None:
                 await page.set_viewport_size(
-                    {"width": self.browser_config.viewport_width, "height": self.browser_config.viewport_height}
+                    {
+                        "width": self.browser_config.viewport_width,
+                        "height": self.browser_config.viewport_height,
+                    }
                 )
                 viewport_size = page.viewport_size
 
@@ -953,7 +983,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         """
         try:
             suggested_filename = download.suggested_filename
-            download_path = os.path.join(self.browser_config.downloads_path, suggested_filename)
+            download_path = os.path.join(
+                self.browser_config.downloads_path, suggested_filename
+            )
 
             self.logger.info(
                 message="Downloading {filename} to {path}",
@@ -1421,7 +1453,6 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     t1 = time.time()
                     await page.wait_for_load_state("domcontentloaded", timeout=5000)
 
-
                     t1 = time.time()
                     await page.wait_for_load_state("networkidle", timeout=5000)
 
@@ -1605,18 +1636,22 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 # HTTP Crawler Strategy
 ####################################################################################################
 
+
 class HTTPCrawlerError(Exception):
     """Base error class for HTTP crawler specific exceptions"""
+
     pass
 
 
 class ConnectionTimeoutError(HTTPCrawlerError):
     """Raised when connection timeout occurs"""
+
     pass
 
 
 class HTTPStatusError(HTTPCrawlerError):
     """Raised for unexpected status codes"""
+
     def __init__(self, status_code: int, message: str):
         self.status_code = status_code
         super().__init__(f"HTTP {status_code}: {message}")
@@ -1626,31 +1661,41 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
     """
     Fast, lightweight HTTP-only crawler strategy optimized for memory efficiency.
     """
-    
-    __slots__ = ('logger', 'max_connections', 'dns_cache_ttl', 'chunk_size', '_session', 'hooks', 'browser_config')
+
+    __slots__ = (
+        "logger",
+        "max_connections",
+        "dns_cache_ttl",
+        "chunk_size",
+        "_session",
+        "hooks",
+        "browser_config",
+    )
 
     DEFAULT_TIMEOUT: Final[int] = 30
-    DEFAULT_CHUNK_SIZE: Final[int] = 64 * 1024  
+    DEFAULT_CHUNK_SIZE: Final[int] = 64 * 1024
     DEFAULT_MAX_CONNECTIONS: Final[int] = min(32, (os.cpu_count() or 1) * 4)
     DEFAULT_DNS_CACHE_TTL: Final[int] = 300
-    VALID_SCHEMES: Final = frozenset({'http', 'https', 'file', 'raw'})
+    VALID_SCHEMES: Final = frozenset({"http", "https", "file", "raw"})
 
-    _BASE_HEADERS: Final = MappingProxyType({
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-    })
-    
+    _BASE_HEADERS: Final = MappingProxyType(
+        {
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        }
+    )
+
     def __init__(
-        self, 
+        self,
         browser_config: Optional[HTTPCrawlerConfig] = None,
         logger: Optional[AsyncLogger] = None,
         max_connections: int = DEFAULT_MAX_CONNECTIONS,
         dns_cache_ttl: int = DEFAULT_DNS_CACHE_TTL,
-        chunk_size: int = DEFAULT_CHUNK_SIZE
+        chunk_size: int = DEFAULT_CHUNK_SIZE,
     ):
         """Initialize the HTTP crawler with config"""
         self.browser_config = browser_config or HTTPCrawlerConfig()
@@ -1659,22 +1704,21 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
         self.dns_cache_ttl = dns_cache_ttl
         self.chunk_size = chunk_size
         self._session: Optional[aiohttp.ClientSession] = None
-        
+
         self.hooks = {
-            k: partial(self._execute_hook, k) 
-            for k in ('before_request', 'after_request', 'on_error')
+            k: partial(self._execute_hook, k)
+            for k in ("before_request", "after_request", "on_error")
         }
 
         # Set default hooks
-        self.set_hook('before_request', lambda *args, **kwargs: None)
-        self.set_hook('after_request', lambda *args, **kwargs: None)
-        self.set_hook('on_error', lambda *args, **kwargs: None)
-                      
+        self.set_hook("before_request", lambda *args, **kwargs: None)
+        self.set_hook("after_request", lambda *args, **kwargs: None)
+        self.set_hook("on_error", lambda *args, **kwargs: None)
 
     async def __aenter__(self) -> AsyncHTTPCrawlerStrategy:
         await self.start()
         return self
-        
+
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         await self.close()
 
@@ -1694,11 +1738,7 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
             raise ValueError(f"Invalid hook type: {hook_type}")
 
     async def _execute_hook(
-        self, 
-        hook_type: str, 
-        hook_func: Callable,
-        *args: Any, 
-        **kwargs: Any
+        self, hook_type: str, hook_func: Callable, *args: Any, **kwargs: Any
     ) -> Any:
         if asyncio.iscoroutinefunction(hook_func):
             return await hook_func(*args, **kwargs)
@@ -1710,12 +1750,12 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
                 limit=self.max_connections,
                 ttl_dns_cache=self.dns_cache_ttl,
                 use_dns_cache=True,
-                force_close=False
+                force_close=False,
             )
             self._session = aiohttp.ClientSession(
                 headers=dict(self._BASE_HEADERS),
                 connector=connector,
-                timeout=ClientTimeout(total=self.DEFAULT_TIMEOUT)
+                timeout=ClientTimeout(total=self.DEFAULT_TIMEOUT),
             )
 
     async def close(self) -> None:
@@ -1725,141 +1765,131 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
             except asyncio.TimeoutError:
                 if self.logger:
                     self.logger.warning(
-                        message="Session cleanup timed out",
-                        tag="CLEANUP"
+                        message="Session cleanup timed out", tag="CLEANUP"
                     )
             finally:
                 self._session = None
 
     async def _stream_file(self, path: str) -> AsyncGenerator[memoryview, None]:
-        async with aiofiles.open(path, mode='rb') as f:
+        async with aiofiles.open(path, mode="rb") as f:
             while chunk := await f.read(self.chunk_size):
                 yield memoryview(chunk)
 
     async def _handle_file(self, path: str) -> AsyncCrawlResponse:
         if not os.path.exists(path):
             raise FileNotFoundError(f"Local file not found: {path}")
-            
+
         chunks = []
         async for chunk in self._stream_file(path):
-            chunks.append(chunk.tobytes().decode('utf-8', errors='replace'))
-            
+            chunks.append(chunk.tobytes().decode("utf-8", errors="replace"))
+
         return AsyncCrawlResponse(
-            html=''.join(chunks),
-            response_headers={},
-            status_code=200
+            html="".join(chunks), response_headers={}, status_code=200
         )
 
     async def _handle_raw(self, content: str) -> AsyncCrawlResponse:
-        return AsyncCrawlResponse(
-            html=content,
-            response_headers={},
-            status_code=200
-        )
-
+        return AsyncCrawlResponse(html=content, response_headers={}, status_code=200)
 
     async def _handle_http(
-        self, 
-        url: str, 
-        config: CrawlerRunConfig
+        self, url: str, config: CrawlerRunConfig
     ) -> AsyncCrawlResponse:
         async with self._session_context() as session:
             timeout = ClientTimeout(
                 total=config.page_timeout or self.DEFAULT_TIMEOUT,
                 connect=10,
-                sock_read=30
+                sock_read=30,
             )
-            
+
             headers = dict(self._BASE_HEADERS)
             if self.browser_config.headers:
                 headers.update(self.browser_config.headers)
 
             request_kwargs = {
-                'timeout': timeout,
-                'allow_redirects': self.browser_config.follow_redirects,
-                'ssl': self.browser_config.verify_ssl,
-                'headers': headers
+                "timeout": timeout,
+                "allow_redirects": self.browser_config.follow_redirects,
+                "ssl": self.browser_config.verify_ssl,
+                "headers": headers,
             }
 
             if self.browser_config.method == "POST":
                 if self.browser_config.data:
-                    request_kwargs['data'] = self.browser_config.data
+                    request_kwargs["data"] = self.browser_config.data
                 if self.browser_config.json:
-                    request_kwargs['json'] = self.browser_config.json
+                    request_kwargs["json"] = self.browser_config.json
 
-            await self.hooks['before_request'](url, request_kwargs)
+            await self.hooks["before_request"](url, request_kwargs)
 
             try:
-                async with session.request(self.browser_config.method, url, **request_kwargs) as response:
+                async with session.request(
+                    self.browser_config.method, url, **request_kwargs
+                ) as response:
                     content = memoryview(await response.read())
-                    
+
                     if not (200 <= response.status < 300):
                         raise HTTPStatusError(
-                            response.status,
-                            f"Unexpected status code for {url}"
+                            response.status, f"Unexpected status code for {url}"
                         )
-                    
+
                     encoding = response.charset
                     if not encoding:
-                        encoding = cchardet.detect(content.tobytes())['encoding'] or 'utf-8'                    
-                    
+                        encoding = (
+                            cchardet.detect(content.tobytes())["encoding"] or "utf-8"
+                        )
+
                     result = AsyncCrawlResponse(
-                        html=content.tobytes().decode(encoding, errors='replace'),
+                        html=content.tobytes().decode(encoding, errors="replace"),
                         response_headers=dict(response.headers),
                         status_code=response.status,
-                        redirected_url=str(response.url)
+                        redirected_url=str(response.url),
                     )
-                    
-                    await self.hooks['after_request'](result)
+
+                    await self.hooks["after_request"](result)
                     return result
 
             except aiohttp.ServerTimeoutError as e:
-                await self.hooks['on_error'](e)
+                await self.hooks["on_error"](e)
                 raise ConnectionTimeoutError(f"Request timed out: {str(e)}")
-                
+
             except aiohttp.ClientConnectorError as e:
-                await self.hooks['on_error'](e)
+                await self.hooks["on_error"](e)
                 raise ConnectionError(f"Connection failed: {str(e)}")
-                
+
             except aiohttp.ClientError as e:
-                await self.hooks['on_error'](e)
+                await self.hooks["on_error"](e)
                 raise HTTPCrawlerError(f"HTTP client error: {str(e)}")
-            
+
             except asyncio.exceptions.TimeoutError as e:
-                await self.hooks['on_error'](e)
+                await self.hooks["on_error"](e)
                 raise ConnectionTimeoutError(f"Request timed out: {str(e)}")
-            
+
             except Exception as e:
-                await self.hooks['on_error'](e)
+                await self.hooks["on_error"](e)
                 raise HTTPCrawlerError(f"HTTP request failed: {str(e)}")
 
     async def crawl(
-        self, 
-        url: str, 
-        config: Optional[CrawlerRunConfig] = None, 
-        **kwargs
+        self, url: str, config: Optional[CrawlerRunConfig] = None, **kwargs
     ) -> AsyncCrawlResponse:
         config = config or CrawlerRunConfig.from_kwargs(kwargs)
-        
+
         parsed = urlparse(url)
-        scheme = parsed.scheme.rstrip('/')
-        
+        scheme = parsed.scheme.rstrip("/")
+
         if scheme not in self.VALID_SCHEMES:
             raise ValueError(f"Unsupported URL scheme: {scheme}")
-            
+
         try:
-            if scheme == 'file':
+            if scheme == "file":
                 return await self._handle_file(parsed.path)
-            elif scheme == 'raw':
+            elif scheme == "raw":
                 return await self._handle_raw(parsed.path)
             else:  # http or https
                 return await self._handle_http(url, config)
-                
+
         except Exception as e:
             if self.logger:
                 self.logger.error(
                     message="Crawl failed: {error}",
                     tag="CRAWL",
-                    params={"error": str(e), "url": url}
+                    params={"error": str(e), "url": url},
                 )
             raise
