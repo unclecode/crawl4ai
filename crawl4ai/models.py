@@ -149,7 +149,11 @@ class CrawlResult(BaseModel):
         markdown_result = data.pop('markdown', None)
         super().__init__(**data)
         if markdown_result is not None:
-            self._markdown = markdown_result
+            self._markdown = (
+                MarkdownGenerationResult(**markdown_result)
+                if isinstance(markdown_result, dict)
+                else markdown_result
+            )
     
     @property
     def markdown(self):

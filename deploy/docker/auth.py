@@ -10,7 +10,7 @@ from pydantic.main import BaseModel
 import base64
 
 instance = JWT()
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 SECRET_KEY = os.environ.get("SECRET_KEY", "mysecret")
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
@@ -30,6 +30,9 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict:
     """Verify the JWT token from the Authorization header."""
+
+    if credentials is None:
+        return None
     token = credentials.credentials
     verifying_key = get_jwk_from_secret(SECRET_KEY)
     try:
@@ -38,9 +41,15 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) 
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
+
 def get_token_dependency(config: Dict):
-    """Return the token dependency if JWT is enabled, else None."""
-    return verify_token if config.get("security", {}).get("jwt_enabled", False) else None
+    """Return the token dependency if JWT is enabled, else a function that returns None."""
+
+    if config.get("security", {}).get("jwt_enabled", False):
+        return verify_token
+    else:
+        return lambda: None
+
 
 class TokenRequest(BaseModel):
     email: EmailStr

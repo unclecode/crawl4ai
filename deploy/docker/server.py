@@ -92,7 +92,7 @@ async def get_markdown(
     f: FilterType = FilterType.FIT,
     q: Optional[str] = None,
     c: Optional[str] = "0",
-    # token_data: Optional[Dict] = Depends(token_dependency)
+    token_data: Optional[Dict] = Depends(token_dependency)
 ):
     result = await handle_markdown_request(url, f, q, c, config)
     return PlainTextResponse(result)
