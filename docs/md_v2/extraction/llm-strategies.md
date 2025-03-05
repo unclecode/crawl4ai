@@ -96,7 +96,8 @@ import asyncio
 import json
 from pydantic import BaseModel, Field
 from typing import List
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, LlmConfig
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
+from crawl4ai.async_configs import LlmConfig #LlmConfig add
 from crawl4ai.extraction_strategy import LLMExtractionStrategy
 
 class Product(BaseModel):
