@@ -1,4 +1,4 @@
-from crawl4ai.async_configs import LlmConfig
+from crawl4ai.types import LLMConfig
 from crawl4ai import AsyncWebCrawler, LLMExtractionStrategy
 import asyncio
 import os
@@ -23,7 +23,7 @@ async def main():
             word_count_threshold=1,
             extraction_strategy=LLMExtractionStrategy(
                 # provider= "openai/gpt-4o", api_token = os.getenv('OPENAI_API_KEY'),
-                llmConfig=LlmConfig(provider="groq/llama-3.1-70b-versatile", api_token=os.getenv("GROQ_API_KEY")),
+                llm_config=LLMConfig(provider="groq/llama-3.1-70b-versatile", api_token=os.getenv("GROQ_API_KEY")),
                 schema=OpenAIModelFee.model_json_schema(),
                 extraction_type="schema",
                 instruction="From the crawled content, extract all mentioned model names along with their "

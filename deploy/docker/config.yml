@@ -3,7 +3,7 @@ app:
   title: "Crawl4AI API"
   version: "1.0.0"
   host: "0.0.0.0"
-  port: 8000
+  port: 8020
   reload: True
   timeout_keep_alive: 300
 
@@ -38,8 +38,8 @@ rate_limiting:
 
 # Security Configuration
 security:
-  enabled: true 
-  jwt_enabled: true 
+  enabled: false 
+  jwt_enabled: false 
   https_redirect: false
   trusted_hosts: ["*"]
   headers:

@@ -1,9 +1,7 @@
 import click
 import os
 import time
-import datetime
-import sys
-import shutil
+
 import humanize
 from typing import Dict, Any, Optional, List
 import json
@@ -13,7 +11,6 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 from rich.prompt import Prompt, Confirm
-from rich.style import Style
 
 from crawl4ai import (
     CacheMode,
@@ -26,12 +23,12 @@ from crawl4ai import (
     JsonXPathExtractionStrategy,
     BM25ContentFilter, 
     PruningContentFilter,
-    BrowserProfiler
+    BrowserProfiler,
+    LLMConfig
 )
 from litellm import completion
 from pathlib import Path
 
-from crawl4ai.async_configs import LlmConfig
 
 # Initialize rich console
 console = Console()
@@ -647,7 +644,7 @@ def crawl_cmd(url: str, browser_config: str, crawler_config: str, filter_config:
                     raise click.ClickException("LLM provider and API token are required for LLM extraction")
 
                 crawler_cfg.extraction_strategy = LLMExtractionStrategy(
-                    llmConfig=LlmConfig(provider=extract_conf["provider"], api_token=extract_conf["api_token"]),
+                    llm_config=LLMConfig(provider=extract_conf["provider"], api_token=extract_conf["api_token"]),
                     instruction=extract_conf["instruction"],
                     schema=schema_data,
                     **extract_conf.get("params", {})

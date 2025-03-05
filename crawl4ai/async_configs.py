@@ -13,13 +13,15 @@ from .config import (
 from .user_agent_generator import UAGen, ValidUAGenerator  # , OnlineUAGenerator
 from .extraction_strategy import ExtractionStrategy
 from .chunking_strategy import ChunkingStrategy, RegexChunking
+
 from .markdown_generation_strategy import MarkdownGenerationStrategy
 from .content_scraping_strategy import ContentScrapingStrategy, WebScrapingStrategy
 from .deep_crawling import DeepCrawlStrategy
-from typing import Union, List
+
 from .cache_context import CacheMode
 from .proxy_strategy import ProxyRotationStrategy
 
+from typing import Union, List
 import inspect
 from typing import Any, Dict, Optional
 from enum import Enum
@@ -1042,7 +1044,7 @@ class CrawlerRunConfig():
         return CrawlerRunConfig.from_kwargs(config_dict)
 
 
-class LlmConfig:
+class LLMConfig:
     def __init__(
         self,
         provider: str = DEFAULT_PROVIDER,
@@ -1063,8 +1065,8 @@ class LlmConfig:
 
 
     @staticmethod
-    def from_kwargs(kwargs: dict) -> "LlmConfig":
-        return LlmConfig(
+    def from_kwargs(kwargs: dict) -> "LLMConfig":
+        return LLMConfig(
             provider=kwargs.get("provider", DEFAULT_PROVIDER),
             api_token=kwargs.get("api_token"),
             base_url=kwargs.get("base_url"),
@@ -1084,8 +1086,8 @@ class LlmConfig:
             **kwargs: Key-value pairs of configuration options to update
 
         Returns:
-            LLMConfig: A new instance with the specified updates
+            llm_config: A new instance with the specified updates
         """
         config_dict = self.to_dict()
         config_dict.update(kwargs)
-        return LlmConfig.from_kwargs(config_dict)
+        return LLMConfig.from_kwargs(config_dict)

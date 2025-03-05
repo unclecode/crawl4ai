@@ -1,6 +1,6 @@
 import os
 import time
-from crawl4ai.async_configs import LlmConfig
+from crawl4ai.types import LLMConfig
 from crawl4ai.web_crawler import WebCrawler
 from crawl4ai.chunking_strategy import *
 from crawl4ai.extraction_strategy import *
@@ -179,7 +179,7 @@ def add_llm_extraction_strategy(crawler):
     result = crawler.run(
         url="https://www.nbcnews.com/business",
         extraction_strategy=LLMExtractionStrategy(
-            llmConfig =  LlmConfig(provider="openai/gpt-4o", api_token=os.getenv("OPENAI_API_KEY"))
+            llm_config =  LLMConfig(provider="openai/gpt-4o", api_token=os.getenv("OPENAI_API_KEY"))
         ),
     )
     cprint(
@@ -198,7 +198,7 @@ def add_llm_extraction_strategy(crawler):
     result = crawler.run(
         url="https://www.nbcnews.com/business",
         extraction_strategy=LLMExtractionStrategy(
-            llmConfig=LlmConfig(provider="openai/gpt-4o",api_token=os.getenv("OPENAI_API_KEY")),
+            llm_config=LLMConfig(provider="openai/gpt-4o",api_token=os.getenv("OPENAI_API_KEY")),
             instruction="I am interested in only financial news",
         ),
     )
@@ -210,7 +210,7 @@ def add_llm_extraction_strategy(crawler):
     result = crawler.run(
         url="https://www.nbcnews.com/business",
         extraction_strategy=LLMExtractionStrategy(
-            llmConfig=LlmConfig(provider="openai/gpt-4o",api_token=os.getenv("OPENAI_API_KEY")),
+            llm_config=LLMConfig(provider="openai/gpt-4o",api_token=os.getenv("OPENAI_API_KEY")),
             instruction="Extract only content related to technology",
         ),
     )
