@@ -38,7 +38,7 @@ rate_limiting:
 
 # Security Configuration
 security:
-  enabled: true 
+  enabled: false 
   jwt_enabled: true 
   https_redirect: false
   trusted_hosts: ["*"]
