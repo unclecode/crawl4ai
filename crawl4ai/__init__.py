@@ -2,7 +2,8 @@
 import warnings
 
 from .async_webcrawler import AsyncWebCrawler, CacheMode
-from .async_configs import BrowserConfig, CrawlerRunConfig, HTTPCrawlerConfig
+from .async_configs import BrowserConfig, CrawlerRunConfig, HTTPCrawlerConfig, LLMConfig
+
 from .content_scraping_strategy import (
     ContentScrapingStrategy,
     WebScrapingStrategy,
@@ -68,6 +69,7 @@ __all__ = [
     "AsyncLogger",
     "AsyncWebCrawler",
     "BrowserProfiler",
+    "LLMConfig",
     "DeepCrawlStrategy",
     "BFSDeepCrawlStrategy",
     "BestFirstCrawlingStrategy",

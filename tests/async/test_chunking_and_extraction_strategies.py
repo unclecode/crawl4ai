@@ -7,7 +7,7 @@ import json
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parent_dir)
 
-from crawl4ai.async_configs import LlmConfig
+from crawl4ai.types import LLMConfig
 from crawl4ai.async_webcrawler import AsyncWebCrawler
 from crawl4ai.chunking_strategy import RegexChunking
 from crawl4ai.extraction_strategy import LLMExtractionStrategy
@@ -49,7 +49,7 @@ async def test_llm_extraction_strategy():
     async with AsyncWebCrawler(verbose=True) as crawler:
         url = "https://www.nbcnews.com/business"
         extraction_strategy = LLMExtractionStrategy(
-            llmConfig=LlmConfig(provider="openai/gpt-4o-mini",api_token=os.getenv("OPENAI_API_KEY")),
+            llm_config=LLMConfig(provider="openai/gpt-4o-mini",api_token=os.getenv("OPENAI_API_KEY")),
             instruction="Extract only content related to technology",
         )
         result = await crawler.arun(

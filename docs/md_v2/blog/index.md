@@ -16,7 +16,7 @@ My dear friends and crawlers, there you go, this is the release of Crawl4AI v0.5
 *   **Multiple Crawler Strategies:** Choose between the full-featured Playwright browser-based crawler or a new, *much* faster HTTP-only crawler for simpler tasks.
 *   **Docker Deployment:**  Deploy Crawl4AI as a scalable, self-contained service with built-in API endpoints and optional JWT authentication.
 *   **Command-Line Interface (CLI):**  Interact with Crawl4AI directly from your terminal.  Crawl, configure, and extract data with simple commands.
-*   **LLM Configuration (`LlmConfig`):** A new, unified way to configure LLM providers (OpenAI, Anthropic, Ollama, etc.) for extraction, filtering, and schema generation.  Simplifies API key management and switching between models.
+*   **LLM Configuration (`LLMConfig`):** A new, unified way to configure LLM providers (OpenAI, Anthropic, Ollama, etc.) for extraction, filtering, and schema generation.  Simplifies API key management and switching between models.
 
 **Minor Updates & Improvements:**
 
@@ -47,7 +47,7 @@ This release includes several breaking changes to improve the library's structur
 * **Config**: FastFilterChain has been replaced with FilterChain
 * **Deep-Crawl**: DeepCrawlStrategy.arun now returns Union[CrawlResultT, List[CrawlResultT], AsyncGenerator[CrawlResultT, None]]
 * **Proxy**: Removed synchronous WebCrawler support and related rate limiting configurations
-*   **LLM Parameters:** Use the new `LlmConfig` object instead of passing `provider`, `api_token`, `base_url`, and `api_base` directly to `LLMExtractionStrategy` and `LLMContentFilter`.
+*   **LLM Parameters:** Use the new `LLMConfig` object instead of passing `provider`, `api_token`, `base_url`, and `api_base` directly to `LLMExtractionStrategy` and `LLMContentFilter`.
 
 **In short:** Update imports, adjust `arun_many()` usage, check for optional fields, and review the Docker deployment guide.
 

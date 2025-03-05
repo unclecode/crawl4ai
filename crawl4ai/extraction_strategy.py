@@ -4,12 +4,10 @@ from typing import Any, List, Dict, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import time
-import os
 
 from .prompts import PROMPT_EXTRACT_BLOCKS, PROMPT_EXTRACT_BLOCKS_WITH_INSTRUCTION, PROMPT_EXTRACT_SCHEMA_WITH_INSTRUCTION, JSON_SCHEMA_BUILDER_XPATH
 from .config import (
-    DEFAULT_PROVIDER, PROVIDER_MODELS, 
-    CHUNK_TOKEN_THRESHOLD,
+    DEFAULT_PROVIDER, CHUNK_TOKEN_THRESHOLD,
     OVERLAP_RATE,
     WORD_TOKEN_RATE,
 )
@@ -22,9 +20,7 @@ from .utils import (
     extract_xml_data,
     split_and_parse_json_objects,
     sanitize_input_encode,
-    chunk_documents,
     merge_chunks,
-    advanced_split,
 )
 from .models import * # noqa: F403
 
@@ -38,8 +34,9 @@ from .model_loader import (
     calculate_batch_size
 )
 
+from .types import LLMConfig
+
 from functools import partial
-import math
 import numpy as np
 import re
 from bs4 import BeautifulSoup
@@ -481,8 +478,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
     A strategy that uses an LLM to extract meaningful content from the HTML.
 
     Attributes:
-        provider: The provider to use for extraction. It follows the format <provider_name>/<model_name>, e.g., "ollama/llama3.3".
-        api_token: The API token for the provider.
+        llm_config: The LLM configuration object.
         instruction: The instruction to use for the LLM model.
         schema: Pydantic model schema for structured data.
         extraction_type: "block" or "schema".
@@ -490,27 +486,20 @@ class LLMExtractionStrategy(ExtractionStrategy):
         overlap_rate: Overlap between chunks.
         word_token_rate: Word to token conversion rate.
         apply_chunking: Whether to apply chunking.
-        base_url: The base URL for the API request.
-        api_base: The base URL for the API request.
-        extra_args: Additional arguments for the API request, such as temprature, max_tokens, etc.
         verbose: Whether to print verbose output.
         usages: List of individual token usages.
         total_usage: Accumulated token usage.
     """
     _UNWANTED_PROPS = {
-            'provider' : 'Instead, use llmConfig=LlmConfig(provider="...")',
-            'api_token' : 'Instead, use llmConfig=LlMConfig(api_token="...")',
-            'base_url' : 'Instead, use llmConfig=LlmConfig(base_url="...")',
-            'api_base' : 'Instead, use llmConfig=LlmConfig(base_url="...")',
+            'provider' : 'Instead, use llm_config=LLMConfig(provider="...")',
+            'api_token' : 'Instead, use llm_config=LlMConfig(api_token="...")',
+            'base_url' : 'Instead, use llm_config=LLMConfig(base_url="...")',
+            'api_base' : 'Instead, use llm_config=LLMConfig(base_url="...")',
         }
     def __init__(
         self,
-        llmConfig: 'LLMConfig' = None,
+        llm_config: 'LLMConfig' = None,
         instruction: str = None,
-        provider: str = DEFAULT_PROVIDER,
-        api_token: Optional[str] = None,
-        base_url: str = None,
-        api_base: str = None,
         schema: Dict = None,
         extraction_type="block",
         chunk_token_threshold=CHUNK_TOKEN_THRESHOLD,
@@ -519,15 +508,18 @@ class LLMExtractionStrategy(ExtractionStrategy):
         apply_chunking=True,
         input_format: str = "markdown",
         verbose=False,
+        # Deprecated arguments
+        provider: str = DEFAULT_PROVIDER,
+        api_token: Optional[str] = None,
+        base_url: str = None,
+        api_base: str = None,
         **kwargs,
     ):
         """
         Initialize the strategy with clustering parameters.
 
         Args:
-            llmConfig: The LLM configuration object.
-            provider: The provider to use for extraction. It follows the format <provider_name>/<model_name>, e.g., "ollama/llama3.3".
-            api_token: The API token for the provider.
+            llm_config: The LLM configuration object.
             instruction: The instruction to use for the LLM model.
             schema: Pydantic model schema for structured data.
             extraction_type: "block" or "schema".
@@ -535,20 +527,19 @@ class LLMExtractionStrategy(ExtractionStrategy):
             overlap_rate: Overlap between chunks.
             word_token_rate: Word to token conversion rate.
             apply_chunking: Whether to apply chunking.
-            base_url: The base URL for the API request.
-            api_base: The base URL for the API request.
-            extra_args: Additional arguments for the API request, such as temprature, max_tokens, etc.
             verbose: Whether to print verbose output.
             usages: List of individual token usages.
             total_usage: Accumulated token usage.
 
+            # Deprecated arguments, will be removed very soon
+            provider: The provider to use for extraction. It follows the format <provider_name>/<model_name>, e.g., "ollama/llama3.3".
+            api_token: The API token for the provider.
+            base_url: The base URL for the API request.
+            api_base: The base URL for the API request.
+            extra_args: Additional arguments for the API request, such as temprature, max_tokens, etc.
         """
         super().__init__( input_format=input_format, **kwargs)
-        self.llmConfig = llmConfig
-        self.provider = provider
-        self.api_token = api_token
-        self.base_url = base_url
-        self.api_base = api_base
+        self.llm_config = llm_config
         self.instruction = instruction
         self.extract_type = extraction_type
         self.schema = schema
@@ -564,6 +555,11 @@ class LLMExtractionStrategy(ExtractionStrategy):
         self.verbose = verbose
         self.usages = []  # Store individual usages
         self.total_usage = TokenUsage()  # Accumulated usage
+
+        self.provider = provider
+        self.api_token = api_token
+        self.base_url = base_url
+        self.api_base = api_base
 
     
     def __setattr__(self, name, value):
@@ -618,10 +614,10 @@ class LLMExtractionStrategy(ExtractionStrategy):
             )
 
         response = perform_completion_with_backoff(
-            self.llmConfig.provider,
+            self.llm_config.provider,
             prompt_with_variables,
-            self.llmConfig.api_token,
-            base_url=self.llmConfig.base_url,
+            self.llm_config.api_token,
+            base_url=self.llm_config.base_url,
             extra_args=self.extra_args,
         )  # , json_response=self.extract_type == "schema")
         # Track usage
@@ -701,7 +697,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
             overlap=int(self.chunk_token_threshold * self.overlap_rate),
         )
         extracted_content = []
-        if self.llmConfig.provider.startswith("groq/"):
+        if self.llm_config.provider.startswith("groq/"):
             # Sequential processing with a delay
             for ix, section in enumerate(merged_sections):
                 extract_func = partial(self.extract, url)
@@ -1043,8 +1039,8 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
         pass
 
     _GENERATE_SCHEMA_UNWANTED_PROPS = {
-        'provider': 'Instead, use llmConfig=LlmConfig(provider="...")',
-        'api_token': 'Instead, use llmConfig=LlMConfig(api_token="...")',
+        'provider': 'Instead, use llm_config=LLMConfig(provider="...")',
+        'api_token': 'Instead, use llm_config=LlMConfig(api_token="...")',
     }
 
     @staticmethod
@@ -1053,7 +1049,7 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
         schema_type: str = "CSS", # or XPATH
         query: str = None,
         target_json_example: str = None,
-        llmConfig: 'LLMConfig' = None,
+        llm_config: 'LLMConfig' = None,
         provider: str = None,
         api_token: str = None,
         **kwargs
@@ -1066,7 +1062,7 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
             query (str, optional): Natural language description of what data to extract
             provider (str): Legacy Parameter. LLM provider to use 
             api_token (str): Legacy Parameter. API token for LLM provider
-            llmConfig (LlmConfig): LLM configuration object
+            llm_config (LLMConfig): LLM configuration object
             prompt (str, optional): Custom prompt template to use
             **kwargs: Additional args passed to perform_completion_with_backoff
             
@@ -1130,10 +1126,10 @@ In this scenario, use your best judgment to generate the schema. Try to maximize
         try:
             # Call LLM with backoff handling
             response = perform_completion_with_backoff(
-                provider=llmConfig.provider,
+                provider=llm_config.provider,
                 prompt_with_variables="\n\n".join([system_message["content"], user_message["content"]]),
                 json_response = True,                
-                api_token=llmConfig.api_token,
+                api_token=llm_config.api_token,
                 **kwargs
             )
             

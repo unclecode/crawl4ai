@@ -1,6 +1,6 @@
 import os, sys
 
-from crawl4ai.async_configs import LlmConfig
+from crawl4ai.types import LLMConfig
 
 sys.path.append(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -211,7 +211,7 @@ async def extract_structured_data_using_llm(
         word_count_threshold=1,
         page_timeout=80000,
         extraction_strategy=LLMExtractionStrategy(
-            llmConfig=LlmConfig(provider=provider,api_token=api_token),
+            llm_config=LLMConfig(provider=provider,api_token=api_token),
             schema=OpenAIModelFee.model_json_schema(),
             extraction_type="schema",
             instruction="""From the crawled content, extract all mentioned model names along with their fees for input and output tokens. 

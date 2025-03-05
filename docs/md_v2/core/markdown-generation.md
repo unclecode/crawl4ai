@@ -175,13 +175,13 @@ prune_filter = PruningContentFilter(
 For intelligent content filtering and high-quality markdown generation, you can use the **LLMContentFilter**. This filter leverages LLMs to generate relevant markdown while preserving the original content's meaning and structure:
 
 ```python
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, LlmConfig
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, LLMConfig
 from crawl4ai.content_filter_strategy import LLMContentFilter
 
 async def main():
     # Initialize LLM filter with specific instruction
     filter = LLMContentFilter(
-        llmConfig = LlmConfig(provider="openai/gpt-4o",api_token="your-api-token"), #or use environment variable
+        llm_config = LLMConfig(provider="openai/gpt-4o",api_token="your-api-token"), #or use environment variable
         instruction="""
         Focus on extracting the core educational content.
         Include:
