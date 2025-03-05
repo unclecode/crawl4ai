@@ -71,7 +71,7 @@ Below is an overview of important LLM extraction parameters. All are typically s
 
 ```python
 extraction_strategy = LLMExtractionStrategy(
-    llmConfig = LlmConfig(provider="openai/gpt-4", api_token="YOUR_OPENAI_KEY"),
+    llm_config = LLMConfig(provider="openai/gpt-4", api_token="YOUR_OPENAI_KEY"),
     schema=MyModel.model_json_schema(),
     extraction_type="schema",
     instruction="Extract a list of items from the text with 'name' and 'price' fields.",
@@ -96,6 +96,7 @@ import asyncio
 import json
 from pydantic import BaseModel, Field
 from typing import List
+
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
 from crawl4ai.async_configs import LlmConfig #LlmConfig add
 from crawl4ai.extraction_strategy import LLMExtractionStrategy
@@ -107,7 +108,7 @@ class Product(BaseModel):
 async def main():
     # 1. Define the LLM extraction strategy
     llm_strategy = LLMExtractionStrategy(
-        llmConfig = LlmConfig(provider="openai/gpt-4o-mini", api_token=os.getenv('OPENAI_API_KEY')),
+        llm_config = LLMConfig(provider="openai/gpt-4o-mini", api_token=os.getenv('OPENAI_API_KEY')),
         schema=Product.schema_json(), # Or use model_json_schema()
         extraction_type="schema",
         instruction="Extract all product objects with 'name' and 'price' from the content.",

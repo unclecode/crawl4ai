@@ -131,7 +131,7 @@ OverlappingWindowChunking(
 ```python
 from pydantic import BaseModel
 from crawl4ai.extraction_strategy import LLMExtractionStrategy
-from crawl4ai.async_configs import LlmConfig
+from crawl4ai.types import LLMConfig
 
 # Define schema
 class Article(BaseModel):
@@ -141,7 +141,7 @@ class Article(BaseModel):
 
 # Create strategy
 strategy = LLMExtractionStrategy(
-    llmConfig = LlmConfig(provider="ollama/llama2"),
+    llm_config = LLMConfig(provider="ollama/llama2"),
     schema=Article.schema(),
     instruction="Extract article details"
 )
@@ -198,7 +198,7 @@ result = await crawler.arun(
 
 ```python
 from crawl4ai.chunking_strategy import OverlappingWindowChunking
-from crawl4ai.async_configs import LlmConfig
+from crawl4ai.types import LLMConfig
 
 # Create chunking strategy
 chunker = OverlappingWindowChunking(
@@ -208,7 +208,7 @@ chunker = OverlappingWindowChunking(
 
 # Use with extraction strategy
 strategy = LLMExtractionStrategy(
-    llmConfig = LlmConfig(provider="ollama/llama2"),
+    llm_config = LLMConfig(provider="ollama/llama2"),
     chunking_strategy=chunker
 )
 

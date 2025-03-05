@@ -17,7 +17,7 @@ from crawl4ai.configs import ProxyConfig
 from crawl4ai import RoundRobinProxyStrategy
 from crawl4ai.content_filter_strategy import LLMContentFilter
 from crawl4ai import DefaultMarkdownGenerator
-from crawl4ai.async_configs import LlmConfig
+from crawl4ai.types import LLMConfig
 from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
 from crawl4ai.processors.pdf import PDFCrawlerStrategy, PDFContentScrapingStrategy
 from pprint import pprint
@@ -284,9 +284,9 @@ async def llm_content_filter():
     PART 5: LLM Content Filter
     
     This function demonstrates:
-    - Configuring LLM providers via LlmConfig
+    - Configuring LLM providers via LLMConfig
     - Using LLM to generate focused markdown
-    - LlmConfig for configuration
+    - LLMConfig for configuration
     
     Note: Requires a valid API key for the chosen LLM provider
     """
@@ -296,7 +296,7 @@ async def llm_content_filter():
     
     # Create LLM configuration
     # Replace with your actual API key or set as environment variable
-    llm_config = LlmConfig(
+    llm_config = LLMConfig(
         provider="gemini/gemini-1.5-pro", 
         api_token="env:GEMINI_API_KEY"  # Will read from GEMINI_API_KEY environment variable
     )
@@ -309,7 +309,7 @@ async def llm_content_filter():
     # Create markdown generator with LLM filter
     markdown_generator = DefaultMarkdownGenerator(
         content_filter=LLMContentFilter(
-            llmConfig=llm_config,
+            llm_config=llm_config,
             instruction="Extract key concepts and summaries"
         )
     )
@@ -381,7 +381,7 @@ async def llm_schema_generation():
     PART 7: LLM Schema Generation
     
     This function demonstrates:
-    - Configuring LLM providers via LlmConfig
+    - Configuring LLM providers via LLMConfig
     - Using LLM to generate extraction schemas
     - JsonCssExtractionStrategy
     
@@ -406,9 +406,9 @@ async def llm_schema_generation():
         <div class="rating">4.7/5</div>
     </div>
     """
-    print("\n📊 Setting up LlmConfig...")
+    print("\n📊 Setting up LLMConfig...")
     # Create LLM configuration
-    llm_config = LlmConfig(
+    llm_config = LLMConfig(
         provider="gemini/gemini-1.5-pro", 
         api_token="env:GEMINI_API_KEY"
     )
@@ -416,7 +416,7 @@ async def llm_schema_generation():
     print("  This would use the LLM to analyze HTML and create an extraction schema")
     schema = JsonCssExtractionStrategy.generate_schema(
     html=sample_html,
-    llmConfig = llm_config,
+    llm_config = llm_config,
     query="Extract product name and price"
     )
     print("\n✅ Generated Schema:")

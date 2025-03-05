@@ -595,8 +595,8 @@ curl http://localhost:8000/health
 ## Complete Examples
 
 Check out the `examples` folder in our repository for full working examples! Here are two to get you started:
-[Using Client SDK](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/docker_python_sdk_example.py)
-[Using REST API](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/docker_python_rest_api_example.py)
+[Using Client SDK](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/docker_python_sdk.py)
+[Using REST API](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/docker_python_rest_api.py)
 
 ## Server Configuration
 

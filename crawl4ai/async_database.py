@@ -4,10 +4,10 @@ import aiosqlite
 import asyncio
 from typing import Optional, Dict
 from contextlib import asynccontextmanager
-import logging
 import json  # Added for serialization/deserialization
 from .utils import ensure_content_dirs, generate_content_hash
 from .models import CrawlResult, MarkdownGenerationResult, StringCompatibleMarkdown
+# , StringCompatibleMarkdown
 import aiofiles
 from .utils import VersionManager
 from .async_logger import AsyncLogger

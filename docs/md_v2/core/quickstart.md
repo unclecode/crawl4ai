@@ -128,7 +128,7 @@ Crawl4AI can also extract structured data (JSON) using CSS or XPath selectors. B
 
 ```python
 from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
-from crawl4ai.async_configs import LlmConfig
+from crawl4ai.types import LLMConfig
 
 # Generate a schema (one-time cost)
 html = "<div class='product'><h2>Gaming Laptop</h2><span class='price'>$999.99</span></div>"
@@ -136,13 +136,13 @@ html = "<div class='product'><h2>Gaming Laptop</h2><span class='price'>$999.99</
 # Using OpenAI (requires API token)
 schema = JsonCssExtractionStrategy.generate_schema(
     html,
-    llmConfig = LlmConfig(provider="openai/gpt-4o",api_token="your-openai-token")  # Required for OpenAI
+    llm_config = LLMConfig(provider="openai/gpt-4o",api_token="your-openai-token")  # Required for OpenAI
 )
 
 # Or using Ollama (open source, no token needed)
 schema = JsonCssExtractionStrategy.generate_schema(
     html,
-    llmConfig = LlmConfig(provider="ollama/llama3.3", api_token=None)  # Not needed for Ollama
+    llm_config = LLMConfig(provider="ollama/llama3.3", api_token=None)  # Not needed for Ollama
 )
 
 # Use the schema for fast, repeated extractions
@@ -211,7 +211,7 @@ import os
 import json
 import asyncio
 from pydantic import BaseModel, Field
-from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, LlmConfig
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, LLMConfig
 from crawl4ai.extraction_strategy import LLMExtractionStrategy
 
 class OpenAIModelFee(BaseModel):
@@ -241,7 +241,7 @@ async def extract_structured_data_using_llm(
         word_count_threshold=1,
         page_timeout=80000,
         extraction_strategy=LLMExtractionStrategy(
-            llmConfig = LlmConfig(provider=provider,api_token=api_token),
+            llm_config = LLMConfig(provider=provider,api_token=api_token),
             schema=OpenAIModelFee.model_json_schema(),
             extraction_type="schema",
             instruction="""From the crawled content, extract all mentioned model names along with their fees for input and output tokens. 

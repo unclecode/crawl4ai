@@ -18,7 +18,8 @@ from crawl4ai import (
     CacheMode,
     BrowserConfig,
     MemoryAdaptiveDispatcher,
-    RateLimiter
+    RateLimiter, 
+    LLMConfig
 )
 from crawl4ai.utils import perform_completion_with_backoff
 from crawl4ai.content_filter_strategy import (
@@ -103,8 +104,10 @@ async def process_llm_extraction(
         else:
             api_key = os.environ.get(config["llm"].get("api_key_env", None), "")
         llm_strategy = LLMExtractionStrategy(
-            provider=config["llm"]["provider"],
-            api_token=api_key,
+            llm_config=LLMConfig(
+                provider=config["llm"]["provider"],
+                api_token=api_key
+            ),
             instruction=instruction,
             schema=json.loads(schema) if schema else None,
         )
@@ -164,8 +167,10 @@ async def handle_markdown_request(
                 FilterType.FIT: PruningContentFilter(),
                 FilterType.BM25: BM25ContentFilter(user_query=query or ""),
                 FilterType.LLM: LLMContentFilter(
-                    provider=config["llm"]["provider"],
-                    api_token=os.environ.get(config["llm"].get("api_key_env", None), ""),
+                    llm_config=LLMConfig(
+                        provider=config["llm"]["provider"],
+                        api_token=os.environ.get(config["llm"].get("api_key_env", None), ""),
+                    ),
                     instruction=query or "Extract main content"
                 )
             }[filter_type]
