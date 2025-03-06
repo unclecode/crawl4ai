@@ -10,6 +10,7 @@ from .filters import FilterChain
 from .scorers import URLScorer
 from . import DeepCrawlStrategy  
 from ..types import AsyncWebCrawler, CrawlerRunConfig, CrawlResult
+from ..utils import normalize_url_for_deep_crawl, efficient_normalize_url_for_deep_crawl
 from math import inf as infinity
 
 class BFSDeepCrawlStrategy(DeepCrawlStrategy):
@@ -99,14 +100,17 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
         # First collect all valid links
         for link in links:
             url = link.get("href")
-            if url in visited:
+            # Strip URL fragments to avoid duplicate crawling
+            # base_url = url.split('#')[0] if url else url
+            base_url = normalize_url_for_deep_crawl(url, source_url)
+            if base_url in visited:
                 continue
             if not await self.can_process_url(url, next_depth):
                 self.stats.urls_skipped += 1
                 continue
 
             # Score the URL if a scorer is provided
-            score = self.url_scorer.score(url) if self.url_scorer else 0
+            score = self.url_scorer.score(base_url) if self.url_scorer else 0
             
             # Skip URLs with scores below the threshold
             if score < self.score_threshold:
@@ -114,7 +118,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
                 self.stats.urls_skipped += 1
                 continue
             
-            valid_links.append((url, score))
+            valid_links.append((base_url, score))
         
         # If we have more valid links than capacity, sort by score and take the top ones
         if len(valid_links) > remaining_capacity:

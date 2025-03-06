@@ -427,6 +427,11 @@ class DomainFilter(URLFilter):
         if isinstance(domains, str):
             return {domains.lower()}
         return {d.lower() for d in domains}
+    
+    @staticmethod
+    def _is_subdomain(domain: str, parent_domain: str) -> bool:
+        """Check if domain is a subdomain of parent_domain"""
+        return domain == parent_domain or domain.endswith(f".{parent_domain}")
 
     @staticmethod
     @lru_cache(maxsize=10000)
@@ -444,20 +449,26 @@ class DomainFilter(URLFilter):
 
         domain = self._extract_domain(url)
 
-        # Early return for blocked domains
-        if domain in self._blocked_domains:
-            self._update_stats(False)
-            return False
+        # Check for blocked domains, including subdomains
+        for blocked in self._blocked_domains:
+            if self._is_subdomain(domain, blocked):
+                self._update_stats(False)
+                return False
 
         # If no allowed domains specified, accept all non-blocked
         if self._allowed_domains is None:
             self._update_stats(True)
             return True
 
-        # Final allowed domains check
-        result = domain in self._allowed_domains
-        self._update_stats(result)
-        return result
+        # Check if domain matches any allowed domain (including subdomains)
+        for allowed in self._allowed_domains:
+            if self._is_subdomain(domain, allowed):
+                self._update_stats(True)
+                return True
+
+        # No matches found
+        self._update_stats(False)
+        return False
 
 
 class ContentRelevanceFilter(URLFilter):
