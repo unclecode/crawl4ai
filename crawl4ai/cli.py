@@ -644,7 +644,7 @@ def crawl_cmd(url: str, browser_config: str, crawler_config: str, filter_config:
                     raise click.ClickException("LLM provider and API token are required for LLM extraction")
 
                 crawler_cfg.extraction_strategy = LLMExtractionStrategy(
-                    llm_config=LLMConfig(provider=extract_conf["provider"], api_token=extract_conf["api_token"]),
+                    llm_config=LLMConfig(provider=extract_conf["provider"], api_token=extract_conf["api_token"], base_url=extract_conf.get("base_url")),
                     instruction=extract_conf["instruction"],
                     schema=schema_data,
                     **extract_conf.get("params", {})
