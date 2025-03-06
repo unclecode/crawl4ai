@@ -1064,7 +1064,7 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
             api_token (str): Legacy Parameter. API token for LLM provider
             llm_config (LLMConfig): LLM configuration object
             prompt (str, optional): Custom prompt template to use
-            **kwargs: Additional args passed to perform_completion_with_backoff
+            **kwargs: Additional args passed to LLM processor
             
         Returns:
             dict: Generated schema following the JsonElementExtractionStrategy format
@@ -1130,7 +1130,8 @@ In this scenario, use your best judgment to generate the schema. Try to maximize
                 prompt_with_variables="\n\n".join([system_message["content"], user_message["content"]]),
                 json_response = True,                
                 api_token=llm_config.api_token,
-                **kwargs
+                base_url=llm_config.base_url,
+                extra_args=kwargs
             )
             
             # Extract and return schema

@@ -13,7 +13,7 @@ from rich.live import Live
 from rich.table import Table
 from rich.console import Console
 from rich import box
-from datetime import timedelta
+from datetime import timedelta, datetime
 from collections.abc import AsyncGenerator
 import time
 import psutil
