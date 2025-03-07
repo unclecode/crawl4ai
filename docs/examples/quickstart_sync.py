@@ -1,6 +1,6 @@
 import os
 import time
-from crawl4ai.types import LLMConfig
+from crawl4ai import LLMConfig
 from crawl4ai.web_crawler import WebCrawler
 from crawl4ai.chunking_strategy import *
 from crawl4ai.extraction_strategy import *

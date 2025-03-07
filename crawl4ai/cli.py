@@ -1,5 +1,6 @@
 import click
 import os
+import sys
 import time
 
 import humanize
@@ -199,7 +200,24 @@ def show_examples():
     # 2. Then use that profile to crawl the authenticated site:
     crwl https://site-requiring-login.com/dashboard -p my-profile-name
 
-5️⃣  Sample Config Files:
+5️⃣  CDP Mode for Browser Automation:
+    # Launch browser with CDP debugging on default port 9222
+    crwl cdp
+
+    # Use a specific profile and custom port
+    crwl cdp -p my-profile -P 9223
+
+    # Launch headless browser with CDP enabled
+    crwl cdp --headless
+
+    # Launch in incognito mode (ignores profile)
+    crwl cdp --incognito
+
+    # Use the CDP URL with other tools (Puppeteer, Playwright, etc.)
+    # The URL will be displayed in the terminal when the browser starts
+
+    
+6️⃣  Sample Config Files:
 
 browser.yml:
     headless: true
@@ -257,7 +275,7 @@ llm_schema.json:
       }
     }
 
-6️⃣  Advanced Usage:
+7️⃣  Advanced Usage:
     # Combine configs with direct parameters
     crwl https://example.com -B browser.yml -b "headless=false,viewport_width=1920"
 
@@ -283,7 +301,7 @@ llm_schema.json:
 
 For more documentation visit: https://github.com/unclecode/crawl4ai
 
-7️⃣  Q&A with LLM:
+8️⃣  Q&A with LLM:
     # Ask a question about the content
     crwl https://example.com -q "What is the main topic discussed?"
 
@@ -311,7 +329,7 @@ For more documentation visit: https://github.com/unclecode/crawl4ai
     
     See full list of providers: https://docs.litellm.ai/docs/providers
 
-8️⃣ Profile Management:
+9️⃣ Profile Management:
     # Launch interactive profile manager
     crwl profiles
 
@@ -550,10 +568,88 @@ async def manage_profiles():
         # Add a separator between operations
         console.print("\n")
 
+
+
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
 def cli():
     """Crawl4AI CLI - Web content extraction and browser profile management tool"""
     pass
+
+
+@cli.command("cdp")
+@click.option("--user-data-dir", "-d", help="Directory to use for browser data (will be created if it doesn't exist)")
+@click.option("--port", "-P", type=int, default=9222, help="Debugging port (default: 9222)")
+@click.option("--browser-type", "-b", type=click.Choice(["chromium", "firefox"]), default="chromium", 
+              help="Browser type (default: chromium)")
+@click.option("--headless", is_flag=True, help="Run browser in headless mode")
+@click.option("--incognito", is_flag=True, help="Run in incognito/private mode (ignores user-data-dir)")
+def cdp_cmd(user_data_dir: Optional[str], port: int, browser_type: str, headless: bool, incognito: bool):
+    """Launch a standalone browser with CDP debugging enabled
+    
+    This command launches a browser with Chrome DevTools Protocol (CDP) debugging enabled,
+    prints the CDP URL, and keeps the browser running until you press 'q'.
+    
+    The CDP URL can be used for various automation and debugging tasks.
+    
+    Examples:
+        # Launch Chromium with CDP on default port 9222
+        crwl cdp
+        
+        # Use a specific directory for browser data and custom port
+        crwl cdp --user-data-dir ~/browser-data --port 9223
+        
+        # Launch in headless mode
+        crwl cdp --headless
+        
+        # Launch in incognito mode (ignores user-data-dir)
+        crwl cdp --incognito
+    """
+    profiler = BrowserProfiler()
+    
+    try:
+        # Handle data directory
+        data_dir = None
+        if not incognito and user_data_dir:
+            # Expand user path (~/something)
+            expanded_path = os.path.expanduser(user_data_dir)
+            
+            # Create directory if it doesn't exist
+            if not os.path.exists(expanded_path):
+                console.print(f"[yellow]Directory '{expanded_path}' doesn't exist. Creating it.[/yellow]")
+                os.makedirs(expanded_path, exist_ok=True)
+            
+            data_dir = expanded_path
+        
+        # Print launch info
+        console.print(Panel(
+            f"[cyan]Launching browser with CDP debugging[/cyan]\n\n"
+            f"Browser type: [green]{browser_type}[/green]\n"
+            f"Debugging port: [yellow]{port}[/yellow]\n"
+            f"User data directory: [cyan]{data_dir or 'Temporary directory'}[/cyan]\n"
+            f"Headless: [cyan]{'Yes' if headless else 'No'}[/cyan]\n"
+            f"Incognito: [cyan]{'Yes' if incognito else 'No'}[/cyan]\n\n"
+            f"[yellow]Press 'q' to quit when done[/yellow]",
+            title="CDP Browser",
+            border_style="cyan"
+        ))
+        
+        # Run the browser
+        cdp_url = anyio.run(
+            profiler.launch_standalone_browser,
+            browser_type,
+            data_dir,
+            port,
+            headless
+        )
+        
+        if not cdp_url:
+            console.print("[red]Failed to launch browser or get CDP URL[/red]")
+            sys.exit(1)
+            
+    except Exception as e:
+        console.print(f"[red]Error launching CDP browser: {str(e)}[/red]")
+        sys.exit(1)
+
 
 @cli.command("crawl")
 @click.argument("url", required=True)
@@ -749,6 +845,7 @@ def default(url: str, example: bool, browser_config: str, crawler_config: str, f
     Other commands:
         crwl profiles   - Manage browser profiles for identity-based crawling
         crwl crawl      - Crawl a website with advanced options
+        crwl cdp        - Launch browser with CDP debugging enabled
         crwl examples   - Show more usage examples
     """
 

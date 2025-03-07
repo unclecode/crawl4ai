@@ -342,7 +342,11 @@ class BrowserProfiler:
         
         # Check if path exists and is a valid profile
         if not os.path.isdir(profile_path):
-            return None
+            # Chrck if profile_name itself is full path
+            if os.path.isabs(profile_name):
+                profile_path = profile_name
+            else:
+                return None
         
         # Look for profile indicators
         is_profile = (
@@ -542,3 +546,224 @@ class BrowserProfiler:
                 
             else:
                 self.logger.error(f"Invalid choice. Please enter a number between 1 and {exit_option}.", tag="MENU")
+
+
+    async def launch_standalone_browser(self, 
+                                  browser_type: str = "chromium",
+                                  user_data_dir: Optional[str] = None,
+                                  debugging_port: int = 9222,
+                                  headless: bool = False) -> Optional[str]:
+        """
+        Launch a standalone browser with CDP debugging enabled and keep it running
+        until the user presses 'q'. Returns and displays the CDP URL.
+        
+        Args:
+            browser_type (str): Type of browser to launch ('chromium' or 'firefox')
+            user_data_dir (str, optional): Path to user profile directory
+            debugging_port (int): Port to use for CDP debugging
+            headless (bool): Whether to run in headless mode
+            
+        Returns:
+            str: CDP URL for the browser, or None if launch failed
+            
+        Example:
+            ```python
+            profiler = BrowserProfiler()
+            cdp_url = await profiler.launch_standalone_browser(
+                user_data_dir="/path/to/profile",
+                debugging_port=9222
+            )
+            # Use cdp_url to connect to the browser
+            ```
+        """
+        # Use the provided directory if specified, otherwise create a temporary directory
+        if user_data_dir:
+            # Directory is provided directly, ensure it exists
+            profile_path = user_data_dir
+            os.makedirs(profile_path, exist_ok=True)
+        else:
+            # Create a temporary profile directory
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            profile_name = f"temp_{timestamp}_{uuid.uuid4().hex[:6]}"
+            profile_path = os.path.join(self.profiles_dir, profile_name)
+            os.makedirs(profile_path, exist_ok=True)
+        
+        # Print initial information
+        border = f"{Fore.CYAN}{'='*80}{Style.RESET_ALL}"
+        self.logger.info(f"\n{border}", tag="CDP")
+        self.logger.info(f"Launching standalone browser with CDP debugging", tag="CDP")
+        self.logger.info(f"Browser type: {Fore.GREEN}{browser_type}{Style.RESET_ALL}", tag="CDP")
+        self.logger.info(f"Profile path: {Fore.YELLOW}{profile_path}{Style.RESET_ALL}", tag="CDP")
+        self.logger.info(f"Debugging port: {Fore.CYAN}{debugging_port}{Style.RESET_ALL}", tag="CDP")
+        self.logger.info(f"Headless mode: {Fore.CYAN}{headless}{Style.RESET_ALL}", tag="CDP")
+        
+        # Create managed browser instance
+        managed_browser = ManagedBrowser(
+            browser_type=browser_type,
+            user_data_dir=profile_path,
+            headless=headless,
+            logger=self.logger,
+            debugging_port=debugging_port
+        )
+        
+        # Set up signal handlers to ensure cleanup on interrupt
+        original_sigint = signal.getsignal(signal.SIGINT)
+        original_sigterm = signal.getsignal(signal.SIGTERM)
+        
+        # Define cleanup handler for signals
+        async def cleanup_handler(sig, frame):
+            self.logger.warning("\nCleaning up browser process...", tag="CDP")
+            await managed_browser.cleanup()
+            # Restore original signal handlers
+            signal.signal(signal.SIGINT, original_sigint)
+            signal.signal(signal.SIGTERM, original_sigterm)
+            if sig == signal.SIGINT:
+                self.logger.error("Browser terminated by user.", tag="CDP")
+                sys.exit(1)
+                    
+        # Set signal handlers
+        def sigint_handler(sig, frame):
+            asyncio.create_task(cleanup_handler(sig, frame))
+        
+        signal.signal(signal.SIGINT, sigint_handler)
+        signal.signal(signal.SIGTERM, sigint_handler)
+        
+        # Event to signal when user wants to exit
+        user_done_event = asyncio.Event()
+        
+        # Run keyboard input loop in a separate task
+        async def listen_for_quit_command():
+            import termios
+            import tty
+            import select
+            
+            # First output the prompt
+            self.logger.info(f"{Fore.CYAN}Press '{Fore.WHITE}q{Fore.CYAN}' to stop the browser and exit...{Style.RESET_ALL}", tag="CDP")
+            
+            # Save original terminal settings
+            fd = sys.stdin.fileno()
+            old_settings = termios.tcgetattr(fd)
+            
+            try:
+                # Switch to non-canonical mode (no line buffering)
+                tty.setcbreak(fd)
+                
+                while True:
+                    # Check if input is available (non-blocking)
+                    readable, _, _ = select.select([sys.stdin], [], [], 0.5)
+                    if readable:
+                        key = sys.stdin.read(1)
+                        if key.lower() == 'q':
+                            self.logger.info(f"{Fore.GREEN}Closing browser...{Style.RESET_ALL}", tag="CDP")
+                            user_done_event.set()
+                            return
+                    
+                    # Check if the browser process has already exited
+                    if managed_browser.browser_process and managed_browser.browser_process.poll() is not None:
+                        self.logger.info("Browser already closed. Ending input listener.", tag="CDP")
+                        user_done_event.set()
+                        return
+                        
+                    await asyncio.sleep(0.1)
+            
+            finally:
+                # Restore terminal settings 
+                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+                
+        # Function to retrieve and display CDP JSON config
+        async def get_cdp_json(port):
+            import aiohttp
+            cdp_url = f"http://localhost:{port}"
+            json_url = f"{cdp_url}/json/version"
+            
+            try:
+                async with aiohttp.ClientSession() as session:
+                    # Try multiple times in case the browser is still starting up
+                    for _ in range(10):
+                        try:
+                            async with session.get(json_url) as response:
+                                if response.status == 200:
+                                    data = await response.json()
+                                    return cdp_url, data
+                        except Exception:
+                            pass
+                        
+                        await asyncio.sleep(0.5)
+                    
+                    return cdp_url, None
+            except Exception as e:
+                self.logger.error(f"Error fetching CDP JSON: {str(e)}", tag="CDP")
+                return cdp_url, None
+        
+        cdp_url = None
+        config_json = None
+        
+        try:
+            # Start the browser
+            await managed_browser.start()
+            
+            # Check if browser started successfully
+            browser_process = managed_browser.browser_process
+            if not browser_process:
+                self.logger.error("Failed to start browser process.", tag="CDP")
+                return None
+            
+            self.logger.info(f"Browser launched successfully. Retrieving CDP information...", tag="CDP") 
+            
+            # Get CDP URL and JSON config
+            cdp_url, config_json = await get_cdp_json(debugging_port)
+            
+            if cdp_url:
+                self.logger.success(f"CDP URL: {Fore.GREEN}{cdp_url}{Style.RESET_ALL}", tag="CDP")
+                
+                if config_json:
+                    # Display relevant CDP information
+                    self.logger.info(f"Browser: {Fore.CYAN}{config_json.get('Browser', 'Unknown')}{Style.RESET_ALL}", tag="CDP")
+                    self.logger.info(f"Protocol Version: {config_json.get('Protocol-Version', 'Unknown')}", tag="CDP")
+                    if 'webSocketDebuggerUrl' in config_json:
+                        self.logger.info(f"WebSocket URL: {Fore.GREEN}{config_json['webSocketDebuggerUrl']}{Style.RESET_ALL}", tag="CDP")
+                else:
+                    self.logger.warning("Could not retrieve CDP configuration JSON", tag="CDP")
+            else:
+                self.logger.error(f"Failed to get CDP URL on port {debugging_port}", tag="CDP")
+                await managed_browser.cleanup()
+                return None
+            
+            # Start listening for keyboard input
+            listener_task = asyncio.create_task(listen_for_quit_command())
+            
+            # Wait for the user to press 'q' or for the browser process to exit naturally
+            while not user_done_event.is_set() and browser_process.poll() is None:
+                await asyncio.sleep(0.5)
+            
+            # Cancel the listener task if it's still running
+            if not listener_task.done():
+                listener_task.cancel()
+                try:
+                    await listener_task
+                except asyncio.CancelledError:
+                    pass
+            
+            # If the browser is still running and the user pressed 'q', terminate it
+            if browser_process.poll() is None and user_done_event.is_set():
+                self.logger.info("Terminating browser process...", tag="CDP")
+                await managed_browser.cleanup()
+            
+            self.logger.success(f"Browser closed.", tag="CDP")
+                
+        except Exception as e:
+            self.logger.error(f"Error launching standalone browser: {str(e)}", tag="CDP")
+            await managed_browser.cleanup()
+            return None
+        finally:
+            # Restore original signal handlers
+            signal.signal(signal.SIGINT, original_sigint)
+            signal.signal(signal.SIGTERM, original_sigterm)
+            
+            # Make sure browser is fully cleaned up
+            await managed_browser.cleanup()
+        
+        # Return the CDP URL
+        return cdp_url
+    
+

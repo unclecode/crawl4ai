@@ -7,7 +7,7 @@ import json
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parent_dir)
 
-from crawl4ai.types import LLMConfig
+from crawl4ai import LLMConfig
 from crawl4ai.async_webcrawler import AsyncWebCrawler
 from crawl4ai.chunking_strategy import RegexChunking
 from crawl4ai.extraction_strategy import LLMExtractionStrategy
