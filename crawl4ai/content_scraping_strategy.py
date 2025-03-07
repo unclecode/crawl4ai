@@ -742,7 +742,7 @@ class WebScrapingStrategy(ContentScrapingStrategy):
                 for element in body.select(excluded_selector):
                     element.extract()
 
-        if css_selector:
+        if False and css_selector:
             selected_elements = body.select(css_selector)
             if not selected_elements:
                 return {
@@ -848,6 +848,7 @@ class WebScrapingStrategy(ContentScrapingStrategy):
 
         return {
             # **markdown_content,
+            "scraped_html": html,
             "cleaned_html": cleaned_html,
             "success": success,
             "media": media,
