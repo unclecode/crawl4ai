@@ -26,6 +26,8 @@ import inspect
 from typing import Any, Dict, Optional
 from enum import Enum
 
+from .proxy_strategy import ProxyConfig
+
 
 def to_serializable_dict(obj: Any, ignore_default_value : bool = False) -> Dict:
     """
@@ -180,7 +182,7 @@ class BrowserConfig:
                               is "chromium". Default: "chromium".
         proxy (Optional[str]): Proxy server URL (e.g., "http://username:password@proxy:port"). If None, no proxy is used.
                              Default: None.
-        proxy_config (dict or None): Detailed proxy configuration, e.g. {"server": "...", "username": "..."}.
+        proxy_config (ProxyConfig or dict or None): Detailed proxy configuration, e.g. {"server": "...", "username": "..."}.
                                      If None, no additional proxy config. Default: None.
         viewport_width (int): Default viewport width for pages. Default: 1080.
         viewport_height (int): Default viewport height for pages. Default: 600.
@@ -225,7 +227,7 @@ class BrowserConfig:
         chrome_channel: str = "chromium",
         channel: str = "chromium",
         proxy: str = None,
-        proxy_config: dict = None,
+        proxy_config: Union[ProxyConfig, dict, None] = None,
         viewport_width: int = 1080,
         viewport_height: int = 600,
         viewport: dict = None,
@@ -315,7 +317,7 @@ class BrowserConfig:
             chrome_channel=kwargs.get("chrome_channel", "chromium"),
             channel=kwargs.get("channel", "chromium"),
             proxy=kwargs.get("proxy"),
-            proxy_config=kwargs.get("proxy_config"),
+            proxy_config=kwargs.get("proxy_config", None),
             viewport_width=kwargs.get("viewport_width", 1080),
             viewport_height=kwargs.get("viewport_height", 600),
             accept_downloads=kwargs.get("accept_downloads", False),
@@ -515,7 +517,7 @@ class CrawlerRunConfig():
                            Default: "lxml".
         scraping_strategy (ContentScrapingStrategy): Scraping strategy to use.
                            Default: WebScrapingStrategy.
-        proxy_config (dict or None): Detailed proxy configuration, e.g. {"server": "...", "username": "..."}.
+        proxy_config (ProxyConfig or dict or None): Detailed proxy configuration, e.g. {"server": "...", "username": "..."}.
                                      If None, no additional proxy config. Default: None.
 
         # SSL Parameters
@@ -656,7 +658,7 @@ class CrawlerRunConfig():
         prettiify: bool = False,
         parser_type: str = "lxml",
         scraping_strategy: ContentScrapingStrategy = None,
-        proxy_config: dict = None,
+        proxy_config: Union[ProxyConfig, dict, None] = None,
         proxy_rotation_strategy: Optional[ProxyRotationStrategy] = None,
         # SSL Parameters
         fetch_ssl_certificate: bool = False,

@@ -531,9 +531,9 @@ class BrowserManager:
                 ProxySettings(server=self.config.proxy)
                 if self.config.proxy
                 else ProxySettings(
-                    server=self.config.proxy_config.get("server"),
-                    username=self.config.proxy_config.get("username"),
-                    password=self.config.proxy_config.get("password"),
+                    server=self.config.proxy_config.server,
+                    username=self.config.proxy_config.username,
+                    password=self.config.proxy_config.password,
                 )
             )
             browser_args["proxy"] = proxy_settings
