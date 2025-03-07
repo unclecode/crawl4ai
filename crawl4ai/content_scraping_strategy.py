@@ -286,9 +286,9 @@ class WebScrapingStrategy(ContentScrapingStrategy):
         Returns:
             dict: A dictionary containing the processed image information.
         """
-        # parse_srcset = lambda s: [{'url': u.strip().split()[0], 'width': u.strip().split()[-1].rstrip('w')
-        #                 if ' ' in u else None}
-        #                 for u in [f"http{p}" for p in s.split("http") if p]]
+        parse_srcset = lambda s: [{'url': u.strip().split()[0], 'width': u.strip().split()[-1].rstrip('w').split('.')[0]
+                        if ' ' in u else None} 
+                        for u in [f"http{p}" for p in s.split("http") if p]]
 
         # Constants for checks
         classes_to_check = frozenset(["button", "icon", "logo"])
