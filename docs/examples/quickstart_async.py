@@ -1,6 +1,6 @@
 import os, sys
 
-from crawl4ai.types import LLMConfig
+from crawl4ai import LLMConfig
 
 # append parent directory to system path
 sys.path.append(

@@ -1168,7 +1168,8 @@ class JsonCssExtractionStrategy(JsonElementExtractionStrategy):
         super().__init__(schema, **kwargs)
 
     def _parse_html(self, html_content: str):
-        return BeautifulSoup(html_content, "html.parser")
+        # return BeautifulSoup(html_content, "html.parser")
+        return BeautifulSoup(html_content, "lxml")
 
     def _get_base_elements(self, parsed_html, selector: str):
         return parsed_html.select(selector)
@@ -1187,6 +1188,373 @@ class JsonCssExtractionStrategy(JsonElementExtractionStrategy):
     def _get_element_attribute(self, element, attribute: str):
         return element.get(attribute)
 
+class JsonLxmlExtractionStrategy(JsonElementExtractionStrategy):
+    def __init__(self, schema: Dict[str, Any], **kwargs):
+        kwargs["input_format"] = "html"
+        super().__init__(schema, **kwargs)
+        self._selector_cache = {}
+        self._xpath_cache = {}
+        self._result_cache = {}
+        
+        # Control selector optimization strategy
+        self.use_caching = kwargs.get("use_caching", True)
+        self.optimize_common_patterns = kwargs.get("optimize_common_patterns", True)
+        
+        # Load lxml dependencies once
+        from lxml import etree, html
+        from lxml.cssselect import CSSSelector
+        self.etree = etree
+        self.html_parser = html
+        self.CSSSelector = CSSSelector
+    
+    def _parse_html(self, html_content: str):
+        """Parse HTML content with error recovery"""
+        try:
+            parser = self.etree.HTMLParser(recover=True, remove_blank_text=True)
+            return self.etree.fromstring(html_content, parser)
+        except Exception as e:
+            if self.verbose:
+                print(f"Error parsing HTML, falling back to alternative method: {e}")
+            try:
+                return self.html_parser.fromstring(html_content)
+            except Exception as e2:
+                if self.verbose:
+                    print(f"Critical error parsing HTML: {e2}")
+                # Create minimal document as fallback
+                return self.etree.Element("html")
+    
+    def _optimize_selector(self, selector_str):
+        """Optimize common selector patterns for better performance"""
+        if not self.optimize_common_patterns:
+            return selector_str
+            
+        # Handle td:nth-child(N) pattern which is very common in table scraping
+        import re
+        if re.search(r'td:nth-child\(\d+\)', selector_str):
+            return selector_str  # Already handled specially in _apply_selector
+            
+        # Split complex selectors into parts for optimization
+        parts = selector_str.split()
+        if len(parts) <= 1:
+            return selector_str
+            
+        # For very long selectors, consider using just the last specific part
+        if len(parts) > 3 and any(p.startswith('.') or p.startswith('#') for p in parts):
+            specific_parts = [p for p in parts if p.startswith('.') or p.startswith('#')]
+            if specific_parts:
+                return specific_parts[-1]  # Use most specific class/id selector
+                
+        return selector_str
+    
+    def _create_selector_function(self, selector_str):
+        """Create a selector function that handles all edge cases"""
+        original_selector = selector_str
+        
+        # Try to optimize the selector if appropriate
+        if self.optimize_common_patterns:
+            selector_str = self._optimize_selector(selector_str)
+        
+        try:
+            # Attempt to compile the CSS selector
+            compiled = self.CSSSelector(selector_str)
+            xpath = compiled.path
+            
+            # Store XPath for later use
+            self._xpath_cache[selector_str] = xpath
+            
+            # Create the wrapper function that implements the selection strategy
+            def selector_func(element, context_sensitive=True):
+                cache_key = None
+                
+                # Use result caching if enabled
+                if self.use_caching:
+                    # Create a cache key based on element and selector
+                    element_id = element.get('id', '') or str(hash(element))
+                    cache_key = f"{element_id}::{selector_str}"
+                    
+                    if cache_key in self._result_cache:
+                        return self._result_cache[cache_key]
+                
+                results = []
+                try:
+                    # Strategy 1: Direct CSS selector application (fastest)
+                    results = compiled(element)
+                    
+                    # If that fails and we need context sensitivity
+                    if not results and context_sensitive:
+                        # Strategy 2: Try XPath with context adjustment
+                        context_xpath = self._make_context_sensitive_xpath(xpath, element)
+                        if context_xpath:
+                            results = element.xpath(context_xpath)
+                        
+                        # Strategy 3: Handle special case - nth-child
+                        if not results and 'nth-child' in original_selector:
+                            results = self._handle_nth_child_selector(element, original_selector)
+                        
+                        # Strategy 4: Direct descendant search for class/ID selectors
+                        if not results:
+                            results = self._fallback_class_id_search(element, original_selector)
+                            
+                        # Strategy 5: Last resort - tag name search for the final part
+                        if not results:
+                            parts = original_selector.split()
+                            if parts:
+                                last_part = parts[-1]
+                                # Extract tag name from the selector
+                                tag_match = re.match(r'^(\w+)', last_part)
+                                if tag_match:
+                                    tag_name = tag_match.group(1)
+                                    results = element.xpath(f".//{tag_name}")
+                    
+                    # Cache results if caching is enabled
+                    if self.use_caching and cache_key:
+                        self._result_cache[cache_key] = results
+                        
+                except Exception as e:
+                    if self.verbose:
+                        print(f"Error applying selector '{selector_str}': {e}")
+                
+                return results
+                
+            return selector_func
+            
+        except Exception as e:
+            if self.verbose:
+                print(f"Error compiling selector '{selector_str}': {e}")
+            
+            # Fallback function for invalid selectors
+            return lambda element, context_sensitive=True: []
+    
+    def _make_context_sensitive_xpath(self, xpath, element):
+        """Convert absolute XPath to context-sensitive XPath"""
+        try:
+            # If starts with descendant-or-self, it's already context-sensitive
+            if xpath.startswith('descendant-or-self::'):
+                return xpath
+                
+            # Remove leading slash if present
+            if xpath.startswith('/'):
+                context_xpath = f".{xpath}"
+            else:
+                context_xpath = f".//{xpath}"
+                
+            # Validate the XPath by trying it
+            try:
+                element.xpath(context_xpath)
+                return context_xpath
+            except:
+                # If that fails, try a simpler descendant search
+                return f".//{xpath.split('/')[-1]}"
+        except:
+            return None
+    
+    def _handle_nth_child_selector(self, element, selector_str):
+        """Special handling for nth-child selectors in tables"""
+        import re
+        results = []
+        
+        try:
+            # Extract the column number from td:nth-child(N)
+            match = re.search(r'td:nth-child\((\d+)\)', selector_str)
+            if match:
+                col_num = match.group(1)
+                
+                # Check if there's content after the nth-child part
+                remaining_selector = selector_str.split(f"td:nth-child({col_num})", 1)[-1].strip()
+                
+                if remaining_selector:
+                    # If there's a specific element we're looking for after the column
+                    # Extract any tag names from the remaining selector
+                    tag_match = re.search(r'(\w+)', remaining_selector)
+                    tag_name = tag_match.group(1) if tag_match else '*'
+                    results = element.xpath(f".//td[{col_num}]//{tag_name}")
+                else:
+                    # Just get the column cell
+                    results = element.xpath(f".//td[{col_num}]")
+        except Exception as e:
+            if self.verbose:
+                print(f"Error handling nth-child selector: {e}")
+                
+        return results
+    
+    def _fallback_class_id_search(self, element, selector_str):
+        """Fallback to search by class or ID"""
+        results = []
+        
+        try:
+            # Extract class selectors (.classname)
+            import re
+            class_matches = re.findall(r'\.([a-zA-Z0-9_-]+)', selector_str)
+            
+            # Extract ID selectors (#idname)
+            id_matches = re.findall(r'#([a-zA-Z0-9_-]+)', selector_str)
+            
+            # Try each class
+            for class_name in class_matches:
+                class_results = element.xpath(f".//*[contains(@class, '{class_name}')]")
+                results.extend(class_results)
+                
+            # Try each ID (usually more specific)
+            for id_name in id_matches:
+                id_results = element.xpath(f".//*[@id='{id_name}']")
+                results.extend(id_results)
+        except Exception as e:
+            if self.verbose:
+                print(f"Error in fallback class/id search: {e}")
+                
+        return results
+    
+    def _get_selector(self, selector_str):
+        """Get or create a selector function with caching"""
+        if selector_str not in self._selector_cache:
+            self._selector_cache[selector_str] = self._create_selector_function(selector_str)
+        return self._selector_cache[selector_str]
+    
+    def _get_base_elements(self, parsed_html, selector: str):
+        """Get all base elements using the selector"""
+        selector_func = self._get_selector(selector)
+        # For base elements, we don't need context sensitivity
+        return selector_func(parsed_html, context_sensitive=False)
+    
+    def _get_elements(self, element, selector: str):
+        """Get child elements using the selector with context sensitivity"""
+        selector_func = self._get_selector(selector)
+        return selector_func(element, context_sensitive=True)
+    
+    def _get_element_text(self, element) -> str:
+        """Extract normalized text from element"""
+        try:
+            # Get all text nodes and normalize
+            text = " ".join(t.strip() for t in element.xpath(".//text()") if t.strip())
+            return text
+        except Exception as e:
+            if self.verbose:
+                print(f"Error extracting text: {e}")
+            # Fallback
+            try:
+                return element.text_content().strip()
+            except:
+                return ""
+    
+    def _get_element_html(self, element) -> str:
+        """Get HTML string representation of element"""
+        try:
+            return self.etree.tostring(element, encoding='unicode', method='html')
+        except Exception as e:
+            if self.verbose:
+                print(f"Error serializing HTML: {e}")
+            return ""
+    
+    def _get_element_attribute(self, element, attribute: str):
+        """Get attribute value safely"""
+        try:
+            return element.get(attribute)
+        except Exception as e:
+            if self.verbose:
+                print(f"Error getting attribute '{attribute}': {e}")
+            return None
+            
+    def _clear_caches(self):
+        """Clear caches to free memory"""
+        if self.use_caching:
+            self._result_cache.clear()
+
+class JsonLxmlExtractionStrategy_naive(JsonElementExtractionStrategy):
+    def __init__(self, schema: Dict[str, Any], **kwargs):
+        kwargs["input_format"] = "html"  # Force HTML input
+        super().__init__(schema, **kwargs)
+        self._selector_cache = {}
+    
+    def _parse_html(self, html_content: str):
+        from lxml import etree
+        parser = etree.HTMLParser(recover=True)
+        return etree.fromstring(html_content, parser)
+    
+    def _get_selector(self, selector_str):
+        """Get a selector function that works within the context of an element"""
+        if selector_str not in self._selector_cache:
+            from lxml.cssselect import CSSSelector
+            try:
+                # Store both the compiled selector and its xpath translation
+                compiled = CSSSelector(selector_str)
+                
+                # Create a function that will apply this selector appropriately
+                def select_func(element):
+                    try:
+                        # First attempt: direct CSS selector application
+                        results = compiled(element)
+                        if results:
+                            return results
+                        
+                        # Second attempt: contextual XPath selection
+                        # Convert the root-based XPath to a context-based XPath
+                        xpath = compiled.path
+                        
+                        # If the XPath already starts with descendant-or-self, handle it specially
+                        if xpath.startswith('descendant-or-self::'):
+                            context_xpath = xpath
+                        else:
+                            # For normal XPath expressions, make them relative to current context
+                            context_xpath = f"./{xpath.lstrip('/')}"
+                        
+                        results = element.xpath(context_xpath)
+                        if results:
+                            return results
+                        
+                        # Final fallback: simple descendant search for common patterns
+                        if 'nth-child' in selector_str:
+                            # Handle td:nth-child(N) pattern
+                            import re
+                            match = re.search(r'td:nth-child\((\d+)\)', selector_str)
+                            if match:
+                                col_num = match.group(1)
+                                sub_selector = selector_str.split(')', 1)[-1].strip()
+                                if sub_selector:
+                                    return element.xpath(f".//td[{col_num}]//{sub_selector}")
+                                else:
+                                    return element.xpath(f".//td[{col_num}]")
+                        
+                        # Last resort: try each part of the selector separately
+                        parts = selector_str.split()
+                        if len(parts) > 1 and parts[-1]:
+                            return element.xpath(f".//{parts[-1]}")
+                            
+                        return []
+                    except Exception as e:
+                        if self.verbose:
+                            print(f"Error applying selector '{selector_str}': {e}")
+                        return []
+                
+                self._selector_cache[selector_str] = select_func
+            except Exception as e:
+                if self.verbose:
+                    print(f"Error compiling selector '{selector_str}': {e}")
+                
+                # Fallback function for invalid selectors
+                def fallback_func(element):
+                    return []
+                
+                self._selector_cache[selector_str] = fallback_func
+                
+        return self._selector_cache[selector_str]
+    
+    def _get_base_elements(self, parsed_html, selector: str):
+        selector_func = self._get_selector(selector)
+        return selector_func(parsed_html)
+    
+    def _get_elements(self, element, selector: str):
+        selector_func = self._get_selector(selector)
+        return selector_func(element)
+    
+    def _get_element_text(self, element) -> str:
+        return "".join(element.xpath(".//text()")).strip()
+    
+    def _get_element_html(self, element) -> str:
+        from lxml import etree
+        return etree.tostring(element, encoding='unicode')
+    
+    def _get_element_attribute(self, element, attribute: str):
+        return element.get(attribute)    
 
 class JsonXPathExtractionStrategy(JsonElementExtractionStrategy):
     """

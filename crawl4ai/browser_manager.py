@@ -434,8 +434,9 @@ class BrowserManager:
 
             self.playwright = await async_playwright().start()
 
-        if self.config.use_managed_browser:
-            cdp_url = await self.managed_browser.start()
+        if self.config.cdp_url or self.config.use_managed_browser:
+            self.config.use_managed_browser = True
+            cdp_url = await self.managed_browser.start() if not self.config.cdp_url else self.config.cdp_url
             self.browser = await self.playwright.chromium.connect_over_cdp(cdp_url)
             contexts = self.browser.contexts
             if contexts:
@@ -790,7 +791,10 @@ class BrowserManager:
         # If using a managed browser, just grab the shared default_context
         if self.config.use_managed_browser:
             context = self.default_context
-            page = await context.new_page()
+            pages = context.pages
+            page = next((p for p in pages if p.url == crawlerRunConfig.url), None)
+            if not page:
+                page = await context.new_page()
         else:
             # Otherwise, check if we have an existing context for this config
             config_signature = self._make_config_signature(crawlerRunConfig)
@@ -840,6 +844,9 @@ class BrowserManager:
 
     async def close(self):
         """Close all browser resources and clean up."""
+        if self.config.cdp_url:
+            return
+        
         if self.config.sleep_on_close:
             await asyncio.sleep(0.5)
 
