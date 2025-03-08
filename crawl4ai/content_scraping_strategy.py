@@ -848,7 +848,7 @@ class WebScrapingStrategy(ContentScrapingStrategy):
 
         return {
             # **markdown_content,
-            "scraped_html": html,
+            # "scraped_html": html,
             "cleaned_html": cleaned_html,
             "success": success,
             "media": media,
