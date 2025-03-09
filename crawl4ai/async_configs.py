@@ -597,6 +597,8 @@ class CrawlerRunConfig():
                                      Default: IMAGE_SCORE_THRESHOLD (e.g., 3).
         exclude_external_images (bool): If True, exclude all external images from processing.
                                          Default: False.
+        table_score_threshold (int): Minimum score threshold for processing a table.
+                                     Default: 7.
 
         # Link and Domain Handling Parameters
         exclude_social_media_domains (list of str): List of domains to exclude for social media links.
@@ -698,6 +700,7 @@ class CrawlerRunConfig():
         pdf: bool = False,
         image_description_min_word_threshold: int = IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
         image_score_threshold: int = IMAGE_SCORE_THRESHOLD,
+        table_score_threshold: int = 7,
         exclude_external_images: bool = False,
         # Link and Domain Handling Parameters
         exclude_social_media_domains: list = None,
@@ -783,6 +786,7 @@ class CrawlerRunConfig():
         self.image_description_min_word_threshold = image_description_min_word_threshold
         self.image_score_threshold = image_score_threshold
         self.exclude_external_images = exclude_external_images
+        self.table_score_threshold = table_score_threshold
 
         # Link and Domain Handling Parameters
         self.exclude_social_media_domains = (
@@ -913,6 +917,7 @@ class CrawlerRunConfig():
             image_score_threshold=kwargs.get(
                 "image_score_threshold", IMAGE_SCORE_THRESHOLD
             ),
+            table_score_threshold=kwargs.get("table_score_threshold", 7),
             exclude_external_images=kwargs.get("exclude_external_images", False),
             # Link and Domain Handling Parameters
             exclude_social_media_domains=kwargs.get(
@@ -1001,6 +1006,7 @@ class CrawlerRunConfig():
             "pdf": self.pdf,
             "image_description_min_word_threshold": self.image_description_min_word_threshold,
             "image_score_threshold": self.image_score_threshold,
+            "table_score_threshold": self.table_score_threshold,
             "exclude_external_images": self.exclude_external_images,
             "exclude_social_media_domains": self.exclude_social_media_domains,
             "exclude_external_links": self.exclude_external_links,

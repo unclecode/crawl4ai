@@ -326,6 +326,7 @@ class Media(BaseModel):
     audios: List[
         MediaItem
     ] = []  # Using MediaItem model for now, can be extended with Audio model if needed
+    tables: List[Dict] = []  # Table data extracted from HTML tables
 
 
 class Links(BaseModel):
