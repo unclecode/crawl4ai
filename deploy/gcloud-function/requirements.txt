@@ -1,0 +1,5 @@
+functions-framework==3.*
+flask==2.3.3
+requests==2.31.0
+websockets==12.0
+git+https://github.com/unclecode/crawl4ai.git@next

@@ -1,0 +1,8 @@
+project_id: PROJECT_ID
+region: REGION_NAME
+artifact_repo: ARTIFACT_REPO_NAME
+function_name: FUNCTION_NAME
+memory: "2048MB"
+timeout: "540s"
+local_image: "gcr.io/ARTIFACT_REPO_NAME/crawl4ai:latest"
+test_query_url: "https://example.com"
