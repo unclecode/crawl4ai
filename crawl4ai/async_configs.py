@@ -11,7 +11,7 @@ from .config import (
 )
 
 from .user_agent_generator import UAGen, ValidUAGenerator  # , OnlineUAGenerator
-from .extraction_strategy import ExtractionStrategy
+from .extraction_strategy import ExtractionStrategy, LLMExtractionStrategy
 from .chunking_strategy import ChunkingStrategy, RegexChunking
 
 from .markdown_generation_strategy import MarkdownGenerationStrategy
@@ -501,6 +501,15 @@ class CrawlerRunConfig():
                           Default: False.
         css_selector (str or None): CSS selector to extract a specific portion of the page.
                                     Default: None.
+        
+        target_elements (list of str or None): List of CSS selectors for specific elements for Markdown generation 
+                                                and structured data extraction. When you set this, only the contents 
+                                                of these elements are processed for extraction and Markdown generation. 
+                                                If you do not set any value, the entire page is processed. 
+                                                The difference between this and css_selector is that this will shrink 
+                                                the initial raw HTML to the selected element, while this will only affect 
+                                                the extraction and Markdown generation.
+                                    Default: None
         excluded_tags (list of str or None): List of HTML tags to exclude from processing.
                                              Default: None.
         excluded_selector (str or None): CSS selector to exclude from processing.
@@ -652,6 +661,7 @@ class CrawlerRunConfig():
         markdown_generator: MarkdownGenerationStrategy = None,
         only_text: bool = False,
         css_selector: str = None,
+        target_elements: List[str] = None,
         excluded_tags: list = None,
         excluded_selector: str = None,
         keep_data_attributes: bool = False,
@@ -732,6 +742,7 @@ class CrawlerRunConfig():
         self.markdown_generator = markdown_generator
         self.only_text = only_text
         self.css_selector = css_selector
+        self.target_elements = target_elements or []
         self.excluded_tags = excluded_tags or []
         self.excluded_selector = excluded_selector or ""
         self.keep_data_attributes = keep_data_attributes
@@ -862,6 +873,7 @@ class CrawlerRunConfig():
             markdown_generator=kwargs.get("markdown_generator"),
             only_text=kwargs.get("only_text", False),
             css_selector=kwargs.get("css_selector"),
+            target_elements=kwargs.get("target_elements", []),
             excluded_tags=kwargs.get("excluded_tags", []),
             excluded_selector=kwargs.get("excluded_selector", ""),
             keep_data_attributes=kwargs.get("keep_data_attributes", False),
@@ -963,6 +975,7 @@ class CrawlerRunConfig():
             "markdown_generator": self.markdown_generator,
             "only_text": self.only_text,
             "css_selector": self.css_selector,
+            "target_elements": self.target_elements,
             "excluded_tags": self.excluded_tags,
             "excluded_selector": self.excluded_selector,
             "keep_data_attributes": self.keep_data_attributes,
@@ -1099,3 +1112,5 @@ class LLMConfig:
         config_dict = self.to_dict()
         config_dict.update(kwargs)
         return LLMConfig.from_kwargs(config_dict)
+
+

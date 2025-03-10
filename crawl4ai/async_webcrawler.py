@@ -514,7 +514,8 @@ class AsyncWebCrawler:
                 scraping_strategy.logger = self.logger
 
             # Process HTML content
-            params = {k: v for k, v in config.to_dict().items() if k not in ["url"]}
+            params = config.__dict__.copy()
+            params.pop("url", None)            
             # add keys from kwargs to params that doesn't exist in params
             params.update({k: v for k, v in kwargs.items() if k not in params.keys()})
 

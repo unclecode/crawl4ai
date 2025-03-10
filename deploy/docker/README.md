@@ -352,7 +352,10 @@ Example:
 from crawl4ai import CrawlerRunConfig, PruningContentFilter
 
 config = CrawlerRunConfig(
-    content_filter=PruningContentFilter(threshold=0.48)
+    markdown_generator=DefaultMarkdownGenerator(
+        content_filter=PruningContentFilter(threshold=0.48, threshold_type="fixed")
+    ),
+    cache_mode= CacheMode.BYPASS
 )
 print(config.dump())  # Use this JSON in your API calls
 ```
