@@ -39,7 +39,7 @@ async def memory_adaptive_with_rate_limit(urls, browser_config, run_config):
     start = time.perf_counter()
     async with AsyncWebCrawler(config=browser_config) as crawler:
         dispatcher = MemoryAdaptiveDispatcher(
-            memory_threshold_percent=70.0,
+            memory_threshold_percent=95.0,
             max_session_permit=10,
             rate_limiter=RateLimiter(
                 base_delay=(1.0, 2.0), max_delay=30.0, max_retries=2

@@ -8,6 +8,10 @@ Below, we show how to configure these parameters and combine them for precise co
 
 ## 1. CSS-Based Selection
 
+There are two ways to select content from a page: using `css_selector` or the more flexible `target_elements`.
+
+### 1.1 Using `css_selector`
+
 A straightforward way to **limit** your crawl results to a certain region of the page is **`css_selector`** in **`CrawlerRunConfig`**:
 
 ```python
@@ -31,6 +35,33 @@ if __name__ == "__main__":
 ```
 
 **Result**: Only elements matching that selector remain in `result.cleaned_html`.
+
+### 1.2 Using `target_elements`
+
+The `target_elements` parameter provides more flexibility by allowing you to target **multiple elements** for content extraction while preserving the entire page context for other features:
+
+```python
+import asyncio
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
+
+async def main():
+    config = CrawlerRunConfig(
+        # Target article body and sidebar, but not other content
+        target_elements=["article.main-content", "aside.sidebar"]
+    )
+    async with AsyncWebCrawler() as crawler:
+        result = await crawler.arun(
+            url="https://example.com/blog-post", 
+            config=config
+        )
+        print("Markdown focused on target elements")
+        print("Links from entire page still available:", len(result.links.get("internal", [])))
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+**Key difference**: With `target_elements`, the markdown generation and structural data extraction focus on those elements, but other page elements (like links, images, and tables) are still extracted from the entire page. This gives you fine-grained control over what appears in your markdown content while preserving full page context for link analysis and media collection.
 
 ---
 
@@ -404,15 +435,59 @@ Stick to BeautifulSoup strategy (default) when:
 
 ---
 
-## 7. Conclusion
+## 7. Combining CSS Selection Methods
 
-By mixing **css_selector** scoping, **content filtering** parameters, and advanced **extraction strategies**, you can precisely **choose** which data to keep. Key parameters in **`CrawlerRunConfig`** for content selection include:
+You can combine `css_selector` and `target_elements` in powerful ways to achieve fine-grained control over your output:
 
-1. **`css_selector`** – Basic scoping to an element or region.  
-2. **`word_count_threshold`** – Skip short blocks.  
-3. **`excluded_tags`** – Remove entire HTML tags.  
-4. **`exclude_external_links`**, **`exclude_social_media_links`**, **`exclude_domains`** – Filter out unwanted links or domains.  
-5. **`exclude_external_images`** – Remove images from external sources.  
-6. **`process_iframes`** – Merge iframe content if needed.  
+```python
+import asyncio
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
+
+async def main():
+    # Target specific content but preserve page context
+    config = CrawlerRunConfig(
+        # Focus markdown on main content and sidebar
+        target_elements=["#main-content", ".sidebar"],
+        
+        # Global filters applied to entire page
+        excluded_tags=["nav", "footer", "header"],
+        exclude_external_links=True,
+        
+        # Use basic content thresholds
+        word_count_threshold=15,
+        
+        cache_mode=CacheMode.BYPASS
+    )
+    
+    async with AsyncWebCrawler() as crawler:
+        result = await crawler.arun(
+            url="https://example.com/article",
+            config=config
+        )
+        
+        print(f"Content focuses on specific elements, but all links still analyzed")
+        print(f"Internal links: {len(result.links.get('internal', []))}")
+        print(f"External links: {len(result.links.get('external', []))}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+This approach gives you the best of both worlds:
+- Markdown generation and content extraction focus on the elements you care about
+- Links, images and other page data still give you the full context of the page
+- Content filtering still applies globally
+
+## 8. Conclusion
+
+By mixing **target_elements** or **css_selector** scoping, **content filtering** parameters, and advanced **extraction strategies**, you can precisely **choose** which data to keep. Key parameters in **`CrawlerRunConfig`** for content selection include:
+
+1. **`target_elements`** – Array of CSS selectors to focus markdown generation and data extraction, while preserving full page context for links and media.
+2. **`css_selector`** – Basic scoping to an element or region for all extraction processes.  
+3. **`word_count_threshold`** – Skip short blocks.  
+4. **`excluded_tags`** – Remove entire HTML tags.  
+5. **`exclude_external_links`**, **`exclude_social_media_links`**, **`exclude_domains`** – Filter out unwanted links or domains.  
+6. **`exclude_external_images`** – Remove images from external sources.  
+7. **`process_iframes`** – Merge iframe content if needed.  
 
 Combine these with structured extraction (CSS, LLM-based, or others) to build powerful crawls that yield exactly the content you want, from raw or cleaned HTML up to sophisticated JSON structures. For more detail, see [Configuration Reference](../api/parameters.md). Enjoy curating your data to the max!

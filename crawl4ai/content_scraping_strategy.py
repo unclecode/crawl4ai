@@ -301,7 +301,21 @@ class WebScrapingStrategy(ContentScrapingStrategy):
         
         # Extract rows with colspan handling
         rows = []
-        for row in table.select('tr:not(:has(ancestor::thead))'):
+        all_rows = table.select('tr')
+        thead = table.select_one('thead')
+        tbody_rows = []
+
+        if thead:
+            thead_rows = thead.select('tr')
+            tbody_rows = [row for row in all_rows if row not in thead_rows]
+        else:
+            if all_rows and all_rows[0].select('th'):
+                tbody_rows = all_rows[1:]
+            else:
+                tbody_rows = all_rows
+                
+        for row in tbody_rows:        
+        # for row in table.select('tr:not(:has(ancestor::thead))'):
             row_data = []
             for cell in row.select('td'):
                 text = cell.get_text().strip()
@@ -822,6 +836,7 @@ class WebScrapingStrategy(ContentScrapingStrategy):
         html: str,
         word_count_threshold: int = MIN_WORD_THRESHOLD,
         css_selector: str = None,
+        target_elements: List[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """
@@ -876,22 +891,37 @@ class WebScrapingStrategy(ContentScrapingStrategy):
                 for element in body.select(excluded_selector):
                     element.extract()
 
-        if False and css_selector:
-            selected_elements = body.select(css_selector)
-            if not selected_elements:
-                return {
-                    "markdown": "",
-                    "cleaned_html": "",
-                    "success": True,
-                    "media": {"images": [], "videos": [], "audios": []},
-                    "links": {"internal": [], "external": []},
-                    "metadata": {},
-                    "message": f"No elements found for CSS selector: {css_selector}",
-                }
-                # raise InvalidCSSSelectorError(f"Invalid CSS selector, No elements found for CSS selector: {css_selector}")
-            body = soup.new_tag("div")
-            for el in selected_elements:
-                body.append(el)
+        # if False and css_selector:
+        #     selected_elements = body.select(css_selector)
+        #     if not selected_elements:
+        #         return {
+        #             "markdown": "",
+        #             "cleaned_html": "",
+        #             "success": True,
+        #             "media": {"images": [], "videos": [], "audios": []},
+        #             "links": {"internal": [], "external": []},
+        #             "metadata": {},
+        #             "message": f"No elements found for CSS selector: {css_selector}",
+        #         }
+        #         # raise InvalidCSSSelectorError(f"Invalid CSS selector, No elements found for CSS selector: {css_selector}")
+        #     body = soup.new_tag("div")
+        #     for el in selected_elements:
+        #         body.append(el)
+
+        content_element = None
+        if target_elements:
+            try:
+                for_content_targeted_element = []
+                for target_element in target_elements:
+                    for_content_targeted_element.extend(body.select(target_element))
+                content_element = soup.new_tag("div")
+                for el in for_content_targeted_element:
+                    content_element.append(el)
+            except Exception as e:
+                self._log("error", f"Error with target element detection: {str(e)}", "SCRAPE")
+                return None
+        else:
+            content_element = body        
 
         kwargs["exclude_social_media_domains"] = set(
             kwargs.get("exclude_social_media_domains", []) + SOCIAL_MEDIA_DOMAINS
@@ -951,7 +981,7 @@ class WebScrapingStrategy(ContentScrapingStrategy):
 
         str_body = ""
         try:
-            str_body = body.encode_contents().decode("utf-8")
+            str_body = content_element.encode_contents().decode("utf-8")
         except Exception:
             # Reset body to the original HTML
             success = False
@@ -1447,6 +1477,7 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
         html: str,
         word_count_threshold: int = MIN_WORD_THRESHOLD,
         css_selector: str = None,
+        target_elements: List[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         if not html:
@@ -1497,24 +1528,38 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
                 meta = {}
 
             # Handle CSS selector targeting
-            if css_selector:
+            # if css_selector:
+            #     try:
+            #         selected_elements = body.cssselect(css_selector)
+            #         if not selected_elements:
+            #             return {
+            #                 "markdown": "",
+            #                 "cleaned_html": "",
+            #                 "success": True,
+            #                 "media": {"images": [], "videos": [], "audios": []},
+            #                 "links": {"internal": [], "external": []},
+            #                 "metadata": meta,
+            #                 "message": f"No elements found for CSS selector: {css_selector}",
+            #             }
+            #         body = lhtml.Element("div")
+            #         body.extend(selected_elements)
+            #     except Exception as e:
+            #         self._log("error", f"Error with CSS selector: {str(e)}", "SCRAPE")
+            #         return None
+
+            content_element = None
+            if target_elements:
                 try:
-                    selected_elements = body.cssselect(css_selector)
-                    if not selected_elements:
-                        return {
-                            "markdown": "",
-                            "cleaned_html": "",
-                            "success": True,
-                            "media": {"images": [], "videos": [], "audios": []},
-                            "links": {"internal": [], "external": []},
-                            "metadata": meta,
-                            "message": f"No elements found for CSS selector: {css_selector}",
-                        }
-                    body = lhtml.Element("div")
-                    body.extend(selected_elements)
+                    for_content_targeted_element = []
+                    for target_element in target_elements:
+                        for_content_targeted_element.extend(body.cssselect(target_element))
+                    content_element = lhtml.Element("div")
+                    content_element.extend(for_content_targeted_element)
                 except Exception as e:
-                    self._log("error", f"Error with CSS selector: {str(e)}", "SCRAPE")
+                    self._log("error", f"Error with target element detection: {str(e)}", "SCRAPE")
                     return None
+            else:
+                content_element = body
 
             # Remove script and style tags
             for tag in ["script", "style", "link", "meta", "noscript"]:
@@ -1585,7 +1630,8 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
 
             # Generate output HTML
             cleaned_html = lhtml.tostring(
-                body,
+                # body,   
+                content_element,
                 encoding="unicode",
                 pretty_print=True,
                 method="html",
