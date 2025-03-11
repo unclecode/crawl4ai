@@ -15,6 +15,7 @@ async def main():
         browser_config=HTTPCrawlerConfig(),
         logger=logger
     )
+    await crawler.start()
     # Test 1: Basic HTTP GET
     print("\n=== Test 1: Basic HTTP GET ===")
     result = await crawler.crawl("https://example.com")
