@@ -33,13 +33,12 @@ from .content_filter_strategy import (
     LLMContentFilter,
     RelevantContentFilter,
 )
-from .models import CrawlResult, MarkdownGenerationResult
+from .models import CrawlResult, MarkdownGenerationResult, DisplayMode
+from .components.crawler_monitor import CrawlerMonitor
 from .async_dispatcher import (
     MemoryAdaptiveDispatcher,
     SemaphoreDispatcher,
     RateLimiter,
-    CrawlerMonitor,
-    DisplayMode,
     BaseDispatcher,
 )
 from .docker_client import Crawl4aiDockerClient

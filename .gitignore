@@ -255,3 +255,6 @@ continue_config.json
 
 .llm.env
 .private/
+
+CLAUDE_MONITOR.md
+CLAUDE.md

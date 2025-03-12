@@ -28,6 +28,12 @@ class CrawlerTaskResult:
     start_time: Union[datetime, float]
     end_time: Union[datetime, float]
     error_message: str = ""
+    retry_count: int = 0
+    wait_time: float = 0.0
+    
+    @property
+    def success(self) -> bool:
+        return self.result.success
 
 
 class CrawlStatus(Enum):
@@ -67,6 +73,9 @@ class CrawlStats:
     memory_usage: float = 0.0
     peak_memory: float = 0.0
     error_message: str = ""
+    wait_time: float = 0.0
+    retry_count: int = 0
+    counted_requeue: bool = False
 
     @property
     def duration(self) -> str:
@@ -86,6 +95,7 @@ class CrawlStats:
             
         duration = end - start
         return str(timedelta(seconds=int(duration.total_seconds())))
+
 
 class DisplayMode(Enum):
     DETAILED = "DETAILED"
