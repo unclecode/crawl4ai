@@ -26,7 +26,7 @@ import cProfile
 import pstats
 from functools import wraps
 import asyncio
-
+from lxml import etree, html as lhtml
 import sqlite3
 import hashlib
 
@@ -2617,3 +2617,116 @@ class HeadPeekr:
     def get_title(head_content: str):
         title_match = re.search(r'<title>(.*?)</title>', head_content, re.IGNORECASE | re.DOTALL)
         return title_match.group(1) if title_match else None
+
+def preprocess_html_for_schema(html_content, text_threshold=100, attr_value_threshold=200, max_size=100000):
+    """
+    Preprocess HTML to reduce size while preserving structure for schema generation.
+    
+    Args:
+        html_content (str): Raw HTML content
+        text_threshold (int): Maximum length for text nodes before truncation
+        attr_value_threshold (int): Maximum length for attribute values before truncation
+        max_size (int): Target maximum size for output HTML
+        
+    Returns:
+        str: Preprocessed HTML content
+    """
+    try:
+        # Parse HTML with error recovery
+        parser = etree.HTMLParser(remove_comments=True, remove_blank_text=True)
+        tree = lhtml.fromstring(html_content, parser=parser)
+        
+        # 1. Remove HEAD section (keep only BODY)
+        head_elements = tree.xpath('//head')
+        for head in head_elements:
+            if head.getparent() is not None:
+                head.getparent().remove(head)
+        
+        # 2. Define tags to remove completely
+        tags_to_remove = [
+            'script', 'style', 'noscript', 'iframe', 'canvas', 'svg',
+            'video', 'audio', 'source', 'track', 'map', 'area'
+        ]
+        
+        # Remove unwanted elements
+        for tag in tags_to_remove:
+            elements = tree.xpath(f'//{tag}')
+            for element in elements:
+                if element.getparent() is not None:
+                    element.getparent().remove(element)
+        
+        # 3. Process remaining elements to clean attributes and truncate text
+        for element in tree.iter():
+            # Skip if we're at the root level
+            if element.getparent() is None:
+                continue
+                
+            # Clean non-essential attributes but preserve structural ones
+            # attribs_to_keep = {'id', 'class', 'name', 'href', 'src', 'type', 'value', 'data-'}
+
+            # This is more aggressive than the previous version
+            attribs_to_keep = {'id', 'class', 'name', 'type', 'value'}
+
+            # attributes_hates_truncate = ['id', 'class', "data-"]
+
+            # This means, I don't care, if an attribute is too long, truncate it, go and find a better css selector to build a schema
+            attributes_hates_truncate = []
+            
+            # Process each attribute
+            for attrib in list(element.attrib.keys()):
+                # Keep if it's essential or starts with data-
+                if not (attrib in attribs_to_keep or attrib.startswith('data-')):
+                    element.attrib.pop(attrib)
+                # Truncate long attribute values except for selectors
+                elif attrib not in attributes_hates_truncate and len(element.attrib[attrib]) > attr_value_threshold:
+                    element.attrib[attrib] = element.attrib[attrib][:attr_value_threshold] + '...'
+            
+            # Truncate text content if it's too long
+            if element.text and len(element.text.strip()) > text_threshold:
+                element.text = element.text.strip()[:text_threshold] + '...'
+                
+            # Also truncate tail text if present
+            if element.tail and len(element.tail.strip()) > text_threshold:
+                element.tail = element.tail.strip()[:text_threshold] + '...'
+        
+        # 4. Find repeated patterns and keep only a few examples
+        # This is a simplistic approach - more sophisticated pattern detection could be implemented
+        pattern_elements = {}
+        for element in tree.xpath('//*[contains(@class, "")]'):
+            parent = element.getparent()
+            if parent is None:
+                continue
+                
+            # Create a signature based on tag and classes
+            classes = element.get('class', '')
+            if not classes:
+                continue
+            signature = f"{element.tag}.{classes}"
+            
+            if signature in pattern_elements:
+                pattern_elements[signature].append(element)
+            else:
+                pattern_elements[signature] = [element]
+        
+        # Keep only 3 examples of each repeating pattern
+        for signature, elements in pattern_elements.items():
+            if len(elements) > 3:
+                # Keep the first 2 and last elements
+                for element in elements[2:-1]:
+                    if element.getparent() is not None:
+                        element.getparent().remove(element)
+        
+        # 5. Convert back to string
+        result = etree.tostring(tree, encoding='unicode', method='html')
+        
+        # If still over the size limit, apply more aggressive truncation
+        if len(result) > max_size:
+            return result[:max_size] + "..."
+            
+        return result
+    
+    except Exception as e:
+        # Fallback for parsing errors
+        return html_content[:max_size] if len(html_content) > max_size else html_content
+    
+

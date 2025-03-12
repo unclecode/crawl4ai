@@ -1,6 +1,7 @@
 import os
 from .config import (
     DEFAULT_PROVIDER,
+    DEFAULT_PROVIDER_API_KEY,
     MIN_WORD_THRESHOLD,
     IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
     PROVIDER_MODELS,
@@ -1080,7 +1081,7 @@ class LLMConfig:
             self.api_token = os.getenv(api_token[4:])
         else:
             self.api_token = PROVIDER_MODELS.get(provider, "no-token") or os.getenv(
-                "OPENAI_API_KEY"
+                DEFAULT_PROVIDER_API_KEY
             )
         self.base_url = base_url
 

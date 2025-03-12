@@ -34,7 +34,7 @@ from .model_loader import (
     calculate_batch_size
 )
 
-from .types import LLMConfig
+from .types import LLMConfig, create_llm_config
 
 from functools import partial
 import numpy as np
@@ -757,8 +757,6 @@ class LLMExtractionStrategy(ExtractionStrategy):
 #######################################################
 # New extraction strategies for JSON-based extraction #
 #######################################################
-
-
 class JsonElementExtractionStrategy(ExtractionStrategy):
     """
     Abstract base class for extracting structured JSON from HTML content.
@@ -1049,7 +1047,7 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
         schema_type: str = "CSS", # or XPATH
         query: str = None,
         target_json_example: str = None,
-        llm_config: 'LLMConfig' = None,
+        llm_config: 'LLMConfig' = create_llm_config(),
         provider: str = None,
         api_token: str = None,
         **kwargs
@@ -1139,7 +1137,6 @@ In this scenario, use your best judgment to generate the schema. Try to maximize
             
         except Exception as e:
             raise Exception(f"Failed to generate schema: {str(e)}")
-
 
 class JsonCssExtractionStrategy(JsonElementExtractionStrategy):
     """
