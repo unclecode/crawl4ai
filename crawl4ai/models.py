@@ -37,13 +37,33 @@ class CrawlStatus(Enum):
     FAILED = "FAILED"
 
 
+# @dataclass
+# class CrawlStats:
+#     task_id: str
+#     url: str
+#     status: CrawlStatus
+#     start_time: Optional[datetime] = None
+#     end_time: Optional[datetime] = None
+#     memory_usage: float = 0.0
+#     peak_memory: float = 0.0
+#     error_message: str = ""
+
+#     @property
+#     def duration(self) -> str:
+#         if not self.start_time:
+#             return "0:00"
+#         end = self.end_time or datetime.now()
+#         duration = end - self.start_time
+#         return str(timedelta(seconds=int(duration.total_seconds())))
+
+
 @dataclass
 class CrawlStats:
     task_id: str
     url: str
     status: CrawlStatus
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
+    start_time: Optional[Union[datetime, float]] = None
+    end_time: Optional[Union[datetime, float]] = None
     memory_usage: float = 0.0
     peak_memory: float = 0.0
     error_message: str = ""
@@ -52,10 +72,20 @@ class CrawlStats:
     def duration(self) -> str:
         if not self.start_time:
             return "0:00"
+            
+        # Convert start_time to datetime if it's a float
+        start = self.start_time
+        if isinstance(start, float):
+            start = datetime.fromtimestamp(start)
+            
+        # Get end time or use current time
         end = self.end_time or datetime.now()
-        duration = end - self.start_time
+        # Convert end_time to datetime if it's a float
+        if isinstance(end, float):
+            end = datetime.fromtimestamp(end)
+            
+        duration = end - start
         return str(timedelta(seconds=int(duration.total_seconds())))
-
 
 class DisplayMode(Enum):
     DETAILED = "DETAILED"
@@ -149,7 +179,11 @@ class CrawlResult(BaseModel):
         markdown_result = data.pop('markdown', None)
         super().__init__(**data)
         if markdown_result is not None:
-            self._markdown = markdown_result
+            self._markdown = (
+                MarkdownGenerationResult(**markdown_result)
+                if isinstance(markdown_result, dict)
+                else markdown_result
+            )
     
     @property
     def markdown(self):
@@ -292,6 +326,7 @@ class Media(BaseModel):
     audios: List[
         MediaItem
     ] = []  # Using MediaItem model for now, can be extended with Audio model if needed
+    tables: List[Dict] = []  # Table data extracted from HTML tables
 
 
 class Links(BaseModel):

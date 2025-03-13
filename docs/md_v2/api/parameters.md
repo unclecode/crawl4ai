@@ -71,7 +71,8 @@ We group them by category.
 | **`word_count_threshold`**   | `int` (default: ~200)                | Skips text blocks below X words. Helps ignore trivial sections.                                 |
 | **`extraction_strategy`**    | `ExtractionStrategy` (default: None) | If set, extracts structured data (CSS-based, LLM-based, etc.).                                  |
 | **`markdown_generator`**     | `MarkdownGenerationStrategy` (None)  | If you want specialized markdown output (citations, filtering, chunking, etc.).                 |
-| **`css_selector`**           | `str` (None)                         | Retains only the part of the page matching this selector.                                       |
+| **`css_selector`**           | `str` (None)                         | Retains only the part of the page matching this selector. Affects the entire extraction process. |
+| **`target_elements`**        | `List[str]` (None)                   | List of CSS selectors for elements to focus on for markdown generation and data extraction, while still processing the entire page for links, media, etc. Provides more flexibility than `css_selector`. |
 | **`excluded_tags`**          | `list` (None)                        | Removes entire tags (e.g. `["script", "style"]`).                                               |
 | **`excluded_selector`**      | `str` (None)                         | Like `css_selector` but to exclude. E.g. `"#ads, .tracker"`.                                    |
 | **`only_text`**              | `bool` (False)                       | If `True`, tries to extract text-only content.                                                  |
@@ -246,8 +247,8 @@ run_config = CrawlerRunConfig(
 )
 ```
 
-# 3. **LlmConfig** - Setting up LLM providers
-LlmConfig is useful to pass LLM provider config to strategies and functions that rely on LLMs to do extraction, filtering, schema generation etc. Currently it can be used in the following -
+# 3. **LLMConfig** - Setting up LLM providers
+LLMConfig is useful to pass LLM provider config to strategies and functions that rely on LLMs to do extraction, filtering, schema generation etc. Currently it can be used in the following -
 
 1. LLMExtractionStrategy
 2. LLMContentFilter
@@ -263,7 +264,7 @@ LlmConfig is useful to pass LLM provider config to strategies and functions that
 
 ## 3.2 Example Usage
 ```python
-llmConfig = LlmConfig(provider="openai/gpt-4o-mini", api_token=os.getenv("OPENAI_API_KEY"))
+llm_config = LLMConfig(provider="openai/gpt-4o-mini", api_token=os.getenv("OPENAI_API_KEY"))
 ```
 
 ## 4. Putting It All Together
@@ -271,7 +272,7 @@ llmConfig = LlmConfig(provider="openai/gpt-4o-mini", api_token=os.getenv("OPENAI
 - **Use** `BrowserConfig` for **global** browser settings: engine, headless, proxy, user agent.  
 - **Use** `CrawlerRunConfig` for each crawl’s **context**: how to filter content, handle caching, wait for dynamic elements, or run JS.  
 - **Pass** both configs to `AsyncWebCrawler` (the `BrowserConfig`) and then to `arun()` (the `CrawlerRunConfig`).  
-- **Use** `LlmConfig` for LLM provider configurations that can be used across all extraction, filtering, schema generation tasks. Can be used in - `LLMExtractionStrategy`, `LLMContentFilter`, `JsonCssExtractionStrategy.generate_schema` & `JsonXPathExtractionStrategy.generate_schema`
+- **Use** `LLMConfig` for LLM provider configurations that can be used across all extraction, filtering, schema generation tasks. Can be used in - `LLMExtractionStrategy`, `LLMContentFilter`, `JsonCssExtractionStrategy.generate_schema` & `JsonXPathExtractionStrategy.generate_schema`
 
 ```python
 # Create a modified copy with the clone() method

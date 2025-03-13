@@ -16,13 +16,13 @@ from .utils import (
     extract_xml_data,
     merge_chunks,
 )
+from .types import LLMConfig
+from .config import DEFAULT_PROVIDER, OVERLAP_RATE, WORD_TOKEN_RATE
 from abc import ABC, abstractmethod
 import math
 from snowballstemmer import stemmer
-from .config import DEFAULT_PROVIDER, OVERLAP_RATE, WORD_TOKEN_RATE, PROVIDER_MODELS
 from .models import TokenUsage
 from .prompts import PROMPT_FILTER_CONTENT
-import os
 import json
 import hashlib
 from pathlib import Path
@@ -770,37 +770,56 @@ class PruningContentFilter(RelevantContentFilter):
 
 
 class LLMContentFilter(RelevantContentFilter):
-    """Content filtering using LLMs to generate relevant markdown."""
+    """Content filtering using LLMs to generate relevant markdown.
+
+    How it works:
+    1. Extracts page metadata with fallbacks.
+    2. Extracts text chunks from the body element.
+    3. Applies LLMs to generate markdown for each chunk.
+    4. Filters out chunks below the threshold.
+    5. Sorts chunks by score in descending order.
+    6. Returns the top N chunks.
+
+    Attributes:
+        llm_config (LLMConfig): LLM configuration object.
+        instruction (str): Instruction for LLM markdown generation
+        chunk_token_threshold (int): Chunk token threshold for splitting (default: 1e9).
+        overlap_rate (float): Overlap rate for chunking (default: 0.5).
+        word_token_rate (float): Word token rate for chunking (default: 0.2).
+        verbose (bool): Enable verbose logging (default: False).
+        logger (AsyncLogger): Custom logger for LLM operations (optional).
+    """
     _UNWANTED_PROPS = {
-        'provider' : 'Instead, use llmConfig=LlmConfig(provider="...")',
-        'api_token' : 'Instead, use llmConfig=LlMConfig(api_token="...")',
-        'base_url' : 'Instead, use llmConfig=LlmConfig(base_url="...")',
-        'api_base' : 'Instead, use llmConfig=LlmConfig(base_url="...")',
+        'provider' : 'Instead, use llm_config=LLMConfig(provider="...")',
+        'api_token' : 'Instead, use llm_config=LlMConfig(api_token="...")',
+        'base_url' : 'Instead, use llm_config=LLMConfig(base_url="...")',
+        'api_base' : 'Instead, use llm_config=LLMConfig(base_url="...")',
     }
 
     def __init__(
         self,
-        provider: str = DEFAULT_PROVIDER,
-        api_token: Optional[str] = None,
-        llmConfig: "LlmConfig" = None,
+        llm_config: "LLMConfig" = None,
         instruction: str = None,
         chunk_token_threshold: int = int(1e9),
         overlap_rate: float = OVERLAP_RATE,
         word_token_rate: float = WORD_TOKEN_RATE,
-        base_url: Optional[str] = None,
-        api_base: Optional[str] = None,
-        extra_args: Dict = None,
         # char_token_rate: float = WORD_TOKEN_RATE * 5,
         # chunk_mode: str = "char",
         verbose: bool = False,
         logger: Optional[AsyncLogger] = None,
         ignore_cache: bool = True,
+        # Deprecated properties
+        provider: str = DEFAULT_PROVIDER,
+        api_token: Optional[str] = None,
+        base_url: Optional[str] = None,
+        api_base: Optional[str] = None,
+        extra_args: Dict = None,
     ):
         super().__init__(None)
         self.provider = provider
         self.api_token = api_token
         self.base_url = base_url or api_base
-        self.llmConfig = llmConfig
+        self.llm_config = llm_config
         self.instruction = instruction
         self.chunk_token_threshold = chunk_token_threshold
         self.overlap_rate = overlap_rate
@@ -872,7 +891,7 @@ class LLMContentFilter(RelevantContentFilter):
             self.logger.info(
                 "Starting LLM markdown content filtering process",
                 tag="LLM",
-                params={"provider": self.llmConfig.provider},
+                params={"provider": self.llm_config.provider},
                 colors={"provider": Fore.CYAN},
             )
 
@@ -959,10 +978,10 @@ class LLMContentFilter(RelevantContentFilter):
 
                 future = executor.submit(
                     _proceed_with_chunk,
-                    self.llmConfig.provider,
+                    self.llm_config.provider,
                     prompt,
-                    self.llmConfig.api_token,
-                    self.llmConfig.base_url,
+                    self.llm_config.api_token,
+                    self.llm_config.base_url,
                     self.extra_args,
                 )
                 futures.append((i, future))

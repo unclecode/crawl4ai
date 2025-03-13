@@ -7,7 +7,7 @@ from crawl4ai import (
     BrowserConfig, CrawlerRunConfig, DefaultMarkdownGenerator,
     PruningContentFilter, JsonCssExtractionStrategy, LLMContentFilter, CacheMode
 )
-from crawl4ai.async_configs import LlmConfig
+from crawl4ai import LLMConfig
 from crawl4ai.docker_client import Crawl4aiDockerClient
 
 class Crawl4AiTester:
@@ -143,7 +143,7 @@ async def test_with_client():
             cache_mode=CacheMode.BYPASS,
             markdown_generator=DefaultMarkdownGenerator(
                 content_filter=LLMContentFilter(
-                    llmConfig=LlmConfig(provider="openai/gpt-40"),
+                    llm_config=LLMConfig(provider="openai/gpt-40"),
                     instruction="Extract key technical concepts"
                 )
             ),

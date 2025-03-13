@@ -37,6 +37,7 @@ class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
             # Clone config to disable recursive deep crawling.
             batch_config = config.clone(deep_crawl_strategy=None, stream=False)
             url_results = await crawler.arun_many(urls=[url], config=batch_config)
+            
             for result in url_results:
                 result.metadata = result.metadata or {}
                 result.metadata["depth"] = depth
@@ -44,13 +45,19 @@ class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
                 if self.url_scorer:
                     result.metadata["score"] = self.url_scorer.score(url)
                 results.append(result)
-
-                new_links: List[Tuple[str, Optional[str]]] = []
-                await self.link_discovery(result, url, depth, visited, new_links, depths)
-                # Push new links in reverse order so the first discovered is processed next.
-                for new_url, new_parent in reversed(new_links):
-                    new_depth = depths.get(new_url, depth + 1)
-                    stack.append((new_url, new_parent, new_depth))
+                
+                # Count only successful crawls toward max_pages limit
+                if result.success:
+                    self._pages_crawled += 1
+                    
+                    # Only discover links from successful crawls
+                    new_links: List[Tuple[str, Optional[str]]] = []
+                    await self.link_discovery(result, url, depth, visited, new_links, depths)
+                    
+                    # Push new links in reverse order so the first discovered is processed next.
+                    for new_url, new_parent in reversed(new_links):
+                        new_depth = depths.get(new_url, depth + 1)
+                        stack.append((new_url, new_parent, new_depth))
         return results
 
     async def _arun_stream(
@@ -83,8 +90,13 @@ class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
                     result.metadata["score"] = self.url_scorer.score(url)
                 yield result
 
-                new_links: List[Tuple[str, Optional[str]]] = []
-                await self.link_discovery(result, url, depth, visited, new_links, depths)
-                for new_url, new_parent in reversed(new_links):
-                    new_depth = depths.get(new_url, depth + 1)
-                    stack.append((new_url, new_parent, new_depth))
+                # Only count successful crawls toward max_pages limit
+                # and only discover links from successful crawls
+                if result.success:
+                    self._pages_crawled += 1
+                    
+                    new_links: List[Tuple[str, Optional[str]]] = []
+                    await self.link_discovery(result, url, depth, visited, new_links, depths)
+                    for new_url, new_parent in reversed(new_links):
+                        new_depth = depths.get(new_url, depth + 1)
+                        stack.append((new_url, new_parent, new_depth))

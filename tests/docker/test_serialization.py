@@ -2,7 +2,7 @@ import inspect
 from typing import Any, Dict
 from enum import Enum
 
-from crawl4ai.async_configs import LlmConfig
+from crawl4ai import LLMConfig
 
 def to_serializable_dict(obj: Any) -> Dict:
     """
@@ -224,7 +224,7 @@ if __name__ == "__main__":
     config3 = CrawlerRunConfig(
         markdown_generator=DefaultMarkdownGenerator(
             content_filter=LLMContentFilter(
-                llmConfig = LlmConfig(provider="openai/gpt-4"),
+                llm_config = LLMConfig(provider="openai/gpt-4"),
                 instruction="Extract key technical concepts",
                 chunk_token_threshold=2000,
                 overlap_rate=0.1

@@ -11,7 +11,7 @@ import asyncio
 import os
 
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
-from crawl4ai.async_configs import LlmConfig
+from crawl4ai import LLMConfig
 from crawl4ai.extraction_strategy import (
     LLMExtractionStrategy,
     JsonCssExtractionStrategy,
@@ -61,19 +61,19 @@ async def main():
 
     # 1. LLM Extraction with different input formats
     markdown_strategy = LLMExtractionStrategy(
-        llmConfig = LlmConfig(provider="openai/gpt-4o-mini", api_token=os.getenv("OPENAI_API_KEY")),
+        llm_config = LLMConfig(provider="openai/gpt-4o-mini", api_token=os.getenv("OPENAI_API_KEY")),
         instruction="Extract product information including name, price, and description",
     )
 
     html_strategy = LLMExtractionStrategy(
         input_format="html",
-        llmConfig=LlmConfig(provider="openai/gpt-4o-mini", api_token=os.getenv("OPENAI_API_KEY")),
+        llm_config=LLMConfig(provider="openai/gpt-4o-mini", api_token=os.getenv("OPENAI_API_KEY")),
         instruction="Extract product information from HTML including structured data",
     )
 
     fit_markdown_strategy = LLMExtractionStrategy(
         input_format="fit_markdown",
-        llmConfig=LlmConfig(provider="openai/gpt-4o-mini",api_token=os.getenv("OPENAI_API_KEY")),
+        llm_config=LLMConfig(provider="openai/gpt-4o-mini",api_token=os.getenv("OPENAI_API_KEY")),
         instruction="Extract product information from cleaned markdown",
     )
 

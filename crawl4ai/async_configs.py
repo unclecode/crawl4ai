@@ -11,18 +11,22 @@ from .config import (
 )
 
 from .user_agent_generator import UAGen, ValidUAGenerator  # , OnlineUAGenerator
-from .extraction_strategy import ExtractionStrategy
+from .extraction_strategy import ExtractionStrategy, LLMExtractionStrategy
 from .chunking_strategy import ChunkingStrategy, RegexChunking
+
 from .markdown_generation_strategy import MarkdownGenerationStrategy
 from .content_scraping_strategy import ContentScrapingStrategy, WebScrapingStrategy
 from .deep_crawling import DeepCrawlStrategy
-from typing import Union, List
+
 from .cache_context import CacheMode
 from .proxy_strategy import ProxyRotationStrategy
 
+from typing import Union, List
 import inspect
 from typing import Any, Dict, Optional
 from enum import Enum
+
+from .proxy_strategy import ProxyConfig
 
 
 def to_serializable_dict(obj: Any, ignore_default_value : bool = False) -> Dict:
@@ -178,7 +182,7 @@ class BrowserConfig:
                               is "chromium". Default: "chromium".
         proxy (Optional[str]): Proxy server URL (e.g., "http://username:password@proxy:port"). If None, no proxy is used.
                              Default: None.
-        proxy_config (dict or None): Detailed proxy configuration, e.g. {"server": "...", "username": "..."}.
+        proxy_config (ProxyConfig or dict or None): Detailed proxy configuration, e.g. {"server": "...", "username": "..."}.
                                      If None, no additional proxy config. Default: None.
         viewport_width (int): Default viewport width for pages. Default: 1080.
         viewport_height (int): Default viewport height for pages. Default: 600.
@@ -223,7 +227,7 @@ class BrowserConfig:
         chrome_channel: str = "chromium",
         channel: str = "chromium",
         proxy: str = None,
-        proxy_config: dict = None,
+        proxy_config: Union[ProxyConfig, dict, None] = None,
         viewport_width: int = 1080,
         viewport_height: int = 600,
         viewport: dict = None,
@@ -313,7 +317,7 @@ class BrowserConfig:
             chrome_channel=kwargs.get("chrome_channel", "chromium"),
             channel=kwargs.get("channel", "chromium"),
             proxy=kwargs.get("proxy"),
-            proxy_config=kwargs.get("proxy_config"),
+            proxy_config=kwargs.get("proxy_config", None),
             viewport_width=kwargs.get("viewport_width", 1080),
             viewport_height=kwargs.get("viewport_height", 600),
             accept_downloads=kwargs.get("accept_downloads", False),
@@ -497,6 +501,15 @@ class CrawlerRunConfig():
                           Default: False.
         css_selector (str or None): CSS selector to extract a specific portion of the page.
                                     Default: None.
+        
+        target_elements (list of str or None): List of CSS selectors for specific elements for Markdown generation 
+                                                and structured data extraction. When you set this, only the contents 
+                                                of these elements are processed for extraction and Markdown generation. 
+                                                If you do not set any value, the entire page is processed. 
+                                                The difference between this and css_selector is that this will shrink 
+                                                the initial raw HTML to the selected element, while this will only affect 
+                                                the extraction and Markdown generation.
+                                    Default: None
         excluded_tags (list of str or None): List of HTML tags to exclude from processing.
                                              Default: None.
         excluded_selector (str or None): CSS selector to exclude from processing.
@@ -513,7 +526,7 @@ class CrawlerRunConfig():
                            Default: "lxml".
         scraping_strategy (ContentScrapingStrategy): Scraping strategy to use.
                            Default: WebScrapingStrategy.
-        proxy_config (dict or None): Detailed proxy configuration, e.g. {"server": "...", "username": "..."}.
+        proxy_config (ProxyConfig or dict or None): Detailed proxy configuration, e.g. {"server": "...", "username": "..."}.
                                      If None, no additional proxy config. Default: None.
 
         # SSL Parameters
@@ -593,6 +606,8 @@ class CrawlerRunConfig():
                                      Default: IMAGE_SCORE_THRESHOLD (e.g., 3).
         exclude_external_images (bool): If True, exclude all external images from processing.
                                          Default: False.
+        table_score_threshold (int): Minimum score threshold for processing a table.
+                                     Default: 7.
 
         # Link and Domain Handling Parameters
         exclude_social_media_domains (list of str): List of domains to exclude for social media links.
@@ -646,6 +661,7 @@ class CrawlerRunConfig():
         markdown_generator: MarkdownGenerationStrategy = None,
         only_text: bool = False,
         css_selector: str = None,
+        target_elements: List[str] = None,
         excluded_tags: list = None,
         excluded_selector: str = None,
         keep_data_attributes: bool = False,
@@ -654,7 +670,7 @@ class CrawlerRunConfig():
         prettiify: bool = False,
         parser_type: str = "lxml",
         scraping_strategy: ContentScrapingStrategy = None,
-        proxy_config: dict = None,
+        proxy_config: Union[ProxyConfig, dict, None] = None,
         proxy_rotation_strategy: Optional[ProxyRotationStrategy] = None,
         # SSL Parameters
         fetch_ssl_certificate: bool = False,
@@ -694,6 +710,7 @@ class CrawlerRunConfig():
         pdf: bool = False,
         image_description_min_word_threshold: int = IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
         image_score_threshold: int = IMAGE_SCORE_THRESHOLD,
+        table_score_threshold: int = 7,
         exclude_external_images: bool = False,
         # Link and Domain Handling Parameters
         exclude_social_media_domains: list = None,
@@ -725,6 +742,7 @@ class CrawlerRunConfig():
         self.markdown_generator = markdown_generator
         self.only_text = only_text
         self.css_selector = css_selector
+        self.target_elements = target_elements or []
         self.excluded_tags = excluded_tags or []
         self.excluded_selector = excluded_selector or ""
         self.keep_data_attributes = keep_data_attributes
@@ -779,6 +797,7 @@ class CrawlerRunConfig():
         self.image_description_min_word_threshold = image_description_min_word_threshold
         self.image_score_threshold = image_score_threshold
         self.exclude_external_images = exclude_external_images
+        self.table_score_threshold = table_score_threshold
 
         # Link and Domain Handling Parameters
         self.exclude_social_media_domains = (
@@ -854,6 +873,7 @@ class CrawlerRunConfig():
             markdown_generator=kwargs.get("markdown_generator"),
             only_text=kwargs.get("only_text", False),
             css_selector=kwargs.get("css_selector"),
+            target_elements=kwargs.get("target_elements", []),
             excluded_tags=kwargs.get("excluded_tags", []),
             excluded_selector=kwargs.get("excluded_selector", ""),
             keep_data_attributes=kwargs.get("keep_data_attributes", False),
@@ -909,6 +929,7 @@ class CrawlerRunConfig():
             image_score_threshold=kwargs.get(
                 "image_score_threshold", IMAGE_SCORE_THRESHOLD
             ),
+            table_score_threshold=kwargs.get("table_score_threshold", 7),
             exclude_external_images=kwargs.get("exclude_external_images", False),
             # Link and Domain Handling Parameters
             exclude_social_media_domains=kwargs.get(
@@ -954,6 +975,7 @@ class CrawlerRunConfig():
             "markdown_generator": self.markdown_generator,
             "only_text": self.only_text,
             "css_selector": self.css_selector,
+            "target_elements": self.target_elements,
             "excluded_tags": self.excluded_tags,
             "excluded_selector": self.excluded_selector,
             "keep_data_attributes": self.keep_data_attributes,
@@ -997,6 +1019,7 @@ class CrawlerRunConfig():
             "pdf": self.pdf,
             "image_description_min_word_threshold": self.image_description_min_word_threshold,
             "image_score_threshold": self.image_score_threshold,
+            "table_score_threshold": self.table_score_threshold,
             "exclude_external_images": self.exclude_external_images,
             "exclude_social_media_domains": self.exclude_social_media_domains,
             "exclude_external_links": self.exclude_external_links,
@@ -1042,7 +1065,7 @@ class CrawlerRunConfig():
         return CrawlerRunConfig.from_kwargs(config_dict)
 
 
-class LlmConfig:
+class LLMConfig:
     def __init__(
         self,
         provider: str = DEFAULT_PROVIDER,
@@ -1063,8 +1086,8 @@ class LlmConfig:
 
 
     @staticmethod
-    def from_kwargs(kwargs: dict) -> "LlmConfig":
-        return LlmConfig(
+    def from_kwargs(kwargs: dict) -> "LLMConfig":
+        return LLMConfig(
             provider=kwargs.get("provider", DEFAULT_PROVIDER),
             api_token=kwargs.get("api_token"),
             base_url=kwargs.get("base_url"),
@@ -1084,8 +1107,10 @@ class LlmConfig:
             **kwargs: Key-value pairs of configuration options to update
 
         Returns:
-            LLMConfig: A new instance with the specified updates
+            llm_config: A new instance with the specified updates
         """
         config_dict = self.to_dict()
         config_dict.update(kwargs)
-        return LlmConfig.from_kwargs(config_dict)
+        return LLMConfig.from_kwargs(config_dict)
+
+

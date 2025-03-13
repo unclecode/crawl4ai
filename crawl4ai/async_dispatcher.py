@@ -13,7 +13,7 @@ from rich.live import Live
 from rich.table import Table
 from rich.console import Console
 from rich import box
-from datetime import timedelta
+from datetime import timedelta, datetime
 from collections.abc import AsyncGenerator
 import time
 import psutil
@@ -23,6 +23,8 @@ import uuid
 from urllib.parse import urlparse
 import random
 from abc import ABC, abstractmethod
+
+from math import inf as infinity
 
 
 class RateLimiter:
@@ -250,7 +252,7 @@ class CrawlerMonitor:
             key=lambda x: (
                 x.status != CrawlStatus.IN_PROGRESS,
                 x.status != CrawlStatus.QUEUED,
-                x.end_time or float('inf'),
+                x.end_time or infinity,
             ),
         )[: self.max_visible_rows]
 

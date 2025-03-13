@@ -1,9 +1,18 @@
 import click
 import os
-from typing import Dict, Any, Optional
+import sys
+import time
+
+import humanize
+from typing import Dict, Any, Optional, List
 import json
 import yaml
 import anyio
+from rich.console import Console
+from rich.table import Table
+from rich.panel import Panel
+from rich.prompt import Prompt, Confirm
+
 from crawl4ai import (
     CacheMode,
     AsyncWebCrawler, 
@@ -14,12 +23,16 @@ from crawl4ai import (
     JsonCssExtractionStrategy,
     JsonXPathExtractionStrategy,
     BM25ContentFilter, 
-    PruningContentFilter
+    PruningContentFilter,
+    BrowserProfiler,
+    LLMConfig
 )
 from litellm import completion
 from pathlib import Path
 
-from crawl4ai.async_configs import LlmConfig
+
+# Initialize rich console
+console = Console()
 
 def get_global_config() -> dict:
     config_dir = Path.home() / ".crawl4ai"
@@ -172,7 +185,38 @@ def show_examples():
     # Crawler settings
     crwl https://example.com -c "css_selector=#main,delay_before_return_html=2,scan_full_page=true"
 
-4️⃣  Sample Config Files:
+4️⃣  Profile Management for Identity-Based Crawling:
+    # Launch interactive profile manager
+    crwl profiles
+
+    # Create, list, and delete browser profiles for identity-based crawling
+    # Use a profile for crawling (keeps you logged in)
+    crwl https://example.com -p my-profile-name
+
+    # Example: Crawl a site that requires login
+    # 1. First create a profile and log in:
+    crwl profiles
+    # 2. Then use that profile to crawl the authenticated site:
+    crwl https://site-requiring-login.com/dashboard -p my-profile-name
+
+5️⃣  CDP Mode for Browser Automation:
+    # Launch browser with CDP debugging on default port 9222
+    crwl cdp
+
+    # Use a specific profile and custom port
+    crwl cdp -p my-profile -P 9223
+
+    # Launch headless browser with CDP enabled
+    crwl cdp --headless
+
+    # Launch in incognito mode (ignores profile)
+    crwl cdp --incognito
+
+    # Use the CDP URL with other tools (Puppeteer, Playwright, etc.)
+    # The URL will be displayed in the terminal when the browser starts
+
+    
+6️⃣  Sample Config Files:
 
 browser.yml:
     headless: true
@@ -230,7 +274,7 @@ llm_schema.json:
       }
     }
 
-5️⃣  Advanced Usage:
+7️⃣  Advanced Usage:
     # Combine configs with direct parameters
     crwl https://example.com -B browser.yml -b "headless=false,viewport_width=1920"
 
@@ -248,9 +292,15 @@ llm_schema.json:
         -f filter_bm25.yml \\
         -o markdown-fit
 
+    # Authenticated crawling with profile
+    crwl https://login-required-site.com \\
+        -p my-authenticated-profile \\
+        -c "css_selector=.dashboard-content" \\
+        -o markdown
+
 For more documentation visit: https://github.com/unclecode/crawl4ai
 
-6️⃣  Q&A with LLM:
+8️⃣  Q&A with LLM:
     # Ask a question about the content
     crwl https://example.com -q "What is the main topic discussed?"
 
@@ -277,12 +327,331 @@ For more documentation visit: https://github.com/unclecode/crawl4ai
       - google/gemini-pro
     
     See full list of providers: https://docs.litellm.ai/docs/providers
+
+9️⃣ Profile Management:
+    # Launch interactive profile manager
+    crwl profiles
+
+    # Create a profile and use it for crawling
+    crwl profiles  # Create and set up your profile interactively
+    crwl https://example.com -p my-profile-name  # Use profile for crawling
+
+    # Example workflow for authenticated site
+    # 1. First create a profile and log in to the site:
+    crwl profiles  # Select "Create new profile" option
+    # 2. Then use that profile to crawl authenticated content:
+    crwl https://site-requiring-login.com/dashboard -p my-profile-name
 """
     click.echo(examples)
 
-@click.command(context_settings={"help_option_names": ["-h", "--help"]})
-@click.argument("url", required=False)
-@click.option("--example", is_flag=True, help="Show usage examples")
+def get_directory_size(path: str) -> int:
+    """Calculate the total size of a directory in bytes"""
+    total_size = 0
+    for dirpath, _, filenames in os.walk(path):
+        for f in filenames:
+            fp = os.path.join(dirpath, f)
+            if not os.path.islink(fp):
+                total_size += os.path.getsize(fp)
+    return total_size
+
+def display_profiles_table(profiles: List[Dict[str, Any]]):
+    """Display a rich table of browser profiles"""
+    if not profiles:
+        console.print(Panel("[yellow]No profiles found. Create one with the 'create' command.[/yellow]", 
+                          title="Browser Profiles", border_style="blue"))
+        return
+    
+    table = Table(title="Browser Profiles", show_header=True, header_style="bold cyan", border_style="blue")
+    table.add_column("#", style="dim", width=4)
+    table.add_column("Name", style="cyan", no_wrap=True)
+    table.add_column("Path", style="green")
+    table.add_column("Created", style="yellow")
+    table.add_column("Browser", style="magenta")
+    table.add_column("Size", style="blue", justify="right")
+    
+    for i, profile in enumerate(profiles):
+        # Calculate folder size
+        size = get_directory_size(profile["path"])
+        human_size = humanize.naturalsize(size)
+        
+        # Format creation date
+        created = profile["created"].strftime("%Y-%m-%d %H:%M")
+        
+        # Add row to table
+        table.add_row(
+            str(i+1), 
+            profile["name"], 
+            profile["path"], 
+            created, 
+            profile["type"].capitalize(), 
+            human_size
+        )
+    
+    console.print(table)
+
+async def create_profile_interactive(profiler: BrowserProfiler):
+    """Interactive profile creation wizard"""
+    console.print(Panel("[bold cyan]Create Browser Profile[/bold cyan]\n"
+                      "This will open a browser window for you to set up your identity.\n"
+                      "Log in to sites, adjust settings, then press 'q' to save.",
+                      border_style="cyan"))
+    
+    profile_name = Prompt.ask("[cyan]Enter profile name[/cyan]", default=f"profile_{int(time.time())}")
+    
+    console.print("[cyan]Creating profile...[/cyan]")
+    console.print("[yellow]A browser window will open. After logging in to sites, press 'q' in this terminal to save.[/yellow]")
+    
+    # Create the profile
+    try:
+        profile_path = await profiler.create_profile(profile_name)
+        
+        if profile_path:
+            console.print(f"[green]Profile successfully created at:[/green] {profile_path}")
+        else:
+            console.print("[red]Failed to create profile.[/red]")
+    except Exception as e:
+        console.print(f"[red]Error creating profile: {str(e)}[/red]")
+
+def delete_profile_interactive(profiler: BrowserProfiler):
+    """Interactive profile deletion"""
+    profiles = profiler.list_profiles()
+    
+    if not profiles:
+        console.print("[yellow]No profiles found to delete.[/yellow]")
+        return
+    
+    # Display profiles
+    display_profiles_table(profiles)
+    
+    # Get profile selection
+    idx = Prompt.ask(
+        "[red]Enter number of profile to delete[/red]", 
+        console=console,
+        choices=[str(i+1) for i in range(len(profiles))],
+        show_choices=False
+    )
+    
+    try:
+        idx = int(idx) - 1
+        profile = profiles[idx]
+        
+        # Confirm deletion
+        if Confirm.ask(f"[red]Are you sure you want to delete profile '{profile['name']}'?[/red]"):
+            success = profiler.delete_profile(profile["path"])
+            
+            if success:
+                console.print(f"[green]Profile '{profile['name']}' deleted successfully.[/green]")
+            else:
+                console.print(f"[red]Failed to delete profile '{profile['name']}'.[/red]")
+    except (ValueError, IndexError):
+        console.print("[red]Invalid selection.[/red]")
+        
+async def crawl_with_profile_cli(profile_path, url):
+    """Use a profile to crawl a website via CLI"""
+    console.print(f"[cyan]Crawling [bold]{url}[/bold] using profile at [bold]{profile_path}[/bold][/cyan]")
+    
+    # Create browser config with the profile
+    browser_cfg = BrowserConfig(
+        headless=False,  # Set to False to see the browser in action
+        use_managed_browser=True,
+        user_data_dir=profile_path
+    )
+    
+    # Default crawler config
+    crawler_cfg = CrawlerRunConfig()
+    
+    # Ask for output format
+    output_format = Prompt.ask(
+        "[cyan]Output format[/cyan]",
+        choices=["all", "json", "markdown", "md", "title"],
+        default="markdown"
+    )
+    
+    try:
+        # Run the crawler
+        result = await run_crawler(url, browser_cfg, crawler_cfg, True)
+        
+        # Handle output
+        if output_format == "all":
+            console.print(json.dumps(result.model_dump(), indent=2))
+        elif output_format == "json":
+            console.print(json.dumps(json.loads(result.extracted_content), indent=2))
+        elif output_format in ["markdown", "md"]:
+            console.print(result.markdown.raw_markdown)
+        elif output_format == "title":
+            console.print(result.metadata.get("title", "No title found"))
+        
+        console.print(f"[green]Successfully crawled[/green] {url}")
+        return result
+    except Exception as e:
+        console.print(f"[red]Error crawling:[/red] {str(e)}")
+        return None
+        
+async def use_profile_to_crawl():
+    """Interactive profile selection for crawling"""
+    profiler = BrowserProfiler()
+    profiles = profiler.list_profiles()
+    
+    if not profiles:
+        console.print("[yellow]No profiles found. Create one first.[/yellow]")
+        return
+        
+    # Display profiles
+    display_profiles_table(profiles)
+    
+    # Get profile selection
+    idx = Prompt.ask(
+        "[cyan]Enter number of profile to use[/cyan]", 
+        console=console,
+        choices=[str(i+1) for i in range(len(profiles))],
+        show_choices=False
+    )
+    
+    try:
+        idx = int(idx) - 1
+        profile = profiles[idx]
+        
+        # Get URL
+        url = Prompt.ask("[cyan]Enter URL to crawl[/cyan]")
+        if url:
+            # Crawl with the selected profile
+            await crawl_with_profile_cli(profile["path"], url)
+        else:
+            console.print("[red]No URL provided[/red]")
+    except (ValueError, IndexError):
+        console.print("[red]Invalid selection[/red]")
+
+async def manage_profiles():
+    """Interactive profile management menu"""
+    profiler = BrowserProfiler()
+    
+    options = {
+        "1": "List profiles",
+        "2": "Create new profile",
+        "3": "Delete profile",
+        "4": "Use a profile to crawl a website",
+        "5": "Exit",
+    }
+    
+    while True:
+        console.print(Panel("[bold cyan]Browser Profile Manager[/bold cyan]", border_style="cyan"))
+        
+        for key, value in options.items():
+            color = "green" if key == "1" else "yellow" if key == "2" else "red" if key == "3" else "blue" if key == "4" else "cyan"
+            console.print(f"[{color}]{key}[/{color}]. {value}")
+        
+        choice = Prompt.ask("Enter choice", choices=list(options.keys()), default="1")
+        
+        if choice == "1":
+            # List profiles
+            profiles = profiler.list_profiles()
+            display_profiles_table(profiles)
+        
+        elif choice == "2":
+            # Create profile
+            await create_profile_interactive(profiler)
+        
+        elif choice == "3":
+            # Delete profile
+            delete_profile_interactive(profiler)
+            
+        elif choice == "4":
+            # Use profile to crawl
+            await use_profile_to_crawl()
+        
+        elif choice == "5":
+            # Exit
+            console.print("[cyan]Exiting profile manager.[/cyan]")
+            break
+        
+        # Add a separator between operations
+        console.print("\n")
+
+
+
+@click.group(context_settings={"help_option_names": ["-h", "--help"]})
+def cli():
+    """Crawl4AI CLI - Web content extraction and browser profile management tool"""
+    pass
+
+
+@cli.command("cdp")
+@click.option("--user-data-dir", "-d", help="Directory to use for browser data (will be created if it doesn't exist)")
+@click.option("--port", "-P", type=int, default=9222, help="Debugging port (default: 9222)")
+@click.option("--browser-type", "-b", type=click.Choice(["chromium", "firefox"]), default="chromium", 
+              help="Browser type (default: chromium)")
+@click.option("--headless", is_flag=True, help="Run browser in headless mode")
+@click.option("--incognito", is_flag=True, help="Run in incognito/private mode (ignores user-data-dir)")
+def cdp_cmd(user_data_dir: Optional[str], port: int, browser_type: str, headless: bool, incognito: bool):
+    """Launch a standalone browser with CDP debugging enabled
+    
+    This command launches a browser with Chrome DevTools Protocol (CDP) debugging enabled,
+    prints the CDP URL, and keeps the browser running until you press 'q'.
+    
+    The CDP URL can be used for various automation and debugging tasks.
+    
+    Examples:
+        # Launch Chromium with CDP on default port 9222
+        crwl cdp
+        
+        # Use a specific directory for browser data and custom port
+        crwl cdp --user-data-dir ~/browser-data --port 9223
+        
+        # Launch in headless mode
+        crwl cdp --headless
+        
+        # Launch in incognito mode (ignores user-data-dir)
+        crwl cdp --incognito
+    """
+    profiler = BrowserProfiler()
+    
+    try:
+        # Handle data directory
+        data_dir = None
+        if not incognito and user_data_dir:
+            # Expand user path (~/something)
+            expanded_path = os.path.expanduser(user_data_dir)
+            
+            # Create directory if it doesn't exist
+            if not os.path.exists(expanded_path):
+                console.print(f"[yellow]Directory '{expanded_path}' doesn't exist. Creating it.[/yellow]")
+                os.makedirs(expanded_path, exist_ok=True)
+            
+            data_dir = expanded_path
+        
+        # Print launch info
+        console.print(Panel(
+            f"[cyan]Launching browser with CDP debugging[/cyan]\n\n"
+            f"Browser type: [green]{browser_type}[/green]\n"
+            f"Debugging port: [yellow]{port}[/yellow]\n"
+            f"User data directory: [cyan]{data_dir or 'Temporary directory'}[/cyan]\n"
+            f"Headless: [cyan]{'Yes' if headless else 'No'}[/cyan]\n"
+            f"Incognito: [cyan]{'Yes' if incognito else 'No'}[/cyan]\n\n"
+            f"[yellow]Press 'q' to quit when done[/yellow]",
+            title="CDP Browser",
+            border_style="cyan"
+        ))
+        
+        # Run the browser
+        cdp_url = anyio.run(
+            profiler.launch_standalone_browser,
+            browser_type,
+            data_dir,
+            port,
+            headless
+        )
+        
+        if not cdp_url:
+            console.print("[red]Failed to launch browser or get CDP URL[/red]")
+            sys.exit(1)
+            
+    except Exception as e:
+        console.print(f"[red]Error launching CDP browser: {str(e)}[/red]")
+        sys.exit(1)
+
+
+@cli.command("crawl")
+@click.argument("url", required=True)
 @click.option("--browser-config", "-B", type=click.Path(exists=True), help="Browser config file (YAML/JSON)")
 @click.option("--crawler-config", "-C", type=click.Path(exists=True), help="Crawler config file (YAML/JSON)")
 @click.option("--filter-config", "-f", type=click.Path(exists=True), help="Content filter config file")
@@ -291,26 +660,44 @@ For more documentation visit: https://github.com/unclecode/crawl4ai
 @click.option("--browser", "-b", type=str, callback=parse_key_values, help="Browser parameters as key1=value1,key2=value2")
 @click.option("--crawler", "-c", type=str, callback=parse_key_values, help="Crawler parameters as key1=value1,key2=value2")
 @click.option("--output", "-o", type=click.Choice(["all", "json", "markdown", "md", "markdown-fit", "md-fit"]), default="all")
-@click.option("--bypass-cache", is_flag=True, default = True,  help="Bypass cache when crawling")
+@click.option("--bypass-cache", is_flag=True, default=True, help="Bypass cache when crawling")
 @click.option("--question", "-q", help="Ask a question about the crawled content")
 @click.option("--verbose", "-v", is_flag=True)
-def cli(url: str, example: bool, browser_config: str, crawler_config: str, filter_config: str, 
-        extraction_config: str, schema: str, browser: Dict, crawler: Dict,
-        output: str, bypass_cache: bool, question: str, verbose: bool):
-    """Crawl4AI CLI - Web content extraction tool
-
+@click.option("--profile", "-p", help="Use a specific browser profile (by name)")
+def crawl_cmd(url: str, browser_config: str, crawler_config: str, filter_config: str, 
+           extraction_config: str, schema: str, browser: Dict, crawler: Dict,
+           output: str, bypass_cache: bool, question: str, verbose: bool, profile: str):
+    """Crawl a website and extract content
+    
     Simple Usage:
-        crwl https://example.com
+        crwl crawl https://example.com
+    """
     
-    Run with --example to see detailed usage examples."""
-
-    if example:
-        show_examples()
-        return
+    # Handle profile option
+    if profile:
+        profiler = BrowserProfiler()
+        profile_path = profiler.get_profile_path(profile)
         
-    if not url:
-        raise click.UsageError("URL argument is required unless using --example")
-    
+        if not profile_path:
+            profiles = profiler.list_profiles()
+            
+            if profiles:
+                console.print(f"[red]Profile '{profile}' not found. Available profiles:[/red]")
+                display_profiles_table(profiles)
+            else:
+                console.print("[red]No profiles found. Create one with 'crwl profiles'[/red]")
+            
+            return
+        
+        # Include the profile in browser config
+        if not browser:
+            browser = {}
+        browser["user_data_dir"] = profile_path
+        browser["use_managed_browser"] = True
+        
+        if verbose:
+            console.print(f"[green]Using browser profile:[/green] {profile}")
+            
     try:
         # Load base configurations
         browser_cfg = BrowserConfig.load(load_config_file(browser_config))
@@ -353,7 +740,7 @@ def cli(url: str, example: bool, browser_config: str, crawler_config: str, filte
                     raise click.ClickException("LLM provider and API token are required for LLM extraction")
 
                 crawler_cfg.extraction_strategy = LLMExtractionStrategy(
-                    llmConfig=LlmConfig(provider=extract_conf["provider"], api_token=extract_conf["api_token"]),
+                    llm_config=LLMConfig(provider=extract_conf["provider"], api_token=extract_conf["api_token"]),
                     instruction=extract_conf["instruction"],
                     schema=schema_data,
                     **extract_conf.get("params", {})
@@ -401,5 +788,89 @@ def cli(url: str, example: bool, browser_config: str, crawler_config: str, filte
     except Exception as e:
         raise click.ClickException(str(e))
 
-if __name__ == "__main__":
+@cli.command("examples")
+def examples_cmd():
+    """Show usage examples"""
+    show_examples()
+
+@cli.command("profiles")
+def profiles_cmd():
+    """Manage browser profiles interactively
+    
+    Launch an interactive browser profile manager where you can:
+    - List all existing profiles
+    - Create new profiles for authenticated browsing
+    - Delete unused profiles
+    """
+    # Run interactive profile manager
+    anyio.run(manage_profiles)
+
+@cli.command(name="")
+@click.argument("url", required=False)
+@click.option("--example", is_flag=True, help="Show usage examples")
+@click.option("--browser-config", "-B", type=click.Path(exists=True), help="Browser config file (YAML/JSON)")
+@click.option("--crawler-config", "-C", type=click.Path(exists=True), help="Crawler config file (YAML/JSON)")
+@click.option("--filter-config", "-f", type=click.Path(exists=True), help="Content filter config file")
+@click.option("--extraction-config", "-e", type=click.Path(exists=True), help="Extraction strategy config file")
+@click.option("--schema", "-s", type=click.Path(exists=True), help="JSON schema for extraction")
+@click.option("--browser", "-b", type=str, callback=parse_key_values, help="Browser parameters as key1=value1,key2=value2")
+@click.option("--crawler", "-c", type=str, callback=parse_key_values, help="Crawler parameters as key1=value1,key2=value2")
+@click.option("--output", "-o", type=click.Choice(["all", "json", "markdown", "md", "markdown-fit", "md-fit"]), default="all")
+@click.option("--bypass-cache", is_flag=True, default=True, help="Bypass cache when crawling")
+@click.option("--question", "-q", help="Ask a question about the crawled content")
+@click.option("--verbose", "-v", is_flag=True)
+@click.option("--profile", "-p", help="Use a specific browser profile (by name)")
+def default(url: str, example: bool, browser_config: str, crawler_config: str, filter_config: str, 
+        extraction_config: str, schema: str, browser: Dict, crawler: Dict,
+        output: str, bypass_cache: bool, question: str, verbose: bool, profile: str):
+    """Crawl4AI CLI - Web content extraction tool
+
+    Simple Usage:
+        crwl https://example.com
+    
+    Run with --example to see detailed usage examples.
+    
+    Other commands:
+        crwl profiles   - Manage browser profiles for identity-based crawling
+        crwl crawl      - Crawl a website with advanced options
+        crwl cdp        - Launch browser with CDP debugging enabled
+        crwl examples   - Show more usage examples
+    """
+
+    if example:
+        show_examples()
+        return
+        
+    if not url:
+        # Show help without error message
+        ctx = click.get_current_context()
+        click.echo(ctx.get_help())
+        return
+        
+    # Forward to crawl command
+    ctx = click.get_current_context()
+    ctx.invoke(
+        crawl_cmd, 
+        url=url, 
+        browser_config=browser_config,
+        crawler_config=crawler_config,
+        filter_config=filter_config,
+        extraction_config=extraction_config, 
+        schema=schema,
+        browser=browser,
+        crawler=crawler,
+        output=output,
+        bypass_cache=bypass_cache,
+        question=question,
+        verbose=verbose,
+        profile=profile
+    )
+
+def main():
+    import sys
+    if len(sys.argv) < 2 or sys.argv[1] not in cli.commands:
+        sys.argv.insert(1, "crawl")
     cli()
+
+if __name__ == "__main__":
+    main()

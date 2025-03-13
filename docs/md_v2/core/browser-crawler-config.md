@@ -4,7 +4,7 @@ Crawl4AI’s flexibility stems from two key classes:
 
 1. **`BrowserConfig`** – Dictates **how** the browser is launched and behaves (e.g., headless or visible, proxy, user agent).  
 2. **`CrawlerRunConfig`** – Dictates **how** each **crawl** operates (e.g., caching, extraction, timeouts, JavaScript code to run, etc.).  
-3. **`LlmConfig`** - Dictates **how** LLM providers are configured. (model, api token, base url, temperature etc.)
+3. **`LLMConfig`** - Dictates **how** LLM providers are configured. (model, api token, base url, temperature etc.)
 
 In most examples, you create **one** `BrowserConfig` for the entire crawler session, then pass a **fresh** or re-used `CrawlerRunConfig` whenever you call `arun()`. This tutorial shows the most commonly used parameters. If you need advanced or rarely used fields, see the [Configuration Parameters](../api/parameters.md).
 
@@ -239,7 +239,7 @@ The `clone()` method:
 
 
 
-## 3. LlmConfig Essentials
+## 3. LLMConfig Essentials
 
 ### Key fields to note
 
@@ -256,16 +256,16 @@ The `clone()` method:
    - If your provider has a custom endpoint
 
 ```python
-llmConfig = LlmConfig(provider="openai/gpt-4o-mini", api_token=os.getenv("OPENAI_API_KEY"))
+llm_config = LLMConfig(provider="openai/gpt-4o-mini", api_token=os.getenv("OPENAI_API_KEY"))
 ```
 
 ## 4. Putting It All Together
 
-In a typical scenario, you define **one** `BrowserConfig` for your crawler session, then create **one or more** `CrawlerRunConfig` & `LlmConfig` depending on each call’s needs:
+In a typical scenario, you define **one** `BrowserConfig` for your crawler session, then create **one or more** `CrawlerRunConfig` & `LLMConfig` depending on each call’s needs:
 
 ```python
 import asyncio
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, LlmConfig
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, LLMConfig
 from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
 
 async def main():
@@ -289,14 +289,14 @@ async def main():
 
     # 3) Example LLM content filtering
 
-    gemini_config = LlmConfig(
+    gemini_config = LLMConfig(
         provider="gemini/gemini-1.5-pro" 
         api_token = "env:GEMINI_API_TOKEN"
     )
 
     # Initialize LLM filter with specific instruction
     filter = LLMContentFilter(
-        llmConfig=gemini_config,  # or your preferred provider
+        llm_config=gemini_config,  # or your preferred provider
         instruction="""
         Focus on extracting the core educational content.
         Include:
@@ -343,7 +343,7 @@ if __name__ == "__main__":
 
 For a **detailed list** of available parameters (including advanced ones), see:
 
-- [BrowserConfig, CrawlerRunConfig & LlmConfig Reference](../api/parameters.md)  
+- [BrowserConfig, CrawlerRunConfig & LLMConfig Reference](../api/parameters.md)  
 
 You can explore topics like:
 
@@ -356,7 +356,7 @@ You can explore topics like:
 
 ## 6. Conclusion
 
-**BrowserConfig**, **CrawlerRunConfig** and **LlmConfig** give you straightforward ways to define:
+**BrowserConfig**, **CrawlerRunConfig** and **LLMConfig** give you straightforward ways to define:
 
 - **Which** browser to launch, how it should run, and any proxy or user agent needs.  
 - **How** each crawl should behave—caching, timeouts, JavaScript code, extraction strategies, etc.

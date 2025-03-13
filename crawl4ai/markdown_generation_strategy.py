@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
-from tabnanny import verbose
 from typing import Optional, Dict, Any, Tuple
 from .models import MarkdownGenerationResult
 from .html2text import CustomHTML2Text
+# from .types import RelevantContentFilter
 from .content_filter_strategy import RelevantContentFilter
 import re
 from urllib.parse import urljoin

@@ -415,7 +415,7 @@ The schema generator is available as a static method on both `JsonCssExtractionS
 
 ```python
 from crawl4ai.extraction_strategy import JsonCssExtractionStrategy, JsonXPathExtractionStrategy
-from crawl4ai.async_configs import LlmConfig
+from crawl4ai import LLMConfig
 
 # Sample HTML with product information
 html = """
@@ -435,14 +435,14 @@ html = """
 css_schema = JsonCssExtractionStrategy.generate_schema(
     html,
     schema_type="css", 
-    llmConfig = LlmConfig(provider="openai/gpt-4o",api_token="your-openai-token")
+    llm_config = LLMConfig(provider="openai/gpt-4o",api_token="your-openai-token")
 )
 
 # Option 2: Using Ollama (open source, no token needed)
 xpath_schema = JsonXPathExtractionStrategy.generate_schema(
     html,
     schema_type="xpath",
-    llmConfig = LlmConfig(provider="ollama/llama3.3", api_token=None)  # Not needed for Ollama
+    llm_config = LLMConfig(provider="ollama/llama3.3", api_token=None)  # Not needed for Ollama
 )
 
 # Use the generated schema for fast, repeated extractions

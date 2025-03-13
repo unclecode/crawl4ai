@@ -16,7 +16,7 @@ class DeepCrawlDecorator:
 
     def __call__(self, original_arun):
         @wraps(original_arun)
-        async def wrapped_arun(url: str, config: Optional[CrawlerRunConfig] = None, **kwargs):
+        async def wrapped_arun(url: str, config: CrawlerRunConfig = None, **kwargs):
             # If deep crawling is already active, call the original method to avoid recursion.
             if config and config.deep_crawl_strategy and not self.deep_crawl_active.get():
                 token = self.deep_crawl_active.set(True)

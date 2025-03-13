@@ -124,6 +124,7 @@ class URLPatternFilter(URLFilter):
         "_simple_prefixes",
         "_domain_patterns",
         "_path_patterns",
+        "_reverse",
     )
 
     PATTERN_TYPES = {
@@ -138,8 +139,10 @@ class URLPatternFilter(URLFilter):
         self,
         patterns: Union[str, Pattern, List[Union[str, Pattern]]],
         use_glob: bool = True,
+        reverse: bool = False,
     ):
         super().__init__()
+        self._reverse = reverse
         patterns = [patterns] if isinstance(patterns, (str, Pattern)) else patterns
 
         self._simple_suffixes = set()
@@ -205,36 +208,40 @@ class URLPatternFilter(URLFilter):
 
     @lru_cache(maxsize=10000)
     def apply(self, url: str) -> bool:
-        """Hierarchical pattern matching"""
         # Quick suffix check (*.html)
         if self._simple_suffixes:
             path = url.split("?")[0]
             if path.split("/")[-1].split(".")[-1] in self._simple_suffixes:
-                self._update_stats(True)
-                return True
+                result = True
+                self._update_stats(result)
+                return not result if self._reverse else result
 
         # Domain check
         if self._domain_patterns:
             for pattern in self._domain_patterns:
                 if pattern.match(url):
-                    self._update_stats(True)
-                    return True
+                    result = True
+                    self._update_stats(result)
+                    return not result if self._reverse else result
 
         # Prefix check (/foo/*)
         if self._simple_prefixes:
             path = url.split("?")[0]
             if any(path.startswith(p) for p in self._simple_prefixes):
-                self._update_stats(True)
-                return True
+                result = True
+                self._update_stats(result)
+                return not result if self._reverse else result
 
         # Complex patterns
         if self._path_patterns:
             if any(p.search(url) for p in self._path_patterns):
-                self._update_stats(True)
-                return True
+                result = True
+                self._update_stats(result)
+                return not result if self._reverse else result
 
-        self._update_stats(False)
-        return False
+        result = False
+        self._update_stats(result)
+        return not result if self._reverse else result
 
 
 class ContentTypeFilter(URLFilter):
@@ -427,6 +434,11 @@ class DomainFilter(URLFilter):
         if isinstance(domains, str):
             return {domains.lower()}
         return {d.lower() for d in domains}
+    
+    @staticmethod
+    def _is_subdomain(domain: str, parent_domain: str) -> bool:
+        """Check if domain is a subdomain of parent_domain"""
+        return domain == parent_domain or domain.endswith(f".{parent_domain}")
 
     @staticmethod
     @lru_cache(maxsize=10000)
@@ -444,20 +456,26 @@ class DomainFilter(URLFilter):
 
         domain = self._extract_domain(url)
 
-        # Early return for blocked domains
-        if domain in self._blocked_domains:
-            self._update_stats(False)
-            return False
+        # Check for blocked domains, including subdomains
+        for blocked in self._blocked_domains:
+            if self._is_subdomain(domain, blocked):
+                self._update_stats(False)
+                return False
 
         # If no allowed domains specified, accept all non-blocked
         if self._allowed_domains is None:
             self._update_stats(True)
             return True
 
-        # Final allowed domains check
-        result = domain in self._allowed_domains
-        self._update_stats(result)
-        return result
+        # Check if domain matches any allowed domain (including subdomains)
+        for allowed in self._allowed_domains:
+            if self._is_subdomain(domain, allowed):
+                self._update_stats(True)
+                return True
+
+        # No matches found
+        self._update_stats(False)
+        return False
 
 
 class ContentRelevanceFilter(URLFilter):

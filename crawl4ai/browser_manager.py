@@ -74,6 +74,7 @@ class ManagedBrowser:
             _get_browser_args(): Returns browser-specific command line arguments.
             _get_user_data_dir(): Returns the user data directory path.
             _cleanup(): Terminates the browser process and removes the temporary directory.
+            create_profile(): Static method to create a user profile by launching a browser for user interaction.
     """
 
     browser_type: str
@@ -288,6 +289,80 @@ class ManagedBrowser:
                     tag="ERROR",
                     params={"error": str(e)},
                 )
+                
+    # These methods have been moved to BrowserProfiler class
+    @staticmethod
+    async def create_profile(browser_config=None, profile_name=None, logger=None):
+        """
+        This method has been moved to the BrowserProfiler class.
+        
+        Creates a browser profile by launching a browser for interactive user setup
+        and waits until the user closes it. The profile is stored in a directory that
+        can be used later with BrowserConfig.user_data_dir.
+        
+        Please use BrowserProfiler.create_profile() instead.
+        
+        Example:
+            ```python
+            from crawl4ai.browser_profiler import BrowserProfiler
+            
+            profiler = BrowserProfiler()
+            profile_path = await profiler.create_profile(profile_name="my-login-profile")
+            ```
+        """
+        from .browser_profiler import BrowserProfiler
+        
+        # Create a BrowserProfiler instance and delegate to it
+        profiler = BrowserProfiler(logger=logger)
+        return await profiler.create_profile(profile_name=profile_name, browser_config=browser_config)
+    
+    @staticmethod
+    def list_profiles():
+        """
+        This method has been moved to the BrowserProfiler class.
+        
+        Lists all available browser profiles in the Crawl4AI profiles directory.
+        
+        Please use BrowserProfiler.list_profiles() instead.
+        
+        Example:
+            ```python
+            from crawl4ai.browser_profiler import BrowserProfiler
+            
+            profiler = BrowserProfiler()
+            profiles = profiler.list_profiles()
+            ```
+        """
+        from .browser_profiler import BrowserProfiler
+        
+        # Create a BrowserProfiler instance and delegate to it
+        profiler = BrowserProfiler()
+        return profiler.list_profiles()
+        
+    @staticmethod
+    def delete_profile(profile_name_or_path):
+        """
+        This method has been moved to the BrowserProfiler class.
+        
+        Delete a browser profile by name or path.
+        
+        Please use BrowserProfiler.delete_profile() instead.
+        
+        Example:
+            ```python
+            from crawl4ai.browser_profiler import BrowserProfiler
+            
+            profiler = BrowserProfiler()
+            success = profiler.delete_profile("my-profile")
+            ```
+        """
+        from .browser_profiler import BrowserProfiler
+        
+        # Create a BrowserProfiler instance and delegate to it
+        profiler = BrowserProfiler()
+        return profiler.delete_profile(profile_name_or_path)
+
+
 
 
 class BrowserManager:
@@ -304,6 +379,7 @@ class BrowserManager:
         sessions (dict): Dictionary to store session information
         session_ttl (int): Session timeout in seconds
     """
+    
 
     def __init__(self, browser_config: BrowserConfig, logger=None):
         """
@@ -358,8 +434,9 @@ class BrowserManager:
 
             self.playwright = await async_playwright().start()
 
-        if self.config.use_managed_browser:
-            cdp_url = await self.managed_browser.start()
+        if self.config.cdp_url or self.config.use_managed_browser:
+            self.config.use_managed_browser = True
+            cdp_url = await self.managed_browser.start() if not self.config.cdp_url else self.config.cdp_url
             self.browser = await self.playwright.chromium.connect_over_cdp(cdp_url)
             contexts = self.browser.contexts
             if contexts:
@@ -454,9 +531,9 @@ class BrowserManager:
                 ProxySettings(server=self.config.proxy)
                 if self.config.proxy
                 else ProxySettings(
-                    server=self.config.proxy_config.get("server"),
-                    username=self.config.proxy_config.get("username"),
-                    password=self.config.proxy_config.get("password"),
+                    server=self.config.proxy_config.server,
+                    username=self.config.proxy_config.username,
+                    password=self.config.proxy_config.password,
                 )
             )
             browser_args["proxy"] = proxy_settings
@@ -714,7 +791,10 @@ class BrowserManager:
         # If using a managed browser, just grab the shared default_context
         if self.config.use_managed_browser:
             context = self.default_context
-            page = await context.new_page()
+            pages = context.pages
+            page = next((p for p in pages if p.url == crawlerRunConfig.url), None)
+            if not page:
+                page = await context.new_page()
         else:
             # Otherwise, check if we have an existing context for this config
             config_signature = self._make_config_signature(crawlerRunConfig)
@@ -764,6 +844,9 @@ class BrowserManager:
 
     async def close(self):
         """Close all browser resources and clean up."""
+        if self.config.cdp_url:
+            return
+        
         if self.config.sleep_on_close:
             await asyncio.sleep(0.5)
 
