@@ -43,8 +43,6 @@ dependencies = [
     "faust-cchardet>=2.1.19",
     "aiohttp>=3.11.11",
     "humanize>=4.10.0",
-    "zstandard>=0.23.0",
-    "msgpack>=1.1.0"
 ]
 classifiers = [
     "Development Status :: 4 - Beta",

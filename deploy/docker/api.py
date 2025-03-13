@@ -388,11 +388,19 @@ async def handle_crawl_request(
         )
 
         async with AsyncWebCrawler(config=browser_config) as crawler:
-            results = await crawler.arun_many(
-                urls=urls,
-                config=crawler_config,
-                dispatcher=dispatcher
-            )
+            results = []
+            if len(urls) == 1:
+                results = await crawler.arun(
+                    url=urls[0],
+                    config=crawler_config,
+                    dispatcher=dispatcher
+                )
+            else:    
+                results = await crawler.arun_many(
+                    urls=urls,
+                    config=crawler_config,
+                    dispatcher=dispatcher
+                )
             
             return {
                 "success": True,
