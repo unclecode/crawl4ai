@@ -507,10 +507,12 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         # Get page for session
         page, context = await self.browser_manager.get_page(crawlerRunConfig=config)
 
+        # await page.goto(URL)
+
         # Add default cookie
-        await context.add_cookies(
-            [{"name": "cookiesEnabled", "value": "true", "url": url}]
-        )
+        # await context.add_cookies(
+        #     [{"name": "cookiesEnabled", "value": "true", "url": url}]
+        # )
 
         # Handle navigator overrides
         if config.override_navigator or config.simulate_user or config.magic:
@@ -562,14 +564,15 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
                 try:
                     # Generate a unique nonce for this request
-                    nonce = hashlib.sha256(os.urandom(32)).hexdigest()
+                    if config.experimental.get("use_csp_nonce", False):
+                        nonce = hashlib.sha256(os.urandom(32)).hexdigest()
 
-                    # Add CSP headers to the request
-                    await page.set_extra_http_headers(
-                        {
-                            "Content-Security-Policy": f"default-src 'self'; script-src 'self' 'nonce-{nonce}' 'strict-dynamic'"
-                        }
-                    )
+                        # Add CSP headers to the request
+                        await page.set_extra_http_headers(
+                            {
+                                "Content-Security-Policy": f"default-src 'self'; script-src 'self' 'nonce-{nonce}' 'strict-dynamic'"
+                            }
+                        )
 
                     response = await page.goto(
                         url, wait_until=config.wait_until, timeout=config.page_timeout
