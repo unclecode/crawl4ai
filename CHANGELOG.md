@@ -5,6 +5,39 @@ All notable changes to Crawl4AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Version 0.5.0.post5 (2025-03-14)
+
+### Added
+
+- *(crawler)* Add experimental parameters dictionary to CrawlerRunConfig to support beta features
+- *(tables)* Add comprehensive table detection and extraction functionality with scoring system
+- *(monitor)* Add real-time crawler monitoring system with memory management
+- *(content)* Add target_elements parameter for selective content extraction
+- *(browser)* Add standalone CDP browser launch capability
+- *(schema)* Add preprocess_html_for_schema utility for better HTML cleaning
+- *(api)* Add special handling for single URL requests in Docker API
+
+### Changed
+
+- *(filters)* Add reverse option to URLPatternFilter for inverting filter logic
+- *(browser)* Make CSP nonce headers optional via experimental config
+- *(browser)* Remove default cookie injection from page initialization
+- *(crawler)* Optimize response handling for single-URL processing
+- *(api)* Refactor crawl request handling to streamline processing
+- *(config)* Update default provider to gpt-4o
+- *(cache)* Change default cache_mode from aggressive to bypass in examples
+
+### Fixed
+
+- *(browser)* Clean up browser context creation code
+- *(api)* Improve code formatting in API handler
+
+### Breaking Changes
+
+- WebScrapingStrategy no longer returns 'scraped_html' in its output dictionary
+- Table extraction logic has been modified to better handle thead/tbody structures
+- Default cookie injection has been removed from page initialization
+
 ## Version 0.5.0 (2025-03-02)
 
 ### Added
