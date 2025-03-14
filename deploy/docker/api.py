@@ -391,7 +391,10 @@ async def handle_crawl_request(
         async with AsyncWebCrawler(config=browser_config) as crawler:
             results = []
             func = getattr(crawler, "arun" if len(urls) == 1 else "arun_many")
-            partial_func = partial(func, urls[0] if len(urls) == 1 else urls, config=crawler_config, dispatcher=dispatcher)
+            partial_func = partial(func, 
+                                   urls[0] if len(urls) == 1 else urls, 
+                                   config=crawler_config, 
+                                   dispatcher=dispatcher)
             results = await partial_func()
             return {
                 "success": True,

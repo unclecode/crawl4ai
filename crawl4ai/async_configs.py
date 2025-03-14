@@ -650,6 +650,12 @@ class CrawlerRunConfig():
         user_agent_generator_config (dict or None): Configuration for user agent generation if user_agent_mode is set.
                                                     Default: None.
 
+        # Experimental Parameters
+        experimental (dict): Dictionary containing experimental parameters that are in beta phase.
+                            This allows passing temporary features that are not yet fully integrated 
+                            into the main parameter set.
+                            Default: None.
+
         url: str = None  # This is not a compulsory parameter
     """
 
@@ -732,6 +738,8 @@ class CrawlerRunConfig():
         user_agent_generator_config: dict = {},
         # Deep Crawl Parameters
         deep_crawl_strategy: Optional[DeepCrawlStrategy] = None,
+        # Experimental Parameters
+        experimental: Dict[str, Any] = None,
     ):
         # TODO: Planning to set properties dynamically based on the __init__ signature
         self.url = url
@@ -845,6 +853,9 @@ class CrawlerRunConfig():
 
         # Deep Crawl Parameters
         self.deep_crawl_strategy = deep_crawl_strategy
+        
+        # Experimental Parameters
+        self.experimental = experimental or {}
 
 
     def __getattr__(self, name):
@@ -953,6 +964,8 @@ class CrawlerRunConfig():
             # Deep Crawl Parameters
             deep_crawl_strategy=kwargs.get("deep_crawl_strategy"),
             url=kwargs.get("url"),
+            # Experimental Parameters 
+            experimental=kwargs.get("experimental"),
         )
 
     # Create a funciton returns dict of the object
@@ -1037,6 +1050,7 @@ class CrawlerRunConfig():
             "user_agent_generator_config": self.user_agent_generator_config,
             "deep_crawl_strategy": self.deep_crawl_strategy,
             "url": self.url,
+            "experimental": self.experimental,
         }
 
     def clone(self, **kwargs):

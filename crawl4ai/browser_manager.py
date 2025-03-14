@@ -443,19 +443,6 @@ class BrowserManager:
                 self.default_context = contexts[0]
             else:
                 self.default_context = await self.create_browser_context()
-                # self.default_context = await self.browser.new_context(
-                #     viewport={
-                #         "width": self.config.viewport_width,
-                #         "height": self.config.viewport_height,
-                #     },
-                #     storage_state=self.config.storage_state,
-                #     user_agent=self.config.headers.get(
-                #         "User-Agent", self.config.user_agent
-                #     ),
-                #     accept_downloads=self.config.accept_downloads,
-                #     ignore_https_errors=self.config.ignore_https_errors,
-                #     java_script_enabled=self.config.java_script_enabled,
-                # )
             await self.setup_context(self.default_context)
         else:
             browser_args = self._build_browser_args()
@@ -469,6 +456,7 @@ class BrowserManager:
                 self.browser = await self.playwright.chromium.launch(**browser_args)
 
             self.default_context = self.browser
+
 
     def _build_browser_args(self) -> dict:
         """Build browser launch arguments from config."""
