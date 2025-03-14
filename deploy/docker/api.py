@@ -48,6 +48,8 @@ async def handle_llm_qa(
 ) -> str:
     """Process QA using LLM with crawled content as context."""
     try:
+        if not url.startswith(('http://', 'https://')):
+            url = 'https://' + url
         # Extract base URL by finding last '?q=' occurrence
         last_q_index = url.rfind('?q=')
         if last_q_index != -1:
@@ -61,7 +63,7 @@ async def handle_llm_qa(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=result.error_message
                 )
-            content = result.markdown.fit_markdown
+            content = result.markdown.fit_markdown or result.markdown.raw_markdown
 
         # Create prompt and get LLM response
         prompt = f"""Use the following content as context to answer the question.
@@ -377,6 +379,7 @@ async def handle_crawl_request(
 ) -> dict:
     """Handle non-streaming crawl requests."""
     try:
+        urls = [('https://' + url) if not url.startswith(('http://', 'https://')) else url for url in urls]
         browser_config = BrowserConfig.load(browser_config)
         crawler_config = CrawlerRunConfig.load(crawler_config)
 
