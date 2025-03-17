@@ -1,0 +1,32 @@
+name: Discord GitHub Notifications
+
+on:
+  issues:
+    types: [opened]
+  pull_request:
+    types: [opened]
+  discussion:
+    types: [created]
+
+jobs:
+  notify-discord:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set webhook based on event type
+        id: set-webhook
+        run: |
+          if [ "${{ github.event_name }}" == "discussion" ]; then
+            echo "webhook=${{ secrets.DISCORD_DISCUSSIONS_WEBHOOK }}" >> $GITHUB_OUTPUT
+          else
+            echo "webhook=${{ secrets.DISCORD_WEBHOOK }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Discord Notification
+        uses: Ilshidur/action-discord@master
+        env:
+          DISCORD_WEBHOOK: ${{ steps.set-webhook.outputs.webhook }}
+        with:
+          args: |
+            ${{ github.event_name == 'issues' && format('📣 New issue created: **{0}** by {1} - {2}', github.event.issue.title, github.event.issue.user.login, github.event.issue.html_url) || 
+            github.event_name == 'pull_request' && format('🔄 New PR opened: **{0}** by {1} - {2}', github.event.pull_request.title, github.event.pull_request.user.login, github.event.pull_request.html_url) || 
+            format('💬 New discussion started: **{0}** by {1} - {2}', github.event.discussion.title, github.event.discussion.user.login, github.event.discussion.html_url) }}
