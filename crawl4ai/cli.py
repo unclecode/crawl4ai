@@ -455,9 +455,9 @@ async def crawl_with_profile_cli(profile_path, url):
         
         # Handle output
         if output_format == "all":
-            console.print(json.dumps(result.model_dump(), indent=2))
+            console.print(json.dumps(result.model_dump(), indent=2, ensure_ascii=False))
         elif output_format == "json":
-            console.print(json.dumps(json.loads(result.extracted_content), indent=2))
+            console.print(json.dumps(json.loads(result.extracted_content), indent=2, ensure_ascii=False))
         elif output_format in ["markdown", "md"]:
             console.print(result.markdown.raw_markdown)
         elif output_format == "title":
@@ -681,9 +681,9 @@ def crawl_cmd(url: str, browser_config: str, crawler_config: str, filter_config:
         
         # Handle output
         if output == "all":
-            click.echo(json.dumps(result.model_dump(), indent=2))
+            click.echo(json.dumps(result.model_dump(), indent=2, ensure_ascii=False))
         elif output == "json":
-            click.echo(json.dumps(json.loads(result.extracted_content), indent=2))
+            click.echo(json.dumps(json.loads(result.extracted_content), indent=2, ensure_ascii=False))
         elif output in ["markdown", "md"]:
             click.echo(result.markdown.raw_markdown)
         elif output in ["markdown-fit", "md-fit"]:
