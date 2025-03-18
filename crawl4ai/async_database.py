@@ -4,19 +4,14 @@ import aiosqlite
 import asyncio
 from typing import Optional, Dict
 from contextlib import asynccontextmanager
-import json  # Added for serialization/deserialization
-from .utils import ensure_content_dirs, generate_content_hash
+import json  
 from .models import CrawlResult, MarkdownGenerationResult, StringCompatibleMarkdown
-# , StringCompatibleMarkdown
 import aiofiles
-from .utils import VersionManager
 from .async_logger import AsyncLogger
-from .utils import get_error_context, create_box_message
 
-# Set up logging
-# logging.basicConfig(level=logging.INFO)
-# logger = logging.getLogger(__name__)
-# logger.setLevel(logging.INFO)
+from .utils import ensure_content_dirs, generate_content_hash
+from .utils import VersionManager
+from .utils import get_error_context, create_box_message
 
 base_directory = DB_PATH = os.path.join(
     os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home()), ".crawl4ai"
