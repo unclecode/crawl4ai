@@ -358,7 +358,7 @@ class AsyncWebCrawler:
                         html=html,
                         extracted_content=extracted_content,
                         config=config,  # Pass the config object instead of individual parameters
-                        screenshot=screenshot_data,
+                        screenshot_data=screenshot_data,
                         pdf_data=pdf_data,
                         verbose=config.verbose,
                         is_raw_html=True if url.startswith("raw:") else False,
@@ -446,7 +446,7 @@ class AsyncWebCrawler:
         html: str,
         extracted_content: str,
         config: CrawlerRunConfig,
-        screenshot: str,
+        screenshot_data: str,
         pdf_data: str,
         verbose: bool,
         **kwargs,
@@ -459,7 +459,7 @@ class AsyncWebCrawler:
             html: Raw HTML content
             extracted_content: Previously extracted content (if any)
             config: Configuration object controlling processing behavior
-            screenshot: Screenshot data (if any)
+            screenshot_data: Screenshot data (if any)
             pdf_data: PDF data (if any)
             verbose: Whether to enable verbose logging
             **kwargs: Additional parameters for backwards compatibility
@@ -623,10 +623,6 @@ class AsyncWebCrawler:
                 tag="EXTRACT",
                 params={"url": _url, "timing": time.perf_counter() - t1},
             )
-
-        # Handle screenshot and PDF data
-        screenshot_data = None if not screenshot else screenshot
-        pdf_data = None if not pdf_data else pdf_data
 
         # Apply HTML formatting if requested
         if config.prettiify:
