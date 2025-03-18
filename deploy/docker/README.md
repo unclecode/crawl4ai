@@ -554,7 +554,7 @@ async def test_stream_crawl(session, token: str):
             "https://example.com/page3",  
         ],
         "browser_config": {"headless": True, "viewport": {"width": 1200}},
-        "crawler_config": {"stream": True, "cache_mode": "aggressive"}
+        "crawler_config": {"stream": True, "cache_mode": "bypass"}
     }
 
     # headers = {"Authorization": f"Bearer {token}"} # If JWT is enabled, more on this later

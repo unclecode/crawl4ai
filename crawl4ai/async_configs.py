@@ -1,6 +1,7 @@
 import os
 from .config import (
     DEFAULT_PROVIDER,
+    DEFAULT_PROVIDER_API_KEY,
     MIN_WORD_THRESHOLD,
     IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
     PROVIDER_MODELS,
@@ -649,6 +650,12 @@ class CrawlerRunConfig():
         user_agent_generator_config (dict or None): Configuration for user agent generation if user_agent_mode is set.
                                                     Default: None.
 
+        # Experimental Parameters
+        experimental (dict): Dictionary containing experimental parameters that are in beta phase.
+                            This allows passing temporary features that are not yet fully integrated 
+                            into the main parameter set.
+                            Default: None.
+
         url: str = None  # This is not a compulsory parameter
     """
 
@@ -731,6 +738,8 @@ class CrawlerRunConfig():
         user_agent_generator_config: dict = {},
         # Deep Crawl Parameters
         deep_crawl_strategy: Optional[DeepCrawlStrategy] = None,
+        # Experimental Parameters
+        experimental: Dict[str, Any] = None,
     ):
         # TODO: Planning to set properties dynamically based on the __init__ signature
         self.url = url
@@ -844,6 +853,9 @@ class CrawlerRunConfig():
 
         # Deep Crawl Parameters
         self.deep_crawl_strategy = deep_crawl_strategy
+        
+        # Experimental Parameters
+        self.experimental = experimental or {}
 
 
     def __getattr__(self, name):
@@ -952,6 +964,8 @@ class CrawlerRunConfig():
             # Deep Crawl Parameters
             deep_crawl_strategy=kwargs.get("deep_crawl_strategy"),
             url=kwargs.get("url"),
+            # Experimental Parameters 
+            experimental=kwargs.get("experimental"),
         )
 
     # Create a funciton returns dict of the object
@@ -1036,6 +1050,7 @@ class CrawlerRunConfig():
             "user_agent_generator_config": self.user_agent_generator_config,
             "deep_crawl_strategy": self.deep_crawl_strategy,
             "url": self.url,
+            "experimental": self.experimental,
         }
 
     def clone(self, **kwargs):
@@ -1071,6 +1086,13 @@ class LLMConfig:
         provider: str = DEFAULT_PROVIDER,
         api_token: Optional[str] = None,
         base_url: Optional[str] = None,
+        temprature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        top_p: Optional[float] = None,
+        frequency_penalty: Optional[float] = None,
+        presence_penalty: Optional[float] = None,
+        stop: Optional[List[str]] = None,
+        n: Optional[int] = None,    
     ):
         """Configuaration class for LLM provider and API token."""
         self.provider = provider
@@ -1080,10 +1102,16 @@ class LLMConfig:
             self.api_token = os.getenv(api_token[4:])
         else:
             self.api_token = PROVIDER_MODELS.get(provider, "no-token") or os.getenv(
-                "OPENAI_API_KEY"
+                DEFAULT_PROVIDER_API_KEY
             )
         self.base_url = base_url
-
+        self.temprature = temprature
+        self.max_tokens = max_tokens
+        self.top_p = top_p
+        self.frequency_penalty = frequency_penalty
+        self.presence_penalty = presence_penalty
+        self.stop = stop
+        self.n = n
 
     @staticmethod
     def from_kwargs(kwargs: dict) -> "LLMConfig":
@@ -1091,13 +1119,27 @@ class LLMConfig:
             provider=kwargs.get("provider", DEFAULT_PROVIDER),
             api_token=kwargs.get("api_token"),
             base_url=kwargs.get("base_url"),
+            temprature=kwargs.get("temprature"),
+            max_tokens=kwargs.get("max_tokens"),
+            top_p=kwargs.get("top_p"),
+            frequency_penalty=kwargs.get("frequency_penalty"),
+            presence_penalty=kwargs.get("presence_penalty"),
+            stop=kwargs.get("stop"),
+            n=kwargs.get("n")
         )
 
     def to_dict(self):
         return {
             "provider": self.provider,
             "api_token": self.api_token,
-            "base_url": self.base_url
+            "base_url": self.base_url,
+            "temprature": self.temprature,
+            "max_tokens": self.max_tokens,
+            "top_p": self.top_p,
+            "frequency_penalty": self.frequency_penalty,
+            "presence_penalty": self.presence_penalty,
+            "stop": self.stop,
+            "n": self.n
         }
 
     def clone(self, **kwargs):
