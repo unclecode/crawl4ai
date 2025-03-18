@@ -69,7 +69,8 @@ We group them by category.
 | **Parameter**                | **Type / Default**                   | **What It Does**                                                                                |
 |------------------------------|--------------------------------------|-------------------------------------------------------------------------------------------------|
 | **`word_count_threshold`**   | `int` (default: ~200)                | Skips text blocks below X words. Helps ignore trivial sections.                                 |
-| **`extraction_strategy`**    | `ExtractionStrategy` (default: None) | If set, extracts structured data (CSS-based, LLM-based, etc.).                                  |
+| **`extraction_strategy`**    | `ExtractionStrategy` (default: None) | If set, extracts structured data (CSS-based, LLM-based, etc.). 
+| **`chunking_strategy`**    | `ChunkingStrategy` (default: RegexChunking) | If set, extracts structured data (CSS-based, LLM-based, etc.).                                  |
 | **`markdown_generator`**     | `MarkdownGenerationStrategy` (None)  | If you want specialized markdown output (citations, filtering, chunking, etc.).                 |
 | **`css_selector`**           | `str` (None)                         | Retains only the part of the page matching this selector. Affects the entire extraction process. |
 | **`target_elements`**        | `List[str]` (None)                   | List of CSS selectors for elements to focus on for markdown generation and data extraction, while still processing the entire page for links, media, etc. Provides more flexibility than `css_selector`. |

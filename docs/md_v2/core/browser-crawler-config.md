@@ -136,11 +136,6 @@ class CrawlerRunConfig:
         wait_for=None,
         screenshot=False,
         pdf=False,
-        enable_rate_limiting=False,
-        rate_limit_config=None,
-        memory_threshold_percent=70.0,
-        check_interval=1.0,
-        max_session_permit=20,
         display_mode=None,
         verbose=True,
         stream=False,  # Enable streaming for arun_many()
@@ -183,25 +178,7 @@ class CrawlerRunConfig:
    - Logs additional runtime details.  
    - Overlaps with the browser’s verbosity if also set to `True` in `BrowserConfig`.
 
-9. **`enable_rate_limiting`**:  
-   - If `True`, enables rate limiting for batch processing.  
-   - Requires `rate_limit_config` to be set.
 
-10. **`memory_threshold_percent`**:  
-    - The memory threshold (as a percentage) to monitor.  
-    - If exceeded, the crawler will pause or slow down.
-
-11. **`check_interval`**:  
-    - The interval (in seconds) to check system resources.  
-    - Affects how often memory and CPU usage are monitored.
-
-12. **`max_session_permit`**:  
-    - The maximum number of concurrent crawl sessions.  
-    - Helps prevent overwhelming the system.
-
-13. **`display_mode`**:  
-    - The display mode for progress information (`DETAILED`, `BRIEF`, etc.).  
-    - Affects how much information is printed during the crawl.
 
 ### Helper Methods
 
@@ -234,9 +211,6 @@ The `clone()` method:
 - Perfect for creating variations without repeating all parameters
 
 ---
-
-
-
 
 
 ## 3. LLMConfig Essentials
