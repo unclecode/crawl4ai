@@ -862,6 +862,8 @@ class WebScrapingStrategy(ContentScrapingStrategy):
         parser_type = kwargs.get("parser", "lxml")
         soup = BeautifulSoup(html, parser_type)
         body = soup.body
+        if body is None:
+            raise Exception("'<body>' tag is not found in fetched html. Consider adding wait_for=\"css:body\" to wait for body tag to be loaded into DOM.")
         base_domain = get_base_domain(url)
         
         # Early removal of all images if exclude_all_images is set
