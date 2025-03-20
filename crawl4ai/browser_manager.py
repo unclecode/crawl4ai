@@ -145,17 +145,59 @@ class ManagedBrowser:
 
         # Start browser process
         try:
-            self.browser_process = subprocess.Popen(
-                args, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-            )
-            # Monitor browser process output for errors
-            asyncio.create_task(self._monitor_browser_process())
+            # Use DETACHED_PROCESS flag on Windows to fully detach the process
+            # On Unix, we'll use preexec_fn=os.setpgrp to start the process in a new process group
+            if sys.platform == "win32":
+                self.browser_process = subprocess.Popen(
+                    args, 
+                    stdout=subprocess.PIPE, 
+                    stderr=subprocess.PIPE,
+                    creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+                )
+            else:
+                self.browser_process = subprocess.Popen(
+                    args, 
+                    stdout=subprocess.PIPE, 
+                    stderr=subprocess.PIPE,
+                    preexec_fn=os.setpgrp  # Start in a new process group
+                )
+                
+            # We'll monitor for a short time to make sure it starts properly, but won't keep monitoring
+            await self._initial_startup_check()
             await asyncio.sleep(2)  # Give browser time to start
             return f"http://{self.host}:{self.debugging_port}"
         except Exception as e:
             await self.cleanup()
             raise Exception(f"Failed to start browser: {e}")
 
+    async def _initial_startup_check(self):
+        """
+        Perform a quick check to make sure the browser started successfully.
+        This only runs once at startup rather than continuously monitoring.
+        """
+        if not self.browser_process:
+            return
+            
+        # Check that process started without immediate termination
+        await asyncio.sleep(0.5)
+        if self.browser_process.poll() is not None:
+            # Process already terminated
+            stdout, stderr = b"", b""
+            try:
+                stdout, stderr = self.browser_process.communicate(timeout=0.5)
+            except subprocess.TimeoutExpired:
+                pass
+                
+            self.logger.error(
+                message="Browser process terminated during startup | Code: {code} | STDOUT: {stdout} | STDERR: {stderr}",
+                tag="ERROR",
+                params={
+                    "code": self.browser_process.returncode,
+                    "stdout": stdout.decode() if stdout else "",
+                    "stderr": stderr.decode() if stderr else "",
+                },
+            )
+    
     async def _monitor_browser_process(self):
         """
         Monitor the browser process for unexpected termination.
@@ -167,6 +209,7 @@ class ManagedBrowser:
         4. If any other error occurs, log the error message.
 
         Note: This method should be called in a separate task to avoid blocking the main event loop.
+        This is DEPRECATED and should not be used for builtin browsers that need to outlive the Python process.
         """
         if self.browser_process:
             try:
@@ -261,22 +304,33 @@ class ManagedBrowser:
 
         if self.browser_process:
             try:
-                self.browser_process.terminate()
-                # Wait for process to end gracefully
-                for _ in range(10):  # 10 attempts, 100ms each
-                    if self.browser_process.poll() is not None:
-                        break
-                    await asyncio.sleep(0.1)
+                # For builtin browsers that should persist, we should check if it's a detached process
+                # Only terminate if we have proper control over the process
+                if not self.browser_process.poll():
+                    # Process is still running
+                    self.browser_process.terminate()
+                    # Wait for process to end gracefully
+                    for _ in range(10):  # 10 attempts, 100ms each
+                        if self.browser_process.poll() is not None:
+                            break
+                        await asyncio.sleep(0.1)
 
-                # Force kill if still running
-                if self.browser_process.poll() is None:
-                    self.browser_process.kill()
-                    await asyncio.sleep(0.1)  # Brief wait for kill to take effect
+                    # Force kill if still running
+                    if self.browser_process.poll() is None:
+                        if sys.platform == "win32":
+                            # On Windows we might need taskkill for detached processes
+                            try:
+                                subprocess.run(["taskkill", "/F", "/PID", str(self.browser_process.pid)])
+                            except Exception:
+                                self.browser_process.kill()
+                        else:
+                            self.browser_process.kill()
+                        await asyncio.sleep(0.1)  # Brief wait for kill to take effect
 
             except Exception as e:
                 self.logger.error(
                     message="Error terminating browser: {error}",
-                    tag="ERROR",
+                    tag="ERROR", 
                     params={"error": str(e)},
                 )
 
@@ -379,7 +433,15 @@ class BrowserManager:
         sessions (dict): Dictionary to store session information
         session_ttl (int): Session timeout in seconds
     """
+
+    _playwright_instance = None
     
+    @classmethod
+    async def get_playwright(cls):
+        from playwright.async_api import async_playwright
+        if cls._playwright_instance is None:
+            cls._playwright_instance = await async_playwright().start()
+        return cls._playwright_instance    
 
     def __init__(self, browser_config: BrowserConfig, logger=None):
         """
@@ -429,6 +491,7 @@ class BrowserManager:
 
         Note: This method should be called in a separate task to avoid blocking the main event loop.
         """
+        self.playwright  = await self.get_playwright()
         if self.playwright is None:
             from playwright.async_api import async_playwright
 
