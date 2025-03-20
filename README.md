@@ -269,7 +269,7 @@ $ echo '{"startUrls": [{ "url": "https://docs.crawl4ai.com/" }], "maxCrawlDepth"
   "html": "https://api.apify.com/v2/key-value-stores/m1Sqnke1KWM0AI8co/records/content_4242424242.html",
   "metadata": {
     "title": "Home - Crawl4AI Documentation (v0.5.x)",
-    "description": "🚀🤖 Crawl4AI, Open-source LLM-Friendly Web Crawler & Scraper",
+    "description": "🚀🤖 Crawl4AI, Open-source LLM-Friendly Web Crawler & Scraper"
   }
 },
 {
@@ -278,7 +278,7 @@ $ echo '{"startUrls": [{ "url": "https://docs.crawl4ai.com/" }], "maxCrawlDepth"
   "html": "https://api.apify.com/v2/key-value-stores/m1Sqnke1KWM0AI8co/records/content_4242424242.html",
   "metadata": {
     "title": "SSL Certificate - Crawl4AI Documentation (v0.5.x)",
-    "description": "🚀🤖 Crawl4AI, Open-source LLM-Friendly Web Crawler & Scraper",
+    "description": "🚀🤖 Crawl4AI, Open-source LLM-Friendly Web Crawler & Scraper"
   }
 },
 # ...
