@@ -37,11 +37,11 @@ class AsyncLoggerBase(ABC):
         pass
 
     @abstractmethod
-    def url_status(self, url: str, success: bool, timing: float, tag: str = "FETCH", url_length: int = 50):
+    def url_status(self, url: str, success: bool, timing: float, tag: str = "FETCH", url_length: int = 100):
         pass
 
     @abstractmethod
-    def error_status(self, url: str, error: str, tag: str = "ERROR", url_length: int = 50):
+    def error_status(self, url: str, error: str, tag: str = "ERROR", url_length: int = 100):
         pass
 
 class AsyncLogger(AsyncLoggerBase):
@@ -110,6 +110,14 @@ class AsyncLogger(AsyncLoggerBase):
     def _get_icon(self, tag: str) -> str:
         """Get the icon for a tag, defaulting to info icon if not found."""
         return self.icons.get(tag, self.icons["INFO"])
+    
+    def _shorten(self, text, length, placeholder="..."):
+        """Truncate text in the middle if longer than length, or pad if shorter."""
+        if len(text) <= length:
+            return text.ljust(length)  # Pad with spaces to reach desired length
+        half = (length - len(placeholder)) // 2
+        shortened = text[:half] + placeholder + text[-half:]
+        return shortened.ljust(length)  # Also pad shortened text to consistent length
 
     def _write_to_file(self, message: str):
         """Write a message to the log file if configured."""
@@ -223,7 +231,7 @@ class AsyncLogger(AsyncLoggerBase):
         success: bool,
         timing: float,
         tag: str = "FETCH",
-        url_length: int = 50,
+        url_length: int = 100,
     ):
         """
         Convenience method for logging URL fetch status.
@@ -237,12 +245,11 @@ class AsyncLogger(AsyncLoggerBase):
         """
         self._log(
             level=LogLevel.SUCCESS if success else LogLevel.ERROR,
-            message="{url:.{url_length}}... | Status: {status} | Time: {timing:.2f}s",
+            message="{url} | {status} | ⏱: {timing:.2f}s",
             tag=tag,
             params={
-                "url": url,
-                "url_length": url_length,
-                "status": success,
+                "url": self._shorten(url, url_length),
+                "status": "✓" if success else "✗",
                 "timing": timing,
             },
             colors={
@@ -265,9 +272,9 @@ class AsyncLogger(AsyncLoggerBase):
         """
         self._log(
             level=LogLevel.ERROR,
-            message="{url:.{url_length}}... | Error: {error}",
+            message="{url} | Error: {error}",
             tag=tag,
-            params={"url": url, "url_length": url_length, "error": error},
+            params={"url": self.shorten(url,url_length), "error": error},
         )
 
 class AsyncFileLogger(AsyncLoggerBase):
@@ -311,13 +318,13 @@ class AsyncFileLogger(AsyncLoggerBase):
         """Log an error message to file."""
         self._write_to_file("ERROR", message, tag)
 
-    def url_status(self, url: str, success: bool, timing: float, tag: str = "FETCH", url_length: int = 50):
+    def url_status(self, url: str, success: bool, timing: float, tag: str = "FETCH", url_length: int = 100):
         """Log URL fetch status to file."""
         status = "SUCCESS" if success else "FAILED"
         message = f"{url[:url_length]}... | Status: {status} | Time: {timing:.2f}s"
         self._write_to_file("URL_STATUS", message, tag)
 
-    def error_status(self, url: str, error: str, tag: str = "ERROR", url_length: int = 50):
+    def error_status(self, url: str, error: str, tag: str = "ERROR", url_length: int = 100):
         """Log error status to file."""
         message = f"{url[:url_length]}... | Error: {error}"
         self._write_to_file("ERROR", message, tag)
