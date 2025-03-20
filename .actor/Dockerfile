@@ -1,7 +1,7 @@
 # First, specify the base Docker image.
 # You can see the Docker images from Apify at https://hub.docker.com/r/apify/.
 # You can also use any other image from Docker Hub.
-FROM apify/actor-python-playwright:3.13
+FROM apify/actor-python-playwright:3.12
 
 RUN apt install -yq git && rm -rf /var/lib/apt/lists/*
 
