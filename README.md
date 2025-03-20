@@ -1,20 +1,41 @@
-# 🔥🕷️ Crawl4AI: Crawl Smarter, Faster, Freely. For AI.
+# 🚀🤖 Crawl4AI: Open-source LLM Friendly Web Crawler & Scraper.
+
+<div align="center">
 
 <a href="https://trendshift.io/repositories/11716" target="_blank"><img src="https://trendshift.io/api/badge/repositories/11716" alt="unclecode%2Fcrawl4ai | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 
 [![GitHub Stars](https://img.shields.io/github/stars/unclecode/crawl4ai?style=social)](https://github.com/unclecode/crawl4ai/stargazers)
-![PyPI - Downloads](https://img.shields.io/pypi/dm/Crawl4AI)
 [![GitHub Forks](https://img.shields.io/github/forks/unclecode/crawl4ai?style=social)](https://github.com/unclecode/crawl4ai/network/members)
-[![GitHub Issues](https://img.shields.io/github/issues/unclecode/crawl4ai)](https://github.com/unclecode/crawl4ai/issues)
-[![GitHub Pull Requests](https://img.shields.io/github/issues-pr/unclecode/crawl4ai)](https://github.com/unclecode/crawl4ai/pulls)
+
+[![PyPI version](https://badge.fury.io/py/crawl4ai.svg)](https://badge.fury.io/py/crawl4ai)
+[![Python Version](https://img.shields.io/pypi/pyversions/crawl4ai)](https://pypi.org/project/crawl4ai/)
+[![Downloads](https://static.pepy.tech/badge/crawl4ai/month)](https://pepy.tech/project/crawl4ai)
+
+<!-- [![Documentation Status](https://readthedocs.org/projects/crawl4ai/badge/?version=latest)](https://crawl4ai.readthedocs.io/) -->
 [![License](https://img.shields.io/github/license/unclecode/crawl4ai)](https://github.com/unclecode/crawl4ai/blob/main/LICENSE)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Security: bandit](https://img.shields.io/badge/security-bandit-yellow.svg)](https://github.com/PyCQA/bandit)
+[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](code_of_conduct.md)
+
+</div>
 
 Crawl4AI is the #1 trending GitHub repository, actively maintained by a vibrant community. It delivers blazing-fast, AI-ready web crawling tailored for LLMs, AI agents, and data pipelines. Open source, flexible, and built for real-time performance, Crawl4AI empowers developers with unmatched speed, precision, and deployment ease.  
 
+[✨ Check out latest update v0.5.0](#-recent-updates)
 
-🎉 **Version 0.4.0 is out!** Introducing our experimental PruningContentFilter - a powerful new algorithm for smarter Markdown generation. Test it out and [share your feedback](https://github.com/unclecode/crawl4ai/issues)! [Read the release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/md_v2/blog/releases/0.4.0.md)
+🎉 **Version 0.5.0 is out!** This major release introduces Deep Crawling with BFS/DFS/BestFirst strategies, Memory-Adaptive Dispatcher, Multiple Crawling Strategies (Playwright and HTTP), Docker Deployment with FastAPI, Command-Line Interface (CLI), and more! [Read the release notes →](https://docs.crawl4ai.com/blog)
 
-[✨ Check out latest update v0.4.0](#-recent-updates)
+<details>
+<summary>🤓 <strong>My Personal Story</strong></summary>
+
+My journey with computers started in childhood when my dad, a computer scientist, introduced me to an Amstrad computer. Those early days sparked a fascination with technology, leading me to pursue computer science and specialize in NLP during my postgraduate studies. It was during this time that I first delved into web crawling, building tools to help researchers organize papers and extract information from publications a challenging yet rewarding experience that honed my skills in data extraction.
+
+Fast forward to 2023, I was working on a tool for a project and needed a crawler to convert a webpage into markdown. While exploring solutions, I found one that claimed to be open-source but required creating an account and generating an API token. Worse, it turned out to be a SaaS model charging $16, and its quality didn’t meet my standards. Frustrated, I realized this was a deeper problem. That frustration turned into turbo anger mode, and I decided to build my own solution. In just a few days, I created Crawl4AI. To my surprise, it went viral, earning thousands of GitHub stars and resonating with a global community.
+
+I made Crawl4AI open-source for two reasons. First, it’s my way of giving back to the open-source community that has supported me throughout my career. Second, I believe data should be accessible to everyone, not locked behind paywalls or monopolized by a few. Open access to data lays the foundation for the democratization of AI, a vision where individuals can train their own models and take ownership of their information. This library is the first step in a larger journey to create the best open-source data extraction and generation tool the world has ever seen, built collaboratively by a passionate community.
+
+Thank you to everyone who has supported this project, used it, and shared feedback. Your encouragement motivates me to dream even bigger. Join us, file issues, submit PRs, or spread the word. Together, we can build a tool that truly empowers people to access their own data and reshape the future of AI.
+</details>
 
 ## 🧐 Why Crawl4AI?
 
@@ -29,23 +50,50 @@ Crawl4AI is the #1 trending GitHub repository, actively maintained by a vibrant 
 
 1. Install Crawl4AI:
 ```bash
-pip install crawl4ai
-crawl4ai-setup # Setup the browser
+# Install the package
+pip install -U crawl4ai
+
+# For pre release versions
+pip install crawl4ai --pre
+
+# Run post-installation setup
+crawl4ai-setup
+
+# Verify your installation
+crawl4ai-doctor
 ```
 
-2. Run a simple web crawl:
+If you encounter any browser-related issues, you can install them manually:
+```bash
+python -m playwright install --with-deps chromium
+```
+
+2. Run a simple web crawl with Python:
 ```python
 import asyncio
-from crawl4ai import AsyncWebCrawler, CacheMode
+from crawl4ai import *
 
 async def main():
-    async with AsyncWebCrawler(verbose=True) as crawler:
-        result = await crawler.arun(url="https://www.nbcnews.com/business")
-        # Soone will be change to result.markdown
-        print(result.markdown_v2.raw_markdown) 
+    async with AsyncWebCrawler() as crawler:
+        result = await crawler.arun(
+            url="https://www.nbcnews.com/business",
+        )
+        print(result.markdown)
 
 if __name__ == "__main__":
     asyncio.run(main())
+```
+
+3. Or use the new command-line interface:
+```bash
+# Basic crawl with markdown output
+crwl https://www.nbcnews.com/business -o markdown
+
+# Deep crawl with BFS strategy, max 10 pages
+crwl https://docs.crawl4ai.com --deep-crawl bfs --max-pages 10
+
+# Use LLM extraction with a specific question
+crwl https://www.example.com/products -q "Extract all product prices"
 ```
 
 ## ✨ Features 
@@ -76,10 +124,12 @@ if __name__ == "__main__":
 
 - 🖥️ **Managed Browser**: Use user-owned browsers with full control, avoiding bot detection.
 - 🔄 **Remote Browser Control**: Connect to Chrome Developer Tools Protocol for remote, large-scale data extraction.
+- 👤 **Browser Profiler**: Create and manage persistent profiles with saved authentication states, cookies, and settings.
 - 🔒 **Session Management**: Preserve browser states and reuse them for multi-step crawling.
 - 🧩 **Proxy Support**: Seamlessly connect to proxies with authentication for secure access.
 - ⚙️ **Full Browser Control**: Modify headers, cookies, user agents, and more for tailored crawling setups.
 - 🌍 **Multi-Browser Support**: Compatible with Chromium, Firefox, and WebKit.
+- 📐 **Dynamic Viewport Adjustment**: Automatically adjusts the browser viewport to match page content, ensuring complete rendering and capturing of all elements.
 
 </details>
 
@@ -95,16 +145,19 @@ if __name__ == "__main__":
 - 💾 **Caching**: Cache data for improved speed and to avoid redundant fetches.
 - 📄 **Metadata Extraction**: Retrieve structured metadata from web pages.
 - 📡 **IFrame Content Extraction**: Seamless extraction from embedded iframe content.
+- 🕵️ **Lazy Load Handling**: Waits for images to fully load, ensuring no content is missed due to lazy loading.
+- 🔄 **Full-Page Scanning**: Simulates scrolling to load and capture all dynamic content, perfect for infinite scroll pages.
 
 </details>
 
 <details>
 <summary>🚀 <strong>Deployment</strong></summary>
 
-- 🐳 **Dockerized Setup**: Optimized Docker image with API server for easy deployment.
+- 🐳 **Dockerized Setup**: Optimized Docker image with FastAPI server for easy deployment.
+- 🔑 **Secure Authentication**: Built-in JWT token authentication for API security.
 - 🔄 **API Gateway**: One-click deployment with secure token authentication for API-based workflows.
 - 🌐 **Scalable Architecture**: Designed for mass-scale production and optimized server performance.
-- ⚙️ **DigitalOcean Deployment**: Ready-to-deploy configurations for DigitalOcean and similar platforms.
+- ☁️ **Cloud Deployment**: Ready-to-deploy configurations for major cloud platforms.
 
 </details>
 
@@ -121,13 +174,11 @@ if __name__ == "__main__":
 
 </details>
 
-
-
 ## Try it Now!
 
 ✨ Play around with this [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1SgRPrByQLzjRfwoRNq1wSGE9nYY_EE8C?usp=sharing)
 
-✨ Visit our [Documentation Website](https://crawl4ai.com/mkdocs/)
+✨ Visit our [Documentation Website](https://docs.crawl4ai.com/)
 
 ## Installation 🛠️
 
@@ -200,193 +251,26 @@ pip install -e ".[all]"             # Install all optional features
 </details>
 
 <details>
-<summary>🚀 <strong>One-Click Deployment</strong></summary>
+<summary>🐳 <strong>Docker Deployment</strong></summary>
 
-Deploy your own instance of Crawl4AI with one click:
+> 🚀 **Major Changes Coming!** We're developing a completely new Docker implementation that will make deployment even more efficient and seamless. The current Docker setup is being deprecated in favor of this new solution.
 
-[![DigitalOcean Referral Badge](https://web-platforms.sfo2.cdn.digitaloceanspaces.com/WWW/Badge%203.svg)](https://www.digitalocean.com/?repo=https://github.com/unclecode/crawl4ai/tree/0.3.74&refcode=a0780f1bdb3d&utm_campaign=Referral_Invite&utm_medium=Referral_Program&utm_source=badge)
+### Current Docker Support
 
-> 💡 **Recommended specs**: 4GB RAM minimum. Select "professional-xs" or higher when deploying for stable operation.
+The existing Docker implementation is being deprecated and will be replaced soon. If you still need to use Docker with the current version:
 
-The deploy will:
-- Set up a Docker container with Crawl4AI
-- Configure Playwright and all dependencies
-- Start the FastAPI server on port `11235`
-- Set up health checks and auto-deployment
+- 📚 [Deprecated Docker Setup](./docs/deprecated/docker-deployment.md) - Instructions for the current Docker implementation
+- ⚠️ Note: This setup will be replaced in the next major release
 
-</details>
+### What's Coming Next?
 
-<details>
-<summary>🐳 <strong>Using Docker</strong></summary>
+Our new Docker implementation will bring:
+- Improved performance and resource efficiency
+- Streamlined deployment process
+- Better integration with Crawl4AI features
+- Enhanced scalability options
 
-Crawl4AI is available as Docker images for easy deployment. You can either pull directly from Docker Hub (recommended) or build from the repository.
-
----
-
-<details>
-<summary>🐳 <strong>Option 1: Docker Hub (Recommended)</strong></summary>
-
-Choose the appropriate image based on your platform and needs:
-
-### For AMD64 (Regular Linux/Windows):
-```bash
-# Basic version (recommended)
-docker pull unclecode/crawl4ai:basic-amd64
-docker run -p 11235:11235 unclecode/crawl4ai:basic-amd64
-
-# Full ML/LLM support
-docker pull unclecode/crawl4ai:all-amd64
-docker run -p 11235:11235 unclecode/crawl4ai:all-amd64
-
-# With GPU support
-docker pull unclecode/crawl4ai:gpu-amd64
-docker run -p 11235:11235 unclecode/crawl4ai:gpu-amd64
-```
-
-### For ARM64 (M1/M2 Macs, ARM servers):
-```bash
-# Basic version (recommended)
-docker pull unclecode/crawl4ai:basic-arm64
-docker run -p 11235:11235 unclecode/crawl4ai:basic-arm64
-
-# Full ML/LLM support
-docker pull unclecode/crawl4ai:all-arm64
-docker run -p 11235:11235 unclecode/crawl4ai:all-arm64
-
-# With GPU support
-docker pull unclecode/crawl4ai:gpu-arm64
-docker run -p 11235:11235 unclecode/crawl4ai:gpu-arm64
-```
-
-Need more memory? Add `--shm-size`:
-```bash
-docker run --shm-size=2gb -p 11235:11235 unclecode/crawl4ai:basic-amd64
-```
-
-Test the installation:
-```bash
-curl http://localhost:11235/health
-```
-
-### For Raspberry Pi (32-bit) (coming soon):
-```bash
-# Pull and run basic version (recommended for Raspberry Pi)
-docker pull unclecode/crawl4ai:basic-armv7
-docker run -p 11235:11235 unclecode/crawl4ai:basic-armv7
-
-# With increased shared memory if needed
-docker run --shm-size=2gb -p 11235:11235 unclecode/crawl4ai:basic-armv7
-```
-
-Note: Due to hardware constraints, only the basic version is recommended for Raspberry Pi.
-
-</details>
-
-<details>
-<summary>🐳 <strong>Option 2: Build from Repository</strong></summary>
-
-Build the image locally based on your platform:
-
-```bash
-# Clone the repository
-git clone https://github.com/unclecode/crawl4ai.git
-cd crawl4ai
-
-# For AMD64 (Regular Linux/Windows)
-docker build --platform linux/amd64 \
-  --tag crawl4ai:local \
-  --build-arg INSTALL_TYPE=basic \
-  .
-
-# For ARM64 (M1/M2 Macs, ARM servers)
-docker build --platform linux/arm64 \
-  --tag crawl4ai:local \
-  --build-arg INSTALL_TYPE=basic \
-  .
-```
-
-Build options:
-- INSTALL_TYPE=basic (default): Basic crawling features
-- INSTALL_TYPE=all: Full ML/LLM support
-- ENABLE_GPU=true: Add GPU support
-
-Example with all options:
-```bash
-docker build --platform linux/amd64 \
-  --tag crawl4ai:local \
-  --build-arg INSTALL_TYPE=all \
-  --build-arg ENABLE_GPU=true \
-  .
-```
-
-Run your local build:
-```bash
-# Regular run
-docker run -p 11235:11235 crawl4ai:local
-
-# With increased shared memory
-docker run --shm-size=2gb -p 11235:11235 crawl4ai:local
-```
-
-Test the installation:
-```bash
-curl http://localhost:11235/health
-```
-
-</details>
-
-<details>
-<summary>🐳 <strong>Option 3: Using Docker Compose</strong></summary>
-
-Docker Compose provides a more structured way to run Crawl4AI, especially when dealing with environment variables and multiple configurations.
-
-```bash
-# Clone the repository
-git clone https://github.com/unclecode/crawl4ai.git
-cd crawl4ai
-```
-
-### For AMD64 (Regular Linux/Windows):
-```bash
-# Build and run locally
-docker-compose --profile local-amd64 up
-
-# Run from Docker Hub
-VERSION=basic docker-compose --profile hub-amd64 up   # Basic version
-VERSION=all docker-compose --profile hub-amd64 up     # Full ML/LLM support
-VERSION=gpu docker-compose --profile hub-amd64 up     # GPU support
-```
-
-### For ARM64 (M1/M2 Macs, ARM servers):
-```bash
-# Build and run locally
-docker-compose --profile local-arm64 up
-
-# Run from Docker Hub
-VERSION=basic docker-compose --profile hub-arm64 up   # Basic version
-VERSION=all docker-compose --profile hub-arm64 up     # Full ML/LLM support
-VERSION=gpu docker-compose --profile hub-arm64 up     # GPU support
-```
-
-Environment variables (optional):
-```bash
-# Create a .env file
-CRAWL4AI_API_TOKEN=your_token
-OPENAI_API_KEY=your_openai_key
-CLAUDE_API_KEY=your_claude_key
-```
-
-The compose file includes:
-- Memory management (4GB limit, 1GB reserved)
-- Shared memory volume for browser support
-- Health checks
-- Auto-restart policy
-- All necessary port mappings
-
-Test the installation:
-```bash
-curl http://localhost:11235/health
-```
+Stay connected with our [GitHub repository](https://github.com/unclecode/crawl4ai) for updates!
 
 </details>
 
@@ -410,7 +294,7 @@ task_id = response.json()["task_id"]
 result = requests.get(f"http://localhost:11235/task/{task_id}")
 ```
 
-For more examples, see our [Docker Examples](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/docker_example.py). For advanced configuration, environment variables, and usage examples, see our [Docker Deployment Guide](https://crawl4ai.com/mkdocs/basic/docker-deployment/).
+For more examples, see our [Docker Examples](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/docker_example.py). For advanced configuration, environment variables, and usage examples, see our [Docker Deployment Guide](https://docs.crawl4ai.com/basic/docker-deployment/).
 
 </details>
 
@@ -424,28 +308,32 @@ You can check the project structure in the directory [https://github.com/uncleco
 
 ```python
 import asyncio
-from crawl4ai import AsyncWebCrawler, CacheMode
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
 from crawl4ai.content_filter_strategy import PruningContentFilter, BM25ContentFilter
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
 async def main():
-    async with AsyncWebCrawler(
+    browser_config = BrowserConfig(
         headless=True,  
         verbose=True,
-    ) as crawler:
+    )
+    run_config = CrawlerRunConfig(
+        cache_mode=CacheMode.ENABLED,
+        markdown_generator=DefaultMarkdownGenerator(
+            content_filter=PruningContentFilter(threshold=0.48, threshold_type="fixed", min_word_threshold=0)
+        ),
+        # markdown_generator=DefaultMarkdownGenerator(
+        #     content_filter=BM25ContentFilter(user_query="WHEN_WE_FOCUS_BASED_ON_A_USER_QUERY", bm25_threshold=1.0)
+        # ),
+    )
+    
+    async with AsyncWebCrawler(config=browser_config) as crawler:
         result = await crawler.arun(
             url="https://docs.micronaut.io/4.7.6/guide/",
-            cache_mode=CacheMode.ENABLED,
-            markdown_generator=DefaultMarkdownGenerator(
-                content_filter=PruningContentFilter(threshold=0.48, threshold_type="fixed", min_word_threshold=0)
-            ),
-            # markdown_generator=DefaultMarkdownGenerator(
-            #     content_filter=BM25ContentFilter(user_query="WHEN_WE_FOCUS_BASED_ON_A_USER_QUERY", bm25_threshold=1.0)
-            # ),
+            config=run_config
         )
-        print(len(result.markdown))
-        print(len(result.fit_markdown))
-        print(len(result.markdown_v2.fit_markdown))
+        print(len(result.markdown.raw_markdown))
+        print(len(result.markdown.fit_markdown))
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -458,7 +346,7 @@ if __name__ == "__main__":
 
 ```python
 import asyncio
-from crawl4ai import AsyncWebCrawler, CacheMode
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
 from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
 import json
 
@@ -493,36 +381,26 @@ async def main():
             "type": "attribute",
             "attribute": "src"
         }
-    ]
+    }
 }
 
     extraction_strategy = JsonCssExtractionStrategy(schema, verbose=True)
 
-    async with AsyncWebCrawler(
+    browser_config = BrowserConfig(
         headless=False,
         verbose=True
-    ) as crawler:
+    )
+    run_config = CrawlerRunConfig(
+        extraction_strategy=extraction_strategy,
+        js_code=["""(async () => {const tabs = document.querySelectorAll("section.charge-methodology .tabs-menu-3 > div");for(let tab of tabs) {tab.scrollIntoView();tab.click();await new Promise(r => setTimeout(r, 500));}})();"""],
+        cache_mode=CacheMode.BYPASS
+    )
         
-        # Create the JavaScript that handles clicking multiple times
-        js_click_tabs = """
-        (async () => {
-            const tabs = document.querySelectorAll("section.charge-methodology .tabs-menu-3 > div");
-            
-            for(let tab of tabs) {
-                // scroll to the tab
-                tab.scrollIntoView();
-                tab.click();
-                // Wait for content to load and animations to complete
-                await new Promise(r => setTimeout(r, 500));
-            }
-        })();
-        """     
-
+    async with AsyncWebCrawler(config=browser_config) as crawler:
+        
         result = await crawler.arun(
             url="https://www.kidocode.com/degrees/technology",
-            extraction_strategy=JsonCssExtractionStrategy(schema, verbose=True),
-            js_code=[js_click_tabs],
-            cache_mode=CacheMode.BYPASS
+            config=run_config
         )
 
         companies = json.loads(result.extracted_content)
@@ -542,7 +420,7 @@ if __name__ == "__main__":
 ```python
 import os
 import asyncio
-from crawl4ai import AsyncWebCrawler, CacheMode
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, LLMConfig
 from crawl4ai.extraction_strategy import LLMExtractionStrategy
 from pydantic import BaseModel, Field
 
@@ -552,21 +430,26 @@ class OpenAIModelFee(BaseModel):
     output_fee: str = Field(..., description="Fee for output token for the OpenAI model.")
 
 async def main():
-    async with AsyncWebCrawler(verbose=True) as crawler:
+    browser_config = BrowserConfig(verbose=True)
+    run_config = CrawlerRunConfig(
+        word_count_threshold=1,
+        extraction_strategy=LLMExtractionStrategy(
+            # Here you can use any provider that Litellm library supports, for instance: ollama/qwen2
+            # provider="ollama/qwen2", api_token="no-token", 
+            llm_config = LLMConfig(provider="openai/gpt-4o", api_token=os.getenv('OPENAI_API_KEY')), 
+            schema=OpenAIModelFee.schema(),
+            extraction_type="schema",
+            instruction="""From the crawled content, extract all mentioned model names along with their fees for input and output tokens. 
+            Do not miss any models in the entire content. One extracted model JSON format should look like this: 
+            {"model_name": "GPT-4", "input_fee": "US$10.00 / 1M tokens", "output_fee": "US$30.00 / 1M tokens"}."""
+        ),            
+        cache_mode=CacheMode.BYPASS,
+    )
+    
+    async with AsyncWebCrawler(config=browser_config) as crawler:
         result = await crawler.arun(
             url='https://openai.com/api/pricing/',
-            word_count_threshold=1,
-            extraction_strategy=LLMExtractionStrategy(
-                # Here you can use any provider that Litellm library supports, for instance: ollama/qwen2
-                # provider="ollama/qwen2", api_token="no-token", 
-                provider="openai/gpt-4o", api_token=os.getenv('OPENAI_API_KEY'), 
-                schema=OpenAIModelFee.schema(),
-                extraction_type="schema",
-                instruction="""From the crawled content, extract all mentioned model names along with their fees for input and output tokens. 
-                Do not miss any models in the entire content. One extracted model JSON format should look like this: 
-                {"model_name": "GPT-4", "input_fee": "US$10.00 / 1M tokens", "output_fee": "US$30.00 / 1M tokens"}."""
-            ),            
-            cache_mode=CacheMode.BYPASS,
+            config=run_config
         )
         print(result.extracted_content)
 
@@ -577,43 +460,35 @@ if __name__ == "__main__":
 </details>
 
 <details>
-<summary>🤖 <strong>Using You own Browswer with Custome User Profile</strong></summary>
+<summary>🤖 <strong>Using You own Browser with Custom User Profile</strong></summary>
 
 ```python
 import os, sys
 from pathlib import Path
 import asyncio, time
-from crawl4ai import AsyncWebCrawler
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
 
 async def test_news_crawl():
     # Create a persistent user data directory
     user_data_dir = os.path.join(Path.home(), ".crawl4ai", "browser_profile")
     os.makedirs(user_data_dir, exist_ok=True)
 
-    async with AsyncWebCrawler(
+    browser_config = BrowserConfig(
         verbose=True,
         headless=True,
         user_data_dir=user_data_dir,
         use_persistent_context=True,
-        headers={
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.5",
-            "Accept-Encoding": "gzip, deflate, br",
-            "DNT": "1",
-            "Connection": "keep-alive",
-            "Upgrade-Insecure-Requests": "1",
-            "Sec-Fetch-Dest": "document",
-            "Sec-Fetch-Mode": "navigate",
-            "Sec-Fetch-Site": "none",
-            "Sec-Fetch-User": "?1",
-            "Cache-Control": "max-age=0",
-        }
-    ) as crawler:
+    )
+    run_config = CrawlerRunConfig(
+        cache_mode=CacheMode.BYPASS
+    )
+    
+    async with AsyncWebCrawler(config=browser_config) as crawler:
         url = "ADDRESS_OF_A_CHALLENGING_WEBSITE"
         
         result = await crawler.arun(
             url,
-            cache_mode=CacheMode.BYPASS,
+            config=run_config,
             magic=True,
         )
         
@@ -623,22 +498,80 @@ async def test_news_crawl():
 
 </details>
 
+## ✨ Recent Updates
 
-## ✨ Recent Updates   
+### Version 0.5.0 Major Release Highlights
 
-- 🔬 **PruningContentFilter**: New unsupervised filtering strategy for intelligent content extraction based on text density and relevance scoring.
-- 🧵 **Enhanced Thread Safety**: Improved multi-threaded environment handling with better locks and parallel processing support.
-- 🤖 **Smart User-Agent Generation**: Advanced user-agent generator with customization options and randomization capabilities.
-- 📝 **New Blog Launch**: Stay updated with our detailed release notes and technical deep dives at [crawl4ai.com/blog](https://crawl4ai.com/blog).
-- 🧪 **Expanded Test Coverage**: Comprehensive test suite for both PruningContentFilter and BM25ContentFilter with edge case handling.
+-   **🚀 Deep Crawling System**: Explore websites beyond initial URLs with three strategies:
+    -   **BFS Strategy**: Breadth-first search explores websites level by level
+    -   **DFS Strategy**: Depth-first search explores each branch deeply before backtracking
+    -   **BestFirst Strategy**: Uses scoring functions to prioritize which URLs to crawl next
+    -   **Page Limiting**: Control the maximum number of pages to crawl with `max_pages` parameter
+    -   **Score Thresholds**: Filter URLs based on relevance scores
+-   **⚡ Memory-Adaptive Dispatcher**: Dynamically adjusts concurrency based on system memory with built-in rate limiting
+-   **🔄 Multiple Crawling Strategies**:
+    -   **AsyncPlaywrightCrawlerStrategy**: Browser-based crawling with JavaScript support (Default)
+    -   **AsyncHTTPCrawlerStrategy**: Fast, lightweight HTTP-only crawler for simple tasks
+-   **🐳 Docker Deployment**: Easy deployment with FastAPI server and streaming/non-streaming endpoints
+-   **💻 Command-Line Interface**: New `crwl` CLI provides convenient terminal access to all features with intuitive commands and configuration options
+-   **👤 Browser Profiler**: Create and manage persistent browser profiles to save authentication states, cookies, and settings for seamless crawling of protected content
+-   **🧠 Crawl4AI Coding Assistant**: AI-powered coding assistant to answer your question for Crawl4ai, and generate proper code for crawling.
+-   **🏎️ LXML Scraping Mode**: Fast HTML parsing using the `lxml` library for improved performance
+-   **🌐 Proxy Rotation**: Built-in support for proxy switching with `RoundRobinProxyStrategy`
+-   **🤖 LLM Content Filter**: Intelligent markdown generation using LLMs
+-   **📄 PDF Processing**: Extract text, images, and metadata from PDF files
+-   **🔗 URL Redirection Tracking**: Automatically follow and record HTTP redirects
+-   **🤖 LLM Schema Generation**: Easily create extraction schemas with LLM assistance
+-   **🔍 robots.txt Compliance**: Respect website crawling rules
 
-Read the full details of this release in our [0.4.0 Release Notes](https://github.com/unclecode/crawl4ai/blob/main/docs/md_v2/blog/releases/0.4.0.md).
+Read the full details in our [0.5.0 Release Notes](https://docs.crawl4ai.com/blog/releases/0.5.0.html) or check the [CHANGELOG](https://github.com/unclecode/crawl4ai/blob/main/CHANGELOG.md).
+
+## Version Numbering in Crawl4AI
+
+Crawl4AI follows standard Python version numbering conventions (PEP 440) to help users understand the stability and features of each release.
+
+### Version Numbers Explained
+
+Our version numbers follow this pattern: `MAJOR.MINOR.PATCH` (e.g., 0.4.3)
+
+#### Pre-release Versions
+We use different suffixes to indicate development stages:
+
+- `dev` (0.4.3dev1): Development versions, unstable
+- `a` (0.4.3a1): Alpha releases, experimental features
+- `b` (0.4.3b1): Beta releases, feature complete but needs testing
+- `rc` (0.4.3rc1): Release candidates, potential final version
+
+#### Installation
+- Regular installation (stable version):
+  ```bash
+  pip install -U crawl4ai
+  ```
+
+- Install pre-release versions:
+  ```bash
+  pip install crawl4ai --pre
+  ```
+
+- Install specific version:
+  ```bash
+  pip install crawl4ai==0.4.3b1
+  ```
+
+#### Why Pre-releases?
+We use pre-releases to:
+- Test new features in real-world scenarios
+- Gather feedback before final releases
+- Ensure stability for production users
+- Allow early adopters to try new features
+
+For production environments, we recommend using the stable version. For testing new features, you can opt-in to pre-releases using the `--pre` flag.
 
 ## 📖 Documentation & Roadmap 
 
 > 🚨 **Documentation Update Alert**: We're undertaking a major documentation overhaul next week to reflect recent updates and improvements. Stay tuned for a more comprehensive and up-to-date guide!
 
-For current documentation, including installation instructions, advanced features, and API reference, visit our [Documentation Website](https://crawl4ai.com/mkdocs/).
+For current documentation, including installation instructions, advanced features, and API reference, visit our [Documentation Website](https://docs.crawl4ai.com/).
 
 To check our development plans and upcoming features, visit our [Roadmap](https://github.com/unclecode/crawl4ai/blob/main/ROADMAP.md).
 
@@ -662,11 +595,85 @@ To check our development plans and upcoming features, visit our [Roadmap](https:
 
 ## 🤝 Contributing 
 
-We welcome contributions from the open-source community. Check out our [contribution guidelines](https://github.com/unclecode/crawl4ai/blob/main/CONTRIBUTING.md) for more information.
+We welcome contributions from the open-source community. Check out our [contribution guidelines](https://github.com/unclecode/crawl4ai/blob/main/CONTRIBUTORS.md) for more information.
 
-## 📄 License 
+I'll help modify the license section with badges. For the halftone effect, here's a version with it:
 
-Crawl4AI is released under the [Apache 2.0 License](https://github.com/unclecode/crawl4ai/blob/main/LICENSE).
+Here's the updated license section:
+
+## 📄 License & Attribution
+
+This project is licensed under the Apache License 2.0 with a required attribution clause. See the [Apache 2.0 License](https://github.com/unclecode/crawl4ai/blob/main/LICENSE) file for details.
+
+### Attribution Requirements
+When using Crawl4AI, you must include one of the following attribution methods:
+
+#### 1. Badge Attribution (Recommended)
+Add one of these badges to your README, documentation, or website:
+
+| Theme | Badge |
+|-------|-------|
+| **Disco Theme (Animated)** | <a href="https://github.com/unclecode/crawl4ai"><img src="./docs/assets/powered-by-disco.svg" alt="Powered by Crawl4AI" width="200"/></a> |
+| **Night Theme (Dark with Neon)** | <a href="https://github.com/unclecode/crawl4ai"><img src="./docs/assets/powered-by-night.svg" alt="Powered by Crawl4AI" width="200"/></a> |
+| **Dark Theme (Classic)** | <a href="https://github.com/unclecode/crawl4ai"><img src="./docs/assets/powered-by-dark.svg" alt="Powered by Crawl4AI" width="200"/></a> |
+| **Light Theme (Classic)** | <a href="https://github.com/unclecode/crawl4ai"><img src="./docs/assets/powered-by-light.svg" alt="Powered by Crawl4AI" width="200"/></a> |
+ 
+
+HTML code for adding the badges:
+```html
+<!-- Disco Theme (Animated) -->
+<a href="https://github.com/unclecode/crawl4ai">
+  <img src="https://raw.githubusercontent.com/unclecode/crawl4ai/main/docs/assets/powered-by-disco.svg" alt="Powered by Crawl4AI" width="200"/>
+</a>
+
+<!-- Night Theme (Dark with Neon) -->
+<a href="https://github.com/unclecode/crawl4ai">
+  <img src="https://raw.githubusercontent.com/unclecode/crawl4ai/main/docs/assets/powered-by-night.svg" alt="Powered by Crawl4AI" width="200"/>
+</a>
+
+<!-- Dark Theme (Classic) -->
+<a href="https://github.com/unclecode/crawl4ai">
+  <img src="https://raw.githubusercontent.com/unclecode/crawl4ai/main/docs/assets/powered-by-dark.svg" alt="Powered by Crawl4AI" width="200"/>
+</a>
+
+<!-- Light Theme (Classic) -->
+<a href="https://github.com/unclecode/crawl4ai">
+  <img src="https://raw.githubusercontent.com/unclecode/crawl4ai/main/docs/assets/powered-by-light.svg" alt="Powered by Crawl4AI" width="200"/>
+</a>
+
+<!-- Simple Shield Badge -->
+<a href="https://github.com/unclecode/crawl4ai">
+  <img src="https://img.shields.io/badge/Powered%20by-Crawl4AI-blue?style=flat-square" alt="Powered by Crawl4AI"/>
+</a>
+```
+
+#### 2. Text Attribution
+Add this line to your documentation:
+```
+This project uses Crawl4AI (https://github.com/unclecode/crawl4ai) for web data extraction.
+```
+
+## 📚 Citation
+
+If you use Crawl4AI in your research or project, please cite:
+
+```bibtex
+@software{crawl4ai2024,
+  author = {UncleCode},
+  title = {Crawl4AI: Open-source LLM Friendly Web Crawler & Scraper},
+  year = {2024},
+  publisher = {GitHub},
+  journal = {GitHub Repository},
+  howpublished = {\url{https://github.com/unclecode/crawl4ai}},
+  commit = {Please use the commit hash you're working with}
+}
+```
+
+Text citation format:
+```
+UncleCode. (2024). Crawl4AI: Open-source LLM Friendly Web Crawler & Scraper [Computer software]. 
+GitHub. https://github.com/unclecode/crawl4ai
+```
 
 ## 📧 Contact 
 
@@ -702,9 +709,6 @@ We envision a future where AI is powered by real human knowledge, ensuring data 
 
 For more details, see our [full mission statement](./MISSION.md).
 </details>
-
-
-
 
 ## Star History
 

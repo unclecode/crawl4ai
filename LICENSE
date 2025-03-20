@@ -49,3 +49,21 @@ You may add Your own copyright statement to Your modifications and may provide a
 9. Accepting Warranty or Additional Liability. While redistributing the Work or Derivative Works thereof, You may choose to offer, and charge a fee for, acceptance of support, warranty, indemnity, or other liability obligations and/or rights consistent with this License. However, in accepting such obligations, You may act only on Your own behalf and on Your sole responsibility, not on behalf of any other Contributor, and only if You agree to indemnify, defend, and hold each Contributor harmless for any liability incurred by, or claims asserted against, such Contributor by reason of your accepting any such warranty or additional liability.
 
 END OF TERMS AND CONDITIONS
+
+---
+Attribution Requirement
+
+All distributions, publications, or public uses of this software, or derivative works based on this software, must include the following attribution:
+
+"This product includes software developed by UncleCode (https://x.com/unclecode) as part of the Crawl4AI project (https://github.com/unclecode/crawl4ai)."
+
+This attribution must be displayed in a prominent and easily accessible location, such as:
+
+-   For software distributions: In a NOTICE file, README file, or equivalent documentation.
+-   For publications (research papers, articles, blog posts): In the acknowledgments section or a footnote.
+-   For websites/web applications: In an "About" or "Credits" section.
+-   For command-line tools: In the help/usage output.
+
+This requirement ensures proper credit is given for the use of Crawl4AI and helps promote the project.
+
+---

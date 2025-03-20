@@ -6,7 +6,7 @@ We would like to thank the following people for their contributions to Crawl4AI:
 
 - [Unclecode](https://github.com/unclecode) - Project Creator and Main Developer
 - [Nasrin](https://github.com/ntohidi) - Project Manager and Developer
-- [Aravind Karnam](https://github.com/aravindkarnam) - Developer
+- [Aravind Karnam](https://github.com/aravindkarnam) - Head of Community and Product 
 
 ## Community Contributors
 
@@ -24,12 +24,25 @@ We would like to thank the following people for their contributions to Crawl4AI:
 - [NanmiCoder](https://github.com/NanmiCoder) - fix: crawler strategy exception handling and fixes [#271](https://github.com/unclecode/crawl4ai/pull/271)
 - [paulokuong](https://github.com/paulokuong) - fix: RAWL4_AI_BASE_DIRECTORY should be Path object instead of string [#298](https://github.com/unclecode/crawl4ai/pull/298)
 
+#### Feb-Alpha-1
+- [sufianuddin](https://github.com/sufianuddin) - fix: [Documentation for JsonCssExtractionStrategy](https://github.com/unclecode/crawl4ai/issues/651)
+- [tautikAg](https://github.com/tautikAg) - fix: [Markdown output has incorect spacing](https://github.com/unclecode/crawl4ai/issues/599)
+- [cardit1](https://github.com/cardit1) - fix: ['AsyncPlaywrightCrawlerStrategy' object has no attribute 'downloads_path'](https://github.com/unclecode/crawl4ai/issues/585)
+- [dmurat](https://github.com/dmurat) - fix: [ Incorrect rendering of inline code inside of links ](https://github.com/unclecode/crawl4ai/issues/583)
+- [Sparshsing](https://github.com/Sparshsing) - fix: [Relative Urls in the webpage not extracted properly ](https://github.com/unclecode/crawl4ai/issues/570)
+
+
 
 ## Other Contributors
 
 - [Gokhan](https://github.com/gkhngyk) 
 - [Shiv Kumar](https://github.com/shivkumar0757)
 - [QIN2DIM](https://github.com/QIN2DIM)
+
+#### Typo fixes
+- [ssoydan](https://github.com/ssoydan)
+- [Darshan](https://github.com/Darshan2104)
+- [tuhinmallick](https://github.com/tuhinmallick)
 
 ## Acknowledgements
 

@@ -3,8 +3,8 @@ import aiohttp
 import json
 import time
 import os
-from typing import Optional, Dict, Any
-from pydantic import BaseModel, HttpUrl
+from typing import Dict, Any
+
 
 class NBCNewsAPITest:
     def __init__(self, base_url: str = "http://localhost:8000"):
@@ -20,7 +20,9 @@ class NBCNewsAPITest:
             await self.session.close()
 
     async def submit_crawl(self, request_data: Dict[str, Any]) -> str:
-        async with self.session.post(f"{self.base_url}/crawl", json=request_data) as response:
+        async with self.session.post(
+            f"{self.base_url}/crawl", json=request_data
+        ) as response:
             result = await response.json()
             return result["task_id"]
 
@@ -28,11 +30,15 @@ class NBCNewsAPITest:
         async with self.session.get(f"{self.base_url}/task/{task_id}") as response:
             return await response.json()
 
-    async def wait_for_task(self, task_id: str, timeout: int = 300, poll_interval: int = 2) -> Dict[str, Any]:
+    async def wait_for_task(
+        self, task_id: str, timeout: int = 300, poll_interval: int = 2
+    ) -> Dict[str, Any]:
         start_time = time.time()
         while True:
             if time.time() - start_time > timeout:
-                raise TimeoutError(f"Task {task_id} did not complete within {timeout} seconds")
+                raise TimeoutError(
+                    f"Task {task_id} did not complete within {timeout} seconds"
+                )
 
             status = await self.get_task_status(task_id)
             if status["status"] in ["completed", "failed"]:
@@ -44,19 +50,18 @@ class NBCNewsAPITest:
         async with self.session.get(f"{self.base_url}/health") as response:
             return await response.json()
 
+
 async def test_basic_crawl():
     print("\n=== Testing Basic Crawl ===")
     async with NBCNewsAPITest() as api:
-        request = {
-            "urls": "https://www.nbcnews.com/business",
-            "priority": 10
-        }
+        request = {"urls": "https://www.nbcnews.com/business", "priority": 10}
         task_id = await api.submit_crawl(request)
         result = await api.wait_for_task(task_id)
         print(f"Basic crawl result length: {len(result['result']['markdown'])}")
         assert result["status"] == "completed"
         assert "result" in result
         assert result["result"]["success"]
+
 
 async def test_js_execution():
     print("\n=== Testing JS Execution ===")
@@ -68,9 +73,7 @@ async def test_js_execution():
                 "const loadMoreButton = Array.from(document.querySelectorAll('button')).find(button => button.textContent.includes('Load More')); loadMoreButton && loadMoreButton.click();"
             ],
             "wait_for": "article.tease-card:nth-child(10)",
-            "crawler_params": {
-                "headless": True
-            }
+            "crawler_params": {"headless": True},
         }
         task_id = await api.submit_crawl(request)
         result = await api.wait_for_task(task_id)
@@ -78,19 +81,21 @@ async def test_js_execution():
         assert result["status"] == "completed"
         assert result["result"]["success"]
 
+
 async def test_css_selector():
     print("\n=== Testing CSS Selector ===")
     async with NBCNewsAPITest() as api:
         request = {
             "urls": "https://www.nbcnews.com/business",
             "priority": 7,
-            "css_selector": ".wide-tease-item__description"
+            "css_selector": ".wide-tease-item__description",
         }
         task_id = await api.submit_crawl(request)
         result = await api.wait_for_task(task_id)
         print(f"CSS selector result length: {len(result['result']['markdown'])}")
         assert result["status"] == "completed"
         assert result["result"]["success"]
+
 
 async def test_structured_extraction():
     print("\n=== Testing Structured Extraction ===")
@@ -99,34 +104,25 @@ async def test_structured_extraction():
             "name": "NBC News Articles",
             "baseSelector": "article.tease-card",
             "fields": [
-                {
-                    "name": "title",
-                    "selector": "h2",
-                    "type": "text"
-                },
+                {"name": "title", "selector": "h2", "type": "text"},
                 {
                     "name": "description",
                     "selector": ".tease-card__description",
-                    "type": "text"
+                    "type": "text",
                 },
                 {
                     "name": "link",
                     "selector": "a",
                     "type": "attribute",
-                    "attribute": "href"
-                }
-            ]
+                    "attribute": "href",
+                },
+            ],
         }
-        
+
         request = {
             "urls": "https://www.nbcnews.com/business",
             "priority": 9,
-            "extraction_config": {
-                "type": "json_css",
-                "params": {
-                    "schema": schema
-                }
-            }
+            "extraction_config": {"type": "json_css", "params": {"schema": schema}},
         }
         task_id = await api.submit_crawl(request)
         result = await api.wait_for_task(task_id)
@@ -136,6 +132,7 @@ async def test_structured_extraction():
         assert result["result"]["success"]
         assert len(extracted) > 0
 
+
 async def test_batch_crawl():
     print("\n=== Testing Batch Crawl ===")
     async with NBCNewsAPITest() as api:
@@ -143,12 +140,10 @@ async def test_batch_crawl():
             "urls": [
                 "https://www.nbcnews.com/business",
                 "https://www.nbcnews.com/business/consumer",
-                "https://www.nbcnews.com/business/economy"
+                "https://www.nbcnews.com/business/economy",
             ],
             "priority": 6,
-            "crawler_params": {
-                "headless": True
-            }
+            "crawler_params": {"headless": True},
         }
         task_id = await api.submit_crawl(request)
         result = await api.wait_for_task(task_id)
@@ -156,6 +151,7 @@ async def test_batch_crawl():
         assert result["status"] == "completed"
         assert "results" in result
         assert len(result["results"]) == 3
+
 
 async def test_llm_extraction():
     print("\n=== Testing LLM Extraction with Ollama ===")
@@ -165,19 +161,19 @@ async def test_llm_extraction():
             "properties": {
                 "article_title": {
                     "type": "string",
-                    "description": "The main title of the news article"
+                    "description": "The main title of the news article",
                 },
                 "summary": {
                     "type": "string",
-                    "description": "A brief summary of the article content"
+                    "description": "A brief summary of the article content",
                 },
                 "main_topics": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "Main topics or themes discussed in the article"
-                }
+                    "description": "Main topics or themes discussed in the article",
+                },
             },
-            "required": ["article_title", "summary", "main_topics"]
+            "required": ["article_title", "summary", "main_topics"],
         }
 
         request = {
@@ -191,25 +187,23 @@ async def test_llm_extraction():
                     "schema": schema,
                     "extraction_type": "schema",
                     "instruction": """Extract the main article information including title, a brief summary, and main topics discussed. 
-                    Focus on the primary business news article on the page."""
-                }
+                    Focus on the primary business news article on the page.""",
+                },
             },
-            "crawler_params": {
-                "headless": True,
-                "word_count_threshold": 1
-            }
+            "crawler_params": {"headless": True, "word_count_threshold": 1},
         }
-        
+
         task_id = await api.submit_crawl(request)
         result = await api.wait_for_task(task_id)
-        
+
         if result["status"] == "completed":
             extracted = json.loads(result["result"]["extracted_content"])
-            print(f"Extracted article analysis:")
+            print("Extracted article analysis:")
             print(json.dumps(extracted, indent=2))
-        
+
         assert result["status"] == "completed"
         assert result["result"]["success"]
+
 
 async def test_screenshot():
     print("\n=== Testing Screenshot ===")
@@ -218,9 +212,7 @@ async def test_screenshot():
             "urls": "https://www.nbcnews.com/business",
             "priority": 5,
             "screenshot": True,
-            "crawler_params": {
-                "headless": True
-            }
+            "crawler_params": {"headless": True},
         }
         task_id = await api.submit_crawl(request)
         result = await api.wait_for_task(task_id)
@@ -229,6 +221,7 @@ async def test_screenshot():
         assert result["result"]["success"]
         assert result["result"]["screenshot"] is not None
 
+
 async def test_priority_handling():
     print("\n=== Testing Priority Handling ===")
     async with NBCNewsAPITest() as api:
@@ -236,7 +229,7 @@ async def test_priority_handling():
         low_priority = {
             "urls": "https://www.nbcnews.com/business",
             "priority": 1,
-            "crawler_params": {"headless": True}
+            "crawler_params": {"headless": True},
         }
         low_task_id = await api.submit_crawl(low_priority)
 
@@ -244,7 +237,7 @@ async def test_priority_handling():
         high_priority = {
             "urls": "https://www.nbcnews.com/business/consumer",
             "priority": 10,
-            "crawler_params": {"headless": True}
+            "crawler_params": {"headless": True},
         }
         high_task_id = await api.submit_crawl(high_priority)
 
@@ -255,6 +248,7 @@ async def test_priority_handling():
         print("Both tasks completed")
         assert high_result["status"] == "completed"
         assert low_result["status"] == "completed"
+
 
 async def main():
     try:
@@ -276,6 +270,7 @@ async def main():
     except Exception as e:
         print(f"Test failed: {str(e)}")
         raise
+
 
 if __name__ == "__main__":
     asyncio.run(main())

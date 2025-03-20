@@ -131,6 +131,7 @@ OverlappingWindowChunking(
 ```python
 from pydantic import BaseModel
 from crawl4ai.extraction_strategy import LLMExtractionStrategy
+from crawl4ai.types import LLMConfig
 
 # Define schema
 class Article(BaseModel):
@@ -140,7 +141,7 @@ class Article(BaseModel):
 
 # Create strategy
 strategy = LLMExtractionStrategy(
-    provider="ollama/llama2",
+    llm_config = LLMConfig(provider="ollama/llama2"),
     schema=Article.schema(),
     instruction="Extract article details"
 )
@@ -197,6 +198,7 @@ result = await crawler.arun(
 
 ```python
 from crawl4ai.chunking_strategy import OverlappingWindowChunking
+from crawl4ai.types import LLMConfig
 
 # Create chunking strategy
 chunker = OverlappingWindowChunking(
@@ -206,7 +208,7 @@ chunker = OverlappingWindowChunking(
 
 # Use with extraction strategy
 strategy = LLMExtractionStrategy(
-    provider="ollama/llama2",
+    llm_config = LLMConfig(provider="ollama/llama2"),
     chunking_strategy=chunker
 )
 
@@ -218,12 +220,12 @@ result = await crawler.arun(
 
 ## Best Practices
 
-1. **Choose the Right Strategy**
+1. **Choose the Right Strategy**
    - Use `LLMExtractionStrategy` for complex, unstructured content
    - Use `JsonCssExtractionStrategy` for well-structured HTML
    - Use `CosineStrategy` for content similarity and clustering
 
-2. **Optimize Chunking**
+2. **Optimize Chunking**
    ```python
    # For long documents
    strategy = LLMExtractionStrategy(
@@ -232,7 +234,7 @@ result = await crawler.arun(
    )
    ```
 
-3. **Handle Errors**
+3. **Handle Errors**
    ```python
    try:
        result = await crawler.arun(
@@ -245,7 +247,7 @@ result = await crawler.arun(
        print(f"Extraction failed: {e}")
    ```
 
-4. **Monitor Performance**
+4. **Monitor Performance**
    ```python
    strategy = CosineStrategy(
        verbose=True,  # Enable logging

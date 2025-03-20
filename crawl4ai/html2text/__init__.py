@@ -54,13 +54,13 @@ class HTML2Text(html.parser.HTMLParser):
         self.td_count = 0
         self.table_start = False
         self.unicode_snob = config.UNICODE_SNOB  # covered in cli
-        
+
         self.escape_snob = config.ESCAPE_SNOB  # covered in cli
         self.escape_backslash = config.ESCAPE_BACKSLASH  # covered in cli
         self.escape_dot = config.ESCAPE_DOT  # covered in cli
         self.escape_plus = config.ESCAPE_PLUS  # covered in cli
         self.escape_dash = config.ESCAPE_DASH  # covered in cli
-        
+
         self.links_each_paragraph = config.LINKS_EACH_PARAGRAPH
         self.body_width = bodywidth  # covered in cli
         self.skip_internal_links = config.SKIP_INTERNAL_LINKS  # covered in cli
@@ -144,8 +144,8 @@ class HTML2Text(html.parser.HTMLParser):
 
     def update_params(self, **kwargs):
         for key, value in kwargs.items():
-            setattr(self, key, value) 
-    
+            setattr(self, key, value)
+
     def feed(self, data: str) -> None:
         data = data.replace("</' + 'script>", "</ignore>")
         super().feed(data)
@@ -510,6 +510,7 @@ class HTML2Text(html.parser.HTMLParser):
 
         if tag == "a" and not self.ignore_links:
             if start:
+                self.inside_link = True
                 if (
                     "href" in attrs
                     and attrs["href"] is not None
@@ -526,6 +527,7 @@ class HTML2Text(html.parser.HTMLParser):
                 else:
                     self.astack.append(None)
             else:
+                self.inside_link = False
                 if self.astack:
                     a = self.astack.pop()
                     if self.maybe_automatic_link and not self.empty_link:
@@ -610,13 +612,22 @@ class HTML2Text(html.parser.HTMLParser):
                         self.o("[" + str(a_props.count) + "]")
 
         if tag == "dl" and start:
-            self.p()
-        if tag == "dt" and not start:
-            self.pbr()
-        if tag == "dd" and start:
-            self.o("    ")
-        if tag == "dd" and not start:
-            self.pbr()
+            self.p()  # Add paragraph break before list starts
+            self.p_p = 0  # Reset paragraph state
+        
+        elif tag == "dt" and start:
+            if self.p_p == 0:  # If not first term
+                self.o("\n\n")  # Add spacing before new term-definition pair
+            self.p_p = 0  # Reset paragraph state
+        
+        elif tag == "dt" and not start:
+            self.o("\n")  # Single newline between term and definition
+        
+        elif tag == "dd" and start:
+            self.o("    ")  # Indent definition
+        
+        elif tag == "dd" and not start:
+            self.p_p = 0
 
         if tag in ["ol", "ul"]:
             # Google Docs create sub lists as top level lists
@@ -903,7 +914,13 @@ class HTML2Text(html.parser.HTMLParser):
                 self.empty_link = False
 
         if not self.code and not self.pre and not entity_char:
-            data = escape_md_section(data, snob=self.escape_snob, escape_dot=self.escape_dot, escape_plus=self.escape_plus, escape_dash=self.escape_dash)
+            data = escape_md_section(
+                data,
+                snob=self.escape_snob,
+                escape_dot=self.escape_dot,
+                escape_plus=self.escape_plus,
+                escape_dash=self.escape_dash,
+            )
         self.preceding_data = data
         self.o(data, puredata=True)
 
@@ -1013,3 +1030,141 @@ def html2text(html: str, baseurl: str = "", bodywidth: Optional[int] = None) -> 
     h = HTML2Text(baseurl=baseurl, bodywidth=bodywidth)
 
     return h.handle(html)
+
+
+class CustomHTML2Text(HTML2Text):
+    def __init__(self, *args, handle_code_in_pre=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.inside_pre = False
+        self.inside_code = False
+        self.inside_link = False
+        self.preserve_tags = set()  # Set of tags to preserve
+        self.current_preserved_tag = None
+        self.preserved_content = []
+        self.preserve_depth = 0
+        self.handle_code_in_pre = handle_code_in_pre
+
+        # Configuration options
+        self.skip_internal_links = False
+        self.single_line_break = False
+        self.mark_code = False
+        self.include_sup_sub = False
+        self.body_width = 0
+        self.ignore_mailto_links = True
+        self.ignore_links = False
+        self.escape_backslash = False
+        self.escape_dot = False
+        self.escape_plus = False
+        self.escape_dash = False
+        self.escape_snob = False
+
+    def update_params(self, **kwargs):
+        """Update parameters and set preserved tags."""
+        for key, value in kwargs.items():
+            if key == "preserve_tags":
+                self.preserve_tags = set(value)
+            elif key == "handle_code_in_pre":
+                self.handle_code_in_pre = value
+            else:
+                setattr(self, key, value)
+
+    def handle_tag(self, tag, attrs, start):
+        # Handle preserved tags
+        if tag in self.preserve_tags:
+            if start:
+                if self.preserve_depth == 0:
+                    self.current_preserved_tag = tag
+                    self.preserved_content = []
+                    # Format opening tag with attributes
+                    attr_str = "".join(
+                        f' {k}="{v}"' for k, v in attrs.items() if v is not None
+                    )
+                    self.preserved_content.append(f"<{tag}{attr_str}>")
+                self.preserve_depth += 1
+                return
+            else:
+                self.preserve_depth -= 1
+                if self.preserve_depth == 0:
+                    self.preserved_content.append(f"</{tag}>")
+                    # Output the preserved HTML block with proper spacing
+                    preserved_html = "".join(self.preserved_content)
+                    self.o("\n" + preserved_html + "\n")
+                    self.current_preserved_tag = None
+                return
+
+        # If we're inside a preserved tag, collect all content
+        if self.preserve_depth > 0:
+            if start:
+                # Format nested tags with attributes
+                attr_str = "".join(
+                    f' {k}="{v}"' for k, v in attrs.items() if v is not None
+                )
+                self.preserved_content.append(f"<{tag}{attr_str}>")
+            else:
+                self.preserved_content.append(f"</{tag}>")
+            return
+
+        # Handle pre tags
+        if tag == "pre":
+            if start:
+                self.o("```\n")  # Markdown code block start
+                self.inside_pre = True
+            else:
+                self.o("\n```\n")  # Markdown code block end
+                self.inside_pre = False
+        elif tag == "code":
+            if self.inside_pre and not self.handle_code_in_pre:
+                # Ignore code tags inside pre blocks if handle_code_in_pre is False
+                return
+            if start:
+                if not self.inside_link:
+                    self.o("`")  # Only output backtick if not inside a link
+                self.inside_code = True
+            else:
+                if not self.inside_link:
+                    self.o("`")  # Only output backtick if not inside a link
+                self.inside_code = False
+
+            # If inside a link, let the parent class handle the content
+            if self.inside_link:
+                super().handle_tag(tag, attrs, start) 
+        else:
+            super().handle_tag(tag, attrs, start)
+
+    def handle_data(self, data, entity_char=False):
+        """Override handle_data to capture content within preserved tags."""
+        if self.preserve_depth > 0:
+            self.preserved_content.append(data)
+            return
+
+        if self.inside_pre:
+            # Output the raw content for pre blocks, including content inside code tags
+            self.o(data)  # Directly output the data as-is (preserve newlines)
+            return
+        if self.inside_code:
+            # Inline code: no newlines allowed
+            self.o(data.replace("\n", " "))
+            return
+
+        # Default behavior for other tags
+        super().handle_data(data, entity_char)
+
+    #     # Handle pre tags
+    #     if tag == 'pre':
+    #         if start:
+    #             self.o('```\n')
+    #             self.inside_pre = True
+    #         else:
+    #             self.o('\n```')
+    #             self.inside_pre = False
+    #     # elif tag in ["h1", "h2", "h3", "h4", "h5", "h6"]:
+    #     #     pass
+    #     else:
+    #         super().handle_tag(tag, attrs, start)
+
+    # def handle_data(self, data, entity_char=False):
+    #     """Override handle_data to capture content within preserved tags."""
+    #     if self.preserve_depth > 0:
+    #         self.preserved_content.append(data)
+    #         return
+    #     super().handle_data(data, entity_char)
