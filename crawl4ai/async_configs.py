@@ -169,6 +169,11 @@ class BrowserConfig:
                             Default: "chromium".
         headless (bool): Whether to run the browser in headless mode (no visible GUI).
                          Default: True.
+        browser_mode (str): Determines how the browser should be initialized:
+                           "builtin" - use the builtin CDP browser running in background
+                           "dedicated" - create a new dedicated browser instance each time
+                           "custom" - use explicit CDP settings provided in cdp_url
+                           Default: "dedicated"
         use_managed_browser (bool): Launch the browser using a managed approach (e.g., via CDP), allowing
                                     advanced manipulation. Default: False.
         cdp_url (str): URL for the Chrome DevTools Protocol (CDP) endpoint. Default: "ws://localhost:9222/devtools/browser/".
@@ -221,6 +226,7 @@ class BrowserConfig:
         self,
         browser_type: str = "chromium",
         headless: bool = True,
+        browser_mode: str = "dedicated",
         use_managed_browser: bool = False,
         cdp_url: str = None,
         use_persistent_context: bool = False,
@@ -257,6 +263,7 @@ class BrowserConfig:
     ):
         self.browser_type = browser_type
         self.headless = headless
+        self.browser_mode = browser_mode
         self.use_managed_browser = use_managed_browser
         self.cdp_url = cdp_url
         self.use_persistent_context = use_persistent_context
@@ -290,6 +297,7 @@ class BrowserConfig:
         self.sleep_on_close = sleep_on_close
         self.verbose = verbose
         self.debugging_port = debugging_port
+        self.host = host
 
         fa_user_agenr_generator = ValidUAGenerator()
         if self.user_agent_mode == "random":
@@ -302,6 +310,18 @@ class BrowserConfig:
         self.browser_hint = UAGen.generate_client_hints(self.user_agent)
         self.headers.setdefault("sec-ch-ua", self.browser_hint)
 
+        # Set appropriate browser management flags based on browser_mode
+        if self.browser_mode == "builtin":
+            # Builtin mode uses managed browser connecting to builtin CDP endpoint
+            self.use_managed_browser = True
+            # cdp_url will be set later by browser_manager
+        elif self.browser_mode == "custom" and self.cdp_url:
+            # Custom mode with explicit CDP URL
+            self.use_managed_browser = True
+        elif self.browser_mode == "dedicated":
+            # Dedicated mode uses a new browser instance each time
+            pass
+
         # If persistent context is requested, ensure managed browser is enabled
         if self.use_persistent_context:
             self.use_managed_browser = True
@@ -311,6 +331,7 @@ class BrowserConfig:
         return BrowserConfig(
             browser_type=kwargs.get("browser_type", "chromium"),
             headless=kwargs.get("headless", True),
+            browser_mode=kwargs.get("browser_mode", "dedicated"),
             use_managed_browser=kwargs.get("use_managed_browser", False),
             cdp_url=kwargs.get("cdp_url"),
             use_persistent_context=kwargs.get("use_persistent_context", False),
@@ -338,12 +359,15 @@ class BrowserConfig:
             text_mode=kwargs.get("text_mode", False),
             light_mode=kwargs.get("light_mode", False),
             extra_args=kwargs.get("extra_args", []),
+            debugging_port=kwargs.get("debugging_port", 9222),
+            host=kwargs.get("host", "localhost"),
         )
 
     def to_dict(self):
         return {
             "browser_type": self.browser_type,
             "headless": self.headless,
+            "browser_mode": self.browser_mode,
             "use_managed_browser": self.use_managed_browser,
             "cdp_url": self.cdp_url,
             "use_persistent_context": self.use_persistent_context,
@@ -370,6 +394,7 @@ class BrowserConfig:
             "sleep_on_close": self.sleep_on_close,
             "verbose": self.verbose,
             "debugging_port": self.debugging_port,
+            "host": self.host,
         }
 
     def clone(self, **kwargs):

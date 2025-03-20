@@ -342,6 +342,32 @@ For more documentation visit: https://github.com/unclecode/crawl4ai
     crwl profiles  # Select "Create new profile" option
     # 2. Then use that profile to crawl authenticated content:
     crwl https://site-requiring-login.com/dashboard -p my-profile-name
+
+🔄 Builtin Browser Management:
+    # Start a builtin browser (runs in the background)
+    crwl browser start
+    
+    # Check builtin browser status
+    crwl browser status
+    
+    # Open a visible window to see the browser
+    crwl browser view --url https://example.com
+    
+    # Stop the builtin browser
+    crwl browser stop
+    
+    # Restart with different options
+    crwl browser restart --browser-type chromium --port 9223 --no-headless
+    
+    # Use the builtin browser in your code
+    # (Just set browser_mode="builtin" in your BrowserConfig)
+    browser_config = BrowserConfig(
+        browser_mode="builtin", 
+        headless=True
+    )
+    
+    # Usage via CLI:
+    crwl https://example.com -b "browser_mode=builtin"
 """
     click.echo(examples)
 
@@ -575,6 +601,307 @@ def cli():
     """Crawl4AI CLI - Web content extraction and browser profile management tool"""
     pass
 
+
+@cli.group("browser")
+def browser_cmd():
+    """Manage browser instances for Crawl4AI
+    
+    Commands to manage browser instances for Crawl4AI, including:
+    - status - Check status of the builtin browser
+    - start - Start a new builtin browser
+    - stop - Stop the running builtin browser
+    - restart - Restart the builtin browser
+    """
+    pass
+    
+@browser_cmd.command("status")
+def browser_status_cmd():
+    """Show status of the builtin browser"""
+    profiler = BrowserProfiler()
+    
+    try:
+        status = anyio.run(profiler.get_builtin_browser_status)
+        
+        if status["running"]:
+            info = status["info"]
+            console.print(Panel(
+                f"[green]Builtin browser is running[/green]\n\n"
+                f"CDP URL: [cyan]{info['cdp_url']}[/cyan]\n"
+                f"Process ID: [yellow]{info['pid']}[/yellow]\n"
+                f"Browser type: [blue]{info['browser_type']}[/blue]\n"
+                f"User data directory: [magenta]{info['user_data_dir']}[/magenta]\n"
+                f"Started: [cyan]{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(info['start_time']))}[/cyan]",
+                title="Builtin Browser Status",
+                border_style="green"
+            ))
+        else:
+            console.print(Panel(
+                "[yellow]Builtin browser is not running[/yellow]\n\n"
+                "Use 'crwl browser start' to start a builtin browser",
+                title="Builtin Browser Status",
+                border_style="yellow"
+            ))
+            
+    except Exception as e:
+        console.print(f"[red]Error checking browser status: {str(e)}[/red]")
+        sys.exit(1)
+        
+@browser_cmd.command("start")
+@click.option("--browser-type", "-b", type=click.Choice(["chromium", "firefox"]), default="chromium", 
+              help="Browser type (default: chromium)")
+@click.option("--port", "-p", type=int, default=9222, help="Debugging port (default: 9222)")
+@click.option("--headless/--no-headless", default=True, help="Run browser in headless mode")
+def browser_start_cmd(browser_type: str, port: int, headless: bool):
+    """Start a builtin browser instance
+    
+    This will start a persistent browser instance that can be used by Crawl4AI
+    by setting browser_mode="builtin" in BrowserConfig.
+    """
+    profiler = BrowserProfiler()
+    
+    # First check if browser is already running
+    status = anyio.run(profiler.get_builtin_browser_status)
+    if status["running"]:
+        console.print(Panel(
+            "[yellow]Builtin browser is already running[/yellow]\n\n"
+            f"CDP URL: [cyan]{status['cdp_url']}[/cyan]\n\n"
+            "Use 'crwl browser restart' to restart the browser",
+            title="Builtin Browser Start",
+            border_style="yellow"
+        ))
+        return
+    
+    try:
+        console.print(Panel(
+            f"[cyan]Starting builtin browser[/cyan]\n\n"
+            f"Browser type: [green]{browser_type}[/green]\n"
+            f"Debugging port: [yellow]{port}[/yellow]\n"
+            f"Headless: [cyan]{'Yes' if headless else 'No'}[/cyan]",
+            title="Builtin Browser Start",
+            border_style="cyan"
+        ))
+        
+        cdp_url = anyio.run(
+            profiler.launch_builtin_browser,
+            browser_type,
+            port,
+            headless
+        )
+        
+        if cdp_url:
+            console.print(Panel(
+                f"[green]Builtin browser started successfully[/green]\n\n"
+                f"CDP URL: [cyan]{cdp_url}[/cyan]\n\n"
+                "This browser will be used automatically when setting browser_mode='builtin'",
+                title="Builtin Browser Start",
+                border_style="green"
+            ))
+        else:
+            console.print(Panel(
+                "[red]Failed to start builtin browser[/red]",
+                title="Builtin Browser Start",
+                border_style="red"
+            ))
+            sys.exit(1)
+            
+    except Exception as e:
+        console.print(f"[red]Error starting builtin browser: {str(e)}[/red]")
+        sys.exit(1)
+        
+@browser_cmd.command("stop")
+def browser_stop_cmd():
+    """Stop the running builtin browser"""
+    profiler = BrowserProfiler()
+    
+    try:
+        # First check if browser is running
+        status = anyio.run(profiler.get_builtin_browser_status)
+        if not status["running"]:
+            console.print(Panel(
+                "[yellow]No builtin browser is currently running[/yellow]",
+                title="Builtin Browser Stop",
+                border_style="yellow"
+            ))
+            return
+            
+        console.print(Panel(
+            "[cyan]Stopping builtin browser...[/cyan]",
+            title="Builtin Browser Stop", 
+            border_style="cyan"
+        ))
+        
+        success = anyio.run(profiler.kill_builtin_browser)
+        
+        if success:
+            console.print(Panel(
+                "[green]Builtin browser stopped successfully[/green]",
+                title="Builtin Browser Stop",
+                border_style="green"
+            ))
+        else:
+            console.print(Panel(
+                "[red]Failed to stop builtin browser[/red]",
+                title="Builtin Browser Stop",
+                border_style="red"
+            ))
+            sys.exit(1)
+            
+    except Exception as e:
+        console.print(f"[red]Error stopping builtin browser: {str(e)}[/red]")
+        sys.exit(1)
+        
+@browser_cmd.command("view")
+@click.option("--url", "-u", help="URL to navigate to (defaults to about:blank)")
+def browser_view_cmd(url: Optional[str]):
+    """
+    Open a visible window of the builtin browser
+    
+    This command connects to the running builtin browser and opens a visible window,
+    allowing you to see what the browser is currently viewing or navigate to a URL.
+    """
+    profiler = BrowserProfiler()
+    
+    try:
+        # First check if browser is running
+        status = anyio.run(profiler.get_builtin_browser_status)
+        if not status["running"]:
+            console.print(Panel(
+                "[yellow]No builtin browser is currently running[/yellow]\n\n"
+                "Use 'crwl browser start' to start a builtin browser first",
+                title="Builtin Browser View",
+                border_style="yellow"
+            ))
+            return
+        
+        info = status["info"]
+        cdp_url = info["cdp_url"]
+        
+        console.print(Panel(
+            f"[cyan]Opening visible window connected to builtin browser[/cyan]\n\n"
+            f"CDP URL: [green]{cdp_url}[/green]\n"
+            f"URL to load: [yellow]{url or 'about:blank'}[/yellow]",
+            title="Builtin Browser View",
+            border_style="cyan"
+        ))
+        
+        # Use the CDP URL to launch a new visible window
+        import subprocess
+        import os
+        
+        # Determine the browser command based on platform
+        if sys.platform == "darwin":  # macOS
+            browser_cmd = ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"]
+        elif sys.platform == "win32":  # Windows
+            browser_cmd = ["C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"]
+        else:  # Linux
+            browser_cmd = ["google-chrome"]
+        
+        # Add arguments
+        browser_args = [
+            f"--remote-debugging-port={info['debugging_port']}",
+            "--remote-debugging-address=localhost",
+            "--no-first-run",
+            "--no-default-browser-check"
+        ]
+        
+        # Add URL if provided
+        if url:
+            browser_args.append(url)
+        
+        # Launch browser
+        try:
+            subprocess.Popen(browser_cmd + browser_args)
+            console.print("[green]Browser window opened. Close it when finished viewing.[/green]")
+        except Exception as e:
+            console.print(f"[red]Error launching browser: {str(e)}[/red]")
+            console.print(f"[yellow]Try connecting manually to {cdp_url} in Chrome or using the '--remote-debugging-port' flag.[/yellow]")
+    
+    except Exception as e:
+        console.print(f"[red]Error viewing builtin browser: {str(e)}[/red]")
+        sys.exit(1)
+
+@browser_cmd.command("restart")
+@click.option("--browser-type", "-b", type=click.Choice(["chromium", "firefox"]), default=None, 
+              help="Browser type (defaults to same as current)")
+@click.option("--port", "-p", type=int, default=None, help="Debugging port (defaults to same as current)")
+@click.option("--headless/--no-headless", default=None, help="Run browser in headless mode")
+def browser_restart_cmd(browser_type: Optional[str], port: Optional[int], headless: Optional[bool]):
+    """Restart the builtin browser
+    
+    Stops the current builtin browser if running and starts a new one.
+    By default, uses the same configuration as the current browser.
+    """
+    profiler = BrowserProfiler()
+    
+    try:
+        # First check if browser is running and get its config
+        status = anyio.run(profiler.get_builtin_browser_status)
+        current_config = {}
+        
+        if status["running"]:
+            info = status["info"]
+            current_config = {
+                "browser_type": info["browser_type"],
+                "port": info["debugging_port"],
+                "headless": True  # Default assumption
+            }
+            
+            # Stop the browser
+            console.print(Panel(
+                "[cyan]Stopping current builtin browser...[/cyan]",
+                title="Builtin Browser Restart", 
+                border_style="cyan"
+            ))
+            
+            success = anyio.run(profiler.kill_builtin_browser)
+            if not success:
+                console.print(Panel(
+                    "[red]Failed to stop current browser[/red]",
+                    title="Builtin Browser Restart",
+                    border_style="red"
+                ))
+                sys.exit(1)
+        
+        # Use provided options or defaults from current config
+        browser_type = browser_type or current_config.get("browser_type", "chromium")
+        port = port or current_config.get("port", 9222)
+        headless = headless if headless is not None else current_config.get("headless", True)
+        
+        # Start a new browser
+        console.print(Panel(
+            f"[cyan]Starting new builtin browser[/cyan]\n\n"
+            f"Browser type: [green]{browser_type}[/green]\n"
+            f"Debugging port: [yellow]{port}[/yellow]\n"
+            f"Headless: [cyan]{'Yes' if headless else 'No'}[/cyan]",
+            title="Builtin Browser Restart",
+            border_style="cyan"
+        ))
+        
+        cdp_url = anyio.run(
+            profiler.launch_builtin_browser,
+            browser_type,
+            port,
+            headless
+        )
+        
+        if cdp_url:
+            console.print(Panel(
+                f"[green]Builtin browser restarted successfully[/green]\n\n"
+                f"CDP URL: [cyan]{cdp_url}[/cyan]",
+                title="Builtin Browser Restart",
+                border_style="green"
+            ))
+        else:
+            console.print(Panel(
+                "[red]Failed to restart builtin browser[/red]",
+                title="Builtin Browser Restart",
+                border_style="red"
+            ))
+            sys.exit(1)
+            
+    except Exception as e:
+        console.print(f"[red]Error restarting builtin browser: {str(e)}[/red]")
+        sys.exit(1)
 
 @cli.command("cdp")
 @click.option("--user-data-dir", "-d", help="Directory to use for browser data (will be created if it doesn't exist)")
@@ -846,6 +1173,7 @@ def default(url: str, example: bool, browser_config: str, crawler_config: str, f
         crwl profiles   - Manage browser profiles for identity-based crawling
         crwl crawl      - Crawl a website with advanced options
         crwl cdp        - Launch browser with CDP debugging enabled
+        crwl browser    - Manage builtin browser (start, stop, status, restart)
         crwl examples   - Show more usage examples
     """
 
