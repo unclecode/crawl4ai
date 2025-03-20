@@ -201,13 +201,35 @@ class AsyncWebCrawler:
         This is equivalent to using 'async with' but gives more control over the lifecycle.
 
         This method will:
-        1. Initialize the browser and context
-        2. Perform warmup sequence
-        3. Return the crawler instance for method chaining
+        1. Check for builtin browser if browser_mode is 'builtin'
+        2. Initialize the browser and context
+        3. Perform warmup sequence
+        4. Return the crawler instance for method chaining
 
         Returns:
             AsyncWebCrawler: The initialized crawler instance
         """
+        # Check for builtin browser if requested
+        if self.browser_config.browser_mode == "builtin" and not self.browser_config.cdp_url:
+            # Import here to avoid circular imports
+            from .browser_profiler import BrowserProfiler
+            profiler = BrowserProfiler(logger=self.logger)
+            
+            # Get builtin browser info or launch if needed
+            browser_info = profiler.get_builtin_browser_info()
+            if not browser_info:
+                self.logger.info("Builtin browser not found, launching new instance...", tag="BROWSER")
+                cdp_url = await profiler.launch_builtin_browser()
+                if not cdp_url:
+                    self.logger.warning("Failed to launch builtin browser, falling back to dedicated browser", tag="BROWSER")
+                else:
+                    self.browser_config.cdp_url = cdp_url
+                    self.browser_config.use_managed_browser = True
+            else:
+                self.logger.info(f"Using existing builtin browser at {browser_info.get('cdp_url')}", tag="BROWSER")
+                self.browser_config.cdp_url = browser_info.get('cdp_url')
+                self.browser_config.use_managed_browser = True
+                
         await self.crawler_strategy.__aenter__()
         await self.awarmup()
         return self
@@ -280,6 +302,10 @@ class AsyncWebCrawler:
         Returns:
             CrawlResult: The result of crawling and processing
         """
+        # Auto-start if not ready
+        if not self.ready:
+            await self.start()
+            
         config = config or CrawlerRunConfig()
         if not isinstance(url, str) or not url:
             raise ValueError("Invalid URL, make sure the URL is a non-empty string")

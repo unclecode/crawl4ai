@@ -12,7 +12,10 @@ import sys
 import datetime
 import uuid
 import shutil
-from typing import List, Dict, Optional, Any
+import json
+import subprocess
+import time
+from typing import List, Dict, Optional, Any, Tuple
 from colorama import Fore, Style, init
 
 from .async_configs import BrowserConfig
@@ -56,6 +59,11 @@ class BrowserProfiler:
         # Ensure profiles directory exists
         self.profiles_dir = os.path.join(get_home_folder(), "profiles")
         os.makedirs(self.profiles_dir, exist_ok=True)
+        
+        # Builtin browser config file
+        self.builtin_browser_dir = os.path.join(get_home_folder(), "builtin-browser")
+        self.builtin_config_file = os.path.join(self.builtin_browser_dir, "browser_config.json")
+        os.makedirs(self.builtin_browser_dir, exist_ok=True)
     
     async def create_profile(self, 
                             profile_name: Optional[str] = None, 
@@ -552,7 +560,8 @@ class BrowserProfiler:
                                   browser_type: str = "chromium",
                                   user_data_dir: Optional[str] = None,
                                   debugging_port: int = 9222,
-                                  headless: bool = False) -> Optional[str]:
+                                  headless: bool = False,
+                                  save_as_builtin: bool = False) -> Optional[str]:
         """
         Launch a standalone browser with CDP debugging enabled and keep it running
         until the user presses 'q'. Returns and displays the CDP URL.
@@ -766,4 +775,201 @@ class BrowserProfiler:
         # Return the CDP URL
         return cdp_url
     
+    async def launch_builtin_browser(self, 
+                                 browser_type: str = "chromium",
+                                 debugging_port: int = 9222,
+                                 headless: bool = True) -> Optional[str]:
+        """
+        Launch a browser in the background for use as the builtin browser.
+        
+        Args:
+            browser_type (str): Type of browser to launch ('chromium' or 'firefox')
+            debugging_port (int): Port to use for CDP debugging
+            headless (bool): Whether to run in headless mode
+            
+        Returns:
+            str: CDP URL for the browser, or None if launch failed
+        """
+        # Check if there's an existing browser still running
+        browser_info = self.get_builtin_browser_info()
+        if browser_info and self._is_browser_running(browser_info.get('pid')):
+            self.logger.info("Builtin browser is already running", tag="BUILTIN")
+            return browser_info.get('cdp_url')
+        
+        # Create a user data directory for the builtin browser
+        user_data_dir = os.path.join(self.builtin_browser_dir, "user_data")
+        os.makedirs(user_data_dir, exist_ok=True)
+        
+        # Create managed browser instance
+        managed_browser = ManagedBrowser(
+            browser_type=browser_type,
+            user_data_dir=user_data_dir,
+            headless=headless,
+            logger=self.logger,
+            debugging_port=debugging_port
+        )
+        
+        try:
+            # Start the browser
+            await managed_browser.start()
+            
+            # Check if browser started successfully
+            browser_process = managed_browser.browser_process
+            if not browser_process:
+                self.logger.error("Failed to start browser process.", tag="BUILTIN")
+                return None
+            
+            # Get CDP URL
+            cdp_url = f"http://localhost:{debugging_port}"
+            
+            # Try to verify browser is responsive by fetching version info
+            import aiohttp
+            json_url = f"{cdp_url}/json/version"
+            config_json = None
+            
+            try:
+                async with aiohttp.ClientSession() as session:
+                    for _ in range(10):  # Try multiple times
+                        try:
+                            async with session.get(json_url) as response:
+                                if response.status == 200:
+                                    config_json = await response.json()
+                                    break
+                        except Exception:
+                            pass
+                        await asyncio.sleep(0.5)
+            except Exception as e:
+                self.logger.warning(f"Could not verify browser: {str(e)}", tag="BUILTIN")
+            
+            # Save browser info
+            browser_info = {
+                'pid': browser_process.pid,
+                'cdp_url': cdp_url,
+                'user_data_dir': user_data_dir,
+                'browser_type': browser_type,
+                'debugging_port': debugging_port,
+                'start_time': time.time(),
+                'config': config_json
+            }
+            
+            with open(self.builtin_config_file, 'w') as f:
+                json.dump(browser_info, f, indent=2)
+                
+            # Detach from the browser process - don't keep any references
+            # This is important to allow the Python script to exit while the browser continues running
+            # We'll just record the PID and other info, and the browser will run independently
+            managed_browser.browser_process = None
+                
+            self.logger.success(f"Builtin browser launched at CDP URL: {cdp_url}", tag="BUILTIN")
+            return cdp_url
+            
+        except Exception as e:
+            self.logger.error(f"Error launching builtin browser: {str(e)}", tag="BUILTIN")
+            if managed_browser:
+                await managed_browser.cleanup()
+            return None
+    
+    def get_builtin_browser_info(self) -> Optional[Dict[str, Any]]:
+        """
+        Get information about the builtin browser.
+        
+        Returns:
+            dict: Browser information or None if no builtin browser is configured
+        """
+        if not os.path.exists(self.builtin_config_file):
+            return None
+            
+        try:
+            with open(self.builtin_config_file, 'r') as f:
+                browser_info = json.load(f)
+                
+            # Check if the browser is still running
+            if not self._is_browser_running(browser_info.get('pid')):
+                self.logger.warning("Builtin browser is not running", tag="BUILTIN")
+                return None
+                
+            return browser_info
+        except Exception as e:
+            self.logger.error(f"Error reading builtin browser config: {str(e)}", tag="BUILTIN")
+            return None
+            
+    def _is_browser_running(self, pid: Optional[int]) -> bool:
+        """Check if a process with the given PID is running"""
+        if not pid:
+            return False
+            
+        try:
+            # Check if the process exists
+            if sys.platform == "win32":
+                process = subprocess.run(["tasklist", "/FI", f"PID eq {pid}"], 
+                                         capture_output=True, text=True)
+                return str(pid) in process.stdout
+            else:
+                # Unix-like systems
+                os.kill(pid, 0)  # This doesn't actually kill the process, just checks if it exists
+            return True
+        except (ProcessLookupError, PermissionError, OSError):
+            return False
+            
+    async def kill_builtin_browser(self) -> bool:
+        """
+        Kill the builtin browser if it's running.
+        
+        Returns:
+            bool: True if the browser was killed, False otherwise
+        """
+        browser_info = self.get_builtin_browser_info()
+        if not browser_info:
+            self.logger.warning("No builtin browser found", tag="BUILTIN")
+            return False
+            
+        pid = browser_info.get('pid')
+        if not pid:
+            return False
+            
+        try:
+            if sys.platform == "win32":
+                subprocess.run(["taskkill", "/F", "/PID", str(pid)], check=True)
+            else:
+                os.kill(pid, signal.SIGTERM)
+                # Wait for termination
+                for _ in range(5):
+                    if not self._is_browser_running(pid):
+                        break
+                    await asyncio.sleep(0.5)
+                else:
+                    # Force kill if still running
+                    os.kill(pid, signal.SIGKILL)
+                    
+            # Remove config file
+            if os.path.exists(self.builtin_config_file):
+                os.unlink(self.builtin_config_file)
+                
+            self.logger.success("Builtin browser terminated", tag="BUILTIN")
+            return True
+        except Exception as e:
+            self.logger.error(f"Error killing builtin browser: {str(e)}", tag="BUILTIN")
+            return False
+    
+    async def get_builtin_browser_status(self) -> Dict[str, Any]:
+        """
+        Get status information about the builtin browser.
+        
+        Returns:
+            dict: Status information with running, cdp_url, and info fields
+        """
+        browser_info = self.get_builtin_browser_info()
+        
+        if not browser_info:
+            return {
+                'running': False,
+                'cdp_url': None,
+                'info': None
+            }
+            
+        return {
+            'running': True,
+            'cdp_url': browser_info.get('cdp_url'),
+            'info': browser_info
+        }
 
