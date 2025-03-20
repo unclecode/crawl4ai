@@ -56,6 +56,7 @@ class Input(BaseModel):
     css_selector: Annotated[str | None, Field(alias="cssSelector")] = None
     wait_for: Annotated[str | None, Field(alias="waitFor")] = None
     js_code: Annotated[str | None, Field(alias="jsCode")] = None
+    max_crawl_depth: Annotated[int | None, Field(alias="maxCrawlDepth")] = None
 
     extraction_strategy_: Annotated[str | None, Field(alias="extractionStrategy")] = (
         None

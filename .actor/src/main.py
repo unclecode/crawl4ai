@@ -12,17 +12,17 @@ from typing import cast
 from urllib.parse import urljoin
 
 from apify import Actor
-from apify.storages import RequestList, RequestQueue
-from crawl4ai import AsyncWebCrawler
+from apify.storages import RequestList
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
+from crawl4ai.async_webcrawler import CrawlResultContainer
 from crawl4ai.extraction_strategy import (
     CosineStrategy,
     JsonCssExtractionStrategy,
     LLMExtractionStrategy,
-    NoExtractionStrategy,
 )
 from crawlee import Request
-from crawlee.basic_crawler import BasicCrawler, BasicCrawlingContext
-from crawlee.storages import KeyValueStore, RequestSourceTandem
+from crawlee.crawlers import BasicCrawler, BasicCrawlingContext
+from crawlee.storages import KeyValueStore
 
 from .input import CosineExtraction, Input, JsonCssExtraction, LLMExtraction
 
@@ -34,32 +34,12 @@ async def create_crawler(input: Input) -> BasicCrawler:
     )
 
     crawler = BasicCrawler(
-        request_provider=RequestSourceTandem(request_list, await RequestQueue.open()),
+        request_manager=await request_list.to_tandem(),
         proxy_configuration=proxy_configuration,
+        max_crawl_depth=input.max_crawl_depth,
     )
 
-    if isinstance(input.extraction_strategy, LLMExtraction):
-        extraction_strategy = LLMExtractionStrategy(
-            provider=input.extraction_strategy.provider,
-            api_token=input.extraction_strategy.api_token,
-            instruction=cast(str, input.extraction_strategy.instruction),
-        )
-    elif isinstance(input.extraction_strategy, JsonCssExtraction):
-        extraction_strategy = JsonCssExtractionStrategy(
-            schema=input.extraction_strategy.extraction_schema
-        )
-    elif isinstance(input.extraction_strategy, CosineExtraction):
-        extraction_strategy = CosineStrategy(
-            semantic_filter=input.extraction_strategy.semantic_filter,
-            word_count_threshold=input.extraction_strategy.word_count_threshold,
-            max_dist=input.extraction_strategy.max_dist,
-            linkage_method=input.extraction_strategy.linkage_method,
-            top_k=input.extraction_strategy.top_k,
-            model_name=input.extraction_strategy.extraction_model_name,
-            sim_threshold=input.extraction_strategy.sim_threshold,
-        )
-    else:
-        extraction_strategy = NoExtractionStrategy()
+    crawler_run_config = create_crawler_run_config(input)
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
@@ -75,14 +55,12 @@ async def create_crawler(input: Input) -> BasicCrawler:
             if context.proxy_info
             else None,
         ) as crawl4ai:
-            result = await crawl4ai.arun(
-                context.request.url,
-                magic=input.magic_mode,
-                screenshot=input.save_screenshots,
-                css_selector=cast(str, input.css_selector),
-                extraction_strategy=extraction_strategy,
-                js_code=input.js_code,
-                wait_for=input.wait_for,
+            result = cast(
+                CrawlResultContainer,  # arun() should always return CrawlResultContainer directly
+                await crawl4ai.arun(
+                    context.request.url,
+                    config=crawler_run_config,
+                ),
             )
 
         await context.add_requests(
@@ -121,6 +99,43 @@ async def create_crawler(input: Input) -> BasicCrawler:
         await context.push_data(data)
 
     return crawler
+
+
+def create_crawler_run_config(input: Input) -> CrawlerRunConfig:
+    config = CrawlerRunConfig(
+        magic=input.magic_mode,
+        screenshot=input.save_screenshots,
+        css_selector=cast(str, input.css_selector),
+    )
+
+    if input.js_code:
+        config.js_code = input.js_code
+
+    if input.wait_for:
+        config.wait_for = input.wait_for
+
+    if isinstance(input.extraction_strategy, LLMExtraction):
+        config.extraction_strategy = LLMExtractionStrategy(
+            provider=input.extraction_strategy.provider,
+            api_token=input.extraction_strategy.api_token,
+            instruction=cast(str, input.extraction_strategy.instruction),
+        )
+    elif isinstance(input.extraction_strategy, JsonCssExtraction):
+        config.extraction_strategy = JsonCssExtractionStrategy(
+            schema=input.extraction_strategy.extraction_schema
+        )
+    elif isinstance(input.extraction_strategy, CosineExtraction):
+        config.extraction_strategy = CosineStrategy(
+            semantic_filter=input.extraction_strategy.semantic_filter,
+            word_count_threshold=input.extraction_strategy.word_count_threshold,
+            max_dist=input.extraction_strategy.max_dist,
+            linkage_method=input.extraction_strategy.linkage_method,
+            top_k=input.extraction_strategy.top_k,
+            model_name=input.extraction_strategy.extraction_model_name,
+            sim_threshold=input.extraction_strategy.sim_threshold,
+        )
+
+    return config
 
 
 async def main() -> None:
