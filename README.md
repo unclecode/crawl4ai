@@ -255,6 +255,36 @@ pip install -e ".[all]"             # Install all optional features
 
 > 🚀 **Major Changes Coming!** We're developing a completely new Docker implementation that will make deployment even more efficient and seamless. The current Docker setup is being deprecated in favor of this new solution.
 
+### Apify Actor Usage [![Crawl4AI Actor](https://apify.com/actor-badge?actor=janbuchar/crawl4ai)](https://apify.com/janbuchar/crawl4ai?fpr=crawl4ai)
+
+<a href="https://apify.com/janbuchar/crawl4ai?fpr=crawl4ai"><img src="https://apify.com/ext/run-on-apify.png" alt="Run Crawl4AI Actor on Apify" width="176" height="39" /></a>
+
+You can run Crawl4AI in the cloud without installation using the [Crawl4AI Actor](https://apify.com/janbuchar/crawl4ai?fpr=crawl4ai) on [Apify](https://apify.com?fpr=crawl4ai) free of charge.
+
+``` bash
+$ echo '{"startUrls": [{ "url": "https://docs.crawl4ai.com/" }], "maxCrawlDepth": 1}' | apify call -so janbuchar/crawl4ai
+[{
+  "url": "https://docs.crawl4ai.com/",
+  "markdown": "https://api.apify.com/v2/key-value-stores/m1Sqnke1KWM0AI8co/records/content_4242424242.md",
+  "html": "https://api.apify.com/v2/key-value-stores/m1Sqnke1KWM0AI8co/records/content_4242424242.html",
+  "metadata": {
+    "title": "Home - Crawl4AI Documentation (v0.5.x)",
+    "description": "🚀🤖 Crawl4AI, Open-source LLM-Friendly Web Crawler & Scraper",
+  }
+},
+{
+  "url": "https://docs.crawl4ai.com/advanced/ssl-certificate/",
+  "markdown": "https://api.apify.com/v2/key-value-stores/m1Sqnke1KWM0AI8co/records/content_4242424242.md",
+  "html": "https://api.apify.com/v2/key-value-stores/m1Sqnke1KWM0AI8co/records/content_4242424242.html",
+  "metadata": {
+    "title": "SSL Certificate - Crawl4AI Documentation (v0.5.x)",
+    "description": "🚀🤖 Crawl4AI, Open-source LLM-Friendly Web Crawler & Scraper",
+  }
+},
+# ...
+]
+```
+
 ### Current Docker Support
 
 The existing Docker implementation is being deprecated and will be replaced soon. If you still need to use Docker with the current version:
