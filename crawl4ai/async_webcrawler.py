@@ -44,7 +44,8 @@ from .utils import (
     RobotsParser,
 )
 
-from typing import Union, AsyncGenerator
+from typing import Union, AsyncGenerator, TypeVar
+from collections.abc import AsyncGenerator
 
 CrawlResultT = TypeVar('CrawlResultT', bound=CrawlResult)
 # RunManyReturn = Union[CrawlResultT, List[CrawlResultT], AsyncGenerator[CrawlResultT, None]]

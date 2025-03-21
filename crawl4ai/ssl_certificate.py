@@ -1,13 +1,132 @@
 """SSL Certificate class for handling certificate operations."""
 
 import ssl
+import socks
 import socket
 import base64
+import logging
+from datetime import datetime
 import json
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Protocol
+from abc import abstractmethod
 from urllib.parse import urlparse
 import OpenSSL.crypto
 from pathlib import Path
+from .configs.proxy_config import ProxyConfig
+
+# Setup logging
+logger = logging.getLogger(__name__)
+
+
+class ConnectionStrategy(Protocol):
+    """Strategy interface for creating socket connections."""
+    
+    def create_connection(self, hostname: str, port: int, timeout: int) -> socket.socket:
+        """
+        Create a socket connection to the specified host.
+        
+        Args:
+            hostname: Target hostname to connect to
+            port: Target port to connect to
+            timeout: Connection timeout in seconds
+            
+        Returns:
+            Connected socket object
+        """
+        pass
+
+
+class DirectConnectionStrategy:
+    """Direct connection strategy without using a proxy."""
+    
+    def create_connection(self, hostname: str, port: int, timeout: int) -> socket.socket:
+        """Create a direct socket connection without proxy."""
+        return socket.create_connection((hostname, port), timeout=timeout)
+
+
+class HttpProxyConnectionStrategy:
+    """HTTP/HTTPS proxy connection strategy."""
+    
+    def __init__(self, proxy_config: ProxyConfig):
+        """
+        Initialize with proxy configuration.
+        
+        Args:
+            proxy_config: Proxy configuration object
+        """
+        self.proxy_config = proxy_config
+        
+    def create_connection(self, hostname: str, port: int, timeout: int) -> socket.socket:
+        """Create a socket connection through HTTP/HTTPS proxy."""
+        sock = socks.socksocket()
+        parsed = urlparse(self.proxy_config.server)
+        
+        # Determine if HTTP or HTTPS proxy
+        proxy_type = socks.HTTPS if "https" in parsed.scheme.lower() else socks.HTTP
+        
+        sock.set_proxy(
+            proxy_type,
+            parsed.hostname,
+            parsed.port or 80,
+            username=self.proxy_config.username,
+            password=self.proxy_config.password,
+        )
+        sock.settimeout(timeout)
+        sock.connect((hostname, port))
+        return sock
+
+
+class SocksProxyConnectionStrategy:
+    """SOCKS proxy connection strategy."""
+    
+    def __init__(self, proxy_config: ProxyConfig):
+        """
+        Initialize with proxy configuration.
+        
+        Args:
+            proxy_config: Proxy configuration object
+        """
+        self.proxy_config = proxy_config
+        
+    def create_connection(self, hostname: str, port: int, timeout: int) -> socket.socket:
+        """Create a socket connection through SOCKS proxy."""
+        sock = socks.socksocket()
+        parsed = urlparse(self.proxy_config.server)
+        
+        sock.set_proxy(
+            socks.SOCKS5,
+            parsed.hostname,
+            parsed.port or 80,
+            username=self.proxy_config.username,
+            password=self.proxy_config.password,
+        )
+        sock.settimeout(timeout)
+        sock.connect((hostname, port))
+        return sock
+
+
+class ConnectionStrategyFactory:
+    """Factory for creating appropriate connection strategies."""
+    
+    @staticmethod
+    def create_strategy(proxy_config: Optional[ProxyConfig]) -> ConnectionStrategy:
+        """
+        Create appropriate connection strategy based on proxy configuration.
+        
+        Args:
+            proxy_config: Optional proxy configuration
+            
+        Returns:
+            A connection strategy instance
+        """
+        if not proxy_config or not proxy_config.server:
+            return DirectConnectionStrategy()
+        
+        proxy_schema = urlparse(proxy_config.server).scheme.lower()
+        if "http" in proxy_schema:
+            return HttpProxyConnectionStrategy(proxy_config)
+        else:
+            return SocksProxyConnectionStrategy(proxy_config)
 
 
 class SSLCertificate:
@@ -18,68 +137,107 @@ class SSLCertificate:
         cert_info (Dict[str, Any]): The certificate information.
 
         Methods:
-            from_url(url: str, timeout: int = 10) -> Optional['SSLCertificate']: Create SSLCertificate instance from a URL.
+            from_url(url: str, timeout: int = 10, proxy_config: Optional[ProxyConfig] = None) -> Optional['SSLCertificate']: Create SSLCertificate instance from a URL.
             from_file(file_path: str) -> Optional['SSLCertificate']: Create SSLCertificate instance from a file.
             from_binary(binary_data: bytes) -> Optional['SSLCertificate']: Create SSLCertificate instance from binary data.
-            export_as_pem() -> str: Export the certificate as PEM format.
-            export_as_der() -> bytes: Export the certificate as DER format.
-            export_as_json() -> Dict[str, Any]: Export the certificate as JSON format.
-            export_as_text() -> str: Export the certificate as text format.
+            to_pem() -> Optional[str]: Export the certificate as PEM format.
+            to_der() -> Optional[bytes]: Export the certificate as DER format.
+            to_json() -> Optional[str]: Export the certificate as JSON format.
+            to_playwright_format() -> Dict[str, Any]: Export the certificate as Playwright format.
     """
 
     def __init__(self, cert_info: Dict[str, Any]):
         self._cert_info = self._decode_cert_data(cert_info)
 
     @staticmethod
-    def from_url(url: str, timeout: int = 10) -> Optional["SSLCertificate"]:
+    def from_url(
+        url: str, timeout: int = 10, proxy_config: Optional[ProxyConfig] = None
+    ) -> Optional["SSLCertificate"]:
         """
         Create SSLCertificate instance from a URL.
 
         Args:
             url (str): URL of the website.
             timeout (int): Timeout for the connection (default: 10).
+            proxy_config (Optional[ProxyConfig]]): Proxy configuration (default: None).
 
         Returns:
             Optional[SSLCertificate]: SSLCertificate instance if successful, None otherwise.
         """
         try:
+            # Extract hostname from URL
             hostname = urlparse(url).netloc
             if ":" in hostname:
                 hostname = hostname.split(":")[0]
-
-            context = ssl.create_default_context()
-            with socket.create_connection((hostname, 443), timeout=timeout) as sock:
-                with context.wrap_socket(sock, server_hostname=hostname) as ssock:
-                    cert_binary = ssock.getpeercert(binary_form=True)
-                    x509 = OpenSSL.crypto.load_certificate(
-                        OpenSSL.crypto.FILETYPE_ASN1, cert_binary
-                    )
-
-                    cert_info = {
-                        "subject": dict(x509.get_subject().get_components()),
-                        "issuer": dict(x509.get_issuer().get_components()),
-                        "version": x509.get_version(),
-                        "serial_number": hex(x509.get_serial_number()),
-                        "not_before": x509.get_notBefore(),
-                        "not_after": x509.get_notAfter(),
-                        "fingerprint": x509.digest("sha256").hex(),
-                        "signature_algorithm": x509.get_signature_algorithm(),
-                        "raw_cert": base64.b64encode(cert_binary),
-                    }
-
-                    # Add extensions
-                    extensions = []
-                    for i in range(x509.get_extension_count()):
-                        ext = x509.get_extension(i)
-                        extensions.append(
-                            {"name": ext.get_short_name(), "value": str(ext)}
-                        )
-                    cert_info["extensions"] = extensions
-
-                    return SSLCertificate(cert_info)
-
-        except Exception:
+            
+            # Get appropriate connection strategy using the factory
+            connection_strategy = ConnectionStrategyFactory.create_strategy(proxy_config)
+            
+            # Create connection and extract certificate
+            sock = None
+            try:
+                sock = connection_strategy.create_connection(hostname, 443, timeout)
+                return SSLCertificate._extract_certificate_from_socket(sock, hostname)
+            finally:
+                # Ensure socket is closed if it wasn't transferred
+                if sock:
+                    try:
+                        sock.close()
+                    except Exception:
+                        pass  # Ignore any errors during closing
+                        
+        except (socket.gaierror, socket.timeout) as e:
+            logger.warning(f"Network error when getting certificate for {url}: {e}")
             return None
+        except socks.ProxyError as e:
+            logger.warning(f"Proxy error when getting certificate for {url}: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error when getting certificate for {url}: {e}")
+            return None
+
+    @staticmethod
+    def _extract_certificate_from_socket(sock: socket.socket, hostname: str) -> "SSLCertificate":
+        """
+        Extract certificate information from an open socket.
+        
+        Args:
+            sock: Connected socket to extract certificate from
+            hostname: Hostname for SSL verification
+            
+        Returns:
+            SSLCertificate object with extracted certificate information
+        """
+        context = ssl.create_default_context()
+        with context.wrap_socket(sock, server_hostname=hostname) as ssock:
+            # Socket is now managed by the SSL context
+            cert_binary = ssock.getpeercert(binary_form=True)
+            x509 = OpenSSL.crypto.load_certificate(
+                OpenSSL.crypto.FILETYPE_ASN1, cert_binary
+            )
+
+            cert_info = {
+                "subject": dict(x509.get_subject().get_components()),
+                "issuer": dict(x509.get_issuer().get_components()),
+                "version": x509.get_version(),
+                "serial_number": hex(x509.get_serial_number()),
+                "not_before": x509.get_notBefore(),
+                "not_after": x509.get_notAfter(),
+                "fingerprint": x509.digest("sha256").hex(),
+                "signature_algorithm": x509.get_signature_algorithm(),
+                "raw_cert": base64.b64encode(cert_binary),
+            }
+
+            # Add extensions
+            extensions = []
+            for i in range(x509.get_extension_count()):
+                ext = x509.get_extension(i)
+                extensions.append(
+                    {"name": ext.get_short_name(), "value": str(ext)}
+                )
+            cert_info["extensions"] = extensions
+
+            return SSLCertificate(cert_info)
 
     @staticmethod
     def _decode_cert_data(data: Any) -> Any:
@@ -96,6 +254,15 @@ class SSLCertificate:
         elif isinstance(data, list):
             return [SSLCertificate._decode_cert_data(item) for item in data]
         return data
+
+    @staticmethod
+    def _parse_certificate_time(time_str: str) -> int:
+        """Parse certificate time."""
+        if time_str.endswith("Z"):
+            time_str = time_str[:-1]
+
+        dt = datetime.strptime(time_str, "%Y%m%d%H%M%S")
+        return int(dt.timestamp())
 
     def to_json(self, filepath: Optional[str] = None) -> Optional[str]:
         """
@@ -157,6 +324,20 @@ class SSLCertificate:
             return der_data
         except Exception:
             return None
+
+    def to_playwright_format(self) -> Dict[str, Any]:
+        """
+        Export certificate as Playwright format.
+        """
+        return {
+            "issuer": self.issuer.get("CN"),
+            "subject": self.subject.get("CN"),
+            "valid_from": self._parse_certificate_time(self.valid_from),
+            "valid_until": self._parse_certificate_time(self.valid_until),
+        }
+
+    def __str__(self) -> str:
+        return self.to_json()
 
     @property
     def issuer(self) -> Dict[str, str]:
