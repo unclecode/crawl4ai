@@ -555,7 +555,6 @@ class BrowserProfiler:
             else:
                 self.logger.error(f"Invalid choice. Please enter a number between 1 and {exit_option}.", tag="MENU")
 
-
     async def launch_standalone_browser(self, 
                                   browser_type: str = "chromium",
                                   user_data_dir: Optional[str] = None,
