@@ -4,6 +4,7 @@ from typing import Optional, Dict, Any
 from colorama import Fore, Style, init
 import os
 from datetime import datetime
+from urllib.parse import unquote
 
 
 class LogLevel(Enum):
@@ -230,12 +231,14 @@ class AsyncLogger(AsyncLoggerBase):
             tag: Tag for the message
             url_length: Maximum length for URL in log
         """
+        decoded_url = unquote(url)
+        readable_url = self._shorten(decoded_url, url_length)
         self._log(
             level=LogLevel.SUCCESS if success else LogLevel.ERROR,
             message="{url} | {status} | ⏱: {timing:.2f}s",
             tag=tag,
             params={
-                "url": self._shorten(url, url_length),
+                "url": readable_url,
                 "status": "✓" if success else "✗",
                 "timing": timing,
             },
@@ -257,11 +260,13 @@ class AsyncLogger(AsyncLoggerBase):
             tag: Tag for the message
             url_length: Maximum length for URL in log
         """
+        decoded_url = unquote(url)
+        readable_url = self._shorten(decoded_url, url_length)
         self._log(
             level=LogLevel.ERROR,
             message="{url} | Error: {error}",
             tag=tag,
-            params={"url": self.shorten(url,url_length), "error": error},
+            params={"url": readable_url, "error": error},
         )
 
 class AsyncFileLogger(AsyncLoggerBase):
