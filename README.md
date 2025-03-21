@@ -10,6 +10,7 @@
 [![PyPI version](https://badge.fury.io/py/crawl4ai.svg)](https://badge.fury.io/py/crawl4ai)
 [![Python Version](https://img.shields.io/pypi/pyversions/crawl4ai)](https://pypi.org/project/crawl4ai/)
 [![Downloads](https://static.pepy.tech/badge/crawl4ai/month)](https://pepy.tech/project/crawl4ai)
+[![Crawl4AI Actor](https://apify.com/actor-badge?actor=janbuchar/crawl4ai)](https://apify.com/janbuchar/crawl4ai?fpr=crawl4ai)
 
 <!-- [![Documentation Status](https://readthedocs.org/projects/crawl4ai/badge/?version=latest)](https://crawl4ai.readthedocs.io/) -->
 [![License](https://img.shields.io/github/license/unclecode/crawl4ai)](https://github.com/unclecode/crawl4ai/blob/main/LICENSE)
@@ -255,7 +256,51 @@ pip install -e ".[all]"             # Install all optional features
 
 > 🚀 **Major Changes Coming!** We're developing a completely new Docker implementation that will make deployment even more efficient and seamless. The current Docker setup is being deprecated in favor of this new solution.
 
-### Apify Actor Usage [![Crawl4AI Actor](https://apify.com/actor-badge?actor=janbuchar/crawl4ai)](https://apify.com/janbuchar/crawl4ai?fpr=crawl4ai)
+### Current Docker Support
+
+The existing Docker implementation is being deprecated and will be replaced soon. If you still need to use Docker with the current version:
+
+- 📚 [Deprecated Docker Setup](./docs/deprecated/docker-deployment.md) - Instructions for the current Docker implementation
+- ⚠️ Note: This setup will be replaced in the next major release
+
+### What's Coming Next?
+
+Our new Docker implementation will bring:
+- Improved performance and resource efficiency
+- Streamlined deployment process
+- Better integration with Crawl4AI features
+- Enhanced scalability options
+
+Stay connected with our [GitHub repository](https://github.com/unclecode/crawl4ai) for updates!
+
+</details>
+
+
+---
+
+### Quick Test
+
+Run a quick test (works for both Docker options):
+
+```python
+import requests
+
+# Submit a crawl job
+response = requests.post(
+    "http://localhost:11235/crawl",
+    json={"urls": "https://example.com", "priority": 10}
+)
+task_id = response.json()["task_id"]
+
+# Continue polling until the task is complete (status="completed")
+result = requests.get(f"http://localhost:11235/task/{task_id}")
+```
+
+For more examples, see our [Docker Examples](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/docker_example.py). For advanced configuration, environment variables, and usage examples, see our [Docker Deployment Guide](https://docs.crawl4ai.com/basic/docker-deployment/).
+
+</details>
+
+## Apify Actor Usage 
 
 <a href="https://apify.com/janbuchar/crawl4ai?fpr=crawl4ai"><img src="https://apify.com/ext/run-on-apify.png" alt="Run Crawl4AI Actor on Apify" width="176" height="39" /></a>
 
@@ -285,49 +330,7 @@ $ echo '{"startUrls": [{ "url": "https://docs.crawl4ai.com/" }], "maxCrawlDepth"
 ]
 ```
 
-### Current Docker Support
-
-The existing Docker implementation is being deprecated and will be replaced soon. If you still need to use Docker with the current version:
-
-- 📚 [Deprecated Docker Setup](./docs/deprecated/docker-deployment.md) - Instructions for the current Docker implementation
-- ⚠️ Note: This setup will be replaced in the next major release
-
-### What's Coming Next?
-
-Our new Docker implementation will bring:
-- Improved performance and resource efficiency
-- Streamlined deployment process
-- Better integration with Crawl4AI features
-- Enhanced scalability options
-
-Stay connected with our [GitHub repository](https://github.com/unclecode/crawl4ai) for updates!
-
-</details>
-
 ---
-
-### Quick Test
-
-Run a quick test (works for both Docker options):
-
-```python
-import requests
-
-# Submit a crawl job
-response = requests.post(
-    "http://localhost:11235/crawl",
-    json={"urls": "https://example.com", "priority": 10}
-)
-task_id = response.json()["task_id"]
-
-# Continue polling until the task is complete (status="completed")
-result = requests.get(f"http://localhost:11235/task/{task_id}")
-```
-
-For more examples, see our [Docker Examples](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/docker_example.py). For advanced configuration, environment variables, and usage examples, see our [Docker Deployment Guide](https://docs.crawl4ai.com/basic/docker-deployment/).
-
-</details>
-
 
 ## 🔬 Advanced Usage Examples 🔬
 
