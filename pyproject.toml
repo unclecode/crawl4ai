@@ -57,20 +57,27 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-pdf = ["PyPDF2"]  
-torch = ["torch", "nltk", "scikit-learn"]
-transformer = ["transformers", "tokenizers"]
-cosine = ["torch", "transformers", "nltk"]
-sync = ["selenium"]
-all = [
-    "PyPDF2",
+pdf = ["PyPDF2"]
+torch = [
     "torch",
+    "torchvision",
+    "torchaudio",
     "nltk",
     "scikit-learn",
+]
+transformer = [
     "transformers",
     "tokenizers",
-    "selenium",
-    "PyPDF2"  
+]
+cosine = [
+    "torch",
+    "transformers",
+    "nltk",
+]
+sync = ["selenium"]
+all = [
+    "crawl4ai[pdf,torch,transformer,cosine,sync]",
+    "spacy<3.8.0", # 3.8.0+ fails on macos: https://github.com/explosion/cython-blis/issues/117
 ]
 
 [project.scripts]
