@@ -160,6 +160,41 @@ def is_empty_value(value: Any) -> bool:
     return False
 
 
+class PagePoolConfig:
+    """Configuration for browser page pooling.
+    
+    This class configures the page pooling mechanism that maintains pre-warmed
+    browser pages ready for immediate use, improving performance for scenarios
+    where multiple URLs need to be processed in sequence.
+    
+    Attributes:
+        mode (str): Pooling mode - "static" or "adaptive".
+                    "static" uses a fixed pool size defined by static_size.
+                    "adaptive" calculates optimal size based on available system memory.
+                    Default: "static".
+        static_size (int): Number of pages to maintain in the pool when mode is "static".
+                           Default: 10.
+        memory_per_page (int): Estimated memory used by a single page in MB.
+                               Used for "adaptive" mode calculations.
+                               Default: 200.
+        memory_threshold (float): Maximum percentage of system memory to use in "adaptive" mode.
+                                  Default: 0.7 (70% of available memory).
+        timeout (float): Seconds to wait for a page from the pool before creating a new one.
+                         Default: 5.0.
+    """
+    
+    def __init__(self, 
+                 mode="static",
+                 static_size=10,
+                 memory_per_page=200,
+                 memory_threshold=0.7,
+                 timeout=5.0):
+        self.mode = mode
+        self.static_size = static_size
+        self.memory_per_page = memory_per_page
+        self.memory_threshold = memory_threshold
+        self.timeout = timeout
+
 class BrowserConfig:
     """
     Configuration class for setting up a browser instance and its context in AsyncPlaywrightCrawlerStrategy.
@@ -227,6 +262,9 @@ class BrowserConfig:
         light_mode (bool): Disables certain background features for performance gains. Default: False.
         extra_args (list): Additional command-line arguments passed to the browser.
                            Default: [].
+        page_pool_config (PagePoolConfig or None): Configuration for page pooling mechanism.
+                                                  If None, page pooling is disabled.
+                                                  Default: None.
     """
 
     def __init__(
@@ -268,6 +306,7 @@ class BrowserConfig:
         extra_args: list = None,
         debugging_port: int = 9222,
         host: str = "localhost",
+        page_pool_config: Optional[PagePoolConfig] = None,
     ):
         self.browser_type = browser_type
         self.headless = headless
@@ -312,6 +351,7 @@ class BrowserConfig:
         self.verbose = verbose
         self.debugging_port = debugging_port
         self.host = host
+        self.page_pool_config = page_pool_config
 
         fa_user_agenr_generator = ValidUAGenerator()
         if self.user_agent_mode == "random":
@@ -346,6 +386,12 @@ class BrowserConfig:
 
     @staticmethod
     def from_kwargs(kwargs: dict) -> "BrowserConfig":
+        # Handle page_pool_config
+        page_pool_config = kwargs.get("page_pool_config")
+        if isinstance(page_pool_config, dict):
+            # If it's a dict, convert to PagePoolConfig
+            page_pool_config = PagePoolConfig(**page_pool_config)
+            
         return BrowserConfig(
             browser_type=kwargs.get("browser_type", "chromium"),
             headless=kwargs.get("headless", True),
@@ -380,6 +426,7 @@ class BrowserConfig:
             extra_args=kwargs.get("extra_args", []),
             debugging_port=kwargs.get("debugging_port", 9222),
             host=kwargs.get("host", "localhost"),
+            page_pool_config=page_pool_config,
         )
 
     def to_dict(self):
@@ -414,6 +461,7 @@ class BrowserConfig:
             "verbose": self.verbose,
             "debugging_port": self.debugging_port,
             "host": self.host,
+            "page_pool_config": self.page_pool_config,
         }
         
         # Include docker_config if it exists
