@@ -2047,7 +2047,7 @@ def normalize_url_for_deep_crawl(href, base_url):
     normalized = urlunparse((
         parsed.scheme,
         netloc,
-        parsed.path.rstrip('/') or '/',  # Normalize trailing slash
+        parsed.path.rstrip('/'),  # Normalize trailing slash
         parsed.params,
         query,
         fragment
@@ -2075,7 +2075,7 @@ def efficient_normalize_url_for_deep_crawl(href, base_url):
     normalized = urlunparse((
         parsed.scheme,
         parsed.netloc.lower(),
-        parsed.path,
+        parsed.path.rstrip('/'),
         parsed.params,
         parsed.query,
         ''  # Remove fragment
