@@ -1,0 +1,12 @@
+# Ignore everything
+*
+
+# But not these files...
+!/crawl4ai
+!/deploy/docker
+!uv.lock
+!pyproject.toml
+!requirements.txt
+!setup.cfg
+!setup.py
+!README.md
