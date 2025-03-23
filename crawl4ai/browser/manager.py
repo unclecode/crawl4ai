@@ -7,9 +7,7 @@ It also implements a page pooling mechanism for improved performance.
 
 import asyncio
 import time
-import os
-import psutil
-from typing import Optional, Tuple, Dict, Any, List, Set
+from typing import Optional, Tuple, List
 
 from playwright.async_api import Page, BrowserContext
 

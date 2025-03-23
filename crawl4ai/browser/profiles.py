@@ -17,7 +17,6 @@ from colorama import Fore, Style, init
 from ..async_configs import BrowserConfig
 from ..async_logger import AsyncLogger, AsyncLoggerBase
 from ..utils import get_home_folder
-from .strategies import is_windows
 
 class BrowserProfileManager:
     """Manages browser profiles for Crawl4AI.

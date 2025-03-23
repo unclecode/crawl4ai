@@ -11,12 +11,11 @@ import time
 import json
 import hashlib
 import subprocess
-import sys
 import shutil
 import signal
 from typing import Optional, Dict, Tuple, List, Any
 
-from playwright.async_api import Browser, BrowserContext, Page, ProxySettings
+from playwright.async_api import BrowserContext, Page, ProxySettings
 
 from ..async_logger import AsyncLogger
 from ..async_configs import BrowserConfig, CrawlerRunConfig
@@ -831,26 +830,25 @@ class CDPBrowserStrategy(BaseBrowserStrategy):
             await asyncio.sleep(0.5)
         
         # If we have a user_data_dir configured, ensure persistence of storage state
-        if self.config.user_data_dir and self.browser:
-            try:
-                # Create a brief sleep to allow the browser to flush any pending operations
-                # This helps ensure all storage state (localStorage, cookies, etc.) gets saved
-                await asyncio.sleep(0.3)
-                if self.logger:
-                    self.logger.debug("Ensuring storage state is persisted before closing CDP browser", tag="BROWSER")
-            except Exception as e:
-                if self.logger:
-                    self.logger.warning(
-                        message="Failed to ensure storage persistence: {error}",
-                        tag="BROWSER", 
-                        params={"error": str(e)}
-                    )
+        if self.config.user_data_dir and self.browser and self.default_context:
+            for context in self.browser.contexts:
+                try:
+                    await context.storage_state(path=os.path.join(self.config.user_data_dir, "Default", "storage_state.json"))
+                    if self.logger:
+                        self.logger.debug("Ensuring storage state is persisted before closing browser", tag="BROWSER")
+                except Exception as e:
+                    if self.logger:
+                        self.logger.warning(
+                            message="Failed to ensure storage persistence: {error}",
+                            tag="BROWSER", 
+                            params={"error": str(e)}
+                        )
         
         # Close all sessions
         session_ids = list(self.sessions.keys())
         for session_id in session_ids:
             await self._kill_session(session_id)
-        
+
         # Close browser
         if self.browser:
             await self.browser.close()
