@@ -171,9 +171,9 @@ async def run_tests():
     """Run all tests sequentially."""
     results = []
     
-    # results.append(await test_basic_browser_manager())
-    # results.append(await test_custom_browser_config())
-    # results.append(await test_multiple_pages())
+    results.append(await test_basic_browser_manager())
+    results.append(await test_custom_browser_config())
+    results.append(await test_multiple_pages())
     results.append(await test_session_management())
     
     # Print summary

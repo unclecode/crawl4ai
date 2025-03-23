@@ -2,11 +2,14 @@
 
 This module provides a central browser management class that uses the
 strategy pattern internally while maintaining the existing API.
+It also implements a page pooling mechanism for improved performance.
 """
 
 import asyncio
 import time
-from typing import Optional, Tuple, Dict, Any
+import os
+import psutil
+from typing import Optional, Tuple, Dict, Any, List, Set
 
 from playwright.async_api import Page, BrowserContext
 
@@ -117,6 +120,28 @@ class BrowserManager:
             self.sessions = self._strategy.sessions
         
         return page, context
+        
+    async def get_pages(self, crawlerRunConfig: CrawlerRunConfig, count: int = 1) -> List[Tuple[Page, BrowserContext]]:
+        """Get multiple pages with the same configuration.
+        
+        This method efficiently creates multiple browser pages using the same configuration,
+        which is useful for parallel crawling of multiple URLs.
+        
+        Args:
+            crawlerRunConfig: Configuration for the pages
+            count: Number of pages to create
+            
+        Returns:
+            List of (Page, Context) tuples
+        """
+        # Delegate to strategy
+        pages = await self._strategy.get_pages(crawlerRunConfig, count)
+        
+        # Sync sessions if needed
+        if hasattr(self._strategy, 'sessions'):
+            self.sessions = self._strategy.sessions
+            
+        return pages
     
     async def kill_session(self, session_id: str):
         """Kill a browser session and clean up resources.
