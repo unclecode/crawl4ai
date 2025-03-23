@@ -143,15 +143,11 @@ async def test_playwright_context_reuse():
         
         # Create identical crawler configs
         crawler_config1 = CrawlerRunConfig(
-            url="https://example.com",
-            viewport_width=1280,
-            viewport_height=800
+            css_selector="body",
         )
         
         crawler_config2 = CrawlerRunConfig(
-            url="https://example.org",  # Different URL but same browser parameters
-            viewport_width=1280,
-            viewport_height=800
+            css_selector="body",
         )
         
         # Get pages with these configs
@@ -163,11 +159,7 @@ async def test_playwright_context_reuse():
         logger.info(f"Contexts reused: {is_same_context}", tag="TEST")
         
         # Now try with a different config
-        crawler_config3 = CrawlerRunConfig(
-            url="https://example.net",
-            viewport_width=800,  # Different viewport size
-            viewport_height=600
-        )
+        crawler_config3 = CrawlerRunConfig()
         
         page3, context3 = await manager.get_page(crawler_config3)
         

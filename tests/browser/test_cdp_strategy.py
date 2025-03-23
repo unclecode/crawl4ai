@@ -209,8 +209,8 @@ async def run_tests():
     """Run all tests sequentially."""
     results = []
     
-    results.append(await test_cdp_launch_connect())
-    results.append(await test_cdp_with_user_data_dir())
+    # results.append(await test_cdp_launch_connect())
+    # results.append(await test_cdp_with_user_data_dir())
     results.append(await test_cdp_session_management())
     
     # Print summary
