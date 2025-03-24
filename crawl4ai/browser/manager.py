@@ -21,6 +21,12 @@ from .strategies import (
     BuiltinBrowserStrategy
 )
 
+# Import DockerBrowserStrategy if available
+try:
+    from .docker_strategy import DockerBrowserStrategy
+except ImportError:
+    DockerBrowserStrategy = None
+
 class BrowserManager:
     """Main interface for browser management in Crawl4AI.
     
@@ -69,6 +75,16 @@ class BrowserManager:
         """
         if self.config.browser_mode == "builtin":
             return BuiltinBrowserStrategy(self.config, self.logger)
+        elif self.config.browser_mode == "docker":
+            if DockerBrowserStrategy is None:
+                if self.logger:
+                    self.logger.error(
+                        "Docker browser strategy requested but not available. "
+                        "Falling back to PlaywrightBrowserStrategy.",
+                        tag="BROWSER"
+                    )
+                return PlaywrightBrowserStrategy(self.config, self.logger)
+            return DockerBrowserStrategy(self.config, self.logger)
         elif self.config.cdp_url or self.config.use_managed_browser:
             return CDPBrowserStrategy(self.config, self.logger)
         else:
