@@ -28,6 +28,10 @@ from typing import Any, Dict, Optional
 from enum import Enum
 
 from .proxy_strategy import ProxyConfig
+try:
+    from .browser.docker_config import DockerConfig
+except ImportError:
+    DockerConfig = None
 
 
 def to_serializable_dict(obj: Any, ignore_default_value : bool = False) -> Dict:
@@ -173,6 +177,7 @@ class BrowserConfig:
                            "builtin" - use the builtin CDP browser running in background
                            "dedicated" - create a new dedicated browser instance each time
                            "custom" - use explicit CDP settings provided in cdp_url
+                           "docker" - run browser in Docker container with isolation
                            Default: "dedicated"
         use_managed_browser (bool): Launch the browser using a managed approach (e.g., via CDP), allowing
                                     advanced manipulation. Default: False.
@@ -190,6 +195,8 @@ class BrowserConfig:
                              Default: None.
         proxy_config (ProxyConfig or dict or None): Detailed proxy configuration, e.g. {"server": "...", "username": "..."}.
                                      If None, no additional proxy config. Default: None.
+        docker_config (DockerConfig or dict or None): Configuration for Docker-based browser automation.
+                                     Contains settings for Docker container operation. Default: None.
         viewport_width (int): Default viewport width for pages. Default: 1080.
         viewport_height (int): Default viewport height for pages. Default: 600.
         viewport (dict): Default viewport dimensions for pages. If set, overrides viewport_width and viewport_height.
@@ -235,6 +242,7 @@ class BrowserConfig:
         channel: str = "chromium",
         proxy: str = None,
         proxy_config: Union[ProxyConfig, dict, None] = None,
+        docker_config: Union["DockerConfig", dict, None] = None,
         viewport_width: int = 1080,
         viewport_height: int = 600,
         viewport: dict = None,
@@ -275,6 +283,12 @@ class BrowserConfig:
             self.chrome_channel = ""
         self.proxy = proxy
         self.proxy_config = proxy_config
+        
+        # Handle docker configuration
+        if isinstance(docker_config, dict) and DockerConfig is not None:
+            self.docker_config = DockerConfig.from_kwargs(docker_config)
+        else:
+            self.docker_config = docker_config
         self.viewport_width = viewport_width
         self.viewport_height = viewport_height
         self.viewport = viewport
@@ -315,6 +329,10 @@ class BrowserConfig:
             # Builtin mode uses managed browser connecting to builtin CDP endpoint
             self.use_managed_browser = True
             # cdp_url will be set later by browser_manager
+        elif self.browser_mode == "docker":
+            # Docker mode uses managed browser with CDP to connect to browser in container
+            self.use_managed_browser = True
+            # cdp_url will be set later by docker browser strategy
         elif self.browser_mode == "custom" and self.cdp_url:
             # Custom mode with explicit CDP URL
             self.use_managed_browser = True
@@ -340,6 +358,7 @@ class BrowserConfig:
             channel=kwargs.get("channel", "chromium"),
             proxy=kwargs.get("proxy"),
             proxy_config=kwargs.get("proxy_config", None),
+            docker_config=kwargs.get("docker_config", None),
             viewport_width=kwargs.get("viewport_width", 1080),
             viewport_height=kwargs.get("viewport_height", 600),
             accept_downloads=kwargs.get("accept_downloads", False),
@@ -364,7 +383,7 @@ class BrowserConfig:
         )
 
     def to_dict(self):
-        return {
+        result = {
             "browser_type": self.browser_type,
             "headless": self.headless,
             "browser_mode": self.browser_mode,
@@ -396,6 +415,15 @@ class BrowserConfig:
             "debugging_port": self.debugging_port,
             "host": self.host,
         }
+        
+        # Include docker_config if it exists
+        if hasattr(self, "docker_config") and self.docker_config is not None:
+            if hasattr(self.docker_config, "to_dict"):
+                result["docker_config"] = self.docker_config.to_dict()
+            else:
+                result["docker_config"] = self.docker_config
+                
+        return result
 
     def clone(self, **kwargs):
         """Create a copy of this configuration with updated values.
