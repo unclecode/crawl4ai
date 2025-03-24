@@ -163,6 +163,7 @@ class ManagedBrowser:
                 )
                 
             # We'll monitor for a short time to make sure it starts properly, but won't keep monitoring
+            await asyncio.sleep(0.5)  # Give browser time to start
             await self._initial_startup_check()
             await asyncio.sleep(2)  # Give browser time to start
             return f"http://{self.host}:{self.debugging_port}"
