@@ -7,6 +7,7 @@ from contextvars import ContextVar
 from ..types import AsyncWebCrawler, CrawlerRunConfig, CrawlResult, RunManyReturn
 
 
+
 class DeepCrawlDecorator:
     """Decorator that adds deep crawling capability to arun method."""
     deep_crawl_active = ContextVar("deep_crawl_active", default=False)
@@ -59,7 +60,8 @@ class DeepCrawlStrategy(ABC):
         start_url: str,
         crawler: AsyncWebCrawler,
         config: CrawlerRunConfig,
-    ) -> List[CrawlResult]:
+    # ) -> List[CrawlResult]:
+    ) -> RunManyReturn:
         """
         Batch (non-streaming) mode:
         Processes one BFS level at a time, then yields all the results.
@@ -72,7 +74,8 @@ class DeepCrawlStrategy(ABC):
         start_url: str,
         crawler: AsyncWebCrawler,
         config: CrawlerRunConfig,
-    ) -> AsyncGenerator[CrawlResult, None]:
+    # ) -> AsyncGenerator[CrawlResult, None]:
+    ) -> RunManyReturn:
         """
         Streaming mode:
         Processes one BFS level at a time and yields results immediately as they arrive.

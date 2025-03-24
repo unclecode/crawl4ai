@@ -673,18 +673,6 @@ class AsyncWebCrawler:
         urls: List[str],
         config: Optional[CrawlerRunConfig] = None, 
         dispatcher: Optional[BaseDispatcher] = None,
-        # Legacy parameters maintained for backwards compatibility
-        # word_count_threshold=MIN_WORD_THRESHOLD,
-        # extraction_strategy: ExtractionStrategy = None,
-        # chunking_strategy: ChunkingStrategy = RegexChunking(),
-        # content_filter: RelevantContentFilter = None,
-        # cache_mode: Optional[CacheMode] = None,
-        # bypass_cache: bool = False,
-        # css_selector: str = None,
-        # screenshot: bool = False,
-        # pdf: bool = False,
-        # user_agent: str = None,
-        # verbose=True,
         **kwargs
         ) -> RunManyReturn:
         """
@@ -718,20 +706,7 @@ class AsyncWebCrawler:
             print(f"Processed {result.url}: {len(result.markdown)} chars")
         """
         config = config or CrawlerRunConfig()
-        # if config is None:
-        #     config = CrawlerRunConfig(
-        #         word_count_threshold=word_count_threshold,
-        #         extraction_strategy=extraction_strategy,
-        #         chunking_strategy=chunking_strategy,
-        #         content_filter=content_filter,
-        #         cache_mode=cache_mode,
-        #         bypass_cache=bypass_cache,
-        #         css_selector=css_selector,
-        #         screenshot=screenshot,
-        #         pdf=pdf,
-        #         verbose=verbose,
-        #         **kwargs,
-        #     )
+
 
         if dispatcher is None:
             dispatcher = MemoryAdaptiveDispatcher(

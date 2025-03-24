@@ -9,7 +9,7 @@ from ..models import TraversalStats
 from .filters import FilterChain
 from .scorers import URLScorer
 from . import DeepCrawlStrategy  
-from ..types import AsyncWebCrawler, CrawlerRunConfig, CrawlResult
+from ..types import AsyncWebCrawler, CrawlerRunConfig, CrawlResult, RunManyReturn
 from ..utils import normalize_url_for_deep_crawl, efficient_normalize_url_for_deep_crawl
 from math import inf as infinity
 
@@ -143,7 +143,8 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
         start_url: str,
         crawler: AsyncWebCrawler,
         config: CrawlerRunConfig,
-    ) -> List[CrawlResult]:
+    # ) -> List[CrawlResult]:
+    ) -> RunManyReturn:
         """
         Batch (non-streaming) mode:
         Processes one BFS level at a time, then yields all the results.
@@ -191,7 +192,8 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
         start_url: str,
         crawler: AsyncWebCrawler,
         config: CrawlerRunConfig,
-    ) -> AsyncGenerator[CrawlResult, None]:
+    # ) -> AsyncGenerator[CrawlResult, None]:
+    ) -> RunManyReturn:
         """
         Streaming mode:
         Processes one BFS level at a time and yields results immediately as they arrive.

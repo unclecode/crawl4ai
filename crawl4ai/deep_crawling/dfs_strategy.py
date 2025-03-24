@@ -3,7 +3,7 @@ from typing import AsyncGenerator, Optional, Set, Dict, List, Tuple
 
 from ..models import CrawlResult
 from .bfs_strategy import BFSDeepCrawlStrategy  # noqa
-from ..types import AsyncWebCrawler, CrawlerRunConfig
+from ..types import AsyncWebCrawler, CrawlerRunConfig, RunManyReturn
 
 class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
     """
@@ -17,7 +17,8 @@ class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
         start_url: str,
         crawler: AsyncWebCrawler,
         config: CrawlerRunConfig,
-    ) -> List[CrawlResult]:
+    # ) -> List[CrawlResult]:
+    ) -> RunManyReturn:
         """
         Batch (non-streaming) DFS mode.
         Uses a stack to traverse URLs in DFS order, aggregating CrawlResults into a list.
@@ -65,7 +66,8 @@ class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
         start_url: str,
         crawler: AsyncWebCrawler,
         config: CrawlerRunConfig,
-    ) -> AsyncGenerator[CrawlResult, None]:
+    # ) -> AsyncGenerator[CrawlResult, None]:
+    ) -> RunManyReturn:
         """
         Streaming DFS mode.
         Uses a stack to traverse URLs in DFS order and yields CrawlResults as they become available.

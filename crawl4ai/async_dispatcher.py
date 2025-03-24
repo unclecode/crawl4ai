@@ -1,4 +1,4 @@
-from typing import Dict, Optional, List, Tuple
+from typing import Dict, Optional, List, Tuple, Union
 from .async_configs import CrawlerRunConfig
 from .models import (
     CrawlResult,
@@ -183,7 +183,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
         config: CrawlerRunConfig,
         task_id: str,
         retry_count: int = 0,
-    ) -> CrawlerTaskResult:
+    ) -> Union[CrawlerTaskResult, List[CrawlerTaskResult]]:
         start_time = time.time()
         error_message = ""
         memory_usage = peak_memory = 0.0
@@ -244,8 +244,53 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
             end_memory = process.memory_info().rss / (1024 * 1024)
             memory_usage = peak_memory = end_memory - start_memory
             
-            # Handle rate limiting
-            if self.rate_limiter and result.status_code:
+            # Check if we have a container with multiple results (deep crawl result)
+            if isinstance(result, list) or (hasattr(result, '_results') and len(result._results) > 1):
+                # Handle deep crawling results - create a list of task results
+                task_results = []
+                result_list = result if isinstance(result, list) else result._results
+                
+                for idx, single_result in enumerate(result_list):
+                    # Create individual task result for each crawled page
+                    sub_task_id = f"{task_id}_{idx}"
+                    single_memory = memory_usage / len(result_list)  # Distribute memory usage
+                    
+                    # Only update rate limiter for first result which corresponds to the original URL
+                    if idx == 0 and self.rate_limiter and hasattr(single_result, 'status_code') and single_result.status_code:
+                        if not self.rate_limiter.update_delay(url, single_result.status_code):
+                            error_msg = f"Rate limit retry count exceeded for domain {urlparse(url).netloc}"
+                            if self.monitor:
+                                self.monitor.update_task(task_id, status=CrawlStatus.FAILED)
+                    
+                    task_result = CrawlerTaskResult(
+                        task_id=sub_task_id,
+                        url=single_result.url,
+                        result=single_result,
+                        memory_usage=single_memory,
+                        peak_memory=single_memory,
+                        start_time=start_time,
+                        end_time=time.time(),
+                        error_message=single_result.error_message if not single_result.success else "",
+                        retry_count=retry_count
+                    )
+                    task_results.append(task_result)
+                
+                # Update monitor with completion status based on the first/primary result
+                if self.monitor:
+                    primary_result = result_list[0]
+                    if not primary_result.success:
+                        self.monitor.update_task(task_id, status=CrawlStatus.FAILED)
+                    else:
+                        self.monitor.update_task(
+                            task_id, 
+                            status=CrawlStatus.COMPLETED,
+                            extra_info=f"Deep crawl: {len(result_list)} pages"
+                        )
+                
+                return task_results
+            
+            # Handle single result (original behavior)
+            if self.rate_limiter and hasattr(result, 'status_code') and result.status_code:
                 if not self.rate_limiter.update_delay(url, result.status_code):
                     error_message = f"Rate limit retry count exceeded for domain {urlparse(url).netloc}"
                     if self.monitor:
@@ -291,7 +336,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
             error_message=error_message,
             retry_count=retry_count
         )
-        
+            
     async def run_urls(
         self,
         urls: List[str],
@@ -356,8 +401,13 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
                     
                     # Process completed tasks
                     for completed_task in done:
-                        result = await completed_task
-                        results.append(result)
+                        task_result = await completed_task
+                        
+                        # Handle both single results and lists of results
+                        if isinstance(task_result, list):
+                            results.extend(task_result)
+                        else:
+                            results.append(task_result)
                         
                     # Update active tasks list
                     active_tasks = list(pending)
@@ -379,7 +429,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
             memory_monitor.cancel()
             if self.monitor:
                 self.monitor.stop()
-                
+
     async def _update_queue_priorities(self):
         """Periodically update priorities of items in the queue to prevent starvation"""
         # Skip if queue is empty
