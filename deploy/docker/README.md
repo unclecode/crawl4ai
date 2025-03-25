@@ -41,10 +41,13 @@ git clone https://github.com/unclecode/crawl4ai.git
 cd crawl4ai/deploy
 
 # Build the Docker image
-docker build --platform=linux/amd64 --no-cache -t crawl4ai .
+docker build --platform=linux/amd64 -t crawl4ai .
 
 # Or build for arm64
-docker build --platform=linux/arm64 --no-cache -t crawl4ai .
+docker build --platform=linux/arm64 -t crawl4ai .
+
+# Or build from a GitHub clone instead of local source
+docker build --platform=linux/arm64 --build-arg BUILD_ENV=github -t crawl4ai .
 ```
 
 #### 2. Environment Setup
@@ -137,6 +140,11 @@ docker build -t crawl4ai
 | INSTALL_TYPE | Feature set | default | default, all, torch, transformer |
 | ENABLE_GPU | GPU support | false | true, false |
 | APP_HOME | Install path | /app | any valid path |
+| UV_IMAGE | uv Image to use | ghcr.io/astral-sh/uv:0.6.6 | any valid uv image |
+| PYTHON_IMAGE | Base Python image | python:3.10-slim | any valid python image |
+| GITHUB_REPO | URL for report if BUILD_ENV=github | [https://github.com/unclecode/crawl4ai.git](https://github.com/unclecode/crawl4ai.git) | Any valid crawl4ai repo URL |
+| GITHUB_BRANCH | The branch to use for if BUILD_ENV=github | main | Any valid branch in the repo |
+| BUILD_ENV | The source to build from | local | local, github |
 
 ### Build Best Practices
 
@@ -174,7 +182,7 @@ async def main():
     async with Crawl4aiDockerClient(base_url="http://localhost:8000", verbose=True) as client:
       # If JWT is enabled, you can authenticate like this: (more on this later)
         # await client.authenticate("test@example.com")
-        
+
         # Non-streaming crawl
         results = await client.crawl(
             ["https://example.com", "https://python.org"],
@@ -182,7 +190,7 @@ async def main():
             crawler_config=CrawlerRunConfig()
         )
         print(f"Non-streaming results: {results}")
-        
+
         # Streaming crawl
         crawler_config = CrawlerRunConfig(stream=True)
         async for result in await client.crawl(
@@ -191,7 +199,7 @@ async def main():
             crawler_config=crawler_config
         ):
             print(f"Streamed result: {result}")
-        
+
         # Get schema
         schema = await client.get_schema()
         print(f"Schema: {schema}")
@@ -502,7 +510,7 @@ print(config.dump())  # Use this JSON in your API calls
                   "type": "PathDepthScorer",
                   "params": {
                     "weight": 0.5,
-                    "optimal_depth": 3  
+                    "optimal_depth": 3
                   }
                 }
               ]
@@ -546,22 +554,22 @@ async def test_stream_crawl(session, token: str):
     payload = {
         "urls": [
             "https://example.com",
-            "https://example.com/page1",  
-            "https://example.com/page2",  
-            "https://example.com/page3",  
+            "https://example.com/page1",
+            "https://example.com/page2",
+            "https://example.com/page3",
         ],
         "browser_config": {"headless": True, "viewport": {"width": 1200}},
         "crawler_config": {"stream": True, "cache_mode": "aggressive"}
     }
 
     # headers = {"Authorization": f"Bearer {token}"} # If JWT is enabled, more on this later
-    
+
     try:
         async with session.post(url, json=payload, headers=headers) as response:
             status = response.status
             print(f"Status: {status} (Expected: 200)")
             assert status == 200, f"Expected 200, got {status}"
-            
+
             # Read streaming response line-by-line (NDJSON)
             async for line in response.content:
                 if line:
@@ -696,7 +704,7 @@ from crawl4ai.docker_client import Crawl4aiDockerClient
 async with Crawl4aiDockerClient() as client:
     # Authenticate first
     await client.authenticate("user@example.com")
-    
+
     # Now all requests will include the token automatically
     result = await client.crawl(urls=["https://example.com"])
 ```
@@ -717,11 +725,11 @@ The default implementation uses a simple email verification. For production use,
    app:
      reload: False              # Disable reload in production
      timeout_keep_alive: 120    # Lower timeout for better resource management
-   
+
    rate_limiting:
      storage_uri: "redis://redis:6379"  # Use Redis for distributed rate limiting
      default_limit: "50/minute"         # More conservative rate limit
-   
+
    security:
      enabled: true                      # Enable all security features
      trusted_hosts: ["your-domain.com"] # Restrict to your domain
@@ -733,7 +741,7 @@ The default implementation uses a simple email verification. For production use,
    app:
      reload: True               # Enable hot reloading
      timeout_keep_alive: 300    # Longer timeout for debugging
-   
+
    logging:
      level: "DEBUG"            # More verbose logging
    ```
@@ -767,7 +775,7 @@ Use a custom config during build:
 ```bash
 # Build with custom config
 docker build --platform=linux/amd64 --no-cache \
-  --build-arg CONFIG_PATH=/path/to/custom-config.yml \ 
+  --build-arg CONFIG_PATH=/path/to/custom-config.yml \
   -t crawl4ai:latest .
 ```
 

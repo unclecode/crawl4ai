@@ -1,9 +1,12 @@
+import argparse
+import os
+import shutil
+import subprocess
 from functools import lru_cache
 from pathlib import Path
-import subprocess, os
-import shutil
-from .model_loader import *
-import argparse
+
+from transformers import AutoModel
+
 from crawl4ai.config import MODEL_REPO_BRANCH
 
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
@@ -73,7 +76,7 @@ def get_home_folder():
 
 @lru_cache()
 def load_bert_base_uncased():
-    from transformers import BertTokenizer, BertModel
+    from transformers import BertModel, BertTokenizer
 
     tokenizer = BertTokenizer.from_pretrained("bert-base-uncased", resume_download=None)
     model = BertModel.from_pretrained("bert-base-uncased", resume_download=None)
@@ -92,7 +95,7 @@ def load_HF_embedding_model(model_name="BAAI/bge-small-en-v1.5") -> tuple:
     Returns:
         tuple: The tokenizer and model.
     """
-    from transformers import AutoTokenizer, AutoModel
+    from transformers import AutoTokenizer
 
     tokenizer = AutoTokenizer.from_pretrained(model_name, resume_download=None)
     model = AutoModel.from_pretrained(model_name, resume_download=None)
@@ -103,8 +106,7 @@ def load_HF_embedding_model(model_name="BAAI/bge-small-en-v1.5") -> tuple:
 
 @lru_cache()
 def load_text_classifier():
-    from transformers import AutoTokenizer, AutoModelForSequenceClassification
-    from transformers import pipeline
+    from transformers import AutoModelForSequenceClassification, AutoTokenizer, pipeline
 
     tokenizer = AutoTokenizer.from_pretrained(
         "dstefa/roberta-base_topic_classification_nyt_news"
@@ -118,11 +120,25 @@ def load_text_classifier():
     return pipe
 
 
+MODEL = "cardiffnlp/tweet-topic-21-multi"
+
+
+def download_text_multilabel_classifier():
+    """Download the multilabel classifer model from Hugging Face Hub.
+
+    Unlike load_text_multilabel_classifier, this function does not
+    load the model into memory only downloads it to the local cache
+    in the foreground."""
+    from huggingface_hub import snapshot_download
+
+    snapshot_download(MODEL)
+
+
 @lru_cache()
-def load_text_multilabel_classifier():
-    from transformers import AutoModelForSequenceClassification, AutoTokenizer
-    from scipy.special import expit
+def load_text_multilabel_classifier(download_only=False):
     import torch
+    from scipy.special import expit
+    from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
     # # Check for available device: CUDA, MPS (for Apple Silicon), or CPU
     # if torch.cuda.is_available():
@@ -133,11 +149,8 @@ def load_text_multilabel_classifier():
     #     device = torch.device("cpu")
     #     # return load_spacy_model(), torch.device("cpu")
 
-    MODEL = "cardiffnlp/tweet-topic-21-multi"
-    tokenizer = AutoTokenizer.from_pretrained(MODEL, resume_download=None)
-    model = AutoModelForSequenceClassification.from_pretrained(
-        MODEL, resume_download=None
-    )
+    tokenizer = AutoTokenizer.from_pretrained(MODEL)
+    model = AutoModelForSequenceClassification.from_pretrained(MODEL)
     model.eval()
     model, device = set_model_device(model)
     class_mapping = model.config.id2label
@@ -182,6 +195,17 @@ def load_nltk_punkt():
     except LookupError:
         nltk.download("punkt")
     return nltk.data.find("tokenizers/punkt")
+
+
+@lru_cache()
+def load_nltk_stopwords():
+    import nltk
+
+    try:
+        nltk.data.find("corpora/stopwords")
+    except LookupError:
+        nltk.download("stopwords")
+    return nltk.data.find("corpora/stopwords")
 
 
 @lru_cache()
@@ -271,10 +295,12 @@ def download_all_models(remove_existing=False):
     # print("[LOG] Downloading ONNX model...")
     # load_onnx_all_MiniLM_l6_v2()
     print("[LOG] Downloading text classifier...")
-    _, device = load_text_multilabel_classifier()
-    print(f"[LOG] Text classifier loaded on {device}")
+    download_text_multilabel_classifier()
+    print("[LOG] Text classifier downloaded")
     print("[LOG] Downloading custom NLTK Punkt model...")
     load_nltk_punkt()
+    print("[LOG] Downloading custom NLTK stopwords model...")
+    load_nltk_stopwords()
     print("[LOG] ✅ All models downloaded successfully.")
 
 
