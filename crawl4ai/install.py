@@ -45,7 +45,8 @@ def post_install():
     setup_home_directory()
     install_playwright()
     run_migration()
-    setup_builtin_browser()
+    # TODO: Will be added in the future
+    # setup_builtin_browser()
     logger.success("Post-installation setup completed!", tag="COMPLETE")
     
 def setup_builtin_browser():
