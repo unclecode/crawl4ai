@@ -1,5 +1,6 @@
 import os
 from typing import Dict, List, Optional
+from ..validators import ProxyValidator
 
 
 
@@ -71,6 +72,7 @@ class ProxyConfig:
         if not parsed.netloc or not parsed.scheme:
             parsed = urlparse(f"http://{self.server}")
         
+        
         username = self.username
         password = self.password
         # The server field takes precedence over username and password.
@@ -91,6 +93,9 @@ class ProxyConfig:
         self.server = server
         self.username = username
         self.password = password
+
+        # Validate the proxy string
+        ProxyValidator().validate(self.server)
 
         return self
     

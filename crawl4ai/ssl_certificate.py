@@ -8,11 +8,11 @@ import logging
 from datetime import datetime
 import json
 from typing import Dict, Any, Optional, Protocol
-from abc import abstractmethod
 from urllib.parse import urlparse
 import OpenSSL.crypto
 from pathlib import Path
 from .configs.proxy_config import ProxyConfig
+from .validators import SSLURLValidator
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -162,7 +162,13 @@ class SSLCertificate:
             verify_ssl (bool): Whether to verify SSL certificate (default: False).
         Returns:
             Optional[SSLCertificate]: SSLCertificate instance if successful, None otherwise.
+        Raises:
+            ValueError: If the URL is not a valid SSL URL.
         """
+        
+        # Validate the URL
+        SSLURLValidator().validate(url)
+
         try:
             # Extract hostname from URL
             hostname = urlparse(url).netloc
