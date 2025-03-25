@@ -128,7 +128,8 @@ class WebScrapingStrategy(ContentScrapingStrategy):
         Returns:
             ScrapingResult: A structured result containing the scraped content.
         """
-        raw_result = self._scrap(url, html, is_async=False, **kwargs)
+        actual_url = kwargs.get("redirected_url", url)
+        raw_result = self._scrap(actual_url, html, is_async=False, **kwargs)
         if raw_result is None:
             return ScrapingResult(
                 cleaned_html="",

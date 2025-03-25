@@ -448,6 +448,7 @@ class AsyncWebCrawler:
                         pdf_data=pdf_data,
                         verbose=config.verbose,
                         is_raw_html=True if url.startswith("raw:") else False,
+                        redirected_url=async_response.redirected_url, 
                         **kwargs,
                     )
 
@@ -596,7 +597,7 @@ class AsyncWebCrawler:
         markdown_result: MarkdownGenerationResult = (
             markdown_generator.generate_markdown(
                 cleaned_html=cleaned_html,
-                base_url=url,
+                base_url=params.get("redirected_url", url),
                 # html2text_options=kwargs.get('html2text', {})
             )
         )
