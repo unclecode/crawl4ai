@@ -1551,7 +1551,7 @@ def extract_xml_tags(string):
     return list(set(tags))
 
 
-def extract_xml_data(tags, string):
+def extract_xml_data_legacy(tags, string):
     """
     Extract data for specified XML tags from a string.
 
@@ -1575,6 +1575,38 @@ def extract_xml_data(tags, string):
         match = re.search(pattern, string, re.DOTALL)
         if match:
             data[tag] = match.group(1).strip()
+        else:
+            data[tag] = ""
+
+    return data
+
+def extract_xml_data(tags, string):
+    """
+    Extract data for specified XML tags from a string, returning the longest content for each tag.
+
+    How it works:
+    1. Finds all occurrences of each tag in the string using regex.
+    2. For each tag, selects the occurrence with the longest content.
+    3. Returns a dictionary of tag-content pairs.
+
+    Args:
+        tags (List[str]): The list of XML tags to extract.
+        string (str): The input string containing XML data.
+
+    Returns:
+        Dict[str, str]: A dictionary with tag names as keys and longest extracted content as values.
+    """
+
+    data = {}
+
+    for tag in tags:
+        pattern = f"<{tag}>(.*?)</{tag}>"
+        matches = re.findall(pattern, string, re.DOTALL)
+        
+        if matches:
+            # Find the longest content for this tag
+            longest_content = max(matches, key=len).strip()
+            data[tag] = longest_content
         else:
             data[tag] = ""
 
@@ -1648,6 +1680,19 @@ def perform_completion_with_backoff(
                         "content": ["Rate limit error. Please try again later."],
                     }
                 ]
+        except Exception as e:
+            raise e  # Raise any other exceptions immediately
+            # print("Error during completion request:", str(e))
+            # error_message = e.message
+            # return [
+            #     {
+            #         "index": 0,
+            #         "tags": ["error"],
+            #         "content": [
+            #             f"Error during LLM completion request. {error_message}"
+            #         ],
+            #     }
+            # ]
 
 
 def extract_blocks(url, html, provider=DEFAULT_PROVIDER, api_token=None, base_url=None):
