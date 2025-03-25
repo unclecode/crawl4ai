@@ -2,7 +2,6 @@ import click
 import os
 import time
 
-from fastapi.datastructures import Default
 import humanize
 from typing import Dict, Any, Optional, List
 import json
