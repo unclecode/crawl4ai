@@ -61,7 +61,7 @@ class ProxyConfig:
         if not self.server:
             return self
 
-        from urllib.parse import urlparse
+        from urllib.parse import urlparse, unquote
 
         parsed = urlparse(self.server)
 
@@ -78,8 +78,11 @@ class ProxyConfig:
             auth_part, host_part = parsed.netloc.split("@", 1)
             if ":" in auth_part:
                 username, password = auth_part.split(":", 1)
+                username = unquote(username)
+                password = unquote(password)
             else:
-                username = auth_part
+                username = unquote(auth_part)
+
                 password = ""
             server = f"{parsed.scheme}://{host_part}"
         else:
