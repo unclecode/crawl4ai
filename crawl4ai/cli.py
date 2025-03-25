@@ -20,6 +20,7 @@ from crawl4ai import (
     BrowserConfig, 
     CrawlerRunConfig,
     LLMExtractionStrategy, 
+    LXMLWebScrapingStrategy,
     JsonCssExtractionStrategy,
     JsonXPathExtractionStrategy,
     BM25ContentFilter, 
@@ -1008,13 +1009,14 @@ def cdp_cmd(user_data_dir: Optional[str], port: int, browser_type: str, headless
 @click.option("--browser", "-b", type=str, callback=parse_key_values, help="Browser parameters as key1=value1,key2=value2")
 @click.option("--crawler", "-c", type=str, callback=parse_key_values, help="Crawler parameters as key1=value1,key2=value2")
 @click.option("--output", "-o", type=click.Choice(["all", "json", "markdown", "md", "markdown-fit", "md-fit"]), default="all")
-@click.option("--bypass-cache", is_flag=True, default=True, help="Bypass cache when crawling")
+@click.option("--output-file", "-O", type=click.Path(), help="Output file path (default: stdout)")
+@click.option("--bypass-cache", "-b", is_flag=True, default=True, help="Bypass cache when crawling")
 @click.option("--question", "-q", help="Ask a question about the crawled content")
 @click.option("--verbose", "-v", is_flag=True)
 @click.option("--profile", "-p", help="Use a specific browser profile (by name)")
 def crawl_cmd(url: str, browser_config: str, crawler_config: str, filter_config: str, 
            extraction_config: str, json_extract: str, schema: str, browser: Dict, crawler: Dict,
-           output: str, bypass_cache: bool, question: str, verbose: bool, profile: str):
+           output: str, output_file: str, bypass_cache: bool, question: str, verbose: bool, profile: str):
     """Crawl a website and extract content
     
     Simple Usage:
@@ -1151,8 +1153,12 @@ Always return valid, properly formatted JSON."""
         if bypass_cache:
             crawler_cfg.cache_mode = CacheMode.BYPASS
 
-        browser_cfg.verbose = verbose
-        crawler_cfg.verbose = verbose
+        crawler_cfg.scraping_strategy = LXMLWebScrapingStrategy()    
+
+        config = get_global_config()
+        
+        browser_cfg.verbose = config.get("VERBOSE", False)
+        crawler_cfg.verbose = config.get("VERBOSE", False)
         
         # Run crawler
         result : CrawlResult = anyio.run(
@@ -1171,17 +1177,31 @@ Always return valid, properly formatted JSON."""
             return
         
         # Handle output
-        if output == "all":
-            click.echo(json.dumps(result.model_dump(), indent=2))
-        elif output == "json":
-            print(result.extracted_content)
-            extracted_items = json.loads(result.extracted_content)
-            click.echo(json.dumps(extracted_items, indent=2))
-            
-        elif output in ["markdown", "md"]:
-            click.echo(result.markdown.raw_markdown)
-        elif output in ["markdown-fit", "md-fit"]:
-            click.echo(result.markdown.fit_markdown)
+        if not output_file:
+            if output == "all":
+                click.echo(json.dumps(result.model_dump(), indent=2))
+            elif output == "json":
+                print(result.extracted_content)
+                extracted_items = json.loads(result.extracted_content)
+                click.echo(json.dumps(extracted_items, indent=2))
+                
+            elif output in ["markdown", "md"]:
+                click.echo(result.markdown.raw_markdown)
+            elif output in ["markdown-fit", "md-fit"]:
+                click.echo(result.markdown.fit_markdown)
+        else:
+            if output == "all":
+                with open(output_file, "w") as f:
+                    f.write(json.dumps(result.model_dump(), indent=2))
+            elif output == "json":
+                with open(output_file, "w") as f:
+                    f.write(result.extracted_content)
+            elif output in ["markdown", "md"]:
+                with open(output_file, "w") as f:
+                    f.write(result.markdown.raw_markdown)
+            elif output in ["markdown-fit", "md-fit"]:
+                with open(output_file, "w") as f:
+                    f.write(result.markdown.fit_markdown)
             
     except Exception as e:
         raise click.ClickException(str(e))
