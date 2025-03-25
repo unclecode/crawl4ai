@@ -2,13 +2,15 @@
 x-base-config: &base-config
   ports:
     - "11235:11235"
-    - "8000:8000"
-    - "9222:9222"
-    - "8080:8080"
+    - "8001:8000"
+    - "9223:9222"
+    - "8081:8080"
   environment:
     - CRAWL4AI_API_TOKEN=${CRAWL4AI_API_TOKEN:-}
     - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     - CLAUDE_API_KEY=${CLAUDE_API_KEY:-}
+    - REDIS_HOST=redis
+    - REDIS_PORT=6379
   volumes:
     - /dev/shm:/dev/shm
   deploy:
@@ -24,8 +26,24 @@ x-base-config: &base-config
     timeout: 10s
     retries: 3
     start_period: 40s
+  depends_on:
+    - redis
 
 services:
+  redis:
+    image: redis:latest
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
   # Local build services for different platforms
   crawl4ai-amd64:
     build:
@@ -38,7 +56,7 @@ services:
       platforms:
         - linux/amd64
     profiles: ["local-amd64"]
-    <<: *base-config  # extends yerine doğrudan yapılandırmayı dahil ettik
+    <<: *base-config
 
   crawl4ai-arm64:
     build:
@@ -63,3 +81,7 @@ services:
     image: unclecode/crawl4ai:${VERSION:-basic}-arm64
     profiles: ["hub-arm64"]
     <<: *base-config
+
+volumes:
+  redis_data:
+    driver: local
