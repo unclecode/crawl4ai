@@ -25,6 +25,7 @@ from crawl4ai import (
     BM25ContentFilter, 
     PruningContentFilter,
     BrowserProfiler,
+    DefaultMarkdownGenerator,
     LLMConfig
 )
 from litellm import completion
@@ -1037,17 +1038,28 @@ def crawl_cmd(url: str, browser_config: str, crawler_config: str, filter_config:
             crawler_cfg = crawler_cfg.clone(**crawler)
             
         # Handle content filter config
-        if filter_config:
-            filter_conf = load_config_file(filter_config)
+        if filter_config or output in ["markdown-fit", "md-fit"]:
+            if filter_config:
+                filter_conf = load_config_file(filter_config)
+            elif not filter_config and output in ["markdown-fit", "md-fit"]:
+                filter_conf = {
+                    "type": "pruning",
+                    "query": "",
+                    "threshold": 0.48
+                }
             if filter_conf["type"] == "bm25":
-                crawler_cfg.content_filter = BM25ContentFilter(
-                    user_query=filter_conf.get("query"),
-                    bm25_threshold=filter_conf.get("threshold", 1.0)
+                crawler_cfg.markdown_generator = DefaultMarkdownGenerator(
+                    content_filter = BM25ContentFilter(
+                        user_query=filter_conf.get("query"),
+                        bm25_threshold=filter_conf.get("threshold", 1.0)
+                    )
                 )
             elif filter_conf["type"] == "pruning":
-                crawler_cfg.content_filter = PruningContentFilter(
-                    user_query=filter_conf.get("query"),
-                    threshold=filter_conf.get("threshold", 0.48)
+                crawler_cfg.markdown_generator = DefaultMarkdownGenerator(
+                    content_filter = PruningContentFilter(
+                        user_query=filter_conf.get("query"),
+                        threshold=filter_conf.get("threshold", 0.48)
+                    )
                 )
                 
         # Handle extraction strategy
