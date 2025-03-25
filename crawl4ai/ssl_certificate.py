@@ -61,11 +61,8 @@ class HttpProxyConnectionStrategy:
         sock = socks.socksocket()
         parsed = urlparse(self.proxy_config.server)
         
-        # Determine if HTTP or HTTPS proxy
-        proxy_type = socks.HTTPS if "https" in parsed.scheme.lower() else socks.HTTP
-        
         sock.set_proxy(
-            proxy_type,
+            socks.HTTP,
             parsed.hostname,
             parsed.port or 80,
             username=self.proxy_config.username,
@@ -151,7 +148,9 @@ class SSLCertificate:
 
     @staticmethod
     def from_url(
-        url: str, timeout: int = 10, proxy_config: Optional[ProxyConfig] = None
+        url: str, timeout: int = 10,
+        proxy_config: Optional[ProxyConfig] = None,
+        verify_ssl: bool = False
     ) -> Optional["SSLCertificate"]:
         """
         Create SSLCertificate instance from a URL.
@@ -159,8 +158,8 @@ class SSLCertificate:
         Args:
             url (str): URL of the website.
             timeout (int): Timeout for the connection (default: 10).
-            proxy_config (Optional[ProxyConfig]]): Proxy configuration (default: None).
-
+            proxy_config (Optional[ProxyConfig]): Proxy configuration (default: None).
+            verify_ssl (bool): Whether to verify SSL certificate (default: False).
         Returns:
             Optional[SSLCertificate]: SSLCertificate instance if successful, None otherwise.
         """
@@ -177,7 +176,7 @@ class SSLCertificate:
             sock = None
             try:
                 sock = connection_strategy.create_connection(hostname, 443, timeout)
-                return SSLCertificate._extract_certificate_from_socket(sock, hostname)
+                return SSLCertificate._extract_certificate_from_socket(sock, hostname, verify_ssl)
             finally:
                 # Ensure socket is closed if it wasn't transferred
                 if sock:
@@ -189,6 +188,9 @@ class SSLCertificate:
         except (socket.gaierror, socket.timeout) as e:
             logger.warning(f"Network error when getting certificate for {url}: {e}")
             return None
+        except ssl.SSLError as e:
+            logger.warning(f"SSL error when getting certificate for {url}: {e}")
+            return None
         except socks.ProxyError as e:
             logger.warning(f"Proxy error when getting certificate for {url}: {e}")
             return None
@@ -197,18 +199,24 @@ class SSLCertificate:
             return None
 
     @staticmethod
-    def _extract_certificate_from_socket(sock: socket.socket, hostname: str) -> "SSLCertificate":
+    def _extract_certificate_from_socket(sock: socket.socket, hostname: str, verify_ssl: bool = False) -> "SSLCertificate":
         """
         Extract certificate information from an open socket.
         
         Args:
             sock: Connected socket to extract certificate from
             hostname: Hostname for SSL verification
+            verify_ssl: Whether to verify SSL certificate (default: False)
             
         Returns:
             SSLCertificate object with extracted certificate information
         """
         context = ssl.create_default_context()
+
+        if not verify_ssl:
+            context.check_hostname = False
+            context.verify_mode = ssl.CERT_NONE
+
         with context.wrap_socket(sock, server_hostname=hostname) as ssock:
             # Socket is now managed by the SSL context
             cert_binary = ssock.getpeercert(binary_form=True)
