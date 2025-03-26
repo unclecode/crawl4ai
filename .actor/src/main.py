@@ -20,14 +20,17 @@ from crawl4ai.extraction_strategy import (
     JsonCssExtractionStrategy,
     LLMExtractionStrategy,
 )
+from crawl4ai.proxy_strategy import ProxyConfig
+from crawl4ai.types import CrawlResult
 from crawlee import Request
 from crawlee.crawlers import BasicCrawler, BasicCrawlingContext
+from crawlee.proxy_configuration import ProxyInfo
 from crawlee.storages import KeyValueStore
 
 from .input import CosineExtraction, Input, JsonCssExtraction, LLMExtraction
 
 
-async def create_crawler(input: Input) -> BasicCrawler:
+async def create_crawler(input: Input, crawl4ai: AsyncWebCrawler) -> BasicCrawler:
     request_list = await RequestList.open(request_list_sources_input=input.start_urls)
     proxy_configuration = await Actor.create_proxy_configuration(
         actor_proxy_input=input.proxy_configuration
@@ -39,34 +42,25 @@ async def create_crawler(input: Input) -> BasicCrawler:
         max_crawl_depth=input.max_crawl_depth,
     )
 
-    crawler_run_config = create_crawler_run_config(input)
-
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
         context.log.info(f"Processing {context.request.url}...")
 
-        # We're making a new crawler for every page to work around memory leaks
-        async with AsyncWebCrawler(
-            proxy_config={
-                "server": context.proxy_info.url,
-                "username": context.proxy_info.username,
-                "password": context.proxy_info.password,
-            }
-            if context.proxy_info
-            else None,
-        ) as crawl4ai:
-            result = cast(
+        result = cast(
+            CrawlResult,
+            cast(
                 CrawlResultContainer,  # arun() should always return CrawlResultContainer directly
                 await crawl4ai.arun(
                     context.request.url,
-                    config=crawler_run_config,
+                    config=create_crawler_run_config(input, context.proxy_info),
                 ),
-            )
+            )[0],
+        )
 
         await context.add_requests(
             [
                 Request.from_url(url=urljoin(result.url, href))
-                for link in result.links["internal"]
+                for link in result.links.get("internal", [])
                 if (href := link["href"]) and not href.startswith("#")
             ]
         )
@@ -101,11 +95,20 @@ async def create_crawler(input: Input) -> BasicCrawler:
     return crawler
 
 
-def create_crawler_run_config(input: Input) -> CrawlerRunConfig:
+def create_crawler_run_config(
+    input: Input, proxy_info: ProxyInfo | None
+) -> CrawlerRunConfig:
     config = CrawlerRunConfig(
         magic=input.magic_mode,
         screenshot=input.save_screenshots,
         css_selector=cast(str, input.css_selector),
+        proxy_config=ProxyConfig(
+            server=proxy_info.url,
+            username=proxy_info.username,
+            password=proxy_info.password,
+        )
+        if proxy_info
+        else None,
     )
 
     if input.js_code:
@@ -139,7 +142,7 @@ def create_crawler_run_config(input: Input) -> CrawlerRunConfig:
 
 
 async def main() -> None:
-    async with Actor:
+    async with Actor, AsyncWebCrawler() as crawl4ai:
         input = Input.model_validate(await Actor.get_input())
-        crawler = await create_crawler(input)
+        crawler = await create_crawler(input, crawl4ai)
         await crawler.run()

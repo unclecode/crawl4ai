@@ -696,14 +696,14 @@ files = [
 
 [[package]]
 name = "crawl4ai"
-version = "0.5.0.post6"
+version = "0.5.0.post8"
 description = "🚀🤖 Crawl4AI: Open-source LLM Friendly Web Crawler & scraper"
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "crawl4ai-0.5.0.post6-py3-none-any.whl", hash = "sha256:0706d524a9e1d887fadeb8aa7a0aec03b6b0403b3060f0ece35dfb730cc40640"},
-    {file = "crawl4ai-0.5.0.post6.tar.gz", hash = "sha256:4035470ae689126b8e863f75544f810a2f7eab9d39092e8053bd4949dcb78874"},
+    {file = "crawl4ai-0.5.0.post8-py3-none-any.whl", hash = "sha256:ad7b59e4a4df721cda40510e493e1b9058899071ac175f9b06d11dd1c7fe79fa"},
+    {file = "crawl4ai-0.5.0.post8.tar.gz", hash = "sha256:7395bcc576a71ce9b768ca8cb8c9cc344288dc12f596ba0d597e2fbeca7bfc5d"},
 ]
 
 [package.dependencies]
@@ -3743,5 +3743,5 @@ cffi = ["cffi (>=1.11)"]
 
 [metadata]
 lock-version = "2.1"
-python-versions = "^3.12"
-content-hash = "29890fa16888da551b0440557b0154ea715a09e22fc07adc9a619e0507f69f05"
+python-versions = ">=3.12,<3.13"
+content-hash = "b50df5264e83d1c9496b6d1005b02d6abd1390be772e810a1ff7a7e51a223761"

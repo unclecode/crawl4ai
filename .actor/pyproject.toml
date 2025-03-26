@@ -1,13 +1,13 @@
 [project]
 name = "store-crawl4ai"
-requires-python = "^3.12"
+requires-python = ">=3.12,<3.13"
 version = "0.1.0"
 description = ""
 authors = [{name = "Jan Buchar", email = "jan.buchar@apify.com"}]
 readme = "README.md"
 dependencies = [
   "crawlee==0.6.5",
-  "Crawl4AI==0.5.0.post6",
+  "Crawl4AI==0.5.0.post8",
   "apify==2.4.0",
   "pydantic"
 ]
