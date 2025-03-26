@@ -7,7 +7,7 @@ import base64
 import logging
 from datetime import datetime
 import json
-from typing import Dict, Any, Optional, Protocol
+from typing import Dict, Any, Optional, Protocol, Tuple
 from urllib.parse import urlparse
 import OpenSSL.crypto
 from pathlib import Path
@@ -89,11 +89,14 @@ class SocksProxyConnectionStrategy:
         """Create a socket connection through SOCKS proxy."""
         sock = socks.socksocket()
         parsed = urlparse(self.proxy_config.server)
+        protocol = socks.SOCKS5 # socks5 default use socks5
+        if parsed.scheme.lower() == "socks4":
+            protocol = socks.SOCKS4
         
         sock.set_proxy(
-            socks.SOCKS5,
+            protocol,
             parsed.hostname,
-            parsed.port or 80,
+            parsed.port or 1080,
             username=self.proxy_config.username,
             password=self.proxy_config.password,
         )
@@ -120,10 +123,13 @@ class ConnectionStrategyFactory:
             return DirectConnectionStrategy()
         
         proxy_schema = urlparse(proxy_config.server).scheme.lower()
-        if "http" in proxy_schema:
+
+        if proxy_schema.startswith("http"):
             return HttpProxyConnectionStrategy(proxy_config)
-        else:
+        elif proxy_schema.startswith("socks"):
             return SocksProxyConnectionStrategy(proxy_config)
+        else:
+            raise ValueError(f"Unsupported proxy scheme: {proxy_schema}")
 
 
 class SSLCertificate:
@@ -151,7 +157,7 @@ class SSLCertificate:
         url: str, timeout: int = 10,
         proxy_config: Optional[ProxyConfig] = None,
         verify_ssl: bool = False
-    ) -> Optional["SSLCertificate"]:
+    ) -> Tuple[Optional["SSLCertificate"], str]:
         """
         Create SSLCertificate instance from a URL.
 
@@ -182,7 +188,7 @@ class SSLCertificate:
             sock = None
             try:
                 sock = connection_strategy.create_connection(hostname, 443, timeout)
-                return SSLCertificate._extract_certificate_from_socket(sock, hostname, verify_ssl)
+                return SSLCertificate._extract_certificate_from_socket(sock, hostname, verify_ssl), None
             finally:
                 # Ensure socket is closed if it wasn't transferred
                 if sock:
@@ -190,19 +196,15 @@ class SSLCertificate:
                         sock.close()
                     except Exception:
                         pass  # Ignore any errors during closing
-                        
+
         except (socket.gaierror, socket.timeout) as e:
-            logger.warning(f"Network error when getting certificate for {url}: {e}")
-            return None
-        except ssl.SSLError as e:
-            logger.warning(f"SSL error when getting certificate for {url}: {e}")
-            return None
+            return None, f"Network error: {e!s}"
+        except ssl.SSLCertVerificationError as e:
+            return None, f"SSL Verify error: {e!s}"
         except socks.ProxyError as e:
-            logger.warning(f"Proxy error when getting certificate for {url}: {e}")
-            return None
+            return None, f"Proxy error: {e!s}"
         except Exception as e:
-            logger.error(f"Unexpected error when getting certificate for {url}: {e}")
-            return None
+            return None, f"Error: {e!s}"
 
     @staticmethod
     def _extract_certificate_from_socket(sock: socket.socket, hostname: str, verify_ssl: bool = False) -> "SSLCertificate":
