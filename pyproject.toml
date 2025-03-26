@@ -42,7 +42,8 @@ dependencies = [
     "pyperclip>=1.8.2",
     "faust-cchardet>=2.1.19",
     "aiohttp>=3.11.11",
-    "humanize>=4.10.0"
+    "humanize>=4.10.0",
+    "PySocks @ git+https://github.com/amirasaran/PySocks.git@3da955fd212ce02c3ab3bc166b5bfac3c91b4019"
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
