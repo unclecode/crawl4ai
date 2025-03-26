@@ -36,6 +36,8 @@ COPY .actor/src ./src
 # Use compileall to ensure the runnability of the Actor Python code.
 RUN python3 -m compileall -q .
 
+RUN crawl4ai-setup && crawl4ai-doctor
+
 # Specify how to launch the source code of your Actor.
 # By default, the "python3 -m ." command is run
 CMD ["python3", "-m", "src"]

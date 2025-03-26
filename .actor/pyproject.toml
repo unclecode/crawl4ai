@@ -1,18 +1,19 @@
-[tool.poetry]
+[project]
 name = "store-crawl4ai"
+requires-python = "^3.12"
 version = "0.1.0"
 description = ""
-authors = ["Jan Buchar <jan.buchar@apify.com>"]
+authors = [{name = "Jan Buchar", email = "jan.buchar@apify.com"}]
 readme = "README.md"
+dependencies = [
+  "crawlee==0.6.5",
+  "Crawl4AI==0.5.0.post6",
+  "apify==2.4.0",
+  "pydantic"
+]
+
+[tool.poetry]
 package-mode = false
-
-[tool.poetry.dependencies]
-python = "^3.12"
-apify = "^2.1.0"
-crawl4ai = "^0.5.0"
-pydantic = "^2.9.2"
-crawlee = "~0.6.0"
-
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.6.8"

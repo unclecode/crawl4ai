@@ -7,7 +7,7 @@
     "buildTag": "latest",
     "input": {
         "title": "Crawl4AI settings",
-        "description": "See https://crawl4ai.com/mkdocs/ for explanation",
+        "description": "See https://docs.crawl4ai.com/ for explanation",
         "type": "object",
         "schemaVersion": 1,
         "properties": {
