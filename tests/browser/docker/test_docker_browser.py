@@ -9,8 +9,6 @@ import os
 import sys
 import shutil
 import uuid
-import json
-from typing import List, Dict, Any, Optional, Tuple
 
 # Add the project root to Python path if running directly
 if __name__ == "__main__":
