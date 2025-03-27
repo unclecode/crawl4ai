@@ -18,14 +18,9 @@ from .strategies import (
     BaseBrowserStrategy,
     PlaywrightBrowserStrategy,
     CDPBrowserStrategy,
-    BuiltinBrowserStrategy
+    BuiltinBrowserStrategy,
+    DockerBrowserStrategy
 )
-
-# Import DockerBrowserStrategy if available
-try:
-    from .docker_strategy import DockerBrowserStrategy
-except ImportError:
-    DockerBrowserStrategy = None
 
 class BrowserManager:
     """Main interface for browser management in Crawl4AI.
