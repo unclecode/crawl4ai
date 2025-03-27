@@ -4,11 +4,13 @@ import time
 import sys
 import base64
 import os
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 
 class Crawl4AiTester:
-    def __init__(self, base_url: str = "http://localhost:11235", api_token: str = None):
+    def __init__(
+        self, base_url: str = "http://localhost:11235", api_token: Optional[str] = None
+    ):
         self.base_url = base_url
         self.api_token = api_token or os.getenv(
             "CRAWL4AI_API_TOKEN"

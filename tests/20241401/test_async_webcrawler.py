@@ -1,9 +1,10 @@
-import asyncio
+import sys
+
 import pytest
-from typing import List
+
 from crawl4ai import (
     AsyncWebCrawler,
-    BrowserConfig, 
+    BrowserConfig,
     CrawlerRunConfig,
     MemoryAdaptiveDispatcher,
     RateLimiter,
@@ -25,12 +26,11 @@ async def test_viewport_config(viewport):
         viewport_width=width,
         viewport_height=height
     )
-    
+
     async with AsyncWebCrawler(config=browser_config) as crawler:
         result = await crawler.arun(
             url="https://example.com",
             config=CrawlerRunConfig(
-                # cache_mode=CacheMode.BYPASS,
                 page_timeout=30000  # 30 seconds
             )
         )
@@ -45,15 +45,15 @@ async def test_memory_management():
         viewport_width=1024,
         viewport_height=768
     )
-    
+
     dispatcher = MemoryAdaptiveDispatcher(
-        memory_threshold_percent=70.0,
+        memory_threshold_percent=80.0,
         check_interval=1.0,
         max_session_permit=5
     )
-    
+
     urls = ["https://example.com"] * 3  # Test with multiple identical URLs
-    
+
     async with AsyncWebCrawler(config=browser_config) as crawler:
         results = await crawler.arun_many(
             urls=urls,
@@ -69,22 +69,22 @@ async def test_rate_limiting():
         browser_type="chromium",
         headless=True
     )
-    
+
     dispatcher = MemoryAdaptiveDispatcher(
         rate_limiter=RateLimiter(
             base_delay=(1.0, 2.0),
             max_delay=5.0,
             max_retries=2
         ),
-        memory_threshold_percent=70.0
+        memory_threshold_percent=80.0,
     )
-    
+
     urls = [
         "https://example.com",
         "https://example.org",
         "https://example.net"
     ]
-    
+
     async with AsyncWebCrawler(config=browser_config) as crawler:
         results = await crawler.arun_many(
             urls=urls,
@@ -101,19 +101,19 @@ async def test_javascript_execution():
         headless=True,
         java_script_enabled=True
     )
-    
+
     js_code = """
         document.body.style.backgroundColor = 'red';
         return document.body.style.backgroundColor;
     """
-    
+
     async with AsyncWebCrawler(config=browser_config) as crawler:
         result = await crawler.arun(
             url="https://example.com",
             config=CrawlerRunConfig(
                 js_code=js_code,
                 page_timeout=30000
-            )
+            ),
         )
         assert result.success
 
@@ -130,7 +130,6 @@ async def test_error_handling(error_url):
         browser_type="chromium",
         headless=True
     )
-    
     async with AsyncWebCrawler(config=browser_config) as crawler:
         result = await crawler.arun(
             url=error_url,
@@ -143,7 +142,6 @@ async def test_error_handling(error_url):
         assert result.error_message is not None
 
 if __name__ == "__main__":
-    asyncio.run(test_viewport_config((1024, 768)))
-    asyncio.run(test_memory_management())
-    asyncio.run(test_rate_limiting())
-    asyncio.run(test_javascript_execution())
+    import subprocess
+
+    sys.exit(subprocess.call(["pytest", "-v", str(__file__)]))

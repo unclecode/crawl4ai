@@ -1,5 +1,5 @@
 import random
-from typing import Optional, Literal, List, Dict, Tuple
+from typing import Optional, Literal, List, Dict, Tuple, Union
 import re
 
 from abc import ABC, abstractmethod

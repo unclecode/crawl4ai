@@ -1,12 +1,15 @@
-from crawl4ai.llmtxt import AsyncLLMTextManager  # Changed to AsyncLLMTextManager
-from crawl4ai.async_logger import AsyncLogger
+import sys
 from pathlib import Path
-import asyncio
+
+import pytest
+
+from crawl4ai.async_logger import AsyncLogger
+from crawl4ai.legacy.llmtxt import AsyncLLMTextManager  # Changed to AsyncLLMTextManager
 
 
-async def main():
+@pytest.mark.asyncio
+async def test_llm_txt():
     current_file = Path(__file__).resolve()
-    # base_dir = current_file.parent.parent / "local/_docs/llm.txt/test_docs"
     base_dir = current_file.parent.parent / "local/_docs/llm.txt"
     docs_dir = base_dir
 
@@ -49,4 +52,6 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    import subprocess
+
+    sys.exit(subprocess.call(["pytest", "-v", str(__file__)]))

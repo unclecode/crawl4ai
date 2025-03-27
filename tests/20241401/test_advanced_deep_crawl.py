@@ -1,16 +1,15 @@
-import asyncio
+import sys
 import time
 
 
 from crawl4ai import CrawlerRunConfig, AsyncWebCrawler, CacheMode
 from crawl4ai.content_scraping_strategy import LXMLWebScrapingStrategy
-from crawl4ai.deep_crawling import BFSDeepCrawlStrategy, BestFirstCrawlingStrategy
+from crawl4ai.deep_crawling import BestFirstCrawlingStrategy
 from crawl4ai.deep_crawling.filters import FilterChain, URLPatternFilter, DomainFilter, ContentTypeFilter, ContentRelevanceFilter
 from crawl4ai.deep_crawling.scorers import KeywordRelevanceScorer
-# from crawl4ai.deep_crawling import BFSDeepCrawlStrategy, BestFirstCrawlingStrategy
 
 
-async def main():
+async def test_deep_crawl():
     """Example deep crawl of documentation site."""
     filter_chain = FilterChain([
         URLPatternFilter(patterns=["*2025*"]),
@@ -43,4 +42,6 @@ async def main():
         print(f"Duration: {time.perf_counter() - start_time:.2f} seconds")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    import subprocess
+
+    sys.exit(subprocess.call(["pytest", "-v", str(__file__)]))

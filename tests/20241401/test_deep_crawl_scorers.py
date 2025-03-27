@@ -1,3 +1,4 @@
+import sys
 from crawl4ai.deep_crawling.scorers import CompositeScorer, ContentTypeScorer, DomainAuthorityScorer, FreshnessScorer, KeywordRelevanceScorer, PathDepthScorer
 
 
@@ -18,7 +19,7 @@ def test_scorers():
                 "https://example.com/other": 0.0
             }
         },
-        
+
         # Path Depth Scorer Tests
         {
             "scorer_type": "path_depth",
@@ -33,7 +34,7 @@ def test_scorers():
                 "https://example.com": 0.33333333
             }
         },
-        
+
         # Content Type Scorer Tests
         {
             "scorer_type": "content_type",
@@ -52,7 +53,7 @@ def test_scorers():
                 "https://example.com/other.txt": 0.0
             }
         },
-        
+
         # Freshness Scorer Tests
         {
             "scorer_type": "freshness",
@@ -66,7 +67,7 @@ def test_scorers():
                 "https://example.com/no-date": 0.5
             }
         },
-        
+
         # Domain Authority Scorer Tests
         {
             "scorer_type": "domain",
@@ -99,11 +100,12 @@ def test_scorers():
             return FreshnessScorer(**config,current_year=2024)
         elif scorer_type == "domain":
             return DomainAuthorityScorer(**config)
+        raise ValueError(f"Unknown scorer type: {scorer_type}")
 
     def run_accuracy_test():
         print("\nAccuracy Tests:")
         print("-" * 50)
-        
+
         all_passed = True
         for test_case in test_cases:
             print(f"\nTesting {test_case['scorer_type']} scorer:")
@@ -111,69 +113,71 @@ def test_scorers():
                 test_case['scorer_type'],
                 test_case['config']
             )
-            
+
             for url, expected in test_case['urls'].items():
                 score = round(scorer.score(url), 8)
                 expected = round(expected, 8)
-                
+
                 if abs(score - expected) > 0.00001:
                     print(f"❌ Scorer Failed: URL '{url}'")
                     print(f"   Expected: {expected}, Got: {score}")
                     all_passed = False
                 else:
                     print(f"✅ Scorer Passed: URL '{url}'")
-                    
-                    
+
+
         return all_passed
 
     def run_composite_test():
         print("\nTesting Composite Scorer:")
         print("-" * 50)
-        
+
         # Create test data
         test_urls = {
             "https://python.org/blog/2024/01/new-release.html":0.86666667,
             "https://github.com/repo/old-code.pdf": 0.62,
             "https://unknown.com/random": 0.26
         }
-        
+
         # Create composite scorers with all types
         scorers = []
-        
+
         for test_case in test_cases:
             scorer = create_scorer(
                 test_case['scorer_type'],
                 test_case['config']
             )
             scorers.append(scorer)
-            
+
         composite = CompositeScorer(scorers, normalize=True)
-        
+
         all_passed = True
         for url, expected in test_urls.items():
             score = round(composite.score(url), 8)
-            
+
             if abs(score - expected) > 0.00001:
                 print(f"❌ Composite Failed: URL '{url}'")
                 print(f"   Expected: {expected}, Got: {score}")
                 all_passed = False
             else:
                 print(f"✅ Composite Passed: URL '{url}'")
-                
+
         return all_passed
 
     # Run tests
     print("Running Scorer Tests...")
     accuracy_passed = run_accuracy_test()
     composite_passed = run_composite_test()
-    
+
     if accuracy_passed and composite_passed:
         print("\n✨ All tests passed!")
         # Note: Already have performance tests in run_scorer_performance_test()
     else:
         print("\n❌ Some tests failed!")
 
-    
+
 
 if __name__ == "__main__":
-    test_scorers()
+    import subprocess
+
+    sys.exit(subprocess.call(["pytest", "-v", str(__file__)]))

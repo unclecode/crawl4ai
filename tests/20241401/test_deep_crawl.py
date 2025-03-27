@@ -1,14 +1,15 @@
-import asyncio
+import sys
 import time
+import pytest
 
 
 from crawl4ai import CrawlerRunConfig, AsyncWebCrawler, CacheMode
 from crawl4ai.content_scraping_strategy import LXMLWebScrapingStrategy
 from crawl4ai.deep_crawling import BFSDeepCrawlStrategy
-# from crawl4ai.deep_crawling import BFSDeepCrawlStrategy, BestFirstCrawlingStrategy
 
 
-async def main():
+@pytest.mark.asyncio
+async def test_deep_crawl():
     """Example deep crawl of documentation site."""
     config = CrawlerRunConfig(
         deep_crawl_strategy = BFSDeepCrawlStrategy(
@@ -43,4 +44,6 @@ async def main():
         print(f"Duration: {time.perf_counter() - start_time:.2f} seconds")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    import subprocess
+
+    sys.exit(subprocess.call(["pytest", "-v", str(__file__)]))

@@ -1,16 +1,16 @@
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from bs4 import BeautifulSoup, Comment, element, Tag, NavigableString
+from bs4 import BeautifulSoup
+from bs4.element import Comment, Tag, NavigableString, PageElement
 import json
 import html
-import lxml
+from lxml.html import fromstring, tostring, document_fromstring
 import re
 import os
 import platform
 from .prompts import PROMPT_EXTRACT_BLOCKS
 from array import array
 from .html2text import html2text, CustomHTML2Text
-# from .config import *
 from .config import MIN_WORD_THRESHOLD, IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD, IMAGE_SCORE_THRESHOLD, DEFAULT_PROVIDER, PROVIDER_MODELS
 import httpx
 from socket import gaierror
@@ -134,7 +134,7 @@ def merge_chunks(
     target_size: int,
     overlap: int = 0,
     word_token_ratio: float = 1.0,
-    splitter: Callable = None
+    splitter: Optional[Callable] = None,
 ) -> List[str]:
     """Merges documents into chunks of specified token size.
     
@@ -509,8 +509,8 @@ def calculate_semaphore_count():
         int: The calculated semaphore count.
     """
 
-    cpu_count = os.cpu_count()
-    memory_gb = get_system_memory() / (1024**3)  # Convert to GB
+    cpu_count = os.cpu_count() or 1
+    memory_gb = get_system_memory() or 0 / (1024**3)  # Convert to GB
     base_count = max(1, cpu_count // 2)
     memory_based_cap = int(memory_gb / 2)  # Assume 2GB per instance
     return min(base_count, memory_based_cap)
@@ -546,7 +546,7 @@ def get_system_memory():
     elif system == "Windows":
         import ctypes
 
-        kernel32 = ctypes.windll.kernel32
+        kernel32 = ctypes.windll.kernel32 # pyright: ignore[reportAttributeAccessIssue]
         c_ulonglong = ctypes.c_ulonglong
 
         class MEMORYSTATUSEX(ctypes.Structure):
@@ -983,7 +983,7 @@ def get_content_of_website(
         # Recursively remove empty elements, their parent elements, and elements with word count below threshold
         def remove_empty_and_low_word_count_elements(node, word_count_threshold):
             for child in node.contents:
-                if isinstance(child, element.Tag):
+                if isinstance(child, Tag):
                     remove_empty_and_low_word_count_elements(
                         child, word_count_threshold
                     )
@@ -1051,7 +1051,7 @@ def get_content_of_website(
         # Flatten nested elements with only one child of the same type
         def flatten_nested_elements(node):
             for child in node.contents:
-                if isinstance(child, element.Tag):
+                if isinstance(child, Tag):
                     flatten_nested_elements(child)
                     if (
                         len(child.contents) == 1
@@ -1108,9 +1108,9 @@ def get_content_of_website_optimized(
     url: str,
     html: str,
     word_count_threshold: int = MIN_WORD_THRESHOLD,
-    css_selector: str = None,
+    css_selector: Optional[str] = None,
     **kwargs,
-) -> Dict[str, Any]:
+) -> Optional[Dict[str, Any]]:
     if not html:
         return None
 
@@ -1243,7 +1243,7 @@ def get_content_of_website_optimized(
             "type": "image",
         }
 
-    def process_element(element: element.PageElement) -> bool:
+    def process_element(element: PageElement) -> bool:
         try:
             if isinstance(element, NavigableString):
                 if isinstance(element, Comment):
@@ -1364,7 +1364,7 @@ def get_content_of_website_optimized(
             return node
         if (
             len(node.contents) == 1
-            and isinstance(node.contents[0], element.Tag)
+            and isinstance(node.contents[0], Tag)
             and node.contents[0].name == node.name
         ):
             return flatten_nested_elements(node.contents[0])
@@ -1416,7 +1416,7 @@ def extract_metadata_using_lxml(html, doc=None):
 
     if doc is None:
         try:
-            doc = lxml.html.document_fromstring(html)
+            doc = document_fromstring(html)
         except Exception:
             return {}
 
@@ -1899,7 +1899,7 @@ def format_html(html_string):
         str: The prettified HTML string.
     """
 
-    soup = BeautifulSoup(html_string, "lxml.parser")
+    soup = BeautifulSoup(html_string, "lxml")
     return soup.prettify()
 
 
@@ -2479,7 +2479,7 @@ def configure_windows_event_loop():
         ```
     """
     if platform.system() == "Windows":
-        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy()) # pyright: ignore[reportAttributeAccessIssue]
 
 
 def get_error_context(exc_info, context_lines: int = 5):
@@ -2544,8 +2544,8 @@ def truncate(value, threshold):
     return value
 
 def optimize_html(html_str, threshold=200):
-    root = lxml.html.fromstring(html_str)
-    
+    root = fromstring(html_str)
+
     for _element in root.iter():
         # Process attributes
         for attr in list(_element.attrib):
@@ -2558,8 +2558,9 @@ def optimize_html(html_str, threshold=200):
         # Process tail text
         if _element.tail and len(_element.tail) > threshold:
             _element.tail = truncate(_element.tail, threshold)
-    
-    return lxml.html.tostring(root, encoding='unicode', pretty_print=False)
+
+    return tostring(root, encoding="unicode", pretty_print=False)
+
 
 class HeadPeekr:
     @staticmethod
@@ -2614,6 +2615,7 @@ class HeadPeekr:
                 
         return meta_tags
 
+    @staticmethod
     def get_title(head_content: str):
         title_match = re.search(r'<title>(.*?)</title>', head_content, re.IGNORECASE | re.DOTALL)
         return title_match.group(1) if title_match else None

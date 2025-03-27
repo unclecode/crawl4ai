@@ -1,5 +1,4 @@
-from re import U
-from pydantic import BaseModel, HttpUrl, PrivateAttr
+from pydantic import BaseModel, HttpUrl, PrivateAttr, Field
 from typing import List, Dict, Optional, Callable, Awaitable, Union, Any
 from enum import Enum
 from dataclasses import dataclass
@@ -110,14 +109,15 @@ class UrlModel(BaseModel):
 
 
 class MarkdownGenerationResult(BaseModel):
-    raw_markdown: str
-    markdown_with_citations: str
-    references_markdown: str
+    raw_markdown: str = ""
+    markdown_with_citations: str = ""
+    references_markdown: str = ""
     fit_markdown: Optional[str] = None
     fit_html: Optional[str] = None
 
     def __str__(self):
         return self.raw_markdown
+
 
 @dataclass
 class TraversalStats:
@@ -270,10 +270,11 @@ class StringCompatibleMarkdown(str):
         return super().__new__(cls, markdown_result.raw_markdown)
     
     def __init__(self, markdown_result):
-        self._markdown_result = markdown_result
-    
+        self.markdown_result = markdown_result
+
     def __getattr__(self, name):
-        return getattr(self._markdown_result, name)
+        return getattr(self.markdown_result, name)
+
 
 # END of backward compatibility code for markdown/markdown_v2.
 # When removing this code in the future, make sure to:
@@ -310,6 +311,12 @@ class MediaItem(BaseModel):
     format: Optional[str] = None
     width: Optional[int] = None
 
+    def __init__(self, **data):
+        if "width" in data and data["width"] == "undefined":
+            data["width"] = None
+
+        super().__init__(**data)
+
 
 class Link(BaseModel):
     href: Optional[str] = ""
@@ -319,23 +326,24 @@ class Link(BaseModel):
 
 
 class Media(BaseModel):
-    images: List[MediaItem] = []
-    videos: List[
-        MediaItem
-    ] = []  # Using MediaItem model for now, can be extended with Video model if needed
-    audios: List[
-        MediaItem
-    ] = []  # Using MediaItem model for now, can be extended with Audio model if needed
+    images: List[MediaItem] = Field(default_factory=list)
+    videos: List[MediaItem] = Field(
+        default_factory=list
+    )  # Using MediaItem model for now, can be extended with Video model if needed
+    audios: List[MediaItem] = Field(
+        default_factory=list
+    )  # Using MediaItem model for now, can be extended with Audio model if needed
 
 
 class Links(BaseModel):
-    internal: List[Link] = []
-    external: List[Link] = []
+    internal: List[Link] = Field(default_factory=list)
+    external: List[Link] = Field(default_factory=list)
 
 
 class ScrapingResult(BaseModel):
     cleaned_html: str
+    markdown: str
     success: bool
     media: Media = Media()
     links: Links = Links()
-    metadata: Dict[str, Any] = {}
+    metadata: Dict[str, Any] = Field(default_factory=dict)

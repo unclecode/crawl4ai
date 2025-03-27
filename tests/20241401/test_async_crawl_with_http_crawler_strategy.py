@@ -1,16 +1,21 @@
-import asyncio
+import sys
+
+import pytest
+
 from crawl4ai import (
     AsyncWebCrawler,
-    CrawlerRunConfig,
-    HTTPCrawlerConfig,
     CacheMode,
+    CrawlerRunConfig,
     DefaultMarkdownGenerator,
-    PruningContentFilter
+    HTTPCrawlerConfig,
+    PruningContentFilter,
 )
 from crawl4ai.async_crawler_strategy import AsyncHTTPCrawlerStrategy
 from crawl4ai.async_logger import AsyncLogger
 
-async def main():
+
+@pytest.mark.asyncio
+async def test_async_crawl():
     # Initialize HTTP crawler strategy
     http_strategy = AsyncHTTPCrawlerStrategy(
         browser_config=HTTPCrawlerConfig(
@@ -27,20 +32,20 @@ async def main():
             cache_mode=CacheMode.BYPASS,
             markdown_generator=DefaultMarkdownGenerator(
                 content_filter=PruningContentFilter(
-                    threshold=0.48, 
-                    threshold_type="fixed", 
+                    threshold=0.48,
+                    threshold_type="fixed",
                     min_word_threshold=0
                 )
             )
         )
-        
+
         # Test different URLs
         urls = [
             "https://example.com",
             "https://httpbin.org/get",
             "raw://<html><body>Test content</body></html>"
         ]
-        
+
         for url in urls:
             print(f"\n=== Testing {url} ===")
             try:
@@ -53,4 +58,6 @@ async def main():
                 print(f"Error: {e}")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    import subprocess
+
+    sys.exit(subprocess.call(["pytest", "-v", str(__file__)]))

@@ -13,7 +13,7 @@ from rich.live import Live
 from rich.table import Table
 from rich.console import Console
 from rich import box
-from datetime import timedelta, datetime
+from datetime import timedelta
 from collections.abc import AsyncGenerator
 import time
 import psutil
@@ -33,7 +33,7 @@ class RateLimiter:
         base_delay: Tuple[float, float] = (1.0, 3.0),
         max_delay: float = 60.0,
         max_retries: int = 3,
-        rate_limit_codes: List[int] = None,
+        rate_limit_codes: Optional[List[int]] = None,
     ):
         self.base_delay = base_delay
         self.max_delay = max_delay
@@ -301,7 +301,6 @@ class BaseDispatcher(ABC):
         url: str,
         config: CrawlerRunConfig,
         task_id: str,
-        monitor: Optional[CrawlerMonitor] = None,
     ) -> CrawlerTaskResult:
         pass
 
@@ -309,11 +308,19 @@ class BaseDispatcher(ABC):
     async def run_urls(
         self,
         urls: List[str],
-        crawler: "AsyncWebCrawler",  # noqa: F821
+        crawler: "AsyncWebCrawler",  # noqa: F821 # pyright: ignore[reportUndefinedVariable]
         config: CrawlerRunConfig,
-        monitor: Optional[CrawlerMonitor] = None,
     ) -> List[CrawlerTaskResult]:
         pass
+
+    @abstractmethod
+    async def run_urls_stream(
+        self,
+        urls: List[str],
+        crawler: "AsyncWebCrawler",  # noqa: F821 # pyright: ignore[reportUndefinedVariable]
+        config: CrawlerRunConfig,
+    ) -> AsyncGenerator[CrawlerTaskResult, None]:
+        yield NotImplemented
 
 
 class MemoryAdaptiveDispatcher(BaseDispatcher):
@@ -419,7 +426,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
     async def run_urls(
         self,
         urls: List[str],
-        crawler: "AsyncWebCrawler",  # noqa: F821
+        crawler: "AsyncWebCrawler",  # noqa: F821 # pyright: ignore[reportUndefinedVariable]
         config: CrawlerRunConfig,
     ) -> List[CrawlerTaskResult]:
         self.crawler = crawler
@@ -473,7 +480,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
     async def run_urls_stream(
         self,
         urls: List[str],
-        crawler: "AsyncWebCrawler", # noqa: F821
+        crawler: "AsyncWebCrawler",  # noqa: F821 # pyright: ignore[reportUndefinedVariable]
         config: CrawlerRunConfig,
     ) -> AsyncGenerator[CrawlerTaskResult, None]:
         self.crawler = crawler
@@ -542,13 +549,16 @@ class SemaphoreDispatcher(BaseDispatcher):
         url: str,
         config: CrawlerRunConfig,
         task_id: str,
-        semaphore: asyncio.Semaphore = None,
+        semaphore: Optional[asyncio.Semaphore] = None,
     ) -> CrawlerTaskResult:
         start_time = time.time()
         error_message = ""
         memory_usage = peak_memory = 0.0
 
         try:
+            if semaphore is None:
+                raise ValueError("Semaphore must be provided")
+
             if self.monitor:
                 self.monitor.update_task(
                     task_id, status=CrawlStatus.IN_PROGRESS, start_time=start_time
@@ -620,8 +630,8 @@ class SemaphoreDispatcher(BaseDispatcher):
 
     async def run_urls(
         self,
-        crawler: "AsyncWebCrawler",  # noqa: F821
         urls: List[str],
+        crawler: "AsyncWebCrawler",  # noqa: F821 # pyright: ignore[reportUndefinedVariable]
         config: CrawlerRunConfig,
     ) -> List[CrawlerTaskResult]:
         self.crawler = crawler
@@ -641,7 +651,37 @@ class SemaphoreDispatcher(BaseDispatcher):
                 )
                 tasks.append(task)
 
-            return await asyncio.gather(*tasks, return_exceptions=True)
+            return await asyncio.gather(*tasks)
+        finally:
+            if self.monitor:
+                self.monitor.stop()
+
+    async def run_urls_stream(
+        self,
+        urls: List[str],
+        crawler: "AsyncWebCrawler",  # noqa: F821 # pyright: ignore[reportUndefinedVariable]
+        config: CrawlerRunConfig,
+    ) -> AsyncGenerator[CrawlerTaskResult, None]:
+        self.crawler = crawler
+        if self.monitor:
+            self.monitor.start()
+
+        try:
+            semaphore = asyncio.Semaphore(self.semaphore_count)
+            tasks = []
+
+            for url in urls:
+                task_id = str(uuid.uuid4())
+                if self.monitor:
+                    self.monitor.add_task(task_id, url)
+                task = asyncio.create_task(
+                    self.crawl_url(url, config, task_id, semaphore)
+                )
+                tasks.append(task)
+
+            for task in asyncio.as_completed(tasks):
+                result = await task
+                yield result
         finally:
             if self.monitor:
                 self.monitor.stop()

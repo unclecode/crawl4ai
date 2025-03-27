@@ -24,7 +24,9 @@ def init_db():
             media TEXT DEFAULT "{}",
             links TEXT DEFAULT "{}",
             metadata TEXT DEFAULT "{}",
-            screenshot TEXT DEFAULT ""
+            screenshot TEXT DEFAULT "",
+            response_headers TEXT DEFAULT "{}", -- Non-legacy field
+            downloaded_files TEXT DEFAULT "{}" -- Non-legacy field
         )
     """
     )
@@ -53,7 +55,7 @@ def check_db_path():
 
 def get_cached_url(
     url: str,
-) -> Optional[Tuple[str, str, str, str, str, str, str, bool, str]]:
+) -> Optional[Tuple[str, str, str, str, str, bool, str, str, str, str]]:
     check_db_path()
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -96,9 +98,9 @@ def cache_url(
                 markdown = excluded.markdown,
                 extracted_content = excluded.extracted_content,
                 success = excluded.success,
-                media = excluded.media,      
-                links = excluded.links,    
-                metadata = excluded.metadata,      
+                media = excluded.media,
+                links = excluded.links,
+                metadata = excluded.metadata,
                 screenshot = excluded.screenshot
         """,
             (
