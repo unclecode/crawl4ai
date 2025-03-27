@@ -58,6 +58,8 @@ class Input(BaseModel):
     js_code: Annotated[str | None, Field(alias="jsCode")] = None
     max_crawl_depth: Annotated[int | None, Field(alias="maxCrawlDepth")] = None
 
+    debug_log: Annotated[bool, Field(alias='debugLog')] = False
+
     extraction_strategy_: Annotated[str | None, Field(alias="extractionStrategy")] = (
         None
     )

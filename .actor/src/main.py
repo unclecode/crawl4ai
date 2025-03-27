@@ -144,5 +144,9 @@ def create_crawler_run_config(
 async def main() -> None:
     async with Actor, AsyncWebCrawler() as crawl4ai:
         input = Input.model_validate(await Actor.get_input())
+
+        if input.debug_log:
+            Actor.config.log_level = "DEBUG"
+
         crawler = await create_crawler(input, crawl4ai)
         await crawler.run()

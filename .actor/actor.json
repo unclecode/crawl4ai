@@ -132,6 +132,13 @@
                 "type": "string",
                 "nullable": true,
                 "editor": "textfield"
+            },
+            "debugLog": {
+                "sectionCaption": "Developer settings",
+                "title": "Debug logging",
+                "description": "Print debug-level log messages",
+                "type": "boolean",
+                "default": false
             }
         },
         "required": ["startUrls"]
