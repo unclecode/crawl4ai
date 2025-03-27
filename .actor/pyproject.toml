@@ -1,0 +1,26 @@
+[project]
+name = "store-crawl4ai"
+requires-python = ">=3.12,<3.13"
+version = "0.1.0"
+description = ""
+authors = [{name = "Jan Buchar", email = "jan.buchar@apify.com"}]
+readme = "README.md"
+dependencies = [
+  "crawlee==0.6.5",
+  "Crawl4AI==0.5.0.post8",
+  "apify==2.5.0",
+  "pydantic"
+]
+
+[tool.poetry]
+package-mode = false
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.6.8"
+
+[tool.basedpyright]
+typeCheckingMode = "standard"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
