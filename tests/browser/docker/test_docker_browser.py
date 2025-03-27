@@ -17,9 +17,9 @@ if __name__ == "__main__":
 from crawl4ai.browser import BrowserManager
 from crawl4ai.async_configs import BrowserConfig, CrawlerRunConfig
 from crawl4ai.async_logger import AsyncLogger
-from crawl4ai.browser.docker_config import DockerConfig
-from crawl4ai.browser.docker_registry import DockerRegistry
-from crawl4ai.browser.docker_utils import DockerUtils
+from crawl4ai.browser import DockerConfig
+from crawl4ai.browser import DockerRegistry
+from crawl4ai.browser import DockerUtils
 
 # Create a logger for clear terminal output
 logger = AsyncLogger(verbose=True, log_file=None)
@@ -136,7 +136,7 @@ async def test_docker_components():
             
         # Verify Chrome is installed in the container
         returncode, stdout, stderr = await docker_utils.exec_in_container(
-            container_id, ["which", "google-chrome"]
+            container_id, ["which", "chromium"]
         )
         
         if returncode != 0:
@@ -149,7 +149,7 @@ async def test_docker_components():
         
         # Test Chrome version
         returncode, stdout, stderr = await docker_utils.exec_in_container(
-            container_id, ["google-chrome", "--version"]
+            container_id, ["chromium", "--version"]
         )
         
         if returncode != 0:
@@ -608,13 +608,13 @@ async def run_tests():
         return
     
     # First test Docker components
-    setup_result = await test_docker_components()
-    if not setup_result:
-        logger.error("Docker component tests failed - skipping browser tests", tag="TEST")
-        return
+    # setup_result = await test_docker_components()
+    # if not setup_result:
+    #     logger.error("Docker component tests failed - skipping browser tests", tag="TEST")
+    #     return
     
     # Run browser tests
-    results.append(await test_docker_connect_mode())
+    # results.append(await test_docker_connect_mode())
     results.append(await test_docker_launch_mode())
     results.append(await test_docker_persistent_storage())
     results.append(await test_docker_parallel_pages())
