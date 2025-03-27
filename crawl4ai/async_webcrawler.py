@@ -42,7 +42,7 @@ from .utils import (
     RobotsParser,
 )
 
-from typing import Union, AsyncGenerator, TypeVar
+from typing import Union, AsyncGenerator
 from collections.abc import AsyncGenerator
 
 CrawlResultT = TypeVar('CrawlResultT', bound=CrawlResult)

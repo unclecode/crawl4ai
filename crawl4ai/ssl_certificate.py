@@ -11,7 +11,7 @@ from typing import Dict, Any, Optional, Protocol, Tuple
 from urllib.parse import urlparse
 import OpenSSL.crypto
 from pathlib import Path
-from .configs.proxy_config import ProxyConfig
+from .proxy_strategy import ProxyConfig
 from .validators import SSLURLValidator
 
 # Setup logging
