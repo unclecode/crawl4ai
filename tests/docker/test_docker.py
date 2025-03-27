@@ -7,7 +7,7 @@ from crawl4ai import (
     BrowserConfig, CrawlerRunConfig, DefaultMarkdownGenerator,
     PruningContentFilter, JsonCssExtractionStrategy, LLMContentFilter, CacheMode
 )
-from crawl4ai.types import LLMConfig
+from crawl4ai import LLMConfig
 from crawl4ai.docker_client import Crawl4aiDockerClient
 
 class Crawl4AiTester:

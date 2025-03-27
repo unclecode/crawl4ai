@@ -2,7 +2,7 @@ import inspect
 from typing import Any, Dict
 from enum import Enum
 
-from crawl4ai.types import LLMConfig
+from crawl4ai import LLMConfig
 
 def to_serializable_dict(obj: Any) -> Dict:
     """

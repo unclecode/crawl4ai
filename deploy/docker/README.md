@@ -352,7 +352,10 @@ Example:
 from crawl4ai import CrawlerRunConfig, PruningContentFilter
 
 config = CrawlerRunConfig(
-    content_filter=PruningContentFilter(threshold=0.48)
+    markdown_generator=DefaultMarkdownGenerator(
+        content_filter=PruningContentFilter(threshold=0.48, threshold_type="fixed")
+    ),
+    cache_mode= CacheMode.BYPASS
 )
 print(config.dump())  # Use this JSON in your API calls
 ```
@@ -551,7 +554,7 @@ async def test_stream_crawl(session, token: str):
             "https://example.com/page3",  
         ],
         "browser_config": {"headless": True, "viewport": {"width": 1200}},
-        "crawler_config": {"stream": True, "cache_mode": "aggressive"}
+        "crawler_config": {"stream": True, "cache_mode": "bypass"}
     }
 
     # headers = {"Authorization": f"Bearer {token}"} # If JWT is enabled, more on this later

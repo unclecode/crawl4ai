@@ -1,6 +1,6 @@
 from crawl4ai import BrowserConfig, AsyncWebCrawler, CrawlerRunConfig, CacheMode
 from crawl4ai.hub import BaseCrawler
-from crawl4ai.utils import optimize_html, get_home_folder
+from crawl4ai.utils import optimize_html, get_home_folder, preprocess_html_for_schema
 from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
 from pathlib import Path
 import json
@@ -68,7 +68,8 @@ class GoogleSearchCrawler(BaseCrawler):
         home_dir = get_home_folder() if not schema_cache_path else schema_cache_path
         os.makedirs(f"{home_dir}/schema", exist_ok=True)
 
-        cleaned_html = optimize_html(html, threshold=100)
+        # cleaned_html = optimize_html(html, threshold=100)
+        cleaned_html = preprocess_html_for_schema(html) 
 
         organic_schema = None
         if os.path.exists(f"{home_dir}/schema/organic_schema.json"):

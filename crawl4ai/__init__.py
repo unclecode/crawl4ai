@@ -23,6 +23,7 @@ from .extraction_strategy import (
     CosineStrategy,
     JsonCssExtractionStrategy,
     JsonXPathExtractionStrategy,
+    JsonLxmlExtractionStrategy
 )
 from .chunking_strategy import ChunkingStrategy, RegexChunking
 from .markdown_generation_strategy import DefaultMarkdownGenerator
@@ -32,13 +33,12 @@ from .content_filter_strategy import (
     LLMContentFilter,
     RelevantContentFilter,
 )
-from .models import CrawlResult, MarkdownGenerationResult
+from .models import CrawlResult, MarkdownGenerationResult, DisplayMode
+from .components.crawler_monitor import CrawlerMonitor
 from .async_dispatcher import (
     MemoryAdaptiveDispatcher,
     SemaphoreDispatcher,
     RateLimiter,
-    CrawlerMonitor,
-    DisplayMode,
     BaseDispatcher,
 )
 from .docker_client import Crawl4aiDockerClient
@@ -103,6 +103,7 @@ __all__ = [
     "CosineStrategy",
     "JsonCssExtractionStrategy",
     "JsonXPathExtractionStrategy",
+    "JsonLxmlExtractionStrategy",
     "ChunkingStrategy",
     "RegexChunking",
     "DefaultMarkdownGenerator",

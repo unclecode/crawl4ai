@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import time
 
-from .prompts import PROMPT_EXTRACT_BLOCKS, PROMPT_EXTRACT_BLOCKS_WITH_INSTRUCTION, PROMPT_EXTRACT_SCHEMA_WITH_INSTRUCTION, JSON_SCHEMA_BUILDER_XPATH
+from .prompts import PROMPT_EXTRACT_BLOCKS, PROMPT_EXTRACT_BLOCKS_WITH_INSTRUCTION, PROMPT_EXTRACT_SCHEMA_WITH_INSTRUCTION, JSON_SCHEMA_BUILDER_XPATH, PROMPT_EXTRACT_INFERRED_SCHEMA
 from .config import (
     DEFAULT_PROVIDER, CHUNK_TOKEN_THRESHOLD,
     OVERLAP_RATE,
@@ -34,7 +34,7 @@ from .model_loader import (
     calculate_batch_size
 )
 
-from .types import LLMConfig
+from .types import LLMConfig, create_llm_config
 
 from functools import partial
 import numpy as np
@@ -507,6 +507,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
         word_token_rate=WORD_TOKEN_RATE,
         apply_chunking=True,
         input_format: str = "markdown",
+        force_json_response=False,
         verbose=False,
         # Deprecated arguments
         provider: str = DEFAULT_PROVIDER,
@@ -527,9 +528,10 @@ class LLMExtractionStrategy(ExtractionStrategy):
             overlap_rate: Overlap between chunks.
             word_token_rate: Word to token conversion rate.
             apply_chunking: Whether to apply chunking.
+            input_format: Content format to use for extraction.
+                            Options: "markdown" (default), "html", "fit_markdown"
+            force_json_response: Whether to force a JSON response from the LLM.
             verbose: Whether to print verbose output.
-            usages: List of individual token usages.
-            total_usage: Accumulated token usage.
 
             # Deprecated arguments, will be removed very soon
             provider: The provider to use for extraction. It follows the format <provider_name>/<model_name>, e.g., "ollama/llama3.3".
@@ -545,6 +547,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
         self.schema = schema
         if schema:
             self.extract_type = "schema"
+        self.force_json_response = force_json_response
         self.chunk_token_threshold = chunk_token_threshold or CHUNK_TOKEN_THRESHOLD
         self.overlap_rate = overlap_rate
         self.word_token_rate = word_token_rate
@@ -608,64 +611,97 @@ class LLMExtractionStrategy(ExtractionStrategy):
             variable_values["SCHEMA"] = json.dumps(self.schema, indent=2) # if type of self.schema is dict else self.schema
             prompt_with_variables = PROMPT_EXTRACT_SCHEMA_WITH_INSTRUCTION
 
+        if self.extract_type == "schema" and not self.schema:
+            prompt_with_variables = PROMPT_EXTRACT_INFERRED_SCHEMA
+
         for variable in variable_values:
             prompt_with_variables = prompt_with_variables.replace(
                 "{" + variable + "}", variable_values[variable]
             )
 
-        response = perform_completion_with_backoff(
-            self.llm_config.provider,
-            prompt_with_variables,
-            self.llm_config.api_token,
-            base_url=self.llm_config.base_url,
-            extra_args=self.extra_args,
-        )  # , json_response=self.extract_type == "schema")
-        # Track usage
-        usage = TokenUsage(
-            completion_tokens=response.usage.completion_tokens,
-            prompt_tokens=response.usage.prompt_tokens,
-            total_tokens=response.usage.total_tokens,
-            completion_tokens_details=response.usage.completion_tokens_details.__dict__
-            if response.usage.completion_tokens_details
-            else {},
-            prompt_tokens_details=response.usage.prompt_tokens_details.__dict__
-            if response.usage.prompt_tokens_details
-            else {},
-        )
-        self.usages.append(usage)
-
-        # Update totals
-        self.total_usage.completion_tokens += usage.completion_tokens
-        self.total_usage.prompt_tokens += usage.prompt_tokens
-        self.total_usage.total_tokens += usage.total_tokens
-
         try:
-            blocks = extract_xml_data(["blocks"], response.choices[0].message.content)[
-                "blocks"
-            ]
-            blocks = json.loads(blocks)
-            for block in blocks:
-                block["error"] = False
-        except Exception:
-            parsed, unparsed = split_and_parse_json_objects(
-                response.choices[0].message.content
+            response = perform_completion_with_backoff(
+                self.llm_config.provider,
+                prompt_with_variables,
+                self.llm_config.api_token,
+                base_url=self.llm_config.base_url,
+                json_response=self.force_json_response,
+                extra_args=self.extra_args,
+            )  # , json_response=self.extract_type == "schema")
+            # Track usage
+            usage = TokenUsage(
+                completion_tokens=response.usage.completion_tokens,
+                prompt_tokens=response.usage.prompt_tokens,
+                total_tokens=response.usage.total_tokens,
+                completion_tokens_details=response.usage.completion_tokens_details.__dict__
+                if response.usage.completion_tokens_details
+                else {},
+                prompt_tokens_details=response.usage.prompt_tokens_details.__dict__
+                if response.usage.prompt_tokens_details
+                else {},
             )
-            blocks = parsed
-            if unparsed:
-                blocks.append(
-                    {"index": 0, "error": True, "tags": ["error"], "content": unparsed}
-                )
+            self.usages.append(usage)
 
-        if self.verbose:
-            print(
-                "[LOG] Extracted",
-                len(blocks),
-                "blocks from URL:",
-                url,
-                "block index:",
-                ix,
-            )
-        return blocks
+            # Update totals
+            self.total_usage.completion_tokens += usage.completion_tokens
+            self.total_usage.prompt_tokens += usage.prompt_tokens
+            self.total_usage.total_tokens += usage.total_tokens
+
+            try:
+                response = response.choices[0].message.content
+                blocks = None
+
+                if self.force_json_response:
+                    blocks = json.loads(response)
+                    if isinstance(blocks, dict):
+                        # If it has only one key which calue is list then assign that to blocks, exampled: {"news": [..]}
+                        if len(blocks) == 1 and isinstance(list(blocks.values())[0], list):
+                            blocks = list(blocks.values())[0]
+                        else:
+                            # If it has only one key which value is not list then assign that to blocks, exampled: { "article_id": "1234", ... }
+                            blocks = [blocks]
+                    elif isinstance(blocks, list):
+                        # If it is a list then assign that to blocks
+                        blocks = blocks
+                else: 
+                    # blocks = extract_xml_data(["blocks"], response.choices[0].message.content)["blocks"]
+                    blocks = extract_xml_data(["blocks"], response)["blocks"]
+                    blocks = json.loads(blocks)
+
+                for block in blocks:
+                    block["error"] = False
+            except Exception:
+                parsed, unparsed = split_and_parse_json_objects(
+                    response.choices[0].message.content
+                )
+                blocks = parsed
+                if unparsed:
+                    blocks.append(
+                        {"index": 0, "error": True, "tags": ["error"], "content": unparsed}
+                    )
+
+            if self.verbose:
+                print(
+                    "[LOG] Extracted",
+                    len(blocks),
+                    "blocks from URL:",
+                    url,
+                    "block index:",
+                    ix,
+                )
+            return blocks
+        except Exception as e:
+            if self.verbose:
+                print(f"[LOG] Error in LLM extraction: {e}")
+            # Add error information to extracted_content
+            return [
+                {
+                    "index": ix,
+                    "error": True,
+                    "tags": ["error"],
+                    "content": str(e),
+                }
+            ]
 
     def _merge(self, documents, chunk_token_threshold, overlap) -> List[str]:
         """
@@ -757,8 +793,6 @@ class LLMExtractionStrategy(ExtractionStrategy):
 #######################################################
 # New extraction strategies for JSON-based extraction #
 #######################################################
-
-
 class JsonElementExtractionStrategy(ExtractionStrategy):
     """
     Abstract base class for extracting structured JSON from HTML content.
@@ -1049,7 +1083,7 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
         schema_type: str = "CSS", # or XPATH
         query: str = None,
         target_json_example: str = None,
-        llm_config: 'LLMConfig' = None,
+        llm_config: 'LLMConfig' = create_llm_config(),
         provider: str = None,
         api_token: str = None,
         **kwargs
@@ -1081,7 +1115,7 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
         # Build the prompt
         system_message = {
             "role": "system", 
-            "content": f"""You specialize in generating special JSON schemas for web scraping. This schema uses CSS or XPATH selectors to present a repetitive pattern in crawled HTML, such as a product in a product list or a search result item in a list of search results. You use this JSON schema to pass to a language model along with the HTML content to extract structured data from the HTML. The language model uses the JSON schema to extract data from the HTML and retrieve values for fields in the JSON schema, following the schema.
+            "content": f"""You specialize in generating special JSON schemas for web scraping. This schema uses CSS or XPATH selectors to present a repetitive pattern in crawled HTML, such as a product in a product list or a search result item in a list of search results. We use this JSON schema to pass to a language model along with the HTML content to extract structured data from the HTML. The language model uses the JSON schema to extract data from the HTML and retrieve values for fields in the JSON schema, following the schema.
 
 Generating this HTML manually is not feasible, so you need to generate the JSON schema using the HTML content. The HTML copied from the crawled website is provided below, which we believe contains the repetitive pattern.
 
@@ -1095,9 +1129,10 @@ Generating this HTML manually is not feasible, so you need to generate the JSON 
 In this context, the following items may or may not be present:
 - Example of target JSON object: This is a sample of the final JSON object that we hope to extract from the HTML using the schema you are generating.
 - Extra Instructions: This is optional instructions to consider when generating the schema provided by the user.
+- Query or explanation of target/goal data item: This is a description of what data we are trying to extract from the HTML. This explanation means we're not sure about the rigid schema of the structures we want, so we leave it to you to use your expertise to create the best and most comprehensive structures aimed at maximizing data extraction from this page. You must ensure that you do not pick up nuances that may exist on a particular page. The focus should be on the data we are extracting, and it must be valid, safe, and robust based on the given HTML.
 
-# What if there is no example of target JSON object?
-In this scenario, use your best judgment to generate the schema. Try to maximize the number of fields that you can extract from the HTML.
+# What if there is no example of target JSON object and also no extra instructions or even no explanation of target/goal data item?
+In this scenario, use your best judgment to generate the schema. You need to examine the content of the page and understand the data it provides. If the page contains repetitive data, such as lists of items, products, jobs, places, books, or movies, focus on one single item that repeats. If the page is a detailed page about one product or item, create a schema to extract the entire structured data. At this stage, you must think and decide for yourself. Try to maximize the number of fields that you can extract from the HTML.
 
 # What are the instructions and details for this schema generation?
 {prompt_template}"""
@@ -1114,11 +1149,18 @@ In this scenario, use your best judgment to generate the schema. Try to maximize
         }
 
         if query:
-            user_message["content"] += f"\n\nImportant Notes to Consider:\n{query}"
+            user_message["content"] += f"\n\n## Query or explanation of target/goal data item:\n{query}"
         if target_json_example:
-            user_message["content"] += f"\n\nExample of target JSON object:\n{target_json_example}"
+            user_message["content"] += f"\n\n## Example of target JSON object:\n```json\n{target_json_example}\n```"
+
+        if query and not target_json_example:
+            user_message["content"] += """IMPORTANT: To remind you, in this process, we are not providing a rigid example of the adjacent objects we seek. We rely on your understanding of the explanation provided in the above section. Make sure to grasp what we are looking for and, based on that, create the best schema.."""
+        elif not query and target_json_example:
+            user_message["content"] += """IMPORTANT: Please remember that in this process, we provided a proper example of a target JSON object. Make sure to adhere to the structure and create a schema that exactly fits this example. If you find that some elements on the page do not match completely, vote for the majority."""
+        elif not query and not target_json_example:
+            user_message["content"] += """IMPORTANT: Since we neither have a query nor an example, it is crucial to rely solely on the HTML content provided. Leverage your expertise to determine the schema based on the repetitive patterns observed in the content."""
         
-        user_message["content"] += """IMPORTANT: Ensure your schema is reliable, meaning do not use selectors that seem to generate dynamically and are not reliable. A reliable schema is what you want, as it consistently returns the same data even after many reloads of the page.
+        user_message["content"] += """IMPORTANT: Ensure your schema remains reliable by avoiding selectors that appear to generate dynamically and are not dependable. You want a reliable schema, as it consistently returns the same data even after many page reloads.
 
         Analyze the HTML and generate a JSON schema that follows the specified format. Only output valid JSON schema, nothing else.
         """
@@ -1139,7 +1181,6 @@ In this scenario, use your best judgment to generate the schema. Try to maximize
             
         except Exception as e:
             raise Exception(f"Failed to generate schema: {str(e)}")
-
 
 class JsonCssExtractionStrategy(JsonElementExtractionStrategy):
     """
@@ -1168,7 +1209,8 @@ class JsonCssExtractionStrategy(JsonElementExtractionStrategy):
         super().__init__(schema, **kwargs)
 
     def _parse_html(self, html_content: str):
-        return BeautifulSoup(html_content, "html.parser")
+        # return BeautifulSoup(html_content, "html.parser")
+        return BeautifulSoup(html_content, "lxml")
 
     def _get_base_elements(self, parsed_html, selector: str):
         return parsed_html.select(selector)
@@ -1187,6 +1229,373 @@ class JsonCssExtractionStrategy(JsonElementExtractionStrategy):
     def _get_element_attribute(self, element, attribute: str):
         return element.get(attribute)
 
+class JsonLxmlExtractionStrategy(JsonElementExtractionStrategy):
+    def __init__(self, schema: Dict[str, Any], **kwargs):
+        kwargs["input_format"] = "html"
+        super().__init__(schema, **kwargs)
+        self._selector_cache = {}
+        self._xpath_cache = {}
+        self._result_cache = {}
+        
+        # Control selector optimization strategy
+        self.use_caching = kwargs.get("use_caching", True)
+        self.optimize_common_patterns = kwargs.get("optimize_common_patterns", True)
+        
+        # Load lxml dependencies once
+        from lxml import etree, html
+        from lxml.cssselect import CSSSelector
+        self.etree = etree
+        self.html_parser = html
+        self.CSSSelector = CSSSelector
+    
+    def _parse_html(self, html_content: str):
+        """Parse HTML content with error recovery"""
+        try:
+            parser = self.etree.HTMLParser(recover=True, remove_blank_text=True)
+            return self.etree.fromstring(html_content, parser)
+        except Exception as e:
+            if self.verbose:
+                print(f"Error parsing HTML, falling back to alternative method: {e}")
+            try:
+                return self.html_parser.fromstring(html_content)
+            except Exception as e2:
+                if self.verbose:
+                    print(f"Critical error parsing HTML: {e2}")
+                # Create minimal document as fallback
+                return self.etree.Element("html")
+    
+    def _optimize_selector(self, selector_str):
+        """Optimize common selector patterns for better performance"""
+        if not self.optimize_common_patterns:
+            return selector_str
+            
+        # Handle td:nth-child(N) pattern which is very common in table scraping
+        import re
+        if re.search(r'td:nth-child\(\d+\)', selector_str):
+            return selector_str  # Already handled specially in _apply_selector
+            
+        # Split complex selectors into parts for optimization
+        parts = selector_str.split()
+        if len(parts) <= 1:
+            return selector_str
+            
+        # For very long selectors, consider using just the last specific part
+        if len(parts) > 3 and any(p.startswith('.') or p.startswith('#') for p in parts):
+            specific_parts = [p for p in parts if p.startswith('.') or p.startswith('#')]
+            if specific_parts:
+                return specific_parts[-1]  # Use most specific class/id selector
+                
+        return selector_str
+    
+    def _create_selector_function(self, selector_str):
+        """Create a selector function that handles all edge cases"""
+        original_selector = selector_str
+        
+        # Try to optimize the selector if appropriate
+        if self.optimize_common_patterns:
+            selector_str = self._optimize_selector(selector_str)
+        
+        try:
+            # Attempt to compile the CSS selector
+            compiled = self.CSSSelector(selector_str)
+            xpath = compiled.path
+            
+            # Store XPath for later use
+            self._xpath_cache[selector_str] = xpath
+            
+            # Create the wrapper function that implements the selection strategy
+            def selector_func(element, context_sensitive=True):
+                cache_key = None
+                
+                # Use result caching if enabled
+                if self.use_caching:
+                    # Create a cache key based on element and selector
+                    element_id = element.get('id', '') or str(hash(element))
+                    cache_key = f"{element_id}::{selector_str}"
+                    
+                    if cache_key in self._result_cache:
+                        return self._result_cache[cache_key]
+                
+                results = []
+                try:
+                    # Strategy 1: Direct CSS selector application (fastest)
+                    results = compiled(element)
+                    
+                    # If that fails and we need context sensitivity
+                    if not results and context_sensitive:
+                        # Strategy 2: Try XPath with context adjustment
+                        context_xpath = self._make_context_sensitive_xpath(xpath, element)
+                        if context_xpath:
+                            results = element.xpath(context_xpath)
+                        
+                        # Strategy 3: Handle special case - nth-child
+                        if not results and 'nth-child' in original_selector:
+                            results = self._handle_nth_child_selector(element, original_selector)
+                        
+                        # Strategy 4: Direct descendant search for class/ID selectors
+                        if not results:
+                            results = self._fallback_class_id_search(element, original_selector)
+                            
+                        # Strategy 5: Last resort - tag name search for the final part
+                        if not results:
+                            parts = original_selector.split()
+                            if parts:
+                                last_part = parts[-1]
+                                # Extract tag name from the selector
+                                tag_match = re.match(r'^(\w+)', last_part)
+                                if tag_match:
+                                    tag_name = tag_match.group(1)
+                                    results = element.xpath(f".//{tag_name}")
+                    
+                    # Cache results if caching is enabled
+                    if self.use_caching and cache_key:
+                        self._result_cache[cache_key] = results
+                        
+                except Exception as e:
+                    if self.verbose:
+                        print(f"Error applying selector '{selector_str}': {e}")
+                
+                return results
+                
+            return selector_func
+            
+        except Exception as e:
+            if self.verbose:
+                print(f"Error compiling selector '{selector_str}': {e}")
+            
+            # Fallback function for invalid selectors
+            return lambda element, context_sensitive=True: []
+    
+    def _make_context_sensitive_xpath(self, xpath, element):
+        """Convert absolute XPath to context-sensitive XPath"""
+        try:
+            # If starts with descendant-or-self, it's already context-sensitive
+            if xpath.startswith('descendant-or-self::'):
+                return xpath
+                
+            # Remove leading slash if present
+            if xpath.startswith('/'):
+                context_xpath = f".{xpath}"
+            else:
+                context_xpath = f".//{xpath}"
+                
+            # Validate the XPath by trying it
+            try:
+                element.xpath(context_xpath)
+                return context_xpath
+            except:
+                # If that fails, try a simpler descendant search
+                return f".//{xpath.split('/')[-1]}"
+        except:
+            return None
+    
+    def _handle_nth_child_selector(self, element, selector_str):
+        """Special handling for nth-child selectors in tables"""
+        import re
+        results = []
+        
+        try:
+            # Extract the column number from td:nth-child(N)
+            match = re.search(r'td:nth-child\((\d+)\)', selector_str)
+            if match:
+                col_num = match.group(1)
+                
+                # Check if there's content after the nth-child part
+                remaining_selector = selector_str.split(f"td:nth-child({col_num})", 1)[-1].strip()
+                
+                if remaining_selector:
+                    # If there's a specific element we're looking for after the column
+                    # Extract any tag names from the remaining selector
+                    tag_match = re.search(r'(\w+)', remaining_selector)
+                    tag_name = tag_match.group(1) if tag_match else '*'
+                    results = element.xpath(f".//td[{col_num}]//{tag_name}")
+                else:
+                    # Just get the column cell
+                    results = element.xpath(f".//td[{col_num}]")
+        except Exception as e:
+            if self.verbose:
+                print(f"Error handling nth-child selector: {e}")
+                
+        return results
+    
+    def _fallback_class_id_search(self, element, selector_str):
+        """Fallback to search by class or ID"""
+        results = []
+        
+        try:
+            # Extract class selectors (.classname)
+            import re
+            class_matches = re.findall(r'\.([a-zA-Z0-9_-]+)', selector_str)
+            
+            # Extract ID selectors (#idname)
+            id_matches = re.findall(r'#([a-zA-Z0-9_-]+)', selector_str)
+            
+            # Try each class
+            for class_name in class_matches:
+                class_results = element.xpath(f".//*[contains(@class, '{class_name}')]")
+                results.extend(class_results)
+                
+            # Try each ID (usually more specific)
+            for id_name in id_matches:
+                id_results = element.xpath(f".//*[@id='{id_name}']")
+                results.extend(id_results)
+        except Exception as e:
+            if self.verbose:
+                print(f"Error in fallback class/id search: {e}")
+                
+        return results
+    
+    def _get_selector(self, selector_str):
+        """Get or create a selector function with caching"""
+        if selector_str not in self._selector_cache:
+            self._selector_cache[selector_str] = self._create_selector_function(selector_str)
+        return self._selector_cache[selector_str]
+    
+    def _get_base_elements(self, parsed_html, selector: str):
+        """Get all base elements using the selector"""
+        selector_func = self._get_selector(selector)
+        # For base elements, we don't need context sensitivity
+        return selector_func(parsed_html, context_sensitive=False)
+    
+    def _get_elements(self, element, selector: str):
+        """Get child elements using the selector with context sensitivity"""
+        selector_func = self._get_selector(selector)
+        return selector_func(element, context_sensitive=True)
+    
+    def _get_element_text(self, element) -> str:
+        """Extract normalized text from element"""
+        try:
+            # Get all text nodes and normalize
+            text = " ".join(t.strip() for t in element.xpath(".//text()") if t.strip())
+            return text
+        except Exception as e:
+            if self.verbose:
+                print(f"Error extracting text: {e}")
+            # Fallback
+            try:
+                return element.text_content().strip()
+            except:
+                return ""
+    
+    def _get_element_html(self, element) -> str:
+        """Get HTML string representation of element"""
+        try:
+            return self.etree.tostring(element, encoding='unicode', method='html')
+        except Exception as e:
+            if self.verbose:
+                print(f"Error serializing HTML: {e}")
+            return ""
+    
+    def _get_element_attribute(self, element, attribute: str):
+        """Get attribute value safely"""
+        try:
+            return element.get(attribute)
+        except Exception as e:
+            if self.verbose:
+                print(f"Error getting attribute '{attribute}': {e}")
+            return None
+            
+    def _clear_caches(self):
+        """Clear caches to free memory"""
+        if self.use_caching:
+            self._result_cache.clear()
+
+class JsonLxmlExtractionStrategy_naive(JsonElementExtractionStrategy):
+    def __init__(self, schema: Dict[str, Any], **kwargs):
+        kwargs["input_format"] = "html"  # Force HTML input
+        super().__init__(schema, **kwargs)
+        self._selector_cache = {}
+    
+    def _parse_html(self, html_content: str):
+        from lxml import etree
+        parser = etree.HTMLParser(recover=True)
+        return etree.fromstring(html_content, parser)
+    
+    def _get_selector(self, selector_str):
+        """Get a selector function that works within the context of an element"""
+        if selector_str not in self._selector_cache:
+            from lxml.cssselect import CSSSelector
+            try:
+                # Store both the compiled selector and its xpath translation
+                compiled = CSSSelector(selector_str)
+                
+                # Create a function that will apply this selector appropriately
+                def select_func(element):
+                    try:
+                        # First attempt: direct CSS selector application
+                        results = compiled(element)
+                        if results:
+                            return results
+                        
+                        # Second attempt: contextual XPath selection
+                        # Convert the root-based XPath to a context-based XPath
+                        xpath = compiled.path
+                        
+                        # If the XPath already starts with descendant-or-self, handle it specially
+                        if xpath.startswith('descendant-or-self::'):
+                            context_xpath = xpath
+                        else:
+                            # For normal XPath expressions, make them relative to current context
+                            context_xpath = f"./{xpath.lstrip('/')}"
+                        
+                        results = element.xpath(context_xpath)
+                        if results:
+                            return results
+                        
+                        # Final fallback: simple descendant search for common patterns
+                        if 'nth-child' in selector_str:
+                            # Handle td:nth-child(N) pattern
+                            import re
+                            match = re.search(r'td:nth-child\((\d+)\)', selector_str)
+                            if match:
+                                col_num = match.group(1)
+                                sub_selector = selector_str.split(')', 1)[-1].strip()
+                                if sub_selector:
+                                    return element.xpath(f".//td[{col_num}]//{sub_selector}")
+                                else:
+                                    return element.xpath(f".//td[{col_num}]")
+                        
+                        # Last resort: try each part of the selector separately
+                        parts = selector_str.split()
+                        if len(parts) > 1 and parts[-1]:
+                            return element.xpath(f".//{parts[-1]}")
+                            
+                        return []
+                    except Exception as e:
+                        if self.verbose:
+                            print(f"Error applying selector '{selector_str}': {e}")
+                        return []
+                
+                self._selector_cache[selector_str] = select_func
+            except Exception as e:
+                if self.verbose:
+                    print(f"Error compiling selector '{selector_str}': {e}")
+                
+                # Fallback function for invalid selectors
+                def fallback_func(element):
+                    return []
+                
+                self._selector_cache[selector_str] = fallback_func
+                
+        return self._selector_cache[selector_str]
+    
+    def _get_base_elements(self, parsed_html, selector: str):
+        selector_func = self._get_selector(selector)
+        return selector_func(parsed_html)
+    
+    def _get_elements(self, element, selector: str):
+        selector_func = self._get_selector(selector)
+        return selector_func(element)
+    
+    def _get_element_text(self, element) -> str:
+        return "".join(element.xpath(".//text()")).strip()
+    
+    def _get_element_html(self, element) -> str:
+        from lxml import etree
+        return etree.tostring(element, encoding='unicode')
+    
+    def _get_element_attribute(self, element, attribute: str):
+        return element.get(attribute)    
 
 class JsonXPathExtractionStrategy(JsonElementExtractionStrategy):
     """

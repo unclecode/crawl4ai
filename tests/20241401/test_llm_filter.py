@@ -1,7 +1,7 @@
 import os
 import asyncio
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
-from crawl4ai.types import LLMConfig
+from crawl4ai import LLMConfig
 from crawl4ai.content_filter_strategy import LLMContentFilter
 
 async def test_llm_filter():
