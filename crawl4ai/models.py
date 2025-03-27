@@ -1,5 +1,5 @@
 from re import U
-from pydantic import BaseModel, HttpUrl, PrivateAttr
+from pydantic import BaseModel, Field, HttpUrl, PrivateAttr
 from typing import List, Dict, Optional, Callable, Awaitable, Union, Any
 from enum import Enum
 from dataclasses import dataclass
@@ -139,26 +139,82 @@ class DispatchResult(BaseModel):
     error_message: str = ""
 
 class CrawlResult(BaseModel):
-    url: str
-    html: str
-    success: bool
-    cleaned_html: Optional[str] = None
-    media: Dict[str, List[Dict]] = {}
-    links: Dict[str, List[Dict]] = {}
-    downloaded_files: Optional[List[str]] = None
-    js_execution_result: Optional[Dict[str, Any]] = None
-    screenshot: Optional[str] = None
-    pdf: Optional[bytes] = None
-    _markdown: Optional[MarkdownGenerationResult] = PrivateAttr(default=None)
-    extracted_content: Optional[str] = None
-    metadata: Optional[dict] = None
-    error_message: Optional[str] = None
-    session_id: Optional[str] = None
-    response_headers: Optional[dict] = None
-    status_code: Optional[int] = None
-    ssl_certificate: Optional[SSLCertificate] = None
-    dispatch_result: Optional[DispatchResult] = None
-    redirected_url: Optional[str] = None
+    url: str = Field(
+        description="The final or actual URL crawled (in case of redirects).",
+    )
+    html: str = Field(
+        description="Original, unmodified page HTML. Good for debugging or custom processing.",
+    )
+    success: bool = Field(
+        description="True if the crawl completed without major errors, else False.",
+    )
+    cleaned_html: Optional[str] = Field(
+        description="Sanitized HTML with scripts/styles removed; can exclude tags if configured via excluded_tags etc.",
+        default=None,
+    )
+    media: Dict[str, List[Dict]] = Field(
+        description="Extracted media info (images, audio, etc.), each with attributes like src, alt, score, etc.",
+        default_factory=dict,
+    )
+    links: Dict[str, List[Dict]] = Field(
+        description="Extracted link data, split by internal and external. Each link usually has href, text, etc.",
+        default_factory=dict,
+    )
+    downloaded_files: Optional[List[str]] = Field(
+        description="If accept_downloads=True in BrowserConfig, this lists the filepaths of saved downloads.",
+        default=None,
+    )
+    js_execution_result: Optional[Dict[str, Any]] = Field(
+        description="The result of executing JavaScript code on the page.",
+        default=None,
+    )
+    screenshot: Optional[str] = Field(
+        description="Screenshot of the page (base64-encoded) if screenshot=True.",
+        default=None,
+    )
+    pdf: Optional[bytes] = Field(
+        description="PDF of the page if pdf=True.",
+        default=None,
+    )
+    _markdown: Optional[MarkdownGenerationResult] = PrivateAttr(
+        default=None,
+    )
+    extracted_content: Optional[str] = Field(
+        description="The output of a structured extraction (CSS/LLM-based) stored as JSON string or other text.",
+        default=None,
+    )
+    metadata: Optional[dict] = Field(
+        description="Additional info about the crawl or extracted data.",
+        default=None,
+    )
+    error_message: Optional[str] = Field(
+        description="If success=False, contains a short description of what went wrong.",
+        default=None,
+    )
+    session_id: Optional[str] = Field(
+        description="The ID of the session used for multi-page or persistent crawling.",
+        default=None,
+    )
+    response_headers: Optional[dict] = Field(
+        description="HTTP response headers, if captured.",
+        default=None,
+    )
+    status_code: Optional[int] = Field(
+        description="HTTP status code (e.g., 200 for OK).",
+        default=None,
+    )
+    ssl_certificate: Optional[SSLCertificate] = Field(
+        description="SSL certificate info if fetch_ssl_certificate=True.",
+        default=None,
+    )
+    dispatch_result: Optional[DispatchResult] = Field(
+        description="Object containing dispatch process details.",
+        default=None,
+    )
+    redirected_url: Optional[str] = Field(
+        description="The URL the page was redirected to, if any.",
+        default=None,
+    )
 
     class Config:
         arbitrary_types_allowed = True
