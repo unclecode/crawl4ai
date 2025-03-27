@@ -197,14 +197,14 @@ trio = ["trio (>=0.26.1)"]
 
 [[package]]
 name = "apify"
-version = "2.4.0"
+version = "2.5.0"
 description = "Apify SDK for Python"
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "apify-2.4.0-py3-none-any.whl", hash = "sha256:08b9da3fd807278828969e323060ebf767749cfd33ba411fd86e7e576e71e04e"},
-    {file = "apify-2.4.0.tar.gz", hash = "sha256:30dc6d003ad34df19044c99858bd68ec70da0a37c8b7ea3212049f31b45840e4"},
+    {file = "apify-2.5.0-py3-none-any.whl", hash = "sha256:e998a8aa6d512403eb60de67835e24f57775f00b8225e6f648ed1d649f8cc6f5"},
+    {file = "apify-2.5.0.tar.gz", hash = "sha256:b2f0331298aa48ed30f9fbce459268b290deea79e908cb8cb886b641c6680e8c"},
 ]
 
 [package.dependencies]
@@ -3744,4 +3744,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.13"
-content-hash = "b50df5264e83d1c9496b6d1005b02d6abd1390be772e810a1ff7a7e51a223761"
+content-hash = "33afe850d29b3205c0cf11a529a018a462e19b32c2ecdd69cc493af245e43502"

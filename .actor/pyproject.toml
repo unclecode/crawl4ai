@@ -8,7 +8,7 @@ readme = "README.md"
 dependencies = [
   "crawlee==0.6.5",
   "Crawl4AI==0.5.0.post8",
-  "apify==2.4.0",
+  "apify==2.5.0",
   "pydantic"
 ]
 
