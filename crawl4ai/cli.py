@@ -20,13 +20,16 @@ from crawl4ai import (
     BrowserConfig, 
     CrawlerRunConfig,
     LLMExtractionStrategy, 
+    LXMLWebScrapingStrategy,
     JsonCssExtractionStrategy,
     JsonXPathExtractionStrategy,
     BM25ContentFilter, 
     PruningContentFilter,
     BrowserProfiler,
+    DefaultMarkdownGenerator,
     LLMConfig
 )
+from crawl4ai.config import USER_SETTINGS
 from litellm import completion
 from pathlib import Path
 
@@ -175,8 +178,12 @@ def show_examples():
     # CSS-based extraction
     crwl https://example.com -e extract_css.yml -s css_schema.json -o json
 
-    # LLM-based extraction
+    # LLM-based extraction with config file
     crwl https://example.com -e extract_llm.yml -s llm_schema.json -o json
+    
+    # Quick LLM-based JSON extraction (prompts for LLM provider first time)
+    crwl https://example.com -j  # Auto-extracts structured data
+    crwl https://example.com -j "Extract product details including name, price, and features"  # With specific instructions
 
 3️⃣  Direct Parameters:
     # Browser settings
@@ -278,13 +285,19 @@ llm_schema.json:
     # Combine configs with direct parameters
     crwl https://example.com -B browser.yml -b "headless=false,viewport_width=1920"
 
-    # Full extraction pipeline
+    # Full extraction pipeline with config files
     crwl https://example.com \\
         -B browser.yml \\
         -C crawler.yml \\
         -e extract_llm.yml \\
         -s llm_schema.json \\
         -o json \\
+        -v
+        
+    # Quick LLM-based extraction with specific instructions
+    crwl https://amazon.com/dp/B01DFKC2SO \\
+        -j "Extract product title, current price, original price, rating, and all product specifications" \\
+        -b "headless=true,viewport_width=1280" \\
         -v
 
     # Content filtering with BM25
@@ -327,6 +340,14 @@ For more documentation visit: https://github.com/unclecode/crawl4ai
       - google/gemini-pro
     
     See full list of providers: https://docs.litellm.ai/docs/providers
+    
+    # Set default LLM provider and token in advance
+    crwl config set DEFAULT_LLM_PROVIDER "anthropic/claude-3-sonnet"
+    crwl config set DEFAULT_LLM_PROVIDER_TOKEN "your-api-token-here"
+    
+    # Set default browser behavior
+    crwl config set BROWSER_HEADLESS false  # Always show browser window
+    crwl config set USER_AGENT_MODE random  # Use random user agent
 
 9️⃣ Profile Management:
     # Launch interactive profile manager
@@ -983,17 +1004,19 @@ def cdp_cmd(user_data_dir: Optional[str], port: int, browser_type: str, headless
 @click.option("--crawler-config", "-C", type=click.Path(exists=True), help="Crawler config file (YAML/JSON)")
 @click.option("--filter-config", "-f", type=click.Path(exists=True), help="Content filter config file")
 @click.option("--extraction-config", "-e", type=click.Path(exists=True), help="Extraction strategy config file")
+@click.option("--json-extract", "-j", is_flag=False, flag_value="", default=None, help="Extract structured data using LLM with optional description")
 @click.option("--schema", "-s", type=click.Path(exists=True), help="JSON schema for extraction")
 @click.option("--browser", "-b", type=str, callback=parse_key_values, help="Browser parameters as key1=value1,key2=value2")
 @click.option("--crawler", "-c", type=str, callback=parse_key_values, help="Crawler parameters as key1=value1,key2=value2")
 @click.option("--output", "-o", type=click.Choice(["all", "json", "markdown", "md", "markdown-fit", "md-fit"]), default="all")
-@click.option("--bypass-cache", is_flag=True, default=True, help="Bypass cache when crawling")
+@click.option("--output-file", "-O", type=click.Path(), help="Output file path (default: stdout)")
+@click.option("--bypass-cache", "-b", is_flag=True, default=True, help="Bypass cache when crawling")
 @click.option("--question", "-q", help="Ask a question about the crawled content")
 @click.option("--verbose", "-v", is_flag=True)
 @click.option("--profile", "-p", help="Use a specific browser profile (by name)")
 def crawl_cmd(url: str, browser_config: str, crawler_config: str, filter_config: str, 
-           extraction_config: str, schema: str, browser: Dict, crawler: Dict,
-           output: str, bypass_cache: bool, question: str, verbose: bool, profile: str):
+           extraction_config: str, json_extract: str, schema: str, browser: Dict, crawler: Dict,
+           output: str, output_file: str, bypass_cache: bool, question: str, verbose: bool, profile: str):
     """Crawl a website and extract content
     
     Simple Usage:
@@ -1037,21 +1060,65 @@ def crawl_cmd(url: str, browser_config: str, crawler_config: str, filter_config:
             crawler_cfg = crawler_cfg.clone(**crawler)
             
         # Handle content filter config
-        if filter_config:
-            filter_conf = load_config_file(filter_config)
+        if filter_config or output in ["markdown-fit", "md-fit"]:
+            if filter_config:
+                filter_conf = load_config_file(filter_config)
+            elif not filter_config and output in ["markdown-fit", "md-fit"]:
+                filter_conf = {
+                    "type": "pruning",
+                    "query": "",
+                    "threshold": 0.48
+                }
             if filter_conf["type"] == "bm25":
-                crawler_cfg.content_filter = BM25ContentFilter(
-                    user_query=filter_conf.get("query"),
-                    bm25_threshold=filter_conf.get("threshold", 1.0)
+                crawler_cfg.markdown_generator = DefaultMarkdownGenerator(
+                    content_filter = BM25ContentFilter(
+                        user_query=filter_conf.get("query"),
+                        bm25_threshold=filter_conf.get("threshold", 1.0)
+                    )
                 )
             elif filter_conf["type"] == "pruning":
-                crawler_cfg.content_filter = PruningContentFilter(
-                    user_query=filter_conf.get("query"),
-                    threshold=filter_conf.get("threshold", 0.48)
+                crawler_cfg.markdown_generator = DefaultMarkdownGenerator(
+                    content_filter = PruningContentFilter(
+                        user_query=filter_conf.get("query"),
+                        threshold=filter_conf.get("threshold", 0.48)
+                    )
                 )
+        
+        # Handle json-extract option (takes precedence over extraction-config)
+        if json_extract is not None:
+            # Get LLM provider and token
+            provider, token = setup_llm_config()
+            
+            # Default sophisticated instruction for structured data extraction
+            default_instruction = """Analyze the web page content and extract structured data as JSON. 
+If the page contains a list of items with repeated patterns, extract all items in an array. 
+If the page is an article or contains unique content, extract a comprehensive JSON object with all relevant information.
+Look at the content, intention of content, what it offers and find the data item(s) in the page.
+Always return valid, properly formatted JSON."""
+            
+            
+            default_instruction_with_user_query = """Analyze the web page content and extract structured data as JSON, following the below instruction and explanation of schema and always return valid, properly formatted JSON. \n\nInstruction:\n\n""" + json_extract
+            
+            # Determine instruction based on whether json_extract is empty or has content
+            instruction = default_instruction_with_user_query if json_extract else default_instruction
+            
+            # Create LLM extraction strategy
+            crawler_cfg.extraction_strategy = LLMExtractionStrategy(
+                llm_config=LLMConfig(provider=provider, api_token=token),
+                instruction=instruction,
+                schema=load_schema_file(schema),  # Will be None if no schema is provided
+                extraction_type="schema", #if schema else "block",
+                apply_chunking=False,
+                force_json_response=True,
+                verbose=verbose,
+            )
+            
+            # Set output to JSON if not explicitly specified
+            if output == "all":
+                output = "json"
                 
-        # Handle extraction strategy
-        if extraction_config:
+        # Handle extraction strategy from config file (only if json-extract wasn't used)
+        elif extraction_config:
             extract_conf = load_config_file(extraction_config)
             schema_data = load_schema_file(schema)
             
@@ -1085,6 +1152,13 @@ def crawl_cmd(url: str, browser_config: str, crawler_config: str, filter_config:
         # No cache
         if bypass_cache:
             crawler_cfg.cache_mode = CacheMode.BYPASS
+
+        crawler_cfg.scraping_strategy = LXMLWebScrapingStrategy()    
+
+        config = get_global_config()
+        
+        browser_cfg.verbose = config.get("VERBOSE", False)
+        crawler_cfg.verbose = config.get("VERBOSE", False)
         
         # Run crawler
         result : CrawlResult = anyio.run(
@@ -1103,14 +1177,31 @@ def crawl_cmd(url: str, browser_config: str, crawler_config: str, filter_config:
             return
         
         # Handle output
-        if output == "all":
-            click.echo(json.dumps(result.model_dump(), indent=2))
-        elif output == "json":
-            click.echo(json.dumps(json.loads(result.extracted_content), indent=2))
-        elif output in ["markdown", "md"]:
-            click.echo(result.markdown.raw_markdown)
-        elif output in ["markdown-fit", "md-fit"]:
-            click.echo(result.markdown.fit_markdown)
+        if not output_file:
+            if output == "all":
+                click.echo(json.dumps(result.model_dump(), indent=2))
+            elif output == "json":
+                print(result.extracted_content)
+                extracted_items = json.loads(result.extracted_content)
+                click.echo(json.dumps(extracted_items, indent=2))
+                
+            elif output in ["markdown", "md"]:
+                click.echo(result.markdown.raw_markdown)
+            elif output in ["markdown-fit", "md-fit"]:
+                click.echo(result.markdown.fit_markdown)
+        else:
+            if output == "all":
+                with open(output_file, "w") as f:
+                    f.write(json.dumps(result.model_dump(), indent=2))
+            elif output == "json":
+                with open(output_file, "w") as f:
+                    f.write(result.extracted_content)
+            elif output in ["markdown", "md"]:
+                with open(output_file, "w") as f:
+                    f.write(result.markdown.raw_markdown)
+            elif output in ["markdown-fit", "md-fit"]:
+                with open(output_file, "w") as f:
+                    f.write(result.markdown.fit_markdown)
             
     except Exception as e:
         raise click.ClickException(str(e))
@@ -1119,6 +1210,120 @@ def crawl_cmd(url: str, browser_config: str, crawler_config: str, filter_config:
 def examples_cmd():
     """Show usage examples"""
     show_examples()
+
+@cli.group("config")
+def config_cmd():
+    """Manage global configuration settings
+    
+    Commands to view and update global configuration settings:
+    - list: Display all current configuration settings
+    - get: Get the value of a specific setting
+    - set: Set the value of a specific setting
+    """
+    pass
+
+@config_cmd.command("list")
+def config_list_cmd():
+    """List all configuration settings"""
+    config = get_global_config()
+    
+    table = Table(title="Crawl4AI Configuration", show_header=True, header_style="bold cyan", border_style="blue")
+    table.add_column("Setting", style="cyan")
+    table.add_column("Value", style="green")
+    table.add_column("Default", style="yellow")
+    table.add_column("Description", style="white")
+    
+    for key, setting in USER_SETTINGS.items():
+        value = config.get(key, setting["default"])
+        
+        # Handle secret values
+        display_value = value
+        if setting.get("secret", False) and value:
+            display_value = "********"
+            
+        # Handle boolean values
+        if setting["type"] == "boolean":
+            display_value = str(value).lower()
+            default_value = str(setting["default"]).lower()
+        else:
+            default_value = str(setting["default"])
+        
+        table.add_row(
+            key,
+            str(display_value),
+            default_value,
+            setting["description"]
+        )
+    
+    console.print(table)
+
+@config_cmd.command("get")
+@click.argument("key", required=True)
+def config_get_cmd(key: str):
+    """Get a specific configuration setting"""
+    config = get_global_config()
+    
+    # Normalize key to uppercase
+    key = key.upper()
+    
+    if key not in USER_SETTINGS:
+        console.print(f"[red]Error: Unknown setting '{key}'[/red]")
+        return
+    
+    value = config.get(key, USER_SETTINGS[key]["default"])
+    
+    # Handle secret values
+    display_value = value
+    if USER_SETTINGS[key].get("secret", False) and value:
+        display_value = "********"
+    
+    console.print(f"[cyan]{key}[/cyan] = [green]{display_value}[/green]")
+    console.print(f"[dim]Description: {USER_SETTINGS[key]['description']}[/dim]")
+
+@config_cmd.command("set")
+@click.argument("key", required=True)
+@click.argument("value", required=True)
+def config_set_cmd(key: str, value: str):
+    """Set a configuration setting"""
+    config = get_global_config()
+    
+    # Normalize key to uppercase
+    key = key.upper()
+    
+    if key not in USER_SETTINGS:
+        console.print(f"[red]Error: Unknown setting '{key}'[/red]")
+        console.print(f"[yellow]Available settings: {', '.join(USER_SETTINGS.keys())}[/yellow]")
+        return
+    
+    setting = USER_SETTINGS[key]
+    
+    # Type conversion and validation
+    if setting["type"] == "boolean":
+        if value.lower() in ["true", "yes", "1", "y"]:
+            typed_value = True
+        elif value.lower() in ["false", "no", "0", "n"]:
+            typed_value = False
+        else:
+            console.print(f"[red]Error: Invalid boolean value. Use 'true' or 'false'.[/red]")
+            return
+    elif setting["type"] == "string":
+        typed_value = value
+        
+        # Check if the value should be one of the allowed options
+        if "options" in setting and value not in setting["options"]:
+            console.print(f"[red]Error: Value must be one of: {', '.join(setting['options'])}[/red]")
+            return
+    
+    # Update config
+    config[key] = typed_value
+    save_global_config(config)
+    
+    # Handle secret values for display
+    display_value = typed_value
+    if setting.get("secret", False) and typed_value:
+        display_value = "********"
+        
+    console.print(f"[green]Successfully set[/green] [cyan]{key}[/cyan] = [green]{display_value}[/green]")
 
 @cli.command("profiles")
 def profiles_cmd():
@@ -1139,6 +1344,7 @@ def profiles_cmd():
 @click.option("--crawler-config", "-C", type=click.Path(exists=True), help="Crawler config file (YAML/JSON)")
 @click.option("--filter-config", "-f", type=click.Path(exists=True), help="Content filter config file")
 @click.option("--extraction-config", "-e", type=click.Path(exists=True), help="Extraction strategy config file")
+@click.option("--json-extract", "-j", is_flag=False, flag_value="", default=None, help="Extract structured data using LLM with optional description")
 @click.option("--schema", "-s", type=click.Path(exists=True), help="JSON schema for extraction")
 @click.option("--browser", "-b", type=str, callback=parse_key_values, help="Browser parameters as key1=value1,key2=value2")
 @click.option("--crawler", "-c", type=str, callback=parse_key_values, help="Crawler parameters as key1=value1,key2=value2")
@@ -1148,7 +1354,7 @@ def profiles_cmd():
 @click.option("--verbose", "-v", is_flag=True)
 @click.option("--profile", "-p", help="Use a specific browser profile (by name)")
 def default(url: str, example: bool, browser_config: str, crawler_config: str, filter_config: str, 
-        extraction_config: str, schema: str, browser: Dict, crawler: Dict,
+        extraction_config: str, json_extract: str, schema: str, browser: Dict, crawler: Dict,
         output: str, bypass_cache: bool, question: str, verbose: bool, profile: str):
     """Crawl4AI CLI - Web content extraction tool
 
@@ -1162,7 +1368,14 @@ def default(url: str, example: bool, browser_config: str, crawler_config: str, f
         crwl crawl      - Crawl a website with advanced options
         crwl cdp        - Launch browser with CDP debugging enabled
         crwl browser    - Manage builtin browser (start, stop, status, restart)
+        crwl config     - Manage global configuration settings
         crwl examples   - Show more usage examples
+        
+    Configuration Examples:
+        crwl config list                         - List all configuration settings
+        crwl config get DEFAULT_LLM_PROVIDER     - Show current LLM provider
+        crwl config set VERBOSE true             - Enable verbose mode globally
+        crwl config set BROWSER_HEADLESS false   - Default to visible browser
     """
 
     if example:
@@ -1183,7 +1396,8 @@ def default(url: str, example: bool, browser_config: str, crawler_config: str, f
         browser_config=browser_config,
         crawler_config=crawler_config,
         filter_config=filter_config,
-        extraction_config=extraction_config, 
+        extraction_config=extraction_config,
+        json_extract=json_extract,
         schema=schema,
         browser=browser,
         crawler=crawler,

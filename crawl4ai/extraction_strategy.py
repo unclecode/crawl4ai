@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import time
 
-from .prompts import PROMPT_EXTRACT_BLOCKS, PROMPT_EXTRACT_BLOCKS_WITH_INSTRUCTION, PROMPT_EXTRACT_SCHEMA_WITH_INSTRUCTION, JSON_SCHEMA_BUILDER_XPATH
+from .prompts import PROMPT_EXTRACT_BLOCKS, PROMPT_EXTRACT_BLOCKS_WITH_INSTRUCTION, PROMPT_EXTRACT_SCHEMA_WITH_INSTRUCTION, JSON_SCHEMA_BUILDER_XPATH, PROMPT_EXTRACT_INFERRED_SCHEMA
 from .config import (
     DEFAULT_PROVIDER, CHUNK_TOKEN_THRESHOLD,
     OVERLAP_RATE,
@@ -507,6 +507,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
         word_token_rate=WORD_TOKEN_RATE,
         apply_chunking=True,
         input_format: str = "markdown",
+        force_json_response=False,
         verbose=False,
         # Deprecated arguments
         provider: str = DEFAULT_PROVIDER,
@@ -527,9 +528,10 @@ class LLMExtractionStrategy(ExtractionStrategy):
             overlap_rate: Overlap between chunks.
             word_token_rate: Word to token conversion rate.
             apply_chunking: Whether to apply chunking.
+            input_format: Content format to use for extraction.
+                            Options: "markdown" (default), "html", "fit_markdown"
+            force_json_response: Whether to force a JSON response from the LLM.
             verbose: Whether to print verbose output.
-            usages: List of individual token usages.
-            total_usage: Accumulated token usage.
 
             # Deprecated arguments, will be removed very soon
             provider: The provider to use for extraction. It follows the format <provider_name>/<model_name>, e.g., "ollama/llama3.3".
@@ -545,6 +547,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
         self.schema = schema
         if schema:
             self.extract_type = "schema"
+        self.force_json_response = force_json_response
         self.chunk_token_threshold = chunk_token_threshold or CHUNK_TOKEN_THRESHOLD
         self.overlap_rate = overlap_rate
         self.word_token_rate = word_token_rate
@@ -608,64 +611,97 @@ class LLMExtractionStrategy(ExtractionStrategy):
             variable_values["SCHEMA"] = json.dumps(self.schema, indent=2) # if type of self.schema is dict else self.schema
             prompt_with_variables = PROMPT_EXTRACT_SCHEMA_WITH_INSTRUCTION
 
+        if self.extract_type == "schema" and not self.schema:
+            prompt_with_variables = PROMPT_EXTRACT_INFERRED_SCHEMA
+
         for variable in variable_values:
             prompt_with_variables = prompt_with_variables.replace(
                 "{" + variable + "}", variable_values[variable]
             )
 
-        response = perform_completion_with_backoff(
-            self.llm_config.provider,
-            prompt_with_variables,
-            self.llm_config.api_token,
-            base_url=self.llm_config.base_url,
-            extra_args=self.extra_args,
-        )  # , json_response=self.extract_type == "schema")
-        # Track usage
-        usage = TokenUsage(
-            completion_tokens=response.usage.completion_tokens,
-            prompt_tokens=response.usage.prompt_tokens,
-            total_tokens=response.usage.total_tokens,
-            completion_tokens_details=response.usage.completion_tokens_details.__dict__
-            if response.usage.completion_tokens_details
-            else {},
-            prompt_tokens_details=response.usage.prompt_tokens_details.__dict__
-            if response.usage.prompt_tokens_details
-            else {},
-        )
-        self.usages.append(usage)
-
-        # Update totals
-        self.total_usage.completion_tokens += usage.completion_tokens
-        self.total_usage.prompt_tokens += usage.prompt_tokens
-        self.total_usage.total_tokens += usage.total_tokens
-
         try:
-            blocks = extract_xml_data(["blocks"], response.choices[0].message.content)[
-                "blocks"
-            ]
-            blocks = json.loads(blocks)
-            for block in blocks:
-                block["error"] = False
-        except Exception:
-            parsed, unparsed = split_and_parse_json_objects(
-                response.choices[0].message.content
+            response = perform_completion_with_backoff(
+                self.llm_config.provider,
+                prompt_with_variables,
+                self.llm_config.api_token,
+                base_url=self.llm_config.base_url,
+                json_response=self.force_json_response,
+                extra_args=self.extra_args,
+            )  # , json_response=self.extract_type == "schema")
+            # Track usage
+            usage = TokenUsage(
+                completion_tokens=response.usage.completion_tokens,
+                prompt_tokens=response.usage.prompt_tokens,
+                total_tokens=response.usage.total_tokens,
+                completion_tokens_details=response.usage.completion_tokens_details.__dict__
+                if response.usage.completion_tokens_details
+                else {},
+                prompt_tokens_details=response.usage.prompt_tokens_details.__dict__
+                if response.usage.prompt_tokens_details
+                else {},
             )
-            blocks = parsed
-            if unparsed:
-                blocks.append(
-                    {"index": 0, "error": True, "tags": ["error"], "content": unparsed}
-                )
+            self.usages.append(usage)
 
-        if self.verbose:
-            print(
-                "[LOG] Extracted",
-                len(blocks),
-                "blocks from URL:",
-                url,
-                "block index:",
-                ix,
-            )
-        return blocks
+            # Update totals
+            self.total_usage.completion_tokens += usage.completion_tokens
+            self.total_usage.prompt_tokens += usage.prompt_tokens
+            self.total_usage.total_tokens += usage.total_tokens
+
+            try:
+                response = response.choices[0].message.content
+                blocks = None
+
+                if self.force_json_response:
+                    blocks = json.loads(response)
+                    if isinstance(blocks, dict):
+                        # If it has only one key which calue is list then assign that to blocks, exampled: {"news": [..]}
+                        if len(blocks) == 1 and isinstance(list(blocks.values())[0], list):
+                            blocks = list(blocks.values())[0]
+                        else:
+                            # If it has only one key which value is not list then assign that to blocks, exampled: { "article_id": "1234", ... }
+                            blocks = [blocks]
+                    elif isinstance(blocks, list):
+                        # If it is a list then assign that to blocks
+                        blocks = blocks
+                else: 
+                    # blocks = extract_xml_data(["blocks"], response.choices[0].message.content)["blocks"]
+                    blocks = extract_xml_data(["blocks"], response)["blocks"]
+                    blocks = json.loads(blocks)
+
+                for block in blocks:
+                    block["error"] = False
+            except Exception:
+                parsed, unparsed = split_and_parse_json_objects(
+                    response.choices[0].message.content
+                )
+                blocks = parsed
+                if unparsed:
+                    blocks.append(
+                        {"index": 0, "error": True, "tags": ["error"], "content": unparsed}
+                    )
+
+            if self.verbose:
+                print(
+                    "[LOG] Extracted",
+                    len(blocks),
+                    "blocks from URL:",
+                    url,
+                    "block index:",
+                    ix,
+                )
+            return blocks
+        except Exception as e:
+            if self.verbose:
+                print(f"[LOG] Error in LLM extraction: {e}")
+            # Add error information to extracted_content
+            return [
+                {
+                    "index": ix,
+                    "error": True,
+                    "tags": ["error"],
+                    "content": str(e),
+                }
+            ]
 
     def _merge(self, documents, chunk_token_threshold, overlap) -> List[str]:
         """
