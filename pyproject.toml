@@ -17,7 +17,7 @@ dependencies = [
     "lxml~=5.3",
     "litellm>=1.53.1",
     "numpy>=1.26.0,<3",
-    "pillow~=10.4",
+    "pillow>=11.0.0",
     "playwright>=1.49.0",
     "python-dotenv~=1.0",
     "requests~=2.26",
@@ -57,7 +57,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-pdf = ["PyPDF2"]  
+pdf = ["PyPDF2"]
 torch = ["torch", "nltk", "scikit-learn"]
 transformer = ["transformers", "tokenizers"]
 cosine = ["torch", "transformers", "nltk"]
@@ -70,7 +70,7 @@ all = [
     "transformers",
     "tokenizers",
     "selenium",
-    "PyPDF2"  
+    "PyPDF2"
 ]
 
 [project.scripts]
