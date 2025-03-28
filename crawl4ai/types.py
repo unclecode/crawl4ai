@@ -90,6 +90,7 @@ if TYPE_CHECKING:
     from .async_webcrawler import (
         AsyncWebCrawler as AsyncWebCrawlerType,
         CacheMode as CacheModeType,
+        RunManyReturn as RunManyReturnType,
     )
     from .models import CrawlResult as CrawlResultType
     from .hub import CrawlerHub as CrawlerHubType
@@ -153,7 +154,6 @@ if TYPE_CHECKING:
         RateLimiter as RateLimiterType,
         CrawlerMonitor as CrawlerMonitorType,
         DisplayMode as DisplayModeType,
-        RunManyReturn as RunManyReturnType,
     )
     
     # Docker client

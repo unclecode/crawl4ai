@@ -1,7 +1,12 @@
-import asyncio
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
-from playwright.async_api import Page, BrowserContext
+import sys
 
+import pytest
+from playwright.async_api import BrowserContext, Page
+
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CacheMode, CrawlerRunConfig
+
+
+@pytest.mark.asyncio
 async def test_reuse_context_by_config():
     # We will store each context ID in these maps to confirm reuse
     context_ids_for_A = []
@@ -82,4 +87,6 @@ async def test_reuse_context_by_config():
         print("❌ A and B ended up sharing the same context somehow!")
 
 if __name__ == "__main__":
-    asyncio.run(test_reuse_context_by_config())
+    import subprocess
+
+    sys.exit(subprocess.call(["pytest", "-v", str(__file__)]))

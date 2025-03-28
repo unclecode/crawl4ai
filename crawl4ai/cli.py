@@ -14,19 +14,19 @@ from rich.prompt import Prompt, Confirm
 
 from crawl4ai import (
     CacheMode,
-    AsyncWebCrawler, 
-    CrawlResult,
-    BrowserConfig, 
+    AsyncWebCrawler,
+    BrowserConfig,
     CrawlerRunConfig,
-    LLMExtractionStrategy, 
+    LLMExtractionStrategy,
     JsonCssExtractionStrategy,
     JsonXPathExtractionStrategy,
-    BM25ContentFilter, 
+    BM25ContentFilter,
     PruningContentFilter,
     BrowserProfiler,
     DefaultMarkdownGenerator,
     LLMConfig
 )
+from crawl4ai.async_webcrawler import CrawlResultContainer
 from litellm import completion
 from pathlib import Path
 
@@ -136,7 +136,8 @@ def load_config_file(path: Optional[str]) -> dict:
     except Exception as e:
         raise click.BadParameter(f'Error loading config file {path}: {str(e)}')
 
-def load_schema_file(path: Optional[str]) -> dict:
+
+def load_schema_file(path: Optional[str]) -> Optional[dict]:
     if not path:
         return None
     return load_config_file(path)
@@ -624,6 +625,9 @@ def crawl_cmd(url: str, browser_config: str, crawler_config: str, filter_config:
                     "query": "",
                     "threshold": 0.48
                 }
+            else:
+                filter_conf = {}
+
             if filter_conf["type"] == "bm25":
                 crawler_cfg.markdown_generator = DefaultMarkdownGenerator(
                     content_filter = BM25ContentFilter(
@@ -669,19 +673,14 @@ def crawl_cmd(url: str, browser_config: str, crawler_config: str, filter_config:
                 crawler_cfg.extraction_strategy = JsonXPathExtractionStrategy(
                     schema=schema_data
                 )
-                
 
         # No cache
         if bypass_cache:
             crawler_cfg.cache_mode = CacheMode.BYPASS
-        
+
         # Run crawler
-        result : CrawlResult = anyio.run(
-            run_crawler,
-            url,
-            browser_cfg,
-            crawler_cfg,
-            verbose
+        result: CrawlResultContainer = anyio.run(
+            run_crawler, url, browser_cfg, crawler_cfg, verbose
         )
 
         # Handle question

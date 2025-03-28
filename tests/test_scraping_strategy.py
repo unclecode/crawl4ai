@@ -1,17 +1,17 @@
-import nest_asyncio
+import sys
 
-nest_asyncio.apply()
+import pytest
 
-import asyncio
 from crawl4ai import (
     AsyncWebCrawler,
+    CacheMode,
     CrawlerRunConfig,
     LXMLWebScrapingStrategy,
-    CacheMode,
 )
 
 
-async def main():
+@pytest.mark.asyncio
+async def test_scraping_strategy():
     config = CrawlerRunConfig(
         cache_mode=CacheMode.BYPASS,
         scraping_strategy=LXMLWebScrapingStrategy(),  # Faster alternative to default BeautifulSoup
@@ -23,4 +23,6 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    import subprocess
+
+    sys.exit(subprocess.call(["pytest", "-v", str(__file__)]))

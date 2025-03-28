@@ -1,16 +1,14 @@
 # https://claude.ai/chat/c4bbe93d-fb54-44ce-92af-76b4c8086c6b
 # https://claude.ai/chat/c24a768c-d8b2-478a-acc7-d76d42a308da
-import os, sys
-
-parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(parent_dir)
-__location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
-
-import asyncio
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
-from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy, JsonXPathExtractionStrategy
 import json
+import os
+import sys
+from typing import Optional
+
+import pytest
+
+from crawl4ai import LLMConfig
+from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
 
 # Test HTML - A complex job board with companies, departments, and positions
 test_html = """
@@ -25,7 +23,7 @@ test_html = """
                 <a href="https://google.careers" class="careers-link">Careers Page</a>
             </div>
         </div>
-        
+
         <div class="departments">
             <div class="department">
                 <h2 class="department-name">Engineering</h2>
@@ -52,7 +50,7 @@ test_html = """
                     <!-- More positions -->
                 </div>
             </div>
-            
+
             <div class="department">
                 <h2 class="department-name">Marketing</h2>
                 <div class="positions">
@@ -82,30 +80,47 @@ test_html = """
 </div>
 """
 
-# Test cases
-def test_schema_generation():
-    # Test 1: No query (should extract everything)
-    print("\nTest 1: No Query (Full Schema)")
-    schema1 = JsonCssExtractionStrategy.generate_schema(test_html)
+
+@pytest.fixture
+def config() -> LLMConfig:
+    """Load OpenAI API key from environment variable.
+
+    If the API key is not found, skip the test."""
+    api_token: Optional[str] = os.environ.get("OPENAI_API_KEY")
+    if not api_token:
+        pytest.skip("OpenAI API key is required for this test")
+
+    return LLMConfig(api_token=api_token)
+
+
+def test_no_query_full_schema(config: LLMConfig):
+    """No query (should extract everything)"""
+    schema1 = JsonCssExtractionStrategy.generate_schema(test_html, llm_config=config)
     print(json.dumps(schema1, indent=2))
-    
-    # Test 2: Query for just basic job info
-    print("\nTest 2: Basic Job Info Query")
+
+
+def test_basic_job_info(config: LLMConfig):
+    """Query for just basic job info"""
     query2 = "I only need job titles, salaries, and locations"
-    schema2 = JsonCssExtractionStrategy.generate_schema(test_html, query2)
+    schema2 = JsonCssExtractionStrategy.generate_schema(test_html, query2, llm_config=config)
     print(json.dumps(schema2, indent=2))
-    
-    # Test 3: Query for company and department structure
-    print("\nTest 3: Organizational Structure Query")
+
+
+def test_company_and_department_structure(config: LLMConfig):
+    """Query for company and department structure"""
     query3 = "Extract company details and department names, without position details"
-    schema3 = JsonCssExtractionStrategy.generate_schema(test_html, query3)
+    schema3 = JsonCssExtractionStrategy.generate_schema(test_html, query3, llm_config=config)
     print(json.dumps(schema3, indent=2))
-    
-    # Test 4: Query for specific skills tracking
-    print("\nTest 4: Skills Analysis Query")
+
+
+def test_specific_skills_tracking(config: LLMConfig):
+    """Query for specific skills tracking"""
     query4 = "I want to analyze required skills across all positions"
-    schema4 = JsonCssExtractionStrategy.generate_schema(test_html, query4)
+    schema4 = JsonCssExtractionStrategy.generate_schema(test_html, query4, llm_config=config)
     print(json.dumps(schema4, indent=2))
 
+
 if __name__ == "__main__":
-    test_schema_generation()
+    import subprocess
+
+    sys.exit(subprocess.call(["pytest", "-v", str(__file__)]))

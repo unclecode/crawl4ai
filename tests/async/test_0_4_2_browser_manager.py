@@ -1,24 +1,22 @@
-import os
 import sys
-import asyncio
+from pathlib import Path
+
+import pytest
+
 from crawl4ai import AsyncWebCrawler, CacheMode
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
-
-parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(parent_dir)
-__location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
-
 
 # Assuming that the changes made allow different configurations
 # for managed browser, persistent context, and so forth.
 
 
+@pytest.mark.asyncio
 async def test_default_headless():
     async with AsyncWebCrawler(
         headless=True,
         verbose=True,
         user_agent_mode="random",
-        user_agent_generator_config={"device_type": "mobile", "os_type": "android"},
+        user_agent_generator_config={"platforms": ["mobile"], "os": "android"},
         use_managed_browser=False,
         use_persistent_context=False,
         ignore_https_errors=True,
@@ -33,16 +31,18 @@ async def test_default_headless():
         print("HTML length:", len(result.html if result.html else ""))
 
 
-async def test_managed_browser_persistent():
+@pytest.mark.asyncio
+async def test_managed_browser_persistent(tmp_path: Path):
     # Treating use_persistent_context=True as managed_browser scenario.
+    user_data_dir: Path = tmp_path / "user_data_dir"
     async with AsyncWebCrawler(
         headless=False,
         verbose=True,
         user_agent_mode="random",
-        user_agent_generator_config={"device_type": "desktop", "os_type": "mac"},
+        user_agent_generator_config={"platforms": ["desktop"], "os": "mac"},
         use_managed_browser=True,
         use_persistent_context=True,  # now should behave same as managed browser
-        user_data_dir="./outpu/test_profile",
+        user_data_dir=user_data_dir.as_posix(),
         # This should store and reuse profile data across runs
     ) as crawler:
         result = await crawler.arun(
@@ -54,6 +54,7 @@ async def test_managed_browser_persistent():
         print("HTML length:", len(result.html if result.html else ""))
 
 
+@pytest.mark.asyncio
 async def test_session_reuse():
     # Test creating a session, using it for multiple calls
     session_id = "my_session"
@@ -84,13 +85,14 @@ async def test_session_reuse():
         print("[test_session_reuse second call] success:", result2.success)
 
 
+@pytest.mark.asyncio
 async def test_magic_mode():
     # Test magic mode with override_navigator and simulate_user
     async with AsyncWebCrawler(
         headless=False,
         verbose=True,
         user_agent_mode="random",
-        user_agent_generator_config={"device_type": "desktop", "os_type": "windows"},
+        user_agent_generator_config={"platforms": ["desktop"], "os": "windows"},
         use_managed_browser=False,
         use_persistent_context=False,
         magic=True,
@@ -106,6 +108,7 @@ async def test_magic_mode():
         print("HTML length:", len(result.html if result.html else ""))
 
 
+@pytest.mark.asyncio
 async def test_proxy_settings():
     # Test with a proxy (if available) to ensure code runs with proxy
     async with AsyncWebCrawler(
@@ -126,6 +129,7 @@ async def test_proxy_settings():
             print("HTML preview:", result.html[:200] if result.html else "")
 
 
+@pytest.mark.asyncio
 async def test_ignore_https_errors():
     # Test ignore HTTPS errors with a self-signed or invalid cert domain
     # This is just conceptual, the domain should be one that triggers SSL error.
@@ -146,15 +150,7 @@ async def test_ignore_https_errors():
         print("[test_ignore_https_errors] success:", result.success)
 
 
-async def main():
-    print("Running tests...")
-    # await test_default_headless()
-    # await test_managed_browser_persistent()
-    # await test_session_reuse()
-    # await test_magic_mode()
-    # await test_proxy_settings()
-    await test_ignore_https_errors()
-
-
 if __name__ == "__main__":
-    asyncio.run(main())
+    import subprocess
+
+    sys.exit(subprocess.call(["pytest", "-v", str(__file__)]))

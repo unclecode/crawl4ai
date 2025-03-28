@@ -1,4 +1,4 @@
-from typing import List, Dict, Optional
+from typing import List, Optional
 from abc import ABC, abstractmethod
 from itertools import cycle
 
@@ -8,19 +8,19 @@ class ProxyRotationStrategy(ABC):
     """Base abstract class for proxy rotation strategies"""
     
     @abstractmethod
-    async def get_next_proxy(self) -> Optional[Dict]:
+    async def get_next_proxy(self) -> Optional[ProxyConfig]:
         """Get next proxy configuration from the strategy"""
         pass
 
     @abstractmethod
-    def add_proxies(self, proxies: List[Dict]):
+    def add_proxies(self, proxies: List[ProxyConfig]):
         """Add proxy configurations to the strategy"""
         pass
 
 class RoundRobinProxyStrategy:
     """Simple round-robin proxy rotation strategy using ProxyConfig objects"""
 
-    def __init__(self, proxies: List[ProxyConfig] = None):
+    def __init__(self, proxies: Optional[List[ProxyConfig]] = None):
         """
         Initialize with optional list of proxy configurations
         

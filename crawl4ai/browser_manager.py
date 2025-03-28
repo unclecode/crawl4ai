@@ -620,9 +620,9 @@ class BrowserManager:
                 or crawlerRunConfig.simulate_user
                 or crawlerRunConfig.magic
             ):
-                await context.add_init_script(load_js_script("navigator_overrider"))        
+                await context.add_init_script(load_js_script("navigator_overrider"))
 
-    async def create_browser_context(self, crawlerRunConfig: CrawlerRunConfig = None):
+    async def create_browser_context(self, crawlerRunConfig: Optional[CrawlerRunConfig] = None):
         """
         Creates and returns a new browser context with configured settings.
         Applies text-only mode settings if text_mode is enabled in config.
