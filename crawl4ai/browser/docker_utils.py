@@ -501,7 +501,7 @@ class DockerUtils:
             bool: True if Chrome started successfully, False otherwise
         """
         # Build Chrome command
-        chrome_cmd = ["google-chrome"]
+        chrome_cmd = ["chromium"]
         chrome_cmd.extend(browser_args)
 
         returncode, _, stderr = await self.exec_in_container(

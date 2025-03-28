@@ -9,11 +9,15 @@
             freetype \
             harfbuzz \
             ca-certificates \
-            ttf-freefont && \
+            ttf-freefont \
+            socat \
+            curl && \
         addgroup -S chromium && adduser -S chromium -G chromium && \
         mkdir -p /data && chown chromium:chromium /data && \
         rm -rf /var/cache/apk/*
     
+    ENV PATH="/usr/bin:/bin:/usr/sbin:/sbin"
+
     # Switch to a non-root user for security
     USER chromium
     WORKDIR /home/chromium
