@@ -80,7 +80,7 @@ class BrowserManager:
                     )
                 return PlaywrightBrowserStrategy(self.config, self.logger)
             return DockerBrowserStrategy(self.config, self.logger)
-        elif self.config.cdp_url or self.config.use_managed_browser:
+        elif self.config.browser_mode == "cdp" or self.config.cdp_url or self.config.use_managed_browser:
             return CDPBrowserStrategy(self.config, self.logger)
         else:
             return PlaywrightBrowserStrategy(self.config, self.logger)
@@ -159,16 +159,12 @@ class BrowserManager:
             session_id: The session ID to kill
         """
         # Handle kill_session via our strategy if it supports it
-        if hasattr(self._strategy, '_kill_session'):
-            await self._strategy._kill_session(session_id)
-        elif session_id in self.sessions:
-            context, page, _ = self.sessions[session_id]
-            await page.close()
-            # Only close context if not using CDP
-            if not self.config.use_managed_browser and not self.config.cdp_url and not self.config.browser_mode == "builtin":
-                await context.close()
-            del self.sessions[session_id]
-    
+        await self._strategy.kill_session(session_id)
+
+        # sync sessions if needed
+        if hasattr(self._strategy, 'sessions'):
+            self.sessions = self._strategy.sessions
+        
     def _cleanup_expired_sessions(self):
         """Clean up expired sessions based on TTL."""
         # Use strategy's implementation if available

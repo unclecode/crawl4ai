@@ -25,6 +25,7 @@ async def test_cdp_launch_connect():
     
     browser_config = BrowserConfig(
         use_managed_browser=True,
+        browser_mode="cdp",
         headless=True
     )
     
@@ -70,8 +71,8 @@ async def test_cdp_with_user_data_dir():
     logger.info(f"Created temporary user data directory: {user_data_dir}", tag="TEST")
     
     browser_config = BrowserConfig(
-        use_managed_browser=True,
         headless=True,
+        browser_mode="cdp",
         user_data_dir=user_data_dir
     )
     
@@ -210,7 +211,7 @@ async def run_tests():
     results = []
     
     # results.append(await test_cdp_launch_connect())
-    # results.append(await test_cdp_with_user_data_dir())
+    results.append(await test_cdp_with_user_data_dir())
     results.append(await test_cdp_session_management())
     
     # Print summary

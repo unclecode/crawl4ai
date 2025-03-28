@@ -16,7 +16,7 @@ from playwright.async_api import BrowserContext, Page
 
 from ...async_logger import AsyncLogger
 from ...async_configs import BrowserConfig, CrawlerRunConfig
-from ..utils import get_playwright, get_browser_executable, create_temp_directory, is_windows
+from ..utils import get_playwright, get_browser_executable, create_temp_directory, is_windows, check_process_is_running, terminate_process
 
 from .base import BaseBrowserStrategy
 
@@ -47,22 +47,34 @@ class CDPBrowserStrategy(BaseBrowserStrategy):
         Returns:
             self: For method chaining
         """
-        self.playwright = await get_playwright()
+        # Call the base class start to initialize Playwright
+        await super().start()
         
-        # Get or create CDP URL
-        cdp_url = await self._get_or_create_cdp_url()
-        
-        # Connect to the browser using CDP
-        self.browser = await self.playwright.chromium.connect_over_cdp(cdp_url)
-        
-        # Get or create default context
-        contexts = self.browser.contexts
-        if contexts:
-            self.default_context = contexts[0]
-        else:
-            self.default_context = await self.create_browser_context()
-        
-        await self.setup_context(self.default_context)
+        try:
+            # Get or create CDP URL
+            cdp_url = await self._get_or_create_cdp_url()
+            
+            # Connect to the browser using CDP
+            self.browser = await self.playwright.chromium.connect_over_cdp(cdp_url)
+            
+            # Get or create default context
+            contexts = self.browser.contexts
+            if contexts:
+                self.default_context = contexts[0]
+            else:
+                self.default_context = await self.create_browser_context()
+            
+            await self.setup_context(self.default_context)
+            
+            if self.logger:
+                self.logger.debug(f"Connected to CDP browser at {cdp_url}", tag="CDP")
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"Failed to connect to CDP browser: {str(e)}", tag="CDP")
+            # Clean up any resources before re-raising
+            await self._cleanup_process()
+            raise
+            
         return self
     
     async def _get_or_create_cdp_url(self) -> str:
@@ -105,39 +117,25 @@ class CDPBrowserStrategy(BaseBrowserStrategy):
                 )
                 
             # Monitor for a short time to make sure it starts properly
-            await asyncio.sleep(0.5)  # Give browser time to start
-            await self._initial_startup_check()
-            await asyncio.sleep(2)  # Give browser more time to start
+            is_running, return_code, stdout, stderr = await check_process_is_running(self.browser_process, delay=2)
+            if not is_running:
+                if self.logger:
+                    self.logger.error(
+                        message="Browser process terminated unexpectedly | Code: {code} | STDOUT: {stdout} | STDERR: {stderr}",
+                        tag="ERROR",
+                        params={
+                            "code": return_code,
+                            "stdout": stdout.decode() if stdout else "",
+                            "stderr": stderr.decode() if stderr else "",
+                        },
+                    )
+                await self._cleanup_process()
+                raise Exception("Browser process terminated unexpectedly")
+
             return f"http://localhost:{self.config.debugging_port}"
         except Exception as e:
             await self._cleanup_process()
-            raise Exception(f"Failed to start browser: {e}")
-    
-    async def _initial_startup_check(self):
-        """Perform a quick check to make sure the browser started successfully."""
-        if not self.browser_process:
-            return
-            
-        # Check that process started without immediate termination
-        await asyncio.sleep(0.5)
-        if self.browser_process.poll() is not None:
-            # Process already terminated
-            stdout, stderr = b"", b""
-            try:
-                stdout, stderr = self.browser_process.communicate(timeout=0.5)
-            except subprocess.TimeoutExpired:
-                pass
-                
-            if self.logger:
-                self.logger.error(
-                    message="Browser process terminated during startup | Code: {code} | STDOUT: {stdout} | STDERR: {stderr}",
-                    tag="ERROR",
-                    params={
-                        "code": self.browser_process.returncode,
-                        "stdout": stdout.decode() if stdout else "",
-                        "stderr": stderr.decode() if stderr else "",
-                    },
-                )
+            raise Exception(f"Failed to start browser: {e}")    
     
     async def _get_browser_args(self, user_data_dir: str) -> List[str]:
         """Returns browser-specific command line arguments.
@@ -148,6 +146,7 @@ class CDPBrowserStrategy(BaseBrowserStrategy):
         Returns:
             List of command-line arguments for the browser
         """
+        browser_args = super()._build_browser_args()
         browser_path = await get_browser_executable(self.config.browser_type)
         base_args = [browser_path]
 
@@ -170,7 +169,7 @@ class CDPBrowserStrategy(BaseBrowserStrategy):
         else:
             raise NotImplementedError(f"Browser type {self.config.browser_type} not supported")
 
-        return base_args + args
+        return base_args + browser_args + args
 
     async def _cleanup_process(self):
         """Cleanup browser process and temporary directory."""
@@ -179,33 +178,26 @@ class CDPBrowserStrategy(BaseBrowserStrategy):
 
         if self.browser_process:
             try:
-                # Only terminate if we have proper control over the process
-                if not self.browser_process.poll():
-                    # Process is still running
-                    self.browser_process.terminate()
-                    # Wait for process to end gracefully
-                    for _ in range(10):  # 10 attempts, 100ms each
-                        if self.browser_process.poll() is not None:
-                            break
-                        await asyncio.sleep(0.1)
-
-                    # Force kill if still running
-                    if self.browser_process.poll() is None:
-                        if is_windows():
-                            # On Windows we might need taskkill for detached processes
-                            try:
-                                subprocess.run(["taskkill", "/F", "/PID", str(self.browser_process.pid)])
-                            except Exception:
-                                self.browser_process.kill()
-                        else:
-                            self.browser_process.kill()
-                        await asyncio.sleep(0.1)  # Brief wait for kill to take effect
-
+                # Only attempt termination if the process is still running
+                if self.browser_process.poll() is None:
+                    # Use our robust cross-platform termination utility
+                    success = terminate_process(
+                        pid=self.browser_process.pid,
+                        timeout=1.0,  # Equivalent to the previous 10*0.1s wait
+                        logger=self.logger
+                    )
+                    
+                    if not success and self.logger:
+                        self.logger.warning(
+                            message="Failed to terminate browser process cleanly",
+                            tag="PROCESS"
+                        )
+                        
             except Exception as e:
                 if self.logger:
                     self.logger.error(
-                        message="Error terminating browser: {error}",
-                        tag="ERROR", 
+                        message="Error during browser process cleanup: {error}",
+                        tag="ERROR",
                         params={"error": str(e)},
                     )
 
@@ -220,54 +212,6 @@ class CDPBrowserStrategy(BaseBrowserStrategy):
                         params={"error": str(e)},
                     )
     
-    async def create_browser_context(self, crawlerRunConfig: Optional[CrawlerRunConfig] = None) -> BrowserContext:
-        """Create a new browser context.
-        
-        Uses the base class implementation which handles all configurations.
-        
-        Args:
-            crawlerRunConfig: Configuration object for the crawler run
-            
-        Returns:
-            BrowserContext: Browser context object
-        """
-        # Handle user_data_dir for CDP browsers
-        if self.config.user_data_dir:
-            # For CDP-based browsers, storage persistence is typically handled by the user_data_dir
-            # at the browser level, but we'll create a storage_state location for Playwright as well
-            storage_path = os.path.join(self.config.user_data_dir, "storage_state.json")
-            if not os.path.exists(storage_path):
-                # Create parent directory if it doesn't exist
-                os.makedirs(os.path.dirname(storage_path), exist_ok=True)
-                with open(storage_path, "w") as f:
-                    json.dump({}, f)
-            self.config.storage_state = storage_path
-            
-        # Use the base class implementation
-        return await super().create_browser_context(crawlerRunConfig)
-    
-    def _cleanup_expired_sessions(self):
-        """Clean up expired sessions based on TTL."""
-        current_time = time.time()
-        expired_sessions = [
-            sid
-            for sid, (_, _, last_used) in self.sessions.items()
-            if current_time - last_used > self.session_ttl
-        ]
-        for sid in expired_sessions:
-            asyncio.create_task(self._kill_session(sid))
-    
-    async def _kill_session(self, session_id: str):
-        """Kill a browser session and clean up resources.
-        
-        Args:
-            session_id: The session ID to kill
-        """
-        if session_id in self.sessions:
-            context, page, _ = self.sessions[session_id]
-            await page.close()
-            del self.sessions[session_id]
-    
     async def get_page(self, crawlerRunConfig: CrawlerRunConfig) -> Tuple[Page, BrowserContext]:
         """Get a page for the given configuration.
         
@@ -277,6 +221,7 @@ class CDPBrowserStrategy(BaseBrowserStrategy):
         Returns:
             Tuple of (Page, BrowserContext)
         """
+        # Clean up expired sessions using base class method
         self._cleanup_expired_sessions()
         
         # If a session_id is provided and we already have it, reuse that page + context
@@ -289,71 +234,56 @@ class CDPBrowserStrategy(BaseBrowserStrategy):
         # For CDP, we typically use the shared default_context
         context = self.default_context
         pages = context.pages
+        
+        # Otherwise, check if we have an existing context for this config
+        config_signature = self._make_config_signature(crawlerRunConfig)
+        self.contexts_by_config[config_signature] = context
+
+        await self.setup_context(context, crawlerRunConfig)
+
+        # Check if there's already a page with the target URL
         page = next((p for p in pages if p.url == crawlerRunConfig.url), None)
+        
+        # If not found, create a new page
         if not page:
             page = await context.new_page()
         
-        # If a session_id is specified, store this session so we can reuse later
+        # If a session_id is specified, store this session for reuse
         if crawlerRunConfig.session_id:
             self.sessions[crawlerRunConfig.session_id] = (context, page, time.time())
         
         return page, context
-    
+
     async def close(self):
-        """Close the browser and clean up resources."""
+        """Close the CDP browser and clean up resources."""
         # Skip cleanup if using external CDP URL and not launched by us
         if self.config.cdp_url and not self.browser_process:
+            if self.logger:
+                self.logger.debug("Skipping cleanup for external CDP browser", tag="CDP")
             return
         
-        if self.config.sleep_on_close:
-            await asyncio.sleep(0.5)
+        # Call parent implementation for common cleanup
+        await super().close()
         
-        # If we have a user_data_dir configured, ensure persistence of storage state
-        if self.config.user_data_dir and self.browser and self.default_context:
-            for context in self.browser.contexts:
-                try:
-                    await context.storage_state(path=os.path.join(self.config.user_data_dir, "Default", "storage_state.json"))
-                    if self.logger:
-                        self.logger.debug("Ensuring storage state is persisted before closing browser", tag="BROWSER")
-                except Exception as e:
-                    if self.logger:
-                        self.logger.warning(
-                            message="Failed to ensure storage persistence: {error}",
-                            tag="BROWSER", 
-                            params={"error": str(e)}
-                        )
-        
-        # Close all sessions
-        session_ids = list(self.sessions.keys())
-        for session_id in session_ids:
-            await self._kill_session(session_id)
-
-        # Close browser
-        if self.browser:
-            await self.browser.close()
-            self.browser = None
-        
-        # Clean up managed browser if we created it
+        # Additional CDP-specific cleanup
         if self.browser_process:
             await asyncio.sleep(0.5)
             await self._cleanup_process()
             self.browser_process = None
+            if self.logger:
+                self.logger.debug("Cleaned up CDP browser process", tag="CDP")
         
-        # Close temporary directory
+        # Clean up temporary directory
         if self.temp_dir and os.path.exists(self.temp_dir):
             try:
                 shutil.rmtree(self.temp_dir)
                 self.temp_dir = None
+                if self.logger:
+                    self.logger.debug("Removed temporary directory", tag="CDP")
             except Exception as e:
                 if self.logger:
                     self.logger.error(
                         message="Error removing temporary directory: {error}",
-                        tag="ERROR",
-                        params={"error": str(e)},
+                        tag="CDP",
+                        params={"error": str(e)}
                     )
-        
-        # Stop playwright
-        if self.playwright:
-            await self.playwright.stop()
-            self.playwright = None
-

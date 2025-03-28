@@ -77,7 +77,7 @@ async def test_builtin_browser_creation():
 
     # Step 4: Get browser info from the strategy
     print(f"\n{INFO}4. Getting browser information{RESET}")
-    browser_info = manager._strategy.get_builtin_browser_info()
+    browser_info = manager._strategy.get_browser_info()
     if browser_info:
         print(f"{SUCCESS}Browser info retrieved:{RESET}")
         for key, value in browser_info.items():
@@ -205,7 +205,7 @@ async def test_multiple_managers():
 
     # Step 1: Create first manager
     print(f"\n{INFO}1. Creating first browser manager{RESET}")
-    browser_config1 = (BrowserConfig(browser_mode="builtin", headless=True),)
+    browser_config1 = BrowserConfig(browser_mode="builtin", headless=True)
     manager1 = BrowserManager(browser_config=browser_config1, logger=logger)
 
     # Step 2: Create second manager
@@ -781,15 +781,16 @@ async def main():
         # await manager.close()
 
         # Run multiple managers test
-        # await test_multiple_managers()
+        await test_multiple_managers()
 
         # Run performance scaling test
         await test_performance_scaling()
+
         # Run cleanup test
-        # await cleanup_browsers()
+        await cleanup_browsers()
 
         # Run edge cases test
-        # await test_edge_cases()
+        await test_edge_cases()
 
         print(f"\n{SUCCESS}All tests completed!{RESET}")
 
