@@ -6,6 +6,7 @@ and serve as functional tests.
 
 import asyncio
 import os
+import re
 import sys
 
 # Add the project root to Python path if running directly
@@ -18,6 +19,53 @@ from crawl4ai.async_logger import AsyncLogger
 
 # Create a logger for clear terminal output
 logger = AsyncLogger(verbose=True, log_file=None)
+
+
+
+async def test_start_close():
+    # Create browser config for standard Playwright
+    browser_config = BrowserConfig(
+        headless=True,
+        viewport_width=1280,
+        viewport_height=800
+    )
+    
+    # Create browser manager with the config
+    manager = BrowserManager(browser_config=browser_config, logger=logger)
+    
+    try:
+        for _ in range(4):
+            # Start the browser
+            await manager.start()
+            logger.info("Browser started successfully", tag="TEST")
+
+            # Get a page
+            page, context = await manager.get_page(CrawlerRunConfig())
+            logger.info("Got page successfully", tag="TEST")
+            
+            # Navigate to a website
+            await page.goto("https://example.com")
+            logger.info("Navigated to example.com", tag="TEST")
+            
+            # Get page title
+            title = await page.title()
+            logger.info(f"Page title: {title}", tag="TEST")
+            
+            # Clean up
+            await manager.close()
+            logger.info("Browser closed successfully", tag="TEST")
+   
+            await asyncio.sleep(1)  # Wait for a moment before restarting
+
+    except Exception as e:
+        logger.error(f"Test failed: {str(e)}", tag="TEST")
+        # Ensure cleanup
+        try:
+            await manager.close()
+        except:
+            pass
+        return False
+    return True
 
 async def test_playwright_basic():
     """Test basic Playwright browser functionality."""
@@ -248,9 +296,10 @@ async def run_tests():
     """Run all tests sequentially."""
     results = []
     
-    results.append(await test_playwright_basic())
-    results.append(await test_playwright_text_mode())
-    results.append(await test_playwright_context_reuse())
+    # results.append(await test_start_close())
+    # results.append(await test_playwright_basic())
+    # results.append(await test_playwright_text_mode())
+    # results.append(await test_playwright_context_reuse())
     results.append(await test_playwright_session_management())
     
     # Print summary

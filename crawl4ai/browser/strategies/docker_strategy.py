@@ -19,12 +19,12 @@ from .builtin import CDPBrowserStrategy
 
 class DockerBrowserStrategy(CDPBrowserStrategy):
     """Docker-based browser strategy.
-    
+
     Extends the CDPBrowserStrategy to run browsers in Docker containers.
     Supports two modes:
     1. "connect" - Uses a Docker image with Chrome already running
     2. "launch" - Starts Chrome within the container with custom settings
-    
+
     Attributes:
         docker_config: Docker-specific configuration options
         container_id: ID of current Docker container
@@ -36,16 +36,16 @@ class DockerBrowserStrategy(CDPBrowserStrategy):
         internal_cdp_port: Chrome's internal CDP port
         internal_mapped_port: Port that socat maps to internally
     """
-    
+
     def __init__(self, config: BrowserConfig, logger: Optional[AsyncLogger] = None):
         """Initialize the Docker browser strategy.
-        
+
         Args:
             config: Browser configuration including Docker-specific settings
             logger: Logger for recording events and errors
         """
         super().__init__(config, logger)
-        
+
         # Initialize Docker-specific attributes
         self.docker_config = self.config.docker_config or DockerConfig()
         self.container_id = None
@@ -56,10 +56,9 @@ class DockerBrowserStrategy(CDPBrowserStrategy):
         if registry_file is None and self.config.user_data_dir:
             # Use the same registry file as BuiltinBrowserStrategy if possible
             registry_file = os.path.join(
-                os.path.dirname(self.config.user_data_dir), 
-                "browser_config.json"
+                os.path.dirname(self.config.user_data_dir), "browser_config.json"
             )
-                    
+
         self.registry = DockerRegistry(self.docker_config.registry_file)
         self.docker_utils = DockerUtils(logger)
         self.chrome_process_id = None
@@ -70,39 +69,44 @@ class DockerBrowserStrategy(CDPBrowserStrategy):
 
     async def start(self):
         """Start or connect to a browser running in a Docker container.
-        
-        This method initializes Playwright and establishes a connection to 
+
+        This method initializes Playwright and establishes a connection to
         a browser running in a Docker container. Depending on the configured mode:
         - "connect": Connects to a container with Chrome already running
         - "launch": Creates a container and launches Chrome within it
-        
+
         Returns:
             self: For method chaining
         """
         # Initialize Playwright
         from ..utils import get_playwright
+
         self.playwright = await get_playwright()
-        
+
         if self.logger:
             self.logger.info(
                 f"Starting Docker browser strategy in {self.docker_config.mode} mode",
-                tag="DOCKER"
+                tag="DOCKER",
             )
-        
+
         try:
             # Get CDP URL by creating or reusing a Docker container
             # This handles the container management and browser startup
             cdp_url = await self._get_or_create_cdp_url()
-            
+
             if not cdp_url:
-                raise Exception("Failed to establish CDP connection to Docker container")
-            
+                raise Exception(
+                    "Failed to establish CDP connection to Docker container"
+                )
+
             if self.logger:
-                self.logger.info(f"Connecting to browser in Docker via CDP: {cdp_url}", tag="DOCKER")
-            
+                self.logger.info(
+                    f"Connecting to browser in Docker via CDP: {cdp_url}", tag="DOCKER"
+                )
+
             # Connect to the browser using CDP
             self.browser = await self.playwright.chromium.connect_over_cdp(cdp_url)
-            
+
             # Get existing context or create default context
             contexts = self.browser.contexts
             if contexts:
@@ -114,33 +118,35 @@ class DockerBrowserStrategy(CDPBrowserStrategy):
                     self.logger.debug("Creating new browser context", tag="DOCKER")
                 self.default_context = await self.create_browser_context()
                 await self.setup_context(self.default_context)
-                
+
             return self
-        
+
         except Exception as e:
             # Clean up resources if startup fails
             if self.container_id and not self.docker_config.persistent:
                 if self.logger:
                     self.logger.warning(
                         f"Cleaning up container after failed start: {self.container_id[:12]}",
-                        tag="DOCKER"
+                        tag="DOCKER",
                     )
                 await self.docker_utils.remove_container(self.container_id)
                 self.registry.unregister_container(self.container_id)
                 self.container_id = None
-                
+
             if self.playwright:
                 await self.playwright.stop()
                 self.playwright = None
-                
+
             # Re-raise the exception
             if self.logger:
-                self.logger.error(f"Failed to start Docker browser: {str(e)}", tag="DOCKER")
-            raise    
+                self.logger.error(
+                    f"Failed to start Docker browser: {str(e)}", tag="DOCKER"
+                )
+            raise
 
     async def _generate_config_hash(self) -> str:
         """Generate a hash of the configuration for container matching.
-        
+
         Returns:
             Hash string uniquely identifying this configuration
         """
@@ -151,66 +157,77 @@ class DockerBrowserStrategy(CDPBrowserStrategy):
             "browser_type": self.config.browser_type,
             "headless": self.config.headless,
         }
-        
+
         # Add browser-specific config if in launch mode
         if self.docker_config.mode == "launch":
-            config_dict.update({
-                "text_mode": self.config.text_mode,
-                "light_mode": self.config.light_mode,
-                "viewport_width": self.config.viewport_width,
-                "viewport_height": self.config.viewport_height,
-            })
-        
+            config_dict.update(
+                {
+                    "text_mode": self.config.text_mode,
+                    "light_mode": self.config.light_mode,
+                    "viewport_width": self.config.viewport_width,
+                    "viewport_height": self.config.viewport_height,
+                }
+            )
+
         # Use the utility method to generate the hash
         return self.docker_utils.generate_config_hash(config_dict)
-    
+
     async def _get_or_create_cdp_url1(self) -> str:
         """Get CDP URL by either creating a new container or using an existing one.
-        
+
         Returns:
             CDP URL for connecting to the browser
-            
+
         Raises:
             Exception: If container creation or browser launch fails
         """
         # If CDP URL is explicitly provided, use it
         if self.config.cdp_url:
             return self.config.cdp_url
-        
+
         # Ensure Docker image exists (will build if needed)
         image_name = await self.docker_utils.ensure_docker_image_exists(
-            self.docker_config.image, 
-            self.docker_config.mode
+            self.docker_config.image, self.docker_config.mode
         )
-        
+
         # Generate config hash for container matching
         config_hash = await self._generate_config_hash()
-        
+
         # Look for existing container with matching config
-        container_id = self.registry.find_container_by_config(config_hash, self.docker_utils)
-        
+        container_id = self.registry.find_container_by_config(
+            config_hash, self.docker_utils
+        )
+
         if container_id:
             # Use existing container
             self.container_id = container_id
             host_port = self.registry.get_container_host_port(container_id)
             if self.logger:
-                self.logger.info(f"Using existing Docker container: {container_id[:12]}", tag="DOCKER")
+                self.logger.info(
+                    f"Using existing Docker container: {container_id[:12]}",
+                    tag="DOCKER",
+                )
         else:
             # Get a port for the new container
-            host_port = self.docker_config.host_port or self.registry.get_next_available_port(self.docker_utils)
-            
+            host_port = (
+                self.docker_config.host_port
+                or self.registry.get_next_available_port(self.docker_utils)
+            )
+
             # Prepare volumes list
             volumes = list(self.docker_config.volumes)
-            
+
             # Add user data directory if specified
             if self.docker_config.user_data_dir:
                 # Ensure user data directory exists
                 os.makedirs(self.docker_config.user_data_dir, exist_ok=True)
-                volumes.append(f"{self.docker_config.user_data_dir}:{self.docker_config.container_user_data_dir}")
-                
+                volumes.append(
+                    f"{self.docker_config.user_data_dir}:{self.docker_config.container_user_data_dir}"
+                )
+
                 # Update config user_data_dir to point to container path
                 self.config.user_data_dir = self.docker_config.container_user_data_dir
-            
+
             # Create a new container
             container_id = await self.docker_utils.create_container(
                 image_name=image_name,
@@ -219,54 +236,63 @@ class DockerBrowserStrategy(CDPBrowserStrategy):
                 volumes=volumes,
                 network=self.docker_config.network,
                 env_vars=self.docker_config.env_vars,
-                extra_args=self.docker_config.extra_args
+                extra_args=self.docker_config.extra_args,
             )
-            
+
             if not container_id:
                 raise Exception("Failed to create Docker container")
-            
+
             self.container_id = container_id
-            
+
             # Register the container
             self.registry.register_container(container_id, host_port, config_hash)
-            
+
             # Wait for container to be ready
             await self.docker_utils.wait_for_container_ready(container_id)
-            
+
             # Handle specific setup based on mode
             if self.docker_config.mode == "launch":
                 # In launch mode, we need to start socat and Chrome
                 await self.docker_utils.start_socat_in_container(container_id)
-                
+
                 # Build browser arguments
                 browser_args = self._build_browser_args()
-                
+
                 # Launch Chrome
-                await self.docker_utils.launch_chrome_in_container(container_id, browser_args)
-                
+                await self.docker_utils.launch_chrome_in_container(
+                    container_id, browser_args
+                )
+
                 # Get PIDs for later cleanup
-                self.chrome_process_id = await self.docker_utils.get_process_id_in_container(
-                    container_id, "chrome"
+                self.chrome_process_id = (
+                    await self.docker_utils.get_process_id_in_container(
+                        container_id, "chrome"
+                    )
                 )
-                self.socat_process_id = await self.docker_utils.get_process_id_in_container(
-                    container_id, "socat"
+                self.socat_process_id = (
+                    await self.docker_utils.get_process_id_in_container(
+                        container_id, "socat"
+                    )
                 )
-            
+
             # Wait for CDP to be ready
             await self.docker_utils.wait_for_cdp_ready(host_port)
-            
+
             if self.logger:
-                self.logger.success(f"Docker container ready: {container_id[:12]} on port {host_port}", tag="DOCKER")
-        
+                self.logger.success(
+                    f"Docker container ready: {container_id[:12]} on port {host_port}",
+                    tag="DOCKER",
+                )
+
         # Return CDP URL
         return f"http://localhost:{host_port}"
 
     async def _get_or_create_cdp_url(self) -> str:
         """Get CDP URL by either creating a new container or using an existing one.
-        
+
         Returns:
             CDP URL for connecting to the browser
-            
+
         Raises:
             Exception: If container creation or browser launch fails
         """
@@ -276,38 +302,47 @@ class DockerBrowserStrategy(CDPBrowserStrategy):
 
         # Ensure Docker image exists (will build if needed)
         image_name = await self.docker_utils.ensure_docker_image_exists(
-            self.docker_config.image, 
-            self.docker_config.mode
+            self.docker_config.image, self.docker_config.mode
         )
-        
+
         # Generate config hash for container matching
         config_hash = await self._generate_config_hash()
-        
+
         # Look for existing container with matching config
-        container_id = await self.registry.find_container_by_config(config_hash, self.docker_utils)
-        
+        container_id = await self.registry.find_container_by_config(
+            config_hash, self.docker_utils
+        )
+
         if container_id:
             # Use existing container
             self.container_id = container_id
             host_port = self.registry.get_container_host_port(container_id)
             if self.logger:
-                self.logger.info(f"Using existing Docker container: {container_id[:12]}", tag="DOCKER")
+                self.logger.info(
+                    f"Using existing Docker container: {container_id[:12]}",
+                    tag="DOCKER",
+                )
         else:
             # Get a port for the new container
-            host_port = self.docker_config.host_port or self.registry.get_next_available_port(self.docker_utils)
-            
+            host_port = (
+                self.docker_config.host_port
+                or self.registry.get_next_available_port(self.docker_utils)
+            )
+
             # Prepare volumes list
             volumes = list(self.docker_config.volumes)
-            
+
             # Add user data directory if specified
             if self.docker_config.user_data_dir:
                 # Ensure user data directory exists
                 os.makedirs(self.docker_config.user_data_dir, exist_ok=True)
-                volumes.append(f"{self.docker_config.user_data_dir}:{self.docker_config.container_user_data_dir}")
-                
-                # Update config user_data_dir to point to container path
-                self.config.user_data_dir = self.docker_config.container_user_data_dir
-            
+                volumes.append(
+                    f"{self.docker_config.user_data_dir}:{self.docker_config.container_user_data_dir}"
+                )
+
+                # # Update config user_data_dir to point to container path
+                # self.config.user_data_dir = self.docker_config.container_user_data_dir
+
             # Create a new container
             container_id = await self.docker_utils.create_container(
                 image_name=image_name,
@@ -318,148 +353,196 @@ class DockerBrowserStrategy(CDPBrowserStrategy):
                 env_vars=self.docker_config.env_vars,
                 cpu_limit=self.docker_config.cpu_limit,
                 memory_limit=self.docker_config.memory_limit,
-                extra_args=self.docker_config.extra_args
+                extra_args=self.docker_config.extra_args,
             )
-            
+
             if not container_id:
                 raise Exception("Failed to create Docker container")
-            
-            self.container_id = container_id           
-            
+
+            self.container_id = container_id
+
             # Wait for container to be ready
             await self.docker_utils.wait_for_container_ready(container_id)
-            
+
             # Handle specific setup based on mode
             if self.docker_config.mode == "launch":
                 # In launch mode, we need to start socat and Chrome
                 await self.docker_utils.start_socat_in_container(container_id)
-                
+
                 # Build browser arguments
                 browser_args = self._build_browser_args()
-                
+
                 # Launch Chrome
-                await self.docker_utils.launch_chrome_in_container(container_id, browser_args)
-                
+                await self.docker_utils.launch_chrome_in_container(
+                    container_id, browser_args
+                )
+
                 # Get PIDs for later cleanup
-                self.chrome_process_id = await self.docker_utils.get_process_id_in_container(
-                    container_id, "chromium"
+                self.chrome_process_id = (
+                    await self.docker_utils.get_process_id_in_container(
+                        container_id, "chromium"
+                    )
                 )
-                self.socat_process_id = await self.docker_utils.get_process_id_in_container(
-                    container_id, "socat"
+                self.socat_process_id = (
+                    await self.docker_utils.get_process_id_in_container(
+                        container_id, "socat"
+                    )
                 )
-            
+
             # Wait for CDP to be ready
             cdp_json_config = await self.docker_utils.wait_for_cdp_ready(host_port)
 
             if cdp_json_config:
                 # Register the container in the shared registry
-                self.registry.register_container(container_id, host_port, config_hash, cdp_json_config)
+                self.registry.register_container(
+                    container_id, host_port, config_hash, cdp_json_config
+                )
             else:
                 raise Exception("Failed to get CDP JSON config from Docker container")
-            
+
             if self.logger:
-                self.logger.success(f"Docker container ready: {container_id[:12]} on port {host_port}", tag="DOCKER")
-        
+                self.logger.success(
+                    f"Docker container ready: {container_id[:12]} on port {host_port}",
+                    tag="DOCKER",
+                )
+
         # Return CDP URL
         return f"http://localhost:{host_port}"
 
     def _build_browser_args(self) -> List[str]:
         """Build Chrome command line arguments based on BrowserConfig.
-        
+
         Returns:
             List of command line arguments for Chrome
         """
-        args = [
-            "--no-sandbox",
-            "--disable-gpu",
+        # Call parent method to get common arguments
+        browser_args = super()._build_browser_args()
+        return browser_args["args"] + [
             f"--remote-debugging-port={self.internal_cdp_port}",
             "--remote-debugging-address=0.0.0.0",  # Allow external connections
             "--disable-dev-shm-usage",
+            "--headless=new",
         ]
-        
-        if self.config.headless:
-            args.append("--headless=new")
-            
-        if self.config.viewport_width and self.config.viewport_height:
-            args.append(f"--window-size={self.config.viewport_width},{self.config.viewport_height}")
-            
-        if self.config.user_agent:
-            args.append(f"--user-agent={self.config.user_agent}")
-            
-        if self.config.text_mode:
-            args.extend([
-                "--blink-settings=imagesEnabled=false",
-                "--disable-remote-fonts",
-                "--disable-images",
-                "--disable-javascript",
-            ])
-            
-        if self.config.light_mode:
-            # Import here to avoid circular import
-            from ..utils import get_browser_disable_options
-            args.extend(get_browser_disable_options())
-            
-        if self.config.user_data_dir:
-            args.append(f"--user-data-dir={self.config.user_data_dir}")
-            
-        if self.config.extra_args:
-            args.extend(self.config.extra_args)
-            
-        return args
-    
+
+        # args = [
+        #     "--no-sandbox",
+        #     "--disable-gpu",
+        #     f"--remote-debugging-port={self.internal_cdp_port}",
+        #     "--remote-debugging-address=0.0.0.0",  # Allow external connections
+        #     "--disable-dev-shm-usage",
+        # ]
+
+        # if self.config.headless:
+        #     args.append("--headless=new")
+
+        # if self.config.viewport_width and self.config.viewport_height:
+        #     args.append(f"--window-size={self.config.viewport_width},{self.config.viewport_height}")
+
+        # if self.config.user_agent:
+        #     args.append(f"--user-agent={self.config.user_agent}")
+
+        # if self.config.text_mode:
+        #     args.extend([
+        #         "--blink-settings=imagesEnabled=false",
+        #         "--disable-remote-fonts",
+        #         "--disable-images",
+        #         "--disable-javascript",
+        #     ])
+
+        # if self.config.light_mode:
+        #     # Import here to avoid circular import
+        #     from ..utils import get_browser_disable_options
+        #     args.extend(get_browser_disable_options())
+
+        # if self.config.user_data_dir:
+        #     args.append(f"--user-data-dir={self.config.user_data_dir}")
+
+        # if self.config.extra_args:
+        #     args.extend(self.config.extra_args)
+
+        # return args
+
     async def close(self):
         """Close the browser and clean up Docker container if needed."""
-        # Set shutting_down flag to prevent race conditions
-        self.shutting_down = True
-        
-        # Store state if needed before closing
-        if self.browser and self.docker_config.user_data_dir and self.docker_config.persistent:
+        # Set flag to track if we were the ones initiating shutdown
+        initiated_shutdown = not getattr(self, "shutting_down", False)
+
+        # Storage persistence for Docker needs special handling
+        # We need to store state before calling super().close() which will close the browser
+        if (
+            self.browser
+            and self.docker_config.user_data_dir
+            and self.docker_config.persistent
+        ):
             for context in self.browser.contexts:
                 try:
-                    storage_path = os.path.join(self.docker_config.user_data_dir, "storage_state.json")
+                    # Ensure directory exists
+                    os.makedirs(self.docker_config.user_data_dir, exist_ok=True)
+
+                    # Save storage state to user data directory
+                    storage_path = os.path.join(
+                        self.docker_config.user_data_dir, "storage_state.json"
+                    )
                     await context.storage_state(path=storage_path)
                     if self.logger:
-                        self.logger.debug("Persisted storage state before closing browser", tag="DOCKER")
+                        self.logger.debug(
+                            "Persisted Docker-specific storage state", tag="DOCKER"
+                        )
                 except Exception as e:
                     if self.logger:
                         self.logger.warning(
-                            message="Failed to persist storage state: {error}",
+                            message="Failed to persist Docker storage state: {error}",
                             tag="DOCKER",
-                            params={"error": str(e)}
+                            params={"error": str(e)},
                         )
-        
-        # Close browser connection (but not container)
-        if self.browser:
-            await self.browser.close()
-            self.browser = None
-        
-        # Only clean up container if not persistent
-        if self.container_id and not self.docker_config.persistent:
-            # Stop Chrome process in "launch" mode
-            if self.docker_config.mode == "launch" and self.chrome_process_id:
-                await self.docker_utils.stop_process_in_container(
-                    self.container_id, self.chrome_process_id
-                )
-            
-            # Stop socat process in "launch" mode
-            if self.docker_config.mode == "launch" and self.socat_process_id:
-                await self.docker_utils.stop_process_in_container(
-                    self.container_id, self.socat_process_id
-                )
-            
-            # Remove or stop container based on configuration
-            if self.docker_config.remove_on_exit:
-                await self.docker_utils.remove_container(self.container_id)
-                # Unregister from registry
-                self.registry.unregister_container(self.container_id)
-            else:
-                await self.docker_utils.stop_container(self.container_id)
-            
-            self.container_id = None
-        
-        # Close Playwright
-        if self.playwright:
-            await self.playwright.stop()
-            self.playwright = None
-        
-        self.shutting_down = False
+
+        # Call parent method to handle common cleanup
+        await super().close()
+
+        # Only perform container cleanup if we initiated shutdown
+        # and we need to handle Docker-specific resources
+        if initiated_shutdown:
+            # Only clean up container if not persistent
+            if self.container_id and not self.docker_config.persistent:
+                # Stop Chrome process in "launch" mode
+                if self.docker_config.mode == "launch" and self.chrome_process_id:
+                    await self.docker_utils.stop_process_in_container(
+                        self.container_id, self.chrome_process_id
+                    )
+                    if self.logger:
+                        self.logger.debug(
+                            f"Stopped Chrome process {self.chrome_process_id} in container",
+                            tag="DOCKER",
+                        )
+
+                # Stop socat process in "launch" mode
+                if self.docker_config.mode == "launch" and self.socat_process_id:
+                    await self.docker_utils.stop_process_in_container(
+                        self.container_id, self.socat_process_id
+                    )
+                    if self.logger:
+                        self.logger.debug(
+                            f"Stopped socat process {self.socat_process_id} in container",
+                            tag="DOCKER",
+                        )
+
+                # Remove or stop container based on configuration
+                if self.docker_config.remove_on_exit:
+                    await self.docker_utils.remove_container(self.container_id)
+                    # Unregister from registry
+                    if hasattr(self, "registry") and self.registry:
+                        self.registry.unregister_container(self.container_id)
+                    if self.logger:
+                        self.logger.debug(
+                            f"Removed Docker container {self.container_id}",
+                            tag="DOCKER",
+                        )
+                else:
+                    await self.docker_utils.stop_container(self.container_id)
+                    if self.logger:
+                        self.logger.debug(
+                            f"Stopped Docker container {self.container_id}",
+                            tag="DOCKER",
+                        )
+
+                self.container_id = None

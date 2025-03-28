@@ -614,9 +614,9 @@ async def run_tests():
     #     return
     
     # Run browser tests
-    # results.append(await test_docker_connect_mode())
-    # results.append(await test_docker_launch_mode())
-    # results.append(await test_docker_persistent_storage())
+    results.append(await test_docker_connect_mode())
+    results.append(await test_docker_launch_mode())
+    results.append(await test_docker_persistent_storage())
     results.append(await test_docker_parallel_pages())
     results.append(await test_docker_registry_reuse())
     
