@@ -14,13 +14,13 @@ from ...async_configs import BrowserConfig
 from ..models import DockerConfig
 from ..docker_registry import DockerRegistry
 from ..docker_utils import DockerUtils
-from .builtin import BuiltinBrowserStrategy
+from .builtin import CDPBrowserStrategy
 
 
-class DockerBrowserStrategy(BuiltinBrowserStrategy):
+class DockerBrowserStrategy(CDPBrowserStrategy):
     """Docker-based browser strategy.
     
-    Extends the BuiltinBrowserStrategy to run browsers in Docker containers.
+    Extends the CDPBrowserStrategy to run browsers in Docker containers.
     Supports two modes:
     1. "connect" - Uses a Docker image with Chrome already running
     2. "launch" - Starts Chrome within the container with custom settings
@@ -342,7 +342,7 @@ class DockerBrowserStrategy(BuiltinBrowserStrategy):
                 
                 # Get PIDs for later cleanup
                 self.chrome_process_id = await self.docker_utils.get_process_id_in_container(
-                    container_id, "chrome"
+                    container_id, "chromium"
                 )
                 self.socat_process_id = await self.docker_utils.get_process_id_in_container(
                     container_id, "socat"
@@ -396,7 +396,7 @@ class DockerBrowserStrategy(BuiltinBrowserStrategy):
             
         if self.config.light_mode:
             # Import here to avoid circular import
-            from .utils import get_browser_disable_options
+            from ..utils import get_browser_disable_options
             args.extend(get_browser_disable_options())
             
         if self.config.user_data_dir:
