@@ -54,7 +54,7 @@ TEST_HTML_SAMPLES = {
 
     "links_citations": """
         <body>
-            <h1>Document with Links</h1>
+            <h1>Article with Links</h1>
             <p>First link to <a href="http://example.com/1">Example 1</a></p>
             <p>Second link to <a href="http://example.com/2" title="Example 2">Test 2</a></p>
             <p>Image link: <img src="test.jpg" alt="test image"></p>
@@ -107,6 +107,8 @@ def test_content_filters(html: str):
     bm25_content = bm25_filter.filter_content(html)
     bm25_time = time.time() - start_time
 
+    assert len(pruned_content) > 0
+    assert len(bm25_content) > 0
     print(f"Original length: {len(html)}")
     print(f"Pruned length: {sum(len(c) for c in pruned_content)} ({pruning_time:.3f}s)")
     print(f"BM25 length: {sum(len(c) for c in bm25_content)} ({bm25_time:.3f}s)")
@@ -130,6 +132,11 @@ def test_markdown_generation(html: str, generator: DefaultMarkdownGenerator):
         base_url="http://example.com",
         citations=True
     )
+
+    assert result is not None
+    assert result.raw_markdown is not None
+    assert result.fit_markdown is not None
+    assert result.references_markdown is not None
 
     print(f"Time: {time.time() - start_time:.3f}s")
     print(f"Raw length: {len(result.raw_markdown)}")

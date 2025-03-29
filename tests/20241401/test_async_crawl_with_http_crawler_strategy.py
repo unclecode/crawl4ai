@@ -1,5 +1,6 @@
 import sys
 
+from httpx import codes
 import pytest
 
 from crawl4ai import (
@@ -15,7 +16,15 @@ from crawl4ai.async_logger import AsyncLogger
 
 
 @pytest.mark.asyncio
-async def test_async_crawl():
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://example.com",
+        "https://httpbin.org/get",
+        "raw://<html><body>Test content</body></html>"
+    ]
+)
+async def test_async_crawl(url: str):
     # Initialize HTTP crawler strategy
     http_strategy = AsyncHTTPCrawlerStrategy(
         browser_config=HTTPCrawlerConfig(
@@ -39,23 +48,14 @@ async def test_async_crawl():
             )
         )
 
-        # Test different URLs
-        urls = [
-            "https://example.com",
-            "https://httpbin.org/get",
-            "raw://<html><body>Test content</body></html>"
-        ]
-
-        for url in urls:
-            print(f"\n=== Testing {url} ===")
-            try:
-                result = await crawler.arun(url=url, config=crawler_config)
-                print(f"Status: {result.status_code}")
-                print(f"Raw HTML length: {len(result.html)}")
-                if hasattr(result, 'markdown'):
-                    print(f"Markdown length: {len(result.markdown.raw_markdown)}")
-            except Exception as e:
-                print(f"Error: {e}")
+        result = await crawler.arun(url=url, config=crawler_config)
+        assert result.status_code == codes.OK
+        assert result.html
+        assert result.markdown
+        assert result.markdown.raw_markdown
+        print(f"Status: {result.status_code}")
+        print(f"Raw HTML length: {len(result.html)}")
+        print(f"Markdown length: {len(result.markdown.raw_markdown)}")
 
 if __name__ == "__main__":
     import subprocess

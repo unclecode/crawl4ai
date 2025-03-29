@@ -482,7 +482,7 @@ class BM25ContentFilter(RelevantContentFilter):
         }
         self.stemmer = stemmer(language)
 
-    def filter_content(self, html: str, min_word_threshold: int = None) -> List[str]:
+    def filter_content(self, html: str, min_word_threshold: Optional[int] = None) -> List[str]:
         """
         Implements content filtering using BM25 algorithm with priority tag handling.
 

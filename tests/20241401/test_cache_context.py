@@ -4,6 +4,7 @@ import pytest
 from playwright.async_api import BrowserContext, Page
 
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CacheMode, CrawlerRunConfig
+from crawl4ai.async_webcrawler import CrawlResultContainer
 
 
 @pytest.mark.asyncio
@@ -17,6 +18,7 @@ async def test_reuse_context_by_config():
         c_id = id(context)
         print(f"[HOOK] on_page_context_created - Context ID: {c_id}")
         # Distinguish which config we used by checking a custom hook param
+        assert config.shared_data is not None
         config_label = config.shared_data.get("config_label", "unknown")
         if config_label == "A":
             context_ids_for_A.append(c_id)
@@ -60,11 +62,13 @@ async def test_reuse_context_by_config():
     print("\n--- Crawling with config A (text_mode=True) ---")
     for _ in range(2):
         # Pass an extra kwarg to the hook so we know which config is being used
-        await crawler.arun(test_url, config=configA)
+        result: CrawlResultContainer = await crawler.arun(test_url, config=configA)
+        assert result.success
 
     print("\n--- Crawling with config B (text_mode=False) ---")
     for _ in range(2):
-        await crawler.arun(test_url, config=configB)
+        result = await crawler.arun(test_url, config=configB)
+        assert result.success
 
     # Close the crawler (shuts down the browser, closes contexts)
     await crawler.close()

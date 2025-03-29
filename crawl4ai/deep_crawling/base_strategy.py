@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import AsyncGenerator, Optional, Set, List, Dict
 from functools import wraps
 from contextvars import ContextVar
-from ..types import AsyncWebCrawler, CrawlerRunConfig, CrawlResult, RunManyReturn
+from ..types import AsyncWebCrawler, CrawlerRunConfig, CrawlResult, CrawlResultContainer
 
 
 class DeepCrawlDecorator:
@@ -86,7 +86,7 @@ class DeepCrawlStrategy(ABC):
         start_url: str,
         crawler: AsyncWebCrawler,
         config: Optional[CrawlerRunConfig] = None,
-    ) -> RunManyReturn:
+    ) -> CrawlResultContainer:
         """
         Traverse the given URL using the specified crawler.
         

@@ -16,7 +16,7 @@ import httpx
 from socket import gaierror
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Callable
-from urllib.parse import urljoin
+from urllib.parse import ParseResult, urljoin
 import requests
 from requests.exceptions import InvalidSchema
 import xxhash
@@ -2074,6 +2074,7 @@ def normalize_url_tmp(href, base_url):
 
     return href.strip()
 
+DEFAULT_PORTS = {"http": 80, "https": 443}
 
 def get_base_domain(url: str) -> str:
     """
@@ -2081,7 +2082,7 @@ def get_base_domain(url: str) -> str:
 
     How it works:
     1. Parses the URL to extract the domain.
-    2. Removes the port number and 'www' prefix.
+    2. Removes the port number and 'www' prefix if necessary.
     3. Handles special domains (e.g., 'co.uk') to extract the correct base.
 
     Args:
@@ -2091,8 +2092,8 @@ def get_base_domain(url: str) -> str:
         str: The extracted base domain or an empty string if parsing fails.
     """
     try:
-        # Get domain from URL
-        domain = urlparse(url).netloc.lower()
+        parsed: ParseResult = urlparse(url)
+        domain = parsed.netloc.lower()
         if not domain:
             return ""
 
@@ -2100,7 +2101,14 @@ def get_base_domain(url: str) -> str:
         domain = domain.split(":")[0]
 
         # Remove www
-        domain = re.sub(r"^www\.", "", domain)
+        domain = domain.removeprefix("www.")
+
+        port_suffix: str = ""
+        port = parsed.port
+        if port is not None and port != DEFAULT_PORTS.get(parsed.scheme):
+            # Port needed.
+            port_suffix = f":{port}"
+
 
         # Extract last two parts of domain (handles co.uk etc)
         parts = domain.split(".")
@@ -2119,9 +2127,9 @@ def get_base_domain(url: str) -> str:
             "af",
             "ag",
         }:
-            return ".".join(parts[-3:])
+            return ".".join(parts[-3:]) + port_suffix
 
-        return ".".join(parts[-2:])
+        return ".".join(parts[-2:]) + port_suffix
     except Exception:
         return ""
 

@@ -10,6 +10,7 @@ CacheMode = Union['CacheModeType']
 CrawlResult = Union['CrawlResultType']
 CrawlerHub = Union['CrawlerHubType']
 BrowserProfiler = Union['BrowserProfilerType']
+CrawlResultContainer = Union['CrawlResultContainerType']
 
 # Configuration types
 BrowserConfig = Union['BrowserConfigType']
@@ -54,7 +55,6 @@ SemaphoreDispatcher = Union['SemaphoreDispatcherType']
 RateLimiter = Union['RateLimiterType']
 CrawlerMonitor = Union['CrawlerMonitorType']
 DisplayMode = Union['DisplayModeType']
-RunManyReturn = Union['RunManyReturnType']
 
 # Docker client
 Crawl4aiDockerClient = Union['Crawl4aiDockerClientType']
@@ -90,7 +90,7 @@ if TYPE_CHECKING:
     from .async_webcrawler import (
         AsyncWebCrawler as AsyncWebCrawlerType,
         CacheMode as CacheModeType,
-        RunManyReturn as RunManyReturnType,
+        CrawlResultContainer as CrawlResultContainerType,
     )
     from .models import CrawlResult as CrawlResultType
     from .hub import CrawlerHub as CrawlerHubType

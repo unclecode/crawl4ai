@@ -1908,7 +1908,7 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
             if scheme == 'file':
                 return await self._handle_file(parsed.path)
             elif scheme == 'raw':
-                return await self._handle_raw(parsed.path)
+                return await self._handle_raw(url.removeprefix('raw://'))
             else:  # http or https
                 return await self._handle_http(url, config)
                 

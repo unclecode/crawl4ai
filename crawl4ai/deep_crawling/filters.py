@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Pattern, Set, Union
+from typing import List, Optional, Pattern, Set, Union
 from urllib.parse import urlparse
 from array import array
 import re
@@ -11,6 +11,8 @@ import weakref
 import math
 from collections import defaultdict
 from typing import Dict
+
+from pydantic import Field
 from ..utils import HeadPeekr
 import asyncio
 import inspect
@@ -42,7 +44,7 @@ class URLFilter(ABC):
 
     __slots__ = ("name", "stats", "_logger_ref")
 
-    def __init__(self, name: str = None):
+    def __init__(self, name: Optional[str] = None):
         self.name = name or self.__class__.__name__
         self.stats = FilterStats()
         # Lazy logger initialization using weakref
@@ -71,8 +73,8 @@ class FilterChain:
 
     __slots__ = ("filters", "stats", "_logger_ref")
 
-    def __init__(self, filters: List[URLFilter] = None):
-        self.filters = tuple(filters or [])  # Immutable tuple for speed
+    def __init__(self, filters: List[URLFilter] = Field(default_factory=list)):
+        self.filters = filters
         self.stats = FilterStats()
         self._logger_ref = None
 
@@ -100,6 +102,11 @@ class FilterChain:
                 tasks.append(result)  # Collect async tasks
             elif not result:  # Sync rejection
                 self.stats._counters[2] += 1  # Sync rejected
+                # Cancel remaining tasks
+                for idx, task in enumerate(tasks):
+                    tasks[idx] = asyncio.create_task(task)
+                    tasks[idx].cancel()
+                await asyncio.gather(*tasks, return_exceptions=True)
                 return False
 
         if tasks:

@@ -18,8 +18,9 @@ async def test_scraping_strategy():
     )
     async with AsyncWebCrawler() as crawler:
         result = await crawler.arun(url="https://example.com", config=config)
-        print(f"Success: {result.success}")
-        print(f"Markdown length: {len(result.markdown.raw_markdown)}")
+        assert result.success
+        assert result.markdown
+        assert result.markdown.raw_markdown
 
 
 if __name__ == "__main__":

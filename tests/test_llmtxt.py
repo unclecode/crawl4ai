@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from crawl4ai.async_logger import AsyncLogger
-from crawl4ai.legacy.llmtxt import AsyncLLMTextManager  # Changed to AsyncLLMTextManager
+from crawl4ai.legacy.llmtxt import AsyncLLMTextManager
 
 
 @pytest.mark.asyncio
@@ -19,7 +19,6 @@ async def test_llm_txt():
     # Initialize logger
     logger = AsyncLogger()
     # Updated initialization with default batching params
-    # manager = AsyncLLMTextManager(docs_dir, logger, max_concurrent_calls=3, batch_size=2)
     manager = AsyncLLMTextManager(docs_dir, logger, batch_size=2)
 
     # Let's first check what files we have
@@ -42,13 +41,10 @@ async def test_llm_txt():
     for query in test_queries:
         print(f"\nQuery: {query}")
         results = manager.search(query, top_k=2)
-        print(f"Results length: {len(results)} characters")
-        if results:
-            print(
-                "First 200 chars of results:", results[:200].replace("\n", " "), "..."
-            )
-        else:
-            print("No results found")
+        assert results, "No results found"
+        print(
+            "First 200 chars of results:", results[:200].replace("\n", " "), "..."
+        )
 
 
 if __name__ == "__main__":

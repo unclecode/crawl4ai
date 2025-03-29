@@ -44,6 +44,8 @@ dependencies = [
     "aiohttp>=3.11.11",
     "humanize>=4.10.0",
     "pdf2image>=1.17.0",
+    "bitarray>=3.2.0",
+    "mmh3>=5.1.0",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",

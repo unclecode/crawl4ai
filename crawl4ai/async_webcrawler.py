@@ -4,7 +4,7 @@ import sys
 import time
 from colorama import Fore
 from pathlib import Path
-from typing import Optional, List, Generic, TypeVar, Self, Iterator, Any, AsyncGenerator, AsyncIterator
+from typing import Optional, List, Generic, TypeVar, Self, Iterator, Any, AsyncIterator
 import json
 import asyncio
 
@@ -36,12 +36,13 @@ from .utils import (
     RobotsParser,
 )
 
-from typing import Union
+from typing import Union, AsyncGenerator
 
+# This is a generic type for the crawl result container used to break circular dependencies.
 CrawlResultT = TypeVar("CrawlResultT", bound=CrawlResult)
 
 CrawlResultsT = Union[
-    CrawlResultT, List[CrawlResultT], AsyncGenerator[CrawlResultT, None]
+   CrawlResult, List[CrawlResult], AsyncGenerator[CrawlResult, None]
 ]
 
 
@@ -56,62 +57,109 @@ class CrawlResultContainer(Generic[CrawlResultT]):
         results: CrawlResultsT,
     ) -> None:
         self.source: CrawlResultsT = results
-        self._results: List[CrawlResultT]
+        self._results: List[CrawlResult]
+        self._first: Optional[CrawlResult] = None
+        self._collected: bool = False
         if isinstance(results, AsyncGenerator):
             self._results = []
         elif isinstance(results, List):
             self._results = results
+            if results:
+                self._first = results[0]
         else:
+            # If results is a single result, wrap it in a list.
+            self._first = results
             self._results = [results]
 
-    def __iter__(self) -> Iterator[CrawlResultT]:
-        if isinstance(self.source, AsyncIterator):
-            raise AttributeError(f"{self.__class__.__name__} object does not support __iter__ in async mode")
+    def _raise_if_async_iterator(self):
+        """Raises a TypeError if the source is an AsyncIterator.
 
-        if isinstance(self.source, List):
+        This is to prevent synchronous operations over an asynchronous source.
+
+        :raises TypeError: If source is an AsyncIterator.
+        """
+        if isinstance(self.source, AsyncIterator):
+            raise TypeError(
+                "CrawlResultContainer source is an AsyncIterator. Use __aiter__() to iterate over it."
+            )
+
+    def __iter__(self) -> Iterator[CrawlResult]: # pyright: ignore[reportIncompatibleMethodOverride]
+        """Returns an iterator for the crawl results.
+
+        This method is used for synchronous iteration.
+
+        :return: An iterator for the crawl results.
+        :rtype: Iterator[CrawlResultsT]
+        :raises TypeError: If the source is an AsyncIterator.
+        """
+        self._raise_if_async_iterator()
+
+        if isinstance(self.source, Iterator): # TODO: is this needed?
             return self.source.__iter__()
 
         return iter(self._results)
 
-    def __aiter__(self) -> AsyncIterator[CrawlResultT]:
+    def __aiter__(self) -> AsyncIterator[CrawlResult]:
+        """Returns an asynchronous iterator for the crawl results."""
         if isinstance(self.source, AsyncIterator):
             return self.source.__aiter__()
 
-        async def async_generator() -> AsyncGenerator[CrawlResultT, None]:
+        async def async_generator() -> AsyncGenerator[CrawlResult, None]:
             for result in self._results:
                 yield result
 
         return async_generator()
 
-    def __getitem__(self, index) -> Any:
+    def __getitem__(self, index: int) -> CrawlResult:
+        """Return the result at a given index.
+
+        :param index: The index of the result to retrieve.
+        :type index: int
+        :return: The crawl result at the specified index.
+        :rtype: CrawlResult
+        :raises TypeError: If the source is an AsyncIterator.
+        :raises IndexError: If the index is out of range.
+        """
+        self._raise_if_async_iterator()
+
         return self._results[index]
 
     def __len__(self) -> int:
+        """Return the number of results in the container.
+
+        :return: The number of results.
+        :rtype: int
+        :raises TypeError: If the source is an AsyncIterator.
+        """
+        self._raise_if_async_iterator()
+
         return len(self._results)
 
     def __getattr__(self, attr) -> Any:
-        if isinstance(self.source, AsyncIterator):
-            raise AttributeError(
-                f"{self.__class__.__name__} object does not support attribute access in async mode"
-            )
+        """Return an attribute from the first result.
+
+        :return: The attribute value from the first result if present.
+        :rtype: Any
+        :raises TypeError: If the source is an AsyncIterator.
+        :raises AttributeError: If the attribute does not exist.
+        """
+        self._raise_if_async_iterator()
 
         # Delegate attribute access to the first element.
-        if self._results:
-            return getattr(self._results[0], attr)
-        raise AttributeError(
-            f"{self.__class__.__name__} object has no attribute '{attr}'"
-        )
+        if self._first:
+            return getattr(self._first, attr)
+
+        raise AttributeError(f"{self.__class__.__name__} object has no attribute '{attr}' and no results")
 
     def __repr__(self) -> str:
+        """Get a string representation of the container.
+
+        The representation will be incomplete if the source is an AsyncIterator.
+        :return: String representation of the container.
+        :rtype: str
+        """
+
         return f"{self.__class__.__name__}({self._results!r})"
-
-
-# Redefine the union type. Now synchronous calls always return a container,
-# while stream mode is handled with an AsyncGenerator.
-RunManyReturn = Union[
-    CrawlResultContainer[CrawlResultT], AsyncGenerator[CrawlResultT, None]
-]
-
 
 class AsyncWebCrawler:
     """
@@ -390,15 +438,14 @@ class AsyncWebCrawler:
                     # Check robots.txt if enabled
                     if config and config.check_robots_txt:
                         if not await self.robots_parser.can_fetch(url, self.browser_config.user_agent):
-                            crawl_result: CrawlResult = CrawlResult(
+                            return CrawlResultContainer(CrawlResult(
                                 url=url,
                                 html="",
                                 success=False,
                                 status_code=403,
                                 error_message="Access denied by robots.txt",
                                 response_headers={"X-Robots-Status": "Blocked by robots.txt"}
-                            )
-                            return CrawlResultContainer(crawl_result)
+                            ))
 
                     ##############################
                     # Call CrawlerStrategy.crawl #

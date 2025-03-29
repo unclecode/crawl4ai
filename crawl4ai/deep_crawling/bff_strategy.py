@@ -10,7 +10,8 @@ from .filters import FilterChain
 from .scorers import URLScorer
 from . import DeepCrawlStrategy
 
-from ..types import AsyncWebCrawler, CrawlerRunConfig, CrawlResult, RunManyReturn
+from ..types import AsyncWebCrawler, CrawlerRunConfig, CrawlResult, CrawlResultContainer
+
 
 from math import inf as infinity
 
@@ -62,8 +63,6 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
                 raise ValueError("Missing scheme or netloc")
             if parsed.scheme not in ("http", "https"):
                 raise ValueError("Invalid scheme")
-            if "." not in parsed.netloc:
-                raise ValueError("Invalid domain")
         except Exception as e:
             self.logger.warning(f"Invalid URL: {url}, error: {e}")
             return False
@@ -233,7 +232,7 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
         start_url: str,
         crawler: AsyncWebCrawler,
         config: Optional[CrawlerRunConfig] = None,
-    ) -> "RunManyReturn":
+    ) -> CrawlResultContainer:
         """
         Main entry point for best-first crawling.
         
