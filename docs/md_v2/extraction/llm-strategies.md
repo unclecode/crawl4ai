@@ -2,7 +2,7 @@
 
 In some cases, you need to extract **complex or unstructured** information from a webpage that a simple CSS/XPath schema cannot easily parse. Or you want **AI**-driven insights, classification, or summarization. For these scenarios, Crawl4AI provides an **LLM-based extraction strategy** that:
 
-1. Works with **any** large language model supported by [LightLLM](https://github.com/LightLLM) (Ollama, OpenAI, Claude, and more).  
+1. Works with **any** large language model supported by [LiteLLM](https://github.com/BerriAI/litellm)) (Ollama, OpenAI, Claude, and more).  
 2. Automatically splits content into chunks (if desired) to handle token limits, then combines results.  
 3. Lets you define a **schema** (like a Pydantic model) or a simpler “block” extraction approach.
 
