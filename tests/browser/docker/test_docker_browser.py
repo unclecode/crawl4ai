@@ -530,7 +530,7 @@ async def test_docker_registry_reuse():
         logger.info("First browser started successfully", tag="TEST")
         
         # Get container ID from the strategy
-        docker_strategy1 = manager1._strategy
+        docker_strategy1 = manager1.strategy
         container_id1 = docker_strategy1.container_id
         logger.info(f"First browser container ID: {container_id1[:12]}", tag="TEST")
         
@@ -560,7 +560,7 @@ async def test_docker_registry_reuse():
         logger.info("Second browser started successfully", tag="TEST")
         
         # Get container ID from the second strategy
-        docker_strategy2 = manager2._strategy
+        docker_strategy2 = manager2.strategy
         container_id2 = docker_strategy2.container_id
         logger.info(f"Second browser container ID: {container_id2[:12]}", tag="TEST")
         

@@ -1,5 +1,7 @@
 from pydantic import BaseModel, HttpUrl, PrivateAttr
 from typing import List, Dict, Optional, Callable, Awaitable, Union, Any
+from typing import AsyncGenerator
+from typing import Generic, TypeVar
 from enum import Enum
 from dataclasses import dataclass
 from .ssl_certificate import SSLCertificate
@@ -34,33 +36,11 @@ class CrawlerTaskResult:
     def success(self) -> bool:
         return self.result.success
 
-
 class CrawlStatus(Enum):
     QUEUED = "QUEUED"
     IN_PROGRESS = "IN_PROGRESS"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
-
-
-# @dataclass
-# class CrawlStats:
-#     task_id: str
-#     url: str
-#     status: CrawlStatus
-#     start_time: Optional[datetime] = None
-#     end_time: Optional[datetime] = None
-#     memory_usage: float = 0.0
-#     peak_memory: float = 0.0
-#     error_message: str = ""
-
-#     @property
-#     def duration(self) -> str:
-#         if not self.start_time:
-#             return "0:00"
-#         end = self.end_time or datetime.now()
-#         duration = end - self.start_time
-#         return str(timedelta(seconds=int(duration.total_seconds())))
-
 
 @dataclass
 class CrawlStats:
@@ -95,7 +75,6 @@ class CrawlStats:
         duration = end - start
         return str(timedelta(seconds=int(duration.total_seconds())))
 
-
 class DisplayMode(Enum):
     DETAILED = "DETAILED"
     AGGREGATED = "AGGREGATED"
@@ -112,11 +91,9 @@ class TokenUsage:
     completion_tokens_details: Optional[dict] = None
     prompt_tokens_details: Optional[dict] = None
 
-
 class UrlModel(BaseModel):
     url: HttpUrl
     forced: bool = False
-
 
 class MarkdownGenerationResult(BaseModel):
     raw_markdown: str
@@ -284,6 +261,40 @@ class StringCompatibleMarkdown(str):
     def __getattr__(self, name):
         return getattr(self._markdown_result, name)
 
+CrawlResultT = TypeVar('CrawlResultT', bound=CrawlResult)
+
+class CrawlResultContainer(Generic[CrawlResultT]):
+    def __init__(self, results: Union[CrawlResultT, List[CrawlResultT]]):
+        # Normalize to a list
+        if isinstance(results, list):
+            self._results = results
+        else:
+            self._results = [results]
+
+    def __iter__(self):
+        return iter(self._results)
+
+    def __getitem__(self, index):
+        return self._results[index]
+
+    def __len__(self):
+        return len(self._results)
+
+    def __getattr__(self, attr):
+        # Delegate attribute access to the first element.
+        if self._results:
+            return getattr(self._results[0], attr)
+        raise AttributeError(f"{self.__class__.__name__} object has no attribute '{attr}'")
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self._results!r})"
+
+RunManyReturn = Union[
+    CrawlResultContainer[CrawlResultT],
+    AsyncGenerator[CrawlResultT, None]
+]
+
+
 # END of backward compatibility code for markdown/markdown_v2.
 # When removing this code in the future, make sure to:
 # 1. Replace the private attribute and property with a standard field
@@ -303,7 +314,6 @@ class AsyncCrawlResponse(BaseModel):
 
     class Config:
         arbitrary_types_allowed = True
-
 
 ###############################
 # Scraping Models

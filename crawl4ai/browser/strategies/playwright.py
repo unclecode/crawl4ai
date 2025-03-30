@@ -80,8 +80,26 @@ class PlaywrightBrowserStrategy(BaseBrowserStrategy):
             raise
             
         return self
-    
-    async def get_page(self, crawlerRunConfig: CrawlerRunConfig) -> Tuple[Page, BrowserContext]:
+
+    async def _generate_page(self, crawlerRunConfig: CrawlerRunConfig) -> Tuple[Page, BrowserContext]:
+        # Otherwise, check if we have an existing context for this config
+        config_signature = self._make_config_signature(crawlerRunConfig)
+        
+        async with self._contexts_lock:
+            if config_signature in self.contexts_by_config:
+                context = self.contexts_by_config[config_signature]
+            else:
+                # Create and setup a new context
+                context = await self.create_browser_context(crawlerRunConfig)
+                await self.setup_context(context, crawlerRunConfig)
+                self.contexts_by_config[config_signature] = context
+
+        # Create a new page from the chosen context
+        page = await context.new_page()
+        
+        return page, context
+
+    async def _get_page(self, crawlerRunConfig: CrawlerRunConfig) -> Tuple[Page, BrowserContext]:
         """Get a page for the given configuration.
         
         Args:
@@ -90,15 +108,8 @@ class PlaywrightBrowserStrategy(BaseBrowserStrategy):
         Returns:
             Tuple of (Page, BrowserContext)
         """
-        # Clean up expired sessions first
-        self._cleanup_expired_sessions()
-        
-        # If a session_id is provided and we already have it, reuse that page + context
-        if crawlerRunConfig.session_id and crawlerRunConfig.session_id in self.sessions:
-            context, page, _ = self.sessions[crawlerRunConfig.session_id]
-            # Update last-used timestamp
-            self.sessions[crawlerRunConfig.session_id] = (context, page, time.time())
-            return page, context
+        # Call parent method to ensure browser is started
+        await super().get_page(crawlerRunConfig)
         
         # Otherwise, check if we have an existing context for this config
         config_signature = self._make_config_signature(crawlerRunConfig)
@@ -121,8 +132,3 @@ class PlaywrightBrowserStrategy(BaseBrowserStrategy):
             
         return page, context
         
-    async def close(self):
-        """Close the Playwright browser and clean up resources."""
-        # The base implementation already handles everything needed for Playwright
-        # including storage persistence, sessions, contexts, browser and playwright
-        await super().close()

@@ -68,9 +68,11 @@ class CDPBrowserStrategy(BaseBrowserStrategy):
             
             if self.logger:
                 self.logger.debug(f"Connected to CDP browser at {cdp_url}", tag="CDP")
+
         except Exception as e:
             if self.logger:
                 self.logger.error(f"Failed to connect to CDP browser: {str(e)}", tag="CDP")
+
             # Clean up any resources before re-raising
             await self._cleanup_process()
             raise
@@ -95,7 +97,32 @@ class CDPBrowserStrategy(BaseBrowserStrategy):
             user_data_dir = self.config.user_data_dir
 
         # Get browser args based on OS and browser type
-        args = await self._get_browser_args(user_data_dir)
+        # args = await self._get_browser_args(user_data_dir)
+        browser_args = super()._build_browser_args()
+        browser_path = await get_browser_executable(self.config.browser_type)
+        base_args = [browser_path]
+
+        if self.config.browser_type == "chromium":
+            args = [
+                f"--remote-debugging-port={self.config.debugging_port}",
+                f"--user-data-dir={user_data_dir}",
+            ]
+            # if self.config.headless:
+            #     args.append("--headless=new")
+
+        elif self.config.browser_type == "firefox":
+            args = [
+                "--remote-debugging-port",
+                str(self.config.debugging_port),
+                "--profile",
+                user_data_dir,
+            ]
+            if self.config.headless:
+                args.append("--headless")
+        else:
+            raise NotImplementedError(f"Browser type {self.config.browser_type} not supported")
+
+        args = base_args + browser_args + args        
 
         # Start browser process
         try:
@@ -136,40 +163,6 @@ class CDPBrowserStrategy(BaseBrowserStrategy):
         except Exception as e:
             await self._cleanup_process()
             raise Exception(f"Failed to start browser: {e}")    
-    
-    async def _get_browser_args(self, user_data_dir: str) -> List[str]:
-        """Returns browser-specific command line arguments.
-        
-        Args:
-            user_data_dir: Path to user data directory
-            
-        Returns:
-            List of command-line arguments for the browser
-        """
-        browser_args = super()._build_browser_args()
-        browser_path = await get_browser_executable(self.config.browser_type)
-        base_args = [browser_path]
-
-        if self.config.browser_type == "chromium":
-            args = [
-                f"--remote-debugging-port={self.config.debugging_port}",
-                f"--user-data-dir={user_data_dir}",
-            ]
-            if self.config.headless:
-                args.append("--headless=new")
-        elif self.config.browser_type == "firefox":
-            args = [
-                "--remote-debugging-port",
-                str(self.config.debugging_port),
-                "--profile",
-                user_data_dir,
-            ]
-            if self.config.headless:
-                args.append("--headless")
-        else:
-            raise NotImplementedError(f"Browser type {self.config.browser_type} not supported")
-
-        return base_args + browser_args + args
 
     async def _cleanup_process(self):
         """Cleanup browser process and temporary directory."""
@@ -204,15 +197,40 @@ class CDPBrowserStrategy(BaseBrowserStrategy):
         if self.temp_dir and os.path.exists(self.temp_dir):
             try:
                 shutil.rmtree(self.temp_dir)
+                self.temp_dir = None
+                if self.logger:
+                    self.logger.debug("Removed temporary directory", tag="CDP")
             except Exception as e:
                 if self.logger:
                     self.logger.error(
                         message="Error removing temporary directory: {error}",
-                        tag="ERROR",
-                        params={"error": str(e)},
+                        tag="CDP",
+                        params={"error": str(e)}
                     )
+
+        self.browser_process = None
     
-    async def get_page(self, crawlerRunConfig: CrawlerRunConfig) -> Tuple[Page, BrowserContext]:
+    async def _generate_page(self, crawlerRunConfig: CrawlerRunConfig) -> Tuple[Page, BrowserContext]:
+        # For CDP, we typically use the shared default_context
+        context = self.default_context
+        pages = context.pages
+        
+        # Otherwise, check if we have an existing context for this config
+        config_signature = self._make_config_signature(crawlerRunConfig)
+        self.contexts_by_config[config_signature] = context
+
+        await self.setup_context(context, crawlerRunConfig)
+
+        # Check if there's already a page with the target URL
+        page = next((p for p in pages if p.url == crawlerRunConfig.url), None)
+        
+        # If not found, create a new page
+        if not page:
+            page = await context.new_page()
+        
+        return page, context
+
+    async def _get_page(self, crawlerRunConfig: CrawlerRunConfig) -> Tuple[Page, BrowserContext]:
         """Get a page for the given configuration.
         
         Args:
@@ -221,15 +239,8 @@ class CDPBrowserStrategy(BaseBrowserStrategy):
         Returns:
             Tuple of (Page, BrowserContext)
         """
-        # Clean up expired sessions using base class method
-        self._cleanup_expired_sessions()
-        
-        # If a session_id is provided and we already have it, reuse that page + context
-        if crawlerRunConfig.session_id and crawlerRunConfig.session_id in self.sessions:
-            context, page, _ = self.sessions[crawlerRunConfig.session_id]
-            # Update last-used timestamp
-            self.sessions[crawlerRunConfig.session_id] = (context, page, time.time())
-            return page, context
+        # Call parent method to ensure browser is started
+        await super().get_page(crawlerRunConfig)
         
         # For CDP, we typically use the shared default_context
         context = self.default_context
@@ -266,24 +277,5 @@ class CDPBrowserStrategy(BaseBrowserStrategy):
         await super().close()
         
         # Additional CDP-specific cleanup
-        if self.browser_process:
-            await asyncio.sleep(0.5)
-            await self._cleanup_process()
-            self.browser_process = None
-            if self.logger:
-                self.logger.debug("Cleaned up CDP browser process", tag="CDP")
-        
-        # Clean up temporary directory
-        if self.temp_dir and os.path.exists(self.temp_dir):
-            try:
-                shutil.rmtree(self.temp_dir)
-                self.temp_dir = None
-                if self.logger:
-                    self.logger.debug("Removed temporary directory", tag="CDP")
-            except Exception as e:
-                if self.logger:
-                    self.logger.error(
-                        message="Error removing temporary directory: {error}",
-                        tag="CDP",
-                        params={"error": str(e)}
-                    )
+        await asyncio.sleep(0.5)
+        await self._cleanup_process()

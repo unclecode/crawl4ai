@@ -82,6 +82,9 @@ class BaseBrowserStrategy(ABC):
         return self
     
     @abstractmethod
+    async def _generate_page(self, crawlerRunConfig: CrawlerRunConfig) -> Tuple[Page, BrowserContext]:
+        pass
+
     async def get_page(self, crawlerRunConfig: CrawlerRunConfig) -> Tuple[Page, BrowserContext]:
         """Get a page with specified configuration.
         
@@ -94,6 +97,23 @@ class BaseBrowserStrategy(ABC):
         Returns:
             Tuple of (Page, BrowserContext)
         """
+        # Clean up expired sessions first
+        self._cleanup_expired_sessions()
+
+        # If a session_id is provided and we already have it, reuse that page + context
+        if crawlerRunConfig.session_id and crawlerRunConfig.session_id in self.sessions:
+            context, page, _ = self.sessions[crawlerRunConfig.session_id]
+            # Update last-used timestamp
+            self.sessions[crawlerRunConfig.session_id] = (context, page, time.time())
+            return page, context
+        
+        page, context = await self._generate_page(crawlerRunConfig)
+
+        # If a session_id is specified, store this session so we can reuse later
+        if crawlerRunConfig.session_id:
+            self.sessions[crawlerRunConfig.session_id] = (context, page, time.time())
+            
+        return page, context        
         pass
     
     async def get_pages(self, crawlerRunConfig: CrawlerRunConfig, count: int = 1) -> List[Tuple[Page, BrowserContext]]:
@@ -120,31 +140,29 @@ class BaseBrowserStrategy(ABC):
         """
         # Define common browser arguments that improve performance and stability
         args = [
-            "--disable-gpu",
-            "--disable-gpu-compositing",
-            "--disable-software-rasterizer",
             "--no-sandbox",
-            "--disable-dev-shm-usage",
             "--no-first-run",
             "--no-default-browser-check",
-            "--disable-infobars",
             "--window-position=0,0",
             "--ignore-certificate-errors",
             "--ignore-certificate-errors-spki-list",
-            "--disable-blink-features=AutomationControlled",
             "--window-position=400,0",
-            "--disable-renderer-backgrounding",
-            "--disable-ipc-flooding-protection",
             "--force-color-profile=srgb",
             "--mute-audio",
+            "--disable-gpu",
+            "--disable-gpu-compositing",
+            "--disable-software-rasterizer",
+            "--disable-dev-shm-usage",
+            "--disable-infobars",
+            "--disable-blink-features=AutomationControlled",
+            "--disable-renderer-backgrounding",
+            "--disable-ipc-flooding-protection",
             "--disable-background-timer-throttling",
             f"--window-size={self.config.viewport_width},{self.config.viewport_height}",
         ]
 
         # Define browser disable options for light mode
         browser_disable_options = [
-            "--disable-background-networking",
-            "--disable-background-timer-throttling",
             "--disable-backgrounding-occluded-windows",
             "--disable-breakpad",
             "--disable-client-side-phishing-detection",
@@ -153,13 +171,10 @@ class BaseBrowserStrategy(ABC):
             "--disable-extensions",
             "--disable-features=TranslateUI",
             "--disable-hang-monitor",
-            "--disable-ipc-flooding-protection",
             "--disable-popup-blocking",
             "--disable-prompt-on-repost",
             "--disable-sync",
-            "--force-color-profile=srgb",
             "--metrics-recording-only",
-            "--no-first-run",
             "--password-store=basic",
             "--use-mock-keychain",
         ]
