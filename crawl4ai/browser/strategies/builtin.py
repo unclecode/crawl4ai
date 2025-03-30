@@ -115,24 +115,11 @@ class BuiltinBrowserStrategy(CDPBrowserStrategy):
         except Exception as e:
             if self.logger:
                 self.logger.error(f"Failed to start built-in browser: {str(e)}", tag="BUILTIN")
+            
+            # There is a possibility that at this point I need to clean up some resourece
             raise
 
-    async def get_page(self, crawlerRunConfig: CrawlerRunConfig) -> Tuple[Page, BrowserContext]:
-        """Get a page for the given configuration.
-        
-        Inherits behavior from CDPBrowserStrategy for page management.
-        
-        Args:
-            crawlerRunConfig: Configuration object for the crawler run
-            
-        Returns:
-            Tuple of (Page, BrowserContext)
-        """
-        # For built-in browsers, we use the same page management as CDP strategy
-        return await super().get_page(crawlerRunConfig)
-
-    @classmethod
-    def get_builtin_browser_info(cls, debugging_port: int, config_file: str, logger: Optional[AsyncLogger] = None) -> Optional[Dict[str, Any]]:
+    def _get_builtin_browser_info(cls, debugging_port: int, config_file: str, logger: Optional[AsyncLogger] = None) -> Optional[Dict[str, Any]]:
         """Get information about the built-in browser for a specific debugging port.
         
         Args:
@@ -157,15 +144,14 @@ class BuiltinBrowserStrategy(CDPBrowserStrategy):
                     browser_info = browser_info_dict["port_map"][port_str]
                     
                     # Check if the browser is still running
-                    pids = browser_info.get('pid')
-                    if type(pids) == str and len(pids.split("\n")) > 1:
-                        pids = [int(pid) for pid in pids.split("\n") if pid.isdigit()]
-                    elif type(pids) == str and pids.isdigit():
-                        pids = [int(pids)]
-                    elif type(pids) == int:
+                    pids = browser_info.get('pid', '')
+                    if isinstance(pids, str):
+                        pids = [int(pid) for pid in pids.split() if pid.isdigit()]
+                    elif isinstance(pids, int):
                         pids = [pids]
                     else:
                         pids = []
+
                     # Check if any of the PIDs are running
                     if not pids:
                         if logger:
@@ -205,7 +191,7 @@ class BuiltinBrowserStrategy(CDPBrowserStrategy):
         Returns:
             dict: Browser information or None if no running browser is configured
         """
-        return self.get_builtin_browser_info(
+        return self._get_builtin_browser_info(
             debugging_port=self.config.debugging_port,
             config_file=self.builtin_config_file,
             logger=self.logger
@@ -226,7 +212,7 @@ class BuiltinBrowserStrategy(CDPBrowserStrategy):
             str: CDP URL for the browser, or None if launch failed
         """
         # Check if there's an existing browser still running
-        browser_info = self.get_builtin_browser_info(
+        browser_info = self._get_builtin_browser_info(
             debugging_port=debugging_port,
             config_file=self.builtin_config_file,
             logger=self.logger
@@ -238,6 +224,7 @@ class BuiltinBrowserStrategy(CDPBrowserStrategy):
         
         # Create a user data directory for the built-in browser
         user_data_dir = os.path.join(self.builtin_browser_dir, "user_data")
+     
         # Raise error if user data dir is already engaged
         if self._check_user_dir_is_engaged(user_data_dir):
             raise Exception(f"User data directory {user_data_dir} is already engaged by another browser instance.")
@@ -246,15 +233,19 @@ class BuiltinBrowserStrategy(CDPBrowserStrategy):
         os.makedirs(user_data_dir, exist_ok=True)
         
         # Prepare browser launch arguments
+        browser_args = super()._build_browser_args()
         browser_path = await get_browser_executable(browser_type)
+        base_args = [browser_path]
+
         if browser_type == "chromium":
             args = [
                 browser_path,
                 f"--remote-debugging-port={debugging_port}",
                 f"--user-data-dir={user_data_dir}",
             ]
-            if headless:
-                args.append("--headless=new")
+            # if headless:
+            #     args.append("--headless=new")
+
         elif browser_type == "firefox":
             args = [
                 browser_path,
@@ -269,6 +260,8 @@ class BuiltinBrowserStrategy(CDPBrowserStrategy):
             if self.logger:
                 self.logger.error(f"Browser type {browser_type} not supported for built-in browser", tag="BUILTIN")
             return None
+        
+        args = base_args + browser_args + args
         
         try:
 
@@ -333,11 +326,12 @@ class BuiltinBrowserStrategy(CDPBrowserStrategy):
                     # Check if it already uses port mapping
                     if isinstance(existing_data, dict) and "port_map" in existing_data:
                         port_map = existing_data["port_map"]
-                    # Convert legacy format to port mapping
-                    elif isinstance(existing_data, dict) and "debugging_port" in existing_data:
-                        old_port = str(existing_data.get("debugging_port"))
-                        if self._is_browser_running(existing_data.get("pid")):
-                            port_map[old_port] = existing_data
+
+                    # # Convert legacy format to port mapping
+                    # elif isinstance(existing_data, dict) and "debugging_port" in existing_data:
+                    #     old_port = str(existing_data.get("debugging_port"))
+                    #     if self._is_browser_running(existing_data.get("pid")):
+                    #         port_map[old_port] = existing_data
                 except Exception as e:
                     if self.logger:
                         self.logger.warning(f"Could not read existing config: {str(e)}", tag="BUILTIN")
@@ -413,15 +407,19 @@ class BuiltinBrowserStrategy(CDPBrowserStrategy):
             # Update config file to remove this browser
             with open(self.builtin_config_file, 'r') as f:
                 browser_info_dict = json.load(f)
+
             # Remove this port from the dictionary
             port_str = str(self.config.debugging_port)
             if port_str in browser_info_dict.get("port_map", {}):
                 del browser_info_dict["port_map"][port_str]
+
             with open(self.builtin_config_file, 'w') as f:
                 json.dump(browser_info_dict, f, indent=2)
+
             # Remove user data directory if it exists
             if os.path.exists(self.builtin_browser_dir):
                 shutil.rmtree(self.builtin_browser_dir)
+
             # Clear the browser info cache
             self.browser = None
             self.temp_dir = None
@@ -460,14 +458,11 @@ class BuiltinBrowserStrategy(CDPBrowserStrategy):
 
     async def close(self):
         """Close the built-in browser and clean up resources."""
-        # Store the shutting_down state
-        was_shutting_down = getattr(self, 'shutting_down', False)
-        
         # Call parent class close method
         await super().close()
         
         # Clean up built-in browser if we created it and were in shutdown mode
-        if was_shutting_down:
+        if self.shutting_down:
             await self.kill_builtin_browser()
             if self.logger:
                 self.logger.debug("Killed built-in browser during shutdown", tag="BUILTIN")

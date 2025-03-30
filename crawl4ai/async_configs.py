@@ -270,7 +270,7 @@ class BrowserConfig:
         host: str = "localhost",
     ):
         self.browser_type = browser_type
-        self.headless = headless
+        self.headless = headless and "new" or False
         self.browser_mode = browser_mode
         self.use_managed_browser = use_managed_browser
         self.cdp_url = cdp_url

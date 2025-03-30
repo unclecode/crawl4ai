@@ -50,7 +50,7 @@ class BrowserManager:
         self.logger = logger
         
         # Create strategy based on configuration
-        self._strategy = self._create_strategy()
+        self.strategy = self._create_strategy()
         
         # Initialize state variables for compatibility with existing code
         self.browser = None
@@ -92,23 +92,23 @@ class BrowserManager:
             self: For method chaining
         """
         # Start the strategy
-        await self._strategy.start()
+        await self.strategy.start()
         
         # Update legacy references
-        self.browser = self._strategy.browser
-        self.default_context = self._strategy.default_context
+        self.browser = self.strategy.browser
+        self.default_context = self.strategy.default_context
         
         # Set browser process reference (for CDP strategy)
-        if hasattr(self._strategy, 'browser_process'):
-            self.managed_browser = self._strategy
+        if hasattr(self.strategy, 'browser_process'):
+            self.managed_browser = self.strategy
         
         # Set Playwright reference
-        self.playwright = self._strategy.playwright
+        self.playwright = self.strategy.playwright
         
         # Sync sessions if needed
-        if hasattr(self._strategy, 'sessions'):
-            self.sessions = self._strategy.sessions
-            self.session_ttl = self._strategy.session_ttl
+        if hasattr(self.strategy, 'sessions'):
+            self.sessions = self.strategy.sessions
+            self.session_ttl = self.strategy.session_ttl
         
         return self
     
@@ -122,11 +122,11 @@ class BrowserManager:
             Tuple of (Page, BrowserContext)
         """
         # Delegate to strategy
-        page, context = await self._strategy.get_page(crawlerRunConfig)
+        page, context = await self.strategy.get_page(crawlerRunConfig)
         
         # Sync sessions if needed
-        if hasattr(self._strategy, 'sessions'):
-            self.sessions = self._strategy.sessions
+        if hasattr(self.strategy, 'sessions'):
+            self.sessions = self.strategy.sessions
         
         return page, context
         
@@ -144,14 +144,15 @@ class BrowserManager:
             List of (Page, Context) tuples
         """
         # Delegate to strategy
-        pages = await self._strategy.get_pages(crawlerRunConfig, count)
+        pages = await self.strategy.get_pages(crawlerRunConfig, count)
         
         # Sync sessions if needed
-        if hasattr(self._strategy, 'sessions'):
-            self.sessions = self._strategy.sessions
+        if hasattr(self.strategy, 'sessions'):
+            self.sessions = self.strategy.sessions
             
         return pages
     
+    # Just for legacy compatibility
     async def kill_session(self, session_id: str):
         """Kill a browser session and clean up resources.
         
@@ -159,33 +160,16 @@ class BrowserManager:
             session_id: The session ID to kill
         """
         # Handle kill_session via our strategy if it supports it
-        await self._strategy.kill_session(session_id)
+        await self.strategy.kill_session(session_id)
 
         # sync sessions if needed
-        if hasattr(self._strategy, 'sessions'):
-            self.sessions = self._strategy.sessions
-        
-    def _cleanup_expired_sessions(self):
-        """Clean up expired sessions based on TTL."""
-        # Use strategy's implementation if available
-        if hasattr(self._strategy, '_cleanup_expired_sessions'):
-            self._strategy._cleanup_expired_sessions()
-            return
-        
-        # Otherwise use our own implementation
-        current_time = time.time()
-        expired_sessions = [
-            sid
-            for sid, (_, _, last_used) in self.sessions.items()
-            if current_time - last_used > self.session_ttl
-        ]
-        for sid in expired_sessions:
-            asyncio.create_task(self.kill_session(sid))
+        if hasattr(self.strategy, 'sessions'):
+            self.sessions = self.strategy.sessions
     
     async def close(self):
         """Close the browser and clean up resources."""
         # Delegate to strategy
-        await self._strategy.close()
+        await self.strategy.close()
         
         # Reset legacy references
         self.browser = None
