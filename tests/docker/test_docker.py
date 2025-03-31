@@ -56,8 +56,8 @@ async def test_direct_structured_extraction(browser_config: BrowserConfig):
         "baseSelector": "body > div",
         "fields": [
             {"name": "title", "selector": "h1", "type": "text"},
-            {"name": "content", "selector": "p", "type": "html"},
-        ],
+            {"name": "content", "selector": "p", "type": "html"}
+        ]
     }
 
     crawler_config = CrawlerRunConfig(
@@ -149,7 +149,7 @@ async def test_with_client_llm_streaming():
         async for result in await client.crawl_async(
             urls=["https://example.com"],
             browser_config=browser_config,
-            crawler_config=crawler_config,
+            crawler_config=crawler_config
         ):
             assert result.success, f"Stream failed with: {result.error_message}"
 
