@@ -4,6 +4,7 @@ import sys
 
 import pytest
 from bs4 import BeautifulSoup
+from playwright.async_api import Page, BrowserContext
 
 from crawl4ai import CacheMode
 from crawl4ai.async_webcrawler import AsyncWebCrawler
@@ -68,7 +69,7 @@ async def test_page_with_mixed_content():
 async def test_typescript_commits_multi_page():
     first_commit = ""
 
-    async def on_execution_started(page):
+    async def on_execution_started(page: Page, context: BrowserContext, **kwargs):
         nonlocal first_commit
         try:
             # Check if the page first commit h4 text is different from the first commit (use document.querySelector('div.Box-sc-g0xbh4-0 h4'))

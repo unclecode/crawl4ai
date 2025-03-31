@@ -116,7 +116,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         self._download_tasks: list[Coroutine] = []
 
         # Initialize hooks system
-        self.hooks = {
+        self.hooks: dict[str, Optional[Callable]] = {
             "on_browser_created": None,
             "on_page_context_created": None,
             "on_user_agent_updated": None,

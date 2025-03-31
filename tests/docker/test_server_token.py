@@ -121,6 +121,7 @@ class TestAPI:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("url,params", markdown_params())
+    @pytest.mark.timeout(60) # LLM tasks can take a while.
     async def test_markdown_endpoint(
         self,
         url: str,

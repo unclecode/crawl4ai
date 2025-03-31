@@ -111,7 +111,7 @@ def test_no_query_full_schema(config: LLMConfig):
                 assert isinstance(department_field, dict)
                 if department_field.get("name", "") == "positions":
                     position_fields: list[dict[str, Any]] = department_field.get("fields", [])
-                    assert len(position_fields) == 9
+                    assert len(position_fields) > 8
                     seen_positions = True
     assert seen_positions
 

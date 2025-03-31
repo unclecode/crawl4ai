@@ -59,6 +59,7 @@ async def llm_task_completion(task_id: str) -> Optional[dict]:
 
 
 @pytest.mark.asyncio
+@pytest.mark.timeout(60) # LLM tasks can take a while.
 @pytest.mark.parametrize("url,params", markdown_params())
 async def test_markdown_endpoint(url: str, params: dict[str, str]):
     response: EndpointResponse = await endpoint("md", url, params)
