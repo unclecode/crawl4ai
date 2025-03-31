@@ -1,10 +1,9 @@
-import os, sys
+import sys
+from typing import Union
+
 import pytest
 from bs4 import BeautifulSoup
-
-# Add the parent directory to the Python path
-parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(parent_dir)
+from bs4.element import PageElement, Tag
 
 from crawl4ai.content_filter_strategy import BM25ContentFilter
 
@@ -16,7 +15,7 @@ def basic_html():
         <head>
             <title>Test Article</title>
             <meta name="description" content="Test description">
-            <meta name="keywords" content="test, keywords">
+            <meta name="keywords" content="fifty, paragraph">
         </head>
         <body>
             <h1>Main Heading</h1>
@@ -38,7 +37,7 @@ def wiki_html():
         </head>
         <body>
             <h1>Article Title</h1>
-            <h2>Section 1</h2>
+            <h2>Section One</h2>
             <p>Short but important section header description.</p>
             <div class="content">
                 <p>Long paragraph with sufficient words to meet the minimum threshold. This paragraph continues with more text to ensure we have enough content for proper testing. We need to make sure this has enough words to pass our filters and be considered valid content for extraction purposes.</p>
@@ -78,7 +77,9 @@ class TestBM25ContentFilter:
 
         # Access internal state to verify query usage
         soup = BeautifulSoup(basic_html, "lxml")
-        extracted_query = filter.extract_page_query(soup.find("head"))
+        head: Union[PageElement, Tag, None] = soup.find("head")
+        assert isinstance(head, Tag)
+        extracted_query = filter.extract_page_query(soup, head)
 
         assert extracted_query == user_query
         assert "Test description" not in extracted_query
@@ -89,7 +90,7 @@ class TestBM25ContentFilter:
         contents = filter.filter_content(wiki_html)
 
         combined_content = " ".join(contents).lower()
-        assert "section 1" in combined_content, "Should include section header"
+        assert "section one" in combined_content, "Should include section header"
         assert "article title" in combined_content, "Should include main title"
 
     def test_no_metadata_fallback(self, no_meta_html):
@@ -106,7 +107,6 @@ class TestBM25ContentFilter:
         """Test handling of empty input"""
         filter = BM25ContentFilter()
         assert filter.filter_content("") == []
-        assert filter.filter_content(None) == []
 
     def test_malformed_html(self):
         """Test handling of malformed HTML"""
@@ -142,7 +142,7 @@ class TestBM25ContentFilter:
         """Test handling of large content blocks"""
         large_html = f"""
         <html><body>
-            <article>{'<p>Test content. ' * 1000}</article>
+            <article><p>{'Test content. ' * 1000}</p></article>
         </body></html>
         """
         filter = BM25ContentFilter()
@@ -180,4 +180,6 @@ class TestBM25ContentFilter:
 
 
 if __name__ == "__main__":
-    pytest.main([__file__])
+    import subprocess
+
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

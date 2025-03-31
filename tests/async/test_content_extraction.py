@@ -1,11 +1,8 @@
-import os
 import sys
+
 import pytest
 
-# Add the parent directory to the Python path
-parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(parent_dir)
-
+from crawl4ai import CacheMode
 from crawl4ai.async_webcrawler import AsyncWebCrawler
 
 
@@ -13,7 +10,7 @@ from crawl4ai.async_webcrawler import AsyncWebCrawler
 async def test_extract_markdown():
     async with AsyncWebCrawler(verbose=True) as crawler:
         url = "https://www.nbcnews.com/business"
-        result = await crawler.arun(url=url, bypass_cache=True)
+        result = await crawler.arun(url=url, cache_mode=CacheMode.BYPASS)
         assert result.success
         assert result.markdown
         assert isinstance(result.markdown, str)
@@ -24,7 +21,7 @@ async def test_extract_markdown():
 async def test_extract_cleaned_html():
     async with AsyncWebCrawler(verbose=True) as crawler:
         url = "https://www.nbcnews.com/business"
-        result = await crawler.arun(url=url, bypass_cache=True)
+        result = await crawler.arun(url=url, cache_mode=CacheMode.BYPASS)
         assert result.success
         assert result.cleaned_html
         assert isinstance(result.cleaned_html, str)
@@ -35,7 +32,7 @@ async def test_extract_cleaned_html():
 async def test_extract_media():
     async with AsyncWebCrawler(verbose=True) as crawler:
         url = "https://www.nbcnews.com/business"
-        result = await crawler.arun(url=url, bypass_cache=True)
+        result = await crawler.arun(url=url, cache_mode=CacheMode.BYPASS)
         assert result.success
         assert result.media
         media = result.media
@@ -52,7 +49,7 @@ async def test_extract_media():
 async def test_extract_links():
     async with AsyncWebCrawler(verbose=True) as crawler:
         url = "https://www.nbcnews.com/business"
-        result = await crawler.arun(url=url, bypass_cache=True)
+        result = await crawler.arun(url=url, cache_mode=CacheMode.BYPASS)
         assert result.success
         assert result.links
         links = result.links
@@ -70,7 +67,7 @@ async def test_extract_links():
 async def test_extract_metadata():
     async with AsyncWebCrawler(verbose=True) as crawler:
         url = "https://www.nbcnews.com/business"
-        result = await crawler.arun(url=url, bypass_cache=True)
+        result = await crawler.arun(url=url, cache_mode=CacheMode.BYPASS)
         assert result.success
         assert result.metadata
         metadata = result.metadata
@@ -85,7 +82,7 @@ async def test_css_selector_extraction():
         url = "https://www.nbcnews.com/business"
         css_selector = "h1, h2, h3"
         result = await crawler.arun(
-            url=url, bypass_cache=True, css_selector=css_selector
+            url=url, cache_mode=CacheMode.BYPASS, css_selector=css_selector
         )
         assert result.success
         assert result.markdown
@@ -94,4 +91,6 @@ async def test_css_selector_extraction():
 
 # Entry point for debugging
 if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+    import subprocess
+
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

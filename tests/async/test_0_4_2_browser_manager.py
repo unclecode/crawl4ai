@@ -1,24 +1,25 @@
-import os
 import sys
-import asyncio
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
+import threading
+
+import pytest
+import requests
+
 from crawl4ai import AsyncWebCrawler, CacheMode
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
-
-parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(parent_dir)
-__location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
-
 
 # Assuming that the changes made allow different configurations
 # for managed browser, persistent context, and so forth.
 
 
+@pytest.mark.asyncio
 async def test_default_headless():
     async with AsyncWebCrawler(
         headless=True,
         verbose=True,
         user_agent_mode="random",
-        user_agent_generator_config={"device_type": "mobile", "os_type": "android"},
+        user_agent_generator_config={"platforms": ["mobile"], "os": "android"},
         use_managed_browser=False,
         use_persistent_context=False,
         ignore_https_errors=True,
@@ -29,20 +30,24 @@ async def test_default_headless():
             cache_mode=CacheMode.BYPASS,
             markdown_generator=DefaultMarkdownGenerator(options={"ignore_links": True}),
         )
+        assert result.success
+        assert result.html
         print("[test_default_headless] success:", result.success)
         print("HTML length:", len(result.html if result.html else ""))
 
 
-async def test_managed_browser_persistent():
+@pytest.mark.asyncio
+async def test_managed_browser_persistent(tmp_path: Path):
     # Treating use_persistent_context=True as managed_browser scenario.
+    user_data_dir: Path = tmp_path / "user_data_dir"
     async with AsyncWebCrawler(
         headless=False,
         verbose=True,
         user_agent_mode="random",
-        user_agent_generator_config={"device_type": "desktop", "os_type": "mac"},
+        user_agent_generator_config={"platforms": ["desktop"], "os": "mac"},
         use_managed_browser=True,
         use_persistent_context=True,  # now should behave same as managed browser
-        user_data_dir="./outpu/test_profile",
+        user_data_dir=user_data_dir.as_posix(),
         # This should store and reuse profile data across runs
     ) as crawler:
         result = await crawler.arun(
@@ -50,10 +55,11 @@ async def test_managed_browser_persistent():
             cache_mode=CacheMode.BYPASS,
             markdown_generator=DefaultMarkdownGenerator(options={"ignore_links": True}),
         )
-        print("[test_managed_browser_persistent] success:", result.success)
-        print("HTML length:", len(result.html if result.html else ""))
+        assert result.success
+        assert result.html
 
 
+@pytest.mark.asyncio
 async def test_session_reuse():
     # Test creating a session, using it for multiple calls
     session_id = "my_session"
@@ -72,7 +78,7 @@ async def test_session_reuse():
             session_id=session_id,
             markdown_generator=DefaultMarkdownGenerator(options={"ignore_links": True}),
         )
-        print("[test_session_reuse first call] success:", result1.success)
+        assert result1.success
 
         # Second call: same session, possibly cookie retained
         result2 = await crawler.arun(
@@ -81,16 +87,17 @@ async def test_session_reuse():
             session_id=session_id,
             markdown_generator=DefaultMarkdownGenerator(options={"ignore_links": True}),
         )
-        print("[test_session_reuse second call] success:", result2.success)
+        assert result2.success
 
 
+@pytest.mark.asyncio
 async def test_magic_mode():
     # Test magic mode with override_navigator and simulate_user
     async with AsyncWebCrawler(
         headless=False,
         verbose=True,
         user_agent_mode="random",
-        user_agent_generator_config={"device_type": "desktop", "os_type": "windows"},
+        user_agent_generator_config={"platforms": ["desktop"], "os": "windows"},
         use_managed_browser=False,
         use_persistent_context=False,
         magic=True,
@@ -102,30 +109,55 @@ async def test_magic_mode():
             cache_mode=CacheMode.BYPASS,
             markdown_generator=DefaultMarkdownGenerator(options={"ignore_links": True}),
         )
-        print("[test_magic_mode] success:", result.success)
-        print("HTML length:", len(result.html if result.html else ""))
+        assert result.success
+        assert result.html
 
 
-async def test_proxy_settings():
+class ProxyHandler(BaseHTTPRequestHandler):
+    """Simple HTTP proxy handler for testing purposes."""
+    def do_GET(self):
+        resp = requests.get(self.path)
+        self.send_response(resp.status_code)
+        for k, v in resp.headers.items():
+            self.send_header(k, v)
+        self.end_headers()
+        self.wfile.write(resp.content)
+
+@pytest.fixture
+def proxy_server():
+    """Fixture to create a simple HTTP proxy server for testing."""
+    server = HTTPServer(('localhost', 0), ProxyHandler)
+    port = server.server_address[1]
+
+    thread = threading.Thread(target=server.serve_forever)
+    thread.daemon = True
+    thread.start()
+
+    yield f"http://localhost:{port}"
+
+    server.shutdown()
+    thread.join()
+
+@pytest.mark.asyncio
+async def test_proxy_settings(proxy_server: str):
     # Test with a proxy (if available) to ensure code runs with proxy
     async with AsyncWebCrawler(
         headless=True,
         verbose=False,
         user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
-        proxy="http://127.0.0.1:8080",  # Assuming local proxy server for test
+        proxy=proxy_server,
         use_managed_browser=False,
         use_persistent_context=False,
     ) as crawler:
         result = await crawler.arun(
-            url="https://httpbin.org/ip",
+            url="http://httpbin.org/ip",
             cache_mode=CacheMode.BYPASS,
             markdown_generator=DefaultMarkdownGenerator(options={"ignore_links": True}),
         )
-        print("[test_proxy_settings] success:", result.success)
-        if result.success:
-            print("HTML preview:", result.html[:200] if result.html else "")
+        assert result.success
 
 
+@pytest.mark.asyncio
 async def test_ignore_https_errors():
     # Test ignore HTTPS errors with a self-signed or invalid cert domain
     # This is just conceptual, the domain should be one that triggers SSL error.
@@ -143,18 +175,10 @@ async def test_ignore_https_errors():
             cache_mode=CacheMode.BYPASS,
             markdown_generator=DefaultMarkdownGenerator(options={"ignore_links": True}),
         )
-        print("[test_ignore_https_errors] success:", result.success)
-
-
-async def main():
-    print("Running tests...")
-    # await test_default_headless()
-    # await test_managed_browser_persistent()
-    # await test_session_reuse()
-    # await test_magic_mode()
-    # await test_proxy_settings()
-    await test_ignore_https_errors()
+        assert result.success
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    import subprocess
+
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

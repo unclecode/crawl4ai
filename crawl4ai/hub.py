@@ -1,6 +1,6 @@
 # crawl4ai/hub.py
 from abc import ABC, abstractmethod
-from typing import Dict, Type, Union
+from typing import Dict, Type, Union, Any
 import logging
 import importlib
 from pathlib import Path
@@ -10,9 +10,12 @@ logger = logging.getLogger(__name__)
 
 
 class BaseCrawler(ABC):
+    meta: dict[str, Any] = {}
+
     def __init__(self):
         self.logger = logging.getLogger(self.__class__.__name__)
-        
+        self._meta: dict[str, Any] = {}
+
     @abstractmethod
     async def run(self, url: str = "", **kwargs) -> str:
         """
@@ -57,9 +60,16 @@ class CrawlerHub:
     @classmethod
     def _maybe_register_crawler(cls, obj, name: str):
         """Brilliant one-liner registration"""
-        if isinstance(obj, type) and issubclass(obj, BaseCrawler) and obj != BaseCrawler:
-            module = importlib.import_module(obj.__module__)
-            obj.meta = getattr(module, "__meta__", {})
+        if (
+            isinstance(obj, type)
+            and issubclass(obj, BaseCrawler)
+            and obj != BaseCrawler
+        ):
+            if hasattr(obj, "__meta__"):
+                obj.meta = obj.__meta__  # pyright: ignore[reportAttributeAccessIssue]
+            else:
+                module = importlib.import_module(obj.__module__)
+                obj.meta = getattr(module, "__meta__", {})
             cls._crawlers[name] = obj
 
     @classmethod

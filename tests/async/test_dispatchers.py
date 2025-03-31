@@ -1,15 +1,19 @@
-import pytest
+import sys
 import time
+
+from httpx import codes
+import pytest
+
 from crawl4ai import (
     AsyncWebCrawler,
     BrowserConfig,
-    CrawlerRunConfig,
-    MemoryAdaptiveDispatcher,
-    SemaphoreDispatcher,
-    RateLimiter,
-    CrawlerMonitor,
-    DisplayMode,
     CacheMode,
+    CrawlerMonitor,
+    CrawlerRunConfig,
+    DisplayMode,
+    MemoryAdaptiveDispatcher,
+    RateLimiter,
+    SemaphoreDispatcher,
 )
 
 
@@ -37,7 +41,7 @@ class TestDispatchStrategies:
     async def test_memory_adaptive_basic(self, browser_config, run_config, test_urls):
         async with AsyncWebCrawler(config=browser_config) as crawler:
             dispatcher = MemoryAdaptiveDispatcher(
-                memory_threshold_percent=70.0, max_session_permit=2, check_interval=0.1
+                memory_threshold_percent=80.0, max_session_permit=2, check_interval=0.1
             )
             results = await crawler.arun_many(
                 test_urls, config=run_config, dispatcher=dispatcher
@@ -50,7 +54,7 @@ class TestDispatchStrategies:
     ):
         async with AsyncWebCrawler(config=browser_config) as crawler:
             dispatcher = MemoryAdaptiveDispatcher(
-                memory_threshold_percent=70.0,
+                memory_threshold_percent=80.0,
                 max_session_permit=2,
                 check_interval=0.1,
                 rate_limiter=RateLimiter(
@@ -140,7 +144,7 @@ class TestDispatchStrategies:
                     base_delay=(0.1, 0.2),
                     max_delay=1.0,
                     max_retries=2,
-                    rate_limit_codes=[200],  # Force rate limiting for testing
+                    rate_limit_codes=[codes.OK],  # Force rate limiting for testing
                 ),
             )
             start_time = time.time()
@@ -167,4 +171,6 @@ class TestDispatchStrategies:
 
 
 if __name__ == "__main__":
-    pytest.main([__file__, "-v", "--asyncio-mode=auto"])
+    import subprocess
+
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

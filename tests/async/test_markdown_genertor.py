@@ -3,14 +3,11 @@
 # - **Title:** [user data crawling opens two windows, unable to control correct user browser](https://github.com/unclecode/crawl4ai/issues/236)
 # - **State:** open
 
-import os, sys, time
-
-parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(parent_dir)
-__location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 import os
+import sys
 import time
-from typing import Dict, Any
+from typing import Any, Dict
+
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
 # Get current directory
@@ -19,7 +16,7 @@ __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file
 
 def print_test_result(name: str, result: Dict[str, Any], execution_time: float):
     """Helper function to print test results."""
-    print(f"\n{'='*20} {name} {'='*20}")
+    print(f"\n{'=' * 20} {name} {'=' * 20}")
     print(f"Execution time: {execution_time:.4f} seconds")
 
     # Save markdown to files
@@ -27,14 +24,6 @@ def print_test_result(name: str, result: Dict[str, Any], execution_time: float):
         if isinstance(content, str):
             with open(__location__ + f"/output/{name.lower()}_{key}.md", "w") as f:
                 f.write(content)
-
-    # # Print first few lines of each markdown version
-    # for key, content in result.items():
-    #     if isinstance(content, str):
-    #         preview = '\n'.join(content.split('\n')[:3])
-    #         print(f"\n{key} (first 3 lines):")
-    #         print(preview)
-    #         print(f"Total length: {len(content)} characters")
 
 
 def test_basic_markdown_conversion():
@@ -65,9 +54,9 @@ def test_basic_markdown_conversion():
     assert result.markdown_with_citations, "Markdown with citations should not be empty"
     assert result.references_markdown, "References should not be empty"
     assert "⟨" in result.markdown_with_citations, "Citations should use ⟨⟩ brackets"
-    assert (
-        "## References" in result.references_markdown
-    ), "Should contain references section"
+    assert "## References" in result.references_markdown, (
+        "Should contain references section"
+    )
 
 
 def test_relative_links():
@@ -114,12 +103,12 @@ def test_link_descriptions():
         cleaned_html=markdown, base_url="https://example.com"
     )
 
-    assert (
-        "Test Title" in result.references_markdown
-    ), "Link title should be in references"
-    assert (
-        "link with description" in result.references_markdown
-    ), "Link text should be in references"
+    assert "Test Title" in result.references_markdown, (
+        "Link title should be in references"
+    )
+    assert "link with description" in result.references_markdown, (
+        "Link text should be in references"
+    )
 
 
 def test_performance_large_document():
@@ -138,11 +127,12 @@ def test_performance_large_document():
         result = generator.generate_markdown(
             cleaned_html=markdown, base_url="https://en.wikipedia.org"
         )
+        assert result.raw_markdown
         end_time = time.perf_counter()
         times.append(end_time - start_time)
 
     avg_time = sum(times) / len(times)
-    print(f"\n{'='*20} Performance Test {'='*20}")
+    print(f"\n{'=' * 20} Performance Test {'=' * 20}")
     print(
         f"Average execution time over {iterations} iterations: {avg_time:.4f} seconds"
     )
@@ -162,20 +152,15 @@ def test_image_links():
         cleaned_html=markdown, base_url="https://example.com"
     )
 
-    assert (
-        "![" in result.markdown_with_citations
-    ), "Image markdown syntax should be preserved"
-    assert (
-        "Image Title" in result.references_markdown
-    ), "Image title should be in references"
+    assert "![" in result.markdown_with_citations, (
+        "Image markdown syntax should be preserved"
+    )
+    assert "Image Title" in result.references_markdown, (
+        "Image title should be in references"
+    )
 
 
 if __name__ == "__main__":
-    print("Running markdown generation strategy tests...")
+    import subprocess
 
-    test_basic_markdown_conversion()
-    test_relative_links()
-    test_duplicate_links()
-    test_link_descriptions()
-    test_performance_large_document()
-    test_image_links()
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

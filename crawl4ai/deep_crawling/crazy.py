@@ -1,5 +1,5 @@
 from __future__ import annotations
-# I just got crazy, trying to wrute K&R C but in Python. Right now I feel like I'm in a quantum state.
+# I just got crazy, trying to write K&R C but in Python. Right now I feel like I'm in a quantum state.
 # I probably won't use this; I just want to leave it here. A century later, the future human race will be like, "WTF?"
 
 # ------ Imports That Will Make You Question Reality ------ #
@@ -23,12 +23,13 @@ from typing import (
     AsyncGenerator,
     Dict,
     List,
+    Optional,
     TypeVar,
     Generic,
     Tuple,
     Callable,
     Awaitable,
-    Union,
+    AsyncIterator,
 )
 from functools import lru_cache
 import mmh3
@@ -44,12 +45,16 @@ P = TypeVar("P")
 # ------ Hyperscalar Context Management ------ #
 deep_crawl_ctx = ContextVar("deep_crawl_stack", default=deque())
 
+async def default_priority_fn(url: str) -> float:
+    """Default priority function."""
+    return 1.0
+
 # ------ Algebraic Crawler Monoid ------ #
 class TraversalContext:
     __slots__ = ('visited', 'frontier', 'depths', 'priority_fn', 'current_depth')
-    
+
     def __init__(self,
-                 priority_fn: Callable[[str], Awaitable[float]] = lambda _: 1.0):
+                 priority_fn: Callable[[str], Awaitable[float]] = default_priority_fn):
         self.visited: BloomFilter = BloomFilter(10**6, 0.01)  # 1M items, 1% FP
         self.frontier: PriorityQueue = PriorityQueue()
         self.depths: Dict[str, int] = {}
@@ -136,10 +141,10 @@ class BloomFilter:
         new.hashes = self.hashes
         new.bits = self.bits.copy()
         return new
-    
+
     def __len__(self) -> int:
         """
-        Estimates the number of items in the filter using the 
+        Estimates the number of items in the filter using the
         count of set bits and the formula:
         n = -m/k * ln(1 - X/m)
         where:
@@ -172,12 +177,16 @@ class DeepCrawlDecorator:
 
     def __call__(self, original_arun: Callable) -> Callable:
         @wraps(original_arun)
-        async def quantum_arun(url: str, config: CrawlerRunConfig = None, **kwargs):
+
+        async def quantum_arun(url: str, config: Optional[CrawlerRunConfig] = None, **kwargs):
             stack = deep_crawl_ctx.get()
             if config and config.deep_crawl_strategy and not stack:
                 stack.append(self.crawler)
                 try:
                     deep_crawl_ctx.set(stack)
+                    if not isinstance(config.deep_crawl_strategy, DeepCrawlStrategy):
+                        raise TypeError("Deep crawl strategy must be an instance of crazy.DeepCrawlStrategy")
+
                     async for result in config.deep_crawl_strategy.traverse(
                         start_url=url,
                         crawler=self.crawler,
@@ -219,30 +228,29 @@ async def collect_many_results(url, crawler, config):
 
 
 # ------ Deep Crawl Strategy Interface ------ #
-CrawlResultT = TypeVar("CrawlResultT", bound=CrawlResult)
-# In batch mode we return List[CrawlResult] and in stream mode an AsyncGenerator.
-RunManyReturn = Union[CrawlResultT, List[CrawlResultT], AsyncGenerator[CrawlResultT, None]]
-
 
 class DeepCrawlStrategy(ABC):
     """Abstract base class that will make Dijkstra smile"""
+    # Not async because it returns an AsyncIterator but does not yield.
+    # See the following issue from pyright for more information:
+    # https://github.com/microsoft/pyright/issues/9949
     @abstractmethod
-    async def traverse(self,
+    def traverse(self,
                       start_url: str,
                       crawler: AsyncWebCrawler,
-                      config: CrawlerRunConfig) -> RunManyReturn:
+                      config: CrawlerRunConfig) -> AsyncIterator[CrawlResult]:
         """Traverse with O(1) memory complexity via generator fusion"""
-        ...
 
     @abstractmethod
     def precompute_priority(self, url: str) -> Awaitable[float]:
         """Quantum-inspired priority precomputation"""
-        pass
 
+    # Not async because it returns an AsyncIterator but does not yield.
+    # See the following issue from pyright for more information:
+    # https://github.com/microsoft/pyright/issues/9949
     @abstractmethod
-    async def link_hypercube(self, result: CrawlResult) -> AsyncGenerator[str, None]:
+    def link_hypercube(self, result: CrawlResult) -> AsyncIterator[str]:
         """Hilbert-curve optimized link generation"""
-        pass
 
 # ------ BFS That Would Make Knuth Proud ------ #
 
@@ -314,8 +322,8 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
     def __init__(self,
                  max_depth: int,
                  filter_chain: FilterChain = FilterChain(),
-                 priority_fn: Callable[[str], Awaitable[float]] = lambda url: 1.0,
-                 logger: logging.Logger = None):
+                 priority_fn: Callable[[str], Awaitable[float]] = default_priority_fn,
+                 logger: Optional[logging.Logger] = None):
         self.max_depth = max_depth
         self.filter_chain = filter_chain
         self.priority_fn = priority_fn
@@ -326,7 +334,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
     async def traverse(self,
                       start_url: str,
                       crawler: AsyncWebCrawler,
-                      config: CrawlerRunConfig) -> RunManyReturn:
+                      config: CrawlerRunConfig) -> AsyncIterator[CrawlResult]:
         """Non-blocking BFS with O(b^d) time complexity awareness"""
         ctx = TraversalContext(self.priority_fn)
         ctx.frontier.insert(self.priority_fn(start_url), (start_url, None, 0))
@@ -378,7 +386,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
         except Exception:
             return False
 
-    async def link_hypercube(self, result: CrawlResult) -> AsyncGenerator[str, None]:
+    async def link_hypercube(self, result: CrawlResult) -> AsyncIterator[str]:
         """Hilbert-ordered link generation with O(1) yield latency"""
         links = (link['href'] for link in result.links.get('internal', []))
         validated = filter(self.validate_url, links)

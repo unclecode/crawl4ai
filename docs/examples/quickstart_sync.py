@@ -1,10 +1,12 @@
 import os
 import time
-from crawl4ai.types import LLMConfig
-from crawl4ai.web_crawler import WebCrawler
-from crawl4ai.chunking_strategy import *
-from crawl4ai.extraction_strategy import *
-from crawl4ai.crawler_strategy import *
+import json
+import base64
+from crawl4ai.async_configs import LLMConfig, CacheMode
+from crawl4ai.legacy.crawler_strategy import LocalSeleniumCrawlerStrategy
+from crawl4ai.chunking_strategy import RegexChunking, NlpSentenceChunking
+from crawl4ai.extraction_strategy import CosineStrategy, LLMExtractionStrategy
+from crawl4ai.legacy.web_crawler import WebCrawler
 from rich import print
 from rich.console import Console
 from functools import lru_cache
@@ -89,7 +91,9 @@ def understanding_parameters(crawler):
     # Force to crawl again
     cprint("2️⃣ Second crawl (Force to crawl again):", True)
     start_time = time.time()
-    result = crawler.run(url="https://www.nbcnews.com/business", bypass_cache=True)
+    result = crawler.run(
+        url="https://www.nbcnews.com/business", cache_mode=CacheMode.BYPASS
+    )
     end_time = time.time()
     cprint(
         f"[LOG] 📦 [bold yellow]Second crawl took {end_time - start_time} seconds and result (forced to crawl):[/bold yellow]"
@@ -246,7 +250,7 @@ def interactive_extraction(crawler):
     """
     # crawler_strategy = LocalSeleniumCrawlerStrategy(js_code=js_code)
     # crawler = WebCrawler(crawler_strategy=crawler_strategy, always_by_pass_cache=True)
-    result = crawler.run(url="https://www.nbcnews.com/business", js=js_code)
+    result = crawler.run(url="https://www.nbcnews.com/business", js_code=js_code)
     cprint(
         "[LOG] 📦 [bold yellow]JavaScript Code (Load More button) result:[/bold yellow]"
     )
@@ -270,7 +274,7 @@ def multiple_scrip(crawler):
     ] * 2
     # crawler_strategy = LocalSeleniumCrawlerStrategy(js_code=js_code)
     # crawler = WebCrawler(crawler_strategy=crawler_strategy, always_by_pass_cache=True)
-    result = crawler.run(url="https://www.nbcnews.com/business", js=js_code)
+    result = crawler.run(url="https://www.nbcnews.com/business", js_code=js_code)
     cprint(
         "[LOG] 📦 [bold yellow]JavaScript Code (Load More button) result:[/bold yellow]"
     )
@@ -363,7 +367,7 @@ def using_crawler_hooks_dleay_example(crawler):
         "\n🔗 [bold cyan]Using Crawler Hooks: Let's add a delay after fetching the url to make sure entire page is fetched.[/bold cyan]"
     )
     crawler = create_crawler()
-    result = crawler.run(url="https://google.com", bypass_cache=True)
+    result = crawler.run(url="https://google.com", cache_mode=CacheMode.BYPASS)
 
     cprint("[LOG] 📦 [bold yellow]Crawler Hooks result:[/bold yellow]")
     print_result(result)

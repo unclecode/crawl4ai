@@ -12,7 +12,7 @@ from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 from litellm import batch_completion
-from .async_logger import AsyncLogger
+from ..async_logger import AsyncLogger
 import litellm
 import pickle
 import hashlib  # <--- ADDED for file-hash
@@ -39,7 +39,7 @@ class AsyncLLMTextManager:
         batch_size: int = 3,
     ) -> None:
         self.docs_dir = docs_dir
-        self.logger = logger
+        self.logger = logger or AsyncLogger()
         self.max_concurrent_calls = max_concurrent_calls
         self.batch_size = batch_size
         self.bm25_index = None
