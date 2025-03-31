@@ -20,6 +20,13 @@
                 ],
                 "editor": "requestListSources"
             },
+            "maxCrawlDepth": {
+                "title": "Maximum crawl depth",
+                "type": "integer",
+                "description": "How many levels of links should the crawler follow. The Start URLs have a depth of 0, all links found there have a depth of 1, and so on.",
+                "minimum": 0,
+                "default": 2
+            },
             "proxyConfiguration": {
                 "title": "Proxy configuration",
                 "type": "object",
