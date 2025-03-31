@@ -48,7 +48,7 @@ def parse_srcset(s: str) -> List[Dict]:
         if len(parts) >= 1:
             url = parts[0]
             width = (
-                parts[1].rstrip("w")
+                parts[1].rstrip("w").split('.')[0]
                 if len(parts) > 1 and parts[1].endswith("w")
                 else None
             )
