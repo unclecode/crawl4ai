@@ -109,6 +109,9 @@ class BaseBrowserStrategy(ABC):
         
         page, context = await self._generate_page(crawlerRunConfig)
 
+        import uuid
+        setattr(page, "guid", uuid.uuid4())
+
         # If a session_id is specified, store this session so we can reuse later
         if crawlerRunConfig.session_id:
             self.sessions[crawlerRunConfig.session_id] = (context, page, time.time())
@@ -132,6 +135,12 @@ class BaseBrowserStrategy(ABC):
             pages.append((page, context))
         return pages
        
+    async def get_opened_pages(self) -> List[Page]:
+        """Get all opened pages in the
+        browser.
+        """
+        return [page for context in self.contexts_by_config.values() for page in context.pages]
+
     def _build_browser_args(self) -> dict:
         """Build browser launch arguments from config.
         

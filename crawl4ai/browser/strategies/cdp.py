@@ -122,7 +122,7 @@ class CDPBrowserStrategy(BaseBrowserStrategy):
         else:
             raise NotImplementedError(f"Browser type {self.config.browser_type} not supported")
 
-        args = base_args + browser_args + args        
+        args = base_args + browser_args['args'] + args         
 
         # Start browser process
         try:
