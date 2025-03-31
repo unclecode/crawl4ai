@@ -86,14 +86,16 @@ Allow: /public/
 
         runner = web.AppRunner(app)
         await runner.setup()
-        site = web.TCPSite(runner, "localhost", 8080)
+        site = web.TCPSite(runner, "localhost", 0)
         await site.start()
         return runner
 
     runner = await start_test_server()
     try:
         print("\n4. Testing robots.txt rules...")
-        base_url = "http://localhost:8080"
+        port: int
+        _, port = runner.addresses[0]
+        base_url = f"http://localhost:{port}"
 
         # Test public access
         result = await parser.can_fetch(f"{base_url}/public/page", "bot")
@@ -106,24 +108,24 @@ Allow: /public/
 
         # Test malformed
         result = await parser.can_fetch(
-            "http://localhost:8080/malformed/page", "bot"
+            f"{base_url}/malformed/page", "bot"
         )
         assert result, "Malformed robots.txt should be handled as allowed"
 
         # Test timeout
         start = time.time()
-        result = await parser.can_fetch("http://localhost:8080/timeout/page", "bot")
+        result = await parser.can_fetch(f"{base_url}/timeout/page", "bot")
         duration = time.time() - start
         assert result, "Timeout should be handled as allowed"
         assert duration < 3, "Timeout not working"
 
         # Test empty
-        result = await parser.can_fetch("http://localhost:8080/empty/page", "bot")
+        result = await parser.can_fetch(f"{base_url}/empty/page", "bot")
         assert result, "Empty robots.txt should be handled as allowed"
 
         # Test giant file
         start = time.time()
-        result = await parser.can_fetch("http://localhost:8080/giant/page", "bot")
+        result = await parser.can_fetch(f"{base_url}/giant/page", "bot")
         assert result, "Giant robots.txt should be handled as allowed"
 
     finally:

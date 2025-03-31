@@ -7,6 +7,7 @@ from crawl4ai.async_configs import LLMConfig
 
 
 @pytest.mark.asyncio
+@pytest.mark.timeout(200)
 async def test_llm_filter():
     if not os.getenv("OPENAI_API_KEY"):
         pytest.skip("Skipping env OPENAI_API_KEY not set")
