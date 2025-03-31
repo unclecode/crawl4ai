@@ -1,6 +1,7 @@
 import os
 import sys
 
+from httpx import codes
 import pytest
 
 from crawl4ai import AsyncWebCrawler, CacheMode, DefaultMarkdownGenerator
@@ -44,7 +45,7 @@ async def test_browser_performance_config():
     async with AsyncWebCrawler(config=browser_config) as crawler:
         result = await crawler.arun("https://example.com")
         assert result.success, "Performance optimized crawl failed"
-        assert result.status_code == 200, "Unexpected status code"
+        assert result.status_code == codes.OK, "Unexpected status code"
 
 
 # Category 2: Content Processing Tests

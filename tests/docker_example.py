@@ -1,3 +1,4 @@
+from httpx import codes
 import requests
 import json
 import time
@@ -26,7 +27,7 @@ class Crawl4AiTester:
         response = requests.post(
             f"{self.base_url}/crawl", json=request_data, headers=self.headers
         )
-        if response.status_code == 403:
+        if response.status_code == codes.FORBIDDEN:
             raise Exception("API token is invalid or missing")
         task_id = response.json()["task_id"]
         print(f"Task ID: {task_id}")
@@ -60,7 +61,7 @@ class Crawl4AiTester:
             headers=self.headers,
             timeout=60,
         )
-        if response.status_code == 408:
+        if response.status_code == codes.REQUEST_TIMEOUT:
             raise TimeoutError("Task did not complete within server timeout")
         response.raise_for_status()
         return response.json()

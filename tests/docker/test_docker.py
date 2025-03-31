@@ -1,5 +1,6 @@
 import sys
 
+from httpx import codes
 import pytest
 
 from crawl4ai import (
@@ -43,7 +44,7 @@ async def test_direct_filtering(browser_config: BrowserConfig):
             json=request_data,
             timeout=300
         )
-        assert response.status_code == 200
+        assert response.status_code == codes.OK
         result = response.json()
         assert result["success"]
 
@@ -75,7 +76,7 @@ async def test_direct_structured_extraction(browser_config: BrowserConfig):
             "/crawl",
             json=request_data
         )
-        assert response.status_code == 200
+        assert response.status_code == codes.OK
         result = response.json()
         assert result["success"]
         assert result["results"]
@@ -97,7 +98,7 @@ async def test_direct_schema(browser_config: BrowserConfig):
     """Get the schema."""
     async with async_client() as client:
         response = await client.get("/schema")
-        assert response.status_code == 200
+        assert response.status_code == codes.OK
         schemas = response.json()
         assert schemas
         assert len(schemas.keys()) == 2

@@ -1,6 +1,7 @@
 import sys
 import time
 
+from httpx import codes
 import pytest
 
 from crawl4ai import (
@@ -143,7 +144,7 @@ class TestDispatchStrategies:
                     base_delay=(0.1, 0.2),
                     max_delay=1.0,
                     max_retries=2,
-                    rate_limit_codes=[200],  # Force rate limiting for testing
+                    rate_limit_codes=[codes.OK],  # Force rate limiting for testing
                 ),
             )
             start_time = time.time()

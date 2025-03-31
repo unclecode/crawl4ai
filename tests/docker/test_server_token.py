@@ -87,7 +87,7 @@ class TestAPI:
         async with client.stream(
             "POST", url, json=payload, headers=headers
         ) as response:
-            print(f"Status: {response.status_code} (Expected: 200)")
+            print(f"Status: {response.status_code} (Expected: {codes.OK})")
             assert response.status_code == codes.OK, (
                 f"Expected {codes.OK}, got {response.status_code}"
             )
@@ -183,7 +183,7 @@ class TestAPI:
 
     async def test_invalid_url(self, setup_session: tuple[AsyncClient, str]):
         client, token = setup_session
-        await self.endpoint(client, token, "md", "not_a_real_url", expected_status=500)
+        await self.endpoint(client, token, "md", "not_a_real_url", expected_status=codes.INTERNAL_SERVER_ERROR)
 
     async def test_invalid_filter(self, setup_session: tuple[AsyncClient, str]):
         client, token = setup_session
@@ -193,13 +193,13 @@ class TestAPI:
             "md",
             "example.com",
             {"f": "invalid"},
-            expected_status=422,
+            expected_status=codes.UNPROCESSABLE_ENTITY,
         )
 
     async def test_missing_query(self, setup_session: tuple[AsyncClient, str]):
         client, token = setup_session
         # Test LLM without query (should fail per your server logic)
-        await self.endpoint(client, token, "llm", "example.com", expected_status=400)
+        await self.endpoint(client, token, "llm", "example.com", expected_status=codes.BAD_REQUEST)
 
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@ from urllib.parse import quote
 
 import aiohttp
 import pytest
-from httpx import Response
+from httpx import Response, codes
 
 from .common import TEST_URLS, async_client, markdown_params
 
@@ -14,7 +14,7 @@ EndpointResponse = Optional[Union[dict, str]]
 
 
 async def endpoint(
-    endpoint: str, url: str, params: Optional[dict] = None, expected_status: int = 200
+    endpoint: str, url: str, params: Optional[dict] = None, expected_status: int = codes.OK
 ) -> EndpointResponse:
     """Test an endpoint and print results"""
     params = params or {}
@@ -112,22 +112,22 @@ async def test_llm_endpoint_schema(url: str):
 
 @pytest.mark.asyncio
 async def test_invalid_url():
-    await endpoint("md", "not_a_real_url", expected_status=500)
+    await endpoint("md", "not_a_real_url", expected_status=codes.INTERNAL_SERVER_ERROR)
 
 
 @pytest.mark.asyncio
 async def test_invalid_filter():
-    await endpoint("md", "example.com", {"f": "invalid"}, expected_status=422)
+    await endpoint("md", "example.com", {"f": "invalid"}, expected_status=codes.UNPROCESSABLE_ENTITY)
 
 
 @pytest.mark.asyncio
 async def test_llm_without_query():
-    await endpoint("llm", "example.com", expected_status=400)
+    await endpoint("llm", "example.com", expected_status=codes.BAD_REQUEST)
 
 
 @pytest.mark.asyncio
 async def test_invalid_task():
-    await endpoint("llm", "llm_invalid_task", expected_status=400)
+    await endpoint("llm", "llm_invalid_task", expected_status=codes.BAD_REQUEST)
 
 
 if __name__ == "__main__":
