@@ -820,7 +820,11 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     
                     for selector in selectors:
                         try:
-                            content = await page.evaluate(f"document.querySelector('{selector}')?.outerHTML || ''")
+                            content = await page.evaluate(
+                                f"""Array.from(document.querySelectorAll("{selector}"))
+                                    .map(el => el.outerHTML)
+                                    .join('')"""
+                            )
                             html_parts.append(content)
                         except Error as e:
                             print(f"Warning: Could not get content for selector '{selector}': {str(e)}")
