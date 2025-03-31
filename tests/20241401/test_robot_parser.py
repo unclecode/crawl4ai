@@ -93,8 +93,8 @@ Allow: /public/
     runner = await start_test_server()
     try:
         print("\n4. Testing robots.txt rules...")
-        port: int
-        _, port = runner.addresses[0]
+        # Addresses are either IPv4 or IPv6, in both types the port is the second element.
+        port: int = runner.addresses[0][1]
         base_url = f"http://localhost:{port}"
 
         # Test public access
