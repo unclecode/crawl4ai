@@ -532,14 +532,12 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 if console_log_type == "error":
                     self.logger.error(
                         message=f"Console error: {msg}",  # Use f-string for variable interpolation
-                        tag="CONSOLE",
-                        params={"msg": msg.text},
+                        tag="CONSOLE"
                     )
                 elif console_log_type == "debug":
                     self.logger.debug(
                         message=f"Console: {msg}",  # Use f-string for variable interpolation
-                        tag="CONSOLE",
-                        params={"msg": msg.text},
+                        tag="CONSOLE"
                     )
 
             page.on("console", log_consol)
