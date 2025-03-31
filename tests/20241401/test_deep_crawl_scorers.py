@@ -14,7 +14,7 @@ from crawl4ai.deep_crawling.scorers import (
 )
 
 
-def test_scorers_params() -> list[ParameterSet]:
+def scorers_params() -> list[ParameterSet]:
     tests: list[ParameterSet] = []
 
     def add_tests(name: str, scorer, urls: dict[str, float]):
@@ -86,7 +86,7 @@ def test_scorers_params() -> list[ParameterSet]:
     return tests
 
 
-@pytest.mark.parametrize("scorer,url,expected", test_scorers_params())
+@pytest.mark.parametrize("scorer,url,expected", scorers_params())
 def test_accuracy(scorer: URLScorer, url: str, expected: float):
     score = round(scorer.score(url), 8)
     expected = round(expected, 8)
