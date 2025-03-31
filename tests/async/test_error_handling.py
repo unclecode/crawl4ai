@@ -20,6 +20,7 @@ async def test_network_error(crawler: AsyncWebCrawler):
     url = "https://www.nonexistentwebsite123456789.com"
     result = await crawler.arun(url=url, cache_mode=CacheMode.BYPASS)
     assert not result.success
+    assert result.error_message
     assert "Failed on navigating ACS-GOTO" in result.error_message
 
 
@@ -29,6 +30,7 @@ async def test_timeout_error(crawler: AsyncWebCrawler):
     url = "https://www.nbcnews.com/business"
     result = await crawler.arun(url=url, cache_mode=CacheMode.BYPASS, page_timeout=0.001)
     assert not result.success
+    assert result.error_message
     assert "timeout" in result.error_message.lower()
 
 
@@ -61,6 +63,7 @@ async def test_empty_page(crawler: AsyncWebCrawler):
     url = "http://example.com/empty"
     result = await crawler.arun(url=url, cache_mode=CacheMode.BYPASS)
     assert result.success  # The crawl itself should succeed
+    assert result.markdown is not None
     assert not result.markdown.strip()  # The markdown content should be empty or just whitespace
 
 
@@ -70,11 +73,11 @@ async def test_rate_limiting(crawler: AsyncWebCrawler):
     # Simulate rate limiting by making multiple rapid requests
     url = "https://www.nbcnews.com/business"
     results = await asyncio.gather(*[crawler.arun(url=url, cache_mode=CacheMode.BYPASS) for _ in range(10)])
-    assert any(not result.success and "rate limit" in result.error_message.lower() for result in results)
+    assert any(not result.success and result.error_message and "rate limit" in result.error_message.lower() for result in results)
 
 
 # Entry point for debugging
 if __name__ == "__main__":
     import subprocess
 
-    sys.exit(subprocess.call(["pytest", "-v", str(__file__)]))
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

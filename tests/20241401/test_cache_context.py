@@ -4,7 +4,7 @@ import pytest
 from playwright.async_api import BrowserContext, Page
 
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CacheMode, CrawlerRunConfig
-from crawl4ai.async_webcrawler import CrawlResultContainer
+from crawl4ai.models import CrawlResultContainer
 
 
 @pytest.mark.asyncio
@@ -77,20 +77,11 @@ async def test_reuse_context_by_config():
     print("\n=== RESULTS ===")
     print(f"Config A context IDs: {context_ids_for_A}")
     print(f"Config B context IDs: {context_ids_for_B}")
-    if len(set(context_ids_for_A)) == 1:
-        print("✅ All config A crawls used the SAME BrowserContext.")
-    else:
-        print("❌ Config A crawls created multiple contexts unexpectedly.")
-    if len(set(context_ids_for_B)) == 1:
-        print("✅ All config B crawls used the SAME BrowserContext.")
-    else:
-        print("❌ Config B crawls created multiple contexts unexpectedly.")
-    if set(context_ids_for_A).isdisjoint(context_ids_for_B):
-        print("✅ Config A context is different from Config B context.")
-    else:
-        print("❌ A and B ended up sharing the same context somehow!")
+    assert len(set(context_ids_for_A)) == 1
+    assert len(set(context_ids_for_B)) == 1
+    assert set(context_ids_for_A).isdisjoint(context_ids_for_B)
 
 if __name__ == "__main__":
     import subprocess
 
-    sys.exit(subprocess.call(["pytest", "-v", str(__file__)]))
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

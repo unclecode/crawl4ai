@@ -3,8 +3,7 @@ from typing import Any, AsyncGenerator
 import pytest
 from _pytest.mark.structures import ParameterSet
 
-from crawl4ai.async_webcrawler import CrawlResultContainer
-from crawl4ai.models import CrawlResult
+from crawl4ai.models import CrawlResultContainer, CrawlResult
 
 RESULT: CrawlResult = CrawlResult(
     url="https://example.com", success=True, html="<html><body>Test content</body></html>"
@@ -85,38 +84,42 @@ def test_len(result: CrawlResultContainer, expected: list[CrawlResult]):
     assert len(result) == len(expected)
 
 
+def result_attributes() -> list[str]:
+    """Return a list of attributes to test for CrawlResult
+
+    :return: List of valid attributes, excluding private, callable, and deprecated attributes.
+    :rtype: list[str]
+    """
+
+    # We check hasattr to avoid class only attribute error and failing on deprecated attributes.
+    return [
+        attr
+        for attr in dir(RESULT)
+        if attr in RESULT.model_fields or (hasattr(RESULT, attr) and isinstance(getattr(RESULT, attr), property))
+    ]
+
+
 @pytest.mark.parametrize("result,expected", result_container_params())
-def test_getattr(result: CrawlResultContainer, expected: list[CrawlResult]):
-    """Test the __getattr__ method of the CrawlResultContainer."""
+def test_getattribute(result: CrawlResultContainer, expected: list[CrawlResult]):
+    """Test the __getattribute__ method of the CrawlResultContainer."""
     assert result.source is not None
 
     if isinstance(result.source, AsyncGenerator):
-        for attr in dir(RESULT):
-            if attr.startswith("_"):
-                continue
-
+        for attr in result_attributes():
             with pytest.raises(TypeError):
                 assert getattr(result, attr) == getattr(RESULT, attr)
 
         return
 
     if not expected:
-        for attr in dir(RESULT):
-            if attr.startswith("_"):
-                continue
-
-            if hasattr(RESULT, attr):
-                with pytest.raises(AttributeError):
-                    assert getattr(result, attr) == getattr(RESULT, attr)
+        for attr in result_attributes():
+            with pytest.raises(AttributeError):
+                assert getattr(result, attr) == getattr(RESULT, attr)
 
         return
 
-    for attr in dir(RESULT):
-        if attr.startswith("_"):
-            continue
-
-        if hasattr(RESULT, attr):
-            assert getattr(result, attr) == getattr(RESULT, attr)
+    for attr in result_attributes():
+        assert getattr(result, attr) == getattr(RESULT, attr)
 
 
 @pytest.mark.parametrize("result,expected", result_container_params())

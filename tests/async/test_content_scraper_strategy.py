@@ -28,7 +28,7 @@ class Result:
     images: int
     internal_links: int
     external_links: int
-    markdown_length: int
+    cleaned_html_length: int
     execution_time: float
 
 
@@ -56,7 +56,7 @@ def print_comparison_table():
         "Images",
         "Internal Links",
         "External Links",
-        "Markdown Length",
+        "Cleaned HTML Length",
         "Time (s)",
     ]
 
@@ -77,8 +77,8 @@ def print_comparison_table():
             differences.append("internal_links")
         if new_result.external_links != current_result.external_links:
             differences.append("external_links")
-        if new_result.markdown_length != current_result.markdown_length:
-            differences.append("markdown")
+        if new_result.cleaned_html_length != current_result.cleaned_html_length:
+            differences.append("cleaned_html")
 
         # Add row for new strategy
         new_row = [
@@ -88,7 +88,7 @@ def print_comparison_table():
             new_result.images,
             new_result.internal_links,
             new_result.external_links,
-            new_result.markdown_length,
+            new_result.cleaned_html_length,
             f"{new_result.execution_time:.3f}",
         ]
         table_data.append(new_row)
@@ -101,7 +101,7 @@ def print_comparison_table():
             current_result.images,
             current_result.internal_links,
             current_result.external_links,
-            current_result.markdown_length,
+            current_result.cleaned_html_length,
             f"{current_result.execution_time:.3f}",
         ]
         table_data.append(current_row)
@@ -134,7 +134,7 @@ def write_results_to_csv():
                 "Images",
                 "Internal Links",
                 "External Links",
-                "Markdown Length",
+                "Cleaned HTML Length",
                 "Execution Time",
             ]
         )
@@ -209,6 +209,7 @@ def test_strategy(
     result: ScrapingResult = strategy.scrap(
         url="https://en.wikipedia.org/wiki/Test", html=wiki_html, **kwargs
     )
+    assert result.success
     execution_time = time.time() - start_time
 
     results.append(
@@ -219,7 +220,7 @@ def test_strategy(
             images=len(result.media.images),
             internal_links=len(result.links.internal),
             external_links=len(result.links.external),
-            markdown_length=len(result.markdown),
+            cleaned_html_length=len(result.cleaned_html),
             execution_time=execution_time,
         )
     )
@@ -228,4 +229,4 @@ def test_strategy(
 if __name__ == "__main__":
     import subprocess
 
-    sys.exit(subprocess.call(["pytest", "-v", str(__file__)]))
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

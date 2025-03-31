@@ -101,13 +101,13 @@ async def test_typescript_commits_multi_page():
                 url=url,  # Only use URL for the first page
                 session_id=session_id,
                 css_selector="div.Box-sc-g0xbh4-0",
-                js=js_next_page if page > 0 else None,  # Don't click 'next' on the first page
+                js_code=js_next_page if page > 0 else None,  # Don't click 'next' on the first page
                 cache_mode=CacheMode.BYPASS,
                 js_only=page > 0,  # Use js_only for subsequent pages
             )
 
             assert result.success, f"Failed to crawl page {page + 1}"
-
+            assert result.cleaned_html, f"No cleaned HTML found for page {page + 1}"
             # Parse the HTML and extract commits
             soup = BeautifulSoup(result.cleaned_html, "html.parser")
             commits = soup.select("li")
@@ -131,4 +131,4 @@ async def test_typescript_commits_multi_page():
 if __name__ == "__main__":
     import subprocess
 
-    sys.exit(subprocess.call(["pytest", "-v", str(__file__)]))
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

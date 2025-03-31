@@ -127,6 +127,7 @@ def test_performance_large_document():
         result = generator.generate_markdown(
             cleaned_html=markdown, base_url="https://en.wikipedia.org"
         )
+        assert result.raw_markdown
         end_time = time.perf_counter()
         times.append(end_time - start_time)
 
@@ -162,4 +163,4 @@ def test_image_links():
 if __name__ == "__main__":
     import subprocess
 
-    sys.exit(subprocess.call(["pytest", "-v", str(__file__)]))
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

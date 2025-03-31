@@ -5,7 +5,8 @@ from pathlib import Path
 import pytest
 from playwright.async_api import Browser, BrowserType, async_playwright
 
-from crawl4ai.async_webcrawler import AsyncWebCrawler, CrawlResultContainer
+from crawl4ai.async_webcrawler import AsyncWebCrawler
+from crawl4ai.models import CrawlResultContainer
 
 
 @pytest.fixture(scope="session")
@@ -134,7 +135,7 @@ class TestDownloads:
                 """,
             )
             assert_downloaded(result)
-            for file in result.downloaded_files:
+            for file in result.downloaded_files: # pyright: ignore[reportOptionalIterable]
                 if os.path.exists(file):
                     os.remove(file)
 
@@ -170,4 +171,4 @@ class TestDownloads:
 if __name__ == "__main__":
     import subprocess
 
-    sys.exit(subprocess.call(["pytest", "-v", str(__file__)]))
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

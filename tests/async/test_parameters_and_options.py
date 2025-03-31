@@ -4,6 +4,7 @@ import pytest
 
 from crawl4ai import CacheMode
 from crawl4ai.async_webcrawler import AsyncWebCrawler
+from pytest_httpserver import HTTPServer
 
 
 @pytest.mark.asyncio
@@ -17,7 +18,10 @@ async def test_word_count_threshold():
         result_with_threshold = await crawler.arun(
             url=url, word_count_threshold=100, cache_mode=CacheMode.BYPASS
         )
-
+        assert result_no_threshold.success
+        assert result_with_threshold.success
+        assert result_no_threshold.markdown
+        assert result_with_threshold.markdown
         assert len(result_no_threshold.markdown) > len(result_with_threshold.markdown)
 
 
@@ -31,6 +35,7 @@ async def test_css_selector():
         )
 
         assert result.success
+        assert result.cleaned_html
         assert (
             "<h1" in result.cleaned_html
             or "<h2" in result.cleaned_html
@@ -45,15 +50,47 @@ async def test_javascript_execution():
 
         # Crawl without JS
         result_without_more = await crawler.arun(url=url, cache_mode=CacheMode.BYPASS)
-
+        assert result_without_more.success
+        assert result_without_more.markdown
         js_code = [
-            "const loadMoreButton = Array.from(document.querySelectorAll('button')).find(button => button.textContent.includes('Load More')); loadMoreButton && loadMoreButton.click();"
+            """function waitForBlobSizeChange(initialSize, timeout = 5000, interval = 100) {
+                return new Promise((resolve, reject) => {
+                    const startTime = Date.now();
+                    const check = () => {
+                        const currentSize = new Blob([document.documentElement.outerHTML]).size;
+
+                        if (currentSize !== initialSize) {
+                            resolve(currentSize);
+                            return;
+                        }
+
+                        if (Date.now() - startTime > timeout) {
+                            reject(new Error('Timeout: Blob size did not change.'));
+                            return;
+                        }
+
+                        setTimeout(check, interval);
+                    };
+
+                    check();
+                });
+            }"""
+            "const loadMoreButton = Array.from(document.querySelectorAll('button')).find(button => button.textContent.includes('Load More'));"
+            """if (loadMoreButton == null) {
+                throw new Error('Load More button not found');
+            } else {
+                let initialSize = new Blob([document.documentElement.outerHTML]).size;
+                loadMoreButton.click();
+                return waitForBlobSizeChange(initialSize);
+            }
+            """,
         ]
         result_with_more = await crawler.arun(
-            url=url, js=js_code, cache_mode=CacheMode.BYPASS
+            url=url, js_code=js_code, cache_mode=CacheMode.BYPASS
         )
 
         assert result_with_more.success
+        assert result_with_more.markdown
         assert len(result_with_more.markdown) > len(result_without_more.markdown)
 
 
@@ -71,16 +108,18 @@ async def test_screenshot():
 
 
 @pytest.mark.asyncio
-async def test_custom_user_agent():
+async def test_custom_user_agent(httpserver: HTTPServer):
+    custom_user_agent: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36 Crawl4AI/1.0"
+    httpserver.expect_request("/", headers={"User-Agent": custom_user_agent}).respond_with_data(
+        content_type="text/html",
+        response_data="<html><body>Simple page</body></html>"
+    )
     async with AsyncWebCrawler(verbose=True) as crawler:
-        url = "https://www.nbcnews.com/business"
-        custom_user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36 Crawl4AI/1.0"
         result = await crawler.arun(
-            url=url, user_agent=custom_user_agent, cache_mode=CacheMode.BYPASS
+            url=httpserver.url_for("/"), user_agent=custom_user_agent, cache_mode=CacheMode.BYPASS
         )
 
         assert result.success
-        # Note: We can't directly verify the user agent in the result, but we can check if the crawl was successful
 
 
 @pytest.mark.asyncio
@@ -117,4 +156,4 @@ async def test_metadata_extraction():
 if __name__ == "__main__":
     import subprocess
 
-    sys.exit(subprocess.call(["pytest", "-v", str(__file__)]))
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

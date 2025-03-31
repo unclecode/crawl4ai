@@ -25,26 +25,22 @@ async def endpoint(
 
     print(f"\nTesting: {path}")
 
-    try:
-        async with async_client() as session:
-            response: Response = await session.get(path)
-            content_type: str = response.headers.get(
-                aiohttp.hdrs.CONTENT_TYPE, ""
-            ).lower()
-            data: Union[dict, str] = (
-                response.json() if content_type == "application/json" else response.text
-            )
+    async with async_client() as session:
+        response: Response = await session.get(path)
+        content_type: str = response.headers.get(
+            aiohttp.hdrs.CONTENT_TYPE, ""
+        ).lower()
+        data: Union[dict, str] = (
+            response.json() if content_type == "application/json" else response.text
+        )
 
-            print(f"Status: {response.status_code} (Expected: {expected_status})")
-            if isinstance(data, dict):
-                print(f"Response: {json.dumps(data, indent=2)}")
-            else:
-                print(f"Response: {data[:500]}...")  # First 500 chars
-            assert response.status_code == expected_status
-            return data
-    except Exception as e:
-        print(f"Error: {str(e)}")
-        return None
+        print(f"Status: {response.status_code} (Expected: {expected_status})")
+        if isinstance(data, dict):
+            print(f"Response: {json.dumps(data, indent=2)}")
+        else:
+            print(f"Response: {data[:500]}...")  # First 500 chars
+        assert response.status_code == expected_status
+        return data
 
 
 async def llm_task_completion(task_id: str) -> Optional[dict]:
@@ -130,10 +126,10 @@ async def test_llm_without_query():
 
 @pytest.mark.asyncio
 async def test_invalid_task():
-    await endpoint("llm", "llm_invalid_task", expected_status=404)
+    await endpoint("llm", "llm_invalid_task", expected_status=400)
 
 
 if __name__ == "__main__":
     import subprocess
 
-    sys.exit(subprocess.call(["pytest", "-v", str(__file__)]))
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

@@ -262,7 +262,7 @@ async def crawl_dynamic_content_pages_method_1():
                 url=url,
                 session_id=session_id,
                 css_selector="li.Box-sc-g0xbh4-0",
-                js=js_next_page if page > 0 else None,
+                js_code=js_next_page if page > 0 else None,
                 cache_mode=CacheMode.BYPASS,
                 js_only=page > 0,
                 headless=False,

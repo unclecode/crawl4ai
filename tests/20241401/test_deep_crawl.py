@@ -10,10 +10,12 @@ from crawl4ai.deep_crawling import BFSDeepCrawlStrategy
 
 from pytest_httpserver import HTTPServer
 
+
 URLS = [
     "/",
     "/level1",
-    "/level2"
+    "/level2/article1",
+    "/level2/article2",
 ]
 
 @pytest.fixture
@@ -26,12 +28,18 @@ def site(httpserver: HTTPServer) -> HTTPServer:
     """)
     httpserver.expect_request("/level1").respond_with_data(content_type="text/html", response_data="""
         <html><body>
-        <a href="/level2">Go to level 2</a>
+        <a href="/level2/article1">Go to level 2 - Article 1</a>
+        <a href="/level2/article2">Go to level 2 - Article 2</a>
         </body></html>
     """)
-    httpserver.expect_request("/level2").respond_with_data(content_type="text/html", response_data="""
+    httpserver.expect_request("/level2/article1").respond_with_data(content_type="text/html", response_data="""
         <html><body>
-        <p>This is level 2</p>
+        <p>This is level 2 - Article 1</p>
+        </body></html>
+    """)
+    httpserver.expect_request("/level2/article2").respond_with_data(content_type="text/html", response_data="""
+        <html><body>
+        <p>This is level 2 - Article 2</p>
         </body></html>
     """)
     return httpserver
@@ -66,7 +74,6 @@ async def test_deep_crawl_batch(site: HTTPServer):
             assert result.status_code == codes.OK
 
 @pytest.mark.asyncio
-@pytest.mark.timeout(600)
 async def test_deep_crawl_stream(site: HTTPServer):
     config = CrawlerRunConfig(
         deep_crawl_strategy = BFSDeepCrawlStrategy(
@@ -102,4 +109,4 @@ async def test_deep_crawl_stream(site: HTTPServer):
 if __name__ == "__main__":
     import subprocess
 
-    sys.exit(subprocess.call(["pytest", "-v", str(__file__)]))
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

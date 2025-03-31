@@ -17,8 +17,8 @@ TEST_CASES = [
     ("https://api.github.com", True),  # API service
     ("https://raw.githubusercontent.com", True),  # Content delivery
     # Non-existent/error cases
-    ("https://thisisnotarealwebsite.com", True),  # Non-existent domain
-    ("https://localhost:12345", True),  # Invalid port
+    ("https://thisisnotarealwebsite123.com", False),  # Non-existent domain
+    ("https://localhost:12345", False),  # Invalid port
 ]
 
 
@@ -48,6 +48,8 @@ async def test_real_websites(url: str, expected: bool):
         if result.error_message:
             print(f"Error: {result.error_message}")
 
+        assert expected == allowed, f"Expected {expected} but got {allowed} for {url}"
+
         # Optional: Print robots.txt content if available
         if result.metadata and 'robots_txt' in result.metadata:
             print(f"Robots.txt rules:\n{result.metadata['robots_txt']}")
@@ -56,4 +58,4 @@ async def test_real_websites(url: str, expected: bool):
 if __name__ == "__main__":
     import subprocess
 
-    sys.exit(subprocess.call(["pytest", "-v", str(__file__)]))
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

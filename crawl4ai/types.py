@@ -90,9 +90,11 @@ if TYPE_CHECKING:
     from .async_webcrawler import (
         AsyncWebCrawler as AsyncWebCrawlerType,
         CacheMode as CacheModeType,
+    )
+    from .models import (
+        CrawlResult as CrawlResultType,
         CrawlResultContainer as CrawlResultContainerType,
     )
-    from .models import CrawlResult as CrawlResultType
     from .hub import CrawlerHub as CrawlerHubType
     from .browser_profiler import BrowserProfiler as BrowserProfilerType
     

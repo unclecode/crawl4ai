@@ -209,6 +209,8 @@ async def test_llm_extraction(tester: Crawl4AiTester):
     extracted = json.loads(result["extracted_content"])
     print(f"Extracted {len(extracted)} model pricing entries")
     print("Sample entry:", json.dumps(extracted[0], indent=2))
+    assert result["success"]
+    assert len(extracted) > 0, "No model pricing entries found"
 
 
 @pytest.mark.asyncio
@@ -255,6 +257,7 @@ async def test_llm_with_ollama(tester: Crawl4AiTester):
     extracted = json.loads(result["extracted_content"])
     print("Extracted content:", json.dumps(extracted, indent=2))
     assert result["success"]
+    assert len(extracted) > 0, "No content extracted"
 
 
 @pytest.mark.asyncio
@@ -281,6 +284,8 @@ async def test_cosine_extraction(tester: Crawl4AiTester):
     extracted = json.loads(result["extracted_content"])
     print(f"Extracted {len(extracted)} text clusters")
     print("First cluster tags:", extracted[0]["tags"])
+    assert result["success"]
+    assert len(extracted) > 0, "No clusters found"
 
 
 @pytest.mark.asyncio
@@ -313,4 +318,4 @@ async def test_screenshot(tester: Crawl4AiTester):
 if __name__ == "__main__":
     import subprocess
 
-    sys.exit(subprocess.call(["pytest", "-v", str(__file__)]))
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

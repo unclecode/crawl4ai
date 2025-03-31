@@ -4,9 +4,8 @@ import json
 import asyncio
 
 from .async_configs import BrowserConfig, CrawlerRunConfig
-from .models import CrawlResult
+from .models import CrawlResult, CrawlResultContainer
 from .async_logger import AsyncLogger, LogLevel
-from .async_webcrawler import CrawlResultContainer
 
 
 class Crawl4aiClientError(Exception):
@@ -114,7 +113,7 @@ class Crawl4aiDockerClient:
         )
         if not isinstance(results.source, AsyncGenerator):
             raise TypeError(
-                f"Unexpected result type {results}, expected AsyncGenerator"
+                f"Unexpected result type {type(results.source)}, expected AsyncGenerator"
             )
 
         return results.source
@@ -134,17 +133,11 @@ class Crawl4aiDockerClient:
         data = self._prepare_request(urls, browser_config, crawler_config)
         is_streaming = crawler_config and crawler_config.stream or stream
 
-        self.logger.info(
-            f"Crawling {len(urls)} URLs {'(streaming)' if is_streaming else ''}",
-            tag="CRAWL",
-        )
+        self.logger.info(f"Crawling {len(urls)} URLs {'(streaming)' if is_streaming else ''}", tag="CRAWL")
 
         if is_streaming:
-
             async def stream_results() -> AsyncGenerator[CrawlResult, None]:
-                async with self._http_client.stream(
-                    "POST", "/crawl/stream", json=data
-                ) as response:
+                async with self._http_client.stream("POST", "/crawl/stream", json=data) as response:
                     if response.status_code != httpx.codes.OK:
                         await response.aread()
                         response_data: dict[str, Any] = response.json()

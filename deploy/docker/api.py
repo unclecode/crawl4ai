@@ -447,7 +447,7 @@ async def handle_stream_crawl_request(
         if not isinstance(results_gen.source, AsyncGenerator):
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Unexpected results type {type(results_gen.source)}",
+                detail=f"Unexpected results type {type(results_gen.source)} expected AsyncGenerator",
             )
 
         return crawler, results_gen.source

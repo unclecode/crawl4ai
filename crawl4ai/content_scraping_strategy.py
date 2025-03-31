@@ -172,6 +172,7 @@ class WebScrapingStrategy(ContentScrapingStrategy):
         )
 
         # TODO: this drops errors which are indicated by message.
+        # TODO: markdown is never set in raw_result.
         return ScrapingResult(
             cleaned_html=raw_result.get("cleaned_html", ""),
             markdown=raw_result.get("markdown", ""),

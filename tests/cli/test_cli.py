@@ -7,13 +7,13 @@ from pathlib import Path
 import click
 import pytest
 import yaml
-from click.testing import CliRunner
+from click.testing import CliRunner, Result
 
 from crawl4ai.cli import cli, load_config_file, parse_key_values
 
 
 @pytest.fixture
-def runner():
+def runner() -> CliRunner:
     return CliRunner()
 
 
@@ -28,7 +28,7 @@ def temp_config_dir():
 
 
 @pytest.fixture
-def sample_configs(temp_config_dir):
+def sample_configs(temp_config_dir: Path) -> dict[str, str]:
     configs = {
         "browser.yml": {
             "headless": True,
@@ -68,18 +68,18 @@ def sample_configs(temp_config_dir):
 
 
 class TestCLIBasics:
-    def test_help(self, runner):
-        result = runner.invoke(cli, ["--help"])
+    def test_help(self, runner: CliRunner):
+        result: Result = runner.invoke(cli, ["--help"])
         assert result.exit_code == 0
         assert "Crawl4AI CLI" in result.output
 
-    def test_examples(self, runner):
-        result = runner.invoke(cli, ["examples"])
+    def test_examples(self, runner: CliRunner):
+        result: Result = runner.invoke(cli, ["examples"])
         assert result.exit_code == 0
         assert "Examples" in result.output
 
     def test_missing_url(self, runner):
-        result = runner.invoke(cli, ["crawl"])
+        result: Result = runner.invoke(cli, ["crawl"])
         assert result.exit_code != 0
         assert "Error: Missing argument 'URL'" in result.output
 
@@ -111,7 +111,7 @@ class TestConfigLoading:
 
 
 class TestLLMConfig:
-    def test_llm_config_creation(self, temp_config_dir, runner):
+    def test_llm_config_creation(self, temp_config_dir: Path, runner: CliRunner):
         def input_simulation(inputs):
             return runner.invoke(
                 cli,
@@ -121,24 +121,24 @@ class TestLLMConfig:
 
 
 class TestCrawlingFeatures:
-    def test_basic_crawl(self, runner):
-        result = runner.invoke(cli, ["crawl", "https://example.com"])
+    def test_basic_crawl(self, runner: CliRunner):
+        result: Result = runner.invoke(cli, ["crawl", "https://example.com"])
         assert result.exit_code == 0
 
 
 class TestErrorHandling:
-    def test_invalid_config_file(self, runner):
-        result = runner.invoke(
+    def test_invalid_config_file(self, runner: CliRunner):
+        result: Result = runner.invoke(
             cli, ["https://example.com", "--browser-config", "nonexistent.yml"]
         )
         assert result.exit_code != 0
 
-    def test_invalid_schema(self, runner, temp_config_dir):
+    def test_invalid_schema(self, runner: CliRunner, temp_config_dir: Path):
         invalid_schema = temp_config_dir / "invalid_schema.json"
         with open(invalid_schema, "w") as f:
             f.write("invalid json")
 
-        result = runner.invoke(
+        result: Result = runner.invoke(
             cli, ["https://example.com", "--schema", str(invalid_schema)]
         )
         assert result.exit_code != 0
@@ -147,4 +147,4 @@ class TestErrorHandling:
 if __name__ == "__main__":
     import subprocess
 
-    sys.exit(subprocess.call(["pytest", "-v", str(__file__)]))
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

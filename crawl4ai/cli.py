@@ -26,7 +26,7 @@ from crawl4ai import (
     DefaultMarkdownGenerator,
     LLMConfig
 )
-from crawl4ai.async_webcrawler import CrawlResultContainer
+from crawl4ai.models import CrawlResultContainer
 from litellm import completion
 from pathlib import Path
 
@@ -135,7 +135,6 @@ def load_config_file(path: Optional[str]) -> dict:
             return json.load(f)
     except Exception as e:
         raise click.BadParameter(f'Error loading config file {path}: {str(e)}')
-
 
 def load_schema_file(path: Optional[str]) -> Optional[dict]:
     if not path:
@@ -680,7 +679,11 @@ def crawl_cmd(url: str, browser_config: str, crawler_config: str, filter_config:
 
         # Run crawler
         result: CrawlResultContainer = anyio.run(
-            run_crawler, url, browser_cfg, crawler_cfg, verbose
+            run_crawler,
+            url,
+            browser_cfg,
+            crawler_cfg,
+            verbose
         )
 
         # Handle question

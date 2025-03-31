@@ -102,39 +102,29 @@ Allow: /public/
 
         # Test private access
         result = await parser.can_fetch(f"{base_url}/private/secret", "bot")
-        print(
-            f"Private access (/private/secret): {'allowed' if result else 'denied'}"
-        )
         assert not result, "Private path should be denied"
 
         # Test malformed
         result = await parser.can_fetch(
             "http://localhost:8080/malformed/page", "bot"
         )
-        print(
-            f"✓ Malformed robots.txt handled: {'allowed' if result else 'denied'}"
-        )
+        assert result, "Malformed robots.txt should be handled as allowed"
 
         # Test timeout
         start = time.time()
         result = await parser.can_fetch("http://localhost:8080/timeout/page", "bot")
         duration = time.time() - start
-        print(
-            f"✓ Timeout handled (took {duration:.2f}s): {'allowed' if result else 'denied'}"
-        )
+        assert result, "Timeout should be handled as allowed"
         assert duration < 3, "Timeout not working"
 
         # Test empty
         result = await parser.can_fetch("http://localhost:8080/empty/page", "bot")
-        print(f"✓ Empty robots.txt handled: {'allowed' if result else 'denied'}")
+        assert result, "Empty robots.txt should be handled as allowed"
 
         # Test giant file
         start = time.time()
         result = await parser.can_fetch("http://localhost:8080/giant/page", "bot")
-        duration = time.time() - start
-        print(
-            f"✓ Giant robots.txt handled (took {duration:.2f}s): {'allowed' if result else 'denied'}"
-        )
+        assert result, "Giant robots.txt should be handled as allowed"
 
     finally:
         await runner.cleanup()
@@ -152,15 +142,16 @@ Allow: /public/
 
     # Test with custom TTL
     custom_parser = RobotsParser(cache_dir=temp_dir, cache_ttl=1)  # 1 second TTL
-    await custom_parser.can_fetch("https://www.example.com", "bot")
-    print("✓ Custom TTL fetch completed")
+    result = await custom_parser.can_fetch("https://www.example.com", "bot")
+    assert result, "Custom TTL fetch failed"
+
     await asyncio.sleep(1.1)
     start = time.time()
-    await custom_parser.can_fetch("https://www.example.com", "bot")
-    print(f"✓ TTL expiry working (refetched after {time.time() - start:.2f}s)")
+    result = await custom_parser.can_fetch("https://www.example.com", "bot")
+    assert result, "Custom TTL fetch failed after expiry"
 
 
 if __name__ == "__main__":
     import subprocess
 
-    sys.exit(subprocess.call(["pytest", "-v", str(__file__)]))
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

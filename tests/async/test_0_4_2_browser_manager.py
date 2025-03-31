@@ -1,7 +1,10 @@
 import sys
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+import threading
 
 import pytest
+import requests
 
 from crawl4ai import AsyncWebCrawler, CacheMode
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
@@ -27,6 +30,8 @@ async def test_default_headless():
             cache_mode=CacheMode.BYPASS,
             markdown_generator=DefaultMarkdownGenerator(options={"ignore_links": True}),
         )
+        assert result.success
+        assert result.html
         print("[test_default_headless] success:", result.success)
         print("HTML length:", len(result.html if result.html else ""))
 
@@ -50,8 +55,8 @@ async def test_managed_browser_persistent(tmp_path: Path):
             cache_mode=CacheMode.BYPASS,
             markdown_generator=DefaultMarkdownGenerator(options={"ignore_links": True}),
         )
-        print("[test_managed_browser_persistent] success:", result.success)
-        print("HTML length:", len(result.html if result.html else ""))
+        assert result.success
+        assert result.html
 
 
 @pytest.mark.asyncio
@@ -73,7 +78,7 @@ async def test_session_reuse():
             session_id=session_id,
             markdown_generator=DefaultMarkdownGenerator(options={"ignore_links": True}),
         )
-        print("[test_session_reuse first call] success:", result1.success)
+        assert result1.success
 
         # Second call: same session, possibly cookie retained
         result2 = await crawler.arun(
@@ -82,7 +87,7 @@ async def test_session_reuse():
             session_id=session_id,
             markdown_generator=DefaultMarkdownGenerator(options={"ignore_links": True}),
         )
-        print("[test_session_reuse second call] success:", result2.success)
+        assert result2.success
 
 
 @pytest.mark.asyncio
@@ -104,29 +109,52 @@ async def test_magic_mode():
             cache_mode=CacheMode.BYPASS,
             markdown_generator=DefaultMarkdownGenerator(options={"ignore_links": True}),
         )
-        print("[test_magic_mode] success:", result.success)
-        print("HTML length:", len(result.html if result.html else ""))
+        assert result.success
+        assert result.html
 
+
+class ProxyHandler(BaseHTTPRequestHandler):
+    """Simple HTTP proxy handler for testing purposes."""
+    def do_GET(self):
+        resp = requests.get(self.path)
+        self.send_response(resp.status_code)
+        for k, v in resp.headers.items():
+            self.send_header(k, v)
+        self.end_headers()
+        self.wfile.write(resp.content)
+
+@pytest.fixture
+def proxy_server():
+    """Fixture to create a simple HTTP proxy server for testing."""
+    server = HTTPServer(('localhost', 0), ProxyHandler)
+    port = server.server_address[1]
+
+    thread = threading.Thread(target=server.serve_forever)
+    thread.daemon = True
+    thread.start()
+
+    yield f"http://localhost:{port}"
+
+    server.shutdown()
+    thread.join()
 
 @pytest.mark.asyncio
-async def test_proxy_settings():
+async def test_proxy_settings(proxy_server: str):
     # Test with a proxy (if available) to ensure code runs with proxy
     async with AsyncWebCrawler(
         headless=True,
         verbose=False,
         user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
-        proxy="http://127.0.0.1:8080",  # Assuming local proxy server for test
+        proxy=proxy_server,
         use_managed_browser=False,
         use_persistent_context=False,
     ) as crawler:
         result = await crawler.arun(
-            url="https://httpbin.org/ip",
+            url="http://httpbin.org/ip",
             cache_mode=CacheMode.BYPASS,
             markdown_generator=DefaultMarkdownGenerator(options={"ignore_links": True}),
         )
-        print("[test_proxy_settings] success:", result.success)
-        if result.success:
-            print("HTML preview:", result.html[:200] if result.html else "")
+        assert result.success
 
 
 @pytest.mark.asyncio
@@ -147,10 +175,10 @@ async def test_ignore_https_errors():
             cache_mode=CacheMode.BYPASS,
             markdown_generator=DefaultMarkdownGenerator(options={"ignore_links": True}),
         )
-        print("[test_ignore_https_errors] success:", result.success)
+        assert result.success
 
 
 if __name__ == "__main__":
     import subprocess
 
-    sys.exit(subprocess.call(["pytest", "-v", str(__file__)]))
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

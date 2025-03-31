@@ -11,8 +11,6 @@ import weakref
 import math
 from collections import defaultdict
 from typing import Dict
-
-from pydantic import Field
 from ..utils import HeadPeekr
 import asyncio
 import inspect
@@ -73,8 +71,8 @@ class FilterChain:
 
     __slots__ = ("filters", "stats", "_logger_ref")
 
-    def __init__(self, filters: List[URLFilter] = Field(default_factory=list)):
-        self.filters = filters
+    def __init__(self, filters: Optional[List[URLFilter]] = None):
+        self.filters: List[URLFilter] = filters if filters is not None else []
         self.stats = FilterStats()
         self._logger_ref = None
 
@@ -411,8 +409,8 @@ class DomainFilter(URLFilter):
 
     def __init__(
         self,
-        allowed_domains: Union[str, List[str]] = None,
-        blocked_domains: Union[str, List[str]] = None,
+        allowed_domains: Optional[Union[str, List[str]]] = None,
+        blocked_domains: Optional[Union[str, List[str]]] = None,
     ):
         super().__init__()
 
@@ -572,8 +570,8 @@ class SEOFilter(URLFilter):
     def __init__(
         self,
         threshold: float = 0.65,
-        keywords: List[str] = None,
-        weights: Dict[str, float] = None,
+        keywords: Optional[List[str]] = None,
+        weights: Optional[Dict[str, float]] = None,
     ):
         super().__init__(name="SEOFilter")
         self.threshold = threshold

@@ -49,18 +49,21 @@ class GoogleSearchCrawler(BaseCrawler):
 
             result = await crawler.arun(url=url, config=config)
             if not result.success:
-                return json.dumps({"error": result.error})
+                return json.dumps({"error": result.error_message})
 
             if search_type == "image":
-                if result.js_execution_result.get("success", False) is False:
-                    return json.dumps({"error": result.js_execution_result.get("error", "Unknown error")})
-                if "results" in result.js_execution_result:
-                    image_result = result.js_execution_result['results'][0]
-                    if image_result.get("success", False) is False:
-                        return json.dumps({"error": image_result.get("error", "Unknown error")})
-                    return json.dumps(image_result["result"], indent=4)
+                if result.js_execution_result:
+                    if result.js_execution_result.get("success", False) is False:
+                        return json.dumps({"error": result.js_execution_result.get("error", "Unknown error")})
+                    if "results" in result.js_execution_result:
+                        image_result = result.js_execution_result['results'][0]
+                        if image_result.get("success", False) is False:
+                            return json.dumps({"error": image_result.get("error", "Unknown error")})
+                        return json.dumps(image_result["result"], indent=4)
 
             # For text search, extract structured data
+            if not result.cleaned_html:
+                return json.dumps({"error": "No HTML content found"})
             schemas = await self._build_schemas(result.cleaned_html, schema_cache_path)
             extracted = {
                 key: JsonCssExtractionStrategy(schema=schemas[key]).run(
@@ -78,6 +81,12 @@ class GoogleSearchCrawler(BaseCrawler):
         os.makedirs(f"{home_dir}/schema", exist_ok=True)
 
         cleaned_html = optimize_html(html, threshold=100)
+        if not isinstance(cleaned_html, (str, bytes)):
+            raise ValueError(
+                "The cleaned HTML is not a valid string or bytes object."
+            )
+        if isinstance(cleaned_html, bytes):
+            cleaned_html = cleaned_html.decode("utf-8")
 
         organic_schema = None
         if os.path.exists(f"{home_dir}/schema/organic_schema.json"):

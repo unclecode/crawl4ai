@@ -250,7 +250,7 @@ def interactive_extraction(crawler):
     """
     # crawler_strategy = LocalSeleniumCrawlerStrategy(js_code=js_code)
     # crawler = WebCrawler(crawler_strategy=crawler_strategy, always_by_pass_cache=True)
-    result = crawler.run(url="https://www.nbcnews.com/business", js=js_code)
+    result = crawler.run(url="https://www.nbcnews.com/business", js_code=js_code)
     cprint(
         "[LOG] 📦 [bold yellow]JavaScript Code (Load More button) result:[/bold yellow]"
     )
@@ -274,7 +274,7 @@ def multiple_scrip(crawler):
     ] * 2
     # crawler_strategy = LocalSeleniumCrawlerStrategy(js_code=js_code)
     # crawler = WebCrawler(crawler_strategy=crawler_strategy, always_by_pass_cache=True)
-    result = crawler.run(url="https://www.nbcnews.com/business", js=js_code)
+    result = crawler.run(url="https://www.nbcnews.com/business", js_code=js_code)
     cprint(
         "[LOG] 📦 [bold yellow]JavaScript Code (Load More button) result:[/bold yellow]"
     )

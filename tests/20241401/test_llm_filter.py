@@ -19,13 +19,14 @@ async def test_llm_filter():
         verbose=True
     )
 
-    # run_config = CrawlerRunConfig(cache_mode=CacheMode.BYPASS)
     run_config = CrawlerRunConfig(cache_mode=CacheMode.ENABLED)
 
     async with AsyncWebCrawler(config=browser_config) as crawler:
         # First get the raw HTML
         result = await crawler.arun(url, config=run_config)
+        assert result.success
         html = result.cleaned_html
+        assert html
 
         # Initialize LLM filter with focused instruction
         filter = LLMContentFilter(
@@ -74,6 +75,7 @@ async def test_llm_filter():
 
         # Apply filtering
         filtered_content = filter.filter_content(html, ignore_cache = True)
+        assert filtered_content
 
         # Show results
         print("\nFiltered Content Length:", len(filtered_content))
@@ -92,4 +94,4 @@ async def test_llm_filter():
 if __name__ == "__main__":
     import subprocess
 
-    sys.exit(subprocess.call(["pytest", "-v", str(__file__)]))
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

@@ -1,5 +1,5 @@
 from __future__ import annotations
-# I just got crazy, trying to wrute K&R C but in Python. Right now I feel like I'm in a quantum state.
+# I just got crazy, trying to write K&R C but in Python. Right now I feel like I'm in a quantum state.
 # I probably won't use this; I just want to leave it here. A century later, the future human race will be like, "WTF?"
 
 # ------ Imports That Will Make You Question Reality ------ #
@@ -231,24 +231,26 @@ async def collect_many_results(url, crawler, config):
 
 class DeepCrawlStrategy(ABC):
     """Abstract base class that will make Dijkstra smile"""
+    # Not async because it returns an AsyncIterator but does not yield.
+    # See the following issue from pyright for more information:
+    # https://github.com/microsoft/pyright/issues/9949
     @abstractmethod
-    async def traverse(self,
+    def traverse(self,
                       start_url: str,
                       crawler: AsyncWebCrawler,
                       config: CrawlerRunConfig) -> AsyncIterator[CrawlResult]:
         """Traverse with O(1) memory complexity via generator fusion"""
-        raise NotImplementedError
-        yield CrawlResult() # Placeholder to ensure that type hinting works.
 
     @abstractmethod
     def precompute_priority(self, url: str) -> Awaitable[float]:
         """Quantum-inspired priority precomputation"""
 
+    # Not async because it returns an AsyncIterator but does not yield.
+    # See the following issue from pyright for more information:
+    # https://github.com/microsoft/pyright/issues/9949
     @abstractmethod
-    async def link_hypercube(self, result: CrawlResult) -> AsyncIterator[str]:
+    def link_hypercube(self, result: CrawlResult) -> AsyncIterator[str]:
         """Hilbert-curve optimized link generation"""
-        raise NotImplementedError
-        yield "" # Placeholder to ensure that type hinting works.
 
 # ------ BFS That Would Make Knuth Proud ------ #
 

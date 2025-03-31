@@ -4,12 +4,12 @@ import sys
 import time
 from colorama import Fore
 from pathlib import Path
-from typing import Optional, List, Generic, TypeVar, Self, Iterator, Any, AsyncIterator
+from typing import Optional, List, Self
 import json
 import asyncio
 
 from contextlib import asynccontextmanager
-from .models import CrawlResult, MarkdownGenerationResult, DispatchResult, ScrapingResult
+from .models import CrawlResult, CrawlerTaskResult, MarkdownGenerationResult, DispatchResult, ScrapingResult, CrawlResultContainer
 from .async_database import async_db_manager
 from .chunking_strategy import IdentityChunking
 from .async_crawler_strategy import (
@@ -36,130 +36,8 @@ from .utils import (
     RobotsParser,
 )
 
-from typing import Union, AsyncGenerator
+from typing import AsyncGenerator
 
-# This is a generic type for the crawl result container used to break circular dependencies.
-CrawlResultT = TypeVar("CrawlResultT", bound=CrawlResult)
-
-CrawlResultsT = Union[
-   CrawlResult, List[CrawlResult], AsyncGenerator[CrawlResult, None]
-]
-
-
-class CrawlResultContainer(Generic[CrawlResultT]):
-    """A container class for crawl results.
-
-    It supports both synchronous and asynchronous iteration.
-    """
-
-    def __init__(
-        self,
-        results: CrawlResultsT,
-    ) -> None:
-        self.source: CrawlResultsT = results
-        self._results: List[CrawlResult]
-        self._first: Optional[CrawlResult] = None
-        self._collected: bool = False
-        if isinstance(results, AsyncGenerator):
-            self._results = []
-        elif isinstance(results, List):
-            self._results = results
-            if results:
-                self._first = results[0]
-        else:
-            # If results is a single result, wrap it in a list.
-            self._first = results
-            self._results = [results]
-
-    def _raise_if_async_iterator(self):
-        """Raises a TypeError if the source is an AsyncIterator.
-
-        This is to prevent synchronous operations over an asynchronous source.
-
-        :raises TypeError: If source is an AsyncIterator.
-        """
-        if isinstance(self.source, AsyncIterator):
-            raise TypeError(
-                "CrawlResultContainer source is an AsyncIterator. Use __aiter__() to iterate over it."
-            )
-
-    def __iter__(self) -> Iterator[CrawlResult]: # pyright: ignore[reportIncompatibleMethodOverride]
-        """Returns an iterator for the crawl results.
-
-        This method is used for synchronous iteration.
-
-        :return: An iterator for the crawl results.
-        :rtype: Iterator[CrawlResultsT]
-        :raises TypeError: If the source is an AsyncIterator.
-        """
-        self._raise_if_async_iterator()
-
-        if isinstance(self.source, Iterator): # TODO: is this needed?
-            return self.source.__iter__()
-
-        return iter(self._results)
-
-    def __aiter__(self) -> AsyncIterator[CrawlResult]:
-        """Returns an asynchronous iterator for the crawl results."""
-        if isinstance(self.source, AsyncIterator):
-            return self.source.__aiter__()
-
-        async def async_generator() -> AsyncGenerator[CrawlResult, None]:
-            for result in self._results:
-                yield result
-
-        return async_generator()
-
-    def __getitem__(self, index: int) -> CrawlResult:
-        """Return the result at a given index.
-
-        :param index: The index of the result to retrieve.
-        :type index: int
-        :return: The crawl result at the specified index.
-        :rtype: CrawlResult
-        :raises TypeError: If the source is an AsyncIterator.
-        :raises IndexError: If the index is out of range.
-        """
-        self._raise_if_async_iterator()
-
-        return self._results[index]
-
-    def __len__(self) -> int:
-        """Return the number of results in the container.
-
-        :return: The number of results.
-        :rtype: int
-        :raises TypeError: If the source is an AsyncIterator.
-        """
-        self._raise_if_async_iterator()
-
-        return len(self._results)
-
-    def __getattr__(self, attr) -> Any:
-        """Return an attribute from the first result.
-
-        :return: The attribute value from the first result if present.
-        :rtype: Any
-        :raises TypeError: If the source is an AsyncIterator.
-        :raises AttributeError: If the attribute does not exist.
-        """
-        self._raise_if_async_iterator()
-
-        # Delegate attribute access to the first element.
-        if self._first:
-            return getattr(self._first, attr)
-
-        raise AttributeError(f"{self.__class__.__name__} object has no attribute '{attr}' and no results")
-
-    def __repr__(self) -> str:
-        """Get a string representation of the container.
-
-        The representation will be incomplete if the source is an AsyncIterator.
-        :return: String representation of the container.
-        :rtype: str
-        """
-
-        return f"{self.__class__.__name__}({self._results!r})"
 
 class AsyncWebCrawler:
     """
@@ -335,7 +213,9 @@ class AsyncWebCrawler:
         Runs the crawler for a single source: URL (web, local file, or raw HTML).
 
         Migration Guide:
+
         Old way (deprecated):
+
             result = await crawler.arun(
                 url="https://example.com",
                 word_count_threshold=200,
@@ -344,6 +224,7 @@ class AsyncWebCrawler:
             )
 
         New way (recommended):
+
             config = CrawlerRunConfig(
                 word_count_threshold=200,
                 screenshot=True,
@@ -351,13 +232,39 @@ class AsyncWebCrawler:
             )
             result = await crawler.arun(url="https://example.com", crawler_config=config)
 
+
+        If `config.stream` is True it returns a `CrawlResultContainer` which wraps an async generator.
+
+        Example:
+
+            async for result in crawl_result:
+                print(result.markdown)
+
+        If `config.stream` is `False` and `config.deep_crawl_strategy` is `None` then the
+        `CrawlResultContainer` will contain a single `CrawlResult` which can be accessed directly.
+
+        Example:
+
+            result = await crawler.arun(url="https://example.com", config=config)
+            print(result.markdown)
+
+        Otherwise it will contain a list of CrawlResult objects.
+
+        Example:
+
+            for result in crawl_result:
+                print(result.markdown)
+
+        If `config.deep_crawl_strategy` is not `None` it returns a `CrawlResultContainer` which can
+        contain multiple `CrawlResult` objects.
+
         Args:
-            url: The URL to crawl (http://, https://, file://, or raw:)
-            crawler_config: Configuration object controlling crawl behavior
+            url (str): The URL to crawl (http://, https://, file://, or raw:)
+            crawler_config (Optional[CrawlerRunConfig]): Configuration object controlling crawl behavior
             [other parameters maintained for backwards compatibility]
 
         Returns:
-            CrawlResult: The result of crawling and processing
+            CrawlResultContainer: The result of crawling and processing
         """
         config = config or CrawlerRunConfig.from_kwargs(kwargs)
         if not isinstance(url, str) or not url:
@@ -786,24 +693,37 @@ class AsyncWebCrawler:
                 ),
             )
 
-        def transform_result(task_result):
-            return (
-                    setattr(task_result.result, 'dispatch_result', 
-                        DispatchResult(
-                            task_id=task_result.task_id,
-                            memory_usage=task_result.memory_usage,
-                            peak_memory=task_result.peak_memory,
-                            start_time=task_result.start_time,
-                            end_time=task_result.end_time,
-                            error_message=task_result.error_message,
-                        )
-                    ) or task_result.result
+        def transform_result(task_result: CrawlerTaskResult) -> CrawlResult:
+            """Transform a CrawlerTaskResult into a CrawlResult.
+
+            Attaches the dispatch result to the CrawlResult.
+
+            Args:
+                task_result (CrawlerTaskResult): The task result to transform.
+            Returns:
+                CrawlResult: The transformed crawl result.
+            Raises:
+                ValueError: If the task result does not contain exactly one result.
+            """
+            results: CrawlResultContainer = task_result.result
+            if len(results) != 1:
+                raise ValueError(
+                    f"Expected a single result, but got {len(results)} results."
                 )
 
-        stream = config.stream
-        
-        if stream:
+            result: CrawlResult = results[0]
+            result.dispatch_result = DispatchResult(
+                task_id=task_result.task_id,
+                memory_usage=task_result.memory_usage,
+                peak_memory=task_result.peak_memory,
+                start_time=task_result.start_time,
+                end_time=task_result.end_time,
+                error_message=task_result.error_message,
+            )
 
+            return result
+
+        if config.stream:
             async def result_transformer() -> AsyncGenerator[CrawlResult, None]:
                 async for task_result in dispatcher.run_urls_stream(
                     crawler=self, urls=urls, config=config

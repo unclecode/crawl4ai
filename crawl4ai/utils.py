@@ -1963,13 +1963,9 @@ def normalize_url(href, base_url):
     return normalized
 
 
-def normalize_url_for_deep_crawl(href, base_url):
+def normalize_url_for_deep_crawl(href: str, base_url: str) -> str:
     """Normalize URLs to ensure consistent format"""
     from urllib.parse import urljoin, urlparse, urlunparse, parse_qs, urlencode
-
-    # Handle None or empty values
-    if not href:
-        return None
 
     # Use urljoin to handle relative URLs
     full_url = urljoin(base_url, href.strip())

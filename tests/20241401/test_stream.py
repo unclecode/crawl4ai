@@ -3,7 +3,7 @@ import sys
 import pytest
 
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CacheMode, CrawlerRunConfig, PruningContentFilter
-from crawl4ai.async_webcrawler import CrawlResultContainer
+from crawl4ai.models import CrawlResultContainer
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
 
@@ -29,12 +29,14 @@ async def test_crawler():
         print("\n=== Testing Batch Mode ===")
         results = await crawler.arun_many(urls=urls, config=crawler_config)
         assert isinstance(results, CrawlResultContainer)
+        assert len(results) == len(urls), "Expected the same number of results as URLs"
         print(f"Received all {len(results)} results at once")
         for result in results:
+            assert result.success
             print(f"Batch result for: {result.url} - Success: {result.success}")
 
 
 if __name__ == "__main__":
     import subprocess
 
-    sys.exit(subprocess.call(["pytest", "-v", str(__file__)]))
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))
