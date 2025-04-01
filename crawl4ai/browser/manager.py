@@ -756,7 +756,6 @@ class BrowserManager:
         
         return status
 
-
     async def start(self):
         """Start at least one browser instance in the pool.
         
