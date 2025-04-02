@@ -505,7 +505,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             )
 
         # Get page for session
-        page, context = await self.browser_manager.get_page(crawlerRunConfig=config)
+        page, context, _ = await self.browser_manager.get_page(crawlerRunConfig=config)
 
         # await page.goto(URL)
 
