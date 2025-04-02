@@ -56,13 +56,13 @@ async def test_builtin_browser_creation():
 
     # Step 2: Check if we have a BuiltinBrowserStrategy
     print(f"\n{INFO}2. Checking if we have a BuiltinBrowserStrategy{RESET}")
-    if isinstance(manager._strategy, BuiltinBrowserStrategy):
+    if isinstance(manager.strategy, BuiltinBrowserStrategy):
         print(
-            f"{SUCCESS}Correct strategy type: {manager._strategy.__class__.__name__}{RESET}"
+            f"{SUCCESS}Correct strategy type: {manager.strategy.__class__.__name__}{RESET}"
         )
     else:
         print(
-            f"{ERROR}Wrong strategy type: {manager._strategy.__class__.__name__}{RESET}"
+            f"{ERROR}Wrong strategy type: {manager.strategy.__class__.__name__}{RESET}"
         )
         return None
 
@@ -77,7 +77,7 @@ async def test_builtin_browser_creation():
 
     # Step 4: Get browser info from the strategy
     print(f"\n{INFO}4. Getting browser information{RESET}")
-    browser_info = manager._strategy.get_builtin_browser_info()
+    browser_info = manager.strategy.get_browser_info()
     if browser_info:
         print(f"{SUCCESS}Browser info retrieved:{RESET}")
         for key, value in browser_info.items():
@@ -149,7 +149,7 @@ async def test_browser_status_management(manager: BrowserManager):
     # Step 1: Get browser status
     print(f"\n{INFO}1. Getting browser status{RESET}")
     try:
-        status = await manager._strategy.get_builtin_browser_status()
+        status = await manager.strategy.get_builtin_browser_status()
         print(f"{SUCCESS}Browser status:{RESET}")
         print(f"  Running: {status['running']}")
         print(f"  CDP URL: {status['cdp_url']}")
@@ -160,7 +160,7 @@ async def test_browser_status_management(manager: BrowserManager):
     # Step 2: Test killing the browser
     print(f"\n{INFO}2. Testing killing the browser{RESET}")
     try:
-        result = await manager._strategy.kill_builtin_browser()
+        result = await manager.strategy.kill_builtin_browser()
         if result:
             print(f"{SUCCESS}Browser killed successfully{RESET}")
         else:
@@ -172,7 +172,7 @@ async def test_browser_status_management(manager: BrowserManager):
     # Step 3: Check status after kill
     print(f"\n{INFO}3. Checking status after kill{RESET}")
     try:
-        status = await manager._strategy.get_builtin_browser_status()
+        status = await manager.strategy.get_builtin_browser_status()
         if not status["running"]:
             print(f"{SUCCESS}Browser is correctly reported as not running{RESET}")
         else:
@@ -184,7 +184,7 @@ async def test_browser_status_management(manager: BrowserManager):
     # Step 4: Launch a new browser
     print(f"\n{INFO}4. Launching a new browser{RESET}")
     try:
-        cdp_url = await manager._strategy.launch_builtin_browser(
+        cdp_url = await manager.strategy.launch_builtin_browser(
             browser_type="chromium", headless=True
         )
         if cdp_url:
@@ -205,7 +205,7 @@ async def test_multiple_managers():
 
     # Step 1: Create first manager
     print(f"\n{INFO}1. Creating first browser manager{RESET}")
-    browser_config1 = (BrowserConfig(browser_mode="builtin", headless=True),)
+    browser_config1 = BrowserConfig(browser_mode="builtin", headless=True)
     manager1 = BrowserManager(browser_config=browser_config1, logger=logger)
 
     # Step 2: Create second manager
@@ -223,8 +223,8 @@ async def test_multiple_managers():
         print(f"{SUCCESS}Second manager started{RESET}")
 
         # Check if they got the same CDP URL
-        cdp_url1 = manager1._strategy.config.cdp_url
-        cdp_url2 = manager2._strategy.config.cdp_url
+        cdp_url1 = manager1.strategy.config.cdp_url
+        cdp_url2 = manager2.strategy.config.cdp_url
 
         if cdp_url1 == cdp_url2:
             print(
@@ -316,7 +316,7 @@ async def test_edge_cases():
 
         # Kill the browser directly
         print(f"{INFO}Killing the browser...{RESET}")
-        await manager._strategy.kill_builtin_browser()
+        await manager.strategy.kill_builtin_browser()
         print(f"{SUCCESS}Browser killed{RESET}")
 
         # Try to get a page (should fail or launch a new browser)
@@ -350,7 +350,7 @@ async def cleanup_browsers():
 
     try:
         # No need to start, just access the strategy directly
-        strategy = manager._strategy
+        strategy = manager.strategy
         if isinstance(strategy, BuiltinBrowserStrategy):
             result = await strategy.kill_builtin_browser()
             if result:
@@ -420,7 +420,7 @@ async def test_performance_scaling():
             user_data_dir=os.path.join(temp_dir, f"browser_profile_{i}"),
         )
         manager = BrowserManager(browser_config=browser_config, logger=logger)
-        manager._strategy.shutting_down = True
+        manager.strategy.shutting_down = True
         manager_configs.append((manager, i, port))
 
     # Define async function to start a single manager
@@ -614,7 +614,7 @@ async def test_performance_scaling_lab( num_browsers: int = 10, pages_per_browse
             user_data_dir=os.path.join(temp_dir, f"browser_profile_{i}"),
         )
         manager = BrowserManager(browser_config=browser_config, logger=logger)
-        manager._strategy.shutting_down = True
+        manager.strategy.shutting_down = True
         manager_configs.append((manager, i, port))
 
     # Define async function to start a single manager
@@ -781,15 +781,16 @@ async def main():
         # await manager.close()
 
         # Run multiple managers test
-        # await test_multiple_managers()
+        await test_multiple_managers()
 
         # Run performance scaling test
         await test_performance_scaling()
+
         # Run cleanup test
-        # await cleanup_browsers()
+        await cleanup_browsers()
 
         # Run edge cases test
-        # await test_edge_cases()
+        await test_edge_cases()
 
         print(f"\n{SUCCESS}All tests completed!{RESET}")
 

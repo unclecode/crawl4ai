@@ -4,7 +4,7 @@ import sys
 import time
 from colorama import Fore
 from pathlib import Path
-from typing import Optional, List, Generic, TypeVar
+from typing import Optional, List
 import json
 import asyncio
 
@@ -15,6 +15,8 @@ from .models import (
     MarkdownGenerationResult,
     DispatchResult,
     ScrapingResult,
+    CrawlResultContainer,
+    RunManyReturn
 )
 from .async_database import async_db_manager
 from .chunking_strategy import *  # noqa: F403
@@ -46,47 +48,6 @@ from .utils import (
     get_error_context,
     RobotsParser,
 )
-
-from typing import Union, AsyncGenerator
-
-CrawlResultT = TypeVar("CrawlResultT", bound=CrawlResult)
-# RunManyReturn = Union[CrawlResultT, List[CrawlResultT], AsyncGenerator[CrawlResultT, None]]
-
-
-class CrawlResultContainer(Generic[CrawlResultT]):
-    def __init__(self, results: Union[CrawlResultT, List[CrawlResultT]]):
-        # Normalize to a list
-        if isinstance(results, list):
-            self._results = results
-        else:
-            self._results = [results]
-
-    def __iter__(self):
-        return iter(self._results)
-
-    def __getitem__(self, index):
-        return self._results[index]
-
-    def __len__(self):
-        return len(self._results)
-
-    def __getattr__(self, attr):
-        # Delegate attribute access to the first element.
-        if self._results:
-            return getattr(self._results[0], attr)
-        raise AttributeError(
-            f"{self.__class__.__name__} object has no attribute '{attr}'"
-        )
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}({self._results!r})"
-
-
-# Redefine the union type. Now synchronous calls always return a container,
-# while stream mode is handled with an AsyncGenerator.
-RunManyReturn = Union[
-    CrawlResultContainer[CrawlResultT], AsyncGenerator[CrawlResultT, None]
-]
 
 
 class AsyncWebCrawler:
@@ -206,52 +167,12 @@ class AsyncWebCrawler:
         """
         Start the crawler explicitly without using context manager.
         This is equivalent to using 'async with' but gives more control over the lifecycle.
-
-        This method will:
-        1. Check for builtin browser if browser_mode is 'builtin'
-        2. Initialize the browser and context
-        3. Perform warmup sequence
-        4. Return the crawler instance for method chaining
-
         Returns:
             AsyncWebCrawler: The initialized crawler instance
         """
-        # Check for builtin browser if requested
-        if (
-            self.browser_config.browser_mode == "builtin"
-            and not self.browser_config.cdp_url
-        ):
-            # Import here to avoid circular imports
-            from .browser_profiler import BrowserProfiler
-
-            profiler = BrowserProfiler(logger=self.logger)
-
-            # Get builtin browser info or launch if needed
-            browser_info = profiler.get_builtin_browser_info()
-            if not browser_info:
-                self.logger.info(
-                    "Builtin browser not found, launching new instance...",
-                    tag="BROWSER",
-                )
-                cdp_url = await profiler.launch_builtin_browser()
-                if not cdp_url:
-                    self.logger.warning(
-                        "Failed to launch builtin browser, falling back to dedicated browser",
-                        tag="BROWSER",
-                    )
-                else:
-                    self.browser_config.cdp_url = cdp_url
-                    self.browser_config.use_managed_browser = True
-            else:
-                self.logger.info(
-                    f"Using existing builtin browser at {browser_info.get('cdp_url')}",
-                    tag="BROWSER",
-                )
-                self.browser_config.cdp_url = browser_info.get("cdp_url")
-                self.browser_config.use_managed_browser = True
-
         await self.crawler_strategy.__aenter__()
-        await self.awarmup()
+        self.logger.info(f"Crawl4AI {crawl4ai_version}", tag="INIT")
+        self.ready = True
         return self
 
     async def close(self):
@@ -270,18 +191,6 @@ class AsyncWebCrawler:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.close()
-
-    async def awarmup(self):
-        """
-        Initialize the crawler with warm-up sequence.
-
-        This method:
-        1. Logs initialization info
-        2. Sets up browser configuration
-        3. Marks the crawler as ready
-        """
-        self.logger.info(f"Crawl4AI {crawl4ai_version}", tag="INIT")
-        self.ready = True
 
     @asynccontextmanager
     async def nullcontext(self):
@@ -607,7 +516,7 @@ class AsyncWebCrawler:
             url=_url,
             success=True,
             timing=int((time.perf_counter() - t1) * 1000) / 1000,
-            tag="SCRAPE",
+            tag="SCRAPE"
         )
         # self.logger.info(
         #     message="{url:.50}... | Time: {timing}s",
@@ -783,15 +692,3 @@ class AsyncWebCrawler:
         else:
             _results = await dispatcher.run_urls(crawler=self, urls=urls, config=config)
             return [transform_result(res) for res in _results]
-
-    async def aclear_cache(self):
-        """Clear the cache database."""
-        await async_db_manager.cleanup()
-
-    async def aflush_cache(self):
-        """Flush the cache database."""
-        await async_db_manager.aflush_db()
-
-    async def aget_cache_size(self):
-        """Get the total number of cached items."""
-        return await async_db_manager.aget_total_count()

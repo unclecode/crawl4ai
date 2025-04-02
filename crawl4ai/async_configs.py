@@ -29,7 +29,7 @@ from enum import Enum
 
 from .proxy_strategy import ProxyConfig
 try:
-    from .browser.docker_config import DockerConfig
+    from .browser.models import DockerConfig
 except ImportError:
     DockerConfig = None
 
@@ -176,7 +176,7 @@ class BrowserConfig:
         browser_mode (str): Determines how the browser should be initialized:
                            "builtin" - use the builtin CDP browser running in background
                            "dedicated" - create a new dedicated browser instance each time
-                           "custom" - use explicit CDP settings provided in cdp_url
+                           "cdp" - use explicit CDP settings provided in cdp_url
                            "docker" - run browser in Docker container with isolation
                            Default: "dedicated"
         use_managed_browser (bool): Launch the browser using a managed approach (e.g., via CDP), allowing
@@ -242,7 +242,7 @@ class BrowserConfig:
         channel: str = "chromium",
         proxy: str = None,
         proxy_config: Union[ProxyConfig, dict, None] = None,
-        docker_config: Union["DockerConfig", dict, None] = None,
+        docker_config: Union[DockerConfig, dict, None] = None,
         viewport_width: int = 1080,
         viewport_height: int = 600,
         viewport: dict = None,
@@ -270,7 +270,7 @@ class BrowserConfig:
         host: str = "localhost",
     ):
         self.browser_type = browser_type
-        self.headless = headless
+        self.headless = headless or True
         self.browser_mode = browser_mode
         self.use_managed_browser = use_managed_browser
         self.cdp_url = cdp_url
@@ -289,6 +289,10 @@ class BrowserConfig:
             self.docker_config = DockerConfig.from_kwargs(docker_config)
         else:
             self.docker_config = docker_config
+
+        if self.docker_config:
+            self.user_data_dir = self.docker_config.user_data_dir
+
         self.viewport_width = viewport_width
         self.viewport_height = viewport_height
         self.viewport = viewport

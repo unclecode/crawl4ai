@@ -11,7 +11,9 @@ import sys
 import time
 import tempfile
 import subprocess
-from typing import Optional
+from typing import Optional, Tuple, Union
+import signal
+import psutil
 
 from playwright.async_api import async_playwright
 
@@ -93,6 +95,8 @@ def is_browser_running(pid: Optional[int]) -> bool:
         return False
         
     try:
+        if type(pid) is str:
+            pid = int(pid)
         # Check if the process exists
         if is_windows():
             process = subprocess.run(["tasklist", "/FI", f"PID eq {pid}"], 
@@ -326,3 +330,136 @@ async def find_optimal_browser_config(total_urls=50, verbose=True, rate_limit_de
         "optimal": optimal,
         "all_configs": results
     }
+
+
+# Find process ID of the existing browser using os
+def find_process_by_port(port: int) -> str:
+    """Find process ID listening on a specific port.
+    
+    Args:
+        port: Port number to check
+        
+    Returns:
+        str: Process ID or empty string if not found
+    """
+    try:
+        if is_windows():
+            cmd = f"netstat -ano | findstr :{port}"
+            result = subprocess.check_output(cmd, shell=True).decode()
+            return result.strip().split()[-1] if result else ""
+        else:
+            cmd = f"lsof -i :{port} -t"
+            return subprocess.check_output(cmd, shell=True).decode().strip()
+    except subprocess.CalledProcessError:
+        return ""
+    
+async def check_process_is_running(process: subprocess.Popen, delay: float = 0.5) -> Tuple[bool, Optional[int], bytes, bytes]:
+    """Perform a quick check to make sure the browser started successfully."""
+    if not process:
+        return False, None, b"", b""
+        
+    # Check that process started without immediate termination
+    await asyncio.sleep(delay)
+    if process.poll() is not None:
+        # Process already terminated
+        stdout, stderr = b"", b""
+        try:
+            stdout, stderr = process.communicate(timeout=0.5)
+        except subprocess.TimeoutExpired:
+            pass
+
+        return False, process.returncode, stdout, stderr
+            
+
+    return True, 0, b"", b""
+
+
+def terminate_process(
+    pid: Union[int, str], 
+    timeout: float = 5.0,
+    force_kill_timeout: float = 3.0,
+    logger = None
+) -> Tuple[bool, Optional[str]]:
+    """
+    Robustly terminate a process across platforms with verification.
+    
+    Args:
+        pid: Process ID to terminate (int or string)
+        timeout: Seconds to wait for graceful termination before force killing
+        force_kill_timeout: Seconds to wait after force kill before considering it failed
+        logger: Optional logger object with error, warning, and info methods
+        
+    Returns:
+        Tuple of (success: bool, error_message: Optional[str])
+    """
+    # Convert pid to int if it's a string
+    if isinstance(pid, str):
+        try:
+            pid = int(pid)
+        except ValueError:
+            error_msg = f"Invalid PID format: {pid}"
+            if logger:
+                logger.error(error_msg)
+            return False, error_msg
+    
+    # Check if process exists
+    if not psutil.pid_exists(pid):
+        return True, None  # Process already terminated
+    
+    try:
+        process = psutil.Process(pid)
+        
+        # First attempt: graceful termination
+        if logger:
+            logger.info(f"Attempting graceful termination of process {pid}")
+            
+        if os.name == 'nt':  # Windows
+            subprocess.run(["taskkill", "/PID", str(pid)], 
+                          stdout=subprocess.DEVNULL, 
+                          stderr=subprocess.DEVNULL, 
+                          check=False)
+        else:  # Unix/Linux/MacOS
+            process.send_signal(signal.SIGTERM)
+        
+        # Wait for process to terminate
+        try:
+            process.wait(timeout=timeout)
+            if logger:
+                logger.info(f"Process {pid} terminated gracefully")
+            return True, None
+        except psutil.TimeoutExpired:
+            if logger:
+                logger.warning(f"Process {pid} did not terminate gracefully within {timeout} seconds, forcing termination")
+        
+        # Second attempt: force kill
+        if os.name == 'nt':  # Windows
+            subprocess.run(["taskkill", "/F", "/PID", str(pid)], 
+                          stdout=subprocess.DEVNULL, 
+                          stderr=subprocess.DEVNULL, 
+                          check=False)
+        else:  # Unix/Linux/MacOS
+            process.send_signal(signal.SIGKILL)
+        
+        # Verify process is killed
+        gone, alive = psutil.wait_procs([process], timeout=force_kill_timeout)
+        if process in alive:
+            error_msg = f"Failed to kill process {pid} even after force kill"
+            if logger:
+                logger.error(error_msg)
+            return False, error_msg
+            
+        if logger:
+            logger.info(f"Process {pid} terminated by force")
+        return True, None
+        
+    except psutil.NoSuchProcess:
+        # Process terminated while we were working with it
+        if logger:
+            logger.info(f"Process {pid} already terminated")
+        return True, None
+        
+    except Exception as e:
+        error_msg = f"Error terminating process {pid}: {str(e)}"
+        if logger:
+            logger.error(error_msg)
+        return False, error_msg
