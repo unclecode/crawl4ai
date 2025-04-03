@@ -11,8 +11,16 @@ x-base-config: &base-config
     - CLAUDE_API_KEY=${CLAUDE_API_KEY:-}
     - REDIS_HOST=redis
     - REDIS_PORT=6379
+    - LOG_LEVEL=DEBUG  # 로깅 레벨 추가
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "100m"
+      max-file: "3"
+      tag: "{{.Name}}"
   volumes:
     - /dev/shm:/dev/shm
+    - ./logs:/app/logs  # 로그 볼륨 마운트 추가
   deploy:
     resources:
       limits:
