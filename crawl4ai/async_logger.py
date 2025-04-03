@@ -156,9 +156,22 @@ class AsyncLogger(AsyncLoggerBase):
                 formatted_message = message.format(**params)
 
                 # Then apply colors if specified
+                color_map = {
+                    "green": Fore.GREEN,
+                    "red": Fore.RED,
+                    "yellow": Fore.YELLOW,
+                    "blue": Fore.BLUE,
+                    "cyan": Fore.CYAN,
+                    "magenta": Fore.MAGENTA,
+                    "white": Fore.WHITE,
+                    "black": Fore.BLACK,
+                    "reset": Style.RESET_ALL,
+                }
                 if colors:
                     for key, color in colors.items():
                         # Find the formatted value in the message and wrap it with color
+                        if color in color_map:
+                            color = color_map[color]
                         if key in params:
                             value_str = str(params[key])
                             formatted_message = formatted_message.replace(

@@ -15,7 +15,7 @@ from .user_agent_generator import UAGen, ValidUAGenerator  # , OnlineUAGenerator
 from .extraction_strategy import ExtractionStrategy, LLMExtractionStrategy
 from .chunking_strategy import ChunkingStrategy, RegexChunking
 
-from .markdown_generation_strategy import MarkdownGenerationStrategy
+from .markdown_generation_strategy import MarkdownGenerationStrategy, DefaultMarkdownGenerator
 from .content_scraping_strategy import ContentScrapingStrategy, WebScrapingStrategy
 from .deep_crawling import DeepCrawlStrategy
 
@@ -722,7 +722,7 @@ class CrawlerRunConfig():
         word_count_threshold: int = MIN_WORD_THRESHOLD,
         extraction_strategy: ExtractionStrategy = None,
         chunking_strategy: ChunkingStrategy = RegexChunking(),
-        markdown_generator: MarkdownGenerationStrategy = None,
+        markdown_generator: MarkdownGenerationStrategy = DefaultMarkdownGenerator(),
         only_text: bool = False,
         css_selector: str = None,
         target_elements: List[str] = None,
