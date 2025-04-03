@@ -21,5 +21,5 @@ psutil>=6.1.1
 nltk>=3.9.1
 rich>=13.9.4
 cssselect>=1.2.0
-faust-cchardet>=2.1.19
+chardet>=5.2.0
 brotli>=1.1.0

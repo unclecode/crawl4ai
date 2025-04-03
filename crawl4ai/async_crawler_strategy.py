@@ -24,7 +24,7 @@ from .browser_manager import BrowserManager
 
 import aiofiles
 import aiohttp
-import cchardet
+import chardet
 from aiohttp.client import ClientTimeout
 from urllib.parse import urlparse
 from types import MappingProxyType
@@ -1822,7 +1822,7 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
                 
                 encoding = response.charset
                 if not encoding:
-                    encoding = cchardet.detect(content.tobytes())['encoding'] or 'utf-8'                    
+                    encoding = chardet.detect(content.tobytes())['encoding'] or 'utf-8'                    
                 
                 result = AsyncCrawlResponse(
                     html=content.tobytes().decode(encoding, errors='replace'),
