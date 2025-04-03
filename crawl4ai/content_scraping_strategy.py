@@ -905,7 +905,7 @@ class WebScrapingStrategy(ContentScrapingStrategy):
                     # Creating a fresh parse of HTML for each selector to prevent element extraction
                     # from modifying the original DOM tree; this keeps the original body 
                     # intact for link processing. This is better performant than deepcopy.
-                    fresh_body = BeautifulSoup(html, "html.parser")
+                    fresh_body = BeautifulSoup(html, "lxml")
                     for_content_targeted_element.extend(fresh_body.select(target_element))
                 content_element = soup.new_tag("div")
                 for el in for_content_targeted_element:
