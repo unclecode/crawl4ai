@@ -1617,7 +1617,7 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
             # Remove empty elements
             self.remove_empty_elements_fast(body, 1)
 
-            # Remvoe unneeded attributes
+            # Remove unneeded attributes
             self.remove_unwanted_attributes_fast(
                 body, keep_data_attributes=kwargs.get("keep_data_attributes", False)
             )
