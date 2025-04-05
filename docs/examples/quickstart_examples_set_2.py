@@ -1,6 +1,6 @@
 import os, sys
 
-from crawl4ai import LLMConfig
+from crawl4ai.types import LLMConfig
 
 sys.path.append(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
