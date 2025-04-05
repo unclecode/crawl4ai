@@ -5,7 +5,7 @@ import base64
 from pathlib import Path
 from typing import List
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode, CrawlResult
-from crawl4ai.configs import ProxyConfig
+from crawl4ai.proxy_strategy import ProxyConfig
 from crawl4ai import RoundRobinProxyStrategy
 from crawl4ai import JsonCssExtractionStrategy, LLMExtractionStrategy
 from crawl4ai import LLMConfig
@@ -19,10 +19,9 @@ __cur_dir__ = Path(__file__).parent
 async def demo_basic_crawl():
     """Basic web crawling with markdown generation"""
     print("\n=== 1. Basic Web Crawling ===")
-
     async with AsyncWebCrawler() as crawler:
         results: List[CrawlResult] = await crawler.arun(
-            url="https://news.ycombinator.com/",
+            url="https://news.ycombinator.com/"
         )
 
         for i, result in enumerate(results):
@@ -33,7 +32,6 @@ async def demo_basic_crawl():
                 print(f"First 100 chars: {result.markdown.raw_markdown[:100]}...")
             else:
                 print("Failed to crawl the URL")
-
 
 async def demo_parallel_crawl():
     """Crawl multiple URLs in parallel"""
@@ -56,14 +54,13 @@ async def demo_parallel_crawl():
                 f"  {i + 1}. {result.url} - {'Success' if result.success else 'Failed'}"
             )
 
-
 async def demo_fit_markdown():
     """Generate focused markdown with LLM content filter"""
     print("\n=== 3. Fit Markdown with LLM Content Filter ===")
 
     async with AsyncWebCrawler() as crawler:
-        result = await crawler.arun(
-            "https://en.wikipedia.org/wiki/Python_(programming_language)",
+        result: CrawlResult = await crawler.arun(
+            url = "https://en.wikipedia.org/wiki/Python_(programming_language)",
             config=CrawlerRunConfig(
                 markdown_generator=DefaultMarkdownGenerator(
                     content_filter=PruningContentFilter()
@@ -75,7 +72,6 @@ async def demo_fit_markdown():
         print(f"Raw: {len(result.markdown.raw_markdown)} chars")
         print(f"Fit: {len(result.markdown.fit_markdown)} chars")
 
-
 async def demo_llm_structured_extraction_no_schema():
     # Create a simple LLM extraction strategy (no schema required)
     extraction_strategy = LLMExtractionStrategy(
@@ -83,7 +79,7 @@ async def demo_llm_structured_extraction_no_schema():
             provider="groq/qwen-2.5-32b",
             api_token="env:GROQ_API_KEY",
         ),
-        instruction="This is news.ycombinator.com, extract all news for each. title, source url, number of comments.",
+        instruction="This is news.ycombinator.com, extract all news, and for each, I want title, source url, number of comments.",
         extract_type="schema",
         schema="{title: string, url: string, comments: int}",
         extra_args={
@@ -109,7 +105,6 @@ async def demo_llm_structured_extraction_no_schema():
             else:
                 print("Failed to extract structured data")
 
-
 async def demo_css_structured_extraction_no_schema():
     """Extract structured data using CSS selectors"""
     print("\n=== 5. CSS-Based Structured Extraction ===")
@@ -129,27 +124,33 @@ async def demo_css_structured_extraction_no_schema():
                     <span class="h-datetime"><i class="icon-font icon-calendar"></i>Apr 05, 2025</span>
                     <span class="h-tags">Malware / Supply Chain Attack</span>
                 </div>
-                <div class="home-desc"> Cybersecurity researchers have uncovered malicious libraries in the Python Package Index (PyPI) repository that are designed to steal sensitive information.  Two of the packages, bitcoinlibdbfix and bitcoinlib-dev, masquerade as fixes for recent issues  detected in a legitimate Python module called bitcoinlib, according to ReversingLabs . A third package discovered  by Socket, disgrasya, contained a fully automated carding script targeting WooCommerce stores.  The packages attracted hundreds of downloads before being taken down, according to statistics from pepy.tech -   bitcoinlibdbfix  - 1,101 downloads  bitcoinlib-dev  - 735 downloads  disgrasya  - 37,217 downloads   "The malicious libraries both attempt a similar attack, overwriting the legitimate 'clw cli' command with malicious code that attempts to exfiltrate sensitive database files," ReversingLabs said.   In an interesting twist, the authors of the counterfeit libraries are said to have joined a GitHub issue...</div>
+                <div class="home-desc"> Cybersecurity researchers have...</div>
             </div>
         </div>
     </a>
 </div>
     """
 
-    # Generate schema using LLM (one-time setup)
-    schema = JsonCssExtractionStrategy.generate_schema(
-        html=sample_html,
-        llm_config=LLMConfig(
-            provider="groq/qwen-2.5-32b",
-            api_token="env:GROQ_API_KEY",
-        ),
-        query="From https://thehackernews.com/, I have shares a sample of one news div with a title, date, and description. Please generate a schema for this news div.",
-    )
+    # Check if schema file exists
+    schema_file_path = f"{__cur_dir__}/tmp/schema.json"
+    if os.path.exists(schema_file_path):
+        with open(schema_file_path, "r") as f:
+            schema = json.load(f)
+    else:
+        # Generate schema using LLM (one-time setup)
+        schema = JsonCssExtractionStrategy.generate_schema(
+            html=sample_html,
+            llm_config=LLMConfig(
+                provider="groq/qwen-2.5-32b",
+                api_token="env:GROQ_API_KEY",
+            ),
+            query="From https://thehackernews.com/, I have shared a sample of one news div with a title, date, and description. Please generate a schema for this news div.",
+        )
 
     print(f"Generated schema: {json.dumps(schema, indent=2)}")
     # Save the schema to a file , and use it for future extractions, in result for such extraction you will call LLM once
-    # with open("schema.json", "w") as f:
-    #     json.dump(schema, f, indent=2)
+    with open(f"{__cur_dir__}/tmp/schema.json", "w") as f:
+        json.dump(schema, f, indent=2)
 
     # Create no-LLM extraction strategy with the generated schema
     extraction_strategy = JsonCssExtractionStrategy(schema)
@@ -169,7 +170,6 @@ async def demo_css_structured_extraction_no_schema():
                 print(json.dumps(data, indent=2))
             else:
                 print("Failed to extract structured data")
-
 
 async def demo_deep_crawl():
     """Deep crawling with BFS strategy"""
@@ -191,7 +191,6 @@ async def demo_deep_crawl():
         for i, result in enumerate(results):
             depth = result.metadata.get("depth", "unknown")
             print(f"  {i + 1}. {result.url} (Depth: {depth})")
-
 
 async def demo_js_interaction():
     """Execute JavaScript to load more content"""
@@ -255,8 +254,6 @@ async def demo_js_interaction():
                 print("Failed to extract structured data")
         print(f"Total items: {len(news)}")
 
-
-
 async def demo_media_and_links():
     """Extract media and links from a page"""
     print("\n=== 8. Media and Links Extraction ===")
@@ -275,17 +272,24 @@ async def demo_media_and_links():
             print(f"Found {len(internal_links)} internal links")
             print(f"Found {len(external_links)} external links")
 
-            # Save everything to files
-            with open("images.json", "w") as f:
-                json.dump(images, f, indent=2)
+            # Print some of the images and links
+            for image in images[:3]:
+                print(f"Image: {image['src']}")
+            for link in internal_links[:3]:
+                print(f"Internal link: {link['href']}")
+            for link in external_links[:3]:
+                print(f"External link: {link['href']}")
 
-            with open("links.json", "w") as f:
-                json.dump(
-                    {"internal": internal_links, "external": external_links},
-                    f,
-                    indent=2,
-                )
+            # # Save everything to files
+            # with open("images.json", "w") as f:
+            #     json.dump(images, f, indent=2)
 
+            # with open("links.json", "w") as f:
+            #     json.dump(
+            #         {"internal": internal_links, "external": external_links},
+            #         f,
+            #         indent=2,
+            #     )
 
 async def demo_screenshot_and_pdf():
     """Capture screenshot and PDF of a page"""
@@ -299,6 +303,7 @@ async def demo_screenshot_and_pdf():
         )
 
         for i, result in enumerate(result):
+            # if result.screenshot_data:
             if result.screenshot:
                 # Save screenshot
                 screenshot_path = f"{__cur_dir__}/tmp/example_screenshot.png"
@@ -306,13 +311,13 @@ async def demo_screenshot_and_pdf():
                     f.write(base64.b64decode(result.screenshot))
                 print(f"Screenshot saved to {screenshot_path}")
 
+            # if result.pdf_data:
             if result.pdf:
                 # Save PDF
                 pdf_path = f"{__cur_dir__}/tmp/example.pdf"
                 with open(pdf_path, "wb") as f:
                     f.write(result.pdf)
                 print(f"PDF saved to {pdf_path}")
-
 
 async def demo_proxy_rotation():
     """Proxy rotation for multiple requests"""
@@ -338,7 +343,6 @@ async def demo_proxy_rotation():
 
         # In a real scenario, these would be run and the proxies would rotate
         print("In a real scenario, requests would rotate through the available proxies")
-
 
 async def demo_raw_html_and_file():
     """Process raw HTML and local files"""
@@ -376,29 +380,27 @@ async def demo_raw_html_and_file():
     os.remove(file_path)
     print(f"Processed both raw HTML and local file ({file_path})")
 
-
 async def main():
     """Run all demo functions sequentially"""
     print("=== Comprehensive Crawl4AI Demo ===")
     print("Note: Some examples require API keys or other configurations")
 
     # Run all demos
-    await demo_basic_crawl()
-    await demo_parallel_crawl()
-    await demo_fit_markdown()
-    await demo_llm_structured_extraction_no_schema()
-    await demo_css_structured_extraction_no_schema()
+    # await demo_basic_crawl()
+    # await demo_parallel_crawl()
+    # await demo_fit_markdown()
+    # await demo_llm_structured_extraction_no_schema()
+    # await demo_css_structured_extraction_no_schema()
     await demo_deep_crawl()
-    await demo_js_interaction()
-    await demo_media_and_links()
-    await demo_screenshot_and_pdf()
-    # await demo_proxy_rotation()
-    await demo_raw_html_and_file()
+    # await demo_js_interaction()
+    # await demo_media_and_links()
+    # await demo_screenshot_and_pdf()
+    # # await demo_proxy_rotation()
+    # await demo_raw_html_and_file()
 
     # Clean up any temp files that may have been created
     print("\n=== Demo Complete ===")
     print("Check for any generated files (screenshots, PDFs) in the current directory")
-
 
 if __name__ == "__main__":
     asyncio.run(main())
