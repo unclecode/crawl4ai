@@ -20,3 +20,22 @@ print("""
 这是第二行
 这是第三行
 """)
+
+# 打印一个列表
+fruits = ["苹果", "香蕉", "橙子"]
+print("我最喜欢的水果是", fruits[0])
+
+# 打印一个字典
+person = {
+    "name": "小明",
+    "age": 18,
+    "city": "北京"
+}
+print("我叫" + person["name"] + "，今年" + str(person["age"]) + "岁，住在" + person["city"])    
+
+# 打印一个函数
+def greet(name):
+    print("你好, " + name + "!")
+
+greet("小明")
+
