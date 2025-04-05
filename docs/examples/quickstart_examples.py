@@ -4,12 +4,13 @@ import json
 import base64
 from pathlib import Path
 from typing import List
-from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode, CrawlResult
 from crawl4ai.proxy_strategy import ProxyConfig
+
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode, CrawlResult
 from crawl4ai import RoundRobinProxyStrategy
 from crawl4ai import JsonCssExtractionStrategy, LLMExtractionStrategy
 from crawl4ai import LLMConfig
-from crawl4ai import PruningContentFilter
+from crawl4ai import PruningContentFilter, BM25ContentFilter
 from crawl4ai import DefaultMarkdownGenerator
 from crawl4ai import BFSDeepCrawlStrategy, DomainFilter, FilterChain
 from crawl4ai import BrowserConfig
@@ -19,7 +20,12 @@ __cur_dir__ = Path(__file__).parent
 async def demo_basic_crawl():
     """Basic web crawling with markdown generation"""
     print("\n=== 1. Basic Web Crawling ===")
-    async with AsyncWebCrawler() as crawler:
+    async with AsyncWebCrawler(config = BrowserConfig(
+        viewport_height=800,
+        viewport_width=1200,
+        headless=True,
+        verbose=True,
+    )) as crawler:
         results: List[CrawlResult] = await crawler.arun(
             url="https://news.ycombinator.com/"
         )
@@ -281,15 +287,15 @@ async def demo_media_and_links():
                 print(f"External link: {link['href']}")
 
             # # Save everything to files
-            # with open("images.json", "w") as f:
-            #     json.dump(images, f, indent=2)
+            with open(f"{__cur_dir__}/tmp/images.json", "w") as f:
+                json.dump(images, f, indent=2)
 
-            # with open("links.json", "w") as f:
-            #     json.dump(
-            #         {"internal": internal_links, "external": external_links},
-            #         f,
-            #         indent=2,
-            #     )
+            with open(f"{__cur_dir__}/tmp/links.json", "w") as f:
+                json.dump(
+                    {"internal": internal_links, "external": external_links},
+                    f,
+                    indent=2,
+                )
 
 async def demo_screenshot_and_pdf():
     """Capture screenshot and PDF of a page"""
@@ -338,7 +344,7 @@ async def demo_proxy_rotation():
 
     async with AsyncWebCrawler() as crawler:
         config = CrawlerRunConfig(
-            proxy_rotation_strategy=proxy_strategy, cache_mode=CacheMode.BYPASS
+            proxy_rotation_strategy=proxy_strategy
         )
 
         # In a real scenario, these would be run and the proxies would rotate
@@ -386,17 +392,17 @@ async def main():
     print("Note: Some examples require API keys or other configurations")
 
     # Run all demos
-    # await demo_basic_crawl()
-    # await demo_parallel_crawl()
-    # await demo_fit_markdown()
-    # await demo_llm_structured_extraction_no_schema()
-    # await demo_css_structured_extraction_no_schema()
+    await demo_basic_crawl()
+    await demo_parallel_crawl()
+    await demo_fit_markdown()
+    await demo_llm_structured_extraction_no_schema()
+    await demo_css_structured_extraction_no_schema()
     await demo_deep_crawl()
-    # await demo_js_interaction()
-    # await demo_media_and_links()
-    # await demo_screenshot_and_pdf()
+    await demo_js_interaction()
+    await demo_media_and_links()
+    await demo_screenshot_and_pdf()
     # # await demo_proxy_rotation()
-    # await demo_raw_html_and_file()
+    await demo_raw_html_and_file()
 
     # Clean up any temp files that may have been created
     print("\n=== Demo Complete ===")
