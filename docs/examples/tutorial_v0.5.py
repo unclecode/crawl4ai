@@ -13,11 +13,11 @@ from crawl4ai.deep_crawling import (
 )
 from crawl4ai.deep_crawling.scorers import KeywordRelevanceScorer
 from crawl4ai.async_crawler_strategy import AsyncHTTPCrawlerStrategy
-from crawl4ai.configs import ProxyConfig
+from crawl4ai.proxy_strategy import ProxyConfig
 from crawl4ai import RoundRobinProxyStrategy
 from crawl4ai.content_filter_strategy import LLMContentFilter
 from crawl4ai import DefaultMarkdownGenerator
-from crawl4ai.types import LLMConfig
+from crawl4ai import LLMConfig
 from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
 from crawl4ai.processors.pdf import PDFCrawlerStrategy, PDFContentScrapingStrategy
 from pprint import pprint

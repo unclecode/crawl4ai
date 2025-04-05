@@ -507,10 +507,12 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         # Get page for session
         page, context = await self.browser_manager.get_page(crawlerRunConfig=config)
 
+        # await page.goto(URL)
+
         # Add default cookie
-        await context.add_cookies(
-            [{"name": "cookiesEnabled", "value": "true", "url": url}]
-        )
+        # await context.add_cookies(
+        #     [{"name": "cookiesEnabled", "value": "true", "url": url}]
+        # )
 
         # Handle navigator overrides
         if config.override_navigator or config.simulate_user or config.magic:
@@ -562,14 +564,15 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
                 try:
                     # Generate a unique nonce for this request
-                    nonce = hashlib.sha256(os.urandom(32)).hexdigest()
+                    if config.experimental.get("use_csp_nonce", False):
+                        nonce = hashlib.sha256(os.urandom(32)).hexdigest()
 
-                    # Add CSP headers to the request
-                    await page.set_extra_http_headers(
-                        {
-                            "Content-Security-Policy": f"default-src 'self'; script-src 'self' 'nonce-{nonce}' 'strict-dynamic'"
-                        }
-                    )
+                        # Add CSP headers to the request
+                        await page.set_extra_http_headers(
+                            {
+                                "Content-Security-Policy": f"default-src 'self'; script-src 'self' 'nonce-{nonce}' 'strict-dynamic'"
+                            }
+                        )
 
                     response = await page.goto(
                         url, wait_until=config.wait_until, timeout=config.page_timeout
@@ -767,6 +770,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             # Handle wait_for condition
             # Todo: Decide how to handle this
             if not config.wait_for and config.css_selector and False:
+            # if not config.wait_for and config.css_selector:
                 config.wait_for = f"css:{config.css_selector}"
 
             if config.wait_for:
@@ -806,8 +810,28 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             if config.remove_overlay_elements:
                 await self.remove_overlay_elements(page)
 
-            # Get final HTML content
-            html = await page.content()
+            if config.css_selector:
+                try:
+                    # Handle comma-separated selectors by splitting them
+                    selectors = [s.strip() for s in config.css_selector.split(',')]
+                    html_parts = []
+                    
+                    for selector in selectors:
+                        try:
+                            content = await page.evaluate(f"document.querySelector('{selector}')?.outerHTML || ''")
+                            html_parts.append(content)
+                        except Error as e:
+                            print(f"Warning: Could not get content for selector '{selector}': {str(e)}")
+                    
+                    # Wrap in a div to create a valid HTML structure
+                    html = f"<div class='crawl4ai-result'>\n" + "\n".join(html_parts) + "\n</div>"                    
+                except Error as e:
+                    raise RuntimeError(f"Failed to extract HTML content: {str(e)}")
+            else:
+                html = await page.content()
+            
+            # # Get final HTML content
+            # html = await page.content()
             await self.execute_hook(
                 "before_return_html", page=page, html=html, context=context, config=config
             )

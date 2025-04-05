@@ -128,7 +128,7 @@ Crawl4AI can also extract structured data (JSON) using CSS or XPath selectors. B
 
 ```python
 from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
-from crawl4ai.types import LLMConfig
+from crawl4ai import LLMConfig
 
 # Generate a schema (one-time cost)
 html = "<div class='product'><h2>Gaming Laptop</h2><span class='price'>$999.99</span></div>"

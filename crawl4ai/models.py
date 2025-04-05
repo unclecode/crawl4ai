@@ -1,4 +1,3 @@
-from re import U
 from pydantic import BaseModel, HttpUrl, PrivateAttr
 from typing import List, Dict, Optional, Callable, Awaitable, Union, Any
 from enum import Enum
@@ -28,6 +27,12 @@ class CrawlerTaskResult:
     start_time: Union[datetime, float]
     end_time: Union[datetime, float]
     error_message: str = ""
+    retry_count: int = 0
+    wait_time: float = 0.0
+    
+    @property
+    def success(self) -> bool:
+        return self.result.success
 
 
 class CrawlStatus(Enum):
@@ -67,6 +72,9 @@ class CrawlStats:
     memory_usage: float = 0.0
     peak_memory: float = 0.0
     error_message: str = ""
+    wait_time: float = 0.0
+    retry_count: int = 0
+    counted_requeue: bool = False
 
     @property
     def duration(self) -> str:
@@ -86,6 +94,7 @@ class CrawlStats:
             
         duration = end - start
         return str(timedelta(seconds=int(duration.total_seconds())))
+
 
 class DisplayMode(Enum):
     DETAILED = "DETAILED"
@@ -326,6 +335,7 @@ class Media(BaseModel):
     audios: List[
         MediaItem
     ] = []  # Using MediaItem model for now, can be extended with Audio model if needed
+    tables: List[Dict] = []  # Table data extracted from HTML tables
 
 
 class Links(BaseModel):

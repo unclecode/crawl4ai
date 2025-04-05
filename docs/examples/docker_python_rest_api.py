@@ -73,7 +73,7 @@ async def test_stream_crawl(session, token: str):
             # "https://news.ycombinator.com/news"
         ],
         "browser_config": {"headless": True, "viewport": {"width": 1200}},
-        "crawler_config": {"stream": True, "cache_mode": "aggressive"}
+        "crawler_config": {"stream": True, "cache_mode": "bypass"}
     }
     headers = {"Authorization": f"Bearer {token}"}
     print(f"\nTesting Streaming Crawl: {url}")
