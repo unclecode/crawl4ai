@@ -353,10 +353,11 @@ class AsyncWebCrawler:
                         html=html,
                         extracted_content=extracted_content,
                         config=config,  # Pass the config object instead of individual parameters
-                        screenshot=screenshot_data,
+                        screenshot_data=screenshot_data,
                         pdf_data=pdf_data,
                         verbose=config.verbose,
                         is_raw_html=True if url.startswith("raw:") else False,
+                        redirected_url=async_response.redirected_url, 
                         **kwargs,
                     )
 
@@ -372,18 +373,11 @@ class AsyncWebCrawler:
                     crawl_result.success = bool(html)
                     crawl_result.session_id = getattr(config, "session_id", None)
 
-                    self.logger.success(
-                        message="{url:.50}... | Status: {status} | Total: {timing}",
+                    self.logger.url_status(
+                        url=cache_context.display_url,
+                        success=crawl_result.success,
+                        timing=time.perf_counter() - start_time,
                         tag="COMPLETE",
-                        params={
-                            "url": cache_context.display_url,
-                            "status": crawl_result.success,
-                            "timing": f"{time.perf_counter() - start_time:.2f}s",
-                        },
-                        colors={
-                            "status": Fore.GREEN if crawl_result.success else Fore.RED,
-                            "timing": Fore.YELLOW,
-                        },
                     )
 
                     # Update cache if appropriate
@@ -393,17 +387,12 @@ class AsyncWebCrawler:
                     return CrawlResultContainer(crawl_result)
 
                 else:
-                    self.logger.success(
-                        message="{url:.50}... | Status: {status} | Total: {timing}",
-                        tag="COMPLETE",
-                        params={
-                            "url": cache_context.display_url,
-                            "status": True,
-                            "timing": f"{time.perf_counter() - start_time:.2f}s",
-                        },
-                        colors={"status": Fore.GREEN, "timing": Fore.YELLOW},
+                    self.logger.url_status(
+                        url=cache_context.display_url,
+                        success=True,
+                        timing=time.perf_counter() - start_time,
+                        tag="COMPLETE"
                     )
-
                     cached_result.success = bool(html)
                     cached_result.session_id = getattr(config, "session_id", None)
                     cached_result.redirected_url = cached_result.redirected_url or url
@@ -437,7 +426,7 @@ class AsyncWebCrawler:
         html: str,
         extracted_content: str,
         config: CrawlerRunConfig,
-        screenshot: str,
+        screenshot_data: str,
         pdf_data: str,
         verbose: bool,
         **kwargs,
@@ -450,7 +439,7 @@ class AsyncWebCrawler:
             html: Raw HTML content
             extracted_content: Previously extracted content (if any)
             config: Configuration object controlling processing behavior
-            screenshot: Screenshot data (if any)
+            screenshot_data: Screenshot data (if any)
             pdf_data: PDF data (if any)
             verbose: Whether to enable verbose logging
             **kwargs: Additional parameters for backwards compatibility
@@ -517,20 +506,23 @@ class AsyncWebCrawler:
         markdown_result: MarkdownGenerationResult = (
             markdown_generator.generate_markdown(
                 cleaned_html=cleaned_html,
-                base_url=url,
+                base_url=params.get("redirected_url", url),
                 # html2text_options=kwargs.get('html2text', {})
             )
         )
 
         # Log processing completion
-        self.logger.info(
-            message="{url:.50}... | Time: {timing}s",
-            tag="SCRAPE",
-            params={
-                "url": _url,
-                "timing": int((time.perf_counter() - t1) * 1000) / 1000,
-            },
+        self.logger.url_status(
+            url=_url,
+            success=True,
+            timing=int((time.perf_counter() - t1) * 1000) / 1000,
+            tag="SCRAPE"
         )
+        # self.logger.info(
+        #     message="{url:.50}... | Time: {timing}s",
+        #     tag="SCRAPE",
+        #     params={"url": _url, "timing": int((time.perf_counter() - t1) * 1000) / 1000},
+        # )
 
         ################################
         # Structured Content Extraction           #
@@ -576,10 +568,6 @@ class AsyncWebCrawler:
                 tag="EXTRACT",
                 params={"url": _url, "timing": time.perf_counter() - t1},
             )
-
-        # Handle screenshot and PDF data
-        screenshot_data = None if not screenshot else screenshot
-        pdf_data = None if not pdf_data else pdf_data
 
         # Apply HTML formatting if requested
         if config.prettiify:

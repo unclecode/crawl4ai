@@ -11,6 +11,7 @@ from .scorers import URLScorer
 from . import DeepCrawlStrategy
 
 from ..types import AsyncWebCrawler, CrawlerRunConfig, CrawlResult, RunManyReturn
+from ..utils import normalize_url_for_deep_crawl
 
 from math import inf as infinity
 
@@ -106,13 +107,14 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
         valid_links = []
         for link in links:
             url = link.get("href")
-            if url in visited:
+            base_url = normalize_url_for_deep_crawl(url, source_url)
+            if base_url in visited:
                 continue
             if not await self.can_process_url(url, new_depth):
                 self.stats.urls_skipped += 1
                 continue
                 
-            valid_links.append(url)
+            valid_links.append(base_url)
             
         # If we have more valid links than capacity, limit them
         if len(valid_links) > remaining_capacity:

@@ -101,13 +101,9 @@ async def get_markdown(
 async def llm_endpoint(
     request: Request,
     url: str = Path(...),
-    q: Optional[str] = Query(None),
+    q: str = Query(...),
     token_data: Optional[Dict] = Depends(token_dependency)
 ):
-    if not q:
-        raise HTTPException(status_code=400, detail="Query parameter 'q' is required")
-    if not url.startswith(('http://', 'https://')):
-        url = 'https://' + url
     try:
         answer = await handle_llm_qa(url, q, config)
         return JSONResponse({"answer": answer})
@@ -136,7 +132,6 @@ async def crawl(
 ):
     if not crawl_request.urls:
         raise HTTPException(status_code=400, detail="At least one URL required")
-    
     results = await handle_crawl_request(
         urls=crawl_request.urls,
         browser_config=crawl_request.browser_config,
