@@ -2,9 +2,9 @@
 import hashlib
 import json
 import asyncio
-from typing import Dict, Optional
+from typing import Dict, Optional, List, Tuple
 from .manager import BrowserManager, UnavailableBehavior
-from ..async_configs import BrowserConfig
+from ..async_configs import BrowserConfig, CrawlerRunConfig
 from ..async_logger import AsyncLogger
 
 class BrowserHub:
@@ -19,7 +19,7 @@ class BrowserHub:
     _lock = asyncio.Lock()
     
     @classmethod
-    async def get_or_create_hub(
+    async def get_browser_manager(
         cls, 
         config: Optional[BrowserConfig] = None,
         hub_id: Optional[str] = None,
@@ -28,10 +28,10 @@ class BrowserHub:
         max_browsers_per_config: int = 10,
         max_pages_per_browser: int = 5,
         initial_pool_size: int = 1,
-        page_configs: Optional[list] = None
+        page_configs: Optional[List[Tuple[BrowserConfig, CrawlerRunConfig, int]]] = None
     ) -> BrowserManager:
         """
-        Get an existing Browser-Hub or create a new one based on parameters.
+        Get an existing BrowserManager or create a new one based on parameters.
         
         Args:
             config: Browser configuration for new hub
@@ -61,7 +61,7 @@ class BrowserHub:
                 config_hash = cls._hash_config(config)
                 instance_key = hub_id or f"config:{config_hash}"
                 if instance_key not in cls._instances:
-                    cls._instances[instance_key] = await cls._create_browser_hub(
+                    cls._instances[instance_key] = await cls._create_browser_manager(
                         config, 
                         logger,
                         max_browsers_per_config,
@@ -83,21 +83,22 @@ class BrowserHub:
             return cls._instances[instance_key]
     
     @classmethod
-    async def _create_browser_hub(
+    async def _create_browser_manager(
         cls, 
         config: BrowserConfig,
         logger: Optional[AsyncLogger],
         max_browsers_per_config: int,
         max_pages_per_browser: int,
         initial_pool_size: int,
-        page_configs: Optional[list]
+        page_configs: Optional[List[Tuple[BrowserConfig, CrawlerRunConfig, int]]] = None
     ) -> BrowserManager:
         """Create a new browser hub with the specified configuration."""
         manager = BrowserManager(
             browser_config=config,
             logger=logger,
             unavailable_behavior=UnavailableBehavior.ON_DEMAND,
-            max_browsers_per_config=max_browsers_per_config
+            max_browsers_per_config=max_browsers_per_config,
+            max_pages_per_browser=max_pages_per_browser,
         )
         
         # Initialize the pool
@@ -119,7 +120,7 @@ class BrowserHub:
     ) -> BrowserManager:
         """Create a default browser hub with standard settings."""
         config = BrowserConfig(headless=True)
-        return await cls._create_browser_hub(
+        return await cls._create_browser_manager(
             config, 
             logger, 
             max_browsers_per_config, 
