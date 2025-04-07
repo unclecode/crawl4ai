@@ -1,14 +1,30 @@
 
 import time
-from typing import Callable, Dict, List, Any, Optional, Awaitable
+import asyncio
+from typing import Callable, Dict, List, Any, Optional, Awaitable, Union, TypedDict, Tuple, Coroutine
 
-from middlewares import create_default_middleware_list, handle_error_middleware
-from crawl4ai.models import CrawlResultContainer
+from .middlewares import create_default_middleware_list, handle_error_middleware
+from crawl4ai.models import CrawlResultContainer, CrawlResult
 from crawl4ai.async_crawler_strategy import AsyncCrawlerStrategy, AsyncPlaywrightCrawlerStrategy
 from crawl4ai.async_configs import BrowserConfig, CrawlerRunConfig
 from crawl4ai.async_logger import AsyncLogger
 
 
+class CrawlSpec(TypedDict, total=False):
+    """Specification for a single crawl operation in batch_crawl."""
+    url: str
+    config: Optional[CrawlerRunConfig]
+    browser_config: Optional[BrowserConfig]
+
+class BatchStatus(TypedDict, total=False):
+    """Status information for batch crawl operations."""
+    total: int
+    processed: int
+    succeeded: int
+    failed: int
+    in_progress: int
+    duration: float
+    
 class Pipeline:
     """
     A pipeline processor that executes a series of async middleware functions.

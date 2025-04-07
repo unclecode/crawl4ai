@@ -1,4 +1,4 @@
-from pydantic import BaseModel, HttpUrl, PrivateAttr
+from pydantic import BaseModel, HttpUrl, PrivateAttr, ConfigDict
 from typing import List, Dict, Optional, Callable, Awaitable, Union, Any
 from typing import AsyncGenerator
 from typing import Generic, TypeVar
@@ -146,8 +146,9 @@ class CrawlResult(BaseModel):
     dispatch_result: Optional[DispatchResult] = None
     redirected_url: Optional[str] = None
 
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    # class Config:
+    #     arbitrary_types_allowed = True
 
 # NOTE: The StringCompatibleMarkdown class, custom __init__ method, property getters/setters,
 # and model_dump override all exist to support a smooth transition from markdown as a string
@@ -312,8 +313,9 @@ class AsyncCrawlResponse(BaseModel):
     ssl_certificate: Optional[SSLCertificate] = None
     redirected_url: Optional[str] = None
 
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    # class Config:
+    #     arbitrary_types_allowed = True
 
 ###############################
 # Scraping Models

@@ -9,6 +9,7 @@ from .profiles import BrowserProfileManager
 from .models import DockerConfig
 from .docker_registry import DockerRegistry
 from .docker_utils import DockerUtils
+from .browser_hub import BrowserHub
 from .strategies import (
     BaseBrowserStrategy,
     PlaywrightBrowserStrategy,
@@ -19,4 +20,4 @@ from .strategies import (
 
 __all__ = ['BrowserManager', 'BrowserProfileManager', 'DockerConfig', 'DockerRegistry', 'DockerUtils', 'BaseBrowserStrategy',
            'PlaywrightBrowserStrategy', 'CDPBrowserStrategy', 'BuiltinBrowserStrategy',
-           'DockerBrowserStrategy']
+           'DockerBrowserStrategy', 'BrowserHub']

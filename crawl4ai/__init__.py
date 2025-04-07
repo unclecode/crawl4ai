@@ -4,6 +4,12 @@ import warnings
 from .async_webcrawler import AsyncWebCrawler, CacheMode
 from .async_configs import BrowserConfig, CrawlerRunConfig, HTTPCrawlerConfig, LLMConfig
 
+from .pipeline.pipeline import (
+    Pipeline,
+    create_pipeline,
+)
+from .pipeline.crawler import Crawler
+
 from .content_scraping_strategy import (
     ContentScrapingStrategy,
     WebScrapingStrategy,
@@ -65,7 +71,14 @@ from .deep_crawling import (
     DeepCrawlDecorator,
 )
 
+from .async_crawler_strategy import AsyncPlaywrightCrawlerStrategy, AsyncHTTPCrawlerStrategy
+
 __all__ = [
+    "Pipeline",
+    "AsyncPlaywrightCrawlerStrategy",
+    "AsyncHTTPCrawlerStrategy",
+    "create_pipeline",
+    "Crawler",
     "AsyncLoggerBase",
     "AsyncLogger",
     "AsyncWebCrawler",
