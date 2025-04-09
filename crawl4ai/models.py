@@ -1,5 +1,6 @@
-from pydantic import BaseModel, HttpUrl, PrivateAttr
-from typing import List, Dict, Optional, Callable, Awaitable, Union, Any
+from __future__ import annotations
+from pydantic import BaseModel, HttpUrl, PrivateAttr, Field
+from typing import List, Dict, Optional, Callable, Awaitable, Union, Any, AsyncGenerator, Iterator, AsyncIterator
 from enum import Enum
 from dataclasses import dataclass
 from .ssl_certificate import SSLCertificate
@@ -42,26 +43,6 @@ class CrawlStatus(Enum):
     FAILED = "FAILED"
 
 
-# @dataclass
-# class CrawlStats:
-#     task_id: str
-#     url: str
-#     status: CrawlStatus
-#     start_time: Optional[datetime] = None
-#     end_time: Optional[datetime] = None
-#     memory_usage: float = 0.0
-#     peak_memory: float = 0.0
-#     error_message: str = ""
-
-#     @property
-#     def duration(self) -> str:
-#         if not self.start_time:
-#             return "0:00"
-#         end = self.end_time or datetime.now()
-#         duration = end - self.start_time
-#         return str(timedelta(seconds=int(duration.total_seconds())))
-
-
 @dataclass
 class CrawlStats:
     task_id: str
@@ -91,9 +72,9 @@ class CrawlStats:
         # Convert end_time to datetime if it's a float
         if isinstance(end, float):
             end = datetime.fromtimestamp(end)
-            
-        duration = end - start
-        return str(timedelta(seconds=int(duration.total_seconds())))
+
+        duration = end - start # pyright: ignore[reportOperatorIssue]
+        return str(timedelta(seconds=int(duration.total_seconds()))) # pyright: ignore[reportAttributeAccessIssue]
 
 
 class DisplayMode(Enum):
@@ -119,9 +100,9 @@ class UrlModel(BaseModel):
 
 
 class MarkdownGenerationResult(BaseModel):
-    raw_markdown: str
-    markdown_with_citations: str
-    references_markdown: str
+    raw_markdown: str = ""
+    markdown_with_citations: str = ""
+    references_markdown: str = ""
     fit_markdown: Optional[str] = None
     fit_html: Optional[str] = None
 
@@ -152,8 +133,8 @@ class CrawlResult(BaseModel):
     html: str
     success: bool
     cleaned_html: Optional[str] = None
-    media: Dict[str, List[Dict]] = {}
-    links: Dict[str, List[Dict]] = {}
+    media: Dict[str, List[Dict]] = Field(default_factory=dict)
+    links: Dict[str, List[Dict]] = Field(default_factory=dict)
     downloaded_files: Optional[List[str]] = None
     js_execution_result: Optional[Dict[str, Any]] = None
     screenshot: Optional[str] = None
@@ -172,26 +153,67 @@ class CrawlResult(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-# NOTE: The StringCompatibleMarkdown class, custom __init__ method, property getters/setters,
-# and model_dump override all exist to support a smooth transition from markdown as a string
-# to markdown as a MarkdownGenerationResult object, while maintaining backward compatibility.
-# 
-# This allows code that expects markdown to be a string to continue working, while also
-# providing access to the full MarkdownGenerationResult object's properties.
-# 
-# The markdown_v2 property is deprecated and raises an error directing users to use markdown.
-# 
-# When backward compatibility is no longer needed in future versions, this entire mechanism
-# can be simplified to a standard field with no custom accessors or serialization logic.
-    
-    def __init__(self, **data):
-        markdown_result = data.pop('markdown', None)
-        super().__init__(**data)
-        if markdown_result is not None:
+    # NOTE: The StringCompatibleMarkdown class, custom __init__ method, property getters/setters,
+    # and model_dump override all exist to support a smooth transition from markdown as a string
+    # to markdown as a MarkdownGenerationResult object, while maintaining backward compatibility.
+    #
+    # This allows code that expects markdown to be a string to continue working, while also
+    # providing access to the full MarkdownGenerationResult object's properties.
+    #
+    # The markdown_v2 property is deprecated and raises an error directing users to use markdown.
+    #
+    # When backward compatibility is no longer needed in future versions, this entire mechanism
+    # can be simplified to a standard field with no custom accessors or serialization logic.
+
+    def __init__(
+        self,
+        url: str,
+        html: str,
+        success: bool,
+        cleaned_html: Optional[str] = None,
+        media: Optional[Dict[str, List[Dict]]] = None,
+        links: Optional[Dict[str, List[Dict]]] = None,
+        downloaded_files: Optional[List[str]] = None,
+        js_execution_result: Optional[Dict[str, Any]] = None,
+        screenshot: Optional[str] = None,
+        pdf: Optional[bytes] = None,
+        markdown: Optional[Union[MarkdownGenerationResult, dict]] = None,
+        extracted_content: Optional[str] = None,
+        metadata: Optional[dict] = None,
+        error_message: Optional[str] = None,
+        session_id: Optional[str] = None,
+        response_headers: Optional[dict] = None,
+        status_code: Optional[int] = None,
+        ssl_certificate: Optional[SSLCertificate] = None,
+        dispatch_result: Optional[DispatchResult] = None,
+        redirected_url: Optional[str] = None
+    ):
+        super().__init__(
+            url=url,
+            html=html,
+            success=success,
+            cleaned_html=cleaned_html,
+            media=media if media is not None else {},
+            links=links if links is not None else {},
+            downloaded_files=downloaded_files,
+            js_execution_result=js_execution_result,
+            screenshot=screenshot,
+            pdf=pdf,
+            extracted_content=extracted_content,
+            metadata=metadata,
+            error_message=error_message,
+            session_id=session_id,
+            response_headers=response_headers,
+            status_code=status_code,
+            ssl_certificate=ssl_certificate,
+            dispatch_result=dispatch_result,
+            redirected_url=redirected_url
+        )
+        if markdown is not None:
             self._markdown = (
-                MarkdownGenerationResult(**markdown_result)
-                if isinstance(markdown_result, dict)
-                else markdown_result
+                MarkdownGenerationResult(**markdown)
+                if isinstance(markdown, dict)
+                else markdown
             )
     
     @property
@@ -279,10 +301,11 @@ class StringCompatibleMarkdown(str):
         return super().__new__(cls, markdown_result.raw_markdown)
     
     def __init__(self, markdown_result):
-        self._markdown_result = markdown_result
-    
+        self.markdown_result = markdown_result
+
     def __getattr__(self, name):
-        return getattr(self._markdown_result, name)
+        return getattr(self.markdown_result, name)
+
 
 # END of backward compatibility code for markdown/markdown_v2.
 # When removing this code in the future, make sure to:
@@ -319,6 +342,12 @@ class MediaItem(BaseModel):
     format: Optional[str] = None
     width: Optional[int] = None
 
+    def __init__(self, **data):
+        if "width" in data and data["width"] == "undefined":
+            data["width"] = None
+
+        super().__init__(**data)
+
 
 class Link(BaseModel):
     href: Optional[str] = ""
@@ -328,19 +357,19 @@ class Link(BaseModel):
 
 
 class Media(BaseModel):
-    images: List[MediaItem] = []
-    videos: List[
-        MediaItem
-    ] = []  # Using MediaItem model for now, can be extended with Video model if needed
-    audios: List[
-        MediaItem
-    ] = []  # Using MediaItem model for now, can be extended with Audio model if needed
-    tables: List[Dict] = []  # Table data extracted from HTML tables
+    images: List[MediaItem] = Field(default_factory=list)
+    videos: List[MediaItem] = Field(
+        default_factory=list
+    )  # Using MediaItem model for now, can be extended with Video model if needed
+    audios: List[MediaItem] = Field(
+        default_factory=list
+    )  # Using MediaItem model for now, can be extended with Audio model if needed
+    tables: List[Dict] = Field(default_factory=list)  # Table data extracted from HTML tables
 
 
 class Links(BaseModel):
-    internal: List[Link] = []
-    external: List[Link] = []
+    internal: List[Link] = Field(default_factory=list)
+    external: List[Link] = Field(default_factory=list)
 
 
 class ScrapingResult(BaseModel):
@@ -348,4 +377,4 @@ class ScrapingResult(BaseModel):
     success: bool
     media: Media = Media()
     links: Links = Links()
-    metadata: Dict[str, Any] = {}
+    metadata: Dict[str, Any] = Field(default_factory=dict)

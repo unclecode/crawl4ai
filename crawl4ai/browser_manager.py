@@ -6,7 +6,7 @@ import sys
 import shutil
 import tempfile
 import subprocess
-from playwright.async_api import BrowserContext
+from playwright.async_api import BrowserContext, async_playwright
 import hashlib
 from .js_snippet import load_js_script
 from .config import DOWNLOAD_PAGE_TIMEOUT
@@ -435,15 +435,6 @@ class BrowserManager:
         session_ttl (int): Session timeout in seconds
     """
 
-    _playwright_instance = None
-    
-    @classmethod
-    async def get_playwright(cls):
-        from playwright.async_api import async_playwright
-        if cls._playwright_instance is None:
-            cls._playwright_instance = await async_playwright().start()
-        return cls._playwright_instance    
-
     def __init__(self, browser_config: BrowserConfig, logger=None):
         """
         Initialize the BrowserManager with a browser configuration.
@@ -492,11 +483,8 @@ class BrowserManager:
 
         Note: This method should be called in a separate task to avoid blocking the main event loop.
         """
-        self.playwright  = await self.get_playwright()
-        if self.playwright is None:
-            from playwright.async_api import async_playwright
 
-            self.playwright = await async_playwright().start()
+        self.playwright = await async_playwright().start()
 
         if self.config.cdp_url or self.config.use_managed_browser:
             self.config.use_managed_browser = True
@@ -595,7 +583,7 @@ class BrowserManager:
     async def setup_context(
         self,
         context: BrowserContext,
-        crawlerRunConfig: CrawlerRunConfig = None,
+        crawlerRunConfig: Optional[CrawlerRunConfig] = None,
         is_default=False,
     ):
         """
@@ -621,7 +609,7 @@ class BrowserManager:
 
         Args:
             context (BrowserContext): The browser context to set up
-            crawlerRunConfig (CrawlerRunConfig): Configuration object containing all browser settings
+            crawlerRunConfig (CrawlerRunConfig or None): Configuration object containing all browser settings
             is_default (bool): Flag indicating if this is the default context
         Returns:
             None
@@ -673,9 +661,9 @@ class BrowserManager:
                 or crawlerRunConfig.simulate_user
                 or crawlerRunConfig.magic
             ):
-                await context.add_init_script(load_js_script("navigator_overrider"))        
+                await context.add_init_script(load_js_script("navigator_overrider"))
 
-    async def create_browser_context(self, crawlerRunConfig: CrawlerRunConfig = None):
+    async def create_browser_context(self, crawlerRunConfig: Optional[CrawlerRunConfig] = None):
         """
         Creates and returns a new browser context with configured settings.
         Applies text-only mode settings if text_mode is enabled in config.

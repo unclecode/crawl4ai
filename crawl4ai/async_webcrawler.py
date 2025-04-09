@@ -159,7 +159,7 @@ class AsyncWebCrawler:
             **kwargs: Additional arguments for backwards compatibility
         """
         # Handle browser configuration
-        browser_config = config or BrowserConfig()
+        browser_config = config or BrowserConfig.from_kwargs(kwargs)
 
         self.browser_config = browser_config
 
@@ -305,8 +305,8 @@ class AsyncWebCrawler:
         # Auto-start if not ready
         if not self.ready:
             await self.start()
-            
-        config = config or CrawlerRunConfig()
+
+        config = config or CrawlerRunConfig.from_kwargs(kwargs)
         if not isinstance(url, str) or not url:
             raise ValueError("Invalid URL, make sure the URL is a non-empty string")
 

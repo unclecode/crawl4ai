@@ -1,18 +1,19 @@
-import os, time
+import os
+import time
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 from pathlib import Path
 
-from .models import UrlModel, CrawlResult
+from ..models import UrlModel, CrawlResult
 from .database import init_db, get_cached_url, cache_url
-from .utils import *
-from .chunking_strategy import *
-from .extraction_strategy import *
-from .crawler_strategy import *
-from typing import List
+from ..utils import InvalidCSSSelectorError, format_html, sanitize_input_encode
+from ..chunking_strategy import ChunkingStrategy, RegexChunking
+from ..extraction_strategy import ExtractionStrategy, NoExtractionStrategy
+from .crawler_strategy import CrawlerStrategy, LocalSeleniumCrawlerStrategy
+from typing import List, Optional
 from concurrent.futures import ThreadPoolExecutor
-from .content_scraping_strategy import WebScrapingStrategy
-from .config import *
+from ..content_scraping_strategy import WebScrapingStrategy
+from ..config import DEFAULT_PROVIDER, IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD, MIN_WORD_THRESHOLD
 import warnings
 import json
 
@@ -25,7 +26,7 @@ warnings.filterwarnings(
 class WebCrawler:
     def __init__(
         self,
-        crawler_strategy: CrawlerStrategy = None,
+        crawler_strategy: Optional[CrawlerStrategy] = None,
         always_by_pass_cache: bool = False,
         verbose: bool = False,
     ):
@@ -57,13 +58,13 @@ class WebCrawler:
         self,
         url_model: UrlModel,
         provider: str = DEFAULT_PROVIDER,
-        api_token: str = None,
+        api_token: Optional[str] = None,
         extract_blocks_flag: bool = True,
         word_count_threshold=MIN_WORD_THRESHOLD,
-        css_selector: str = None,
+        css_selector: Optional[str] = None,
         screenshot: bool = False,
         use_cached_html: bool = False,
-        extraction_strategy: ExtractionStrategy = None,
+        extraction_strategy: Optional[ExtractionStrategy] = None,
         chunking_strategy: ChunkingStrategy = RegexChunking(),
         **kwargs,
     ) -> CrawlResult:
@@ -83,13 +84,13 @@ class WebCrawler:
         self,
         url_models: List[UrlModel],
         provider: str = DEFAULT_PROVIDER,
-        api_token: str = None,
+        api_token: Optional[str] = None,
         extract_blocks_flag: bool = True,
         word_count_threshold=MIN_WORD_THRESHOLD,
         use_cached_html: bool = False,
-        css_selector: str = None,
+        css_selector: Optional[str] = None,
         screenshot: bool = False,
-        extraction_strategy: ExtractionStrategy = None,
+        extraction_strategy: Optional[ExtractionStrategy] = None,
         chunking_strategy: ChunkingStrategy = RegexChunking(),
         **kwargs,
     ) -> List[CrawlResult]:
@@ -122,34 +123,38 @@ class WebCrawler:
         self,
         url: str,
         word_count_threshold=MIN_WORD_THRESHOLD,
-        extraction_strategy: ExtractionStrategy = None,
+        extraction_strategy: Optional[ExtractionStrategy] = None,
         chunking_strategy: ChunkingStrategy = RegexChunking(),
         bypass_cache: bool = False,
-        css_selector: str = None,
+        css_selector: Optional[str] = None,
         screenshot: bool = False,
-        user_agent: str = None,
+        user_agent: Optional[str] = None,
         verbose=True,
         **kwargs,
     ) -> CrawlResult:
         try:
             extraction_strategy = extraction_strategy or NoExtractionStrategy()
-            extraction_strategy.verbose = verbose
             if not isinstance(extraction_strategy, ExtractionStrategy):
                 raise ValueError("Unsupported extraction strategy")
+            extraction_strategy.verbose = verbose
+
             if not isinstance(chunking_strategy, ChunkingStrategy):
                 raise ValueError("Unsupported chunking strategy")
 
             word_count_threshold = max(word_count_threshold, MIN_WORD_THRESHOLD)
 
             cached = None
-            screenshot_data = None
-            extracted_content = None
+            screenshot_data: str = ""
+            extracted_content: str = ""
             if not bypass_cache and not self.always_by_pass_cache:
                 cached = get_cached_url(url)
 
             if kwargs.get("warmup", True) and not self.ready:
-                return None
+                raise ValueError(
+                    "WebCrawler is not ready. Please call the warmup method before crawling."
+                )
 
+            html: str = ""
             if cached:
                 html = sanitize_input_encode(cached[1])
                 extracted_content = sanitize_input_encode(cached[4])
@@ -200,8 +205,8 @@ class WebCrawler:
         word_count_threshold: int,
         extraction_strategy: ExtractionStrategy,
         chunking_strategy: ChunkingStrategy,
-        css_selector: str,
-        screenshot: bool,
+        css_selector: Optional[str],
+        screenshot: str,
         verbose: bool,
         is_cached: bool,
         **kwargs,
@@ -240,42 +245,19 @@ class WebCrawler:
         except InvalidCSSSelectorError as e:
             raise ValueError(str(e))
 
-        cleaned_html = sanitize_input_encode(result.get("cleaned_html", ""))
-        markdown = sanitize_input_encode(result.get("markdown", ""))
-        media = result.get("media", [])
-        links = result.get("links", [])
-        metadata = result.get("metadata", {})
-
-        if extracted_content is None:
-            if verbose:
-                print(
-                    f"[LOG] 🔥 Extracting semantic blocks for {url}, Strategy: {extraction_strategy.name}"
-                )
-
-            sections = chunking_strategy.chunk(markdown)
-            extracted_content = extraction_strategy.run(url, sections)
-            extracted_content = json.dumps(
-                extracted_content, indent=4, default=str, ensure_ascii=False
-            )
-
-            if verbose:
-                print(
-                    f"[LOG] 🚀 Extraction done for {url}, time taken: {time.time() - t:.2f} seconds."
-                )
-
-        screenshot = None if not screenshot else screenshot
+        cleaned_html = sanitize_input_encode(result.cleaned_html)
 
         if not is_cached:
             cache_url(
                 url,
                 html,
                 cleaned_html,
-                markdown,
+                "",
                 extracted_content,
                 True,
-                json.dumps(media),
-                json.dumps(links),
-                json.dumps(metadata),
+                json.dumps(result.media.model_dump()),
+                json.dumps(result.links.model_dump()),
+                json.dumps(result.metadata),
                 screenshot=screenshot,
             )
 
@@ -283,10 +265,9 @@ class WebCrawler:
             url=url,
             html=html,
             cleaned_html=format_html(cleaned_html),
-            markdown=markdown,
-            media=media,
-            links=links,
-            metadata=metadata,
+            media=result.media.model_dump(),
+            links=result.links.model_dump(),
+            metadata=result.metadata,
             screenshot=screenshot,
             extracted_content=extracted_content,
             success=True,
