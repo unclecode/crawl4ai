@@ -440,8 +440,7 @@ class BrowserManager:
     @classmethod
     async def get_playwright(cls):
         from playwright.async_api import async_playwright
-        if cls._playwright_instance is None:
-            cls._playwright_instance = await async_playwright().start()
+        cls._playwright_instance = await async_playwright().start()
         return cls._playwright_instance    
 
     def __init__(self, browser_config: BrowserConfig, logger=None):
@@ -492,7 +491,6 @@ class BrowserManager:
 
         Note: This method should be called in a separate task to avoid blocking the main event loop.
         """
-        self.playwright  = await self.get_playwright()
         if self.playwright is None:
             from playwright.async_api import async_playwright
 

@@ -365,6 +365,7 @@ class AsyncWebCrawler:
                     crawl_result.response_headers = async_response.response_headers
                     crawl_result.downloaded_files = async_response.downloaded_files
                     crawl_result.js_execution_result = js_execution_result
+                    crawl_result.mhtml = async_response.mhtml_data
                     crawl_result.ssl_certificate = (
                         async_response.ssl_certificate
                     )  # Add SSL certificate

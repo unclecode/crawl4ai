@@ -772,10 +772,12 @@ class CrawlerRunConfig():
         screenshot_wait_for: float = None,
         screenshot_height_threshold: int = SCREENSHOT_HEIGHT_TRESHOLD,
         pdf: bool = False,
+        capture_mhtml: bool = False,
         image_description_min_word_threshold: int = IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
         image_score_threshold: int = IMAGE_SCORE_THRESHOLD,
         table_score_threshold: int = 7,
         exclude_external_images: bool = False,
+        exclude_all_images: bool = False,
         # Link and Domain Handling Parameters
         exclude_social_media_domains: list = None,
         exclude_external_links: bool = False,
@@ -860,9 +862,11 @@ class CrawlerRunConfig():
         self.screenshot_wait_for = screenshot_wait_for
         self.screenshot_height_threshold = screenshot_height_threshold
         self.pdf = pdf
+        self.capture_mhtml = capture_mhtml
         self.image_description_min_word_threshold = image_description_min_word_threshold
         self.image_score_threshold = image_score_threshold
         self.exclude_external_images = exclude_external_images
+        self.exclude_all_images = exclude_all_images
         self.table_score_threshold = table_score_threshold
 
         # Link and Domain Handling Parameters
@@ -991,6 +995,7 @@ class CrawlerRunConfig():
                 "screenshot_height_threshold", SCREENSHOT_HEIGHT_TRESHOLD
             ),
             pdf=kwargs.get("pdf", False),
+            capture_mhtml=kwargs.get("capture_mhtml", False),
             image_description_min_word_threshold=kwargs.get(
                 "image_description_min_word_threshold",
                 IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
@@ -999,6 +1004,7 @@ class CrawlerRunConfig():
                 "image_score_threshold", IMAGE_SCORE_THRESHOLD
             ),
             table_score_threshold=kwargs.get("table_score_threshold", 7),
+            exclude_all_images=kwargs.get("exclude_all_images", False),
             exclude_external_images=kwargs.get("exclude_external_images", False),
             # Link and Domain Handling Parameters
             exclude_social_media_domains=kwargs.get(
@@ -1088,9 +1094,11 @@ class CrawlerRunConfig():
             "screenshot_wait_for": self.screenshot_wait_for,
             "screenshot_height_threshold": self.screenshot_height_threshold,
             "pdf": self.pdf,
+            "capture_mhtml": self.capture_mhtml,
             "image_description_min_word_threshold": self.image_description_min_word_threshold,
             "image_score_threshold": self.image_score_threshold,
             "table_score_threshold": self.table_score_threshold,
+            "exclude_all_images": self.exclude_all_images,
             "exclude_external_images": self.exclude_external_images,
             "exclude_social_media_domains": self.exclude_social_media_domains,
             "exclude_external_links": self.exclude_external_links,
