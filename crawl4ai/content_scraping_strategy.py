@@ -860,6 +860,12 @@ class WebScrapingStrategy(ContentScrapingStrategy):
         soup = BeautifulSoup(html, parser_type)
         body = soup.body
         base_domain = get_base_domain(url)
+        
+        # Early removal of all images if exclude_all_images is set
+        # This happens before any processing to minimize memory usage
+        if kwargs.get("exclude_all_images", False):
+            for img in body.find_all('img'):
+                img.decompose()
 
         try:
             meta = extract_metadata("", soup)
@@ -1491,6 +1497,13 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
             body = doc
 
             base_domain = get_base_domain(url)
+            
+            # Early removal of all images if exclude_all_images is set
+            # This is more efficient in lxml as we remove elements before any processing
+            if kwargs.get("exclude_all_images", False):
+                for img in body.xpath('//img'):
+                    if img.getparent() is not None:
+                        img.getparent().remove(img)
 
             # Add comment removal
             if kwargs.get("remove_comments", False):

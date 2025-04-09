@@ -15,6 +15,7 @@ class CrawlResult(BaseModel):
     downloaded_files: Optional[List[str]] = None
     screenshot: Optional[str] = None
     pdf : Optional[bytes] = None
+    mhtml: Optional[str] = None
     markdown: Optional[Union[str, MarkdownGenerationResult]] = None
     extracted_content: Optional[str] = None
     metadata: Optional[dict] = None
@@ -236,7 +237,16 @@ if result.pdf:
         f.write(result.pdf)
 ```
 
-### 5.5 **`metadata`** *(Optional[dict])*  
+### 5.5 **`mhtml`** *(Optional[str])*  
+**What**: MHTML snapshot of the page if `capture_mhtml=True` in `CrawlerRunConfig`. MHTML (MIME HTML) format preserves the entire web page with all its resources (CSS, images, scripts, etc.) in a single file.  
+**Usage**:
+```python
+if result.mhtml:
+    with open("page.mhtml", "w", encoding="utf-8") as f:
+        f.write(result.mhtml)
+```
+
+### 5.6 **`metadata`** *(Optional[dict])*  
 **What**: Page-level metadata if discovered (title, description, OG data, etc.).  
 **Usage**:
 ```python
@@ -304,11 +314,13 @@ async def handle_result(result: CrawlResult):
     if result.extracted_content:
         print("Structured data:", result.extracted_content)
     
-    # Screenshot/PDF
+    # Screenshot/PDF/MHTML
     if result.screenshot:
         print("Screenshot length:", len(result.screenshot))
     if result.pdf:
         print("PDF bytes length:", len(result.pdf))
+    if result.mhtml:
+        print("MHTML length:", len(result.mhtml))
 ```
 
 ---

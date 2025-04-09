@@ -836,13 +836,17 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 "before_return_html", page=page, html=html, context=context, config=config
             )
 
-            # Handle PDF and screenshot generation
+            # Handle PDF, MHTML and screenshot generation
             start_export_time = time.perf_counter()
             pdf_data = None
             screenshot_data = None
+            mhtml_data = None
 
             if config.pdf:
                 pdf_data = await self.export_pdf(page)
+
+            if config.capture_mhtml:
+                mhtml_data = await self.capture_mhtml(page)
 
             if config.screenshot:
                 if config.screenshot_wait_for:
@@ -851,9 +855,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     page, screenshot_height_threshold=config.screenshot_height_threshold
                 )
 
-            if screenshot_data or pdf_data:
+            if screenshot_data or pdf_data or mhtml_data:
                 self.logger.info(
-                    message="Exporting PDF and taking screenshot took {duration:.2f}s",
+                    message="Exporting media (PDF/MHTML/screenshot) took {duration:.2f}s",
                     tag="EXPORT",
                     params={"duration": time.perf_counter() - start_export_time},
                 )
@@ -876,6 +880,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 status_code=status_code,
                 screenshot=screenshot_data,
                 pdf_data=pdf_data,
+                mhtml_data=mhtml_data,
                 get_delayed_content=get_delayed_content,
                 ssl_certificate=ssl_cert,
                 downloaded_files=(
@@ -1052,6 +1057,70 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         """
         pdf_data = await page.pdf(print_background=True)
         return pdf_data
+        
+    async def capture_mhtml(self, page: Page) -> Optional[str]:
+        """
+        Captures the current page as MHTML using CDP.
+        
+        MHTML (MIME HTML) is a web page archive format that combines the HTML content 
+        with its resources (images, CSS, etc.) into a single MIME-encoded file.
+        
+        Args:
+            page (Page): The Playwright page object
+            
+        Returns:
+            Optional[str]: The MHTML content as a string, or None if there was an error
+        """
+        try:
+            # Ensure the page is fully loaded before capturing
+            try:
+                # Wait for DOM content and network to be idle
+                await page.wait_for_load_state("domcontentloaded", timeout=5000)
+                await page.wait_for_load_state("networkidle", timeout=5000)
+                
+                # Give a little extra time for JavaScript execution
+                await page.wait_for_timeout(1000)
+                
+                # Wait for any animations to complete
+                await page.evaluate("""
+                    () => new Promise(resolve => {
+                        // First requestAnimationFrame gets scheduled after the next repaint
+                        requestAnimationFrame(() => {
+                            // Second requestAnimationFrame gets called after all animations complete
+                            requestAnimationFrame(resolve);
+                        });
+                    })
+                """)
+            except Error as e:
+                if self.logger:
+                    self.logger.warning(
+                        message="Wait for load state timed out: {error}",
+                        tag="MHTML",
+                        params={"error": str(e)},
+                    )
+            
+            # Create a new CDP session
+            cdp_session = await page.context.new_cdp_session(page)
+            
+            # Call Page.captureSnapshot with format "mhtml"
+            result = await cdp_session.send("Page.captureSnapshot", {"format": "mhtml"})
+            
+            # The result contains a 'data' field with the MHTML content
+            mhtml_content = result.get("data")
+            
+            # Detach the CDP session to clean up resources
+            await cdp_session.detach()
+            
+            return mhtml_content
+        except Exception as e:
+            # Log the error but don't raise it - we'll just return None for the MHTML
+            if self.logger:
+                self.logger.error(
+                    message="Failed to capture MHTML: {error}",
+                    tag="MHTML",
+                    params={"error": str(e)},
+                )
+            return None
 
     async def take_screenshot(self, page, **kwargs) -> str:
         """

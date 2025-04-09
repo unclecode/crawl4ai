@@ -136,6 +136,7 @@ class CrawlerRunConfig:
         wait_for=None,
         screenshot=False,
         pdf=False,
+        capture_mhtml=False,
         enable_rate_limiting=False,
         rate_limit_config=None,
         memory_threshold_percent=70.0,
@@ -175,10 +176,9 @@ class CrawlerRunConfig:
    - A CSS or JS expression to wait for before extracting content.  
    - Common usage: `wait_for="css:.main-loaded"` or `wait_for="js:() => window.loaded === true"`.
 
-7. **`screenshot`** & **`pdf`**:  
-   - If `True`, captures a screenshot or PDF after the page is fully loaded.  
-   - The results go to `result.screenshot` (base64) or `result.pdf` (bytes).
-
+7. **`screenshot`**, **`pdf`**, & **`capture_mhtml`**:  
+   - If `True`, captures a screenshot, PDF, or MHTML snapshot after the page is fully loaded.  
+   - The results go to `result.screenshot` (base64), `result.pdf` (bytes), or `result.mhtml` (string).
 8. **`verbose`**:  
    - Logs additional runtime details.  
    - Overlaps with the browser’s verbosity if also set to `True` in `BrowserConfig`.
