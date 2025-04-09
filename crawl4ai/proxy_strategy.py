@@ -2,6 +2,7 @@ from typing import List, Dict, Optional
 from abc import ABC, abstractmethod
 from itertools import cycle
 import os
+from .validators import ProxyValidator
 
 
 class ProxyConfig:
@@ -26,6 +27,9 @@ class ProxyConfig:
         
         # Extract IP from server if not explicitly provided
         self.ip = ip or self._extract_ip_from_server()
+        
+        # Normalize proxy configuration
+        self._normalize_proxy_config()
     
     def _extract_ip_from_server(self) -> Optional[str]:
         """Extract IP address from server URL."""
@@ -39,7 +43,63 @@ class ProxyConfig:
                 return parts[0]
         except Exception:
             return None
-    
+
+    def _normalize_proxy_config(self):
+        """
+        Normalize proxy configuration to ensure consistency.
+        
+        Example:
+            proxy_config = {
+                "server": "http://user:pass@1.1.1.1:8090",
+                "username": "",
+                "password": "",
+            } ->
+            normalized_proxy_config = {
+                "server": "http://1.1.1.1:8090",
+                "username": "user",
+                "password": "pass",
+            }
+        """
+        if not self.server:
+            return self
+
+        from urllib.parse import urlparse, unquote
+
+        parsed = urlparse(self.server)
+
+        # urlparse("1.1.1.1:8090") -> scheme='', netloc='', path='1.1.1.1:8090'
+        # urlparse("localhost:8090") -> scheme='localhost', netloc='', path='8090'
+        # if both of these cases, we need to try re-parse URL with `http://` prefix.
+        if not parsed.netloc or not parsed.scheme:
+            parsed = urlparse(f"http://{self.server}")
+        
+        
+        username = self.username
+        password = self.password
+        # The server field takes precedence over username and password.
+        if "@" in parsed.netloc:
+            auth_part, host_part = parsed.netloc.split("@", 1)
+            if ":" in auth_part:
+                username, password = auth_part.split(":", 1)
+                username = unquote(username)
+                password = unquote(password)
+            else:
+                username = unquote(auth_part)
+
+                password = ""
+            server = f"{parsed.scheme}://{host_part}"
+        else:
+            server = f"{parsed.scheme}://{parsed.netloc}"
+
+        self.server = server
+        self.username = username
+        self.password = password
+
+        # Validate the proxy string
+        ProxyValidator().validate(self.server)
+
+        return self
+
     @staticmethod
     def from_string(proxy_str: str) -> "ProxyConfig":
         """Create a ProxyConfig from a string in the format 'ip:port:username:password'."""
@@ -69,7 +129,7 @@ class ProxyConfig:
             username=proxy_dict.get("username"),
             password=proxy_dict.get("password"),
             ip=proxy_dict.get("ip")
-        )
+        )._normalize_proxy_config()
     
     @staticmethod
     def from_env(env_var: str = "PROXIES") -> List["ProxyConfig"]:
@@ -113,7 +173,6 @@ class ProxyConfig:
         config_dict = self.to_dict()
         config_dict.update(kwargs)
         return ProxyConfig.from_dict(config_dict)
-
 
 class ProxyRotationStrategy(ABC):
     """Base abstract class for proxy rotation strategies"""

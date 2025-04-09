@@ -22,3 +22,4 @@ nltk>=3.9.1
 rich>=13.9.4
 cssselect>=1.2.0
 faust-cchardet>=2.1.19
+PySocks @ git+https://github.com/amirasaran/PySocks.git@3da955fd212ce02c3ab3bc166b5bfac3c91b4019
