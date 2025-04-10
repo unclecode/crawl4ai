@@ -442,7 +442,7 @@ def create_box_message(
     Returns:
         str: A formatted string containing the styled message box.
     """
-    # Initialize colorama if it's not already initialized
+    # Initialize colorama for colorful terminal input if it's not already initialized
     init_colorama_safe()
 
     # Define border and text colors for different types
@@ -2483,6 +2483,12 @@ def profile_and_time(func):
     return wrapper
 
 def init_colorama_safe():
+    """
+    Initialize colorama safely to avoid re-initialization errors. Indeed, every time
+    colorama is imported, it wraps the sys.stdout and sys.stderr streams. This can cause issues
+    if colorama is imported multiple times in different modules or contexts.
+    """
+    # Attribute "_already_initialized" is used as a guard to prevent re-initialization
     if not hasattr(colorama, "_already_initialized"):
         if USE_COLORED_SHELL:
             colorama.init()

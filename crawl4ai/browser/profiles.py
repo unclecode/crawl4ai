@@ -33,7 +33,7 @@ class BrowserProfileManager:
         Args:
             logger: Logger for outputting messages. If None, a default AsyncLogger is created.
         """
-        # Initialize colorama if it's not already initialized
+        # Initialize colorama for colorful terminal input if it's not already initialized
         init_colorama_safe()
         
         # Create a logger if not provided
