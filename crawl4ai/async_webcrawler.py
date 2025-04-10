@@ -2,7 +2,6 @@ from .__version__ import __version__ as crawl4ai_version
 import os
 import sys
 import time
-from colorama import Fore
 from pathlib import Path
 from typing import Optional, List
 import json
@@ -382,8 +381,8 @@ class AsyncWebCrawler:
                             "timing": f"{time.perf_counter() - start_time:.2f}s",
                         },
                         colors={
-                            "status": Fore.GREEN if crawl_result.success else Fore.RED,
-                            "timing": Fore.YELLOW,
+                            "status": "green" if crawl_result.success else "red",
+                            "timing": "yellow",
                         },
                     )
 
@@ -402,7 +401,7 @@ class AsyncWebCrawler:
                             "status": True,
                             "timing": f"{time.perf_counter() - start_time:.2f}s",
                         },
-                        colors={"status": Fore.GREEN, "timing": Fore.YELLOW},
+                        colors={"status": "green", "timing": "yellow"},
                     )
 
                     cached_result.success = bool(html)
@@ -422,7 +421,7 @@ class AsyncWebCrawler:
 
                 self.logger.error_status(
                     url=url,
-                    error=create_box_message(error_message, type="error"),
+                    error=error_message,
                     tag="ERROR",
                 )
 

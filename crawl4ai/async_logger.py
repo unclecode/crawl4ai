@@ -1,9 +1,11 @@
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Optional, Dict, Any
-from colorama import Fore, Style, init
+from typing import Optional, Dict, Any, List
 import os
 from datetime import datetime
+from rich.console import Console
+from rich.text import Text
+from .utils import create_box_message
 
 
 class LogLevel(Enum):
@@ -13,6 +15,8 @@ class LogLevel(Enum):
     WARNING = 4
     ERROR = 5
 
+    def __str__(self):
+        return self.name.lower()
 
 
 class AsyncLoggerBase(ABC):
@@ -64,11 +68,11 @@ class AsyncLogger(AsyncLoggerBase):
     }
 
     DEFAULT_COLORS = {
-        LogLevel.DEBUG: Fore.LIGHTBLACK_EX,
-        LogLevel.INFO: Fore.CYAN,
-        LogLevel.SUCCESS: Fore.GREEN,
-        LogLevel.WARNING: Fore.YELLOW,
-        LogLevel.ERROR: Fore.RED,
+        LogLevel.DEBUG: "lightblack",
+        LogLevel.INFO: "cyan",
+        LogLevel.SUCCESS: "green",
+        LogLevel.WARNING: "yellow",
+        LogLevel.ERROR: "red",
     }
 
     def __init__(
@@ -91,13 +95,13 @@ class AsyncLogger(AsyncLoggerBase):
             colors: Custom colors for different log levels
             verbose: Whether to output to console
         """
-        init()  # Initialize colorama
         self.log_file = log_file
         self.log_level = log_level
         self.tag_width = tag_width
         self.icons = icons or self.DEFAULT_ICONS
         self.colors = colors or self.DEFAULT_COLORS
         self.verbose = verbose
+        self.console = Console()
 
         # Create log file directory if needed
         if log_file:
@@ -114,16 +118,11 @@ class AsyncLogger(AsyncLoggerBase):
     def _write_to_file(self, message: str):
         """Write a message to the log file if configured."""
         if self.log_file:
+            text = Text.from_markup(message)
+            plain_text = text.plain
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
             with open(self.log_file, "a", encoding="utf-8") as f:
-                # Strip ANSI color codes for file output
-                clean_message = message.replace(Fore.RESET, "").replace(
-                    Style.RESET_ALL, ""
-                )
-                for color in vars(Fore).values():
-                    if isinstance(color, str):
-                        clean_message = clean_message.replace(color, "")
-                f.write(f"[{timestamp}] {clean_message}\n")
+                f.write(f"[{timestamp}] {plain_text}\n")
 
     def _log(
         self,
@@ -132,6 +131,7 @@ class AsyncLogger(AsyncLoggerBase):
         tag: str,
         params: Optional[Dict[str, Any]] = None,
         colors: Optional[Dict[str, str]] = None,
+        boxes: Optional[List[str]] = None,
         base_color: Optional[str] = None,
         **kwargs,
     ):
@@ -144,55 +144,41 @@ class AsyncLogger(AsyncLoggerBase):
             tag: Tag for the message
             params: Parameters to format into the message
             colors: Color overrides for specific parameters
+            boxes: Box overrides for specific parameters
             base_color: Base color for the entire message
         """
         if level.value < self.log_level.value:
             return
 
-        # Format the message with parameters if provided
+        # avoid conflict with rich formatting
+        parsed_message = message.replace("[", "[[").replace("]", "]]")
+        raw_message = message.format(**params) if params else message
         if params:
-            try:
-                # First format the message with raw parameters
-                formatted_message = message.format(**params)
-
-                # Then apply colors if specified
-                color_map = {
-                    "green": Fore.GREEN,
-                    "red": Fore.RED,
-                    "yellow": Fore.YELLOW,
-                    "blue": Fore.BLUE,
-                    "cyan": Fore.CYAN,
-                    "magenta": Fore.MAGENTA,
-                    "white": Fore.WHITE,
-                    "black": Fore.BLACK,
-                    "reset": Style.RESET_ALL,
-                }
-                if colors:
-                    for key, color in colors.items():
-                        # Find the formatted value in the message and wrap it with color
-                        if color in color_map:
-                            color = color_map[color]
-                        if key in params:
-                            value_str = str(params[key])
-                            formatted_message = formatted_message.replace(
-                                value_str, f"{color}{value_str}{Style.RESET_ALL}"
-                            )
-
-            except KeyError as e:
-                formatted_message = (
-                    f"LOGGING ERROR: Missing parameter {e} in message template"
-                )
-                level = LogLevel.ERROR
+            formatted_message = parsed_message.format(**params)
+            for key, value in params.items():
+                # value_str may discard `[` and `]`, so we need to replace it. 
+                value_str = str(value).replace("[", "[[").replace("]", "]]")
+                # check is need apply color
+                if colors and key in colors:
+                    color_str = f"[{colors[key]}]{value_str}[/{colors[key]}]"
+                    formatted_message = formatted_message.replace(value_str, color_str)
+                    value_str = color_str
+                
+                # check is need apply box
+                if boxes and key in boxes:
+                    formatted_message = formatted_message.replace(value_str, 
+                        create_box_message(value_str, type=str(level)))
+            
         else:
-            formatted_message = message
+            formatted_message = parsed_message
 
         # Construct the full log line
         color = base_color or self.colors[level]
-        log_line = f"{color}{self._format_tag(tag)} {self._get_icon(tag)} {formatted_message}{Style.RESET_ALL}"
+        log_line = f"[{color}]{self._format_tag(tag)} {self._get_icon(tag)} {formatted_message} [/{color}]"
 
         # Output to console if verbose
         if self.verbose or kwargs.get("force_verbose", False):
-            print(log_line)
+            self.console.print(log_line)
 
         # Write to file if configured
         self._write_to_file(log_line)
@@ -246,8 +232,8 @@ class AsyncLogger(AsyncLoggerBase):
                 "timing": timing,
             },
             colors={
-                "status": Fore.GREEN if success else Fore.RED,
-                "timing": Fore.YELLOW,
+                "status": "green" if success else "red",
+                "timing": "yellow",
             },
         )
 
@@ -268,6 +254,7 @@ class AsyncLogger(AsyncLoggerBase):
             message="{url:.{url_length}}... | Error: {error}",
             tag=tag,
             params={"url": url, "url_length": url_length, "error": error},
+            boxes=["error"],
         )
 
 class AsyncFileLogger(AsyncLoggerBase):
