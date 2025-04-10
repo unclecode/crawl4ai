@@ -787,6 +787,9 @@ class CrawlerRunConfig():
         # Debugging and Logging Parameters
         verbose: bool = True,
         log_console: bool = False,
+        # Network and Console Capturing Parameters
+        capture_network_requests: bool = False,
+        capture_console_messages: bool = False,
         # Connection Parameters
         method: str = "GET",
         stream: bool = False,
@@ -881,6 +884,10 @@ class CrawlerRunConfig():
         # Debugging and Logging Parameters
         self.verbose = verbose
         self.log_console = log_console
+        
+        # Network and Console Capturing Parameters
+        self.capture_network_requests = capture_network_requests
+        self.capture_console_messages = capture_console_messages
 
         # Connection Parameters
         self.stream = stream
@@ -1017,6 +1024,9 @@ class CrawlerRunConfig():
             # Debugging and Logging Parameters
             verbose=kwargs.get("verbose", True),
             log_console=kwargs.get("log_console", False),
+            # Network and Console Capturing Parameters
+            capture_network_requests=kwargs.get("capture_network_requests", False),
+            capture_console_messages=kwargs.get("capture_console_messages", False),
             # Connection Parameters
             method=kwargs.get("method", "GET"),
             stream=kwargs.get("stream", False),
@@ -1107,6 +1117,8 @@ class CrawlerRunConfig():
             "exclude_internal_links": self.exclude_internal_links,
             "verbose": self.verbose,
             "log_console": self.log_console,
+            "capture_network_requests": self.capture_network_requests,
+            "capture_console_messages": self.capture_console_messages,
             "method": self.method,
             "stream": self.stream,
             "check_robots_txt": self.check_robots_txt,

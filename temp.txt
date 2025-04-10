@@ -1,3 +1,0 @@
-7. **`screenshot`**, **`pdf`**, & **`capture_mhtml`**:  
-   - If `True`, captures a screenshot, PDF, or MHTML snapshot after the page is fully loaded.  
-   - The results go to `result.screenshot` (base64), `result.pdf` (bytes), or `result.mhtml` (string).

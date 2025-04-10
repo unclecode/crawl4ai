@@ -366,9 +366,10 @@ class AsyncWebCrawler:
                     crawl_result.downloaded_files = async_response.downloaded_files
                     crawl_result.js_execution_result = js_execution_result
                     crawl_result.mhtml = async_response.mhtml_data
-                    crawl_result.ssl_certificate = (
-                        async_response.ssl_certificate
-                    )  # Add SSL certificate
+                    crawl_result.ssl_certificate = async_response.ssl_certificate
+                    # Add captured network and console data if available
+                    crawl_result.network_requests = async_response.network_requests
+                    crawl_result.console_messages = async_response.console_messages
 
                     crawl_result.success = bool(html)
                     crawl_result.session_id = getattr(config, "session_id", None)
