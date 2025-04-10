@@ -38,7 +38,7 @@ First, clone the repository and build the Docker image:
 ```bash
 # Clone the repository
 git clone https://github.com/unclecode/crawl4ai.git
-cd crawl4ai/deploy
+cd crawl4ai
 
 # Build the Docker image
 docker build --platform=linux/amd64 --no-cache -t crawl4ai .
