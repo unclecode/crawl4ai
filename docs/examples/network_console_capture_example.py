@@ -357,8 +357,7 @@ async def demo_performance_analysis():
     async with AsyncWebCrawler() as crawler:
         config = CrawlerRunConfig(
             capture_network_requests=True,
-            wait_until="networkidle",
-            page_timeout=60000  # 60 seconds
+            page_timeout=60 * 2 * 1000  # 120 seconds
         )
         
         result = await crawler.arun(
@@ -402,6 +401,13 @@ async def demo_performance_analysis():
                     if isinstance(timing, dict) and "requestTime" in timing and "receiveHeadersEnd" in timing:
                         # Convert to milliseconds
                         duration = (timing["receiveHeadersEnd"] - timing["requestTime"]) * 1000
+                        resource_timings[resource_type].append({
+                            "url": url,
+                            "duration_ms": duration
+                        })
+                    if isinstance(timing, dict) and "requestStart" in timing and "responseStart" in timing and "startTime" in timing:
+                        # Convert to milliseconds
+                        duration = (timing["responseStart"] - timing["requestStart"]) * 1000
                         resource_timings[resource_type].append({
                             "url": url,
                             "duration_ms": duration
@@ -455,14 +461,14 @@ async def main():
     os.makedirs(os.path.join(__cur_dir__, "tmp"), exist_ok=True)
     
     # Run basic examples
-    await demo_basic_network_capture()
+    # await demo_basic_network_capture()
     await demo_basic_console_capture()
-    await demo_combined_capture()
+    # await demo_combined_capture()
     
     # Run advanced examples
-    await analyze_spa_network_traffic()
-    await demo_security_analysis()
-    await demo_performance_analysis()
+    # await analyze_spa_network_traffic()
+    # await demo_security_analysis()
+    # await demo_performance_analysis()
     
     print("\n=== Examples Complete ===")
     print(f"Check the tmp directory for output files: {os.path.join(__cur_dir__, 'tmp')}")

@@ -409,7 +409,11 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
         user_agent = kwargs.get("user_agent", self.user_agent)
         # Use browser_manager to get a fresh page & context assigned to this session_id
-        page, context = await self.browser_manager.get_page(session_id, user_agent)
+        page, context = await self.browser_manager.get_page(CrawlerRunConfig(
+            session_id=session_id,
+            user_agent=user_agent,
+            **kwargs,
+        ))
         return session_id
 
     async def crawl(
@@ -447,12 +451,17 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 html = f.read()
             if config.screenshot:
                 screenshot_data = await self._generate_screenshot_from_html(html)
+            if config.capture_console_messages:
+                page, context = await self.browser_manager.get_page(crawlerRunConfig=config)
+                captured_console = await self._capture_console_messages(page, url)
+
             return AsyncCrawlResponse(
                 html=html,
                 response_headers=response_headers,
                 status_code=status_code,
                 screenshot=screenshot_data,
                 get_delayed_content=None,
+                console_messages=captured_console,
             )
 
         elif url.startswith("raw:") or url.startswith("raw://"):
@@ -582,7 +591,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         "url": request.url,
                         "method": request.method,
                         "resource_type": request.resource_type,
-                        "failure_text": request.failure.error_text if request.failure else "Unknown failure",
+                        "failure_text": str(request.failure) if request.failure else "Unknown failure",
                         "timestamp": time.time()
                     })
                  except Exception as e:
@@ -1274,6 +1283,42 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 )
             return None
 
+    async def _capture_console_messages(
+        self, page: Page, file_path: str
+    ) -> List[Dict[str, Union[str, float]]]:
+        """
+        Captures console messages from the page.
+        Args:
+
+            page (Page): The Playwright page object
+        Returns:
+            List[Dict[str, Union[str, float]]]: A list of captured console messages
+        """
+        captured_console = []
+
+        def handle_console_message(msg):
+            try:
+                message_type = msg.type
+                message_text = msg.text
+
+                entry = {
+                    "type": message_type,
+                    "text": message_text,
+                    "timestamp": time.time(),
+                }
+                captured_console.append(entry)
+            except Exception as e:
+                if self.logger:
+                    self.logger.warning(
+                        f"Error capturing console message: {e}", tag="CAPTURE"
+                    )
+
+        page.on("console", handle_console_message)
+        
+        await page.goto(file_path)
+
+        return captured_console
+        
     async def take_screenshot(self, page, **kwargs) -> str:
         """
         Take a screenshot of the current page.

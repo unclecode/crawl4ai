@@ -1,15 +1,31 @@
-# Base configuration (not a service, just a reusable config block)
+# docker-compose.yml
+# This file is in the root directory alongside Dockerfile
+
+# Base configuration anchor for reusability
 x-base-config: &base-config
   ports:
+    # Map host port 11235 to container port 11235 (where Gunicorn will listen)
     - "11235:11235"
-    - "8000:8000"
-    - "9222:9222"
-    - "8080:8080"
+    # - "8080:8080" # Uncomment if needed
+
+  # Load API keys primarily from .llm.env file
+  # Create .llm.env in the root directory from deploy/docker/.llm.env.example
+  env_file:
+    - .llm.env
+
+  # Define environment variables, allowing overrides from host environment
+  # Syntax ${VAR:-} uses host env var 'VAR' if set, otherwise uses value from .llm.env
   environment:
-    - CRAWL4AI_API_TOKEN=${CRAWL4AI_API_TOKEN:-}
     - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-    - CLAUDE_API_KEY=${CLAUDE_API_KEY:-}
+    - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+    - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    - GROQ_API_KEY=${GROQ_API_KEY:-}
+    - TOGETHER_API_KEY=${TOGETHER_API_KEY:-}
+    - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
+    - GEMINI_API_TOKEN=${GEMINI_API_TOKEN:-}
+
   volumes:
+    # Mount /dev/shm for Chromium/Playwright performance
     - /dev/shm:/dev/shm
   deploy:
     resources:
@@ -19,47 +35,47 @@ x-base-config: &base-config
         memory: 1G
   restart: unless-stopped
   healthcheck:
+    # IMPORTANT: Ensure Gunicorn binds to 11235 in supervisord.conf
     test: ["CMD", "curl", "-f", "http://localhost:11235/health"]
     interval: 30s
     timeout: 10s
     retries: 3
-    start_period: 40s
+    start_period: 40s # Give the server time to start
+  # Run the container as the non-root user defined in the Dockerfile
+  user: "appuser"
 
 services:
-  # Local build services for different platforms
-  crawl4ai-amd64:
+  # --- Local Build Services ---
+  crawl4ai-local-amd64:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: . # Build context is the root directory
+      dockerfile: Dockerfile # Dockerfile is in the root directory
       args:
-        PYTHON_VERSION: "3.10"
-        INSTALL_TYPE: ${INSTALL_TYPE:-basic}
-        ENABLE_GPU: false
-      platforms:
-        - linux/amd64
+        INSTALL_TYPE: ${INSTALL_TYPE:-default}
+        ENABLE_GPU: ${ENABLE_GPU:-false}
+        # PYTHON_VERSION arg is omitted as it's fixed by 'FROM python:3.10-slim' in Dockerfile
+    platform: linux/amd64
     profiles: ["local-amd64"]
-    <<: *base-config  # extends yerine doğrudan yapılandırmayı dahil ettik
+    <<: *base-config # Inherit base configuration
 
-  crawl4ai-arm64:
+  crawl4ai-local-arm64:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: . # Build context is the root directory
+      dockerfile: Dockerfile # Dockerfile is in the root directory
       args:
-        PYTHON_VERSION: "3.10"
-        INSTALL_TYPE: ${INSTALL_TYPE:-basic}
-        ENABLE_GPU: false
-      platforms:
-        - linux/arm64
+        INSTALL_TYPE: ${INSTALL_TYPE:-default}
+        ENABLE_GPU: ${ENABLE_GPU:-false}
+    platform: linux/arm64
     profiles: ["local-arm64"]
     <<: *base-config
 
-  # Hub services for different platforms and versions
+  # --- Docker Hub Image Services ---
   crawl4ai-hub-amd64:
-    image: unclecode/crawl4ai:${VERSION:-basic}-amd64
+    image: unclecode/crawl4ai:${VERSION:-latest}-amd64
     profiles: ["hub-amd64"]
     <<: *base-config
 
   crawl4ai-hub-arm64:
-    image: unclecode/crawl4ai:${VERSION:-basic}-arm64
+    image: unclecode/crawl4ai:${VERSION:-latest}-arm64
     profiles: ["hub-arm64"]
     <<: *base-config
