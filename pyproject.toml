@@ -96,3 +96,24 @@ crawl4ai = { workspace = true }
 dev = [
     "crawl4ai",
 ]
+
+[tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = "function" # Prevent deprecation warning
+# Disable deprecation warnings for code we don't control.
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "default::DeprecationWarning:__main__",
+    "default::DeprecationWarning:crawl4ai.*",
+]
+timeout = 20
+timeout_func_only = true
+
+# Basic configuration for the `ruff` tool to preserve basic formatting.
+[tool.ruff]
+line-length = 120
+target-version = "py39"
+
+# As a temporary workaround, exclude all files from ruff formatting as the
+# code base has various code style and would introduce a lot of noise.
+[tool.ruff.format]
+exclude = ["*.py"]
