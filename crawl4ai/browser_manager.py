@@ -658,7 +658,7 @@ class BrowserManager:
                     "name": "cookiesEnabled",
                     "value": "true",
                     "url": crawlerRunConfig.url
-                    if crawlerRunConfig
+                    if crawlerRunConfig and crawlerRunConfig.url
                     else "https://crawl4ai.com/",
                 }
             ]
