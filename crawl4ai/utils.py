@@ -11,7 +11,8 @@ from .prompts import PROMPT_EXTRACT_BLOCKS
 from array import array
 from .html2text import html2text, CustomHTML2Text
 # from .config import *
-from .config import MIN_WORD_THRESHOLD, IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD, IMAGE_SCORE_THRESHOLD, DEFAULT_PROVIDER, PROVIDER_MODELS
+from .config import MIN_WORD_THRESHOLD, IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD, IMAGE_SCORE_THRESHOLD, \
+    DEFAULT_PROVIDER, PROVIDER_MODELS, USE_COLORED_SHELL
 import httpx
 from socket import gaierror
 from pathlib import Path
@@ -20,7 +21,8 @@ from urllib.parse import urljoin
 import requests
 from requests.exceptions import InvalidSchema
 import xxhash
-from colorama import Fore, Style, init
+import colorama
+from colorama import Fore, Style
 import textwrap
 import cProfile
 import pstats
@@ -440,8 +442,8 @@ def create_box_message(
     Returns:
         str: A formatted string containing the styled message box.
     """
-
-    init()
+    # Initialize colorama if it's not already initialized
+    init_colorama_safe()
 
     # Define border and text colors for different types
     styles = {
@@ -2480,6 +2482,11 @@ def profile_and_time(func):
 
     return wrapper
 
+def init_colorama_safe():
+    if not hasattr(colorama, "_already_initialized"):
+        if USE_COLORED_SHELL:
+            colorama.init()
+        colorama._already_initialized = True
 
 def generate_content_hash(content: str) -> str:
     """Generate a unique hash for content"""

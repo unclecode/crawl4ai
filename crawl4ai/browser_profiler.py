@@ -16,12 +16,12 @@ import json
 import subprocess
 import time
 from typing import List, Dict, Optional, Any, Tuple
-from colorama import Fore, Style, init
+from colorama import Fore, Style
 
 from .async_configs import BrowserConfig
 from .browser_manager import ManagedBrowser
 from .async_logger import AsyncLogger, AsyncLoggerBase
-from .utils import get_home_folder
+from .utils import get_home_folder, init_colorama_safe
 
 
 class BrowserProfiler:
@@ -45,8 +45,8 @@ class BrowserProfiler:
             logger (AsyncLoggerBase, optional): Logger for outputting messages.
                 If None, a default AsyncLogger will be created.
         """
-        # Initialize colorama for colorful terminal output
-        init()
+        # Initialize colorama if it's not already initialized
+        init_colorama_safe()
         
         # Create a logger if not provided
         if logger is None:
