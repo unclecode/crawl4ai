@@ -1,36 +1,47 @@
+from __future__ import annotations
+
 import time
 import uuid
 import threading
+import errno
 import psutil
-from datetime import datetime, timedelta
-from typing import Dict, Optional, List
-import threading
+import sys
+from datetime import timedelta
+from typing import Dict, Optional
 from rich.console import Console
 from rich.layout import Layout
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 from rich.live import Live
-from rich import box
 from ..models import CrawlStatus
 
 class TerminalUI:
     """Terminal user interface for CrawlerMonitor using rich library."""
-    
-    def __init__(self, refresh_rate: float = 1.0, max_width: int = 120):
+
+    def __init__(self, monitor: CrawlerMonitor, refresh_rate: float = 1.0, max_width: int = 120):
         """
         Initialize the terminal UI.
         
         Args:
             refresh_rate: How often to refresh the UI (in seconds)
             max_width: Maximum width of the UI in characters
+
+        Raises:
+            OSError: If sys.stdin is not a terminal.
         """
+        if not sys.stdin.isatty():
+            # Can't set cbreak mode if stdin is not a terminal, such as running in pytest.
+            # We check early as the UI loop runs in a separate thread, which would hang
+            # if we try to set cbreak mode later.
+            raise OSError(errno.ENOTTY, "stdin is not a terminal")
+
         self.console = Console(width=max_width)
         self.layout = Layout()
         self.refresh_rate = refresh_rate
         self.stop_event = threading.Event()
         self.ui_thread = None
-        self.monitor = None  # Will be set by CrawlerMonitor
+        self.monitor: CrawlerMonitor = monitor
         self.max_width = max_width
         
         # Setup layout - vertical layout (top to bottom)
@@ -40,10 +51,9 @@ class TerminalUI:
             Layout(name="task_details", ratio=1),
             Layout(name="footer", size=3)  # Increased footer size to fit all content
         )
-        
-    def start(self, monitor):
+
+    def start(self):
         """Start the UI thread."""
-        self.monitor = monitor
         self.stop_event.clear()
         self.ui_thread = threading.Thread(target=self._ui_loop)
         self.ui_thread.daemon = True
@@ -358,7 +368,7 @@ class CrawlerMonitor:
         self,
         urls_total: int = 0,
         refresh_rate: float = 1.0,
-        enable_ui: bool = True,
+        enable_ui: Optional[bool] = None,
         max_width: int = 120
     ):
         """
@@ -401,12 +411,13 @@ class CrawlerMonitor:
         self._lock = threading.RLock()
         
         # Terminal UI
-        self.enable_ui = enable_ui
+        self.enable_ui = sys.stdin.isatty() if enable_ui is None else enable_ui
         self.terminal_ui = TerminalUI(
-            refresh_rate=refresh_rate, 
+            monitor=self,
+            refresh_rate=refresh_rate,
             max_width=max_width
-        ) if enable_ui else None
-    
+        ) if self.enable_ui else None
+
     def start(self):
         """
         Start the monitoring session.
@@ -421,8 +432,8 @@ class CrawlerMonitor:
             
             # Start the terminal UI
             if self.enable_ui and self.terminal_ui:
-                self.terminal_ui.start(self)
-    
+                self.terminal_ui.start()
+
     def stop(self):
         """
         Stop the monitoring session.

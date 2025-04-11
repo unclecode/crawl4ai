@@ -1,3 +1,5 @@
+import json
+
 from crawl4ai.hub import BaseCrawler
 
 __meta__ = {
@@ -8,7 +10,7 @@ __meta__ = {
 }
 
 class AmazonProductCrawler(BaseCrawler):
-    async def run(self, url: str, **kwargs) -> str:
+    async def run(self, url: str = "", **kwargs) -> str:
         try:
             self.logger.info(f"Crawling {url}")
             return '{"product": {"name": "Test Amazon Product"}}'

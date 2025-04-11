@@ -5,14 +5,12 @@ from datetime import datetime
 from typing import AsyncGenerator, Optional, Set, Dict, List, Tuple
 from urllib.parse import urlparse
 
-from ..models import TraversalStats
+from ..models import TraversalStats, CrawlResultContainer
 from .filters import FilterChain
 from .scorers import URLScorer
 from . import DeepCrawlStrategy
 
-from ..types import AsyncWebCrawler, CrawlerRunConfig, CrawlResult, RunManyReturn
-
-from math import inf as infinity
+from ..types import AsyncWebCrawler, CrawlerRunConfig, CrawlResult
 
 # Configurable batch size for processing items from the priority queue
 BATCH_SIZE = 10
@@ -38,7 +36,7 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
         filter_chain: FilterChain = FilterChain(),
         url_scorer: Optional[URLScorer] = None,
         include_external: bool = False,
-        max_pages: int = infinity,
+        max_pages: int = -1,
         logger: Optional[logging.Logger] = None,
     ):
         self.max_depth = max_depth
@@ -62,8 +60,6 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
                 raise ValueError("Missing scheme or netloc")
             if parsed.scheme not in ("http", "https"):
                 raise ValueError("Invalid scheme")
-            if "." not in parsed.netloc:
-                raise ValueError("Invalid domain")
         except Exception as e:
             self.logger.warning(f"Invalid URL: {url}, error: {e}")
             return False
@@ -92,10 +88,12 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
             return
             
         # If we've reached the max pages limit, don't discover new links
-        remaining_capacity = self.max_pages - self._pages_crawled
-        if remaining_capacity <= 0:
-            self.logger.info(f"Max pages limit ({self.max_pages}) reached, stopping link discovery")
-            return
+        remaining_capacity: int = -1
+        if self.max_pages > 0:
+            remaining_capacity = self.max_pages - self._pages_crawled
+            if remaining_capacity <= 0:
+                self.logger.info(f"Max pages limit ({self.max_pages}) reached, stopping link discovery")
+                return
 
         # Retrieve internal links; include external links if enabled.
         links = result.links.get("internal", [])
@@ -106,7 +104,7 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
         valid_links = []
         for link in links:
             url = link.get("href")
-            if url in visited:
+            if not url or url in visited:
                 continue
             if not await self.can_process_url(url, new_depth):
                 self.stats.urls_skipped += 1
@@ -115,7 +113,7 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
             valid_links.append(url)
             
         # If we have more valid links than capacity, limit them
-        if len(valid_links) > remaining_capacity:
+        if self.max_pages > 0 and len(valid_links) > remaining_capacity:
             valid_links = valid_links[:remaining_capacity]
             self.logger.info(f"Limiting to {remaining_capacity} URLs due to max_pages limit")
             
@@ -144,7 +142,7 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
 
         while not queue.empty() and not self._cancel_event.is_set():
             # Stop if we've reached the max pages limit
-            if self._pages_crawled >= self.max_pages:
+            if self.max_pages > 0 and self._pages_crawled >= self.max_pages:
                 self.logger.info(f"Max pages limit ({self.max_pages}) reached, stopping crawl")
                 break
                 
@@ -233,7 +231,7 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
         start_url: str,
         crawler: AsyncWebCrawler,
         config: Optional[CrawlerRunConfig] = None,
-    ) -> "RunManyReturn":
+    ) -> CrawlResultContainer:
         """
         Main entry point for best-first crawling.
         
@@ -243,9 +241,9 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
         if config is None:
             raise ValueError("CrawlerRunConfig must be provided")
         if config.stream:
-            return self._arun_stream(start_url, crawler, config)
-        else:
-            return await self._arun_batch(start_url, crawler, config)
+            return CrawlResultContainer(self._arun_stream(start_url, crawler, config))
+
+        return CrawlResultContainer(await self._arun_batch(start_url, crawler, config))
 
     async def shutdown(self) -> None:
         """

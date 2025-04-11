@@ -7,7 +7,7 @@ from playwright.async_api import Browser, BrowserType, async_playwright
 
 from crawl4ai.async_configs import BrowserConfig
 from crawl4ai.async_webcrawler import AsyncWebCrawler
-from crawl4ai.async_webcrawler import CrawlResultContainer
+from crawl4ai.models import CrawlResultContainer
 
 
 @pytest.fixture(scope="session")

@@ -1,14 +1,19 @@
-import requests
 import shutil
 from pathlib import Path
+from typing import Final
+
+import requests
+
 from crawl4ai.async_logger import AsyncLogger
-from crawl4ai.llmtxt import AsyncLLMTextManager
+from .llmtxt import AsyncLLMTextManager
+
+GIT_DOCS: Final = "https://api.github.com/repos/unclecode/crawl4ai/contents/docs"
 
 
 class DocsManager:
     def __init__(self, logger=None):
         self.docs_dir = Path.home() / ".crawl4ai" / "docs"
-        self.local_docs = Path(__file__).parent.parent / "docs" / "llm.txt"
+        self.local_docs = Path(__file__).parent.parent.parent / "docs"
         self.docs_dir.mkdir(parents=True, exist_ok=True)
         self.logger = logger or AsyncLogger(verbose=True)
         self.llm_text = AsyncLLMTextManager(self.docs_dir, self.logger)
@@ -21,39 +26,53 @@ class DocsManager:
     async def fetch_docs(self) -> bool:
         """Copy from local docs or download from GitHub"""
         try:
-            # Try local first
-            if self.local_docs.exists() and (
-                any(self.local_docs.glob("*.md"))
-                or any(self.local_docs.glob("*.tokens"))
-            ):
-                # Empty the local docs directory
-                for file_path in self.docs_dir.glob("*.md"):
-                    file_path.unlink()
-                # for file_path in self.docs_dir.glob("*.tokens"):
-                #     file_path.unlink()
-                for file_path in self.local_docs.glob("*.md"):
-                    shutil.copy2(file_path, self.docs_dir / file_path.name)
-                # for file_path in self.local_docs.glob("*.tokens"):
-                #     shutil.copy2(file_path, self.docs_dir / file_path.name)
-                return True
+            # Remove existing markdown files.
+            dirs: set[Path] = set()
+            for file_path in self.docs_dir.glob("**/*.md"):
+                dirs.add(file_path.parent)
+                file_path.unlink()
 
-            # Fallback to GitHub
-            response = requests.get(
-                "https://api.github.com/repos/unclecode/crawl4ai/contents/docs/llm.txt",
-                headers={"Accept": "application/vnd.github.v3+json"},
-            )
-            response.raise_for_status()
+            # Remove empty directories.
+            for dir_path in sorted(dirs, reverse=True):
+                if not any(dir_path.iterdir()):
+                    dir_path.rmdir()
 
-            for item in response.json():
-                if item["type"] == "file" and item["name"].endswith(".md"):
-                    content = requests.get(item["download_url"]).text
-                    with open(self.docs_dir / item["name"], "w", encoding="utf-8") as f:
-                        f.write(content)
+            if self.local_docs.exists() and (any(self.local_docs.glob("**/*.md"))):
+                # Copy from local docs.
+                for file_path in self.local_docs.glob("**/*.md"):
+                    rel_path = file_path.relative_to(self.local_docs)
+                    dest_path = self.docs_dir / rel_path
+                    dest_path.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(file_path, dest_path)
+            else:
+                # Download from GitHub.
+                self.download_docs(GIT_DOCS)
+
             return True
-
         except Exception as e:
             self.logger.error(f"Failed to fetch docs: {str(e)}")
             raise
+
+    def download_docs(self, url: str):
+        """Download docs from GitHub"""
+
+        response = requests.get(
+            url,
+            headers={"Accept": "application/vnd.github.v3+json"},
+        )
+        response.raise_for_status()
+
+        for item in response.json():
+            if item["type"] == "dir":
+                self.download_docs(item["url"])
+            elif item["type"] == "file" and item["name"].endswith(".md"):
+                path: str = item["path"]
+                dest_path: Path = self.docs_dir / path.removeprefix("docs/")
+                dest_path.parent.mkdir(parents=True, exist_ok=True)
+
+                content = requests.get(item["download_url"]).text
+                with open(dest_path, "w", encoding="utf-8") as f:
+                    f.write(content)
 
     def list(self) -> list[str]:
         """List available topics"""

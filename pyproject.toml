@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=64.0.0", "wheel"]
+requires = ["setuptools>=78.0.1", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "🚀🤖 Crawl4AI: Open-source LLM Friendly Web Crawler & scraper"
 readme = "README.md"
 requires-python = ">=3.9"
-license = {text = "MIT"}
+license = "MIT"
 authors = [
     {name = "Unclecode", email = "unclecode@kidocode.com"}
 ]
@@ -43,11 +43,13 @@ dependencies = [
     "faust-cchardet>=2.1.19",
     "aiohttp>=3.11.11",
     "humanize>=4.10.0",
+    "pdf2image>=1.17.0",
+    "bitarray>=3.2.0",
+    "mmh3>=5.1.0",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
@@ -57,20 +59,17 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-pdf = ["PyPDF2"]  
+pdf = ["PyPDF2", "pdf2image"]
 torch = ["torch", "nltk", "scikit-learn"]
 transformer = ["transformers", "tokenizers"]
 cosine = ["torch", "transformers", "nltk"]
 sync = ["selenium"]
 all = [
-    "PyPDF2",
-    "torch",
-    "nltk",
-    "scikit-learn",
-    "transformers",
-    "tokenizers",
-    "selenium",
-    "PyPDF2"  
+    "crawl4ai[cosine]",
+    "crawl4ai[pdf]",
+    "crawl4ai[sync]",
+    "crawl4ai[torch]",
+    "crawl4ai[transformer]",
 ]
 
 [project.scripts]
@@ -95,6 +94,25 @@ crawl4ai = { workspace = true }
 [dependency-groups]
 dev = [
     "crawl4ai",
+]
+docker = [
+    "fastapi>=0.115.11",
+    "redis>=5.2.1",
+]
+test = [
+    "matplotlib>=3.9.4",
+    "nest-asyncio>=1.6.0",
+    "nltk>=3.9.1",
+    "pytest-asyncio>=0.25.3",
+    "pytest-cov>=6.0.0",
+    "pytest-httpserver>=1.1.2",
+    "pytest-timeout>=2.3.1",
+    "pytest>=8.3.5",
+    "scipy>=1.13.1",
+    "selenium>=4.29.0",
+    "tabulate>=0.9.0",
+    "torch>=2.6.0",
+    "transformers>=4.49.0",
 ]
 
 [tool.pytest.ini_options]

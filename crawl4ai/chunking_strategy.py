@@ -71,7 +71,6 @@ class NlpSentenceChunking(ChunkingStrategy):
         """
         Initialize the NlpSentenceChunking object.
         """
-        from crawl4ai.le.legacy.model_loader import load_nltk_punkt
         load_nltk_punkt()
 
     def chunk(self, text: str) -> list:

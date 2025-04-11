@@ -22,7 +22,7 @@ class DomainState:
 class CrawlerTaskResult:
     task_id: str
     url: str
-    result: "CrawlResult"
+    result: CrawlResultContainer
     memory_usage: float
     peak_memory: float
     start_time: Union[datetime, float]
@@ -294,6 +294,157 @@ class CrawlResult(BaseModel):
         if self._markdown is not None:
             result["markdown"] = self._markdown.model_dump() 
         return result
+
+CrawlResultsT = Union[
+   CrawlResult, List[CrawlResult], AsyncGenerator[CrawlResult, None]
+]
+
+class CrawlResultContainer(CrawlResult):
+    """A container class for crawl results.
+
+    Provides a consistent interface for synchronous and asynchronous iteration
+    as well as direct access to fields of first result and the length of the
+    results.
+    """
+    # We use private attributes and a property for source to simplify the
+    # implementation of __getattribute__.
+    _source: CrawlResultsT = PrivateAttr()
+    _results: List[CrawlResult] = PrivateAttr()
+
+    def __init__(
+        self,
+        results: CrawlResultsT,
+    ) -> None:
+        result_list: List[CrawlResult]
+        if isinstance(results, AsyncGenerator):
+            result_list = []
+        elif isinstance(results, List):
+            result_list = results
+        else:
+            result_list = [results]
+
+        if len(result_list) == 0:
+            super().__init__(url="", html="", success=False)
+        else:
+            super().__init__(**result_list[0].model_dump())
+
+        self._source = results
+        self._results = result_list
+
+    @property
+    def source(self) -> CrawlResultsT:
+        """Returns the source of the crawl results.
+
+        :return: The source of the crawl results.
+        :rtype: CrawlResultsT
+        """
+        return self._source
+
+    def _raise_if_async_generator(self):
+        """Raises a TypeError if the source is an AsyncGenerator.
+
+        This is to prevent synchronous operations over an asynchronous source.
+
+        :raises TypeError: If source is an AsyncGenerator.
+        """
+        if isinstance(self._source, AsyncGenerator):
+            raise TypeError(
+                "CrawlResultContainer source is an AsyncGenerator. Use __aiter__() to iterate over it."
+            )
+
+    def __iter__(self) -> Iterator[CrawlResult]: # pyright: ignore[reportIncompatibleMethodOverride]
+        """Returns an iterator for the crawl results.
+
+        This method is used for synchronous iteration.
+
+        :return: An iterator for the crawl results.
+        :rtype: Iterator[CrawlResult]
+        :raises TypeError: If the source is an AsyncGenerator.
+        """
+        self._raise_if_async_generator()
+
+        return iter(self._results)
+
+    def __aiter__(self) -> AsyncIterator[CrawlResult]:
+        """Returns an asynchronous iterator for the crawl results."""
+        if isinstance(self._source, AsyncIterator):
+            return self._source.__aiter__()
+
+        async def async_iterator() -> AsyncIterator[CrawlResult]:
+            for result in self._results:
+                yield result
+
+        return async_iterator()
+
+    def __getitem__(self, index: int) -> CrawlResult:
+        """Return the result at a given index.
+
+        :param index: The index of the result to retrieve.
+        :type index: int
+        :return: The crawl result at the specified index.
+        :rtype: CrawlResult
+        :raises TypeError: If the source is an AsyncGenerator.
+        :raises IndexError: If the index is out of range.
+        """
+        self._raise_if_async_generator()
+
+        return self._results[index]
+
+    def __len__(self) -> int:
+        """Return the number of results in the container.
+
+        :return: The number of results.
+        :rtype: int
+        :raises TypeError: If the source is an AsyncGenerator.
+        """
+        self._raise_if_async_generator()
+
+        return len(self._results)
+
+    def __getattribute__(self, attr: str) -> Any:
+        """Return an attribute from the first result.
+
+        :param attr: The name of the attribute to retrieve.
+        :type attr: str
+        :return: The attribute value from the first result if present.
+        :rtype: Any
+        :raises TypeError: If the source is an AsyncGenerator.
+        :raises AttributeError: If the attribute does not exist.
+        """
+        if attr.startswith("_") or attr == "source":
+            # Private attribute or known local field so just delegate to the parent class.
+            return super().__getattribute__(attr)
+
+        try:
+            source: CrawlResultsT = self._source
+        except (AttributeError, TypeError):
+            # _source is not defined yet so we're in the __init__ method.
+            # Just delegate to the parent class.
+            return super().__getattribute__(attr)
+
+        # We have a CrawlResult field.
+        # Local test to avoid the additional lookups from calling _raise_if_async_generator.
+        if isinstance(source, AsyncGenerator):
+            raise TypeError(
+                "CrawlResultContainer source is an AsyncGenerator. Use __aiter__() to iterate over it."
+            )
+
+        if not source:
+            # Empty source so we can't return the attribute.
+            raise AttributeError(f"{self.__class__.__name__} object has no results")
+
+        # Delegate to the first result.
+        return super().__getattribute__(attr)
+
+    def __repr__(self) -> str:
+        """Get a string representation of the container.
+
+        The representation will be incomplete if the source is an AsyncIterator.
+        :return: String representation of the container.
+        :rtype: str
+        """
+
+        return f"{self.__class__.__name__}({self._results!r})"
 
 class StringCompatibleMarkdown(str):
     """A string subclass that also provides access to MarkdownGenerationResult attributes"""

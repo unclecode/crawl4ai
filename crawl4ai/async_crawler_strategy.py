@@ -472,6 +472,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             with open(local_file_path, "r", encoding="utf-8") as f:
                 html = f.read()
             if config.screenshot:
+                # TODO: Fix as this method has been removed, see:
+                # https://github.com/unclecode/crawl4ai/commit/c38ac29edbcebcb2f3672145424e7af3193caa6e#diff-ede9fd3357068d6fca3803250d507a6816ed8476e6fa71990948bcedb1c460fbR1073
                 screenshot_data = await self._generate_screenshot_from_html(html)
             return AsyncCrawlResponse(
                 html=html,
@@ -486,6 +488,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             raw_html = url[4:] if url[:4] == "raw:" else url[7:]
             html = raw_html
             if config.screenshot:
+                # TODO: Fix as this method has been removed, see:
+                # https://github.com/unclecode/crawl4ai/commit/c38ac29edbcebcb2f3672145424e7af3193caa6e#diff-ede9fd3357068d6fca3803250d507a6816ed8476e6fa71990948bcedb1c460fbR1073
                 screenshot_data = await self._generate_screenshot_from_html(html)
             return AsyncCrawlResponse(
                 html=html,
@@ -516,7 +520,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         response_headers = {}
         execution_result = None
         status_code = None
-        redirected_url = url 
+        redirected_url = url
 
         # Reset downloaded files list for new crawl
         self._downloaded_files = []
@@ -638,8 +642,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         const element = document.body;
                         if (!element) return false;
                         const style = window.getComputedStyle(element);
-                        const isVisible = style.display !== 'none' && 
-                                        style.visibility !== 'hidden' && 
+                        const isVisible = style.display !== 'none' &&
+                                        style.visibility !== 'hidden' &&
                                         style.opacity !== '0';
                         return isVisible;
                     }""",
@@ -846,21 +850,21 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     # Handle comma-separated selectors by splitting them
                     selectors = [s.strip() for s in config.css_selector.split(',')]
                     html_parts = []
-                    
+
                     for selector in selectors:
                         try:
                             content = await page.evaluate(f"document.querySelector('{selector}')?.outerHTML || ''")
                             html_parts.append(content)
                         except Error as e:
                             print(f"Warning: Could not get content for selector '{selector}': {str(e)}")
-                    
+
                     # Wrap in a div to create a valid HTML structure
-                    html = f"<div class='crawl4ai-result'>\n" + "\n".join(html_parts) + "\n</div>"                    
+                    html = "<div class='crawl4ai-result'>\n" + "\n".join(html_parts) + "\n</div>"
                 except Error as e:
                     raise RuntimeError(f"Failed to extract HTML content: {str(e)}")
             else:
                 html = await page.content()
-            
+
             # # Get final HTML content
             # html = await page.content()
             await self.execute_hook(
@@ -1446,7 +1450,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                                     const result = (function() {{
                                         {script}
                                     }})();
-                                    
+
                                     // If result is a promise, wait for it
                                     if (result instanceof Promise) {{
                                         result.then(() => {{
@@ -1516,8 +1520,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 const element = document.body;
                 if (!element) return false;
                 const style = window.getComputedStyle(element);
-                const isVisible = style.display !== 'none' && 
-                                style.visibility !== 'hidden' && 
+                const isVisible = style.display !== 'none' &&
+                                style.visibility !== 'hidden' &&
                                 style.opacity !== '0';
                 return isVisible;
             }
@@ -1557,11 +1561,11 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         const startX = window.scrollX;
                         const startY = window.scrollY;
                         window.scrollTo({x}, {y});
-                        
+
                         // Get final position after scroll
                         const endX = window.scrollX;
                         const endY = window.scrollY;
-                        
+
                         return {{
                             success: true,
                             startPosition: {{ x: startX, y: startY }},
@@ -1672,11 +1676,11 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
     """
     Fast, lightweight HTTP-only crawler strategy optimized for memory efficiency.
     """
-    
+
     __slots__ = ('logger', 'max_connections', 'dns_cache_ttl', 'chunk_size', '_session', 'hooks', 'browser_config')
 
     DEFAULT_TIMEOUT: Final[int] = 30
-    DEFAULT_CHUNK_SIZE: Final[int] = 64 * 1024  
+    DEFAULT_CHUNK_SIZE: Final[int] = 64 * 1024
     DEFAULT_MAX_CONNECTIONS: Final[int] = min(32, (os.cpu_count() or 1) * 4)
     DEFAULT_DNS_CACHE_TTL: Final[int] = 300
     VALID_SCHEMES: Final = frozenset({'http', 'https', 'file', 'raw'})
@@ -1689,9 +1693,9 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
         'Upgrade-Insecure-Requests': '1',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
     })
-    
+
     def __init__(
-        self, 
+        self,
         browser_config: Optional[HTTPCrawlerConfig] = None,
         logger: Optional[AsyncLogger] = None,
         max_connections: int = DEFAULT_MAX_CONNECTIONS,
@@ -1708,7 +1712,7 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
         self._base_headers = self._BASE_HEADERS.copy()
 
         self.hooks = {
-            k: partial(self._execute_hook, k) 
+            k: partial(self._execute_hook, k)
             for k in ('before_request', 'after_request', 'on_error')
         }
 
@@ -1716,13 +1720,13 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
         self.set_hook('before_request', lambda *args, **kwargs: None)
         self.set_hook('after_request', lambda *args, **kwargs: None)
         self.set_hook('on_error', lambda *args, **kwargs: None)
-                      
+
 
 
     async def __aenter__(self) -> Self:
         await self.start()
         return self
-        
+
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         await self.close()
 
@@ -1766,10 +1770,10 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
         self._base_headers.update(headers)
 
     async def _execute_hook(
-        self, 
-        hook_type: str, 
+        self,
+        hook_type: str,
         hook_func: Callable,
-        *args: Any, 
+        *args: Any,
         **kwargs: Any
     ) -> Any:
         if asyncio.iscoroutinefunction(hook_func):
@@ -1811,11 +1815,11 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
     async def _handle_file(self, path: str) -> AsyncCrawlResponse:
         if not os.path.exists(path):
             raise FileNotFoundError(f"Local file not found: {path}")
-            
+
         chunks = []
         async for chunk in self._stream_file(path):
             chunks.append(chunk.tobytes().decode('utf-8', errors='replace'))
-            
+
         return AsyncCrawlResponse(
             html=''.join(chunks),
             response_headers={},
@@ -1831,8 +1835,8 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
 
 
     async def _handle_http(
-        self, 
-        url: str, 
+        self,
+        url: str,
         config: CrawlerRunConfig
     ) -> AsyncCrawlResponse:
         async with self._session_context() as session:
@@ -1864,61 +1868,61 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
             try:
                 async with session.request(self.browser_config.method, url, **request_kwargs) as response:
                     content = memoryview(await response.read())
-                    
+
                     if not (200 <= response.status < 300):
                         raise HTTPStatusError(
                             response.status,
                             f"Unexpected status code for {url}"
                         )
-                    
+
                     encoding = response.charset
                     if not encoding:
-                        encoding = cchardet.detect(content.tobytes())['encoding'] or 'utf-8'                    
-                    
+                        encoding = cchardet.detect(content.tobytes())['encoding'] or 'utf-8'
+
                     result = AsyncCrawlResponse(
                         html=content.tobytes().decode(encoding, errors='replace'),
                         response_headers=dict(response.headers),
                         status_code=response.status,
                         redirected_url=str(response.url)
                     )
-                    
+
                     await self.hooks['after_request'](result)
                     return result
 
             except aiohttp.ServerTimeoutError as e:
                 await self.hooks['on_error'](e)
                 raise ConnectionTimeoutError(f"Request timed out: {str(e)}")
-                
+
             except aiohttp.ClientConnectorError as e:
                 await self.hooks['on_error'](e)
                 raise ConnectionError(f"Connection failed: {str(e)}")
-                
+
             except aiohttp.ClientError as e:
                 await self.hooks['on_error'](e)
                 raise HTTPCrawlerError(f"HTTP client error: {str(e)}")
-            
+
             except asyncio.exceptions.TimeoutError as e:
                 await self.hooks['on_error'](e)
                 raise ConnectionTimeoutError(f"Request timed out: {str(e)}")
-            
+
             except Exception as e:
                 await self.hooks['on_error'](e)
                 raise HTTPCrawlerError(f"HTTP request failed: {str(e)}")
 
     async def crawl(
-        self, 
-        url: str, 
-        config: Optional[CrawlerRunConfig] = None, 
+        self,
+        url: str,
+        config: Optional[CrawlerRunConfig] = None,
         **kwargs
     ) -> AsyncCrawlResponse:
         config = config or CrawlerRunConfig.from_kwargs(kwargs)
-        
+
         parsed = urlparse(url)
         scheme = parsed.scheme.rstrip('/')
-        
+
         if scheme not in self.VALID_SCHEMES:
             raise ValueError(f"Unsupported URL scheme: {scheme}")
-            
+
         try:
             if scheme == 'file':
                 return await self._handle_file(parsed.path)
@@ -1926,7 +1930,7 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
                 return await self._handle_raw(url.removeprefix('raw://'))
             else:  # http or https
                 return await self._handle_http(url, config)
-                
+
         except Exception as e:
             if self.logger:
                 self.logger.error(

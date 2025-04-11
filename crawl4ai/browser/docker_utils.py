@@ -5,8 +5,7 @@ import hashlib
 import tempfile
 import shutil
 import socket
-import subprocess
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple
 
 class DockerUtils:
     """Utility class for Docker operations in browser automation.
@@ -66,9 +65,9 @@ class DockerUtils:
             if self.logger:
                 self.logger.debug(f"Error checking if image exists: {str(e)}", tag="DOCKER")
             return False
-    
-    async def build_docker_image(self, image_name: str, dockerfile_path: str, 
-                              files_to_copy: Dict[str, str] = None) -> bool:
+
+    async def build_docker_image(self, image_name: str, dockerfile_path: str,
+                              files_to_copy: Optional[Dict[str, str]] = None) -> bool:
         """Build a Docker image from a Dockerfile.
         
         Args:
@@ -116,8 +115,8 @@ class DockerUtils:
             if self.logger:
                 self.logger.success(f"Successfully built Docker image: {image_name}", tag="DOCKER")
             return True
-    
-    async def ensure_docker_image_exists(self, image_name: str, mode: str = "connect") -> str:
+
+    async def ensure_docker_image_exists(self, image_name: Optional[str] = None, mode: str = "connect") -> str:
         """Ensure the required Docker image exists, creating it if necessary.
         
         Args:
@@ -174,10 +173,10 @@ class DockerUtils:
     
     async def create_container(self, image_name: str, host_port: int, 
                             container_name: Optional[str] = None,
-                            volumes: List[str] = None,
+                            volumes: Optional[List[str]] = None,
                             network: Optional[str] = None,
-                            env_vars: Dict[str, str] = None,
-                            extra_args: List[str] = None) -> Optional[str]:
+                            env_vars: Optional[Dict[str, str]] = None,
+                            extra_args: Optional[List[str]] = None) -> Optional[str]:
         """Create a new Docker container.
         
         Args:

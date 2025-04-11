@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import AsyncGenerator, Optional, Set, List, Dict
-from functools import wraps
 from contextvars import ContextVar
-from ..types import AsyncWebCrawler, CrawlerRunConfig, CrawlResult, RunManyReturn
+from functools import wraps
+from typing import Any, AsyncGenerator, Callable, Dict, List, Optional, Set, Awaitable
+from typing_extensions import Concatenate
 
+from ..types import AsyncWebCrawler, CrawlerRunConfig, CrawlResult
+from ..models import CrawlResultContainer
 
 class DeepCrawlDecorator:
     """Decorator that adds deep crawling capability to arun method."""
@@ -14,32 +16,37 @@ class DeepCrawlDecorator:
     def __init__(self, crawler: AsyncWebCrawler): 
         self.crawler = crawler
 
-    def __call__(self, original_arun):
+    def __call__(self, original_arun: Callable[Concatenate[str, Optional[CrawlerRunConfig], ...], Awaitable[CrawlResultContainer]]):
         @wraps(original_arun)
-        async def wrapped_arun(url: str, config: CrawlerRunConfig = None, **kwargs):
+        async def wrapped_arun(
+            url: str, config: Optional[CrawlerRunConfig] = None, **kwargs
+        ) -> CrawlResultContainer:
             # If deep crawling is already active, call the original method to avoid recursion.
             if config and config.deep_crawl_strategy and not self.deep_crawl_active.get():
                 token = self.deep_crawl_active.set(True)
                 # Await the arun call to get the actual result object.
-                result_obj = await config.deep_crawl_strategy.arun(
+                result_obj: CrawlResultContainer = await config.deep_crawl_strategy.arun(
                     crawler=self.crawler,
                     start_url=url,
                     config=config
                 )
                 if config.stream:
-                    async def result_wrapper():
+                    # Streaming mode.
+                    async def result_wrapper() -> AsyncGenerator[CrawlResult, Any]:
                         try:
                             async for result in result_obj:
                                 yield result
                         finally:
                             self.deep_crawl_active.reset(token)
-                    return result_wrapper()
-                else:
-                    try:
-                        return result_obj
-                    finally:
-                        self.deep_crawl_active.reset(token)
-            return await original_arun(url, config=config, **kwargs)
+                    return CrawlResultContainer(result_wrapper())
+
+                # Batch mode.
+                try:
+                    return result_obj
+                finally:
+                    self.deep_crawl_active.reset(token)
+
+            return await original_arun(url, config, **kwargs)
         return wrapped_arun
 
 class DeepCrawlStrategy(ABC):
@@ -66,8 +73,11 @@ class DeepCrawlStrategy(ABC):
         """
         pass
 
+    # Not async because it returns an AsyncGenerator but does not yield.
+    # See the following issue from pyright for more information:
+    # https://github.com/microsoft/pyright/issues/9949
     @abstractmethod
-    async def _arun_stream(
+    def _arun_stream(
         self,
         start_url: str,
         crawler: AsyncWebCrawler,
@@ -84,7 +94,7 @@ class DeepCrawlStrategy(ABC):
         start_url: str,
         crawler: AsyncWebCrawler,
         config: Optional[CrawlerRunConfig] = None,
-    ) -> RunManyReturn:
+    ) -> CrawlResultContainer:
         """
         Traverse the given URL using the specified crawler.
         
@@ -94,15 +104,15 @@ class DeepCrawlStrategy(ABC):
             crawler_run_config (Optional[CrawlerRunConfig]): Crawler configuration.
         
         Returns:
-            Union[CrawlResultT, List[CrawlResultT], AsyncGenerator[CrawlResultT, None]]
+            CrawlResultContainer
         """
         if config is None:
             raise ValueError("CrawlerRunConfig must be provided")
 
         if config.stream:
-            return self._arun_stream(start_url, crawler, config)
-        else:
-            return await self._arun_batch(start_url, crawler, config)
+            return CrawlResultContainer(self._arun_stream(start_url, crawler, config))
+
+        return CrawlResultContainer(await self._arun_batch(start_url, crawler, config))
 
     def __call__(self, start_url: str, crawler: AsyncWebCrawler, config: CrawlerRunConfig):
         return self.arun(start_url, crawler, config)

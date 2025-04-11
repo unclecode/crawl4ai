@@ -50,6 +50,7 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 cover/
+tests/async/output/
 
 # Translations
 *.mo
@@ -258,3 +259,6 @@ continue_config.json
 
 CLAUDE_MONITOR.md
 CLAUDE.md
+
+# Test output
+logs/
