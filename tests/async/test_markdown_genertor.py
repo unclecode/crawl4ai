@@ -3,14 +3,11 @@
 # - **Title:** [user data crawling opens two windows, unable to control correct user browser](https://github.com/unclecode/crawl4ai/issues/236)
 # - **State:** open
 
-import os, sys, time
-
-parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(parent_dir)
-__location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 import os
+import sys
 import time
-from typing import Dict, Any
+from typing import Any, Dict
+
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
 # Get current directory
@@ -27,14 +24,6 @@ def print_test_result(name: str, result: Dict[str, Any], execution_time: float):
         if isinstance(content, str):
             with open(__location__ + f"/output/{name.lower()}_{key}.md", "w") as f:
                 f.write(content)
-
-    # # Print first few lines of each markdown version
-    # for key, content in result.items():
-    #     if isinstance(content, str):
-    #         preview = '\n'.join(content.split('\n')[:3])
-    #         print(f"\n{key} (first 3 lines):")
-    #         print(preview)
-    #         print(f"Total length: {len(content)} characters")
 
 
 def test_basic_markdown_conversion():
@@ -138,6 +127,7 @@ def test_performance_large_document():
         result = generator.generate_markdown(
             cleaned_html=markdown, base_url="https://en.wikipedia.org"
         )
+        assert result.raw_markdown
         end_time = time.perf_counter()
         times.append(end_time - start_time)
 
@@ -171,11 +161,6 @@ def test_image_links():
 
 
 if __name__ == "__main__":
-    print("Running markdown generation strategy tests...")
+    import subprocess
 
-    test_basic_markdown_conversion()
-    test_relative_links()
-    test_duplicate_links()
-    test_link_descriptions()
-    test_performance_large_document()
-    test_image_links()
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

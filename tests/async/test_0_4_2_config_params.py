@@ -1,18 +1,18 @@
-import os, sys
+import os
+import sys
 
-parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(parent_dir)
-__location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
+from httpx import codes
+import pytest
 
-import asyncio
-from crawl4ai import AsyncWebCrawler, CacheMode
+from crawl4ai import AsyncWebCrawler, CacheMode, DefaultMarkdownGenerator
 from crawl4ai.async_configs import BrowserConfig, CrawlerRunConfig
+from crawl4ai.chunking_strategy import RegexChunking
 from crawl4ai.content_filter_strategy import PruningContentFilter
 from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
-from crawl4ai.chunking_strategy import RegexChunking
 
 
 # Category 1: Browser Configuration Tests
+@pytest.mark.asyncio
 async def test_browser_config_object():
     """Test the new BrowserConfig object with various browser settings"""
     browser_config = BrowserConfig(
@@ -22,7 +22,7 @@ async def test_browser_config_object():
         viewport_height=1080,
         use_managed_browser=True,
         user_agent_mode="random",
-        user_agent_generator_config={"device_type": "desktop", "os_type": "windows"},
+        user_agent_generator_config={"os": "windows"},
     )
 
     async with AsyncWebCrawler(config=browser_config, verbose=True) as crawler:
@@ -31,6 +31,7 @@ async def test_browser_config_object():
         assert len(result.html) > 0, "No HTML content retrieved"
 
 
+@pytest.mark.asyncio
 async def test_browser_performance_config():
     """Test browser configurations focused on performance"""
     browser_config = BrowserConfig(
@@ -44,10 +45,11 @@ async def test_browser_performance_config():
     async with AsyncWebCrawler(config=browser_config) as crawler:
         result = await crawler.arun("https://example.com")
         assert result.success, "Performance optimized crawl failed"
-        assert result.status_code == 200, "Unexpected status code"
+        assert result.status_code == codes.OK, "Unexpected status code"
 
 
 # Category 2: Content Processing Tests
+@pytest.mark.asyncio
 async def test_content_extraction_config():
     """Test content extraction with various strategies"""
     crawler_config = CrawlerRunConfig(
@@ -60,7 +62,9 @@ async def test_content_extraction_config():
             }
         ),
         chunking_strategy=RegexChunking(),
-        content_filter=PruningContentFilter(),
+        markdown_generator=DefaultMarkdownGenerator(
+            content_filter=PruningContentFilter(),
+        ),
     )
 
     async with AsyncWebCrawler() as crawler:
@@ -72,6 +76,7 @@ async def test_content_extraction_config():
 
 
 # Category 3: Cache and Session Management Tests
+@pytest.mark.asyncio
 async def test_cache_and_session_management():
     """Test different cache modes and session handling"""
     browser_config = BrowserConfig(use_persistent_context=True)
@@ -93,9 +98,10 @@ async def test_cache_and_session_management():
 
 
 # Category 4: Media Handling Tests
+@pytest.mark.asyncio
 async def test_media_handling_config():
     """Test configurations related to media handling"""
-    # Get the base path for home directroy ~/.crawl4ai/downloads, make sure it exists
+    # Get the base path for home directory ~/.crawl4ai/downloads, make sure it exists
     os.makedirs(os.path.expanduser("~/.crawl4ai/downloads"), exist_ok=True)
     browser_config = BrowserConfig(
         viewport_width=1920,
@@ -118,6 +124,7 @@ async def test_media_handling_config():
 
 
 # Category 5: Anti-Bot and Site Interaction Tests
+@pytest.mark.asyncio
 async def test_antibot_config():
     """Test configurations for handling anti-bot measures"""
     crawler_config = CrawlerRunConfig(
@@ -136,6 +143,7 @@ async def test_antibot_config():
 
 
 # Category 6: Parallel Processing Tests
+@pytest.mark.asyncio
 async def test_parallel_processing():
     """Test parallel processing capabilities"""
     crawler_config = CrawlerRunConfig(mean_delay=0.5, max_range=1.0, semaphore_count=5)
@@ -149,6 +157,7 @@ async def test_parallel_processing():
 
 
 # Category 7: Backwards Compatibility Tests
+@pytest.mark.asyncio
 async def test_legacy_parameter_support():
     """Test that legacy parameters still work"""
     async with AsyncWebCrawler(
@@ -158,13 +167,14 @@ async def test_legacy_parameter_support():
             "https://example.com",
             screenshot=True,
             word_count_threshold=200,
-            bypass_cache=True,
+            cache_mode=CacheMode.BYPASS,
             css_selector=".main-content",
         )
         assert result.success, "Legacy parameter support failed"
 
 
 # Category 8: Mixed Configuration Tests
+@pytest.mark.asyncio
 async def test_mixed_config_usage():
     """Test mixing new config objects with legacy parameters"""
     browser_config = BrowserConfig(headless=True)
@@ -184,28 +194,6 @@ async def test_mixed_config_usage():
 
 
 if __name__ == "__main__":
+    import subprocess
 
-    async def run_tests():
-        test_functions = [
-            test_browser_config_object,
-            # test_browser_performance_config,
-            # test_content_extraction_config,
-            # test_cache_and_session_management,
-            # test_media_handling_config,
-            # test_antibot_config,
-            # test_parallel_processing,
-            # test_legacy_parameter_support,
-            # test_mixed_config_usage
-        ]
-
-        for test in test_functions:
-            print(f"\nRunning {test.__name__}...")
-            try:
-                await test()
-                print(f"✓ {test.__name__} passed")
-            except AssertionError as e:
-                print(f"✗ {test.__name__} failed: {str(e)}")
-            except Exception as e:
-                print(f"✗ {test.__name__} error: {str(e)}")
-
-    asyncio.run(run_tests())
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

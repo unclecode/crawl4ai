@@ -4,15 +4,11 @@ These examples demonstrate the functionality of BrowserProfileManager
 and serve as functional tests.
 """
 
-import asyncio
 import os
 import sys
 import uuid
 import shutil
-
-# Add the project root to Python path if running directly
-if __name__ == "__main__":
-    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+import pytest
 
 from crawl4ai.browser import BrowserManager, BrowserProfileManager
 from crawl4ai.async_configs import BrowserConfig, CrawlerRunConfig
@@ -21,6 +17,7 @@ from crawl4ai.async_logger import AsyncLogger
 # Create a logger for clear terminal output
 logger = AsyncLogger(verbose=True, log_file=None)
 
+@pytest.mark.asyncio
 async def test_profile_creation():
     """Test creating and managing browser profiles."""
     logger.info("Testing profile creation and management", tag="TEST")
@@ -75,10 +72,11 @@ async def test_profile_creation():
         try:
             if os.path.exists(profile_path):
                 shutil.rmtree(profile_path, ignore_errors=True)
-        except:
+        except Exception:
             pass
         return False
 
+@pytest.mark.asyncio
 async def test_profile_with_browser():
     """Test using a profile with a browser."""
     logger.info("Testing using a profile with a browser", tag="TEST")
@@ -151,26 +149,11 @@ async def test_profile_with_browser():
         try:
             if profile_path and os.path.exists(profile_path):
                 shutil.rmtree(profile_path, ignore_errors=True)
-        except:
+        except Exception:
             pass
         return False
 
-async def run_tests():
-    """Run all tests sequentially."""
-    results = []
-    
-    results.append(await test_profile_creation())
-    results.append(await test_profile_with_browser())
-    
-    # Print summary
-    total = len(results)
-    passed = sum(results)
-    logger.info(f"Tests complete: {passed}/{total} passed", tag="SUMMARY")
-    
-    if passed == total:
-        logger.success("All tests passed!", tag="SUMMARY")
-    else:
-        logger.error(f"{total - passed} tests failed", tag="SUMMARY")
-
 if __name__ == "__main__":
-    asyncio.run(run_tests())
+    import subprocess
+
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

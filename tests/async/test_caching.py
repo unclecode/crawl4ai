@@ -1,12 +1,9 @@
-import os
-import sys
-import pytest
 import asyncio
+import sys
 
-# Add the parent directory to the Python path
-parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(parent_dir)
+import pytest
 
+from crawl4ai import CacheMode
 from crawl4ai.async_webcrawler import AsyncWebCrawler
 
 
@@ -17,7 +14,7 @@ async def test_caching():
 
         # First crawl (should not use cache)
         start_time = asyncio.get_event_loop().time()
-        result1 = await crawler.arun(url=url, bypass_cache=True)
+        result1 = await crawler.arun(url=url, cache_mode=CacheMode.BYPASS)
         end_time = asyncio.get_event_loop().time()
         time_taken1 = end_time - start_time
 
@@ -42,8 +39,8 @@ async def test_bypass_cache():
         result1 = await crawler.arun(url=url, bypass_cache=False)
         assert result1.success
 
-        # Second crawl with bypass_cache=True
-        result2 = await crawler.arun(url=url, bypass_cache=True)
+        # Second crawl with cache_mode=CacheMode.BYPASS
+        result2 = await crawler.arun(url=url, cache_mode=CacheMode.BYPASS)
         assert result2.success
 
         # Content should be different (or at least, not guaranteed to be the same)
@@ -84,4 +81,6 @@ async def test_flush_cache():
 
 # Entry point for debugging
 if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+    import subprocess
+
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

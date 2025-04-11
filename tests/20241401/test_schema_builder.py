@@ -1,17 +1,14 @@
 # https://claude.ai/chat/c4bbe93d-fb54-44ce-92af-76b4c8086c6b
 # https://claude.ai/chat/c24a768c-d8b2-478a-acc7-d76d42a308da
-import os, sys
-
-parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(parent_dir)
-__location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
-
-import asyncio
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
-from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy, JsonXPathExtractionStrategy
-from crawl4ai.utils import preprocess_html_for_schema, JsonXPathExtractionStrategy
 import json
+import os
+import sys
+from typing import Any, Optional
+
+import pytest
+
+from crawl4ai import LLMConfig
+from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
 
 # Test HTML - A complex job board with companies, departments, and positions
 test_html = """
@@ -83,30 +80,123 @@ test_html = """
 </div>
 """
 
-# Test cases
-def test_schema_generation():
-    # Test 1: No query (should extract everything)
-    print("\nTest 1: No Query (Full Schema)")
-    schema1 = JsonCssExtractionStrategy.generate_schema(test_html)
-    print(json.dumps(schema1, indent=2))
-    
-    # Test 2: Query for just basic job info
-    print("\nTest 2: Basic Job Info Query")
-    query2 = "I only need job titles, salaries, and locations"
-    schema2 = JsonCssExtractionStrategy.generate_schema(test_html, query2)
-    print(json.dumps(schema2, indent=2))
-    
-    # Test 3: Query for company and department structure
-    print("\nTest 3: Organizational Structure Query")
-    query3 = "Extract company details and department names, without position details"
-    schema3 = JsonCssExtractionStrategy.generate_schema(test_html, query3)
-    print(json.dumps(schema3, indent=2))
-    
-    # Test 4: Query for specific skills tracking
-    print("\nTest 4: Skills Analysis Query")
-    query4 = "I want to analyze required skills across all positions"
-    schema4 = JsonCssExtractionStrategy.generate_schema(test_html, query4)
-    print(json.dumps(schema4, indent=2))
+
+@pytest.fixture
+def config() -> LLMConfig:
+    """Load OpenAI API key from environment variable.
+
+    If the API key is not found, skip the test."""
+    api_token: Optional[str] = os.environ.get("OPENAI_API_KEY")
+    if not api_token:
+        pytest.skip("OpenAI API key is required for this test")
+
+    return LLMConfig(api_token=api_token)
+
+
+def test_no_query_full_schema(config: LLMConfig):
+    """No query (should extract everything)"""
+    schema = JsonCssExtractionStrategy.generate_schema(test_html, llm_config=config)
+    assert schema
+    assert isinstance(schema, dict)
+    assert schema.get("name", "")
+    fields: list[dict[str, Any]] = schema.get("fields", [])
+    assert len(fields) == 6
+    seen_positions: bool = False
+    for field in fields:
+        assert isinstance(field, dict)
+        if field.get("name", "") == "departments":
+            department_fields: list[dict[str, Any]] = field.get("fields", [])
+            assert len(department_fields) == 2
+            for department_field in department_fields:
+                assert isinstance(department_field, dict)
+                if department_field.get("name", "") == "positions":
+                    position_fields: list[dict[str, Any]] = department_field.get("fields", [])
+                    assert len(position_fields) > 8
+                    seen_positions = True
+    assert seen_positions
+
+
+@pytest.mark.skip(reason="LLM extraction can be unpredictable")
+def test_basic_job_info(config: LLMConfig):
+    """Query for just basic job info"""
+    query = "I only need job titles, salaries, and locations"
+    schema = JsonCssExtractionStrategy.generate_schema(test_html, query=query, llm_config=config)
+    print(json.dumps(schema, indent=2))
+    assert schema
+    assert isinstance(schema, dict)
+    assert schema.get("name", "")
+    fields: list[dict[str, Any]] = schema.get("fields", [])
+    assert len(fields) == 3
+    seen_job_title: bool = False
+    seen_salary_range: bool = False
+    seen_location: bool = False
+    for field in fields:
+        assert isinstance(field, dict)
+        name: str = field.get("name", "")
+        if name == "job_title":
+            seen_job_title = True
+        elif name == "salary_range":
+            seen_salary_range = True
+        elif name == "location":
+            seen_location = True
+
+    assert seen_job_title
+    assert seen_salary_range
+    assert seen_location
+
+
+def test_company_and_department_structure(config: LLMConfig):
+    """Query for company and department structure"""
+    query = "Extract company details and department names, without position details"
+    schema = JsonCssExtractionStrategy.generate_schema(test_html, query=query, llm_config=config)
+    print(json.dumps(schema, indent=2))
+    assert schema
+    assert isinstance(schema, dict)
+    assert schema.get("name", "")
+    fields: list[dict[str, Any]] = schema.get("fields", [])
+    assert len(fields) == 6
+    seen_department_name: bool = False
+    for field in fields:
+        assert isinstance(field, dict)
+        if field.get("name", "") == "departments":
+            department_fields: list[dict[str, Any]] = field.get("fields", [])
+            assert len(department_fields) == 1
+            for department_field in department_fields:
+                assert isinstance(department_field, dict)
+                if department_field.get("name", "") == "department_name":
+                    seen_department_name = True
+    assert seen_department_name
+
+
+@pytest.mark.skip(reason="LLM extraction can be unpredictable")
+def test_specific_skills_tracking(config: LLMConfig):
+    """Query for specific skills tracking"""
+    query = "I want to analyze required skills across all positions"
+    schema = JsonCssExtractionStrategy.generate_schema(test_html, query=query, llm_config=config)
+    print(json.dumps(schema, indent=2))
+    assert schema
+    assert isinstance(schema, dict)
+    assert schema.get("name", "")
+    fields: list[dict[str, Any]] = schema.get("fields", [])
+    seen_skills_required: bool = False
+    for field in fields:
+        assert isinstance(field, dict)
+        if field.get("name", "") == "departments":
+            department_fields: list[dict[str, Any]] = field.get("fields", [])
+            assert len(department_fields) == 2
+            for department_field in department_fields:
+                assert isinstance(department_field, dict)
+                if department_field.get("name", "") == "positions":
+                    position_fields: list[dict[str, Any]] = department_field.get("fields", [])
+                    assert len(position_fields)
+                    for position_field in position_fields:
+                        assert isinstance(position_field, dict)
+                        if position_field.get("name", "") == "skills_required":
+                            seen_skills_required = True
+    assert seen_skills_required
+
 
 if __name__ == "__main__":
-    test_schema_generation()
+    import subprocess
+
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

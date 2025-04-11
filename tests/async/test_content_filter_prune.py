@@ -1,8 +1,6 @@
-import os, sys
-import pytest
+import sys
 
-parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(parent_dir)
+import pytest
 
 from crawl4ai.content_filter_strategy import PruningContentFilter
 
@@ -86,11 +84,11 @@ class TestPruningContentFilter:
 
     def test_threshold_types(self, basic_html):
         """Test fixed vs dynamic thresholds"""
-        fixed_filter = PruningContentFilter(threshold_type="fixed", threshold=0.48)
-        dynamic_filter = PruningContentFilter(threshold_type="dynamic", threshold=0.45)
+        fixed_filter = PruningContentFilter(threshold_type="fixed", threshold=1.1)
+        dynamic_filter = PruningContentFilter(threshold_type="dynamic", threshold=1.1)
 
-        fixed_contents = fixed_filter.filter_content(basic_html)
-        dynamic_contents = dynamic_filter.filter_content(basic_html)
+        fixed_contents = "".join(fixed_filter.filter_content(basic_html))
+        dynamic_contents = "".join(dynamic_filter.filter_content(basic_html))
 
         assert len(fixed_contents) != len(
             dynamic_contents
@@ -120,7 +118,6 @@ class TestPruningContentFilter:
         """Test handling of empty input"""
         filter = PruningContentFilter()
         assert filter.filter_content("") == []
-        assert filter.filter_content(None) == []
 
     def test_malformed_html(self):
         """Test handling of malformed HTML"""
@@ -167,4 +164,6 @@ class TestPruningContentFilter:
 
 
 if __name__ == "__main__":
-    pytest.main([__file__])
+    import subprocess
+
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

@@ -1,14 +1,17 @@
+from httpx import codes
 import requests
 import json
 import time
 import sys
 import base64
 import os
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 
 class Crawl4AiTester:
-    def __init__(self, base_url: str = "http://localhost:11235", api_token: str = None):
+    def __init__(
+        self, base_url: str = "http://localhost:11235", api_token: Optional[str] = None
+    ):
         self.base_url = base_url
         self.api_token = api_token or os.getenv(
             "CRAWL4AI_API_TOKEN"
@@ -24,7 +27,7 @@ class Crawl4AiTester:
         response = requests.post(
             f"{self.base_url}/crawl", json=request_data, headers=self.headers
         )
-        if response.status_code == 403:
+        if response.status_code == codes.FORBIDDEN:
             raise Exception("API token is invalid or missing")
         task_id = response.json()["task_id"]
         print(f"Task ID: {task_id}")
@@ -58,7 +61,7 @@ class Crawl4AiTester:
             headers=self.headers,
             timeout=60,
         )
-        if response.status_code == 408:
+        if response.status_code == codes.REQUEST_TIMEOUT:
             raise TimeoutError("Task did not complete within server timeout")
         response.raise_for_status()
         return response.json()
@@ -66,7 +69,6 @@ class Crawl4AiTester:
 
 def test_docker_deployment(version="basic"):
     tester = Crawl4AiTester(
-        # base_url="http://localhost:11235" ,
         base_url="https://crawl4ai-sby74.ondigitalocean.app",
         api_token="test",
     )

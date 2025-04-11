@@ -11,25 +11,27 @@ This script tests:
 """
 
 import asyncio
-import os
 import sys
 import time
-from typing import List, Dict, Any
-from colorama import Fore, Style, init
+import gc
+from aiohttp import web
+from httpx import codes
+from pytest_aiohttp import AiohttpServer
+from aiohttp.test_utils import TestServer
 
-# Add the project root to the path for imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+from typing import Any, AsyncGenerator, List, Optional, Tuple
+from pathlib import Path
 
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
-from rich.text import Text
-from rich.box import Box, SIMPLE
+import psutil
+import pytest
+import pytest_asyncio
+from colorama import Fore, init
+from playwright.async_api import Page, Response
 
-from crawl4ai.browser import BrowserManager
-from crawl4ai.browser.strategies import BuiltinBrowserStrategy
 from crawl4ai.async_configs import BrowserConfig, CrawlerRunConfig
 from crawl4ai.async_logger import AsyncLogger
+from crawl4ai.browser import BrowserManager
+from crawl4ai.browser.strategies import BuiltinBrowserStrategy
 
 # Initialize colorama for cross-platform colored terminal output
 init()
@@ -41,768 +43,428 @@ ERROR = Fore.RED
 INFO = Fore.CYAN
 RESET = Fore.RESET
 
-# Create logger
-logger = AsyncLogger(verbose=True)
 
-
-async def test_builtin_browser_creation():
-    """Test creating a builtin browser using the BrowserManager with BuiltinBrowserStrategy"""
-    print(f"\n{INFO}========== Testing Builtin Browser Creation =========={RESET}")
-
-    # Step 1: Create a BrowserManager with builtin mode
-    print(f"\n{INFO}1. Creating BrowserManager with builtin mode{RESET}")
-    browser_config = BrowserConfig(browser_mode="builtin", headless=True, verbose=True)
-    manager = BrowserManager(browser_config=browser_config, logger=logger)
-
-    # Step 2: Check if we have a BuiltinBrowserStrategy
-    print(f"\n{INFO}2. Checking if we have a BuiltinBrowserStrategy{RESET}")
-    if isinstance(manager._strategy, BuiltinBrowserStrategy):
+class BrowsersManager:
+    """Class to manage multiple browser instances for performance testing."""
+    def __init__(self, num_browsers: int = 10, pages_per_browser: int = 10):
+        self.num_browsers: int = num_browsers
+        self.pages_per_browser: int = pages_per_browser
+        self.managers: List[BrowserManager] = []
+        self.all_pages: List[Tuple[Page, Any]] = []
+        self.peak_memory: float = 0.0
+        self.total_pages: int = num_browsers * pages_per_browser
+        self.process: psutil.Process = psutil.Process()
         print(
-            f"{SUCCESS}Correct strategy type: {manager._strategy.__class__.__name__}{RESET}"
+            f"{INFO}Test configuration: {num_browsers} browsers × {pages_per_browser} pages = {self.total_pages} total crawls{RESET}"
         )
-    else:
-        print(
-            f"{ERROR}Wrong strategy type: {manager._strategy.__class__.__name__}{RESET}"
-        )
-        return None
 
-    # Step 3: Start the manager to launch or connect to builtin browser
-    print(f"\n{INFO}3. Starting the browser manager{RESET}")
+    async def run(self, tmp_path: Path):
+        """Run the BrowsersManager to start multiple browser instances."""
+        self.check_memory()
+
+        logger: AsyncLogger = AsyncLogger()
+         # Create all managers but don't start them yet
+        managers: List[BrowserManager] = []
+        for i in range(self.num_browsers):
+            browser_config: BrowserConfig = BrowserConfig(
+                browser_mode="builtin",
+                headless=True,
+                debugging_port=0,
+                user_data_dir=str(tmp_path / f"browser_profile_{i}"),
+            )
+            manager: BrowserManager = BrowserManager(browser_config=browser_config, logger=logger)
+            assert isinstance(manager._strategy, BuiltinBrowserStrategy), f"Wrong strategy type {manager._strategy.__class__.__name__}"
+            manager._strategy.shutting_down = True
+            managers.append(manager)
+
+        # Define async function to start a single manager
+        async def start_manager(manager: BrowserManager, index: int) -> Optional[BrowserManager]:
+            try:
+                await manager.start()
+                try:
+                    pages = await manager.get_pages(CrawlerRunConfig(), count=self.pages_per_browser)
+                    self.all_pages.extend(pages)
+                except Exception as e:
+                    print(f"{ERROR}Failed to create pages for browser {index}: {str(e)}{RESET}")
+
+                return manager
+            except Exception as e:
+                print(
+                    f"{ERROR}Failed to start browser {index}: {str(e)}{RESET}"
+                )
+                await self._safe_close(manager)
+                return None
+
+        # Start all managers and create pages in parallel
+        start_tasks = [
+            start_manager(manager, i + 1) for i, manager in enumerate(managers)
+        ]
+
+        # Filter out None values (failed starts) and add to managers list
+        self.managers = [m for m in await asyncio.gather(*start_tasks) if m is not None]
+        self.check_memory()
+
+        if len(self.managers) < self.num_browsers:
+            print(
+                f"{WARNING}Only {len(self.managers)} out of {self.num_browsers} browser managers started successfully{RESET}"
+            )
+
+    async def _safe_close(self, manager: BrowserManager):
+        try:
+            await manager.close()
+        except Exception as e:
+            print(f"{ERROR}Failed to close browser manager: {str(e)}{RESET}")
+
+    async def close(self):
+        """Close all browser instances managed by this manager."""
+        await asyncio.gather(*[self._safe_close(manager) for manager in self.managers]
+)
+
+    def check_memory(self) -> float:
+        """Checks the current memory usage.
+
+        Updates the peak memory usage if the current memory is higher.
+
+        Returns:
+            float: Current memory usage in MB.
+        """
+        gc.collect()
+        current_memory: float = self.process.memory_info().rss / 1024 / 1024
+        self.peak_memory = max(self.peak_memory, current_memory)
+        return current_memory
+
+@pytest_asyncio.fixture
+async def test_server(aiohttp_server: AiohttpServer) -> TestServer:
+    async def handler(request):
+        return web.Response(text="""<!doctype html>
+<html>
+<head>
+    <title>Example Domain</title>
+
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type="text/css">
+    body {
+        background-color: #f0f0f2;
+        margin: 0;
+        padding: 0;
+        font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+    }
+    div {
+        width: 600px;
+        margin: 5em auto;
+        padding: 2em;
+        background-color: #fdfdff;
+        border-radius: 0.5em;
+        box-shadow: 2px 3px 7px 2px rgba(0,0,0,0.02);
+    }
+    a:link, a:visited {
+        color: #38488f;
+        text-decoration: none;
+    }
+    @media (max-width: 700px) {
+        div {
+            margin: 0 auto;
+            width: auto;
+        }
+    }
+    </style>
+</head>
+
+<body>
+<div>
+    <h1>Example Domain</h1>
+    <p>This domain is for use in illustrative examples in documents. You may use this
+    domain in literature without prior coordination or asking for permission.</p>
+    <p><a href="https://www.iana.org/domains/example">More information...</a></p>
+</div>
+</body>
+</html>""")
+
+    app = web.Application()
+    app.router.add_get("/{route}", handler)
+    return await aiohttp_server(app)
+
+@pytest_asyncio.fixture
+async def browsers_manager(tmp_path: Path) -> AsyncGenerator[BrowsersManager, None]:
+    manager: BrowsersManager = BrowsersManager()
+    await manager.run(tmp_path)
+    yield manager
+    await manager.close()
+
+
+@pytest_asyncio.fixture
+async def manager() -> AsyncGenerator[BrowserManager, None]:
+    browser_config: BrowserConfig = BrowserConfig(browser_mode="builtin", headless=True, verbose=True)
+    manager: BrowserManager = BrowserManager(browser_config=browser_config)
+    await manager.start()
+    yield manager
+    await manager.close()
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("browser_type", ["webkit", "firefox"])
+async def test_not_supported(tmp_path: Path, browser_type: str):
+    browser_config: BrowserConfig = BrowserConfig(
+        browser_mode="builtin",
+        browser_type=browser_type,
+        headless=True,
+        debugging_port=0,
+        user_data_dir=str(tmp_path),
+    )
+    logger: AsyncLogger = AsyncLogger()
+    manager: BrowserManager = BrowserManager(browser_config=browser_config, logger=logger)
+    assert isinstance(manager._strategy, BuiltinBrowserStrategy), f"Wrong strategy type {manager._strategy.__class__.__name__}"
+    manager._strategy.shutting_down = True
+    with pytest.raises(Exception):
+        await manager.start()
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("browser_type", ["chromium"])
+async def test_ephemeral_port(tmp_path: Path, browser_type: str):
+    browser_config: BrowserConfig = BrowserConfig(
+        browser_mode="builtin",
+        browser_type=browser_type,
+        headless=True,
+        debugging_port=0,
+        user_data_dir=str(tmp_path),
+    )
+    logger: AsyncLogger = AsyncLogger()
+    manager: BrowserManager = BrowserManager(browser_config=browser_config, logger=logger)
+    assert isinstance(manager._strategy, BuiltinBrowserStrategy), f"Wrong strategy type {manager._strategy.__class__.__name__}"
+    manager._strategy.shutting_down = True
     try:
         await manager.start()
-        print(f"{SUCCESS}Browser manager started successfully{RESET}")
-    except Exception as e:
-        print(f"{ERROR}Failed to start browser manager: {str(e)}{RESET}")
-        return None
+        assert manager._strategy.config.debugging_port != 0, "Ephemeral port not assigned"
+    finally:
+        await manager.close()
 
-    # Step 4: Get browser info from the strategy
-    print(f"\n{INFO}4. Getting browser information{RESET}")
-    browser_info = manager._strategy.get_builtin_browser_info()
-    if browser_info:
-        print(f"{SUCCESS}Browser info retrieved:{RESET}")
-        for key, value in browser_info.items():
-            if key != "config":  # Skip the verbose config section
-                print(f"  {key}: {value}")
+@pytest.mark.asyncio
+async def test_builtin_browser_creation(manager: BrowserManager):
+    """Test creating a builtin browser using the BrowserManager with BuiltinBrowserStrategy"""
+    # Check if we have a BuiltinBrowserStrategy
+    assert isinstance(manager._strategy, BuiltinBrowserStrategy), f"Wrong strategy type {manager._strategy.__class__.__name__}"
 
-        cdp_url = browser_info.get("cdp_url")
-        print(f"{SUCCESS}CDP URL: {cdp_url}{RESET}")
-    else:
-        print(f"{ERROR}Failed to get browser information{RESET}")
-        cdp_url = None
+    # Check we can get browser info from the strategy
+    strategy: BuiltinBrowserStrategy = manager._strategy
+    browser_info = strategy.get_browser_info()
+    assert browser_info, "Failed to get browser info"
 
-    # Save manager for later tests
-    return manager, cdp_url
-
-
+@pytest.mark.asyncio
 async def test_page_operations(manager: BrowserManager):
     """Test page operations with the builtin browser"""
-    print(
-        f"\n{INFO}========== Testing Page Operations with Builtin Browser =========={RESET}"
-    )
 
     # Step 1: Get a single page
-    print(f"\n{INFO}1. Getting a single page{RESET}")
-    try:
-        crawler_config = CrawlerRunConfig()
-        page, context = await manager.get_page(crawler_config)
-        print(f"{SUCCESS}Got page successfully{RESET}")
+    crawler_config = CrawlerRunConfig()
+    page, context = await manager.get_page(crawler_config)
 
-        # Navigate to a test URL
-        await page.goto("https://example.com")
-        title = await page.title()
-        print(f"{SUCCESS}Page title: {title}{RESET}")
+    # Navigate to a test URL
+    await page.goto("https://example.com")
+    title = await page.title()
 
-        # Close the page
-        await page.close()
-        print(f"{SUCCESS}Page closed successfully{RESET}")
-    except Exception as e:
-        print(f"{ERROR}Page operation failed: {str(e)}{RESET}")
-        return False
+    # Close the page
+    await page.close()
 
     # Step 2: Get multiple pages
-    print(f"\n{INFO}2. Getting multiple pages with get_pages(){RESET}")
-    try:
-        # Request 3 pages
-        crawler_config = CrawlerRunConfig()
-        pages = await manager.get_pages(crawler_config, count=3)
-        print(f"{SUCCESS}Got {len(pages)} pages{RESET}")
 
-        # Test each page
-        for i, (page, context) in enumerate(pages):
-            await page.goto(f"https://example.com?test={i}")
-            title = await page.title()
-            print(f"{SUCCESS}Page {i + 1} title: {title}{RESET}")
-            await page.close()
+    # Request 3 pages
+    crawler_config = CrawlerRunConfig()
+    pages = await manager.get_pages(crawler_config, count=3)
 
-        print(f"{SUCCESS}All pages tested and closed successfully{RESET}")
-    except Exception as e:
-        print(f"{ERROR}Multiple page operation failed: {str(e)}{RESET}")
-        return False
+    # Test each page
+    for i, (page, context) in enumerate(pages):
+        response = await page.goto(f"https://example.com?test={i}")
+        assert response, f"Failed to load page {i + 1}"
+        title: str = await page.title()
+        assert title == "Example Domain", f"Expected title 'Example Domain', got '{title}'"
+        await page.close()
 
-    return True
-
-
+@pytest.mark.asyncio
 async def test_browser_status_management(manager: BrowserManager):
     """Test browser status and management operations"""
-    print(f"\n{INFO}========== Testing Browser Status and Management =========={RESET}")
-
-    # Step 1: Get browser status
-    print(f"\n{INFO}1. Getting browser status{RESET}")
-    try:
-        status = await manager._strategy.get_builtin_browser_status()
-        print(f"{SUCCESS}Browser status:{RESET}")
-        print(f"  Running: {status['running']}")
-        print(f"  CDP URL: {status['cdp_url']}")
-    except Exception as e:
-        print(f"{ERROR}Failed to get browser status: {str(e)}{RESET}")
-        return False
+    assert isinstance(manager._strategy, BuiltinBrowserStrategy), f"Wrong strategy type {manager._strategy.__class__.__name__}"
+    status = await manager._strategy.get_builtin_browser_status()
 
     # Step 2: Test killing the browser
-    print(f"\n{INFO}2. Testing killing the browser{RESET}")
-    try:
-        result = await manager._strategy.kill_builtin_browser()
-        if result:
-            print(f"{SUCCESS}Browser killed successfully{RESET}")
-        else:
-            print(f"{ERROR}Failed to kill browser{RESET}")
-    except Exception as e:
-        print(f"{ERROR}Browser kill operation failed: {str(e)}{RESET}")
-        return False
+    result = await manager._strategy.kill_builtin_browser()
+    assert result, "Failed to kill the browser"
 
     # Step 3: Check status after kill
-    print(f"\n{INFO}3. Checking status after kill{RESET}")
-    try:
-        status = await manager._strategy.get_builtin_browser_status()
-        if not status["running"]:
-            print(f"{SUCCESS}Browser is correctly reported as not running{RESET}")
-        else:
-            print(f"{ERROR}Browser is incorrectly reported as still running{RESET}")
-    except Exception as e:
-        print(f"{ERROR}Failed to get browser status: {str(e)}{RESET}")
-        return False
+    status = await manager._strategy.get_builtin_browser_status()
+    assert status, "Failed to get browser status after kill"
+    assert not status["running"], "Browser is still running after kill"
 
     # Step 4: Launch a new browser
-    print(f"\n{INFO}4. Launching a new browser{RESET}")
-    try:
-        cdp_url = await manager._strategy.launch_builtin_browser(
-            browser_type="chromium", headless=True
-        )
-        if cdp_url:
-            print(f"{SUCCESS}New browser launched at: {cdp_url}{RESET}")
-        else:
-            print(f"{ERROR}Failed to launch new browser{RESET}")
-            return False
-    except Exception as e:
-        print(f"{ERROR}Browser launch failed: {str(e)}{RESET}")
-        return False
+    cdp_url = await manager._strategy.launch_builtin_browser(
+        browser_type="chromium", headless=True
+    )
+    assert cdp_url, "Failed to launch a new browser"
 
-    return True
-
-
+@pytest.mark.asyncio
 async def test_multiple_managers():
     """Test creating multiple BrowserManagers that use the same builtin browser"""
-    print(f"\n{INFO}========== Testing Multiple Browser Managers =========={RESET}")
 
     # Step 1: Create first manager
-    print(f"\n{INFO}1. Creating first browser manager{RESET}")
-    browser_config1 = (BrowserConfig(browser_mode="builtin", headless=True),)
-    manager1 = BrowserManager(browser_config=browser_config1, logger=logger)
+    browser_config1: BrowserConfig = BrowserConfig(browser_mode="builtin", headless=True)
+    manager1: BrowserManager = BrowserManager(browser_config=browser_config1)
 
     # Step 2: Create second manager
-    print(f"\n{INFO}2. Creating second browser manager{RESET}")
-    browser_config2 = BrowserConfig(browser_mode="builtin", headless=True)
-    manager2 = BrowserManager(browser_config=browser_config2, logger=logger)
+    browser_config2: BrowserConfig = BrowserConfig(browser_mode="builtin", headless=True)
+    manager2: BrowserManager = BrowserManager(browser_config=browser_config2)
 
     # Step 3: Start both managers (should connect to the same builtin browser)
-    print(f"\n{INFO}3. Starting both managers{RESET}")
+    page1: Optional[Page] = None
+    page2: Optional[Page] = None
     try:
         await manager1.start()
-        print(f"{SUCCESS}First manager started{RESET}")
-
         await manager2.start()
-        print(f"{SUCCESS}Second manager started{RESET}")
 
         # Check if they got the same CDP URL
         cdp_url1 = manager1._strategy.config.cdp_url
         cdp_url2 = manager2._strategy.config.cdp_url
 
-        if cdp_url1 == cdp_url2:
-            print(
-                f"{SUCCESS}Both managers connected to the same browser: {cdp_url1}{RESET}"
-            )
-        else:
-            print(
-                f"{WARNING}Managers connected to different browsers: {cdp_url1} and {cdp_url2}{RESET}"
-            )
-    except Exception as e:
-        print(f"{ERROR}Failed to start managers: {str(e)}{RESET}")
-        return False
+        assert cdp_url1 == cdp_url2, "CDP URLs do not match between managers"
 
-    # Step 4: Test using both managers
-    print(f"\n{INFO}4. Testing operations with both managers{RESET}")
-    try:
+        # Step 4: Test using both managers
         # First manager creates a page
         page1, ctx1 = await manager1.get_page(CrawlerRunConfig())
         await page1.goto("https://example.com")
-        title1 = await page1.title()
-        print(f"{SUCCESS}Manager 1 page title: {title1}{RESET}")
+        title1: str = await page1.title()
+        assert title1 == "Example Domain", f"Expected title 'Example Domain', got '{title1}'"
 
         # Second manager creates a page
         page2, ctx2 = await manager2.get_page(CrawlerRunConfig())
         await page2.goto("https://example.org")
-        title2 = await page2.title()
-        print(f"{SUCCESS}Manager 2 page title: {title2}{RESET}")
-
-        # Clean up
-        await page1.close()
-        await page2.close()
-    except Exception as e:
-        print(f"{ERROR}Failed to use both managers: {str(e)}{RESET}")
-        return False
-
-    # Step 5: Close both managers
-    print(f"\n{INFO}5. Closing both managers{RESET}")
-    try:
+        title2: str = await page2.title()
+        assert title2 == "Example Domain", f"Expected title 'Example Domain', got '{title2}'"
+    finally:
+        if page1:
+            await page1.close()
+        if page2:
+            await page2.close()
+        # Close both managers
         await manager1.close()
-        print(f"{SUCCESS}First manager closed{RESET}")
-
         await manager2.close()
-        print(f"{SUCCESS}Second manager closed{RESET}")
-    except Exception as e:
-        print(f"{ERROR}Failed to close managers: {str(e)}{RESET}")
-        return False
-
-    return True
 
 
-async def test_edge_cases():
-    """Test edge cases like multiple starts, killing browser during operations, etc."""
-    print(f"\n{INFO}========== Testing Edge Cases =========={RESET}")
-
-    # Step 1: Test multiple starts with the same manager
-    print(f"\n{INFO}1. Testing multiple starts with the same manager{RESET}")
-    browser_config = BrowserConfig(browser_mode="builtin", headless=True)
-    manager = BrowserManager(browser_config=browser_config, logger=logger)
-
+@pytest.mark.asyncio
+async def test_multiple_starts(manager: BrowserManager):
+    """Test multiple starts with the same manager."""
+    page: Optional[Page] = None
     try:
-        await manager.start()
-        print(f"{SUCCESS}First start successful{RESET}")
-
         # Try to start again
         await manager.start()
-        print(f"{SUCCESS}Second start completed without errors{RESET}")
 
         # Test if it's still functional
         page, context = await manager.get_page(CrawlerRunConfig())
+        assert page is not None, "Failed to create a page after multiple starts"
         await page.goto("https://example.com")
-        title = await page.title()
-        print(
-            f"{SUCCESS}Page operations work after multiple starts. Title: {title}{RESET}"
-        )
-        await page.close()
-    except Exception as e:
-        print(f"{ERROR}Multiple starts test failed: {str(e)}{RESET}")
-        return False
+        title: str = await page.title()
+        assert title == "Example Domain", f"Expected title 'Example Domain', got '{title}'"
     finally:
-        await manager.close()
-
-    # Step 2: Test killing the browser while manager is active
-    print(f"\n{INFO}2. Testing killing the browser while manager is active{RESET}")
-    manager = BrowserManager(browser_config=browser_config, logger=logger)
-
-    try:
-        await manager.start()
-        print(f"{SUCCESS}Manager started{RESET}")
-
-        # Kill the browser directly
-        print(f"{INFO}Killing the browser...{RESET}")
-        await manager._strategy.kill_builtin_browser()
-        print(f"{SUCCESS}Browser killed{RESET}")
-
-        # Try to get a page (should fail or launch a new browser)
-        try:
-            page, context = await manager.get_page(CrawlerRunConfig())
-            print(
-                f"{WARNING}Page request succeeded despite killed browser (might have auto-restarted){RESET}"
-            )
-            title = await page.title()
-            print(f"{SUCCESS}Got page title: {title}{RESET}")
+        if page:
             await page.close()
-        except Exception as e:
-            print(
-                f"{SUCCESS}Page request failed as expected after browser was killed: {str(e)}{RESET}"
-            )
-    except Exception as e:
-        print(f"{ERROR}Kill during operation test failed: {str(e)}{RESET}")
-        return False
-    finally:
         await manager.close()
 
-    return True
+@pytest.mark.asyncio
+async def test_kill_while_active(manager: BrowserManager):
+    """Test killing the browser while manager is active."""
+    assert isinstance(manager._strategy, BuiltinBrowserStrategy), f"Wrong strategy type {manager._strategy.__class__.__name__}"
+    await manager._strategy.kill_builtin_browser()
 
+    with pytest.raises(Exception):
+        # Try to get a page should fail
+        await manager.get_page(CrawlerRunConfig())
 
-async def cleanup_browsers():
-    """Clean up any remaining builtin browsers"""
-    print(f"\n{INFO}========== Cleaning Up Builtin Browsers =========={RESET}")
-
-    browser_config = BrowserConfig(browser_mode="builtin", headless=True)
-    manager = BrowserManager(browser_config=browser_config, logger=logger)
-
-    try:
-        # No need to start, just access the strategy directly
-        strategy = manager._strategy
-        if isinstance(strategy, BuiltinBrowserStrategy):
-            result = await strategy.kill_builtin_browser()
-            if result:
-                print(f"{SUCCESS}Successfully killed all builtin browsers{RESET}")
-            else:
-                print(f"{WARNING}No builtin browsers found to kill{RESET}")
-        else:
-            print(f"{ERROR}Wrong strategy type: {strategy.__class__.__name__}{RESET}")
-    except Exception as e:
-        print(f"{ERROR}Cleanup failed: {str(e)}{RESET}")
-    finally:
-        # Just to be safe
-        try:
-            await manager.close()
-        except:
-            pass
-
-
-async def test_performance_scaling():
+@pytest.mark.asyncio
+@pytest.mark.timeout(30)
+async def test_performance_scaling(browsers_manager: BrowsersManager, test_server: TestServer):
     """Test performance with multiple browsers and pages.
 
     This test creates multiple browsers on different ports,
     spawns multiple pages per browser, and measures performance metrics.
     """
-    print(f"\n{INFO}========== Testing Performance Scaling =========={RESET}")
-
-    # Configuration parameters
-    num_browsers = 10
-    pages_per_browser = 10
-    total_pages = num_browsers * pages_per_browser
-    base_port = 9222
-
-    # Set up a measuring mechanism for memory
-    import psutil
-    import gc
-
-    # Force garbage collection before starting
-    gc.collect()
-    process = psutil.Process()
-    initial_memory = process.memory_info().rss / 1024 / 1024  # in MB
-    peak_memory = initial_memory
-
-    # Report initial configuration
-    print(
-        f"{INFO}Test configuration: {num_browsers} browsers × {pages_per_browser} pages = {total_pages} total crawls{RESET}"
-    )
-
-    # List to track managers
-    managers: List[BrowserManager] = []
-    all_pages = []
-
-
-
-    # Get crawl4ai home directory
-    crawl4ai_home = os.path.expanduser("~/.crawl4ai")
-    temp_dir = os.path.join(crawl4ai_home, "temp")
-    os.makedirs(temp_dir, exist_ok=True)
-
-    # Create all managers but don't start them yet
-    manager_configs = []
-    for i in range(num_browsers):
-        port = base_port + i
-        browser_config = BrowserConfig(
-            browser_mode="builtin",
-            headless=True,
-            debugging_port=port,
-            user_data_dir=os.path.join(temp_dir, f"browser_profile_{i}"),
-        )
-        manager = BrowserManager(browser_config=browser_config, logger=logger)
-        manager._strategy.shutting_down = True
-        manager_configs.append((manager, i, port))
-
-    # Define async function to start a single manager
-    async def start_manager(manager, index, port):
-        try:
-            await manager.start()
-            return manager
-        except Exception as e:
-            print(
-                f"{ERROR}Failed to start browser {index + 1} on port {port}: {str(e)}{RESET}"
-            )
-            return None
-
-    # Start all managers in parallel
-    start_tasks = [
-        start_manager(manager, i, port) for manager, i, port in manager_configs
-    ]
-    started_managers = await asyncio.gather(*start_tasks)
-
-    # Filter out None values (failed starts) and add to managers list
-    managers = [m for m in started_managers if m is not None]
-
-    if len(managers) == 0:
-        print(f"{ERROR}All browser managers failed to start. Aborting test.{RESET}")
-        return False
-
-    if len(managers) < num_browsers:
-        print(
-            f"{WARNING}Only {len(managers)} out of {num_browsers} browser managers started successfully{RESET}"
-        )
-
-    # Create pages for each browser
-    for i, manager in enumerate(managers):
-        try:
-            pages = await manager.get_pages(CrawlerRunConfig(), count=pages_per_browser)
-            all_pages.extend(pages)
-        except Exception as e:
-            print(f"{ERROR}Failed to create pages for browser {i + 1}: {str(e)}{RESET}")
-
-    # Check memory after page creation
-    gc.collect()
-    current_memory = process.memory_info().rss / 1024 / 1024
-    peak_memory = max(peak_memory, current_memory)
+    assert browsers_manager.managers, "Failed to start any browser managers"
 
     # Ask for confirmation before loading
     confirmation = input(
         f"{WARNING}Do you want to proceed with loading pages? (y/n): {RESET}"
-    )
+    ) if sys.stdin.isatty() else "y"
+
+    assert confirmation.lower() == "y", "User aborted the test"
+
     # Step 1: Create and start multiple browser managers in parallel
     start_time = time.time()
-    
-    if confirmation.lower() == "y":
-        load_start_time = time.time()
 
-        # Function to load a single page
-        async def load_page(page_ctx, index):
-            page, _ = page_ctx
-            try:
-                await page.goto(f"https://example.com/page{index}", timeout=30000)
-                title = await page.title()
-                return title
-            except Exception as e:
-                return f"Error: {str(e)}"
-
-        # Load all pages concurrently
-        load_tasks = [load_page(page_ctx, i) for i, page_ctx in enumerate(all_pages)]
-        load_results = await asyncio.gather(*load_tasks, return_exceptions=True)
-
-        # Count successes and failures
-        successes = sum(
-            1 for r in load_results if isinstance(r, str) and not r.startswith("Error")
-        )
-        failures = len(load_results) - successes
-
-        load_time = time.time() - load_start_time
-        total_test_time = time.time() - start_time
-
-        # Check memory after loading (peak memory)
-        gc.collect()
-        current_memory = process.memory_info().rss / 1024 / 1024
-        peak_memory = max(peak_memory, current_memory)
-
-        # Calculate key metrics
-        memory_per_page = peak_memory / successes if successes > 0 else 0
-        time_per_crawl = total_test_time / successes if successes > 0 else 0
-        crawls_per_second = successes / total_test_time if total_test_time > 0 else 0
-        crawls_per_minute = crawls_per_second * 60
-        crawls_per_hour = crawls_per_minute * 60
-
-        # Print simplified performance summary
-        from rich.console import Console
-        from rich.table import Table
-
-        console = Console()
-
-        # Create a simple summary table
-        table = Table(title="CRAWL4AI PERFORMANCE SUMMARY")
-
-        table.add_column("Metric", style="cyan")
-        table.add_column("Value", style="green")
-
-        table.add_row("Total Crawls Completed", f"{successes}")
-        table.add_row("Total Time", f"{total_test_time:.2f} seconds")
-        table.add_row("Time Per Crawl", f"{time_per_crawl:.2f} seconds")
-        table.add_row("Crawling Speed", f"{crawls_per_second:.2f} crawls/second")
-        table.add_row("Projected Rate (1 minute)", f"{crawls_per_minute:.0f} crawls")
-        table.add_row("Projected Rate (1 hour)", f"{crawls_per_hour:.0f} crawls")
-        table.add_row("Peak Memory Usage", f"{peak_memory:.2f} MB")
-        table.add_row("Memory Per Crawl", f"{memory_per_page:.2f} MB")
-
-        # Display the table
-        console.print(table)
-
-    # Ask confirmation before cleanup
-    confirmation = input(
-        f"{WARNING}Do you want to proceed with cleanup? (y/n): {RESET}"
-    )
-    if confirmation.lower() != "y":
-        print(f"{WARNING}Cleanup aborted by user{RESET}")
-        return False
-
-    # Close all pages
-    for page, _ in all_pages:
+    # Function to load a single page
+    url = test_server.make_url("/page")
+    async def load_page(page_ctx: Tuple[Page, Any], index):
+        page, _ = page_ctx
         try:
-            await page.close()
-        except:
-            pass
+            response: Optional[Response] = await page.goto(f"{url}{index}", timeout=5000) # example.com tends to hang connections under load.
+            if response is None:
+                print(f"{ERROR}Failed to load page {index}: No response{RESET}")
+                return "Error: No response"
 
-    # Close all managers
-    for manager in managers:
-        try:
-            await manager.close()
-        except:
-            pass
+            if response.status != codes.OK:
+                print(f"{ERROR}Failed to load page {index}: {response.status}{RESET}")
+                return f"Error: {response.status}"
 
-    # Remove the temp directory
-    import shutil
-
-    if os.path.exists(temp_dir):
-        shutil.rmtree(temp_dir)
-
-    return True
-
-
-async def test_performance_scaling_lab( num_browsers: int = 10, pages_per_browser: int = 10):
-    """Test performance with multiple browsers and pages.
-
-    This test creates multiple browsers on different ports,
-    spawns multiple pages per browser, and measures performance metrics.
-    """
-    print(f"\n{INFO}========== Testing Performance Scaling =========={RESET}")
-
-    # Configuration parameters
-    num_browsers = num_browsers
-    pages_per_browser = pages_per_browser
-    total_pages = num_browsers * pages_per_browser
-    base_port = 9222
-
-    # Set up a measuring mechanism for memory
-    import psutil
-    import gc
-
-    # Force garbage collection before starting
-    gc.collect()
-    process = psutil.Process()
-    initial_memory = process.memory_info().rss / 1024 / 1024  # in MB
-    peak_memory = initial_memory
-
-    # Report initial configuration
-    print(
-        f"{INFO}Test configuration: {num_browsers} browsers × {pages_per_browser} pages = {total_pages} total crawls{RESET}"
-    )
-
-    # List to track managers
-    managers: List[BrowserManager] = []
-    all_pages = []
-
-    # Get crawl4ai home directory
-    crawl4ai_home = os.path.expanduser("~/.crawl4ai")
-    temp_dir = os.path.join(crawl4ai_home, "temp")
-    os.makedirs(temp_dir, exist_ok=True)
-
-    # Create all managers but don't start them yet
-    manager_configs = []
-    for i in range(num_browsers):
-        port = base_port + i
-        browser_config = BrowserConfig(
-            browser_mode="builtin",
-            headless=True,
-            debugging_port=port,
-            user_data_dir=os.path.join(temp_dir, f"browser_profile_{i}"),
-        )
-        manager = BrowserManager(browser_config=browser_config, logger=logger)
-        manager._strategy.shutting_down = True
-        manager_configs.append((manager, i, port))
-
-    # Define async function to start a single manager
-    async def start_manager(manager, index, port):
-        try:
-            await manager.start()
-            return manager
+            return await page.title()
         except Exception as e:
-            print(
-                f"{ERROR}Failed to start browser {index + 1} on port {port}: {str(e)}{RESET}"
-            )
-            return None
+            print(f"{ERROR}Failed to load page {index}: {str(e)}{RESET}")
+            return f"Error: {str(e)}"
 
-    # Start all managers in parallel
-    start_tasks = [
-        start_manager(manager, i, port) for manager, i, port in manager_configs
-    ]
-    started_managers = await asyncio.gather(*start_tasks)
+    # Load all pages concurrently
+    load_tasks = [load_page(page_ctx, i + 1) for i, page_ctx in enumerate(browsers_manager.all_pages)]
+    load_results = await asyncio.gather(*load_tasks)
 
-    # Filter out None values (failed starts) and add to managers list
-    managers = [m for m in started_managers if m is not None]
-
-    if len(managers) == 0:
-        print(f"{ERROR}All browser managers failed to start. Aborting test.{RESET}")
-        return False
-
-    if len(managers) < num_browsers:
-        print(
-            f"{WARNING}Only {len(managers)} out of {num_browsers} browser managers started successfully{RESET}"
-        )
-
-    # Create pages for each browser
-    for i, manager in enumerate(managers):
-        try:
-            pages = await manager.get_pages(CrawlerRunConfig(), count=pages_per_browser)
-            all_pages.extend(pages)
-        except Exception as e:
-            print(f"{ERROR}Failed to create pages for browser {i + 1}: {str(e)}{RESET}")
-
-    # Check memory after page creation
-    gc.collect()
-    current_memory = process.memory_info().rss / 1024 / 1024
-    peak_memory = max(peak_memory, current_memory)
-
-    # Ask for confirmation before loading
-    confirmation = input(
-        f"{WARNING}Do you want to proceed with loading pages? (y/n): {RESET}"
+    # Count successes and failures
+    successes = sum(
+        1 for r in load_results if isinstance(r, str) and not r.startswith("Error")
     )
-    # Step 1: Create and start multiple browser managers in parallel
-    start_time = time.time()
-    
-    if confirmation.lower() == "y":
-        load_start_time = time.time()
+    failures = len(load_results) - successes
 
-        # Function to load a single page
-        async def load_page(page_ctx, index):
-            page, _ = page_ctx
-            try:
-                await page.goto(f"https://example.com/page{index}", timeout=30000)
-                title = await page.title()
-                return title
-            except Exception as e:
-                return f"Error: {str(e)}"
+    assert not failures, f"Failed to load {failures} pages"
 
-        # Load all pages concurrently
-        load_tasks = [load_page(page_ctx, i) for i, page_ctx in enumerate(all_pages)]
-        load_results = await asyncio.gather(*load_tasks, return_exceptions=True)
+    total_test_time = time.time() - start_time
 
-        # Count successes and failures
-        successes = sum(
-            1 for r in load_results if isinstance(r, str) and not r.startswith("Error")
-        )
-        failures = len(load_results) - successes
+    # Check memory after loading (peak memory)
+    browsers_manager.check_memory()
 
-        load_time = time.time() - load_start_time
-        total_test_time = time.time() - start_time
+    # Calculate key metrics
+    memory_per_page = browsers_manager.peak_memory / successes if successes > 0 else 0
+    time_per_crawl = total_test_time / successes if successes > 0 else 0
+    crawls_per_second = successes / total_test_time if total_test_time > 0 else 0
+    crawls_per_minute = crawls_per_second * 60
+    crawls_per_hour = crawls_per_minute * 60
 
-        # Check memory after loading (peak memory)
-        gc.collect()
-        current_memory = process.memory_info().rss / 1024 / 1024
-        peak_memory = max(peak_memory, current_memory)
+    # Print simplified performance summary
+    from rich.console import Console
+    from rich.table import Table
 
-        # Calculate key metrics
-        memory_per_page = peak_memory / successes if successes > 0 else 0
-        time_per_crawl = total_test_time / successes if successes > 0 else 0
-        crawls_per_second = successes / total_test_time if total_test_time > 0 else 0
-        crawls_per_minute = crawls_per_second * 60
-        crawls_per_hour = crawls_per_minute * 60
+    console = Console()
 
-        # Print simplified performance summary
-        from rich.console import Console
-        from rich.table import Table
+    # Create a simple summary table
+    table = Table(title="CRAWL4AI PERFORMANCE SUMMARY")
 
-        console = Console()
+    table.add_column("Metric", style="cyan")
+    table.add_column("Value", style="green")
 
-        # Create a simple summary table
-        table = Table(title="CRAWL4AI PERFORMANCE SUMMARY")
+    table.add_row("Total Crawls Completed", f"{successes}")
+    table.add_row("Total Time", f"{total_test_time:.2f} seconds")
+    table.add_row("Time Per Crawl", f"{time_per_crawl:.2f} seconds")
+    table.add_row("Crawling Speed", f"{crawls_per_second:.2f} crawls/second")
+    table.add_row("Projected Rate (1 minute)", f"{crawls_per_minute:.0f} crawls")
+    table.add_row("Projected Rate (1 hour)", f"{crawls_per_hour:.0f} crawls")
+    table.add_row("Peak Memory Usage", f"{browsers_manager.peak_memory:.2f} MB")
+    table.add_row("Memory Per Crawl", f"{memory_per_page:.2f} MB")
 
-        table.add_column("Metric", style="cyan")
-        table.add_column("Value", style="green")
-
-        table.add_row("Total Crawls Completed", f"{successes}")
-        table.add_row("Total Time", f"{total_test_time:.2f} seconds")
-        table.add_row("Time Per Crawl", f"{time_per_crawl:.2f} seconds")
-        table.add_row("Crawling Speed", f"{crawls_per_second:.2f} crawls/second")
-        table.add_row("Projected Rate (1 minute)", f"{crawls_per_minute:.0f} crawls")
-        table.add_row("Projected Rate (1 hour)", f"{crawls_per_hour:.0f} crawls")
-        table.add_row("Peak Memory Usage", f"{peak_memory:.2f} MB")
-        table.add_row("Memory Per Crawl", f"{memory_per_page:.2f} MB")
-
-        # Display the table
-        console.print(table)
-
-    # Ask confirmation before cleanup
-    confirmation = input(
-        f"{WARNING}Do you want to proceed with cleanup? (y/n): {RESET}"
-    )
-    if confirmation.lower() != "y":
-        print(f"{WARNING}Cleanup aborted by user{RESET}")
-        return False
-
-    # Close all pages
-    for page, _ in all_pages:
-        try:
-            await page.close()
-        except:
-            pass
-
-    # Close all managers
-    for manager in managers:
-        try:
-            await manager.close()
-        except:
-            pass
-
-    # Remove the temp directory
-    import shutil
-
-    if os.path.exists(temp_dir):
-        shutil.rmtree(temp_dir)
-
-    return True
-
-
-
-async def main():
-    """Run all tests"""
-    try:
-        print(f"{INFO}Starting builtin browser tests with browser module{RESET}")
-
-        # # Run browser creation test
-        # manager, cdp_url = await test_builtin_browser_creation()
-        # if not manager:
-        #     print(f"{ERROR}Browser creation failed, cannot continue tests{RESET}")
-        #     return
-
-        # # Run page operations test
-        # await test_page_operations(manager)
-
-        # # Run browser status and management test
-        # await test_browser_status_management(manager)
-
-        # # Close manager before multiple manager test
-        # await manager.close()
-
-        # Run multiple managers test
-        # await test_multiple_managers()
-
-        # Run performance scaling test
-        await test_performance_scaling()
-        # Run cleanup test
-        # await cleanup_browsers()
-
-        # Run edge cases test
-        # await test_edge_cases()
-
-        print(f"\n{SUCCESS}All tests completed!{RESET}")
-
-    except Exception as e:
-        print(f"\n{ERROR}Test failed with error: {str(e)}{RESET}")
-        import traceback
-
-        traceback.print_exc()
-    finally:
-        # Clean up: kill any remaining builtin browsers
-        await cleanup_browsers()
-        print(f"{SUCCESS}Test cleanup complete{RESET}")
-
+    # Display the table
+    console.print(table)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    import subprocess
+
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

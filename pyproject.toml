@@ -103,6 +103,7 @@ test = [
     "matplotlib>=3.9.4",
     "nest-asyncio>=1.6.0",
     "nltk>=3.9.1",
+    "pytest-aiohttp>=1.1.0",
     "pytest-asyncio>=0.25.3",
     "pytest-cov>=6.0.0",
     "pytest-httpserver>=1.1.2",

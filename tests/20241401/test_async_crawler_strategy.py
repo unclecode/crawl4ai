@@ -1,13 +1,14 @@
+import os
+import sys
+from pathlib import Path
+from typing import AsyncGenerator, Optional
+
+from httpx import codes
 import pytest
 import pytest_asyncio
-import asyncio
-from typing import Dict, Any
-from pathlib import Path
-from unittest.mock import MagicMock, patch
-import os
+
 from crawl4ai.async_configs import BrowserConfig, CrawlerRunConfig
 from crawl4ai.async_crawler_strategy import AsyncPlaywrightCrawlerStrategy
-from crawl4ai.models import AsyncCrawlResponse
 from crawl4ai.async_logger import AsyncLogger, LogLevel
 
 CRAWL4AI_HOME_DIR = Path(os.path.expanduser("~")).joinpath(".crawl4ai")
@@ -17,7 +18,7 @@ if not CRAWL4AI_HOME_DIR.joinpath("profiles", "test_profile").exists():
 
 # Test Config Files
 @pytest.fixture
-def basic_browser_config():
+def basic_browser_config() -> BrowserConfig:
     return BrowserConfig(
         browser_type="chromium",
         headless=True,
@@ -25,20 +26,19 @@ def basic_browser_config():
     )
 
 @pytest.fixture
-def advanced_browser_config():
+def advanced_browser_config() -> BrowserConfig:
     return BrowserConfig(
-        browser_type="chromium", 
+        browser_type="chromium",
         headless=True,
         use_managed_browser=True,
-        user_data_dir=CRAWL4AI_HOME_DIR.joinpath("profiles", "test_profile"),
-        # proxy="http://localhost:8080",
+        user_data_dir=CRAWL4AI_HOME_DIR.joinpath("profiles", "test_profile").as_posix(),
         viewport_width=1920,
         viewport_height=1080,
         user_agent_mode="random"
     )
 
 @pytest.fixture
-def basic_crawler_config():
+def basic_crawler_config() -> CrawlerRunConfig:
     return CrawlerRunConfig(
         word_count_threshold=100,
         wait_until="domcontentloaded",
@@ -46,12 +46,12 @@ def basic_crawler_config():
     )
 
 @pytest.fixture
-def logger():
+def logger() -> AsyncLogger:
     return AsyncLogger(verbose=True, log_level=LogLevel.DEBUG)
 
 @pytest_asyncio.fixture
-async def crawler_strategy(basic_browser_config, logger):
-    strategy = AsyncPlaywrightCrawlerStrategy(browser_config=basic_browser_config, logger=logger)
+async def crawler_strategy(basic_browser_config, logger) -> AsyncGenerator[AsyncPlaywrightCrawlerStrategy, None]:
+    strategy: AsyncPlaywrightCrawlerStrategy = AsyncPlaywrightCrawlerStrategy(browser_config=basic_browser_config, logger=logger)
     await strategy.start()
     yield strategy
     await strategy.close()
@@ -67,7 +67,7 @@ async def test_browser_config_initialization():
     assert config.user_agent is not None
     assert config.headless is True
 
-@pytest.mark.asyncio 
+@pytest.mark.asyncio
 async def test_persistent_browser_config():
     config = BrowserConfig(
         use_persistent_context=True,
@@ -78,17 +78,17 @@ async def test_persistent_browser_config():
 
 # Crawler Strategy Tests
 @pytest.mark.asyncio
-async def test_basic_page_load(crawler_strategy):
+async def test_basic_page_load(crawler_strategy: AsyncPlaywrightCrawlerStrategy):
     response = await crawler_strategy.crawl(
         "https://example.com",
         CrawlerRunConfig()
     )
-    assert response.status_code == 200
+    assert response.status_code == codes.OK
     assert len(response.html) > 0
     assert "Example Domain" in response.html
 
 @pytest.mark.asyncio
-async def test_screenshot_capture(crawler_strategy):
+async def test_screenshot_capture(crawler_strategy: AsyncPlaywrightCrawlerStrategy):
     config = CrawlerRunConfig(screenshot=True)
     response = await crawler_strategy.crawl(
         "https://example.com",
@@ -98,17 +98,17 @@ async def test_screenshot_capture(crawler_strategy):
     assert len(response.screenshot) > 0
 
 @pytest.mark.asyncio
-async def test_pdf_generation(crawler_strategy):
+async def test_pdf_generation(crawler_strategy: AsyncPlaywrightCrawlerStrategy):
     config = CrawlerRunConfig(pdf=True)
     response = await crawler_strategy.crawl(
-        "https://example.com", 
+        "https://example.com",
         config
     )
     assert response.pdf_data is not None
     assert len(response.pdf_data) > 0
 
 @pytest.mark.asyncio
-async def test_handle_js_execution(crawler_strategy):
+async def test_handle_js_execution(crawler_strategy: AsyncPlaywrightCrawlerStrategy):
     config = CrawlerRunConfig(
         js_code="document.body.style.backgroundColor = 'red';"
     )
@@ -116,11 +116,11 @@ async def test_handle_js_execution(crawler_strategy):
         "https://example.com",
         config
     )
-    assert response.status_code == 200
+    assert response.status_code == codes.OK
     assert 'background-color: red' in response.html.lower()
 
 @pytest.mark.asyncio
-async def test_multiple_js_commands(crawler_strategy):
+async def test_multiple_js_commands(crawler_strategy: AsyncPlaywrightCrawlerStrategy):
     js_commands = [
         "document.body.style.backgroundColor = 'blue';",
         "document.title = 'Modified Title';",
@@ -131,14 +131,14 @@ async def test_multiple_js_commands(crawler_strategy):
         "https://example.com",
         config
     )
-    assert response.status_code == 200
+    assert response.status_code == codes.OK
     assert 'background-color: blue' in response.html.lower()
     assert 'id="test"' in response.html
     assert '>Test Content<' in response.html
     assert '<title>Modified Title</title>' in response.html
 
 @pytest.mark.asyncio
-async def test_complex_dom_manipulation(crawler_strategy):
+async def test_complex_dom_manipulation(crawler_strategy: AsyncPlaywrightCrawlerStrategy):
     js_code = """
     // Create a complex structure
     const container = document.createElement('div');
@@ -162,7 +162,7 @@ async def test_complex_dom_manipulation(crawler_strategy):
         "https://example.com",
         config
     )
-    assert response.status_code == 200
+    assert response.status_code == codes.OK
     assert 'class="test-container"' in response.html
     assert 'class="test-list"' in response.html
     assert 'class="item-1"' in response.html
@@ -171,7 +171,7 @@ async def test_complex_dom_manipulation(crawler_strategy):
     assert '>Item 3<' in response.html
 
 @pytest.mark.asyncio
-async def test_style_modifications(crawler_strategy):
+async def test_style_modifications(crawler_strategy: AsyncPlaywrightCrawlerStrategy):
     js_code = """
     const testDiv = document.createElement('div');
     testDiv.id = 'style-test';
@@ -184,7 +184,7 @@ async def test_style_modifications(crawler_strategy):
         "https://example.com",
         config
     )
-    assert response.status_code == 200
+    assert response.status_code == codes.OK
     assert 'id="style-test"' in response.html
     assert 'color: green' in response.html.lower()
     assert 'font-size: 20px' in response.html.lower()
@@ -192,7 +192,7 @@ async def test_style_modifications(crawler_strategy):
     assert '>Styled Content<' in response.html
 
 @pytest.mark.asyncio
-async def test_dynamic_content_loading(crawler_strategy):
+async def test_dynamic_content_loading(crawler_strategy: AsyncPlaywrightCrawlerStrategy):
     js_code = """
     // Simulate dynamic content loading
     setTimeout(() => {
@@ -213,33 +213,41 @@ async def test_dynamic_content_loading(crawler_strategy):
         "https://example.com",
         config
     )
-    assert response.status_code == 200
+    assert response.status_code == codes.OK
     assert 'id="loading"' in response.html
     assert '>Loading...</' in response.html
     assert 'dynamic-content' in response.html
     assert '>Dynamically Loaded<' in response.html
 
-# @pytest.mark.asyncio
-# async def test_js_return_values(crawler_strategy):
-#     js_code = """
-#     return {
-#         title: document.title,
-#         metaCount: document.getElementsByTagName('meta').length,
-#         bodyClass: document.body.className
-#     };
-#     """
-#     config = CrawlerRunConfig(js_code=js_code)
-#     response = await crawler_strategy.crawl(
-#         "https://example.com",
-#         config
-#     )
-#     assert response.status_code == 200
-#     assert 'Example Domain' in response.html
-#     assert 'meta name="viewport"' in response.html
-#     assert 'class="main"' in response.html
+@pytest.mark.asyncio
+async def test_js_return_values(crawler_strategy: AsyncPlaywrightCrawlerStrategy):
+    js_code = """
+    return {
+        title: document.title,
+        metaCount: document.getElementsByTagName('meta').length,
+        bodyClass: document.body.className
+    };
+    """
+    config = CrawlerRunConfig(js_code=js_code)
+    response = await crawler_strategy.crawl(
+        "https://example.com",
+        config
+    )
+    assert response.status_code == codes.OK
+    assert 'Example Domain' in response.html
+    assert 'meta name="viewport"' in response.html
+    assert response.js_execution_result is not None
+    assert response.js_execution_result.get("success")
+    results: Optional[list[dict]] = response.js_execution_result.get("results")
+    assert results
+    assert results[0] == {
+        "title": "Example Domain",
+        "metaCount": 3,
+        "bodyClass": ""
+    }
 
 @pytest.mark.asyncio
-async def test_async_js_execution(crawler_strategy):
+async def test_async_js_execution(crawler_strategy: AsyncPlaywrightCrawlerStrategy):
     js_code = """
     await new Promise(resolve => setTimeout(resolve, 1000));
     document.body.style.color = 'green';
@@ -251,34 +259,38 @@ async def test_async_js_execution(crawler_strategy):
         "https://example.com",
         config
     )
-    assert response.status_code == 200
+    assert response.status_code == codes.OK
     assert 'color: green' in response.html.lower()
 
-# @pytest.mark.asyncio
-# async def test_js_error_handling(crawler_strategy):
-#     js_code = """
-#     // Intentionally cause different types of errors
-#     const results = [];
-#     try {
-#         nonExistentFunction();
-#     } catch (e) {
-#         results.push(e.name);
-#     }
-#     try {
-#         JSON.parse('{invalid}');
-#     } catch (e) {
-#         results.push(e.name);
-#     }
-#     return results;
-#     """
-#     config = CrawlerRunConfig(js_code=js_code)
-#     response = await crawler_strategy.crawl(
-#         "https://example.com",
-#         config
-#     )
-#     assert response.status_code == 200
-#     assert 'ReferenceError' in response.html
-#     assert 'SyntaxError' in response.html
+@pytest.mark.asyncio
+async def test_js_error_handling(crawler_strategy: AsyncPlaywrightCrawlerStrategy):
+    js_code = """
+    // Intentionally cause different types of errors
+    const results = [];
+    try {
+        nonExistentFunction();
+    } catch (e) {
+        results.push(e.name);
+    }
+    try {
+        JSON.parse('{invalid}');
+    } catch (e) {
+        results.push(e.name);
+    }
+    return results;
+    """
+    config = CrawlerRunConfig(js_code=js_code)
+    response = await crawler_strategy.crawl(
+        "https://example.com",
+        config
+    )
+    assert response.status_code == codes.OK
+    assert response.js_execution_result is not None
+    assert response.js_execution_result.get("success")
+    results: Optional[list[dict]] = response.js_execution_result.get("results")
+    assert results
+    assert 'ReferenceError' in results[0]
+    assert 'SyntaxError' in results[0]
 
 @pytest.mark.asyncio
 async def test_handle_navigation_timeout():
@@ -288,7 +300,7 @@ async def test_handle_navigation_timeout():
             await strategy.crawl("https://example.com", config)
 
 @pytest.mark.asyncio
-async def test_session_management(crawler_strategy):
+async def test_session_management(crawler_strategy: AsyncPlaywrightCrawlerStrategy):
     config = CrawlerRunConfig(session_id="test_session")
     response1 = await crawler_strategy.crawl(
         "https://example.com",
@@ -298,23 +310,23 @@ async def test_session_management(crawler_strategy):
         "https://example.com",
         config
     )
-    assert response1.status_code == 200
-    assert response2.status_code == 200
+    assert response1.status_code == codes.OK
+    assert response2.status_code == codes.OK
 
 @pytest.mark.asyncio
-async def test_process_iframes(crawler_strategy):
+async def test_process_iframes(crawler_strategy: AsyncPlaywrightCrawlerStrategy):
     config = CrawlerRunConfig(
         process_iframes=True,
         wait_for_images=True
     )
     response = await crawler_strategy.crawl(
         "https://example.com",
-        config  
+        config
     )
-    assert response.status_code == 200
+    assert response.status_code == codes.OK
 
 @pytest.mark.asyncio
-async def test_stealth_mode(crawler_strategy):
+async def test_stealth_mode(crawler_strategy: AsyncPlaywrightCrawlerStrategy):
     config = CrawlerRunConfig(
         simulate_user=True,
         override_navigator=True
@@ -323,16 +335,16 @@ async def test_stealth_mode(crawler_strategy):
         "https://bot.sannysoft.com",
         config
     )
-    assert response.status_code == 200
+    assert response.status_code == codes.OK
 
-# Error Handling Tests  
+# Error Handling Tests
 @pytest.mark.asyncio
 async def test_invalid_url():
     with pytest.raises(ValueError):
         async with AsyncPlaywrightCrawlerStrategy() as strategy:
             await strategy.crawl("not_a_url", CrawlerRunConfig())
 
-@pytest.mark.asyncio 
+@pytest.mark.asyncio
 async def test_network_error_handling():
     config = CrawlerRunConfig()
     with pytest.raises(Exception):
@@ -340,4 +352,6 @@ async def test_network_error_handling():
             await strategy.crawl("https://invalid.example.com", config)
 
 if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+    import subprocess
+
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

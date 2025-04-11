@@ -3,13 +3,14 @@ import time
 import psutil
 import logging
 import random
-from typing import List, Dict
+from typing import List, Dict, Optional
 import uuid
 import sys
 import os
+import pytest
 
 # Import your crawler components
-from crawl4ai.models import DisplayMode, CrawlStatus, CrawlResult
+from crawl4ai.models import CrawlStatus
 from crawl4ai.async_configs import CrawlerRunConfig, BrowserConfig, CacheMode
 from crawl4ai import AsyncWebCrawler
 from crawl4ai import MemoryAdaptiveDispatcher, CrawlerMonitor
@@ -73,8 +74,8 @@ class MemorySimulator:
             time.sleep(0.5)  # Give system time to register the allocation
         except MemoryError:
             logger.warning("Unable to allocate more memory")
-            
-    def release_pressure(self, percent: float = None):
+
+    def release_pressure(self, percent: Optional[float] = None):
         """
         Release allocated memory
         If percent is specified, release that percentage of blocks
@@ -101,24 +102,24 @@ class MemorySimulator:
         logger.info(f"Creating memory pressure spike for {duration} seconds")
         # Save current blocks count
         initial_blocks = len(self.memory_blocks)
-        
+
         # Create spike with extra 5%
         self.apply_pressure(additional_percent=5.0)
-        
+
         # Schedule release after duration
         asyncio.create_task(self._delayed_release(duration, initial_blocks))
-        
+
     async def _delayed_release(self, delay: float, target_blocks: int):
         """Helper for spike_pressure - releases extra blocks after delay"""
         await asyncio.sleep(delay)
-        
+
         # Remove blocks added since spike started
         if len(self.memory_blocks) > target_blocks:
             logger.info(f"Releasing memory spike ({len(self.memory_blocks) - target_blocks} blocks)")
             self.memory_blocks = self.memory_blocks[:target_blocks]
-            
+
 # Test statistics collector
-class TestResults:
+class StressTestResults:
     def __init__(self):
         self.start_time = time.time()
         self.completed_urls: List[str] = []
@@ -167,7 +168,7 @@ class TestResults:
 # Custom monitor with stats tracking
 # Custom monitor that extends CrawlerMonitor with test-specific tracking
 class StressTestMonitor(CrawlerMonitor):
-    def __init__(self, test_results: TestResults, **kwargs):
+    def __init__(self, test_results: StressTestResults, **kwargs):
         # Initialize the parent CrawlerMonitor
         super().__init__(**kwargs)
         self.test_results = test_results
@@ -192,32 +193,51 @@ class StressTestMonitor(CrawlerMonitor):
         
         # Call parent method to update the dashboard
         super().update_queue_statistics(total_queued, highest_wait_time, avg_wait_time)
-        
-    def update_task(self, task_id: str, **kwargs):
+
+    def update_task(
+        self,
+        task_id: str,
+        status: Optional[CrawlStatus] = None,
+        start_time: Optional[float] = None,
+        end_time: Optional[float] = None,
+        memory_usage: Optional[float] = None,
+        peak_memory: Optional[float] = None,
+        error_message: Optional[str] = None,
+        retry_count: Optional[int] = None,
+        wait_time: Optional[float] = None
+    ):
         # Track URL status changes for test results
         if task_id in self.stats:
-            old_status = self.stats[task_id].status
-            
+            old_status = self.stats[task_id]["status"]
+
             # If this is a requeue event (requeued due to memory pressure)
-            if 'error_message' in kwargs and 'requeued' in kwargs['error_message']:
-                if not hasattr(self.stats[task_id], 'counted_requeue') or not self.stats[task_id].counted_requeue:
+            if error_message and 'requeued' in error_message:
+                if not self.stats[task_id]["counted_requeue"]:
                     self.test_results.requeued_count += 1
-                    self.stats[task_id].counted_requeue = True
-                    
+                    self.stats[task_id]["counted_requeue"] = True
+
             # Track completion status for test results
-            if 'status' in kwargs:
-                new_status = kwargs['status']
-                if old_status != new_status:
-                    if new_status == CrawlStatus.COMPLETED:
+            if status:
+                if old_status != status:
+                    if status == CrawlStatus.COMPLETED:
                         if task_id not in self.test_results.completed_urls:
                             self.test_results.completed_urls.append(task_id)
-                    elif new_status == CrawlStatus.FAILED:
+                    elif status == CrawlStatus.FAILED:
                         if task_id not in self.test_results.failed_urls:
                             self.test_results.failed_urls.append(task_id)
         
         # Call parent method to update the dashboard
-        super().update_task(task_id, **kwargs)
-        self.live.update(self._create_table())
+        super().update_task(
+            task_id=task_id,
+            status=status,
+            start_time=start_time,
+            end_time=end_time,
+            memory_usage=memory_usage,
+            peak_memory=peak_memory,
+            error_message=error_message,
+            retry_count=retry_count,
+            wait_time=wait_time
+        )
 
 # Generate test URLs - use example.com with unique paths to avoid browser caching
 def generate_test_urls(count: int) -> List[str]:
@@ -230,7 +250,7 @@ def generate_test_urls(count: int) -> List[str]:
     return urls
 
 # Process result callback
-async def process_result(result, test_results: TestResults):
+async def process_result(result, test_results: StressTestResults):
     # Track attempt counts
     if result.url not in test_results.url_to_attempt:
         test_results.url_to_attempt[result.url] = 1
@@ -248,7 +268,7 @@ async def process_result(result, test_results: TestResults):
         logger.warning(f"Failed to process: {result.url} - {result.error_message}")
 
 # Process multiple results (used in non-streaming mode)
-async def process_results(results, test_results: TestResults):
+async def process_results(results, test_results: StressTestResults):
     for result in results:
         await process_result(result, test_results)
 
@@ -260,7 +280,25 @@ async def run_memory_stress_test(
     aggressive: bool = False,
     spikes: bool = True
 ):
-    test_results = TestResults()
+    # Scale values based on initial memory usage.
+    # With no initial memory pressure, we can use the default values:
+    # - 55% is the threshold for normal operation - plenty of memory
+    # - 63% is the threshold for throttling
+    # - 70% is the threshold for requeuing - incredibly aggressive
+    initial_percent: float = psutil.virtual_memory().percent
+    baseline: float = 55.0
+    if initial_percent > baseline:
+        baseline = initial_percent + 5.0
+
+    memory_threshold_percent = baseline + 8
+    critical_threshold_percent = baseline + 15
+    recovery_threshold_percent = baseline
+
+    if critical_threshold_percent > 99.0:
+        pytest.skip("Memory pressure too high for this system")
+
+    test_results = StressTestResults()
+
     memory_simulator = MemorySimulator(target_percent=target_memory_percent, aggressive=aggressive)
     
     logger.info(f"Starting stress test with {url_count} URLs in {'STREAM' if STREAM else 'NON-STREAM'} mode")
@@ -285,17 +323,15 @@ async def run_memory_stress_test(
     # Create monitor with reference to test results
     monitor = StressTestMonitor(
         test_results=test_results,
-        display_mode=DisplayMode.DETAILED,
-        max_visible_rows=20,
-        total_urls=url_count  # Pass total URLs count
+        urls_total=url_count  # Pass total URLs count
     )
     
     # Create dispatcher with EXTREME settings - pure survival mode
     # These settings are designed to create a memory battleground
     dispatcher = MemoryAdaptiveDispatcher(
-        memory_threshold_percent=63.0,  # Start throttling at just 60% memory
-        critical_threshold_percent=70.0,  # Start requeuing at 70% - incredibly aggressive  
-        recovery_threshold_percent=55.0,  # Only resume normal ops when plenty of memory available
+        memory_threshold_percent=memory_threshold_percent,
+        critical_threshold_percent=critical_threshold_percent,
+        recovery_threshold_percent=recovery_threshold_percent,
         check_interval=0.1,  # Check extremely frequently (100ms)
         max_session_permit=20 if aggressive else 10,  # Double the concurrent sessions - pure chaos
         fairness_timeout=10.0,  # Extremely low timeout - rapid priority changes
@@ -303,8 +339,8 @@ async def run_memory_stress_test(
     )
     
     # Set up spike schedule if enabled
+    spike_intervals = []
     if spikes:
-        spike_intervals = []
         # Create 3-5 random spike times
         num_spikes = random.randint(3, 5)
         for _ in range(num_spikes):
@@ -378,6 +414,12 @@ async def run_memory_stress_test(
             
         logger.info("TEST PASSED: All URLs were processed without crashing.")
         return True
+
+@pytest.mark.asyncio
+@pytest.mark.timeout(600)
+async def test_memory_stress():
+    """Run the memory stress test with default parameters."""
+    assert await run_memory_stress_test()
 
 # Command-line entry point
 if __name__ == "__main__":

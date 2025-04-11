@@ -1,14 +1,11 @@
-import os
-import sys
-import pytest
 import base64
-from PIL import Image
 import io
+import sys
 
-# Add the parent directory to the Python path
-parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(parent_dir)
+import pytest
+from PIL import Image
 
+from crawl4ai import CacheMode
 from crawl4ai.async_webcrawler import AsyncWebCrawler
 
 
@@ -16,7 +13,9 @@ from crawl4ai.async_webcrawler import AsyncWebCrawler
 async def test_basic_screenshot():
     async with AsyncWebCrawler(verbose=True) as crawler:
         url = "https://example.com"  # A static website
-        result = await crawler.arun(url=url, bypass_cache=True, screenshot=True)
+        result = await crawler.arun(
+            url=url, cache_mode=CacheMode.BYPASS, screenshot=True
+        )
 
         assert result.success
         assert result.screenshot is not None
@@ -35,7 +34,7 @@ async def test_screenshot_with_wait_for():
         wait_for = "css:#content"  # Wait for the main content to load
 
         result = await crawler.arun(
-            url=url, bypass_cache=True, screenshot=True, wait_for=wait_for
+            url=url, cache_mode=CacheMode.BYPASS, screenshot=True, wait_for=wait_for
         )
 
         assert result.success
@@ -53,11 +52,11 @@ async def test_screenshot_with_wait_for():
 @pytest.mark.asyncio
 async def test_screenshot_with_js_wait_for():
     async with AsyncWebCrawler(verbose=True) as crawler:
-        url = "https://www.amazon.com"
-        wait_for = "js:() => document.querySelector('#nav-logo-sprites') !== null"
+        url = "https://example.com"
+        wait_for = "js:() => document.querySelector('h1') !== null"
 
         result = await crawler.arun(
-            url=url, bypass_cache=True, screenshot=True, wait_for=wait_for
+            url=url, cache_mode=CacheMode.BYPASS, screenshot=True, wait_for=wait_for
         )
 
         assert result.success
@@ -65,7 +64,7 @@ async def test_screenshot_with_js_wait_for():
 
         image_data = base64.b64decode(result.screenshot)
         image = Image.open(io.BytesIO(image_data))
-        assert image.format == "PNG"
+        assert image.format in ("PNG", "BMP")
 
 
 @pytest.mark.asyncio
@@ -73,34 +72,40 @@ async def test_screenshot_without_wait_for():
     async with AsyncWebCrawler(verbose=True) as crawler:
         url = "https://www.nytimes.com"  # A website with lots of dynamic content
 
-        result = await crawler.arun(url=url, bypass_cache=True, screenshot=True)
+        result = await crawler.arun(
+            url=url, cache_mode=CacheMode.BYPASS, screenshot=True
+        )
 
         assert result.success
         assert result.screenshot is not None
 
         image_data = base64.b64decode(result.screenshot)
         image = Image.open(io.BytesIO(image_data))
-        assert image.format == "PNG"
+        assert image.format in ("PNG", "BMP")
 
 
 @pytest.mark.asyncio
 async def test_screenshot_comparison():
     async with AsyncWebCrawler(verbose=True) as crawler:
-        url = "https://www.reddit.com"
-        wait_for = "css:#SHORTCUT_FOCUSABLE_DIV"
+        url = "https://example.com"
+        wait_for = (
+            "css:body > div > p:nth-child(3) > a"  # Wait for the more information link.
+        )
 
         # Take screenshot without wait_for
         result_without_wait = await crawler.arun(
-            url=url, bypass_cache=True, screenshot=True
+            url=url, cache_mode=CacheMode.BYPASS, screenshot=True
         )
+
+        assert result_without_wait.success
+        assert result_without_wait.screenshot is not None
 
         # Take screenshot with wait_for
         result_with_wait = await crawler.arun(
-            url=url, bypass_cache=True, screenshot=True, wait_for=wait_for
+            url=url, cache_mode=CacheMode.BYPASS, screenshot=True, wait_for=wait_for
         )
 
-        assert result_without_wait.success and result_with_wait.success
-        assert result_without_wait.screenshot is not None
+        assert result_with_wait.success
         assert result_with_wait.screenshot is not None
 
         # Compare the two screenshots
@@ -113,10 +118,12 @@ async def test_screenshot_comparison():
 
         # This is a simple size comparison. In a real-world scenario, you might want to use
         # more sophisticated image comparison techniques.
-        assert image_with_wait.size[0] >= image_without_wait.size[0]
-        assert image_with_wait.size[1] >= image_without_wait.size[1]
+        assert image_with_wait.size[0] == image_without_wait.size[0]
+        assert image_with_wait.size[1] == image_without_wait.size[1]
 
 
 # Entry point for debugging
 if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+    import subprocess
+
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

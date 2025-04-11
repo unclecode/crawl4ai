@@ -1,7 +1,18 @@
-import asyncio
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, AsyncLoggerBase
 import os
+import sys
 from datetime import datetime
+from pathlib import Path
+
+import pytest
+
+from crawl4ai import (
+    AsyncLoggerBase,
+    AsyncWebCrawler,
+    BrowserConfig,
+    CacheMode,
+    CrawlerRunConfig,
+)
+
 
 class AsyncFileLogger(AsyncLoggerBase):
     """
@@ -55,26 +66,25 @@ class AsyncFileLogger(AsyncLoggerBase):
         message = f"{url[:url_length]}... | Error: {error}"
         self._write_to_file("ERROR", message, tag)
 
-async def main():
+
+@pytest.mark.asyncio
+async def test_logger(tmp_path: Path):
+    log_file: Path = tmp_path / "test.log"
     browser_config = BrowserConfig(headless=True, verbose=True)
-    crawler = AsyncWebCrawler(config=browser_config, logger=AsyncFileLogger("/Users/unclecode/devs/crawl4ai/.private/tmp/crawl.log"))
-    await crawler.start()
-    
-    try:
+    async with AsyncWebCrawler(config=browser_config,logger=AsyncFileLogger(log_file.as_posix())) as crawler:
         crawl_config = CrawlerRunConfig(
             cache_mode=CacheMode.BYPASS,
         )
+
         # Use the crawler multiple times
-        result = await crawler.arun(
-            url='https://kidocode.com/',
-            config=crawl_config
-        )
-        if result.success:
-            print("First crawl - Raw Markdown Length:", len(result.markdown.raw_markdown))
-            
-    finally:
-        # Always ensure we close the crawler
-        await crawler.close()
+        for _ in range(3):
+            result = await crawler.arun(
+                url='https://kidocode.com/',
+                config=crawl_config
+            )
+            assert result.success
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    import subprocess
+
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))
