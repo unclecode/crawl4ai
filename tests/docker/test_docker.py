@@ -1,58 +1,25 @@
-import requests
-import time
-import httpx
-import asyncio
-from typing import Dict, Any
+import sys
+
+from httpx import codes
+import pytest
+
 from crawl4ai import (
     BrowserConfig, CrawlerRunConfig, DefaultMarkdownGenerator,
     PruningContentFilter, JsonCssExtractionStrategy, LLMContentFilter, CacheMode
 )
-from crawl4ai import LLMConfig
-from crawl4ai.docker_client import Crawl4aiDockerClient
+from crawl4ai.async_configs import LLMConfig
 
-class Crawl4AiTester:
-    def __init__(self, base_url: str = "http://localhost:11235"):
-        self.base_url = base_url
+from .common import async_client, docker_client
 
-    def submit_and_wait(
-        self, request_data: Dict[str, Any], timeout: int = 300
-    ) -> Dict[str, Any]:
-        # Submit crawl job
-        response = requests.post(f"{self.base_url}/crawl", json=request_data)
-        task_id = response.json()["task_id"]
-        print(f"Task ID: {task_id}")
 
-        # Poll for result
-        start_time = time.time()
-        while True:
-            if time.time() - start_time > timeout:
-                raise TimeoutError(
-                    f"Task {task_id} did not complete within {timeout} seconds"
-                )
+@pytest.fixture
+def browser_config() -> BrowserConfig:
+    return BrowserConfig(headless=True, viewport_width=1200, viewport_height=800)
 
-            result = requests.get(f"{self.base_url}/task/{task_id}")
-            status = result.json()
 
-            if status["status"] == "failed":
-                print("Task failed:", status.get("error"))
-                raise Exception(f"Task failed: {status.get('error')}")
-
-            if status["status"] == "completed":
-                return status
-
-            time.sleep(2)
-
-async def test_direct_api():
-    """Test direct API endpoints without using the client SDK"""
-    print("\n=== Testing Direct API Calls ===")
-    
-    # Test 1: Basic crawl with content filtering
-    browser_config = BrowserConfig(
-        headless=True,
-        viewport_width=1200,
-        viewport_height=800
-    )
-    
+@pytest.mark.asyncio
+async def test_direct_filtering(browser_config: BrowserConfig):
+    """Direct request with content filtering."""
     crawler_config = CrawlerRunConfig(
         cache_mode=CacheMode.BYPASS,
         markdown_generator=DefaultMarkdownGenerator(
@@ -72,22 +39,25 @@ async def test_direct_api():
     }
 
     # Make direct API call
-    async with httpx.AsyncClient() as client:
+    async with async_client() as client:
         response = await client.post(
-            "http://localhost:8000/crawl",
+            "/crawl",
             json=request_data,
             timeout=300
         )
-        assert response.status_code == 200
+        assert response.status_code == codes.OK
         result = response.json()
-        print("Basic crawl result:", result["success"])
+        assert result["success"]
 
-    # Test 2: Structured extraction with JSON CSS
+
+@pytest.mark.asyncio
+async def test_direct_structured_extraction(browser_config: BrowserConfig):
+    """Direct request using structured extraction with JSON CSS."""
     schema = {
-        "baseSelector": "article.post",
+        "baseSelector": "body > div",
         "fields": [
             {"name": "title", "selector": "h1", "type": "text"},
-            {"name": "content", "selector": ".content", "type": "html"}
+            {"name": "content", "selector": "p", "type": "html"}
         ]
     }
 
@@ -96,30 +66,50 @@ async def test_direct_api():
         extraction_strategy=JsonCssExtractionStrategy(schema=schema)
     )
 
-    request_data["crawler_config"] = crawler_config.dump()
+    request_data = {
+        "urls": ["https://example.com"],
+        "browser_config": browser_config.dump(),
+        "crawler_config": crawler_config.dump()
+    }
 
-    async with httpx.AsyncClient() as client:
+    async with async_client() as client:
         response = await client.post(
-            "http://localhost:8000/crawl",
+            "/crawl",
             json=request_data
         )
-        assert response.status_code == 200
+        assert response.status_code == codes.OK
         result = response.json()
-        print("Structured extraction result:", result["success"])
+        assert result["success"]
+        assert result["results"]
+        assert len(result["results"]) == 1
+        assert "extracted_content" in result["results"][0]
+        assert (
+            result["results"][0]["extracted_content"]
+            == """[
+    {
+        "title": "Example Domain",
+        "content": "<p>This domain is for use in illustrative examples in documents. You may use this\\n    domain in literature without prior coordination or asking for permission.</p>"
+    }
+]"""
+        )
 
-    # Test 3: Get schema
-    # async with httpx.AsyncClient() as client:
-    #     response = await client.get("http://localhost:8000/schema")
-    #     assert response.status_code == 200
-    #     schemas = response.json()
-    #     print("Retrieved schemas for:", list(schemas.keys()))
 
-async def test_with_client():
+@pytest.mark.asyncio
+async def test_direct_schema(browser_config: BrowserConfig):
+    """Get the schema."""
+    async with async_client() as client:
+        response = await client.get("/schema")
+        assert response.status_code == codes.OK
+        schemas = response.json()
+        assert schemas
+        assert len(schemas.keys()) == 2
+        print("Retrieved schemas for:", list(schemas.keys()))
+
+
+@pytest.mark.asyncio
+async def test_with_client_basic():
     """Test using the Crawl4AI Docker client SDK"""
-    print("\n=== Testing Client SDK ===")
-    
-    async with Crawl4aiDockerClient(verbose=True) as client:
-        # Test 1: Basic crawl
+    async with docker_client() as client:
         browser_config = BrowserConfig(headless=True)
         crawler_config = CrawlerRunConfig(
             cache_mode=CacheMode.BYPASS,
@@ -128,17 +118,23 @@ async def test_with_client():
                     threshold=0.48,
                     threshold_type="fixed"
                 )
-            )
+            ),
+            stream=False,
         )
 
+        await client.authenticate("test@example.com")
         result = await client.crawl(
             urls=["https://example.com"],
             browser_config=browser_config,
             crawler_config=crawler_config
         )
-        print("Client SDK basic crawl:", result.success)
+        assert result.success
 
-        # Test 2: LLM extraction with streaming
+
+@pytest.mark.asyncio
+async def test_with_client_llm_streaming():
+    async with docker_client() as client:
+        browser_config = BrowserConfig(headless=True)
         crawler_config = CrawlerRunConfig(
             cache_mode=CacheMode.BYPASS,
             markdown_generator=DefaultMarkdownGenerator(
@@ -150,26 +146,24 @@ async def test_with_client():
             stream=True
         )
 
+        await client.authenticate("test@example.com")
         async for result in await client.crawl(
             urls=["https://example.com"],
             browser_config=browser_config,
             crawler_config=crawler_config
         ):
-            print(f"Streaming result for: {result.url}")
+            assert result.success, f"Stream failed with: {result.error_message}"
 
-        # # Test 3: Get schema
-        # schemas = await client.get_schema()
-        # print("Retrieved client schemas for:", list(schemas.keys()))
 
-async def main():
-    """Run all tests"""
-    # Test direct API
-    print("Testing direct API calls...")
-    await test_direct_api()
+@pytest.mark.asyncio
+async def test_with_client_get_schema():
+    async with docker_client() as client:
+        await client.authenticate("test@example.com")
+        schemas = await client.get_schema()
+        print("Retrieved client schemas for:", list(schemas.keys()))
 
-    # Test client SDK
-    print("\nTesting client SDK...")
-    await test_with_client()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    import subprocess
+
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

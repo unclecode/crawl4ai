@@ -4,13 +4,8 @@ These examples demonstrate the functionality of CDPBrowserStrategy
 and serve as functional tests.
 """
 
-import asyncio
-import os
 import sys
-
-# Add the project root to Python path if running directly
-if __name__ == "__main__":
-    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+import pytest
 
 from crawl4ai.browser import BrowserManager
 from crawl4ai.async_configs import BrowserConfig, CrawlerRunConfig
@@ -19,6 +14,7 @@ from crawl4ai.async_logger import AsyncLogger
 # Create a logger for clear terminal output
 logger = AsyncLogger(verbose=True, log_file=None)
 
+@pytest.mark.asyncio
 async def test_cdp_launch_connect():
     """Test launching a browser and connecting via CDP."""
     logger.info("Testing launch and connect via CDP", tag="TEST")
@@ -56,10 +52,11 @@ async def test_cdp_launch_connect():
         logger.error(f"Test failed: {str(e)}", tag="TEST")
         try:
             await manager.close()
-        except:
+        except Exception:
             pass
         return False
 
+@pytest.mark.asyncio
 async def test_cdp_with_user_data_dir():
     """Test CDP browser with a user data directory."""
     logger.info("Testing CDP browser with user data directory", tag="TEST")
@@ -124,25 +121,26 @@ async def test_cdp_with_user_data_dir():
         # Remove temporary directory
         import shutil
         shutil.rmtree(user_data_dir, ignore_errors=True)
-        logger.info(f"Removed temporary user data directory", tag="TEST")
-        
+        logger.info("Removed temporary user data directory", tag="TEST")
+
         return has_test_cookie and has_test_cookie2
     except Exception as e:
         logger.error(f"Test failed: {str(e)}", tag="TEST")
         try:
             await manager.close()
-        except:
+        except Exception:
             pass
             
         # Clean up temporary directory
         try:
             import shutil
             shutil.rmtree(user_data_dir, ignore_errors=True)
-        except:
+        except Exception:
             pass
             
         return False
 
+@pytest.mark.asyncio
 async def test_cdp_session_management():
     """Test session management with CDP browser."""
     logger.info("Testing session management with CDP browser", tag="TEST")
@@ -186,8 +184,8 @@ async def test_cdp_session_management():
         
         # Kill first session
         await manager.kill_session(session1_id)
-        logger.info(f"Killed session 1", tag="TEST")
-        
+        logger.info("Killed session 1", tag="TEST")
+
         # Verify second session still works
         data2 = await page2.evaluate("localStorage.getItem('session2_data')")
         logger.info(f"Session 2 still functional after killing session 1, data: {data2}", tag="TEST")
@@ -201,27 +199,11 @@ async def test_cdp_session_management():
         logger.error(f"Test failed: {str(e)}", tag="TEST")
         try:
             await manager.close()
-        except:
+        except Exception:
             pass
         return False
 
-async def run_tests():
-    """Run all tests sequentially."""
-    results = []
-    
-    # results.append(await test_cdp_launch_connect())
-    # results.append(await test_cdp_with_user_data_dir())
-    results.append(await test_cdp_session_management())
-    
-    # Print summary
-    total = len(results)
-    passed = sum(results)
-    logger.info(f"Tests complete: {passed}/{total} passed", tag="SUMMARY")
-    
-    if passed == total:
-        logger.success("All tests passed!", tag="SUMMARY")
-    else:
-        logger.error(f"{total - passed} tests failed", tag="SUMMARY")
-
 if __name__ == "__main__":
-    asyncio.run(run_tests())
+    import subprocess
+
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

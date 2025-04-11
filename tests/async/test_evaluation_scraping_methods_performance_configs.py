@@ -1,13 +1,20 @@
-import json
-import time
-from bs4 import BeautifulSoup
-from crawl4ai.content_scraping_strategy import (
-    WebScrapingStrategy,
-    LXMLWebScrapingStrategy,
-)
-from typing import Dict, List, Tuple
 import difflib
-from lxml import html as lhtml, etree
+import sys
+import time
+from typing import Any, List, Tuple
+
+import pytest
+from _pytest.mark import ParameterSet
+from bs4 import BeautifulSoup
+from bs4.element import Tag
+from lxml import etree
+from lxml import html as lhtml
+
+from crawl4ai.content_scraping_strategy import (
+    LXMLWebScrapingStrategy,
+    WebScrapingStrategy,
+)
+from crawl4ai.models import Links, Media, ScrapingResult
 
 
 def normalize_dom(element):
@@ -197,7 +204,7 @@ def generate_complicated_html():
       <head>
         <title>Complicated Test Page</title>
         <meta name="description" content="A very complicated page for testing.">
-        
+
         <style>
           .hidden { display: none; }
           .highlight { color: red; }
@@ -205,7 +212,7 @@ def generate_complicated_html():
       </head>
       <body>
         <!-- This is a comment that we may remove if remove_comments=True -->
-        
+
         <header>
           <h1>Main Title of the Page</h1>
           <nav>
@@ -214,51 +221,51 @@ def generate_complicated_html():
             <a href="javascript:void(0)">JS Void Link</a>
           </nav>
         </header>
-        
+
         <noscript>
           <p>JavaScript is disabled or not supported.</p>
         </noscript>
-        
+
         <form action="submit.php" method="post">
           <input type="text" name="username" />
           <button type="submit">Submit</button>
         </form>
-        
+
         <section>
           <article>
             <h2>Article Title</h2>
             <p>
-              This paragraph has a good amount of text to exceed word_count_threshold if it's 
+              This paragraph has a good amount of text to exceed word_count_threshold if it's
               set to something small. But it might not exceed a very high threshold.
             </p>
-            
+
             <img src="http://images.example.com/photo.jpg" alt="Descriptive alt text"
                  style="width:200px;height:150px;" data-lazy="true">
-            
+
             <img src="icon.png" alt="Icon" style="display:none;">
-            
+
             <p>Another short text. <a href="/local-link">Local Link</a></p>
           </article>
         </section>
-        
+
         <section id="promo-section">
           <p>Promo text <a href="http://ads.example.com/ad">Ad Link</a></p>
         </section>
-        
+
         <aside class="sidebar">
           <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA..." alt="Base64 Image">
           <div data-info="secret" class="social-widget">
             <p>Follow us on <a href="http://facebook.com/brand">Facebook</a></p>
           </div>
         </aside>
-        
+
         <!-- Another comment below this line -->
         <script>console.log("script that might be removed");</script>
-        
+
         <div style="display:none;">
           <p>This is hidden</p>
         </div>
-        
+
         <footer>
           <small>Footer Info &copy; 2025</small>
         </footer>
@@ -267,112 +274,129 @@ def generate_complicated_html():
     """
 
 
-def get_test_scenarios():
+def get_test_scenarios() -> List[ParameterSet]:
     """
     Returns a dictionary of parameter sets (test scenarios) for the scraper.
     Each scenario name maps to a dictionary of keyword arguments
     that will be passed into scrap() for testing various features.
     """
-    TEST_SCENARIOS = {
-        # "default": {},
-        # "exclude_domains": {
-        #     "exclude_domains": {"images.example.com", "ads.example.com"}
-        # },
-        # "exclude_social_media_links": {
-        #     "exclude_social_media_links": True
-        # },
-        # "high_word_threshold": {
-        #     "word_count_threshold": 100
-        # },
-        # "keep_data_attrs": {
-        #     "keep_data_attributes": True
-        # },
-        # "remove_forms_and_comments": {
-        #     "remove_forms": True,
-        #     "remove_comments": True
-        # },
-        # "exclude_tags_and_selector": {
-        #     "excluded_tags": ["aside", "script"],
-        #     "excluded_selector": ".social-widget"
-        # },
-        # "only_text_mode": {
-        #     "only_text": True
-        # },
-        # "combo_mode": {
-        #     "exclude_domains": {"images.example.com", "ads.example.com"},
-        #     "exclude_social_media_links": True,
-        #     "remove_forms": True,
-        #     "remove_comments": True,
-        #     "excluded_tags": ["aside"],
-        #     "excluded_selector": "#promo-section",
-        #     "only_text": False,
-        #     "keep_data_attributes": True,
-        #     "word_count_threshold": 20
-        # },
-        # "exclude_external_images": {
-        #     "exclude_external_images": True,
-        #     "exclude_social_media_links": True
-        # },
-        # "strict_image_scoring": {
-        #     "image_score_threshold": 3,
-        #     "image_description_min_word_threshold": 10
-        # },
-        # "custom_css_selector": {
-        #     "css_selector": "section#promo-section"
-        # },
-        # "remove_noscript": {
-        #     "excluded_tags": ["noscript"]
-        # },
-        # "exclude_external_links": {
-        #     "exclude_external_links": True
-        # },
-        # "large_word_count": {
-        #     "word_count_threshold": 500
-        # },
-        # "super_strict_images": {
-        #     "image_score_threshold": 5,
-        #     "image_description_min_word_threshold": 15
-        # },
-        # "exclude_style_and_script": {
-        #     "excluded_tags": ["style", "script"]
-        # },
-        # "keep_data_and_remove_forms": {
-        #     "keep_data_attributes": True,
-        #     "remove_forms": True
-        # },
-        # "only_text_high_word_count": {
-        #     "only_text": True,
-        #     "word_count_threshold": 40
-        # },
-        # "reduce_to_selector": {
-        #     "css_selector": "section > article"
-        # },
-        # "exclude_all_links": {
-        #     # Removes all external links and also excludes example.com & social.com
-        #     "exclude_domains": {"example.com", "social.com", "facebook.com"},
-        #     "exclude_external_links": True
-        # },
-        # "comprehensive_removal": {
-        #     # Exclude multiple tags, remove forms & comments,
-        #     # and also remove targeted selectors
-        #     "excluded_tags": ["aside", "noscript", "script"],
-        #     "excluded_selector": "#promo-section, .social-widget",
-        #     "remove_comments": True,
-        #     "remove_forms": True
-        # }
-    }
-    return TEST_SCENARIOS
+    return [
+        pytest.param(
+            {},
+            id="default",
+        ),
+        pytest.param(
+            {"exclude_domains": {"images.example.com", "ads.example.com"}},
+            id="exclude_domains",
+        ),
+        pytest.param(
+            {"exclude_social_media_links": True},
+            id="exclude_social_media_links",
+        ),
+        pytest.param(
+            {"word_count_threshold": 100},
+            id="high_word_threshold",
+        ),
+        pytest.param(
+            {"keep_data_attributes": True},
+            id="keep_data_attrs",
+        ),
+        pytest.param(
+            {"remove_forms": True, "remove_comments": True},
+            id="remove_forms_and_comments",
+        ),
+        pytest.param(
+            {
+                "excluded_tags": ["aside", "script"],
+                "excluded_selector": ".social-widget",
+            },
+            id="exclude_tags",
+        ),
+        pytest.param(
+            {"only_text": True},
+            id="only_text_mode",
+        ),
+        pytest.param(
+            {
+                "exclude_domains": {"images.example.com", "ads.example.com"},
+                "exclude_social_media_links": True,
+                "remove_forms": True,
+                "remove_comments": True,
+                "excluded_tags": ["aside"],
+                "excluded_selector": "#promo-section",
+                "only_text": False,
+                "keep_data_attributes": True,
+                "word_count_threshold": 20,
+            },
+            id="combo_mode",
+        ),
+        pytest.param(
+            {"exclude_external_images": True, "exclude_social_media_links": True},
+            id="exclude_external_images",
+        ),
+        pytest.param(
+            {"image_score_threshold": 3, "image_description_min_word_threshold": 10},
+            id="strict_image_scoring",
+        ),
+        pytest.param(
+            {"css_selector": "section#promo-section"},
+            id="custom_css_selector",
+        ),
+        pytest.param(
+            {"exclude_tags": ["noscript"]},
+            id="remove_noscript",
+        ),
+        pytest.param(
+            {"exclude_external_links": True},
+            id="exclude_external_links",
+        ),
+        pytest.param(
+            {"word_count_threshold": 500},
+            id="large_word_count",
+        ),
+        pytest.param(
+            {"image_score_threshold": 5, "image_description_min_word_threshold": 15},
+            id="super_strict_images",
+        ),
+        pytest.param(
+            {"exclude_tags": ["aside", "script"]},
+            id="exclude_style_and_script",
+        ),
+        pytest.param(
+            {"keep_data_attributes": True, "remove_forms": True},
+            id="keep_data_and_remove_forms",
+        ),
+        pytest.param(
+            {"only_text": True, "word_count_threshold": 40},
+            id="only_text_high_word_count",
+        ),
+        pytest.param(
+            {"css_selector": "section > article"},
+            id="reduce_to_selector",
+        ),
+        pytest.param(
+            # Remove all external links and also exclude example.com & social.com
+            {
+                "exclude_domains": {"example.com", "social.com", "facebook.com"},
+                "exclude_external_links": True,
+            },
+            id="exclude_all_links",
+        ),
+        pytest.param(
+            # Exclude multiple tags, remove forms & comments,
+            # and also remove targeted selectors
+            {
+                "excluded_tags": ["aside", "noscript", "script"],
+                "excluded_selector": "#promo-section, .social-widget",
+                "remove_comments": True,
+                "remove_forms": True,
+            },
+            id="comprehensive_removal",
+        ),
+    ]
 
 
-class ScraperEquivalenceTester:
-    def __init__(self):
-        self.test_cases = {
-            "basic": self.generate_basic_html(),
-            "complex": self.generate_complex_html(),
-            "malformed": self.generate_malformed_html(),
-            # 'real_world': self.load_real_samples()
-        }
-
+class TestScraperEquivalence:
     def generate_basic_html(self):
         return generate_large_html(1000)  # Your existing function
 
@@ -416,13 +440,13 @@ class ScraperEquivalenceTester:
         }
         return samples
 
-    def deep_compare_links(self, old_links: Dict, new_links: Dict) -> List[str]:
+    def deep_compare_links(self, old_links: Links, new_links: Links) -> List[str]:
         """Detailed comparison of link structures"""
         differences = []
 
         for category in ["internal", "external"]:
-            old_urls = {link["href"] for link in old_links[category]}
-            new_urls = {link["href"] for link in new_links[category]}
+            old_urls = {link.href for link in getattr(old_links, category)}
+            new_urls = {link.href for link in getattr(new_links, category)}
 
             missing = old_urls - new_urls
             extra = new_urls - old_urls
@@ -435,11 +459,15 @@ class ScraperEquivalenceTester:
             # Compare link attributes for common URLs
             common = old_urls & new_urls
             for url in common:
-                old_link = next(l for l in old_links[category] if l["href"] == url)
-                new_link = next(l for l in new_links[category] if l["href"] == url)
+                old_link = next(
+                    link for link in getattr(old_links, category) if link.href == url
+                )
+                new_link = next(
+                    link for link in getattr(new_links, category) if link.href == url
+                )
 
                 for attr in ["text", "title"]:
-                    if old_link[attr] != new_link[attr]:
+                    if getattr(old_link, attr) != getattr(new_link, attr):
                         differences.append(
                             f"Link attribute mismatch for {url} - {attr}:"
                             f" old='{old_link[attr]}' vs new='{new_link[attr]}'"
@@ -447,13 +475,13 @@ class ScraperEquivalenceTester:
 
         return differences
 
-    def deep_compare_media(self, old_media: Dict, new_media: Dict) -> List[str]:
+    def deep_compare_media(self, old_media: Media, new_media: Media) -> List[str]:
         """Detailed comparison of media elements"""
         differences = []
 
         for media_type in ["images", "videos", "audios"]:
-            old_srcs = {item["src"] for item in old_media[media_type]}
-            new_srcs = {item["src"] for item in new_media[media_type]}
+            old_srcs = {item.src for item in getattr(old_media, media_type)}
+            new_srcs = {item.src for item in getattr(new_media, media_type)}
 
             missing = old_srcs - new_srcs
             extra = new_srcs - old_srcs
@@ -466,14 +494,18 @@ class ScraperEquivalenceTester:
             # Compare media attributes for common sources
             common = old_srcs & new_srcs
             for src in common:
-                old_item = next(m for m in old_media[media_type] if m["src"] == src)
-                new_item = next(m for m in new_media[media_type] if m["src"] == src)
+                old_item = next(
+                    m for m in getattr(old_media, media_type) if m.src == src
+                )
+                new_item = next(
+                    m for m in getattr(new_media, media_type) if m.src == src
+                )
 
-                for attr in ["alt", "description"]:
-                    if old_item.get(attr) != new_item.get(attr):
+                for attr in ["alt", "desc"]:
+                    if getattr(old_item, attr) != getattr(new_item, attr):
                         differences.append(
                             f"{media_type} attribute mismatch for {src} - {attr}:"
-                            f" old='{old_item.get(attr)}' vs new='{new_item.get(attr)}'"
+                            f" old='{getattr(old_item, attr)}' vs new='{getattr(new_item, attr)}'"
                         )
 
         return differences
@@ -486,7 +518,10 @@ class ScraperEquivalenceTester:
         def normalize_html(html: str) -> Tuple[str, str]:
             soup = BeautifulSoup(html, "lxml")
             # Get both structure and text
-            structure = " ".join(tag.name for tag in soup.find_all())
+            soup.find_all()
+            structure = " ".join(
+                tag.name for tag in soup.find_all() if isinstance(tag, Tag)
+            )
             text = " ".join(soup.get_text().split())
             return structure, text
 
@@ -512,194 +547,55 @@ class ScraperEquivalenceTester:
 
         return differences
 
-    def compare_results(
-        self, old_result: Dict, new_result: Dict
-    ) -> Dict[str, List[str]]:
-        """Comprehensive comparison of scraper outputs"""
-        differences = {}
-
-        # Compare links
-        link_differences = self.deep_compare_links(
-            old_result["links"], new_result["links"]
-        )
-        if link_differences:
-            differences["links"] = link_differences
-
-        # Compare media
-        media_differences = self.deep_compare_media(
-            old_result["media"], new_result["media"]
-        )
-        if media_differences:
-            differences["media"] = media_differences
-
-        # Compare HTML
-        html_differences = self.compare_html_content(
-            old_result["cleaned_html"], new_result["cleaned_html"]
-        )
-        if html_differences:
-            differences["html"] = html_differences
-
-        return differences
-
-    def run_tests(self) -> Dict:
-        """Run comparison tests using the complicated HTML with multiple parameter scenarios."""
-        # We'll still keep some "test_cases" logic from above (basic, complex, malformed).
-        # But we add a new section for the complicated HTML scenarios.
-
-        results = {"tests": [], "summary": {"passed": 0, "failed": 0}}
-
-        # 1) First, run the existing 3 built-in test cases (basic, complex, malformed).
-        # for case_name, html in self.test_cases.items():
-        #     print(f"\nTesting built-in case: {case_name}...")
-
-        #     original = WebScrapingStrategy()
-        #     lxml = LXMLWebScrapingStrategy()
-
-        #     start = time.time()
-        #     orig_result = original.scrap("http://test.com", html)
-        #     orig_time = time.time() - start
-
-        #     print("\nOriginal Mode:")
-        #     print(f"Cleaned HTML size: {len(orig_result['cleaned_html'])/1024:.2f} KB")
-        #     print(f"Images: {len(orig_result['media']['images'])}")
-        #     print(f"External links: {len(orig_result['links']['external'])}")
-        #     print(f"Times - Original: {orig_time:.3f}s")
-
-        #     start = time.time()
-        #     lxml_result = lxml.scrap("http://test.com", html)
-        #     lxml_time = time.time() - start
-
-        #     print("\nLXML Mode:")
-        #     print(f"Cleaned HTML size: {len(lxml_result['cleaned_html'])/1024:.2f} KB")
-        #     print(f"Images: {len(lxml_result['media']['images'])}")
-        #     print(f"External links: {len(lxml_result['links']['external'])}")
-        #     print(f"Times - LXML: {lxml_time:.3f}s")
-
-        #     # Compare
-        #     diffs = {}
-        #     link_diff = self.deep_compare_links(orig_result['links'], lxml_result['links'])
-        #     if link_diff:
-        #         diffs['links'] = link_diff
-
-        #     media_diff = self.deep_compare_media(orig_result['media'], lxml_result['media'])
-        #     if media_diff:
-        #         diffs['media'] = media_diff
-
-        #     html_diff = self.compare_html_content(orig_result['cleaned_html'], lxml_result['cleaned_html'])
-        #     if html_diff:
-        #         diffs['html'] = html_diff
-
-        #     test_result = {
-        #         'case': case_name,
-        #         'lxml_mode': {
-        #             'differences': diffs,
-        #             'execution_time': lxml_time
-        #         },
-        #         'original_time': orig_time
-        #     }
-        #     results['tests'].append(test_result)
-
-        #     if not diffs:
-        #         results['summary']['passed'] += 1
-        #     else:
-        #         results['summary']['failed'] += 1
-
-        # 2) Now, run the complicated HTML with multiple parameter scenarios.
+    @pytest.mark.parametrize("params", get_test_scenarios())
+    def test_strapping(self, params: dict[str, Any]):
         complicated_html = generate_complicated_html()
-        print("\n=== Testing complicated HTML with multiple parameter scenarios ===")
-
-        # Create the scrapers once (or you can re-create if needed)
-        original = WebScrapingStrategy()
+        web = WebScrapingStrategy()
         lxml = LXMLWebScrapingStrategy()
 
-        for scenario_name, params in get_test_scenarios().items():
-            print(f"\nScenario: {scenario_name}")
+        start = time.time()
+        orig_result: ScrapingResult = web.scrap(
+            "http://test.com", complicated_html, **params
+        )
+        orig_time = time.time() - start
 
-            start = time.time()
-            orig_result = original.scrap("http://test.com", complicated_html, **params)
-            orig_time = time.time() - start
+        start = time.time()
+        lxml_result: ScrapingResult = lxml.scrap(
+            "http://test.com", complicated_html, **params
+        )
+        lxml_time = time.time() - start
 
-            start = time.time()
-            lxml_result = lxml.scrap("http://test.com", complicated_html, **params)
-            lxml_time = time.time() - start
+        diffs = {}
+        link_diff = self.deep_compare_links(orig_result.links, lxml_result.links)
+        if link_diff:
+            diffs["links"] = link_diff
 
-            diffs = {}
-            link_diff = self.deep_compare_links(
-                orig_result["links"], lxml_result["links"]
+        media_diff = self.deep_compare_media(orig_result.media, lxml_result.media)
+        if media_diff:
+            diffs["media"] = media_diff
+
+        html_diff = self.compare_html_content(
+            orig_result.cleaned_html, lxml_result.cleaned_html
+        )
+        if html_diff:
+            diffs["html"] = html_diff
+
+        if not diffs:
+            print(
+                f"✅ [OK] No differences found. Time(Orig: {orig_time:.3f}s, LXML: {lxml_time:.3f}s)"
             )
-            if link_diff:
-                diffs["links"] = link_diff
+            return
 
-            media_diff = self.deep_compare_media(
-                orig_result["media"], lxml_result["media"]
-            )
-            if media_diff:
-                diffs["media"] = media_diff
+        print("❌ Differences found:")
+        for category, dlist in diffs.items():
+            print(f"  {category}:")
+            for d in dlist:
+                print(f"    - {d}")
 
-            html_diff = self.compare_html_content(
-                orig_result["cleaned_html"], lxml_result["cleaned_html"]
-            )
-            if html_diff:
-                diffs["html"] = html_diff
-
-            test_result = {
-                "case": f"complicated_{scenario_name}",
-                "lxml_mode": {"differences": diffs, "execution_time": lxml_time},
-                "original_time": orig_time,
-            }
-            results["tests"].append(test_result)
-
-            if not diffs:
-                results["summary"]["passed"] += 1
-                print(
-                    f"✅ [OK] No differences found. Time(Orig: {orig_time:.3f}s, LXML: {lxml_time:.3f}s)"
-                )
-            else:
-                results["summary"]["failed"] += 1
-                print("❌ Differences found:")
-                for category, dlist in diffs.items():
-                    print(f"  {category}:")
-                    for d in dlist:
-                        print(f"    - {d}")
-
-        return results
-
-    def print_report(self, results: Dict):
-        """Generate detailed equivalence report"""
-        print("\n=== Scraper Equivalence Test Report ===\n")
-        print(f"Total Cases: {len(results['tests'])}")
-        print(f"Passed: {results['summary']['passed']}")
-        print(f"Failed: {results['summary']['failed']}")
-
-        for test in results["tests"]:
-            print(f"\nTest Case: {test['case']}")
-
-            if not test["lxml_mode"]["differences"]:
-                print("✅ All implementations produced identical results")
-                print(
-                    f"Times - Original: {test['original_time']:.3f}s, "
-                    f"LXML: {test['lxml_mode']['execution_time']:.3f}s"
-                )
-            else:
-                print("❌ Differences found:")
-
-                if test["lxml_mode"]["differences"]:
-                    print("\nLXML Mode Differences:")
-                    for category, diffs in test["lxml_mode"]["differences"].items():
-                        print(f"\n{category}:")
-                        for diff in diffs:
-                            print(f"  - {diff}")
-
-
-def main():
-    tester = ScraperEquivalenceTester()
-    results = tester.run_tests()
-    tester.print_report(results)
-
-    # Save detailed results for debugging
-    with open("scraper_equivalence_results.json", "w") as f:
-        json.dump(results, f, indent=2)
+        pytest.fail("Differences found")
 
 
 if __name__ == "__main__":
-    main()
+    import subprocess
+
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

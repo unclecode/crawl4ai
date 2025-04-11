@@ -1,146 +1,136 @@
 import asyncio
 import json
-from typing import Optional
+import sys
+from typing import Optional, Union
 from urllib.parse import quote
 
-async def test_endpoint(
-    endpoint: str, 
-    url: str, 
-    params: Optional[dict] = None,
-    expected_status: int = 200
-) -> None:
+import aiohttp
+import pytest
+from httpx import Response, codes
+
+from .common import TEST_URLS, async_client, markdown_params
+
+EndpointResponse = Optional[Union[dict, str]]
+
+
+async def endpoint(
+    endpoint: str, url: str, params: Optional[dict] = None, expected_status: int = codes.OK
+) -> EndpointResponse:
     """Test an endpoint and print results"""
-    import aiohttp
-    
     params = params or {}
     param_str = "&".join(f"{k}={v}" for k, v in params.items())
-    full_url = f"http://localhost:8000/{endpoint}/{quote(url)}"
+    path = f"/{endpoint}/{quote(url)}"
     if param_str:
-        full_url += f"?{param_str}"
-        
-    print(f"\nTesting: {full_url}")
-    
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(full_url) as response:
-                status = response.status
-                try:
-                    data = await response.json()
-                except:
-                    data = await response.text()
-                
-                print(f"Status: {status} (Expected: {expected_status})")
-                if isinstance(data, dict):
-                    print(f"Response: {json.dumps(data, indent=2)}")
-                else:
-                    print(f"Response: {data[:500]}...")  # First 500 chars
-                assert status == expected_status
-                return data
-    except Exception as e:
-        print(f"Error: {str(e)}")
-        return None
+        path += f"?{param_str}"
 
-async def test_llm_task_completion(task_id: str) -> None:
+    print(f"\nTesting: {path}")
+
+    async with async_client() as session:
+        response: Response = await session.get(path)
+        content_type: str = response.headers.get(
+            aiohttp.hdrs.CONTENT_TYPE, ""
+        ).lower()
+        data: Union[dict, str] = (
+            response.json() if content_type == "application/json" else response.text
+        )
+
+        print(f"Status: {response.status_code} (Expected: {expected_status})")
+        if isinstance(data, dict):
+            print(f"Response: {json.dumps(data, indent=2)}")
+        else:
+            print(f"Response: {data[:500]}...")  # First 500 chars
+        assert response.status_code == expected_status
+        return data
+
+
+async def llm_task_completion(task_id: str) -> Optional[dict]:
     """Poll task until completion"""
     for _ in range(10):  # Try 10 times
-        result = await test_endpoint("llm", task_id)
+        result: EndpointResponse = await endpoint("llm", task_id)
+        assert result, "Failed to process endpoint request"
+        assert isinstance(result, dict), "Expected dict response"
+
         if result and result.get("status") in ["completed", "failed"]:
             return result
         print("Task still processing, waiting 5 seconds...")
         await asyncio.sleep(5)
     print("Task timed out")
+    return None
 
-async def run_tests():
-    print("Starting API Tests...")
-    
-    # Test URLs
-    urls = [
-        "example.com",
-        "https://www.python.org",
-        "https://news.ycombinator.com/news",
-        "https://github.com/trending"
-    ]
-    
-    print("\n=== Testing Markdown Endpoint ===")
-    for url in[] : #urls:
-        # Test different filter types
-        for filter_type in ["raw", "fit", "bm25", "llm"]:
-            params = {"f": filter_type}
-            if filter_type in ["bm25", "llm"]:
-                params["q"] = "extract main content"
-            
-            # Test with and without cache
-            for cache in ["0", "1"]:
-                params["c"] = cache
-                await test_endpoint("md", url, params)
-                await asyncio.sleep(1)  # Be nice to the server
 
-    print("\n=== Testing LLM Endpoint ===")
-    for url in []: # urls:
-        # Test basic extraction
-        result = await test_endpoint(
-            "llm", 
-            url, 
-            {"q": "Extract title and main content"}
-        )
-        if result and "task_id" in result:
-            print("\nChecking task completion...")
-            await test_llm_task_completion(result["task_id"])
-        
-        # Test with schema
-        schema = {
-            "type": "object",
-            "properties": {
-                "title": {"type": "string"},
-                "content": {"type": "string"},
-                "links": {"type": "array", "items": {"type": "string"}}
-            }
-        }
-        result = await test_endpoint(
-            "llm", 
-            url, 
-            {
-                "q": "Extract content with links", 
-                "s": json.dumps(schema),
-                "c": "1"  # Test with cache
-            }
-        )
-        if result and "task_id" in result:
-            print("\nChecking schema task completion...")
-            await test_llm_task_completion(result["task_id"])
-        
-        await asyncio.sleep(2)  # Be nice to the server
-    
-    print("\n=== Testing Error Cases ===")
-    # Test invalid URL
-    await test_endpoint(
-        "md", 
-        "not_a_real_url", 
-        expected_status=500
+@pytest.mark.asyncio
+@pytest.mark.timeout(60) # LLM tasks can take a while.
+@pytest.mark.parametrize("url,params", markdown_params())
+async def test_markdown_endpoint(url: str, params: dict[str, str]):
+    response: EndpointResponse = await endpoint("md", url, params)
+    assert response, "Failed to process endpoint request"
+    assert isinstance(response, str), "Expected str response"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url", TEST_URLS)
+@pytest.mark.skip("LLM endpoint doesn't task based requests yet")
+async def test_llm_endpoint_no_schema(url: str):
+    result: EndpointResponse = await endpoint(
+        "llm", url, {"q": "Extract title and main content"}
     )
-    
-    # Test invalid filter type
-    await test_endpoint(
-        "md", 
-        "example.com", 
-        {"f": "invalid"},
-        expected_status=422
+    assert result, "Failed to process endpoint request"
+    assert isinstance(result, dict), "Expected dict response"
+    assert "task_id" in result
+
+    print("\nChecking task completion...")
+    await llm_task_completion(result["task_id"])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url", TEST_URLS)
+@pytest.mark.skip("LLM endpoint doesn't task based or schema requests yet")
+async def test_llm_endpoint_schema(url: str):
+    schema = {
+        "type": "object",
+        "properties": {
+            "title": {"type": "string"},
+            "content": {"type": "string"},
+            "links": {"type": "array", "items": {"type": "string"}},
+        },
+    }
+    result: EndpointResponse = await endpoint(
+        "llm",
+        url,
+        {
+            "q": "Extract content with links",
+            "s": json.dumps(schema),
+            "c": "1",  # Test with cache
+        },
     )
-    
-    # Test LLM without query
-    await test_endpoint(
-        "llm", 
-        "example.com"
-    )
-    
-    # Test invalid task ID
-    await test_endpoint(
-        "llm", 
-        "llm_invalid_task",
-        expected_status=404
-    )
-    
-    print("\nAll tests completed!")
+    assert result, "Failed to process endpoint request"
+    assert isinstance(result, dict), "Expected dict response"
+    assert "task_id" in result
+    print("\nChecking schema task completion...")
+    await llm_task_completion(result["task_id"])
+
+
+@pytest.mark.asyncio
+async def test_invalid_url():
+    await endpoint("md", "not_a_real_url", expected_status=codes.INTERNAL_SERVER_ERROR)
+
+
+@pytest.mark.asyncio
+async def test_invalid_filter():
+    await endpoint("md", "example.com", {"f": "invalid"}, expected_status=codes.UNPROCESSABLE_ENTITY)
+
+
+@pytest.mark.asyncio
+async def test_llm_without_query():
+    await endpoint("llm", "example.com", expected_status=codes.BAD_REQUEST)
+
+
+@pytest.mark.asyncio
+async def test_invalid_task():
+    await endpoint("llm", "llm_invalid_task", expected_status=codes.BAD_REQUEST)
+
 
 if __name__ == "__main__":
-    asyncio.run(run_tests())
+    import subprocess
+
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

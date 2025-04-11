@@ -1,10 +1,16 @@
 import os
-import asyncio
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
-from crawl4ai import LLMConfig
+import sys
+import pytest
 from crawl4ai.content_filter_strategy import LLMContentFilter
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
+from crawl4ai.async_configs import LLMConfig
 
+@pytest.mark.asyncio
+@pytest.mark.timeout(200)
 async def test_llm_filter():
+    if not os.getenv("OPENAI_API_KEY"):
+        pytest.skip("Skipping env OPENAI_API_KEY not set")
+
     # Create an HTML source that needs intelligent filtering
     url = "https://docs.python.org/3/tutorial/classes.html"
     
@@ -12,14 +18,15 @@ async def test_llm_filter():
         headless=True,
         verbose=True
     )
-    
-    # run_config = CrawlerRunConfig(cache_mode=CacheMode.BYPASS)
+
     run_config = CrawlerRunConfig(cache_mode=CacheMode.ENABLED)
     
     async with AsyncWebCrawler(config=browser_config) as crawler:
         # First get the raw HTML
         result = await crawler.arun(url, config=run_config)
+        assert result.success
         html = result.cleaned_html
+        assert html
 
         # Initialize LLM filter with focused instruction
         filter = LLMContentFilter(
@@ -59,28 +66,32 @@ async def test_llm_filter():
             - Sidebars with external links
             - Any UI elements that don't contribute to learning
 
-            The goal is to create a clean markdown version that reads exactly like the original article, 
-            keeping all valuable content but free from distracting elements. Imagine you're creating 
+            The goal is to create a clean markdown version that reads exactly like the original article,
+            keeping all valuable content but free from distracting elements. Imagine you're creating
             a perfect reading experience where nothing valuable is lost, but all noise is removed.
             """,
-            verbose=True
-        )        
+            verbose=True,
+        )
 
         # Apply filtering
         filtered_content = filter.filter_content(html, ignore_cache = True)
-        
+        assert filtered_content
+
         # Show results
         print("\nFiltered Content Length:", len(filtered_content))
         print("\nFirst 500 chars of filtered content:")
         if filtered_content:
             print(filtered_content[0][:500])
-        
+
         # Save on disc the markdown version
         with open("filtered_content.md", "w", encoding="utf-8") as f:
             f.write("\n".join(filtered_content))
-        
+
         # Show token usage
         filter.show_usage()
 
+
 if __name__ == "__main__":
-    asyncio.run(test_llm_filter())
+    import subprocess
+
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

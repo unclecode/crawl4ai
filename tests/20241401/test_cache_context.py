@@ -1,7 +1,13 @@
-import asyncio
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
-from playwright.async_api import Page, BrowserContext
+import sys
 
+import pytest
+from playwright.async_api import BrowserContext, Page
+
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CacheMode, CrawlerRunConfig
+from crawl4ai.models import CrawlResultContainer
+
+
+@pytest.mark.asyncio
 async def test_reuse_context_by_config():
     # We will store each context ID in these maps to confirm reuse
     context_ids_for_A = []
@@ -12,6 +18,7 @@ async def test_reuse_context_by_config():
         c_id = id(context)
         print(f"[HOOK] on_page_context_created - Context ID: {c_id}")
         # Distinguish which config we used by checking a custom hook param
+        assert config.shared_data is not None
         config_label = config.shared_data.get("config_label", "unknown")
         if config_label == "A":
             context_ids_for_A.append(c_id)
@@ -55,11 +62,13 @@ async def test_reuse_context_by_config():
     print("\n--- Crawling with config A (text_mode=True) ---")
     for _ in range(2):
         # Pass an extra kwarg to the hook so we know which config is being used
-        await crawler.arun(test_url, config=configA)
+        result: CrawlResultContainer = await crawler.arun(test_url, config=configA)
+        assert result.success
 
     print("\n--- Crawling with config B (text_mode=False) ---")
     for _ in range(2):
-        await crawler.arun(test_url, config=configB)
+        result = await crawler.arun(test_url, config=configB)
+        assert result.success
 
     # Close the crawler (shuts down the browser, closes contexts)
     await crawler.close()
@@ -68,18 +77,11 @@ async def test_reuse_context_by_config():
     print("\n=== RESULTS ===")
     print(f"Config A context IDs: {context_ids_for_A}")
     print(f"Config B context IDs: {context_ids_for_B}")
-    if len(set(context_ids_for_A)) == 1:
-        print("✅ All config A crawls used the SAME BrowserContext.")
-    else:
-        print("❌ Config A crawls created multiple contexts unexpectedly.")
-    if len(set(context_ids_for_B)) == 1:
-        print("✅ All config B crawls used the SAME BrowserContext.")
-    else:
-        print("❌ Config B crawls created multiple contexts unexpectedly.")
-    if set(context_ids_for_A).isdisjoint(context_ids_for_B):
-        print("✅ Config A context is different from Config B context.")
-    else:
-        print("❌ A and B ended up sharing the same context somehow!")
+    assert len(set(context_ids_for_A)) == 1
+    assert len(set(context_ids_for_B)) == 1
+    assert set(context_ids_for_A).isdisjoint(context_ids_for_B)
 
 if __name__ == "__main__":
-    asyncio.run(test_reuse_context_by_config())
+    import subprocess
+
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))
