@@ -6,14 +6,11 @@ which offers better isolation, consistency across platforms, and easy scaling.
 
 import os
 import uuid
-import asyncio
-from typing import Dict, List, Optional, Tuple, Union
-from pathlib import Path
+from typing import List, Optional
 
-from playwright.async_api import Page, BrowserContext
 
 from ..async_logger import AsyncLogger
-from ..async_configs import BrowserConfig, CrawlerRunConfig
+from ..async_configs import BrowserConfig
 from .docker_config import DockerConfig
 from .docker_registry import DockerRegistry
 from .docker_utils import DockerUtils

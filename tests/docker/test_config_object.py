@@ -1,4 +1,5 @@
 import json
+import sys
 from crawl4ai import (
     CrawlerRunConfig,
     DefaultMarkdownGenerator,
@@ -8,9 +9,8 @@ from crawl4ai import (
     CacheMode
 )
 from crawl4ai.deep_crawling import BFSDeepCrawlStrategy
-from crawl4ai.deep_crawling.filters import FastFilterChain
-from crawl4ai.deep_crawling.filters import FastContentTypeFilter, FastDomainFilter
-from crawl4ai.deep_crawling.scorers import FastKeywordRelevanceScorer
+from crawl4ai.deep_crawling.filters import FilterChain, ContentTypeFilter, DomainFilter
+from crawl4ai.deep_crawling.scorers import KeywordRelevanceScorer
 
 def create_test_config() -> CrawlerRunConfig:
     # Set up content filtering and markdown generation
@@ -35,12 +35,12 @@ def create_test_config() -> CrawlerRunConfig:
     extraction_strategy = JsonCssExtractionStrategy(schema=extraction_schema)
 
     # Set up deep crawling
-    filter_chain = FastFilterChain([
-        FastContentTypeFilter(["text/html"]),
-        FastDomainFilter(blocked_domains=["ads.*"])
+    filter_chain = FilterChain([
+        ContentTypeFilter(["text/html"]),
+        DomainFilter(blocked_domains=["ads.*"]),
     ])
 
-    url_scorer = FastKeywordRelevanceScorer(
+    url_scorer = KeywordRelevanceScorer(
         keywords=["article", "blog"],
         weight=1.0
     )
@@ -104,10 +104,12 @@ def test_config_serialization_cycle():
     
     # Verify deep crawl strategy configuration
     assert deserialized_config.deep_crawl_strategy.max_depth == 3
-    assert isinstance(deserialized_config.deep_crawl_strategy.filter_chain, FastFilterChain)
-    assert isinstance(deserialized_config.deep_crawl_strategy.url_scorer, FastKeywordRelevanceScorer)
+    assert isinstance(deserialized_config.deep_crawl_strategy.filter_chain, FilterChain)
+    assert isinstance(deserialized_config.deep_crawl_strategy.url_scorer, KeywordRelevanceScorer)
 
     print("Serialization cycle test passed successfully!")
 
 if __name__ == "__main__":
-    test_config_serialization_cycle()
+    import subprocess
+
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

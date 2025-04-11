@@ -1,11 +1,11 @@
 from crawl4ai import BrowserConfig, AsyncWebCrawler, CrawlerRunConfig, CacheMode
 from crawl4ai.hub import BaseCrawler
-from crawl4ai.utils import optimize_html, get_home_folder, preprocess_html_for_schema
+from crawl4ai.utils import get_home_folder, preprocess_html_for_schema
 from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
 from pathlib import Path
 import json
 import os
-from typing import Dict
+from typing import Dict, Optional
 
 
 class GoogleSearchCrawler(BaseCrawler):
@@ -21,7 +21,14 @@ class GoogleSearchCrawler(BaseCrawler):
         self.js_script = (Path(__file__).parent /
                           "script.js").read_text()
 
-    async def run(self, url="", query: str = "", search_type: str = "text", schema_cache_path = None, **kwargs) -> str:
+    async def run(
+        self,
+        url="",
+        query: str = "",
+        search_type: str = "text",
+        schema_cache_path: Optional[str] = None,
+        **kwargs,
+    ) -> str:
         """Crawl Google Search results for a query"""
         url = f"https://www.google.com/search?q={query}&gl=sg&hl=en" if search_type == "text" else f"https://www.google.com/search?q={query}&gl=sg&hl=en&tbs=qdr:d&udm=2"
         if kwargs.get("page_start", 1) > 1:
@@ -42,18 +49,21 @@ class GoogleSearchCrawler(BaseCrawler):
 
             result = await crawler.arun(url=url, config=config)
             if not result.success:
-                return json.dumps({"error": result.error})
+                return json.dumps({"error": result.error_message})
 
             if search_type == "image":
-                if result.js_execution_result.get("success", False) is False:
-                    return json.dumps({"error": result.js_execution_result.get("error", "Unknown error")})
-                if "results" in result.js_execution_result:
-                    image_result = result.js_execution_result['results'][0]
-                    if image_result.get("success", False) is False:
-                        return json.dumps({"error": image_result.get("error", "Unknown error")})
-                    return json.dumps(image_result["result"], indent=4)
+                if result.js_execution_result:
+                    if result.js_execution_result.get("success", False) is False:
+                        return json.dumps({"error": result.js_execution_result.get("error", "Unknown error")})
+                    if "results" in result.js_execution_result:
+                        image_result = result.js_execution_result['results'][0]
+                        if image_result.get("success", False) is False:
+                            return json.dumps({"error": image_result.get("error", "Unknown error")})
+                        return json.dumps(image_result["result"], indent=4)
 
             # For text search, extract structured data
+            if not result.cleaned_html:
+                return json.dumps({"error": "No HTML content found"})
             schemas = await self._build_schemas(result.cleaned_html, schema_cache_path)
             extracted = {
                 key: JsonCssExtractionStrategy(schema=schemas[key]).run(
@@ -63,13 +73,14 @@ class GoogleSearchCrawler(BaseCrawler):
             }
             return json.dumps(extracted, indent=4)
 
-    async def _build_schemas(self, html: str, schema_cache_path: str = None) -> Dict[str, Dict]:
+    async def _build_schemas(
+        self, html: str, schema_cache_path: Optional[str] = None
+    ) -> Dict[str, Dict]:
         """Build extraction schemas (organic, top stories, etc.)"""
         home_dir = get_home_folder() if not schema_cache_path else schema_cache_path
         os.makedirs(f"{home_dir}/schema", exist_ok=True)
 
-        # cleaned_html = optimize_html(html, threshold=100)
-        cleaned_html = preprocess_html_for_schema(html) 
+        cleaned_html = preprocess_html_for_schema(html)
 
         organic_schema = None
         if os.path.exists(f"{home_dir}/schema/organic_schema.json"):

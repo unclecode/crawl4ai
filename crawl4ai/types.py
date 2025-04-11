@@ -10,6 +10,7 @@ CacheMode = Union['CacheModeType']
 CrawlResult = Union['CrawlResultType']
 CrawlerHub = Union['CrawlerHubType']
 BrowserProfiler = Union['BrowserProfilerType']
+CrawlResultContainer = Union['CrawlResultContainerType']
 
 # Configuration types
 BrowserConfig = Union['BrowserConfigType']
@@ -54,7 +55,6 @@ SemaphoreDispatcher = Union['SemaphoreDispatcherType']
 RateLimiter = Union['RateLimiterType']
 CrawlerMonitor = Union['CrawlerMonitorType']
 DisplayMode = Union['DisplayModeType']
-RunManyReturn = Union['RunManyReturnType']
 
 # Docker client
 Crawl4aiDockerClient = Union['Crawl4aiDockerClientType']
@@ -91,7 +91,10 @@ if TYPE_CHECKING:
         AsyncWebCrawler as AsyncWebCrawlerType,
         CacheMode as CacheModeType,
     )
-    from .models import CrawlResult as CrawlResultType
+    from .models import (
+        CrawlResult as CrawlResultType,
+        CrawlResultContainer as CrawlResultContainerType,
+    )
     from .hub import CrawlerHub as CrawlerHubType
     from .browser_profiler import BrowserProfiler as BrowserProfilerType
     
@@ -153,7 +156,6 @@ if TYPE_CHECKING:
         RateLimiter as RateLimiterType,
         CrawlerMonitor as CrawlerMonitorType,
         DisplayMode as DisplayModeType,
-        RunManyReturn as RunManyReturnType,
     )
     
     # Docker client
@@ -179,9 +181,3 @@ if TYPE_CHECKING:
         DFSDeepCrawlStrategy as DFSDeepCrawlStrategyType,
         DeepCrawlDecorator as DeepCrawlDecoratorType,
     )
-
-
-
-def create_llm_config(*args, **kwargs) -> 'LLMConfigType':
-    from .async_configs import LLMConfig
-    return LLMConfig(*args, **kwargs)

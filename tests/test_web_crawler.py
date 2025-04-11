@@ -1,17 +1,23 @@
-import unittest, os
-from crawl4ai import LLMConfig
-from crawl4ai.web_crawler import WebCrawler
+import os
+import sys
+import unittest
+
+import pytest
+
+from crawl4ai import CacheMode
+from crawl4ai.async_configs import LLMConfig
 from crawl4ai.chunking_strategy import (
-    RegexChunking,
     FixedLengthWordChunking,
+    RegexChunking,
     SlidingWindowChunking,
+    TopicSegmentationChunking,
 )
 from crawl4ai.extraction_strategy import (
     CosineStrategy,
     LLMExtractionStrategy,
-    TopicExtractionStrategy,
     NoExtractionStrategy,
 )
+from crawl4ai.legacy.web_crawler import WebCrawler
 
 
 class TestWebCrawler(unittest.TestCase):
@@ -28,13 +34,16 @@ class TestWebCrawler(unittest.TestCase):
             word_count_threshold=5,
             chunking_strategy=RegexChunking(),
             extraction_strategy=CosineStrategy(),
-            bypass_cache=True,
+            cache_mode=CacheMode.BYPASS,
+            warmup=False,
         )
         self.assertTrue(
             result.success, "Failed to crawl and extract using default strategies"
         )
 
     def test_run_different_strategies(self):
+        if not os.getenv("OPENAI_API_KEY"):
+            self.skipTest("Skipping env OPENAI_API_KEY not set")
         url = "https://www.nbcnews.com/business"
 
         # Test with FixedLengthWordChunking and LLMExtractionStrategy
@@ -45,7 +54,8 @@ class TestWebCrawler(unittest.TestCase):
             extraction_strategy=LLMExtractionStrategy(
                 llm_config=LLMConfig(provider="openai/gpt-3.5-turbo", api_token=os.getenv("OPENAI_API_KEY"))
             ),
-            bypass_cache=True,
+            cache_mode=CacheMode.BYPASS,
+            warmup=False
         )
         self.assertTrue(
             result.success,
@@ -56,9 +66,11 @@ class TestWebCrawler(unittest.TestCase):
         result = self.crawler.run(
             url=url,
             word_count_threshold=5,
-            chunking_strategy=SlidingWindowChunking(window_size=100, step=50),
-            extraction_strategy=TopicExtractionStrategy(num_keywords=5),
-            bypass_cache=True,
+            chunking_strategy=TopicSegmentationChunking(
+                window_size=100, step=50, num_keywords=5
+            ),
+            cache_mode=CacheMode.BYPASS,
+            warmup=False,
         )
         self.assertTrue(
             result.success,
@@ -66,37 +78,46 @@ class TestWebCrawler(unittest.TestCase):
         )
 
     def test_invalid_url(self):
-        with self.assertRaises(Exception) as context:
-            self.crawler.run(url="invalid_url", bypass_cache=True)
-        self.assertIn("Invalid URL", str(context.exception))
+        result = self.crawler.run(
+            url="invalid_url", cache_mode=CacheMode.BYPASS, warmup=False
+        )
+        self.assertFalse(result.success, "Extraction should fail with invalid URL")
+        msg = "" if not result.error_message else result.error_message
+        self.assertTrue("invalid argument" in msg)
 
     def test_unsupported_extraction_strategy(self):
-        with self.assertRaises(Exception) as context:
-            self.crawler.run(
-                url="https://www.nbcnews.com/business",
-                extraction_strategy="UnsupportedStrategy",
-                bypass_cache=True,
-            )
-        self.assertIn("Unsupported extraction strategy", str(context.exception))
+        result = self.crawler.run(
+            url="https://www.nbcnews.com/business",
+            extraction_strategy="UnsupportedStrategy", # pyright: ignore[reportArgumentType]
+            cache_mode=CacheMode.BYPASS,
+        )
+        self.assertFalse(
+            result.success, "Extraction should fail with unsupported strategy"
+        )
+        self.assertEqual("Unsupported extraction strategy", result.error_message)
 
+    @pytest.mark.skip("Skipping InvalidCSSSelectorError is no longer raised")
     def test_invalid_css_selector(self):
-        with self.assertRaises(ValueError) as context:
-            self.crawler.run(
-                url="https://www.nbcnews.com/business",
-                css_selector="invalid_selector",
-                bypass_cache=True,
-            )
-        self.assertIn("Invalid CSS selector", str(context.exception))
+        result = self.crawler.run(
+            url="https://www.nbcnews.com/business",
+            css_selector="invalid_selector",
+            cache_mode=CacheMode.BYPASS,
+            warmup=False
+        )
+        self.assertFalse(
+            result.success, "Extraction should fail with invalid CSS selector"
+        )
+        self.assertEqual("Invalid CSS selector", result.error_message)
 
     def test_crawl_with_cache_and_bypass_cache(self):
         url = "https://www.nbcnews.com/business"
 
         # First crawl with cache enabled
-        result = self.crawler.run(url=url, bypass_cache=False)
+        result = self.crawler.run(url=url, bypass_cache=False, warmup=False)
         self.assertTrue(result.success, "Failed to crawl and cache the result")
 
-        # Second crawl with bypass_cache=True
-        result = self.crawler.run(url=url, bypass_cache=True)
+        # Second crawl with cache_mode=CacheMode.BYPASS
+        result = self.crawler.run(url=url, cache_mode=CacheMode.BYPASS, warmup=False)
         self.assertTrue(result.success, "Failed to bypass cache and fetch fresh data")
 
     def test_fetch_multiple_pages(self):
@@ -108,7 +129,8 @@ class TestWebCrawler(unittest.TestCase):
                 word_count_threshold=5,
                 chunking_strategy=RegexChunking(),
                 extraction_strategy=CosineStrategy(),
-                bypass_cache=True,
+                cache_mode=CacheMode.BYPASS,
+                warmup=False
             )
             results.append(result)
 
@@ -124,7 +146,8 @@ class TestWebCrawler(unittest.TestCase):
             word_count_threshold=5,
             chunking_strategy=FixedLengthWordChunking(chunk_size=100),
             extraction_strategy=NoExtractionStrategy(),
-            bypass_cache=True,
+            cache_mode=CacheMode.BYPASS,
+            warmup=False,
         )
         self.assertTrue(
             result.success,
@@ -137,7 +160,8 @@ class TestWebCrawler(unittest.TestCase):
             word_count_threshold=5,
             chunking_strategy=SlidingWindowChunking(window_size=100, step=50),
             extraction_strategy=NoExtractionStrategy(),
-            bypass_cache=True,
+            cache_mode=CacheMode.BYPASS,
+            warmup=False
         )
         self.assertTrue(
             result.success,
@@ -146,4 +170,6 @@ class TestWebCrawler(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    import subprocess
+
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

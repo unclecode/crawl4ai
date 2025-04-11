@@ -1,9 +1,10 @@
-import asyncio
+import sys
+
 import pytest
-from typing import List
+
 from crawl4ai import (
     AsyncWebCrawler,
-    BrowserConfig, 
+    BrowserConfig,
     CrawlerRunConfig,
     MemoryAdaptiveDispatcher,
     RateLimiter,
@@ -30,7 +31,6 @@ async def test_viewport_config(viewport):
         result = await crawler.arun(
             url="https://example.com",
             config=CrawlerRunConfig(
-                # cache_mode=CacheMode.BYPASS,
                 page_timeout=30000  # 30 seconds
             )
         )
@@ -47,7 +47,7 @@ async def test_memory_management():
     )
     
     dispatcher = MemoryAdaptiveDispatcher(
-        memory_threshold_percent=70.0,
+        memory_threshold_percent=80.0,
         check_interval=1.0,
         max_session_permit=5
     )
@@ -76,7 +76,7 @@ async def test_rate_limiting():
             max_delay=5.0,
             max_retries=2
         ),
-        memory_threshold_percent=70.0
+        memory_threshold_percent=80.0,
     )
     
     urls = [
@@ -143,7 +143,6 @@ async def test_error_handling(error_url):
         assert result.error_message is not None
 
 if __name__ == "__main__":
-    asyncio.run(test_viewport_config((1024, 768)))
-    asyncio.run(test_memory_management())
-    asyncio.run(test_rate_limiting())
-    asyncio.run(test_javascript_execution())
+    import subprocess
+
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

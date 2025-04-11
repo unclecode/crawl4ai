@@ -1,16 +1,17 @@
 import os
 import sys
 import time
-from typing import List, Optional, Dict
-from fastapi import FastAPI, HTTPException, Request, Query, Path, Depends
+from typing import Optional, Dict, Any, Annotated
+from fastapi import FastAPI, HTTPException, Request, Query, Path, Depends, status
 from fastapi.responses import StreamingResponse, RedirectResponse, PlainTextResponse, JSONResponse
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from pydantic import BaseModel, Field
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from prometheus_fastapi_instrumentator import Instrumentator
 from redis import asyncio as aioredis
+
+from crawl4ai.async_configs import Serialisable
 
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 from utils import FilterType, load_config, setup_logging, verify_email_domain
@@ -19,16 +20,13 @@ from api import (
     handle_llm_qa,
     handle_stream_crawl_request,
     handle_crawl_request,
-    stream_results
+    stream_results,
+    CrawlRequest
 )
 from auth import create_access_token, get_token_dependency, TokenRequest  # Import from auth.py
 
 __version__ = "0.2.6"
 
-class CrawlRequest(BaseModel):
-    urls: List[str] = Field(min_length=1, max_length=100)
-    browser_config: Optional[Dict] = Field(default_factory=dict)
-    crawler_config: Optional[Dict] = Field(default_factory=dict)
 
 # Load configuration and setup
 config = load_config()
@@ -79,7 +77,9 @@ async def add_security_headers(request: Request, call_next):
 @app.post("/token")
 async def get_token(request_data: TokenRequest):
     if not verify_email_domain(request_data.email):
-        raise HTTPException(status_code=400, detail="Invalid email domain")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid email domain"
+        )
     token = create_access_token({"sub": request_data.email})
     return {"email": request_data.email, "access_token": token, "token_type": "bearer"}
 
@@ -91,10 +91,10 @@ async def get_markdown(
     url: str,
     f: FilterType = FilterType.FIT,
     q: Optional[str] = None,
-    c: Optional[str] = "0",
-    token_data: Optional[Dict] = Depends(token_dependency)
-):
-    result = await handle_markdown_request(url, f, q, c, config)
+    c: str = "0",
+    token_data: Optional[Dict] = Depends(token_dependency),
+) -> PlainTextResponse:
+    result = await handle_markdown_request(url, f, config, q, c)
     return PlainTextResponse(result)
 
 @app.get("/llm/{url:path}", description="URL should be without http/https prefix")
@@ -102,8 +102,9 @@ async def llm_endpoint(
     request: Request,
     url: str = Path(...),
     q: Optional[str] = Query(None),
-    token_data: Optional[Dict] = Depends(token_dependency)
-):
+    # TODO: Add schema and cache support as per get_markdown
+    token_data: Optional[Dict] = Depends(token_dependency),
+) -> JSONResponse:
     if not q:
         raise HTTPException(status_code=400, detail="Query parameter 'q' is required")
     if not url.startswith(('http://', 'https://')):
@@ -115,33 +116,39 @@ async def llm_endpoint(
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/schema")
-async def get_schema():
+async def get_schema() -> dict[str, Serialisable]:
     from crawl4ai import BrowserConfig, CrawlerRunConfig
     return {"browser": BrowserConfig().dump(), "crawler": CrawlerRunConfig().dump()}
 
 @app.get(config["observability"]["health_check"]["endpoint"])
-async def health():
+async def health() -> dict[str, Any]:
     return {"status": "ok", "timestamp": time.time(), "version": __version__}
 
 @app.get(config["observability"]["prometheus"]["endpoint"])
-async def metrics():
+async def metrics() -> RedirectResponse:
     return RedirectResponse(url=config["observability"]["prometheus"]["endpoint"])
 
 @app.post("/crawl")
 @limiter.limit(config["rate_limiting"]["default_limit"])
 async def crawl(
     request: Request,
-    crawl_request: CrawlRequest,
-    token_data: Optional[Dict] = Depends(token_dependency)
-):
+    crawl_request: Annotated[CrawlRequest, Depends(CrawlRequest)],
+    token_data: Optional[Dict] = Depends(token_dependency),
+) -> JSONResponse:
     if not crawl_request.urls:
-        raise HTTPException(status_code=400, detail="At least one URL required")
-    
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="At least one URL required"
+        )
+
+    if crawl_request.crawler_config.stream:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Streaming mode not allowed for this endpoint. Use /crawl/stream instead.",
+        )
+
     results = await handle_crawl_request(
-        urls=crawl_request.urls,
-        browser_config=crawl_request.browser_config,
-        crawler_config=crawl_request.crawler_config,
-        config=config
+        crawl_request=crawl_request,
+        config=config,
     )
 
     return JSONResponse(results)
@@ -151,17 +158,23 @@ async def crawl(
 @limiter.limit(config["rate_limiting"]["default_limit"])
 async def crawl_stream(
     request: Request,
-    crawl_request: CrawlRequest,
-    token_data: Optional[Dict] = Depends(token_dependency)
+    crawl_request: Annotated[CrawlRequest, Depends(CrawlRequest)],
+    token_data: Optional[Dict] = Depends(token_dependency),
 ):
     if not crawl_request.urls:
-        raise HTTPException(status_code=400, detail="At least one URL required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="At least one URL required"
+        )
+
+    if not crawl_request.crawler_config.stream:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Streaming mode must be set for this endpoint. Use /crawl instead {crawl_request.crawler_config}.",
+        )
 
     crawler, results_gen = await handle_stream_crawl_request(
-        urls=crawl_request.urls,
-        browser_config=crawl_request.browser_config,
-        crawler_config=crawl_request.crawler_config,
-        config=config
+        crawl_request=crawl_request,
+        config=config,
     )
 
     return StreamingResponse(

@@ -9,6 +9,7 @@ import random
 import threading
 import sys
 import os
+import pytest
 
 # Add the parent directory to the path to import crawl4ai
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
@@ -59,7 +60,7 @@ def simulate_crawler_task(monitor, task_id, url, simulate_failure=False):
             memory_usage=0.0
         )
 
-def update_queue_stats(monitor, num_queued_tasks):
+def update_queue_stats(monitor: CrawlerMonitor, num_queued_tasks):
     """Update queue statistics periodically."""
     while monitor.is_running:
         queued_tasks = [
@@ -102,6 +103,7 @@ def update_queue_stats(monitor, num_queued_tasks):
             
         time.sleep(1.0)
 
+@pytest.mark.timeout(60)
 def test_crawler_monitor():
     """Test the CrawlerMonitor with simulated crawler tasks."""
     # Total number of URLs to crawl
@@ -165,4 +167,6 @@ def test_crawler_monitor():
         print("\nCrawler monitor test completed")
 
 if __name__ == "__main__":
+    # Doesn't use the standard pytest entry point as it's not compatible
+    # with the tty output in the terminal.
     test_crawler_monitor()

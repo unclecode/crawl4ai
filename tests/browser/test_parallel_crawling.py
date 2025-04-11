@@ -6,14 +6,8 @@ and serve as functional tests for multi-page crawling performance.
 """
 
 import asyncio
-import os
-import sys
 import time
-from typing import List
-
-# Add the project root to Python path if running directly
-if __name__ == "__main__":
-    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+import pytest
 
 from crawl4ai.browser import BrowserManager
 from crawl4ai.async_configs import BrowserConfig, CrawlerRunConfig
@@ -22,6 +16,7 @@ from crawl4ai.async_logger import AsyncLogger
 # Create a logger for clear terminal output
 logger = AsyncLogger(verbose=True, log_file=None)
 
+@pytest.mark.asyncio
 async def test_get_pages_basic():
     """Test basic functionality of get_pages method."""
     logger.info("Testing basic get_pages functionality", tag="TEST")
@@ -53,10 +48,11 @@ async def test_get_pages_basic():
         logger.error(f"Test failed: {str(e)}", tag="TEST")
         try:
             await manager.close()
-        except:
+        except Exception:
             pass
         return False
 
+@pytest.mark.asyncio
 async def test_parallel_approaches_comparison():
     """Compare two parallel crawling approaches:
     1. Create a page for each URL on-demand (get_page + gather)
@@ -148,10 +144,11 @@ async def test_parallel_approaches_comparison():
         logger.error(f"Test failed: {str(e)}", tag="TEST")
         try:
             await manager.close()
-        except:
+        except Exception:
             pass
         return False
 
+@pytest.mark.asyncio
 async def test_multi_browser_scaling(num_browsers=3, pages_per_browser=5):
     """Test performance with multiple browsers and pages per browser.
     Compares two approaches:
@@ -166,8 +163,7 @@ async def test_multi_browser_scaling(num_browsers=3, pages_per_browser=5):
     
     # Create browser managers
     managers = []
-    base_port = 9222
-    
+
     try:
         # Start all browsers in parallel
         start_tasks = []
@@ -268,7 +264,7 @@ async def test_multi_browser_scaling(num_browsers=3, pages_per_browser=5):
         for manager in managers:
             try:
                 await manager.close()
-            except:
+            except Exception:
                 pass
         return False
 
@@ -469,7 +465,7 @@ async def grid_search_optimal_configuration(total_urls=50):
             for manager in managers:
                 try:
                     await manager.close()
-                except:
+                except Exception:
                     pass
                     
     # Print summary of all configurations
@@ -880,7 +876,7 @@ async def run_tests():
     if configs:
         # Show the optimal configuration
         optimal = configs["optimal"]
-        print(f"\n🎯 Recommended configuration for production use:")
+        print("\n🎯 Recommended configuration for production use:")
         print(f"   {optimal['browser_count']} browsers with distribution {optimal['distribution']}")
         print(f"   Estimated performance: {optimal['pages_per_second']:.1f} pages/second")
         results.append(True)

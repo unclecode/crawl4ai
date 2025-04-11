@@ -15,21 +15,21 @@ from rich.prompt import Prompt, Confirm
 
 from crawl4ai import (
     CacheMode,
-    AsyncWebCrawler, 
-    CrawlResult,
-    BrowserConfig, 
+    AsyncWebCrawler,
+    BrowserConfig,
     CrawlerRunConfig,
-    LLMExtractionStrategy, 
+    LLMExtractionStrategy,
     LXMLWebScrapingStrategy,
     JsonCssExtractionStrategy,
     JsonXPathExtractionStrategy,
-    BM25ContentFilter, 
+    BM25ContentFilter,
     PruningContentFilter,
     BrowserProfiler,
     DefaultMarkdownGenerator,
     LLMConfig
 )
 from crawl4ai.config import USER_SETTINGS
+from crawl4ai.models import CrawlResultContainer
 from litellm import completion
 from pathlib import Path
 
@@ -139,7 +139,7 @@ def load_config_file(path: Optional[str]) -> dict:
     except Exception as e:
         raise click.BadParameter(f'Error loading config file {path}: {str(e)}')
 
-def load_schema_file(path: Optional[str]) -> dict:
+def load_schema_file(path: Optional[str]) -> Optional[dict]:
     if not path:
         return None
     return load_config_file(path)
@@ -806,8 +806,7 @@ def browser_view_cmd(url: Optional[str]):
         
         # Use the CDP URL to launch a new visible window
         import subprocess
-        import os
-        
+
         # Determine the browser command based on platform
         if sys.platform == "darwin":  # macOS
             browser_cmd = ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"]
@@ -1069,6 +1068,9 @@ def crawl_cmd(url: str, browser_config: str, crawler_config: str, filter_config:
                     "query": "",
                     "threshold": 0.48
                 }
+            else:
+                filter_conf = {}
+
             if filter_conf["type"] == "bm25":
                 crawler_cfg.markdown_generator = DefaultMarkdownGenerator(
                     content_filter = BM25ContentFilter(
@@ -1161,7 +1163,7 @@ Always return valid, properly formatted JSON."""
         crawler_cfg.verbose = config.get("VERBOSE", False)
         
         # Run crawler
-        result : CrawlResult = anyio.run(
+        result: CrawlResultContainer = anyio.run(
             run_crawler,
             url,
             browser_cfg,
@@ -1304,7 +1306,7 @@ def config_set_cmd(key: str, value: str):
         elif value.lower() in ["false", "no", "0", "n"]:
             typed_value = False
         else:
-            console.print(f"[red]Error: Invalid boolean value. Use 'true' or 'false'.[/red]")
+            console.print("[red]Error: Invalid boolean value. Use 'true' or 'false'.[/red]")
             return
     elif setting["type"] == "string":
         typed_value = value

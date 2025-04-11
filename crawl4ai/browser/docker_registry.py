@@ -7,7 +7,7 @@ across browser sessions, improving performance and resource utilization.
 import os
 import json
 import time
-from typing import Dict, Optional
+from typing import Optional
 
 from ..utils import get_home_folder
 

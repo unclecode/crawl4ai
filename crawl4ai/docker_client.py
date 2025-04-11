@@ -1,11 +1,10 @@
-from typing import List, Optional, Union, AsyncGenerator, Dict, Any
+from typing import List, Optional, AsyncGenerator, Dict, Any, Self
 import httpx
 import json
-from urllib.parse import urljoin
 import asyncio
 
 from .async_configs import BrowserConfig, CrawlerRunConfig
-from .models import CrawlResult
+from .models import CrawlResult, CrawlResultContainer
 from .async_logger import AsyncLogger, LogLevel
 
 
@@ -33,12 +32,14 @@ class Crawl4aiDockerClient:
         timeout: float = 30.0,
         verify_ssl: bool = True,
         verbose: bool = True,
-        log_file: Optional[str] = None
+        log_file: Optional[str] = None,
+        transport: Optional[httpx.AsyncBaseTransport] = None,
     ):
-        self.base_url = base_url.rstrip('/')
         self.timeout = timeout
         self.logger = AsyncLogger(log_file=log_file, log_level=LogLevel.DEBUG, verbose=verbose)
         self._http_client = httpx.AsyncClient(
+            base_url=base_url.rstrip("/"),
+            transport=transport,
             timeout=timeout,
             verify=verify_ssl,
             headers={"Content-Type": "application/json"}
@@ -47,10 +48,9 @@ class Crawl4aiDockerClient:
 
     async def authenticate(self, email: str) -> None:
         """Authenticate with the server and store the token."""
-        url = urljoin(self.base_url, "/token")
         try:
             self.logger.info(f"Authenticating with email: {email}", tag="AUTH")
-            response = await self._http_client.post(url, json={"email": email})
+            response = await self._http_client.post("/token", json={"email": email})
             response.raise_for_status()
             data = response.json()
             self._token = data["access_token"]
@@ -64,26 +64,31 @@ class Crawl4aiDockerClient:
     async def _check_server(self) -> None:
         """Check if server is reachable, raising an error if not."""
         try:
-            await self._http_client.get(urljoin(self.base_url, "/health"))
-            self.logger.success(f"Connected to {self.base_url}", tag="READY")
+            await self._http_client.get("/health")
+            self.logger.success(
+                f"Connected to {self._http_client.base_url}", tag="READY"
+            )
         except httpx.RequestError as e:
             self.logger.error(f"Server unreachable: {str(e)}", tag="ERROR")
             raise ConnectionError(f"Cannot connect to server: {str(e)}")
 
-    def _prepare_request(self, urls: List[str], browser_config: Optional[BrowserConfig] = None, 
-                       crawler_config: Optional[CrawlerRunConfig] = None) -> Dict[str, Any]:
+    def _prepare_request(
+        self,
+        urls: List[str],
+        browser_config: Optional[BrowserConfig] = None,
+        crawler_config: Optional[CrawlerRunConfig] = None,
+    ) -> Dict[str, Any]:
         """Prepare request data from configs."""
         return {
             "urls": urls,
             "browser_config": browser_config.dump() if browser_config else {},
-            "crawler_config": crawler_config.dump() if crawler_config else {}
+            "crawler_config": crawler_config.dump() if crawler_config else {},
         }
 
     async def _request(self, method: str, endpoint: str, **kwargs) -> httpx.Response:
         """Make an HTTP request with error handling."""
-        url = urljoin(self.base_url, endpoint)
         try:
-            response = await self._http_client.request(method, url, **kwargs)
+            response = await self._http_client.request(method, endpoint, **kwargs)
             response.raise_for_status()
             return response
         except httpx.TimeoutException as e:
@@ -100,8 +105,8 @@ class Crawl4aiDockerClient:
         self,
         urls: List[str],
         browser_config: Optional[BrowserConfig] = None,
-        crawler_config: Optional[CrawlerRunConfig] = None
-    ) -> Union[CrawlResult, List[CrawlResult], AsyncGenerator[CrawlResult, None]]:
+        crawler_config: Optional[CrawlerRunConfig] = None,
+    ) -> CrawlResultContainer:
         """Execute a crawl operation."""
         if not self._token:
             raise Crawl4aiClientError("Authentication required. Call authenticate() first.")
@@ -114,8 +119,20 @@ class Crawl4aiDockerClient:
         
         if is_streaming:
             async def stream_results() -> AsyncGenerator[CrawlResult, None]:
-                async with self._http_client.stream("POST", f"{self.base_url}/crawl/stream", json=data) as response:
-                    response.raise_for_status()
+                async with self._http_client.stream("POST", "/crawl/stream", json=data) as response:
+                    if response.status_code != httpx.codes.OK:
+                        await response.aread()
+                        response_data: dict[str, Any] = response.json()
+                        yield CrawlResult(
+                            url=data.get("url", "unknown"),
+                            html="",
+                            success=False,
+                            error_message=str(
+                                response_data.get("detail", "Unknown error")
+                            ),
+                        )
+                        return
+
                     async for line in response.aiter_lines():
                         if line.strip():
                             result = json.loads(line)
@@ -127,8 +144,9 @@ class Crawl4aiDockerClient:
                                 continue
                             else:
                                 yield CrawlResult(**result)
-            return stream_results()
-        
+
+            return CrawlResultContainer(stream_results())
+
         response = await self._request("POST", "/crawl", json=data)
         result_data = response.json()
         if not result_data.get("success", False):
@@ -136,7 +154,7 @@ class Crawl4aiDockerClient:
         
         results = [CrawlResult(**r) for r in result_data.get("results", [])]
         self.logger.success(f"Crawl completed with {len(results)} results", tag="CRAWL")
-        return results[0] if len(results) == 1 else results
+        return CrawlResultContainer(results)
 
     async def get_schema(self) -> Dict[str, Any]:
         """Retrieve configuration schemas."""
@@ -150,7 +168,7 @@ class Crawl4aiDockerClient:
         self.logger.info("Closing client", tag="CLOSE")
         await self._http_client.aclose()
 
-    async def __aenter__(self) -> "Crawl4aiDockerClient":
+    async def __aenter__(self) -> Self:
         return self
 
     async def __aexit__(self, exc_type: Optional[type], exc_val: Optional[Exception], exc_tb: Optional[Any]) -> None:

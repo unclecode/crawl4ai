@@ -8,7 +8,7 @@ parent_dir = os.path.dirname(
 sys.path.append(parent_dir)
 
 import asyncio
-from crawl4ai import AsyncWebCrawler
+from crawl4ai import AsyncWebCrawler, CacheMode
 
 
 async def main():
@@ -30,7 +30,7 @@ async def main():
         results = await crawler.arun_many(
             urls=urls,
             word_count_threshold=word_count_threshold,
-            bypass_cache=True,
+            cache_mode=CacheMode.BYPASS,
             verbose=True,
         )
 

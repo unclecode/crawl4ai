@@ -6,7 +6,7 @@ import asyncio
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 from firecrawl import FirecrawlApp
-from crawl4ai import AsyncWebCrawler
+from crawl4ai import AsyncWebCrawler, CacheMode
 
 __data__ = os.path.join(os.path.dirname(__file__), "..", "..") + "/.data"
 
@@ -34,7 +34,7 @@ async def compare():
             url="https://www.nbcnews.com/business",
             # js_code=["const loadMoreButton = Array.from(document.querySelectorAll('button')).find(button => button.textContent.includes('Load More')); loadMoreButton && loadMoreButton.click();"],
             word_count_threshold=0,
-            bypass_cache=True,
+            cache_mode=CacheMode.BYPASS,
             verbose=False,
         )
         end = time.time()
@@ -53,7 +53,7 @@ async def compare():
                 "const loadMoreButton = Array.from(document.querySelectorAll('button')).find(button => button.textContent.includes('Load More')); loadMoreButton && loadMoreButton.click();"
             ],
             word_count_threshold=0,
-            bypass_cache=True,
+            cache_mode=CacheMode.BYPASS,
             verbose=False,
         )
         end = time.time()

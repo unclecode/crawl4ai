@@ -1,16 +1,17 @@
 import os
 import json
 import asyncio
-from typing import List, Tuple
+from dataclasses import dataclass
+from typing import List, Tuple, Optional, Annotated, AsyncGenerator, Any
 from functools import partial
 
 import logging
-from typing import Optional, AsyncGenerator
 from urllib.parse import unquote
-from fastapi import HTTPException, Request, status
+from fastapi import HTTPException, Request, status, Body
 from fastapi.background import BackgroundTasks
 from fastapi.responses import JSONResponse
 from redis import asyncio as aioredis
+from pydantic.fields import Field
 
 from crawl4ai import (
     AsyncWebCrawler,
@@ -42,11 +43,26 @@ from utils import (
 
 logger = logging.getLogger(__name__)
 
-async def handle_llm_qa(
-    url: str,
-    query: str,
-    config: dict
-) -> str:
+
+@dataclass
+class CrawlRequest:
+    urls: List[str]
+    browser_config: BrowserConfig
+    crawler_config: CrawlerRunConfig
+
+    def __init__(
+        self,
+        urls: Annotated[List[str], Field(min_length=1, max_length=100)] = Body(None),
+        browser_config: Optional[dict[str, Any]] = Body(None),
+        crawler_config: Optional[dict[str, Any]] = Body(None),
+    ) -> None:
+        """Build a CrawlRequest object from request body."""
+        self.urls = urls
+        self.browser_config = BrowserConfig.load(browser_config)
+        self.crawler_config = CrawlerRunConfig.load(crawler_config)
+
+
+async def handle_llm_qa(url: str, query: str, config: dict) -> str:
     """Process QA using LLM with crawled content as context."""
     try:
         # Extract base URL by finding last '?q=' occurrence
@@ -151,9 +167,9 @@ async def process_llm_extraction(
 async def handle_markdown_request(
     url: str,
     filter_type: FilterType,
+    config: dict,
     query: Optional[str] = None,
     cache: str = "0",
-    config: Optional[dict] = None
 ) -> str:
     """Handle markdown generation requests."""
     try:
@@ -371,16 +387,11 @@ async def stream_results(crawler: AsyncWebCrawler, results_gen: AsyncGenerator) 
             logger.error(f"Crawler cleanup error: {e}")
 
 async def handle_crawl_request(
-    urls: List[str],
-    browser_config: dict,
-    crawler_config: dict,
-    config: dict
+    crawl_request: CrawlRequest,
+    config: dict,
 ) -> dict:
     """Handle non-streaming crawl requests."""
     try:
-        browser_config = BrowserConfig.load(browser_config)
-        crawler_config = CrawlerRunConfig.load(crawler_config)
-
         dispatcher = MemoryAdaptiveDispatcher(
             memory_threshold_percent=config["crawler"]["memory_threshold_percent"],
             rate_limiter=RateLimiter(
@@ -388,19 +399,20 @@ async def handle_crawl_request(
             )
         )
 
-        async with AsyncWebCrawler(config=browser_config) as crawler:
+        async with AsyncWebCrawler(config=crawl_request.browser_config) as crawler:
             results = []
-            func = getattr(crawler, "arun" if len(urls) == 1 else "arun_many")
-            partial_func = partial(func, 
-                                   urls[0] if len(urls) == 1 else urls, 
-                                   config=crawler_config, 
-                                   dispatcher=dispatcher)
+            func = getattr(crawler, "arun" if len(crawl_request.urls) == 1 else "arun_many")
+            partial_func = partial(func,
+                                   crawl_request.urls[0] if len(crawl_request.urls) == 1 else crawl_request.urls,
+                                   config=crawl_request.crawler_config,
+                                   dispatcher=dispatcher,)
             results = await partial_func()
             return {
                 "success": True,
                 "results": [result.model_dump() for result in results]
             }
-
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Crawl error: {str(e)}", exc_info=True)
         raise HTTPException(
@@ -409,17 +421,14 @@ async def handle_crawl_request(
         )
 
 async def handle_stream_crawl_request(
-    urls: List[str],
-    browser_config: dict,
-    crawler_config: dict,
-    config: dict
+    crawl_request: CrawlRequest,
+    config: dict,
 ) -> Tuple[AsyncWebCrawler, AsyncGenerator]:
     """Handle streaming crawl requests."""
+    crawler: Optional[AsyncWebCrawler] = None
     try:
-        browser_config = BrowserConfig.load(browser_config)
-        browser_config.verbose = True
-        crawler_config = CrawlerRunConfig.load(crawler_config)
-        crawler_config.scraping_strategy = LXMLWebScrapingStrategy()
+        crawl_request.browser_config.verbose = True
+        crawl_request.crawler_config.scraping_strategy = LXMLWebScrapingStrategy()
 
         dispatcher = MemoryAdaptiveDispatcher(
             memory_threshold_percent=config["crawler"]["memory_threshold_percent"],
@@ -428,21 +437,28 @@ async def handle_stream_crawl_request(
             )
         )
 
-        crawler = AsyncWebCrawler(config=browser_config)
+        crawler = AsyncWebCrawler(config=crawl_request.browser_config)
         await crawler.start()
 
         results_gen = await crawler.arun_many(
-            urls=urls,
-            config=crawler_config,
-            dispatcher=dispatcher
+            urls=crawl_request.urls,
+            config=crawl_request.crawler_config,
+            dispatcher=dispatcher,
         )
+        if not isinstance(results_gen.source, AsyncGenerator):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Unexpected results type {type(results_gen.source)} expected AsyncGenerator",
+            )
 
-        return crawler, results_gen
+        return crawler, results_gen.source
 
+    except HTTPException:
+        raise
     except Exception as e:
-        if 'crawler' in locals():
-            await crawler.close()
         logger.error(f"Stream crawl error: {str(e)}", exc_info=True)
+        if crawler is not None:
+            await crawler.close()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)

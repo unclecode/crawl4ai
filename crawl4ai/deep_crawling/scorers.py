@@ -1,13 +1,11 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict, Optional
-from dataclasses import dataclass
-from urllib.parse import urlparse, unquote
 import re
-import logging
 from functools import lru_cache
 from array import array
 import ctypes
 import platform
+
 PLATFORM = platform.system()
 
 # Pre-computed scores for common year differences
@@ -25,13 +23,26 @@ _FRESHNESS_SCORES = [
 
 class ScoringStats:
     __slots__ = ('_urls_scored', '_total_score', '_min_score', '_max_score')
-    
-    def __init__(self):
-        self._urls_scored = 0
-        self._total_score = 0.0
-        self._min_score = None  # Lazy initialization
-        self._max_score = None
-    
+
+    def __init__(
+        self,
+        urls_scored: int = 0,
+        total_score: float = 0.0,
+        min_score: Optional[float] = None,
+        max_score: Optional[float] = None,
+    ):
+        """Initialize scoring statistics.
+        Args:
+            urls_scored (int): Number of URLs scored
+            total_score (float): Sum of all scores
+            min_score (float or None): Minimum score observed
+            max_score (float or None): Maximum score observed
+        """
+        self._urls_scored = urls_scored
+        self._total_score = total_score
+        self._min_score = min_score
+        self._max_score = max_score
+
     def update(self, score: float) -> None:
         """Optimized update with minimal operations"""
         self._urls_scored += 1
@@ -62,12 +73,12 @@ class ScoringStats:
         return self._max_score
 class URLScorer(ABC):
     __slots__ = ('_weight', '_stats')
-    
-    def __init__(self, weight: float = 1.0):
+
+    def __init__(self, weight: float = 1.0, stats: Optional[ScoringStats] = None):
         # Store weight directly as float32 for memory efficiency
         self._weight = ctypes.c_float(weight).value
-        self._stats = ScoringStats()
-    
+        self._stats = stats or ScoringStats()
+
     @abstractmethod
     def _calculate_score(self, url: str) -> float:
         """Calculate raw score for URL."""
@@ -159,9 +170,9 @@ class CompositeScorer(URLScorer):
 
 class KeywordRelevanceScorer(URLScorer):
     __slots__ = ('_weight', '_stats', '_keywords', '_case_sensitive')
-    
-    def __init__(self, keywords: List[str], weight: float = 1.0, case_sensitive: bool = False):
-        super().__init__(weight=weight)
+
+    def __init__(self, keywords: List[str], weight: float = 1.0, case_sensitive: bool = False, stats: Optional[ScoringStats] = None):
+        super().__init__(weight=weight, stats=stats)
         self._case_sensitive = case_sensitive
         # Pre-process keywords once
         self._keywords = [k if case_sensitive else k.lower() for k in keywords]

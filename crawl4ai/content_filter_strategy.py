@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup, Tag
 from typing import List, Tuple, Dict, Optional
 from rank_bm25 import BM25Okapi
 from collections import deque
-from bs4 import NavigableString, Comment
+from bs4.element import NavigableString, Comment
 
 from .utils import (
     clean_tokens,
@@ -31,12 +31,42 @@ from .async_logger import AsyncLogger, LogLevel
 from colorama import Fore, Style
 
 
+# TODO: remove once https://github.com/dorianbrown/rank_bm25/pull/40 has
+# been merged and we have updated the dependency.
+class BM25OkapiFixed(BM25Okapi):
+    """BM25 implementation with which avoids zero idf values."""
+
+    def _calc_idf(self, nd: dict[str, int]) -> None:
+        """
+        Calculates frequencies of terms in documents and in corpus.
+        This algorithm sets a floor on the idf values to eps * average_idf
+        """
+        # log( (N - n(qi) + 0.5) / (n(qi) + 0.5) + 1)
+        # where N is the total number of documents in the collection,
+        # and n(qi) is the number of documents containing qi.
+        # We use a refactored version of the formula avoiding the division
+        # to improve performance.
+        idf_sum: float = 0
+        negative_idfs: list[str] = []
+        for word, freq in nd.items():
+            idf: float = math.log(self.corpus_size + 1) - math.log(freq + 0.5)
+            self.idf[word] = idf
+            idf_sum += idf
+            if idf < 0:
+                negative_idfs.append(word)
+        self.average_idf = idf_sum / len(self.idf)
+
+        eps: float = self.epsilon * self.average_idf
+        for word in negative_idfs:
+            self.idf[word] = eps
+
+
 class RelevantContentFilter(ABC):
     """Abstract base class for content filtering strategies"""
 
     def __init__(
         self,
-        user_query: str = None,
+        user_query: Optional[str] = None,
         verbose: bool = False,
         logger: Optional[AsyncLogger] = None,
     ):
@@ -131,46 +161,63 @@ class RelevantContentFilter(ABC):
         query_parts = []
 
         # Title
-        try:
-            title = soup.title.string
-            if title:
-                query_parts.append(title)
-        except Exception:
-            pass
+        if title := soup.title:
+            query_parts.append(title.string)
 
-        if soup.find("h1"):
-            query_parts.append(soup.find("h1").get_text())
+        # Tags that typically contain meaningful headers.
+        HEADER_TAGS = {"h1", "h2", "h3", "h4", "h5", "h6", "header"}
+        for tag in HEADER_TAGS:
+            if header := soup.find(tag):
+                query_parts.append(header.get_text())
 
         # Meta tags
-        temp = ""
+        empty: bool = True
         for meta_name in ["keywords", "description"]:
             meta = soup.find("meta", attrs={"name": meta_name})
-            if meta and meta.get("content"):
-                query_parts.append(meta["content"])
-                temp += meta["content"]
+            if meta and isinstance(meta, Tag):
+                attrib: Union[str, list[str], None] = meta.get("content")
+                if attrib:
+                    content: str = (
+                        attrib if isinstance(attrib, str) else " ".join(attrib)
+                    )
+                    # TODO: should this be split?
+                    query_parts.append(content.replace(",", " ").replace("  ", " "))
+                    empty = False
 
         # If still empty, grab first significant paragraph
-        if not temp:
-            # Find the first tag P thatits text contains more than 50 characters
+        if empty:
+            # Find the first tag P that its text contains more than 150 characters
             for p in body.find_all("p"):
-                if len(p.get_text()) > 150:
-                    query_parts.append(p.get_text()[:150])
+                text: str = p.get_text()
+                if len(text) > 150:
+                    # Find the last space within the first 150 characters.
+                    if len(text) == 150 or text[150] == " ":
+                        # End of text is at word boundary.
+                        query_parts.append(text[:150])
+                    else:
+                        last_space_pos: int = text[:150].rfind(" ")
+                        if last_space_pos > 0:
+                            # Include only complete words up to the last space.
+                            query_parts.append(text[:last_space_pos])
+                        else:
+                            # Fallback if no space found and not at word boundary.
+                            query_parts.append(text[:150])
                     break
 
         return " ".join(filter(None, query_parts))
 
     def extract_text_chunks(
-        self, body: Tag, min_word_threshold: int = None
-    ) -> List[Tuple[str, str]]:
+        self, body: Tag, min_word_threshold: Optional[int] = None
+    ) -> List[Tuple[int, str, str, Tag]]:
         """
         Extracts text chunks from a BeautifulSoup body element while preserving order.
-        Returns list of tuples (text, tag_name) for classification.
+        Returns list of tuples for classification.
 
         Args:
             body: BeautifulSoup Tag object representing the body element
 
         Returns:
-            List of (text, tag_name) tuples
+            List of (index, chunk, tag_type, tag) tuples
         """
         # Tags to ignore - inline elements that shouldn't break text flow
         INLINE_TAGS = {
@@ -403,7 +450,7 @@ class BM25ContentFilter(RelevantContentFilter):
 
     def __init__(
         self,
-        user_query: str = None,
+        user_query: Optional[str] = None,
         bm25_threshold: float = 1.0,
         language: str = "english",
     ):
@@ -435,7 +482,7 @@ class BM25ContentFilter(RelevantContentFilter):
         }
         self.stemmer = stemmer(language)
 
-    def filter_content(self, html: str, min_word_threshold: int = None) -> List[str]:
+    def filter_content(self, html: str, min_word_threshold: Optional[int] = None) -> List[str]:
         """
         Implements content filtering using BM25 algorithm with priority tag handling.
 
@@ -459,27 +506,20 @@ class BM25ContentFilter(RelevantContentFilter):
         if not soup.body:
             # Wrap in body tag if missing
             soup = BeautifulSoup(f"<body>{html}</body>", "lxml")
-        body = soup.find("body")
+
+        body = soup.body
+        if not body:
+            return []
 
         query = self.extract_page_query(soup, body)
-
         if not query:
             return []
-            # return [self.clean_element(soup)]
 
         candidates = self.extract_text_chunks(body, min_word_threshold)
-
         if not candidates:
             return []
 
-        # Tokenize corpus
-        # tokenized_corpus = [chunk.lower().split() for _, chunk, _, _ in candidates]
-        # tokenized_query = query.lower().split()
-
-        # tokenized_corpus = [[ps.stem(word) for word in chunk.lower().split()]
-        #                 for _, chunk, _, _ in candidates]
-        # tokenized_query = [ps.stem(word) for word in query.lower().split()]
-
+        # Tokenize corpus and query
         tokenized_corpus = [
             [self.stemmer.stemWord(word) for word in chunk.lower().split()]
             for _, chunk, _, _ in candidates
@@ -488,22 +528,21 @@ class BM25ContentFilter(RelevantContentFilter):
             self.stemmer.stemWord(word) for word in query.lower().split()
         ]
 
-        # tokenized_corpus = [[self.stemmer.stemWord(word) for word in tokenize_text(chunk.lower())]
-        #            for _, chunk, _, _ in candidates]
-        # tokenized_query = [self.stemmer.stemWord(word) for word in tokenize_text(query.lower())]
-
         # Clean from stop words and noise
         tokenized_corpus = [clean_tokens(tokens) for tokens in tokenized_corpus]
         tokenized_query = clean_tokens(tokenized_query)
 
-        bm25 = BM25Okapi(tokenized_corpus)
+        bm25 = BM25OkapiFixed(tokenized_corpus)
         scores = bm25.get_scores(tokenized_query)
 
         # Adjust scores with tag weights
         adjusted_candidates = []
-        for score, (index, chunk, tag_type, tag) in zip(scores, candidates):
-            tag_weight = self.priority_tags.get(tag.name, 1.0)
-            adjusted_score = score * tag_weight
+        for score, (index, chunk, _, tag) in zip(scores, candidates):
+            if score:
+                tag_weight = self.priority_tags.get(tag.name, 1.0)
+                adjusted_score = score * tag_weight
+            else:
+                adjusted_score = score
             adjusted_candidates.append((adjusted_score, index, chunk, tag))
 
         # Filter candidates by threshold
@@ -546,8 +585,8 @@ class PruningContentFilter(RelevantContentFilter):
 
     def __init__(
         self,
-        user_query: str = None,
-        min_word_threshold: int = None,
+        user_query: Optional[str] = None,
+        min_word_threshold: Optional[int] = None,
         threshold_type: str = "fixed",
         threshold: float = 0.48,
     ):
@@ -563,7 +602,7 @@ class PruningContentFilter(RelevantContentFilter):
             threshold_type (str): Threshold type for dynamic threshold (default: 'fixed').
             threshold (float): Fixed threshold value (default: 0.48).
         """
-        super().__init__(None)
+        super().__init__(user_query=user_query)
         self.min_word_threshold = min_word_threshold
         self.threshold_type = threshold_type
         self.threshold = threshold
@@ -615,7 +654,9 @@ class PruningContentFilter(RelevantContentFilter):
             "h6": 0.7,
         }
 
-    def filter_content(self, html: str, min_word_threshold: int = None) -> List[str]:
+    def filter_content(
+        self, html: str, min_word_threshold: Optional[int] = None
+    ) -> List[str]:
         """
         Implements content filtering using pruning algorithm with dynamic threshold.
 
@@ -798,8 +839,8 @@ class LLMContentFilter(RelevantContentFilter):
 
     def __init__(
         self,
-        llm_config: "LLMConfig" = None,
-        instruction: str = None,
+        llm_config: Optional[LLMConfig] = None,
+        instruction: Optional[str] = None,
         chunk_token_threshold: int = int(1e9),
         overlap_rate: float = OVERLAP_RATE,
         word_token_rate: float = WORD_TOKEN_RATE,
@@ -813,7 +854,7 @@ class LLMContentFilter(RelevantContentFilter):
         api_token: Optional[str] = None,
         base_url: Optional[str] = None,
         api_base: Optional[str] = None,
-        extra_args: Dict = None,
+        extra_args: Optional[Dict] = None,
     ):
         super().__init__(None)
         self.provider = provider

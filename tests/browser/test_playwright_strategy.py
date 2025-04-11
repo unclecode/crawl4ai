@@ -4,13 +4,8 @@ These examples demonstrate the functionality of PlaywrightBrowserStrategy
 and serve as functional tests.
 """
 
-import asyncio
-import os
 import sys
-
-# Add the project root to Python path if running directly
-if __name__ == "__main__":
-    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+import pytest
 
 from crawl4ai.browser import BrowserManager
 from crawl4ai.async_configs import BrowserConfig, CrawlerRunConfig
@@ -19,6 +14,7 @@ from crawl4ai.async_logger import AsyncLogger
 # Create a logger for clear terminal output
 logger = AsyncLogger(verbose=True, log_file=None)
 
+@pytest.mark.asyncio
 async def test_playwright_basic():
     """Test basic Playwright browser functionality."""
     logger.info("Testing standard Playwright browser", tag="TEST")
@@ -63,10 +59,11 @@ async def test_playwright_basic():
         # Ensure cleanup
         try:
             await manager.close()
-        except:
+        except Exception:
             pass
         return False
 
+@pytest.mark.asyncio
 async def test_playwright_text_mode():
     """Test Playwright browser in text-only mode."""
     logger.info("Testing Playwright text mode", tag="TEST")
@@ -106,7 +103,7 @@ async def test_playwright_text_mode():
                 await page.goto("https://picsum.photos/", wait_until="domcontentloaded")
                 request = await request_info.value
                 has_images = True
-            except:
+            except Exception:
                 # Timeout without image requests means text mode is working
                 has_images = False
         
@@ -122,10 +119,11 @@ async def test_playwright_text_mode():
         # Ensure cleanup
         try:
             await manager.close()
-        except:
+        except Exception:
             pass
         return False
 
+@pytest.mark.asyncio
 async def test_playwright_context_reuse():
     """Test context caching and reuse with identical configurations."""
     logger.info("Testing context reuse with identical configurations", tag="TEST")
@@ -178,10 +176,11 @@ async def test_playwright_context_reuse():
         # Ensure cleanup
         try:
             await manager.close()
-        except:
+        except Exception:
             pass
         return False
 
+@pytest.mark.asyncio
 async def test_playwright_session_management():
     """Test session management with Playwright browser."""
     logger.info("Testing session management with Playwright browser", tag="TEST")
@@ -225,8 +224,8 @@ async def test_playwright_session_management():
         
         # Kill first session
         await manager.kill_session(session1_id)
-        logger.info(f"Killed session 1", tag="TEST")
-        
+        logger.info("Killed session 1", tag="TEST")
+
         # Verify second session still works
         data2 = await page2.evaluate("localStorage.getItem('playwright_session2_data')")
         logger.info(f"Session 2 still functional after killing session 1, data: {data2}", tag="TEST")
@@ -240,28 +239,12 @@ async def test_playwright_session_management():
         logger.error(f"Test failed: {str(e)}", tag="TEST")
         try:
             await manager.close()
-        except:
+        except Exception:
             pass
         return False
 
-async def run_tests():
-    """Run all tests sequentially."""
-    results = []
-    
-    results.append(await test_playwright_basic())
-    results.append(await test_playwright_text_mode())
-    results.append(await test_playwright_context_reuse())
-    results.append(await test_playwright_session_management())
-    
-    # Print summary
-    total = len(results)
-    passed = sum(results)
-    logger.info(f"Tests complete: {passed}/{total} passed", tag="SUMMARY")
-    
-    if passed == total:
-        logger.success("All tests passed!", tag="SUMMARY")
-    else:
-        logger.error(f"{total - passed} tests failed", tag="SUMMARY")
 
 if __name__ == "__main__":
-    asyncio.run(run_tests())
+    import subprocess
+
+    sys.exit(subprocess.call(["pytest", *sys.argv[1:], sys.argv[0]]))

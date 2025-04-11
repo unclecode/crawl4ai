@@ -34,13 +34,14 @@ from .model_loader import (
     calculate_batch_size
 )
 
-from .types import LLMConfig, create_llm_config
+from .types import LLMConfig
 
 from functools import partial
 import numpy as np
 import re
 from bs4 import BeautifulSoup
-from lxml import html, etree
+from lxml import etree
+from lxml.html import fromstring
 
 
 class ExtractionStrategy(ABC):
@@ -498,9 +499,9 @@ class LLMExtractionStrategy(ExtractionStrategy):
         }
     def __init__(
         self,
-        llm_config: 'LLMConfig' = None,
-        instruction: str = None,
-        schema: Dict = None,
+        llm_config: Optional[LLMConfig] = None,
+        instruction: Optional[str] = None,
+        schema: Optional[Dict] = None,
         extraction_type="block",
         chunk_token_threshold=CHUNK_TOKEN_THRESHOLD,
         overlap_rate=OVERLAP_RATE,
@@ -512,8 +513,8 @@ class LLMExtractionStrategy(ExtractionStrategy):
         # Deprecated arguments
         provider: str = DEFAULT_PROVIDER,
         api_token: Optional[str] = None,
-        base_url: str = None,
-        api_base: str = None,
+        base_url: Optional[str] = None,
+        api_base: Optional[str] = None,
         **kwargs,
     ):
         """
@@ -884,7 +885,7 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
         return results
 
     @abstractmethod
-    def _parse_html(self, html_content: str):
+    def _parse_html(self, html_content: str) -> Any:
         """Parse HTML content into appropriate format"""
         pass
 
@@ -1080,13 +1081,13 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
     @staticmethod
     def generate_schema(
         html: str,
-        schema_type: str = "CSS", # or XPATH
-        query: str = None,
-        target_json_example: str = None,
-        llm_config: 'LLMConfig' = create_llm_config(),
-        provider: str = None,
-        api_token: str = None,
-        **kwargs
+        schema_type: str = "CSS",  # or XPATH
+        query: Optional[str] = None,
+        target_json_example: Optional[str] = None,
+        llm_config: Optional[LLMConfig] = None,
+        provider: Optional[str] = None,
+        api_token: Optional[str] = None,
+        **kwargs,
     ) -> dict:
         """
         Generate extraction schema from HTML content and optional query.
@@ -1167,13 +1168,21 @@ In this scenario, use your best judgment to generate the schema. You need to exa
 
         try:
             # Call LLM with backoff handling
+            base_url: str = ""
+            if llm_config:
+                provider = llm_config.provider
+                api_token = llm_config.api_token
+                base_url = llm_config.base_url or ""
+
             response = perform_completion_with_backoff(
-                provider=llm_config.provider,
-                prompt_with_variables="\n\n".join([system_message["content"], user_message["content"]]),
-                json_response = True,                
-                api_token=llm_config.api_token,
-                base_url=llm_config.base_url,
-                extra_args=kwargs
+                provider=provider,
+                prompt_with_variables="\n\n".join(
+                    [system_message["content"], user_message["content"]]
+                ),
+                json_response=True,
+                api_token=api_token,
+                base_url=base_url,
+                extra_args=kwargs,
             )
             
             # Extract and return schema
@@ -1209,7 +1218,6 @@ class JsonCssExtractionStrategy(JsonElementExtractionStrategy):
         super().__init__(schema, **kwargs)
 
     def _parse_html(self, html_content: str):
-        # return BeautifulSoup(html_content, "html.parser")
         return BeautifulSoup(html_content, "lxml")
 
     def _get_base_elements(self, parsed_html, selector: str):
@@ -1625,7 +1633,7 @@ class JsonXPathExtractionStrategy(JsonElementExtractionStrategy):
         super().__init__(schema, **kwargs)
 
     def _parse_html(self, html_content: str):
-        return html.fromstring(html_content)
+        return fromstring(html_content)
 
     def _get_base_elements(self, parsed_html, selector: str):
         return parsed_html.xpath(selector)
