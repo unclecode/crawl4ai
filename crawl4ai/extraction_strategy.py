@@ -7,7 +7,9 @@ import time
 
 from .prompts import PROMPT_EXTRACT_BLOCKS, PROMPT_EXTRACT_BLOCKS_WITH_INSTRUCTION, PROMPT_EXTRACT_SCHEMA_WITH_INSTRUCTION, JSON_SCHEMA_BUILDER_XPATH, PROMPT_EXTRACT_INFERRED_SCHEMA
 from .config import (
-    DEFAULT_PROVIDER, CHUNK_TOKEN_THRESHOLD,
+    DEFAULT_PROVIDER,
+    DEFAULT_PROVIDER_API_KEY,
+    CHUNK_TOKEN_THRESHOLD,
     OVERLAP_RATE,
     WORD_TOKEN_RATE,
 )
@@ -542,6 +544,11 @@ class LLMExtractionStrategy(ExtractionStrategy):
         """
         super().__init__( input_format=input_format, **kwargs)
         self.llm_config = llm_config
+        if not self.llm_config:
+            self.llm_config = create_llm_config(
+                provider=DEFAULT_PROVIDER,
+                api_token=os.environ.get(DEFAULT_PROVIDER_API_KEY),
+            )
         self.instruction = instruction
         self.extract_type = extraction_type
         self.schema = schema

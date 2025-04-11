@@ -122,23 +122,25 @@ def from_serializable_dict(data: Any) -> Any:
     # Handle typed data
     if isinstance(data, dict) and "type" in data:
         # Handle plain dictionaries
-        if data["type"] == "dict":
+        if data["type"] == "dict" and "value" in data:
             return {k: from_serializable_dict(v) for k, v in data["value"].items()}
 
         # Import from crawl4ai for class instances
         import crawl4ai
 
-        cls = getattr(crawl4ai, data["type"])
+        if hasattr(crawl4ai, data["type"]):
+            cls = getattr(crawl4ai, data["type"])
 
-        # Handle Enum
-        if issubclass(cls, Enum):
-            return cls(data["params"])
+            # Handle Enum
+            if issubclass(cls, Enum):
+                return cls(data["params"])
 
-        # Handle class instances
-        constructor_args = {
-            k: from_serializable_dict(v) for k, v in data["params"].items()
-        }
-        return cls(**constructor_args)
+            if "params" in data:
+                # Handle class instances
+                constructor_args = {
+                    k: from_serializable_dict(v) for k, v in data["params"].items()
+                }
+                return cls(**constructor_args)
 
     # Handle lists
     if isinstance(data, list):
