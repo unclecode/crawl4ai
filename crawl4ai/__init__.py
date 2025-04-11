@@ -1,5 +1,6 @@
 # __init__.py
 import warnings
+from logging import Logger
 
 from .async_webcrawler import AsyncWebCrawler, CacheMode
 from .async_configs import BrowserConfig, CrawlerRunConfig, HTTPCrawlerConfig, LLMConfig
@@ -64,6 +65,7 @@ from .deep_crawling import (
     DFSDeepCrawlStrategy,
     DeepCrawlDecorator,
 )
+from .deep_crawling.scorers import ScoringStats
 
 __all__ = [
     "AsyncLoggerBase",
@@ -121,6 +123,8 @@ __all__ = [
     "Crawl4aiDockerClient",
     "ProxyRotationStrategy",
     "RoundRobinProxyStrategy",
+    "ScoringStats",
+    "Logger", # Required for serialization
 ]
 
 

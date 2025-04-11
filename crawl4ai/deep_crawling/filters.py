@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Pattern, Set, Union
+from typing import List, Optional, Pattern, Set, Union
 from urllib.parse import urlparse
 from array import array
 import re
@@ -42,7 +42,7 @@ class URLFilter(ABC):
 
     __slots__ = ("name", "stats", "_logger_ref")
 
-    def __init__(self, name: str = None):
+    def __init__(self, name: Optional[str] = None):
         self.name = name or self.__class__.__name__
         self.stats = FilterStats()
         # Lazy logger initialization using weakref
@@ -71,8 +71,8 @@ class FilterChain:
 
     __slots__ = ("filters", "stats", "_logger_ref")
 
-    def __init__(self, filters: List[URLFilter] = None):
-        self.filters = tuple(filters or [])  # Immutable tuple for speed
+    def __init__(self, filters: Optional[List[URLFilter]] = None):
+        self.filters: List[URLFilter] = filters if filters is not None else []
         self.stats = FilterStats()
         self._logger_ref = None
 
@@ -100,6 +100,11 @@ class FilterChain:
                 tasks.append(result)  # Collect async tasks
             elif not result:  # Sync rejection
                 self.stats._counters[2] += 1  # Sync rejected
+                # Cancel remaining tasks
+                for idx, task in enumerate(tasks):
+                    tasks[idx] = asyncio.create_task(task)
+                    tasks[idx].cancel()
+                await asyncio.gather(*tasks, return_exceptions=True)
                 return False
 
         if tasks:
@@ -411,8 +416,8 @@ class DomainFilter(URLFilter):
 
     def __init__(
         self,
-        allowed_domains: Union[str, List[str]] = None,
-        blocked_domains: Union[str, List[str]] = None,
+        allowed_domains: Optional[Union[str, List[str]]] = None,
+        blocked_domains: Optional[Union[str, List[str]]] = None,
     ):
         super().__init__()
 
@@ -572,8 +577,8 @@ class SEOFilter(URLFilter):
     def __init__(
         self,
         threshold: float = 0.65,
-        keywords: List[str] = None,
-        weights: Dict[str, float] = None,
+        keywords: Optional[List[str]] = None,
+        weights: Optional[Dict[str, float]] = None,
     ):
         super().__init__(name="SEOFilter")
         self.threshold = threshold

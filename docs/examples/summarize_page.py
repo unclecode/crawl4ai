@@ -1,9 +1,8 @@
 import os
 import json
-from crawl4ai.web_crawler import WebCrawler
-from crawl4ai.chunking_strategy import *
-from crawl4ai.extraction_strategy import *
-from crawl4ai.crawler_strategy import *
+from crawl4ai import CacheMode
+from crawl4ai.extraction_strategy import LLMExtractionStrategy
+from crawl4ai.legacy.web_crawler import WebCrawler
 
 url = r"https://marketplace.visualstudio.com/items?itemName=Unclecode.groqopilot"
 
@@ -37,7 +36,7 @@ result = crawler.run(
         "The extracted JSON format should look like this: "
         '{ "title": "Page Title", "summary": "Detailed summary of the page.", "brief_summary": "Brief summary in a paragraph.", "keywords": ["keyword1", "keyword2", "keyword3"] }',
     ),
-    bypass_cache=True,
+    cache_mode=CacheMode.BYPASS,
 )
 
 page_summary = json.loads(result.extracted_content)

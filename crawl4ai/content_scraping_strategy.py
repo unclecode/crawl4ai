@@ -13,8 +13,7 @@ from .config import (
     IMPORTANT_ATTRS,
     SOCIAL_MEDIA_DOMAINS,
 )
-from bs4 import NavigableString, Comment
-from bs4 import PageElement, Tag
+from bs4.element import PageElement, Tag, NavigableString, Comment
 from urllib.parse import urljoin
 from requests.exceptions import InvalidSchema
 from .utils import (
@@ -172,6 +171,7 @@ class WebScrapingStrategy(ContentScrapingStrategy):
             ],
         )
 
+        # TODO: this drops errors which are indicated by message.
         return ScrapingResult(
             cleaned_html=raw_result.get("cleaned_html", ""),
             success=raw_result.get("success", False),
@@ -192,7 +192,7 @@ class WebScrapingStrategy(ContentScrapingStrategy):
         Returns:
             ScrapingResult: A structured result containing the scraped content.
         """
-        return await asyncio.to_thread(self._scrap, url, html, **kwargs)
+        return await asyncio.to_thread(self.scrap, url, html, **kwargs)
 
     def is_data_table(self, table: Tag, **kwargs) -> bool:
         """
@@ -362,7 +362,19 @@ class WebScrapingStrategy(ContentScrapingStrategy):
         node.contents = [self.flatten_nested_elements(child) for child in node.contents]
         return node
 
-    def find_closest_parent_with_useful_text(self, tag, **kwargs):
+    def clean_description(self, description) -> str:
+        """
+        Clean the description text.
+
+        Args:
+            description (str): The description text to clean.
+
+        Returns:
+            str: The cleaned description text.
+        """
+        return re.sub(r"\s+", " ", description).strip()
+
+    def find_closest_parent_with_useful_text(self, tag, **kwargs) -> Optional[str]:
         """
         Find the closest parent with useful text.
 
@@ -384,7 +396,7 @@ class WebScrapingStrategy(ContentScrapingStrategy):
                 text_content = current_tag.get_text(separator=" ", strip=True)
                 # Check if the text content has at least word_count_threshold
                 if len(text_content.split()) >= image_description_min_word_threshold:
-                    return text_content
+                    return self.clean_description(text_content)
         return None
 
     def remove_unwanted_attributes(
@@ -691,7 +703,8 @@ class WebScrapingStrategy(ContentScrapingStrategy):
                     potential_sources = [
                         "src",
                         "data-src",
-                        "srcset" "data-lazy-src",
+                        "srcset",
+                        "data-lazy-src",
                         "data-original",
                     ]
                     src = element.get("src", "")
@@ -755,7 +768,7 @@ class WebScrapingStrategy(ContentScrapingStrategy):
                         "src": element.get("src"),
                         "alt": element.get("alt"),
                         "type": element.name,
-                        "description": self.find_closest_parent_with_useful_text(
+                        "desc": self.find_closest_parent_with_useful_text(
                             element, **kwargs
                         ),
                     }
@@ -767,7 +780,7 @@ class WebScrapingStrategy(ContentScrapingStrategy):
                             "src": source_tag.get("src"),
                             "alt": element.get("alt"),
                             "type": element.name,
-                            "description": self.find_closest_parent_with_useful_text(
+                            "desc": self.find_closest_parent_with_useful_text(
                                 element, **kwargs
                             ),
                         }
@@ -835,10 +848,10 @@ class WebScrapingStrategy(ContentScrapingStrategy):
         url: str,
         html: str,
         word_count_threshold: int = MIN_WORD_THRESHOLD,
-        css_selector: str = None,
-        target_elements: List[str] = None,
+        css_selector: Optional[str] = None,
+        target_elements: Optional[List[str]] = None,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> Optional[Dict[str, Any]]:
         """
         Extract content from HTML using BeautifulSoup.
 
@@ -846,7 +859,7 @@ class WebScrapingStrategy(ContentScrapingStrategy):
             url (str): The URL of the page to scrape.
             html (str): The HTML content of the page to scrape.
             word_count_threshold (int): The minimum word count threshold for content extraction.
-            css_selector (str): The CSS selector to use for content extraction.
+            css_selector (str or None): The CSS selector to use for content extraction.
             **kwargs: Additional keyword arguments.
 
         Returns:
@@ -859,6 +872,9 @@ class WebScrapingStrategy(ContentScrapingStrategy):
         parser_type = kwargs.get("parser", "lxml")
         soup = BeautifulSoup(html, parser_type)
         body = soup.body
+        if body is None:
+            return None
+
         base_domain = get_base_domain(url)
 
         try:
@@ -949,7 +965,7 @@ class WebScrapingStrategy(ContentScrapingStrategy):
         links["internal"] = list(internal_links_dict.values())
         links["external"] = list(external_links_dict.values())
 
-        # # Process images using ThreadPoolExecutor
+        # Process images using ThreadPoolExecutor
         imgs = body.find_all("img")
 
         media["images"] = [
@@ -974,7 +990,11 @@ class WebScrapingStrategy(ContentScrapingStrategy):
         body = self.flatten_nested_elements(body)
         base64_pattern = re.compile(r'data:image/[^;]+;base64,([^"]+)')
         for img in imgs:
+            if not isinstance(img, Tag):
+                continue
             src = img.get("src", "")
+            if not src or not isinstance(src, str):
+                continue
             if base64_pattern.match(src):
                 # Replace base64 data with empty string
                 img["src"] = base64_pattern.sub("", src)
@@ -1119,9 +1139,7 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
                     "src": elem.get("src"),
                     "alt": elem.get("alt"),
                     "type": media_type,
-                    "description": self.find_closest_parent_with_useful_text(
-                        elem, **kwargs
-                    ),
+                    "desc": self.find_closest_parent_with_useful_text(elem, **kwargs),
                 }
                 media[f"{media_type}s"].append(media_info)
 
@@ -1159,10 +1177,10 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
         while current is not None:
             if (
                 current.text
-                and len(current.text_content().split())
+                and len(current.text_content().strip().split())
                 >= image_description_min_word_threshold
             ):
-                return current.text_content().strip()
+                return self.clean_description(current.text_content())
             current = current.getparent()
         return None
 
@@ -1211,9 +1229,9 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
 
         # Score calculation
         score = 0
-        if (width := img.get("width")) and width.isdigit():
+        if (width := img.get("width", "")) and width.isdigit():
             score += 1 if int(width) > 150 else 0
-        if (height := img.get("height")) and height.isdigit():
+        if (height := img.get("height", "")) and height.isdigit():
             score += 1 if int(height) > 150 else 0
         if alt:
             score += 1
@@ -1476,10 +1494,10 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
         url: str,
         html: str,
         word_count_threshold: int = MIN_WORD_THRESHOLD,
-        css_selector: str = None,
-        target_elements: List[str] = None,
+        css_selector: Optional[str] = None,
+        target_elements: Optional[List[str]] = None,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> Optional[Dict[str, Any]]:
         if not html:
             return None
 
@@ -1623,7 +1641,7 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
             # Remove empty elements
             self.remove_empty_elements_fast(body, 1)
 
-            # Remvoe unneeded attributes
+            # Remove unneeded attributes
             self.remove_unwanted_attributes_fast(
                 body, keep_data_attributes=kwargs.get("keep_data_attributes", False)
             )

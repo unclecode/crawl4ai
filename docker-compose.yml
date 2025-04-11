@@ -38,7 +38,7 @@ services:
       platforms:
         - linux/amd64
     profiles: ["local-amd64"]
-    <<: *base-config  # extends yerine doğrudan yapılandırmayı dahil ettik
+    <<: *base-config  # extends we included the configuration directly instead
 
   crawl4ai-arm64:
     build:

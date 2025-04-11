@@ -83,7 +83,6 @@ def filter_params() -> list[ParameterSet]:
     ]
 
 @pytest.mark.parametrize("html", filter_params())
-@pytest.mark.skip(reason="Requires BM25 idf calculation fix")
 def test_content_filters(html: str):
     """Test various content filtering strategies and return length comparisons."""
     # Initialize filters

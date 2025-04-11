@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 from .config import (
     DEFAULT_PROVIDER,
@@ -12,7 +14,7 @@ from .config import (
 )
 
 from .user_agent_generator import UAGen, ValidUAGenerator  # , OnlineUAGenerator
-from .extraction_strategy import ExtractionStrategy, LLMExtractionStrategy
+from .extraction_strategy import ExtractionStrategy
 from .chunking_strategy import ChunkingStrategy, RegexChunking
 
 from .markdown_generation_strategy import MarkdownGenerationStrategy
@@ -20,21 +22,23 @@ from .content_scraping_strategy import ContentScrapingStrategy, WebScrapingStrat
 from .deep_crawling import DeepCrawlStrategy
 
 from .cache_context import CacheMode
-from .proxy_strategy import ProxyRotationStrategy
+from .proxy_strategy import ProxyRotationStrategy, ProxyConfig
 
 from typing import Union, List
 import inspect
 from typing import Any, Dict, Optional
 from enum import Enum
+from pathlib import Path
 
-from .proxy_strategy import ProxyConfig
 try:
     from .browser.docker_config import DockerConfig
 except ImportError:
     DockerConfig = None
 
+Serialisable = Optional[Union[str, int, float, bool, List, Dict]]
 
-def to_serializable_dict(obj: Any, ignore_default_value : bool = False) -> Dict:
+
+def to_serializable_dict(obj: Any, ignore_default_value: bool = False) -> Serialisable:
     """
     Recursively convert an object to a serializable dictionary using {type, params} structure
     for complex objects.
@@ -108,7 +112,7 @@ def to_serializable_dict(obj: Any, ignore_default_value : bool = False) -> Dict:
     return str(obj)
 
 
-def from_serializable_dict(data: Any) -> Any:
+def from_serializable(data: Serialisable) -> Any:
     """
     Recursively convert a serializable dictionary back to an object instance.
     """
@@ -123,7 +127,7 @@ def from_serializable_dict(data: Any) -> Any:
     if isinstance(data, dict) and "type" in data:
         # Handle plain dictionaries
         if data["type"] == "dict":
-            return {k: from_serializable_dict(v) for k, v in data["value"].items()}
+            return {k: from_serializable(v) for k, v in data["value"].items()}
 
         # Import from crawl4ai for class instances
         import crawl4ai
@@ -135,18 +139,16 @@ def from_serializable_dict(data: Any) -> Any:
             return cls(data["params"])
 
         # Handle class instances
-        constructor_args = {
-            k: from_serializable_dict(v) for k, v in data["params"].items()
-        }
+        constructor_args = {k: from_serializable(v) for k, v in data["params"].items()}
         return cls(**constructor_args)
 
     # Handle lists
     if isinstance(data, list):
-        return [from_serializable_dict(item) for item in data]
+        return [from_serializable(item) for item in data]
 
     # Handle raw dictionaries (legacy support)
     if isinstance(data, dict):
-        return {k: from_serializable_dict(v) for k, v in data.items()}
+        return {k: from_serializable(v) for k, v in data.items()}
 
     return data
 
@@ -205,7 +207,7 @@ class BrowserConfig:
                         Default: True.
         accept_downloads (bool): Whether to allow file downloads. If True, requires a downloads_path.
                                  Default: False.
-        downloads_path (str or None): Directory to store downloaded files. If None and accept_downloads is True,
+        downloads_path (Path or str or None): Directory to store downloaded files. If None and accept_downloads is True,
                                       a default path will be created. Default: None.
         storage_state (str or dict or None): An in-memory storage state (cookies, localStorage).
                                              Default: None.
@@ -235,26 +237,26 @@ class BrowserConfig:
         headless: bool = True,
         browser_mode: str = "dedicated",
         use_managed_browser: bool = False,
-        cdp_url: str = None,
+        cdp_url: Optional[str] = None,
         use_persistent_context: bool = False,
-        user_data_dir: str = None,
+        user_data_dir: Optional[str] = None,
         chrome_channel: str = "chromium",
         channel: str = "chromium",
-        proxy: str = None,
+        proxy: Optional[str] = None,
         proxy_config: Union[ProxyConfig, dict, None] = None,
         docker_config: Union["DockerConfig", dict, None] = None,
         viewport_width: int = 1080,
         viewport_height: int = 600,
-        viewport: dict = None,
+        viewport: Optional[dict] = None,
         accept_downloads: bool = False,
-        downloads_path: str = None,
+        downloads_path: Optional[Union[Path, str]] = None,
         storage_state: Union[str, dict, None] = None,
         ignore_https_errors: bool = True,
         java_script_enabled: bool = True,
         sleep_on_close: bool = False,
         verbose: bool = True,
-        cookies: list = None,
-        headers: dict = None,
+        cookies: Optional[list] = None,
+        headers: Optional[dict] = None,
         user_agent: str = (
             # "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) AppleWebKit/537.36 "
             # "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
@@ -265,7 +267,7 @@ class BrowserConfig:
         user_agent_generator_config: dict = {},
         text_mode: bool = False,
         light_mode: bool = False,
-        extra_args: list = None,
+        extra_args: Optional[list] = None,
         debugging_port: int = 9222,
         host: str = "localhost",
     ):
@@ -373,8 +375,8 @@ class BrowserConfig:
                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36",
             ),
-            user_agent_mode=kwargs.get("user_agent_mode"),
-            user_agent_generator_config=kwargs.get("user_agent_generator_config"),
+            user_agent_mode=kwargs.get("user_agent_mode", ""),
+            user_agent_generator_config=kwargs.get("user_agent_generator_config", ""),
             text_mode=kwargs.get("text_mode", False),
             light_mode=kwargs.get("light_mode", False),
             extra_args=kwargs.get("extra_args", []),
@@ -438,15 +440,18 @@ class BrowserConfig:
         config_dict.update(kwargs)
         return BrowserConfig.from_kwargs(config_dict)
 
-    # Create a funciton returns dict of the object
-    def dump(self) -> dict:
+    # Create a function returns dict of the object
+    def dump(self) -> Serialisable:
         # Serialize the object to a dictionary
         return to_serializable_dict(self)
 
     @staticmethod
-    def load(data: dict) -> "BrowserConfig":
+    def load(data: Serialisable) -> "BrowserConfig":
+        if data is None:
+            return BrowserConfig()
+
         # Deserialize the object from a dictionary
-        config = from_serializable_dict(data)
+        config = from_serializable(data)
         if isinstance(config, BrowserConfig):
             return config
         return BrowserConfig.from_kwargs(config)
@@ -512,17 +517,18 @@ class HTTPCrawlerConfig:
         config_dict.update(kwargs)
         return HTTPCrawlerConfig.from_kwargs(config_dict)
 
-    def dump(self) -> dict:
+    def dump(self) -> Serialisable:
         return to_serializable_dict(self)
 
     @staticmethod
     def load(data: dict) -> "HTTPCrawlerConfig":
-        config = from_serializable_dict(data)
+        config = from_serializable(data)
         if isinstance(config, HTTPCrawlerConfig):
             return config
         return HTTPCrawlerConfig.from_kwargs(config)
 
-class CrawlerRunConfig():
+
+class CrawlerRunConfig:
     _UNWANTED_PROPS = {
         'disable_cache' : 'Instead, use cache_mode=CacheMode.DISABLED',
         'bypass_cache' : 'Instead, use cache_mode=CacheMode.BYPASS',
@@ -709,50 +715,50 @@ class CrawlerRunConfig():
                             into the main parameter set.
                             Default: None.
 
-        url: str = None  # This is not a compulsory parameter
+        url (str or None): This is not a compulsory parameter
     """
 
     def __init__(
         self,
         # Content Processing Parameters
         word_count_threshold: int = MIN_WORD_THRESHOLD,
-        extraction_strategy: ExtractionStrategy = None,
+        extraction_strategy: Optional[ExtractionStrategy] = None,
         chunking_strategy: ChunkingStrategy = RegexChunking(),
-        markdown_generator: MarkdownGenerationStrategy = None,
+        markdown_generator: Optional[MarkdownGenerationStrategy] = None,
         only_text: bool = False,
-        css_selector: str = None,
-        target_elements: List[str] = None,
-        excluded_tags: list = None,
-        excluded_selector: str = None,
+        css_selector: Optional[str] = None,
+        target_elements: Optional[List[str]] = None,
+        excluded_tags: Optional[list] = None,
+        excluded_selector: Optional[str] = None,
         keep_data_attributes: bool = False,
-        keep_attrs: list = None,
+        keep_attrs: Optional[list] = None,
         remove_forms: bool = False,
         prettiify: bool = False,
         parser_type: str = "lxml",
-        scraping_strategy: ContentScrapingStrategy = None,
+        scraping_strategy: Optional[ContentScrapingStrategy] = None,
         proxy_config: Union[ProxyConfig, dict, None] = None,
         proxy_rotation_strategy: Optional[ProxyRotationStrategy] = None,
         # SSL Parameters
         fetch_ssl_certificate: bool = False,
         # Caching Parameters
         cache_mode: CacheMode = CacheMode.BYPASS,
-        session_id: str = None,
+        session_id: Optional[str] = None,
         bypass_cache: bool = False,
         disable_cache: bool = False,
         no_cache_read: bool = False,
         no_cache_write: bool = False,
-        shared_data: dict = None,
+        shared_data: Optional[dict] = None,
         # Page Navigation and Timing Parameters
         wait_until: str = "domcontentloaded",
         page_timeout: int = PAGE_TIMEOUT,
-        wait_for: str = None,
+        wait_for: Optional[str] = None,
         wait_for_images: bool = False,
         delay_before_return_html: float = 0.1,
         mean_delay: float = 0.1,
         max_range: float = 0.3,
         semaphore_count: int = 5,
         # Page Interaction Parameters
-        js_code: Union[str, List[str]] = None,
+        js_code: Optional[Union[str, List[str]]] = None,
         js_only: bool = False,
         ignore_body_visibility: bool = True,
         scan_full_page: bool = False,
@@ -765,7 +771,7 @@ class CrawlerRunConfig():
         adjust_viewport_to_content: bool = False,
         # Media Handling Parameters
         screenshot: bool = False,
-        screenshot_wait_for: float = None,
+        screenshot_wait_for: Optional[float] = None,
         screenshot_height_threshold: int = SCREENSHOT_HEIGHT_TRESHOLD,
         pdf: bool = False,
         image_description_min_word_threshold: int = IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
@@ -773,10 +779,10 @@ class CrawlerRunConfig():
         table_score_threshold: int = 7,
         exclude_external_images: bool = False,
         # Link and Domain Handling Parameters
-        exclude_social_media_domains: list = None,
+        exclude_social_media_domains: Optional[list] = None,
         exclude_external_links: bool = False,
         exclude_social_media_links: bool = False,
-        exclude_domains: list = None,
+        exclude_domains: Optional[list] = None,
         exclude_internal_links: bool = False,
         # Debugging and Logging Parameters
         verbose: bool = True,
@@ -784,15 +790,15 @@ class CrawlerRunConfig():
         # Connection Parameters
         method: str = "GET",
         stream: bool = False,
-        url: str = None,
+        url: Optional[str] = None,
         check_robots_txt: bool = False,
-        user_agent: str = None,
-        user_agent_mode: str = None,
+        user_agent: Optional[str] = None,
+        user_agent_mode: Optional[str] = None,
         user_agent_generator_config: dict = {},
         # Deep Crawl Parameters
         deep_crawl_strategy: Optional[DeepCrawlStrategy] = None,
         # Experimental Parameters
-        experimental: Dict[str, Any] = None,
+        experimental: Optional[Dict[str, Any]] = None,
     ):
         # TODO: Planning to set properties dynamically based on the __init__ signature
         self.url = url
@@ -1021,15 +1027,18 @@ class CrawlerRunConfig():
             experimental=kwargs.get("experimental"),
         )
 
-    # Create a funciton returns dict of the object
-    def dump(self) -> dict:
+    # Create a function returns dict of the object
+    def dump(self) -> Serialisable:
         # Serialize the object to a dictionary
         return to_serializable_dict(self)
 
     @staticmethod
-    def load(data: dict) -> "CrawlerRunConfig":
+    def load(data: Serialisable) -> "CrawlerRunConfig":
+        if data is None:
+            return CrawlerRunConfig()
+
         # Deserialize the object from a dictionary
-        config = from_serializable_dict(data)
+        config = from_serializable(data)
         if isinstance(config, CrawlerRunConfig):
             return config
         return CrawlerRunConfig.from_kwargs(config)
@@ -1139,15 +1148,15 @@ class LLMConfig:
         provider: str = DEFAULT_PROVIDER,
         api_token: Optional[str] = None,
         base_url: Optional[str] = None,
-        temprature: Optional[float] = None,
+        temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
         top_p: Optional[float] = None,
         frequency_penalty: Optional[float] = None,
         presence_penalty: Optional[float] = None,
         stop: Optional[List[str]] = None,
-        n: Optional[int] = None,    
+        n: Optional[int] = None,
     ):
-        """Configuaration class for LLM provider and API token."""
+        """Configuration class for LLM provider and API token."""
         self.provider = provider
         if api_token and not api_token.startswith("env:"):
             self.api_token = api_token
@@ -1158,7 +1167,7 @@ class LLMConfig:
                 DEFAULT_PROVIDER_API_KEY
             )
         self.base_url = base_url
-        self.temprature = temprature
+        self.temperature = temperature
         self.max_tokens = max_tokens
         self.top_p = top_p
         self.frequency_penalty = frequency_penalty
@@ -1167,12 +1176,12 @@ class LLMConfig:
         self.n = n
 
     @staticmethod
-    def from_kwargs(kwargs: dict) -> "LLMConfig":
+    def from_kwargs(kwargs: dict) -> LLMConfig:
         return LLMConfig(
             provider=kwargs.get("provider", DEFAULT_PROVIDER),
             api_token=kwargs.get("api_token"),
             base_url=kwargs.get("base_url"),
-            temprature=kwargs.get("temprature"),
+            temperature=kwargs.get("temperature"),
             max_tokens=kwargs.get("max_tokens"),
             top_p=kwargs.get("top_p"),
             frequency_penalty=kwargs.get("frequency_penalty"),
@@ -1186,7 +1195,7 @@ class LLMConfig:
             "provider": self.provider,
             "api_token": self.api_token,
             "base_url": self.base_url,
-            "temprature": self.temprature,
+            "temperature": self.temperature,
             "max_tokens": self.max_tokens,
             "top_p": self.top_p,
             "frequency_penalty": self.frequency_penalty,

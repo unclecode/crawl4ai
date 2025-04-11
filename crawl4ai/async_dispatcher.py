@@ -2,6 +2,7 @@ from typing import Dict, Optional, List, Tuple
 from .async_configs import CrawlerRunConfig
 from .models import (
     CrawlResult,
+    CrawlResultContainer,
     CrawlerTaskResult,
     CrawlStatus,
     DomainState,
@@ -29,7 +30,7 @@ class RateLimiter:
         base_delay: Tuple[float, float] = (1.0, 3.0),
         max_delay: float = 60.0,
         max_retries: int = 3,
-        rate_limit_codes: List[int] = None,
+        rate_limit_codes: Optional[List[int]] = None,
     ):
         self.base_delay = base_delay
         self.max_delay = max_delay
@@ -90,7 +91,6 @@ class BaseDispatcher(ABC):
         rate_limiter: Optional[RateLimiter] = None,
         monitor: Optional[CrawlerMonitor] = None,
     ):
-        self.crawler = None
         self._domain_last_hit: Dict[str, float] = {}
         self.concurrent_sessions = 0
         self.rate_limiter = rate_limiter
@@ -99,10 +99,10 @@ class BaseDispatcher(ABC):
     @abstractmethod
     async def crawl_url(
         self,
+        crawler: AsyncWebCrawler,
         url: str,
         config: CrawlerRunConfig,
         task_id: str,
-        monitor: Optional[CrawlerMonitor] = None,
     ) -> CrawlerTaskResult:
         pass
 
@@ -110,11 +110,19 @@ class BaseDispatcher(ABC):
     async def run_urls(
         self,
         urls: List[str],
-        crawler: AsyncWebCrawler,  # noqa: F821
+        crawler: AsyncWebCrawler,
         config: CrawlerRunConfig,
-        monitor: Optional[CrawlerMonitor] = None,
     ) -> List[CrawlerTaskResult]:
         pass
+
+    @abstractmethod
+    async def run_urls_stream(
+        self,
+        urls: List[str],
+        crawler: AsyncWebCrawler,
+        config: CrawlerRunConfig,
+    ) -> AsyncGenerator[CrawlerTaskResult, None]:
+        yield NotImplemented
 
 
 class MemoryAdaptiveDispatcher(BaseDispatcher):
@@ -179,6 +187,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
     
     async def crawl_url(
         self,
+        crawler: AsyncWebCrawler,
         url: str,
         config: CrawlerRunConfig,
         task_id: str,
@@ -225,9 +234,11 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
                 return CrawlerTaskResult(
                     task_id=task_id,
                     url=url,
-                    result=CrawlResult(
-                        url=url, html="", metadata={"status": "requeued"}, 
-                        success=False, error_message="Requeued due to critical memory pressure"
+                    result=CrawlResultContainer(
+                        CrawlResult(
+                            url=url, html="", metadata={"status": "requeued"},
+                            success=False, error_message="Requeued due to critical memory pressure"
+                        )
                     ),
                     memory_usage=0,
                     peak_memory=0,
@@ -238,8 +249,8 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
                 )
             
             # Execute the crawl
-            result = await self.crawler.arun(url, config=config, session_id=task_id)
-            
+            result: CrawlResultContainer = await crawler.arun(url, config=config, session_id=task_id)
+
             # Measure memory usage
             end_memory = process.memory_info().rss / (1024 * 1024)
             memory_usage = peak_memory = end_memory - start_memory
@@ -263,8 +274,10 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
             error_message = str(e)
             if self.monitor:
                 self.monitor.update_task(task_id, status=CrawlStatus.FAILED)
-            result = CrawlResult(
-                url=url, html="", metadata={}, success=False, error_message=str(e)
+            result = CrawlResultContainer(
+                CrawlResult(
+                    url=url, html="", metadata={}, success=False, error_message=str(e)
+                )
             )
             
         finally:
@@ -288,7 +301,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
             peak_memory=peak_memory,
             start_time=start_time,
             end_time=end_time,
-            error_message=error_message,
+            error_message=error_message or "",
             retry_count=retry_count
         )
         
@@ -298,16 +311,14 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
         crawler: AsyncWebCrawler,
         config: CrawlerRunConfig,
     ) -> List[CrawlerTaskResult]:
-        self.crawler = crawler
-        
         # Start the memory monitor task
         memory_monitor = asyncio.create_task(self._memory_monitor_task())
         
         if self.monitor:
             self.monitor.start()
-            
-        results = []
-        
+
+        results: List[CrawlerTaskResult] = []
+
         try:
             # Initialize task queue
             for url in urls:
@@ -331,7 +342,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
                         
                         # Create and start the task
                         task = asyncio.create_task(
-                            self.crawl_url(url, config, task_id, retry_count)
+                            self.crawl_url(crawler, url, config, task_id, retry_count)
                         )
                         active_tasks.append(task)
                         
@@ -367,9 +378,6 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
                     
                 # Update priorities for waiting tasks if needed
                 await self._update_queue_priorities()
-                
-            return results
-
         except Exception as e:
             if self.monitor:
                 self.monitor.update_memory_status(f"QUEUE_ERROR: {str(e)}")                
@@ -379,7 +387,9 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
             memory_monitor.cancel()
             if self.monitor:
                 self.monitor.stop()
-                
+
+        return results
+
     async def _update_queue_priorities(self):
         """Periodically update priorities of items in the queue to prevent starvation"""
         # Skip if queue is empty
@@ -416,8 +426,9 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
                     break
         except Exception as e:
             # If anything goes wrong, make sure we refill the queue with what we've got
-            self.monitor.update_memory_status(f"QUEUE_ERROR: {str(e)}")
-        
+            if self.monitor:
+                self.monitor.update_memory_status(f"QUEUE_ERROR: {str(e)}")
+
         # Calculate queue statistics
         if temp_items and self.monitor:
             total_queued = len(temp_items)
@@ -445,8 +456,6 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
         crawler: AsyncWebCrawler,
         config: CrawlerRunConfig,
     ) -> AsyncGenerator[CrawlerTaskResult, None]:
-        self.crawler = crawler
-        
         # Start the memory monitor task
         memory_monitor = asyncio.create_task(self._memory_monitor_task())
         
@@ -477,7 +486,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
                         
                         # Create and start the task
                         task = asyncio.create_task(
-                            self.crawl_url(url, config, task_id, retry_count)
+                            self.crawl_url(crawler, url, config, task_id, retry_count)
                         )
                         active_tasks.append(task)
                         
@@ -538,16 +547,20 @@ class SemaphoreDispatcher(BaseDispatcher):
 
     async def crawl_url(
         self,
+        crawler: AsyncWebCrawler,
         url: str,
         config: CrawlerRunConfig,
         task_id: str,
-        semaphore: asyncio.Semaphore = None,
+        semaphore: Optional[asyncio.Semaphore] = None,
     ) -> CrawlerTaskResult:
         start_time = time.time()
         error_message = ""
         memory_usage = peak_memory = 0.0
 
         try:
+            if semaphore is None:
+                raise ValueError(f"Semaphore must be provided to {self.__class__.__name__}")
+
             if self.monitor:
                 self.monitor.update_task(
                     task_id, status=CrawlStatus.IN_PROGRESS, start_time=start_time
@@ -559,7 +572,7 @@ class SemaphoreDispatcher(BaseDispatcher):
             async with semaphore:
                 process = psutil.Process()
                 start_memory = process.memory_info().rss / (1024 * 1024)
-                result = await self.crawler.arun(url, config=config, session_id=task_id)
+                result: CrawlResultContainer = await crawler.arun(url, config=config, session_id=task_id)
                 end_memory = process.memory_info().rss / (1024 * 1024)
 
                 memory_usage = peak_memory = end_memory - start_memory
@@ -591,8 +604,10 @@ class SemaphoreDispatcher(BaseDispatcher):
             error_message = str(e)
             if self.monitor:
                 self.monitor.update_task(task_id, status=CrawlStatus.FAILED)
-            result = CrawlResult(
-                url=url, html="", metadata={}, success=False, error_message=str(e)
+            result = CrawlResultContainer(
+                CrawlResult(
+                    url=url, html="", metadata={}, success=False, error_message=str(e)
+                )
             )
 
         finally:
@@ -614,16 +629,15 @@ class SemaphoreDispatcher(BaseDispatcher):
             peak_memory=peak_memory,
             start_time=start_time,
             end_time=end_time,
-            error_message=error_message,
+            error_message=error_message or "",
         )
 
     async def run_urls(
         self,
-        crawler: AsyncWebCrawler,  # noqa: F821
         urls: List[str],
+        crawler: AsyncWebCrawler,
         config: CrawlerRunConfig,
     ) -> List[CrawlerTaskResult]:
-        self.crawler = crawler
         if self.monitor:
             self.monitor.start()
 
@@ -636,11 +650,40 @@ class SemaphoreDispatcher(BaseDispatcher):
                 if self.monitor:
                     self.monitor.add_task(task_id, url)
                 task = asyncio.create_task(
-                    self.crawl_url(url, config, task_id, semaphore)
+                    self.crawl_url(crawler, url, config, task_id, semaphore)
                 )
                 tasks.append(task)
 
-            return await asyncio.gather(*tasks, return_exceptions=True)
+            return await asyncio.gather(*tasks)
+        finally:
+            if self.monitor:
+                self.monitor.stop()
+
+    async def run_urls_stream(
+        self,
+        urls: List[str],
+        crawler: AsyncWebCrawler,
+        config: CrawlerRunConfig,
+    ) -> AsyncGenerator[CrawlerTaskResult, None]:
+        if self.monitor:
+            self.monitor.start()
+
+        try:
+            semaphore = asyncio.Semaphore(self.semaphore_count)
+            tasks = []
+
+            for url in urls:
+                task_id = str(uuid.uuid4())
+                if self.monitor:
+                    self.monitor.add_task(task_id, url)
+                task = asyncio.create_task(
+                    self.crawl_url(crawler, url, config, task_id, semaphore)
+                )
+                tasks.append(task)
+
+            for task in asyncio.as_completed(tasks):
+                result = await task
+                yield result
         finally:
             if self.monitor:
                 self.monitor.stop()

@@ -13,6 +13,7 @@ import hashlib
 import subprocess
 import shutil
 import signal
+import re
 from typing import Optional, Dict, Tuple, List, Any
 
 from playwright.async_api import BrowserContext, Page, ProxySettings
@@ -64,7 +65,7 @@ class BaseBrowserStrategy(ABC):
         self.playwright = None
         
     @abstractmethod
-    async def start(self):
+    async def start(self) -> Any:
         """Start the browser.
         
         Returns:
@@ -574,8 +575,11 @@ class CDPBrowserStrategy(BaseBrowserStrategy):
         cdp_url = await self._get_or_create_cdp_url()
         
         # Connect to the browser using CDP
-        self.browser = await self.playwright.chromium.connect_over_cdp(cdp_url)
-        
+        if self.config.browser_type == "chromium":
+            self.browser = await self.playwright.chromium.connect_over_cdp(cdp_url)
+        else:
+            raise NotImplementedError(f"Browser type {self.config.browser_type} not supported")
+
         # Get or create default context
         contexts = self.browser.contexts
         if contexts:
@@ -610,6 +614,8 @@ class CDPBrowserStrategy(BaseBrowserStrategy):
         try:
             # Use DETACHED_PROCESS flag on Windows to fully detach the process
             # On Unix, we'll use preexec_fn=os.setpgrp to start the process in a new process group
+            # TODO: fix as using a pipe here can cause the process to hang
+            # if the pipe becomes full and nothing is reading from it.
             if is_windows():
                 self.browser_process = subprocess.Popen(
                     args, 
@@ -679,15 +685,6 @@ class CDPBrowserStrategy(BaseBrowserStrategy):
             ]
             if self.config.headless:
                 args.append("--headless=new")
-        elif self.config.browser_type == "firefox":
-            args = [
-                "--remote-debugging-port",
-                str(self.config.debugging_port),
-                "--profile",
-                user_data_dir,
-            ]
-            if self.config.headless:
-                args.append("--headless")
         else:
             raise NotImplementedError(f"Browser type {self.config.browser_type} not supported")
 
@@ -810,6 +807,10 @@ class CDPBrowserStrategy(BaseBrowserStrategy):
         # For CDP, we typically use the shared default_context
         context = self.default_context
         pages = context.pages
+
+        # TODO: Fix this so it doesn't create a new page for the first request
+        # Where the URL is None or empty and we have a page displaying:
+        # chrome://new-tab-page/
         page = next((p for p in pages if p.url == crawlerRunConfig.url), None)
         if not page:
             page = await context.new_page()
@@ -894,6 +895,7 @@ class BuiltinBrowserStrategy(CDPBrowserStrategy):
         super().__init__(config, logger)
         self.builtin_browser_dir = os.path.join(get_home_folder(), "builtin-browser") if not self.config.user_data_dir else self.config.user_data_dir
         self.builtin_config_file = os.path.join(self.builtin_browser_dir, "browser_config.json")
+        self.pid: int = 0
 
         # Raise error if user data dir is already engaged
         if self._check_user_dir_is_engaged(self.builtin_browser_dir):
@@ -1016,7 +1018,7 @@ class BuiltinBrowserStrategy(CDPBrowserStrategy):
         """Launch a browser in the background for use as the built-in browser.
         
         Args:
-            browser_type: Type of browser to launch ('chromium' or 'firefox')
+            browser_type: Type of browser to launch ('chromium')
             debugging_port: Port to use for CDP debugging
             headless: Whether to run in headless mode
             
@@ -1053,16 +1055,6 @@ class BuiltinBrowserStrategy(CDPBrowserStrategy):
             ]
             if headless:
                 args.append("--headless=new")
-        elif browser_type == "firefox":
-            args = [
-                browser_path,
-                "--remote-debugging-port",
-                str(debugging_port),
-                "--profile",
-                user_data_dir,
-            ]
-            if headless:
-                args.append("--headless")
         else:
             if self.logger:
                 self.logger.error(f"Browser type {browser_type} not supported for built-in browser", tag="BUILTIN")
@@ -1093,7 +1085,22 @@ class BuiltinBrowserStrategy(CDPBrowserStrategy):
                 if self.logger:
                     self.logger.error(f"Browser process exited immediately with code {process.returncode}", tag="BUILTIN")
                 return None
-            
+
+            self.pid = process.pid
+
+            if debugging_port == 0:
+                # Determine the actual debugging port used.
+                try:
+                    process.communicate(timeout=0.1)
+                except subprocess.TimeoutExpired as e:
+                    if not e.stderr:
+                        raise Exception("Unable to determine debugging port") from e
+                    match: Optional[re.Match] = re.search(r"ws://[^:]+:(\d+)", e.stderr.decode())
+                    if not match:
+                        raise Exception("Unable to determine debugging port") from e
+                    debugging_port = int(match.group(1))
+                    self.config.debugging_port = debugging_port
+
             # Construct CDP URL
             cdp_url = f"http://localhost:{debugging_port}"
             
@@ -1141,7 +1148,7 @@ class BuiltinBrowserStrategy(CDPBrowserStrategy):
                     # Convert legacy format to port mapping
                     elif isinstance(existing_data, dict) and "debugging_port" in existing_data:
                         old_port = str(existing_data.get("debugging_port"))
-                        if self._is_browser_running(existing_data.get("pid")):
+                        if is_browser_running(existing_data.get("pid")):
                             port_map[old_port] = existing_data
                 except Exception as e:
                     if self.logger:
@@ -1190,13 +1197,21 @@ class BuiltinBrowserStrategy(CDPBrowserStrategy):
                 os.kill(pid, signal.SIGTERM)
                 # Wait for termination
                 for _ in range(5):
+                    if self.pid == pid:
+                        # We created the process, so wait for it otherwise it will
+                        # become a zombie process causing retry until SIGKILL.
+                        os.waitpid(pid, os.WNOHANG)
+
                     if not is_browser_running(pid):
                         break
                     await asyncio.sleep(0.5)
                 else:
                     # Force kill if still running
                     os.kill(pid, signal.SIGKILL)
-                    
+
+                if self.pid == pid:
+                    self.pid = 0
+
             # Update config file to remove this browser
             with open(self.builtin_config_file, 'r') as f:
                 browser_info_dict = json.load(f)
@@ -1254,3 +1269,5 @@ class BuiltinBrowserStrategy(CDPBrowserStrategy):
         # Clean up built-in browser if we created it
         if self.shutting_down:
             await self.kill_builtin_browser()
+
+        self.pid = 0

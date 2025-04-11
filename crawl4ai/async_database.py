@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 import aiosqlite
 import asyncio
-from typing import Optional, Dict
+from typing import Optional, Dict, TypeVar, Callable, Awaitable
 from contextlib import asynccontextmanager
 import json  
 from .models import CrawlResult, MarkdownGenerationResult, StringCompatibleMarkdown
@@ -19,6 +19,10 @@ base_directory = DB_PATH = os.path.join(
 os.makedirs(DB_PATH, exist_ok=True)
 DB_PATH = os.path.join(base_directory, "crawl4ai.db")
 
+R = TypeVar("R")
+
+class MalformedTableError(Exception):
+    """Raised when a table is missing required columns."""
 
 class AsyncDatabaseManager:
     def __init__(self, pool_size: int = 10, max_retries: int = 3):
@@ -134,30 +138,38 @@ class AsyncDatabaseManager:
                         await conn.execute("PRAGMA busy_timeout = 5000")
 
                         # Verify database structure
-                        async with conn.execute(
-                            "PRAGMA table_info(crawled_data)"
-                        ) as cursor:
-                            columns = await cursor.fetchall()
-                            column_names = [col[1] for col in columns]
-                            expected_columns = {
-                                "url",
-                                "html",
-                                "cleaned_html",
-                                "markdown",
-                                "extracted_content",
-                                "success",
-                                "media",
-                                "links",
-                                "metadata",
-                                "screenshot",
-                                "response_headers",
-                                "downloaded_files",
-                            }
-                            missing_columns = expected_columns - set(column_names)
-                            if missing_columns:
-                                raise ValueError(
-                                    f"Database missing columns: {missing_columns}"
-                                )
+                        retry: bool = True
+                        while retry:
+                            async with conn.execute(
+                                "PRAGMA table_info(crawled_data)"
+                            ) as cursor:
+                                columns = await cursor.fetchall()
+                                if not columns:
+                                    # Table doesn't exist, reinitialize.
+                                    await self.initialize()
+                                    continue
+
+                                retry = False
+                                column_names = [col[1] for col in columns]
+                                expected_columns = {
+                                    "url",
+                                    "html",
+                                    "cleaned_html",
+                                    "markdown",
+                                    "extracted_content",
+                                    "success",
+                                    "media",
+                                    "links",
+                                    "metadata",
+                                    "screenshot",
+                                    "response_headers",
+                                    "downloaded_files",
+                                }
+                                missing_columns = expected_columns - set(column_names)
+                                if missing_columns:
+                                    raise MalformedTableError(
+                                        f"Database missing columns: {missing_columns}"
+                                    )
 
                         self.connection_pool[task_id] = conn
                     except Exception as e:
@@ -199,14 +211,23 @@ class AsyncDatabaseManager:
                     del self.connection_pool[task_id]
             self.connection_semaphore.release()
 
-    async def execute_with_retry(self, operation, *args):
+    async def execute_with_retry(
+        self, operation: Callable[[aiosqlite.Connection], Awaitable[R]]
+    ) -> Optional[R]:
         """Execute database operations with retry logic"""
         for attempt in range(self.max_retries):
             try:
                 async with self.get_connection() as db:
-                    result = await operation(db, *args)
-                    await db.commit()
-                    return result
+                    return await operation(db)
+            except MalformedTableError as e:
+                # Table is malformed, no point in retrying.
+                self.logger.error(
+                    message="Operation failed after {retries} attempts: {error}",
+                    tag="ERROR",
+                    force_verbose=True,
+                    params={"retries": self.max_retries, "error": str(e)},
+                )
+                raise
             except Exception as e:
                 if attempt == self.max_retries - 1:
                     self.logger.error(
@@ -217,6 +238,8 @@ class AsyncDatabaseManager:
                     )
                     raise
                 await asyncio.sleep(1 * (attempt + 1))  # Exponential backoff
+
+        return None
 
     async def ainit_db(self):
         """Initialize database schema"""
@@ -282,7 +305,7 @@ class AsyncDatabaseManager:
     async def aget_cached_url(self, url: str) -> Optional[CrawlResult]:
         """Retrieve cached URL data as CrawlResult"""
 
-        async def _get(db):
+        async def _get(db: aiosqlite.Connection) -> Optional[CrawlResult]:
             async with db.execute(
                 "SELECT * FROM crawled_data WHERE url = ?", (url,)
             ) as cursor:
@@ -341,10 +364,6 @@ class AsyncDatabaseManager:
                         else:
                             row_dict[field] = {}
 
-                if isinstance(row_dict["markdown"], Dict):
-                    if row_dict["markdown"].get("raw_markdown"):
-                        row_dict["markdown"] = row_dict["markdown"]["raw_markdown"]
-
                 # Parse downloaded_files
                 try:
                     row_dict["downloaded_files"] = (
@@ -386,7 +405,7 @@ class AsyncDatabaseManager:
         try:
             if isinstance(result.markdown, StringCompatibleMarkdown):
                 content_map["markdown"] = (
-                    result.markdown,
+                    result.markdown.markdown_result.model_dump_json(),
                     "markdown",
                 )
             elif isinstance(result.markdown, MarkdownGenerationResult):
@@ -419,7 +438,7 @@ class AsyncDatabaseManager:
         for field, (content, content_type) in content_map.items():
             content_hashes[field] = await self._store_content(content, content_type)
 
-        async def _cache(db):
+        async def _cache(db: aiosqlite.Connection) -> None:
             await db.execute(
                 """
                 INSERT INTO crawled_data (
@@ -456,6 +475,7 @@ class AsyncDatabaseManager:
                     json.dumps(result.downloaded_files or []),
                 ),
             )
+            await db.commit()
 
         try:
             await self.execute_with_retry(_cache)
@@ -470,13 +490,14 @@ class AsyncDatabaseManager:
     async def aget_total_count(self) -> int:
         """Get total number of cached URLs"""
 
-        async def _count(db):
+        async def _count(db: aiosqlite.Connection) -> int:
             async with db.execute("SELECT COUNT(*) FROM crawled_data") as cursor:
                 result = await cursor.fetchone()
                 return result[0] if result else 0
 
         try:
-            return await self.execute_with_retry(_count)
+            result: Optional[int] = await self.execute_with_retry(_count)
+            return result or 0
         except Exception as e:
             self.logger.error(
                 message="Error getting total count: {error}",
@@ -489,8 +510,9 @@ class AsyncDatabaseManager:
     async def aclear_db(self):
         """Clear all data from the database"""
 
-        async def _clear(db):
+        async def _clear(db: aiosqlite.Connection) -> None:
             await db.execute("DELETE FROM crawled_data")
+            await db.commit()
 
         try:
             await self.execute_with_retry(_clear)
@@ -505,8 +527,9 @@ class AsyncDatabaseManager:
     async def aflush_db(self):
         """Drop the entire table"""
 
-        async def _flush(db):
+        async def _flush(db: aiosqlite.Connection) -> None:
             await db.execute("DROP TABLE IF EXISTS crawled_data")
+            await db.commit()
 
         try:
             await self.execute_with_retry(_flush)
@@ -544,7 +567,7 @@ class AsyncDatabaseManager:
         try:
             async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
                 return await f.read()
-        except:
+        except Exception:
             self.logger.error(
                 message="Failed to load content: {file_path}",
                 tag="ERROR",
