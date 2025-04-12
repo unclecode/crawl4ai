@@ -95,15 +95,7 @@ class UrlModel(BaseModel):
     url: HttpUrl
     forced: bool = False
 
-class MarkdownGenerationResult(BaseModel):
-    raw_markdown: str
-    markdown_with_citations: str
-    references_markdown: str
-    fit_markdown: Optional[str] = None
-    fit_html: Optional[str] = None
 
-    def __str__(self):
-        return self.raw_markdown
 
 @dataclass
 class TraversalStats:
@@ -124,6 +116,16 @@ class DispatchResult(BaseModel):
     end_time: Union[datetime, float]
     error_message: str = ""
 
+class MarkdownGenerationResult(BaseModel):
+    raw_markdown: str
+    markdown_with_citations: str
+    references_markdown: str
+    fit_markdown: Optional[str] = None
+    fit_html: Optional[str] = None
+
+    def __str__(self):
+        return self.raw_markdown
+    
 class CrawlResult(BaseModel):
     url: str
     html: str
@@ -135,6 +137,7 @@ class CrawlResult(BaseModel):
     js_execution_result: Optional[Dict[str, Any]] = None
     screenshot: Optional[str] = None
     pdf: Optional[bytes] = None
+    mhtml: Optional[str] = None
     _markdown: Optional[MarkdownGenerationResult] = PrivateAttr(default=None)
     extracted_content: Optional[str] = None
     metadata: Optional[dict] = None
@@ -145,6 +148,8 @@ class CrawlResult(BaseModel):
     ssl_certificate: Optional[SSLCertificate] = None
     dispatch_result: Optional[DispatchResult] = None
     redirected_url: Optional[str] = None
+    network_requests: Optional[List[Dict[str, Any]]] = None
+    console_messages: Optional[List[Dict[str, Any]]] = None
 
     class Config:
         arbitrary_types_allowed = True
@@ -307,10 +312,13 @@ class AsyncCrawlResponse(BaseModel):
     status_code: int
     screenshot: Optional[str] = None
     pdf_data: Optional[bytes] = None
+    mhtml_data: Optional[str] = None
     get_delayed_content: Optional[Callable[[Optional[float]], Awaitable[str]]] = None
     downloaded_files: Optional[List[str]] = None
     ssl_certificate: Optional[SSLCertificate] = None
     redirected_url: Optional[str] = None
+    network_requests: Optional[List[Dict[str, Any]]] = None
+    console_messages: Optional[List[Dict[str, Any]]] = None
 
     class Config:
         arbitrary_types_allowed = True

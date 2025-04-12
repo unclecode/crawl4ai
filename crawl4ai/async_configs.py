@@ -15,7 +15,7 @@ from .user_agent_generator import UAGen, ValidUAGenerator  # , OnlineUAGenerator
 from .extraction_strategy import ExtractionStrategy, LLMExtractionStrategy
 from .chunking_strategy import ChunkingStrategy, RegexChunking
 
-from .markdown_generation_strategy import MarkdownGenerationStrategy
+from .markdown_generation_strategy import MarkdownGenerationStrategy, DefaultMarkdownGenerator
 from .content_scraping_strategy import ContentScrapingStrategy, WebScrapingStrategy
 from .deep_crawling import DeepCrawlStrategy
 
@@ -722,7 +722,7 @@ class CrawlerRunConfig():
         word_count_threshold: int = MIN_WORD_THRESHOLD,
         extraction_strategy: ExtractionStrategy = None,
         chunking_strategy: ChunkingStrategy = RegexChunking(),
-        markdown_generator: MarkdownGenerationStrategy = None,
+        markdown_generator: MarkdownGenerationStrategy = DefaultMarkdownGenerator(),
         only_text: bool = False,
         css_selector: str = None,
         target_elements: List[str] = None,
@@ -772,10 +772,12 @@ class CrawlerRunConfig():
         screenshot_wait_for: float = None,
         screenshot_height_threshold: int = SCREENSHOT_HEIGHT_TRESHOLD,
         pdf: bool = False,
+        capture_mhtml: bool = False,
         image_description_min_word_threshold: int = IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
         image_score_threshold: int = IMAGE_SCORE_THRESHOLD,
         table_score_threshold: int = 7,
         exclude_external_images: bool = False,
+        exclude_all_images: bool = False,
         # Link and Domain Handling Parameters
         exclude_social_media_domains: list = None,
         exclude_external_links: bool = False,
@@ -785,6 +787,9 @@ class CrawlerRunConfig():
         # Debugging and Logging Parameters
         verbose: bool = True,
         log_console: bool = False,
+        # Network and Console Capturing Parameters
+        capture_network_requests: bool = False,
+        capture_console_messages: bool = False,
         # Connection Parameters
         method: str = "GET",
         stream: bool = False,
@@ -860,9 +865,11 @@ class CrawlerRunConfig():
         self.screenshot_wait_for = screenshot_wait_for
         self.screenshot_height_threshold = screenshot_height_threshold
         self.pdf = pdf
+        self.capture_mhtml = capture_mhtml
         self.image_description_min_word_threshold = image_description_min_word_threshold
         self.image_score_threshold = image_score_threshold
         self.exclude_external_images = exclude_external_images
+        self.exclude_all_images = exclude_all_images
         self.table_score_threshold = table_score_threshold
 
         # Link and Domain Handling Parameters
@@ -877,6 +884,10 @@ class CrawlerRunConfig():
         # Debugging and Logging Parameters
         self.verbose = verbose
         self.log_console = log_console
+        
+        # Network and Console Capturing Parameters
+        self.capture_network_requests = capture_network_requests
+        self.capture_console_messages = capture_console_messages
 
         # Connection Parameters
         self.stream = stream
@@ -991,6 +1002,7 @@ class CrawlerRunConfig():
                 "screenshot_height_threshold", SCREENSHOT_HEIGHT_TRESHOLD
             ),
             pdf=kwargs.get("pdf", False),
+            capture_mhtml=kwargs.get("capture_mhtml", False),
             image_description_min_word_threshold=kwargs.get(
                 "image_description_min_word_threshold",
                 IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
@@ -999,6 +1011,7 @@ class CrawlerRunConfig():
                 "image_score_threshold", IMAGE_SCORE_THRESHOLD
             ),
             table_score_threshold=kwargs.get("table_score_threshold", 7),
+            exclude_all_images=kwargs.get("exclude_all_images", False),
             exclude_external_images=kwargs.get("exclude_external_images", False),
             # Link and Domain Handling Parameters
             exclude_social_media_domains=kwargs.get(
@@ -1011,6 +1024,9 @@ class CrawlerRunConfig():
             # Debugging and Logging Parameters
             verbose=kwargs.get("verbose", True),
             log_console=kwargs.get("log_console", False),
+            # Network and Console Capturing Parameters
+            capture_network_requests=kwargs.get("capture_network_requests", False),
+            capture_console_messages=kwargs.get("capture_console_messages", False),
             # Connection Parameters
             method=kwargs.get("method", "GET"),
             stream=kwargs.get("stream", False),
@@ -1088,9 +1104,11 @@ class CrawlerRunConfig():
             "screenshot_wait_for": self.screenshot_wait_for,
             "screenshot_height_threshold": self.screenshot_height_threshold,
             "pdf": self.pdf,
+            "capture_mhtml": self.capture_mhtml,
             "image_description_min_word_threshold": self.image_description_min_word_threshold,
             "image_score_threshold": self.image_score_threshold,
             "table_score_threshold": self.table_score_threshold,
+            "exclude_all_images": self.exclude_all_images,
             "exclude_external_images": self.exclude_external_images,
             "exclude_social_media_domains": self.exclude_social_media_domains,
             "exclude_external_links": self.exclude_external_links,
@@ -1099,6 +1117,8 @@ class CrawlerRunConfig():
             "exclude_internal_links": self.exclude_internal_links,
             "verbose": self.verbose,
             "log_console": self.log_console,
+            "capture_network_requests": self.capture_network_requests,
+            "capture_console_messages": self.capture_console_messages,
             "method": self.method,
             "stream": self.stream,
             "check_robots_txt": self.check_robots_txt,
