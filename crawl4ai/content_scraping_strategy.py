@@ -1534,17 +1534,11 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
             content_element = None
             if target_elements:
                 try:
-                    content_element = lhtml.Element("div")
+                    for_content_targeted_element = []
                     for target_element in target_elements:
-                        # Creating a fresh parse of HTML for each selector to prevent element extraction
-                        # from modifying the original DOM tree; this keeps the original body 
-                        # intact for link processing. This is better performant than deepcopy.
-                        fresh_body = lhtml.document_fromstring(html)
-                        for_content_targeted_element = []
-                        for target_element in target_elements:
-                            for_content_targeted_element.extend(fresh_body.cssselect(target_element))
-                        content_element = lhtml.Element("div")
-                        content_element.extend(for_content_targeted_element)
+                        for_content_targeted_element.extend(body.cssselect(target_element))
+                    content_element = lhtml.Element("div")
+                    content_element.extend(for_content_targeted_element)
                 except Exception as e:
                     self._log("error", f"Error with target element detection: {str(e)}", "SCRAPE")
                     return None
