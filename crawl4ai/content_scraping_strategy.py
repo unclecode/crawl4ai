@@ -907,11 +907,7 @@ class WebScrapingStrategy(ContentScrapingStrategy):
             try:
                 for_content_targeted_element = []
                 for target_element in target_elements:
-                    # Creating a fresh parse of HTML for each selector to prevent element extraction
-                    # from modifying the original DOM tree; this keeps the original body 
-                    # intact for link processing. This is better performant than deepcopy.
-                    fresh_body = BeautifulSoup(html, "lxml")
-                    for_content_targeted_element.extend(fresh_body.select(target_element))
+                    for_content_targeted_element.extend(body.select(target_element))
                 content_element = soup.new_tag("div")
                 for el in for_content_targeted_element:
                     content_element.append(el)
@@ -919,7 +915,7 @@ class WebScrapingStrategy(ContentScrapingStrategy):
                 self._log("error", f"Error with target element detection: {str(e)}", "SCRAPE")
                 return None
         else:
-            content_element = body      
+            content_element = body     
 
         kwargs["exclude_social_media_domains"] = set(
             kwargs.get("exclude_social_media_domains", []) + SOCIAL_MEDIA_DOMAINS
