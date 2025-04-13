@@ -673,18 +673,6 @@ class AsyncWebCrawler:
         urls: List[str],
         config: Optional[CrawlerRunConfig] = None, 
         dispatcher: Optional[BaseDispatcher] = None,
-        # Legacy parameters maintained for backwards compatibility
-        # word_count_threshold=MIN_WORD_THRESHOLD,
-        # extraction_strategy: ExtractionStrategy = None,
-        # chunking_strategy: ChunkingStrategy = RegexChunking(),
-        # content_filter: RelevantContentFilter = None,
-        # cache_mode: Optional[CacheMode] = None,
-        # bypass_cache: bool = False,
-        # css_selector: str = None,
-        # screenshot: bool = False,
-        # pdf: bool = False,
-        # user_agent: str = None,
-        # verbose=True,
         **kwargs
         ) -> RunManyReturn:
         """
@@ -717,28 +705,42 @@ class AsyncWebCrawler:
         ):
             print(f"Processed {result.url}: {len(result.markdown)} chars")
         """
+        import gc
         config = config or CrawlerRunConfig()
-        # if config is None:
-        #     config = CrawlerRunConfig(
-        #         word_count_threshold=word_count_threshold,
-        #         extraction_strategy=extraction_strategy,
-        #         chunking_strategy=chunking_strategy,
-        #         content_filter=content_filter,
-        #         cache_mode=cache_mode,
-        #         bypass_cache=bypass_cache,
-        #         css_selector=css_selector,
-        #         screenshot=screenshot,
-        #         pdf=pdf,
-        #         verbose=verbose,
-        #         **kwargs,
-        #     )
+
+        # Add memory optimization flag if not explicitly set
+        if not hasattr(config, "enable_memory_optimization"):
+            config.enable_memory_optimization = True
+
+        # Validate URLs before processing
+        valid_urls = [url for url in urls if url and isinstance(url, str)]
+        if not valid_urls:
+            self.logger.error("No valid URLs provided for crawling", tag="ERROR")
+            if not config.stream:
+                return []  # Return empty list for non-streaming mode
+            else:
+                # For streaming mode, need to create a generator that yields nothing
+                async def empty_generator():
+                    # Just yield a single error result
+                    yield CrawlResult(
+                        url="error",
+                        html="",
+                        success=False,
+                        error_message="No valid URLs provided"
+                    )
+                return empty_generator()
 
         if dispatcher is None:
             dispatcher = MemoryAdaptiveDispatcher(
                 rate_limiter=RateLimiter(
                     base_delay=(1.0, 3.0), max_delay=60.0, max_retries=3
                 ),
+                memory_threshold_percent=80,  # Set conservative memory threshold
             )
+
+        # Force garbage collection before starting
+        if config.enable_memory_optimization:
+            gc.collect()
 
         def transform_result(task_result):
             return (
@@ -758,12 +760,41 @@ class AsyncWebCrawler:
         
         if stream:
             async def result_transformer():
-                async for task_result in dispatcher.run_urls_stream(crawler=self, urls=urls, config=config):
-                    yield transform_result(task_result)
+                result_count = 0
+                try:
+                    async for task_result in dispatcher.run_urls_stream(crawler=self, urls=valid_urls, config=config):
+                        result = transform_result(task_result)
+                        result_count += 1
+                        
+                        # Perform garbage collection periodically to prevent memory build-up
+                        if config.enable_memory_optimization and result_count % 5 == 0:
+                            gc.collect()
+                            
+                        yield result
+                except Exception as e:
+                    self.logger.error(f"Stream error: {str(e)}", tag="STREAM")
+                    # Yield error result to avoid empty stream
+                    yield CrawlResult(
+                        url="stream_error",
+                        html="",
+                        success=False,
+                        error_message=f"Stream error: {str(e)}"
+                    )
+                finally:
+                    # Final garbage collection after streaming
+                    if config.enable_memory_optimization:
+                        gc.collect()
+                        
             return result_transformer()
         else:
-            _results = await dispatcher.run_urls(crawler=self, urls=urls, config=config)
-            return [transform_result(res) for res in _results]    
+            _results = await dispatcher.run_urls(crawler=self, urls=valid_urls, config=config)
+            results = [transform_result(res) for res in _results]
+            
+            # Force garbage collection after batch processing
+            if config.enable_memory_optimization:
+                gc.collect()
+                
+            return results
 
     async def aclear_cache(self):
         """Clear the cache database."""
