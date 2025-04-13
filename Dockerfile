@@ -149,7 +149,15 @@ RUN pip install --no-cache-dir --upgrade pip && \
     python -c "import crawl4ai; print('✅ crawl4ai is ready to rock!')" && \
     python -c "from playwright.sync_api import sync_playwright; print('✅ Playwright is feeling dramatic!')"
 
-RUN playwright install --with-deps chromium
+RUN crawl4ai-setup
+
+RUN playwright install --with-deps
+
+RUN mkdir -p /home/appuser/.cache/ms-playwright \
+    && cp -r /root/.cache/ms-playwright/chromium-* /home/appuser/.cache/ms-playwright/ \
+    && chown -R appuser:appuser /home/appuser/.cache/ms-playwright
+
+RUN crawl4ai-doctor
 
 # Copy application code
 COPY deploy/docker/* ${APP_HOME}/
@@ -174,4 +182,8 @@ EXPOSE 6379
 # Switch to the non-root user before starting the application
 USER appuser
 
+# Set environment variables to ptoduction
+ENV PYTHON_ENV=production 
+
+# Start the application using supervisord
 CMD ["supervisord", "-c", "supervisord.conf"]

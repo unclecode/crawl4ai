@@ -1,5 +1,4 @@
 # docker-compose.yml
-# This file is in the root directory alongside Dockerfile
 
 # Base configuration anchor for reusability
 x-base-config: &base-config
@@ -9,7 +8,7 @@ x-base-config: &base-config
     # - "8080:8080" # Uncomment if needed
 
   # Load API keys primarily from .llm.env file
-  # Create .llm.env in the root directory from deploy/docker/.llm.env.example
+  # Create .llm.env in the root directory .llm.env.example
   env_file:
     - .llm.env
 

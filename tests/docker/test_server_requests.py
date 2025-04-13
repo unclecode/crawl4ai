@@ -6,6 +6,10 @@ import asyncio
 import os
 from typing import List, Dict, Any, AsyncGenerator
 
+from dotenv import load_dotenv
+load_dotenv()
+
+
 # Optional: Import crawl4ai classes directly for reference/easier payload creation aid
 # You don't strictly NEED these imports for the tests to run against the server,
 # but they help in understanding the structure you are mimicking in JSON.
@@ -29,7 +33,8 @@ from crawl4ai import (
 )
 
 # --- Test Configuration ---
-BASE_URL = os.getenv("CRAWL4AI_TEST_URL", "http://localhost:8020") # Make base URL configurable
+# BASE_URL = os.getenv("CRAWL4AI_TEST_URL", "http://localhost:8020") # Make base URL configurable
+BASE_URL = os.getenv("CRAWL4AI_TEST_URL", "http://localhost:11235") # Make base URL configurable
 # Use a known simple HTML page for basic tests
 SIMPLE_HTML_URL = "https://httpbin.org/html"
 # Use a site suitable for scraping tests
