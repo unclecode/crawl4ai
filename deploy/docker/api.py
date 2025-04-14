@@ -388,21 +388,25 @@ async def handle_crawl_request(
             )
         )
 
-        async with AsyncWebCrawler(config=browser_config) as crawler:
-            results = []
-            func = getattr(crawler, "arun" if len(urls) == 1 else "arun_many")
-            partial_func = partial(func, 
-                                   urls[0] if len(urls) == 1 else urls, 
-                                   config=crawler_config, 
-                                   dispatcher=dispatcher)
-            results = await partial_func()
-            return {
-                "success": True,
-                "results": [result.model_dump() for result in results]
-            }
+        crawler: AsyncWebCrawler = AsyncWebCrawler(config=browser_config)
+        await crawler.start()
+        results = []
+        func = getattr(crawler, "arun" if len(urls) == 1 else "arun_many")
+        partial_func = partial(func, 
+                                urls[0] if len(urls) == 1 else urls, 
+                                config=crawler_config, 
+                                dispatcher=dispatcher)
+        results = await partial_func()
+        await crawler.close()
+        return {
+            "success": True,
+            "results": [result.model_dump() for result in results]
+        }
 
     except Exception as e:
         logger.error(f"Crawl error: {str(e)}", exc_info=True)
+        if 'crawler' in locals():
+            await crawler.close()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)

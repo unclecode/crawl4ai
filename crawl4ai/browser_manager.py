@@ -491,10 +491,12 @@ class BrowserManager:
 
         Note: This method should be called in a separate task to avoid blocking the main event loop.
         """
-        if self.playwright is None:
-            from playwright.async_api import async_playwright
+        if self.playwright is not None:
+            await self.close()
+            
+        from playwright.async_api import async_playwright
 
-            self.playwright = await async_playwright().start()
+        self.playwright = await async_playwright().start()
 
         if self.config.cdp_url or self.config.use_managed_browser:
             self.config.use_managed_browser = True
