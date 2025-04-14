@@ -116,5 +116,5 @@ async () => {
 
     // Wait a bit for any animations to complete
     document.body.scrollIntoView(false);
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await new Promise((resolve) => setTimeout(resolve, 50));
 };
