@@ -148,6 +148,14 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
                 self.logger.info(f"Max pages limit ({self.max_pages}) reached, stopping crawl")
                 break
                 
+            # Calculate how many more URLs we can process in this batch
+            remaining = self.max_pages - self._pages_crawled
+            batch_size = min(BATCH_SIZE, remaining)
+            if batch_size <= 0:
+                # No more pages to crawl
+                self.logger.info(f"Max pages limit ({self.max_pages}) reached, stopping crawl")
+                break
+                
             batch: List[Tuple[float, int, str, Optional[str]]] = []
             # Retrieve up to BATCH_SIZE items from the priority queue.
             for _ in range(BATCH_SIZE):
@@ -182,6 +190,10 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
                 # Count only successful crawls toward max_pages limit
                 if result.success:
                     self._pages_crawled += 1
+                    # Check if we've reached the limit during batch processing
+                    if self._pages_crawled >= self.max_pages:
+                        self.logger.info(f"Max pages limit ({self.max_pages}) reached during batch, stopping crawl")
+                        break  # Exit the generator
                 
                 yield result
                 
