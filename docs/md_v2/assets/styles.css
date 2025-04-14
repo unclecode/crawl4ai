@@ -50,7 +50,16 @@
     --display-h1-decoration: none;
 
     --display-h1-decoration: none;
+
+    --header-height: 65px; /* Adjust based on your actual header height */
+    --sidebar-width: 280px; /* Adjust based on your desired sidebar width */
+    --toc-width: 240px; /* Adjust based on your desired ToC width */
+    --layout-transition-speed: 0.2s; /* For potential future animations */
+
+    --page-width : 90em; /* Adjust based on your design */
 }
+
+
 
 /* body {
     background-color: var(--background-color);
@@ -257,3 +266,5 @@ div.badges a {
 div.badges a > img {
     width: auto;
 }
+
+
