@@ -72,7 +72,7 @@ body {
 #terminal-mkdocs-side-panel {
     position: fixed;
     top: var(--header-height);
-    left: max(0px, calc((100vw - var(--content-max-width)) / 2)); 
+    left: max(0px, calc((90vw - var(--content-max-width)) / 2)); 
     bottom: 0;
     width: var(--sidebar-width);
     background-color: var(--background-color);
@@ -293,5 +293,149 @@ footer {
     /* Further hide or simplify on mobile if needed */
      .github-stats-badge {
         display: none; /* Example: Hide completely on smallest screens */
+     }
+}
+
+/* --- Ask AI Selection Button --- */
+.ask-ai-selection-button {
+    background-color: var(--primary-dimmed-color, #09b5a5);
+    color: var(--background-color, #070708);
+    border: none;
+    padding: 4px 8px;
+    font-size: 0.8em;
+    border-radius: 4px;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    transition: background-color 0.2s ease;
+    white-space: nowrap;
+}
+
+.ask-ai-selection-button:hover {
+    background-color: var(--primary-color, #50ffff);
+}
+
+/* ==== File: docs/assets/layout.css (Additions) ==== */
+
+/* ... (keep all existing layout CSS) ... */
+
+/* --- Copy Code Button Styling --- */
+
+/* Ensure the parent <pre> can contain the absolutely positioned button */
+#terminal-mkdocs-main-content pre {
+    position: relative; /* Needed for absolute positioning of child */
+    /* Add a little padding top/right to make space for the button */
+    padding-top: 2.5em;
+    padding-right: 1em; /* Ensure padding is sufficient */
+}
+
+.copy-code-button {
+    position: absolute;
+    top: 0.5em; /* Adjust spacing from top */
+    left: 0.5em; /* Adjust spacing from left */
+    z-index: 1; /* Sit on top of code */
+
+    background-color: var(--progress-bar-background, #444); /* Use a background */
+    color: var(--font-color, #eaeaea);
+    border: 1px solid var(--secondary-color, #727578);
+    padding: 3px 8px;
+    font-size: 0.8em;
+    font-family: var(--font-stack, monospace);
+    border-radius: 4px;
+    cursor: pointer;
+    opacity: 0; /* Hidden by default */
+    transition: opacity 0.2s ease-in-out, background-color 0.2s ease, color 0.2s ease;
+    white-space: nowrap;
+}
+
+/* Show button on hover of the <pre> container */
+#terminal-mkdocs-main-content pre:hover .copy-code-button {
+    opacity: 0.8; /* Show partially */
+}
+
+.copy-code-button:hover {
+    opacity: 1; /* Fully visible on button hover */
+    background-color: var(--secondary-color, #727578);
+}
+
+.copy-code-button:focus {
+     opacity: 1; /* Ensure visible when focused */
+     outline: 1px dashed var(--primary-color);
+}
+
+
+/* Style for "Copied!" state */
+.copy-code-button.copied {
+    background-color: var(--primary-dimmed-color, #09b5a5);
+    color: var(--background-color, #070708);
+    border-color: var(--primary-dimmed-color, #09b5a5);
+    opacity: 1; /* Ensure visible */
+}
+.copy-code-button.copied:hover {
+     background-color: var(--primary-dimmed-color, #09b5a5); /* Prevent hover change */
+}
+
+/* ==== File: docs/assets/layout.css (Additions) ==== */
+
+/* ... (keep all existing layout CSS) ... */
+
+/* --- Floating Ask AI Button --- */
+.floating-ask-ai-button {
+    position: fixed;
+    bottom: 25px;
+    right: 25px;
+    z-index: 1050; /* Below modals, above most content */
+
+    background-color: var(--primary-dimmed-color, #09b5a5);
+    color: var(--background-color, #070708);
+    border: none;
+    border-radius: 50%; /* Make it circular */
+    width: 60px; /* Adjust size */
+    height: 60px; /* Adjust size */
+    padding: 10px; /* Adjust padding */
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+    cursor: pointer;
+    transition: background-color 0.2s ease, transform 0.2s ease;
+
+    display: flex;
+    flex-direction: column; /* Stack icon and text */
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    text-align: center;
+}
+
+.floating-ask-ai-button svg {
+    width: 24px; /* Control icon size */
+    height: 24px;
+}
+
+.floating-ask-ai-button span {
+    font-size: 0.7em;
+    margin-top: 2px; /* Space between icon and text */
+    display: block; /* Ensure it takes space */
+     line-height: 1;
+}
+
+
+.floating-ask-ai-button:hover {
+    background-color: var(--primary-color, #50ffff);
+    transform: scale(1.05); /* Slight grow effect */
+}
+
+.floating-ask-ai-button:focus {
+     outline: 2px solid var(--primary-color);
+     outline-offset: 2px;
+}
+
+/* Optional: Hide text on smaller screens if needed */
+@media screen and (max-width: 768px) {
+     .floating-ask-ai-button span {
+        /* display: none; */ /* Uncomment to hide text */
+     }
+     .floating-ask-ai-button {
+        width: 55px;
+        height: 55px;
+        bottom: 20px;
+        right: 20px;
      }
 }
