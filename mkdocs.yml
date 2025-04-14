@@ -76,6 +76,7 @@ extra:
   version: !ENV [CRAWL4AI_VERSION, 'development']
 
 extra_css:
+  - assets/layout.css
   - assets/styles.css
   - assets/highlight.css
   - assets/dmvendor.css
@@ -84,3 +85,5 @@ extra_javascript:
   - assets/highlight.min.js
   - assets/highlight_init.js
   - https://buttons.github.io/buttons.js
+  - assets/toc.js
+  - assets/github_stats.js 
