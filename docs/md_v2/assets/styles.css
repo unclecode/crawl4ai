@@ -6,8 +6,8 @@
 }
 
 :root {
-    --global-font-size: 16px;
-    --global-code-font-size: 16px;
+    --global-font-size: 14px;
+    --global-code-font-size: 13px;
     --global-line-height: 1.5em;
     --global-space: 10px;
     --font-stack: Menlo, Monaco, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono,
@@ -56,7 +56,7 @@
     --toc-width: 240px; /* Adjust based on your desired ToC width */
     --layout-transition-speed: 0.2s; /* For potential future animations */
 
-    --page-width : 90em; /* Adjust based on your design */
+    --page-width : 100em; /* Adjust based on your design */
 }
 
 
