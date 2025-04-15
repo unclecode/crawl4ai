@@ -119,411 +119,411 @@ class TestDeepCrawlEndpoints:
         await check_server_health(async_client)
 
     # 1. Basic Deep Crawl
-    # async def test_deep_crawl_basic_bfs(self, async_client: httpx.AsyncClient):
-    #     """Test BFS deep crawl with limited depth and pages."""
-    #     max_depth = 1
-    #     max_pages = 3 # start_url + 2 more
-    #     payload = {
-    #         "urls": [DEEP_CRAWL_BASE_URL],
-    #         "browser_config": {"type": "BrowserConfig", "params": {"headless": True}},
-    #         "crawler_config": {
-    #             "type": "CrawlerRunConfig",
-    #             "params": {
-    #                 "stream": False,
-    #                 "cache_mode": "BYPASS", # Use string value for CacheMode
-    #                 "deep_crawl_strategy": {
-    #                     "type": "BFSDeepCrawlStrategy",
-    #                     "params": {
-    #                         "max_depth": max_depth,
-    #                         "max_pages": max_pages,
-    #                         # Minimal filters for basic test
-    #                         "filter_chain": {
-    #                             "type": "FilterChain",
-    #                             "params": {
-    #                                 "filters": [
-    #                                     {
-    #                                         "type": "DomainFilter",
-    #                                         "params": {"allowed_domains": [DEEP_CRAWL_DOMAIN]}
-    #                                     }
-    #                                 ]
-    #                             }
-    #                         }
-    #                     }
-    #                 }
-    #             }
-    #         }
-    #     }
-    #     response = await async_client.post("/crawl", json=payload)
-    #     response.raise_for_status()
-    #     data = response.json()
+    async def test_deep_crawl_basic_bfs(self, async_client: httpx.AsyncClient):
+        """Test BFS deep crawl with limited depth and pages."""
+        max_depth = 1
+        max_pages = 3 # start_url + 2 more
+        payload = {
+            "urls": [DEEP_CRAWL_BASE_URL],
+            "browser_config": {"type": "BrowserConfig", "params": {"headless": True}},
+            "crawler_config": {
+                "type": "CrawlerRunConfig",
+                "params": {
+                    "stream": False,
+                    "cache_mode": "BYPASS", # Use string value for CacheMode
+                    "deep_crawl_strategy": {
+                        "type": "BFSDeepCrawlStrategy",
+                        "params": {
+                            "max_depth": max_depth,
+                            "max_pages": max_pages,
+                            # Minimal filters for basic test
+                            "filter_chain": {
+                                "type": "FilterChain",
+                                "params": {
+                                    "filters": [
+                                        {
+                                            "type": "DomainFilter",
+                                            "params": {"allowed_domains": [DEEP_CRAWL_DOMAIN]}
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        response = await async_client.post("/crawl", json=payload)
+        response.raise_for_status()
+        data = response.json()
 
-    #     assert data["success"] is True
-    #     assert isinstance(data["results"], list)
-    #     assert len(data["results"]) > 1 # Should be more than just the start URL
-    #     assert len(data["results"]) <= max_pages # Respect max_pages
+        assert data["success"] is True
+        assert isinstance(data["results"], list)
+        assert len(data["results"]) > 1 # Should be more than just the start URL
+        assert len(data["results"]) <= max_pages # Respect max_pages
 
-    #     found_depth_0 = False
-    #     found_depth_1 = False
-    #     for result in data["results"]:
-    #         await assert_crawl_result_structure(result)
-    #         assert result["success"] is True
-    #         assert DEEP_CRAWL_DOMAIN in result["url"]
-    #         depth = result["metadata"]["depth"]
-    #         assert depth <= max_depth
-    #         if depth == 0: found_depth_0 = True
-    #         if depth == 1: found_depth_1 = True
+        found_depth_0 = False
+        found_depth_1 = False
+        for result in data["results"]:
+            await assert_crawl_result_structure(result)
+            assert result["success"] is True
+            assert DEEP_CRAWL_DOMAIN in result["url"]
+            depth = result["metadata"]["depth"]
+            assert depth <= max_depth
+            if depth == 0: found_depth_0 = True
+            if depth == 1: found_depth_1 = True
 
-    #     assert found_depth_0
-    #     assert found_depth_1
+        assert found_depth_0
+        assert found_depth_1
 
-    # # 2. Deep Crawl with Filtering
-    # async def test_deep_crawl_with_filters(self, async_client: httpx.AsyncClient):
-    #     """Test BFS deep crawl with content type and domain filters."""
-    #     max_depth = 1
-    #     max_pages = 5
-    #     payload = {
-    #         "urls": [DEEP_CRAWL_BASE_URL],
-    #         "browser_config": {"type": "BrowserConfig", "params": {"headless": True}},
-    #         "crawler_config": {
-    #             "type": "CrawlerRunConfig",
-    #             "params": {
-    #                 "stream": False,
-    #                 "cache_mode": "BYPASS",
-    #                 "deep_crawl_strategy": {
-    #                     "type": "BFSDeepCrawlStrategy",
-    #                     "params": {
-    #                         "max_depth": max_depth,
-    #                         "max_pages": max_pages,
-    #                         "filter_chain": {
-    #                             "type": "FilterChain",
-    #                             "params": {
-    #                                 "filters": [
-    #                                     {
-    #                                         "type": "DomainFilter",
-    #                                         "params": {"allowed_domains": [DEEP_CRAWL_DOMAIN]}
-    #                                     },
-    #                                     {
-    #                                         "type": "ContentTypeFilter",
-    #                                         "params": {"allowed_types": ["text/html"]}
-    #                                     },
-    #                                     # Example: Exclude specific paths using regex
-    #                                     {
-    #                                         "type": "URLPatternFilter",
-    #                                          "params": {
-    #                                              "patterns": ["*/category-3/*"], # Block category 3
-    #                                              "reverse": True # Block if match
-    #                                          }
-    #                                     }
-    #                                 ]
-    #                             }
-    #                         }
-    #                     }
-    #                 }
-    #             }
-    #         }
-    #     }
-    #     response = await async_client.post("/crawl", json=payload)
-    #     response.raise_for_status()
-    #     data = response.json()
+    # 2. Deep Crawl with Filtering
+    async def test_deep_crawl_with_filters(self, async_client: httpx.AsyncClient):
+        """Test BFS deep crawl with content type and domain filters."""
+        max_depth = 1
+        max_pages = 5
+        payload = {
+            "urls": [DEEP_CRAWL_BASE_URL],
+            "browser_config": {"type": "BrowserConfig", "params": {"headless": True}},
+            "crawler_config": {
+                "type": "CrawlerRunConfig",
+                "params": {
+                    "stream": False,
+                    "cache_mode": "BYPASS",
+                    "deep_crawl_strategy": {
+                        "type": "BFSDeepCrawlStrategy",
+                        "params": {
+                            "max_depth": max_depth,
+                            "max_pages": max_pages,
+                            "filter_chain": {
+                                "type": "FilterChain",
+                                "params": {
+                                    "filters": [
+                                        {
+                                            "type": "DomainFilter",
+                                            "params": {"allowed_domains": [DEEP_CRAWL_DOMAIN]}
+                                        },
+                                        {
+                                            "type": "ContentTypeFilter",
+                                            "params": {"allowed_types": ["text/html"]}
+                                        },
+                                        # Example: Exclude specific paths using regex
+                                        {
+                                            "type": "URLPatternFilter",
+                                             "params": {
+                                                 "patterns": ["*/category-3/*"], # Block category 3
+                                                 "reverse": True # Block if match
+                                             }
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        response = await async_client.post("/crawl", json=payload)
+        response.raise_for_status()
+        data = response.json()
 
-    #     assert data["success"] is True
-    #     assert len(data["results"]) > 0
-    #     assert len(data["results"]) <= max_pages
+        assert data["success"] is True
+        assert len(data["results"]) > 0
+        assert len(data["results"]) <= max_pages
 
-    #     for result in data["results"]:
-    #         await assert_crawl_result_structure(result)
-    #         assert result["success"] is True
-    #         assert DEEP_CRAWL_DOMAIN in result["url"]
-    #         assert "category-3" not in result["url"] # Check if filter worked
-    #         assert result["metadata"]["depth"] <= max_depth
+        for result in data["results"]:
+            await assert_crawl_result_structure(result)
+            assert result["success"] is True
+            assert DEEP_CRAWL_DOMAIN in result["url"]
+            assert "category-3" not in result["url"] # Check if filter worked
+            assert result["metadata"]["depth"] <= max_depth
 
-    # # 3. Deep Crawl with Scoring
-    # async def test_deep_crawl_with_scoring(self, async_client: httpx.AsyncClient):
-    #     """Test BFS deep crawl with URL scoring."""
-    #     max_depth = 1
-    #     max_pages = 4
-    #     payload = {
-    #         "urls": [DEEP_CRAWL_BASE_URL],
-    #         "browser_config": {"type": "BrowserConfig", "params": {"headless": True}},
-    #         "crawler_config": {
-    #             "type": "CrawlerRunConfig",
-    #             "params": {
-    #                 "stream": False,
-    #                 "cache_mode": "BYPASS",
-    #                 "deep_crawl_strategy": {
-    #                     "type": "BFSDeepCrawlStrategy",
-    #                     "params": {
-    #                         "max_depth": max_depth,
-    #                         "max_pages": max_pages,
-    #                         "filter_chain": { # Keep basic domain filter
-    #                             "type": "FilterChain",
-    #                             "params": { "filters": [{"type": "DomainFilter", "params": {"allowed_domains": [DEEP_CRAWL_DOMAIN]}}]}
-    #                         },
-    #                         "url_scorer": { # Add scorer
-    #                             "type": "CompositeScorer",
-    #                             "params": {
-    #                                 "scorers": [
-    #                                     {   # Favor pages with 'product' in the URL
-    #                                         "type": "KeywordRelevanceScorer",
-    #                                         "params": {"keywords": ["product"], "weight": 1.0}
-    #                                     },
-    #                                     {   # Penalize deep paths slightly
-    #                                         "type": "PathDepthScorer",
-    #                                         "params": {"optimal_depth": 2, "weight": -0.2}
-    #                                     }
-    #                                 ]
-    #                             }
-    #                         },
-    #                         # Set a threshold if needed: "score_threshold": 0.1
-    #                     }
-    #                 }
-    #             }
-    #         }
-    #     }
-    #     response = await async_client.post("/crawl", json=payload)
-    #     response.raise_for_status()
-    #     data = response.json()
+    # 3. Deep Crawl with Scoring
+    async def test_deep_crawl_with_scoring(self, async_client: httpx.AsyncClient):
+        """Test BFS deep crawl with URL scoring."""
+        max_depth = 1
+        max_pages = 4
+        payload = {
+            "urls": [DEEP_CRAWL_BASE_URL],
+            "browser_config": {"type": "BrowserConfig", "params": {"headless": True}},
+            "crawler_config": {
+                "type": "CrawlerRunConfig",
+                "params": {
+                    "stream": False,
+                    "cache_mode": "BYPASS",
+                    "deep_crawl_strategy": {
+                        "type": "BFSDeepCrawlStrategy",
+                        "params": {
+                            "max_depth": max_depth,
+                            "max_pages": max_pages,
+                            "filter_chain": { # Keep basic domain filter
+                                "type": "FilterChain",
+                                "params": { "filters": [{"type": "DomainFilter", "params": {"allowed_domains": [DEEP_CRAWL_DOMAIN]}}]}
+                            },
+                            "url_scorer": { # Add scorer
+                                "type": "CompositeScorer",
+                                "params": {
+                                    "scorers": [
+                                        {   # Favor pages with 'product' in the URL
+                                            "type": "KeywordRelevanceScorer",
+                                            "params": {"keywords": ["product"], "weight": 1.0}
+                                        },
+                                        {   # Penalize deep paths slightly
+                                            "type": "PathDepthScorer",
+                                            "params": {"optimal_depth": 2, "weight": -0.2}
+                                        }
+                                    ]
+                                }
+                            },
+                            # Set a threshold if needed: "score_threshold": 0.1
+                        }
+                    }
+                }
+            }
+        }
+        response = await async_client.post("/crawl", json=payload)
+        response.raise_for_status()
+        data = response.json()
 
-    #     assert data["success"] is True
-    #     assert len(data["results"]) > 0
-    #     assert len(data["results"]) <= max_pages
+        assert data["success"] is True
+        assert len(data["results"]) > 0
+        assert len(data["results"]) <= max_pages
 
-    #     # Check if results seem biased towards products (harder to assert strictly without knowing exact scores)
-    #     product_urls_found = any("product_" in result["url"] for result in data["results"] if result["metadata"]["depth"] > 0)
-    #     print(f"Product URLs found among depth > 0 results: {product_urls_found}")
-    #     # We expect scoring to prioritize product pages if available within limits
-    #     # assert product_urls_found # This might be too strict depending on site structure and limits
+        # Check if results seem biased towards products (harder to assert strictly without knowing exact scores)
+        product_urls_found = any("product_" in result["url"] for result in data["results"] if result["metadata"]["depth"] > 0)
+        print(f"Product URLs found among depth > 0 results: {product_urls_found}")
+        # We expect scoring to prioritize product pages if available within limits
+        # assert product_urls_found # This might be too strict depending on site structure and limits
 
-    #     for result in data["results"]:
-    #         await assert_crawl_result_structure(result)
-    #         assert result["success"] is True
-    #         assert result["metadata"]["depth"] <= max_depth
+        for result in data["results"]:
+            await assert_crawl_result_structure(result)
+            assert result["success"] is True
+            assert result["metadata"]["depth"] <= max_depth
 
-    # # 4. Deep Crawl with CSS Extraction
-    # async def test_deep_crawl_with_css_extraction(self, async_client: httpx.AsyncClient):
-    #     """Test BFS deep crawl combined with JsonCssExtractionStrategy."""
-    #     max_depth = 6 # Go deep enough to reach product pages
-    #     max_pages = 20
-    #     # Schema to extract product details
-    #     product_schema = {
-    #         "name": "ProductDetails",
-    #         "baseSelector": "div.container", # Base for product page
-    #         "fields": [
-    #             {"name": "product_title", "selector": "h1", "type": "text"},
-    #             {"name": "price", "selector": ".product-price", "type": "text"},
-    #             {"name": "description", "selector": ".product-description p", "type": "text"},
-    #             {"name": "specs", "selector": ".product-specs li", "type": "list", "fields":[
-    #                  {"name": "spec_name", "selector": ".spec-name", "type": "text"},
-    #                  {"name": "spec_value", "selector": ".spec-value", "type": "text"}
-    #             ]}
-    #         ]
-    #     }
-    #     payload = {
-    #         "urls": [DEEP_CRAWL_BASE_URL],
-    #         "browser_config": {"type": "BrowserConfig", "params": {"headless": True}},
-    #         "crawler_config": {
-    #             "type": "CrawlerRunConfig",
-    #             "params": {
-    #                 "stream": False,
-    #                 "cache_mode": "BYPASS",
-    #                 "extraction_strategy": { # Apply extraction to ALL crawled pages
-    #                     "type": "JsonCssExtractionStrategy",
-    #                     "params": {"schema": {"type": "dict", "value": product_schema}}
-    #                 },
-    #                 "deep_crawl_strategy": {
-    #                     "type": "BFSDeepCrawlStrategy",
-    #                     "params": {
-    #                         "max_depth": max_depth,
-    #                         "max_pages": max_pages,
-    #                         "filter_chain": { # Only crawl HTML on our domain
-    #                             "type": "FilterChain",
-    #                             "params": {
-    #                                 "filters": [
-    #                                     {"type": "DomainFilter", "params": {"allowed_domains": [DEEP_CRAWL_DOMAIN]}},
-    #                                     {"type": "ContentTypeFilter", "params": {"allowed_types": ["text/html"]}}
-    #                                 ]
-    #                             }
-    #                         }
-    #                         # Optional: Add scoring to prioritize product pages for extraction
-    #                     }
-    #                 }
-    #             }
-    #         }
-    #     }
-    #     response = await async_client.post("/crawl", json=payload)
-    #     response.raise_for_status()
-    #     data = response.json()
+    # 4. Deep Crawl with CSS Extraction
+    async def test_deep_crawl_with_css_extraction(self, async_client: httpx.AsyncClient):
+        """Test BFS deep crawl combined with JsonCssExtractionStrategy."""
+        max_depth = 6 # Go deep enough to reach product pages
+        max_pages = 20
+        # Schema to extract product details
+        product_schema = {
+            "name": "ProductDetails",
+            "baseSelector": "div.container", # Base for product page
+            "fields": [
+                {"name": "product_title", "selector": "h1", "type": "text"},
+                {"name": "price", "selector": ".product-price", "type": "text"},
+                {"name": "description", "selector": ".product-description p", "type": "text"},
+                {"name": "specs", "selector": ".product-specs li", "type": "list", "fields":[
+                     {"name": "spec_name", "selector": ".spec-name", "type": "text"},
+                     {"name": "spec_value", "selector": ".spec-value", "type": "text"}
+                ]}
+            ]
+        }
+        payload = {
+            "urls": [DEEP_CRAWL_BASE_URL],
+            "browser_config": {"type": "BrowserConfig", "params": {"headless": True}},
+            "crawler_config": {
+                "type": "CrawlerRunConfig",
+                "params": {
+                    "stream": False,
+                    "cache_mode": "BYPASS",
+                    "extraction_strategy": { # Apply extraction to ALL crawled pages
+                        "type": "JsonCssExtractionStrategy",
+                        "params": {"schema": {"type": "dict", "value": product_schema}}
+                    },
+                    "deep_crawl_strategy": {
+                        "type": "BFSDeepCrawlStrategy",
+                        "params": {
+                            "max_depth": max_depth,
+                            "max_pages": max_pages,
+                            "filter_chain": { # Only crawl HTML on our domain
+                                "type": "FilterChain",
+                                "params": {
+                                    "filters": [
+                                        {"type": "DomainFilter", "params": {"allowed_domains": [DEEP_CRAWL_DOMAIN]}},
+                                        {"type": "ContentTypeFilter", "params": {"allowed_types": ["text/html"]}}
+                                    ]
+                                }
+                            }
+                            # Optional: Add scoring to prioritize product pages for extraction
+                        }
+                    }
+                }
+            }
+        }
+        response = await async_client.post("/crawl", json=payload)
+        response.raise_for_status()
+        data = response.json()
 
-    #     assert data["success"] is True
-    #     assert len(data["results"]) > 0
-    #     # assert len(data["results"]) <= max_pages
+        assert data["success"] is True
+        assert len(data["results"]) > 0
+        # assert len(data["results"]) <= max_pages
 
-    #     found_extracted_product = False
-    #     for result in data["results"]:
-    #         await assert_crawl_result_structure(result)
-    #         assert result["success"] is True
-    #         assert "extracted_content" in result
-    #         if "product_" in result["url"]: # Check product pages specifically
-    #              assert result["extracted_content"] is not None
-    #              try:
-    #                  extracted = json.loads(result["extracted_content"])
-    #                  # Schema returns list even if one base match
-    #                  assert isinstance(extracted, list)
-    #                  if extracted:
-    #                      item = extracted[0]
-    #                      assert "product_title" in item and item["product_title"]
-    #                      assert "price" in item and item["price"]
-    #                      # Specs might be empty list if not found
-    #                      assert "specs" in item and isinstance(item["specs"], list)
-    #                      found_extracted_product = True
-    #                      print(f"Extracted product: {item.get('product_title')}")
-    #              except (json.JSONDecodeError, AssertionError, IndexError) as e:
-    #                   pytest.fail(f"Extraction validation failed for {result['url']}: {e}\nContent: {result['extracted_content']}")
-    #         # else:
-    #         #      # Non-product pages might have None or empty list depending on schema match
-    #         #      assert result["extracted_content"] is None or json.loads(result["extracted_content"]) == []
+        found_extracted_product = False
+        for result in data["results"]:
+            await assert_crawl_result_structure(result)
+            assert result["success"] is True
+            assert "extracted_content" in result
+            if "product_" in result["url"]: # Check product pages specifically
+                 assert result["extracted_content"] is not None
+                 try:
+                     extracted = json.loads(result["extracted_content"])
+                     # Schema returns list even if one base match
+                     assert isinstance(extracted, list)
+                     if extracted:
+                         item = extracted[0]
+                         assert "product_title" in item and item["product_title"]
+                         assert "price" in item and item["price"]
+                         # Specs might be empty list if not found
+                         assert "specs" in item and isinstance(item["specs"], list)
+                         found_extracted_product = True
+                         print(f"Extracted product: {item.get('product_title')}")
+                 except (json.JSONDecodeError, AssertionError, IndexError) as e:
+                      pytest.fail(f"Extraction validation failed for {result['url']}: {e}\nContent: {result['extracted_content']}")
+            # else:
+            #      # Non-product pages might have None or empty list depending on schema match
+            #      assert result["extracted_content"] is None or json.loads(result["extracted_content"]) == []
 
-    #     assert found_extracted_product, "Did not find any pages where product data was successfully extracted."
+        assert found_extracted_product, "Did not find any pages where product data was successfully extracted."
 
-    # # 5. Deep Crawl with LLM Extraction (Requires Server LLM Setup)
-    # async def test_deep_crawl_with_llm_extraction(self, async_client: httpx.AsyncClient):
-    #     """Test BFS deep crawl combined with LLMExtractionStrategy."""
-    #     max_depth = 1 # Limit depth to keep LLM calls manageable
-    #     max_pages = 3
-    #     payload = {
-    #         "urls": [DEEP_CRAWL_BASE_URL],
-    #         "browser_config": {"type": "BrowserConfig", "params": {"headless": True}},
-    #         "crawler_config": {
-    #             "type": "CrawlerRunConfig",
-    #             "params": {
-    #                 "stream": False,
-    #                 "cache_mode": "BYPASS",
-    #                 "extraction_strategy": { # Apply LLM extraction to crawled pages
-    #                     "type": "LLMExtractionStrategy",
-    #                     "params": {
-    #                         "instruction": "Extract the main H1 title and the text content of the first paragraph.",
-    #                         "llm_config": { # Example override, rely on server default if possible
-    #                            "type": "LLMConfig",
-    #                            "params": {"provider": "openai/gpt-4.1-mini"} # Use a cheaper model for testing
-    #                         },
-    #                          "schema": { # Expected JSON output
-    #                             "type": "dict",
-    #                             "value": {
-    #                                 "title": "PageContent", "type": "object",
-    #                                 "properties": {
-    #                                     "h1_title": {"type": "string"},
-    #                                     "first_paragraph": {"type": "string"}
-    #                                 }
-    #                             }
-    #                         }
-    #                     }
-    #                 },
-    #                 "deep_crawl_strategy": {
-    #                     "type": "BFSDeepCrawlStrategy",
-    #                     "params": {
-    #                         "max_depth": max_depth,
-    #                         "max_pages": max_pages,
-    #                         "filter_chain": {
-    #                             "type": "FilterChain",
-    #                             "params": {
-    #                                 "filters": [
-    #                                     {"type": "DomainFilter", "params": {"allowed_domains": [DEEP_CRAWL_DOMAIN]}},
-    #                                     {"type": "ContentTypeFilter", "params": {"allowed_types": ["text/html"]}}
-    #                                 ]
-    #                             }
-    #                         }
-    #                     }
-    #                 }
-    #             }
-    #         }
-    #     }
+    # 5. Deep Crawl with LLM Extraction (Requires Server LLM Setup)
+    async def test_deep_crawl_with_llm_extraction(self, async_client: httpx.AsyncClient):
+        """Test BFS deep crawl combined with LLMExtractionStrategy."""
+        max_depth = 1 # Limit depth to keep LLM calls manageable
+        max_pages = 3
+        payload = {
+            "urls": [DEEP_CRAWL_BASE_URL],
+            "browser_config": {"type": "BrowserConfig", "params": {"headless": True}},
+            "crawler_config": {
+                "type": "CrawlerRunConfig",
+                "params": {
+                    "stream": False,
+                    "cache_mode": "BYPASS",
+                    "extraction_strategy": { # Apply LLM extraction to crawled pages
+                        "type": "LLMExtractionStrategy",
+                        "params": {
+                            "instruction": "Extract the main H1 title and the text content of the first paragraph.",
+                            "llm_config": { # Example override, rely on server default if possible
+                               "type": "LLMConfig",
+                               "params": {"provider": "openai/gpt-4.1-mini"} # Use a cheaper model for testing
+                            },
+                             "schema": { # Expected JSON output
+                                "type": "dict",
+                                "value": {
+                                    "title": "PageContent", "type": "object",
+                                    "properties": {
+                                        "h1_title": {"type": "string"},
+                                        "first_paragraph": {"type": "string"}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "deep_crawl_strategy": {
+                        "type": "BFSDeepCrawlStrategy",
+                        "params": {
+                            "max_depth": max_depth,
+                            "max_pages": max_pages,
+                            "filter_chain": {
+                                "type": "FilterChain",
+                                "params": {
+                                    "filters": [
+                                        {"type": "DomainFilter", "params": {"allowed_domains": [DEEP_CRAWL_DOMAIN]}},
+                                        {"type": "ContentTypeFilter", "params": {"allowed_types": ["text/html"]}}
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
-    #     try:
-    #         response = await async_client.post("/crawl", json=payload)
-    #         response.raise_for_status()
-    #         data = response.json()
-    #     except httpx.HTTPStatusError as e:
-    #         pytest.fail(f"Deep Crawl + LLM extraction request failed: {e}. Response: {e.response.text}. Check server logs and LLM API key setup.")
-    #     except httpx.RequestError as e:
-    #          pytest.fail(f"Deep Crawl + LLM extraction request failed: {e}.")
-
-
-    #     assert data["success"] is True
-    #     assert len(data["results"]) > 0
-    #     assert len(data["results"]) <= max_pages
-
-    #     found_llm_extraction = False
-    #     for result in data["results"]:
-    #         await assert_crawl_result_structure(result)
-    #         assert result["success"] is True
-    #         assert "extracted_content" in result
-    #         assert result["extracted_content"] is not None
-    #         try:
-    #             extracted = json.loads(result["extracted_content"])
-    #             if isinstance(extracted, list): extracted = extracted[0] # Handle list output
-    #             assert isinstance(extracted, dict)
-    #             assert "h1_title" in extracted # Check keys based on schema
-    #             assert "first_paragraph" in extracted
-    #             found_llm_extraction = True
-    #             print(f"LLM extracted from {result['url']}: Title='{extracted.get('h1_title')}'")
-    #         except (json.JSONDecodeError, AssertionError, IndexError, TypeError) as e:
-    #             pytest.fail(f"LLM extraction validation failed for {result['url']}: {e}\nContent: {result['extracted_content']}")
-
-    #     assert found_llm_extraction, "LLM extraction did not yield expected data on any crawled page."
+        try:
+            response = await async_client.post("/crawl", json=payload)
+            response.raise_for_status()
+            data = response.json()
+        except httpx.HTTPStatusError as e:
+            pytest.fail(f"Deep Crawl + LLM extraction request failed: {e}. Response: {e.response.text}. Check server logs and LLM API key setup.")
+        except httpx.RequestError as e:
+             pytest.fail(f"Deep Crawl + LLM extraction request failed: {e}.")
 
 
-    # # 6. Deep Crawl with SSL Certificate Fetching
-    # async def test_deep_crawl_with_ssl(self, async_client: httpx.AsyncClient):
-    #     """Test BFS deep crawl with fetch_ssl_certificate enabled."""
-    #     max_depth = 0 # Only fetch for start URL to keep test fast
-    #     max_pages = 1
-    #     payload = {
-    #         "urls": [DEEP_CRAWL_BASE_URL],
-    #         "browser_config": {"type": "BrowserConfig", "params": {"headless": True}},
-    #         "crawler_config": {
-    #             "type": "CrawlerRunConfig",
-    #             "params": {
-    #                 "stream": False,
-    #                 "cache_mode": "BYPASS",
-    #                 "fetch_ssl_certificate": True, # <-- Enable SSL fetching
-    #                 "deep_crawl_strategy": {
-    #                     "type": "BFSDeepCrawlStrategy",
-    #                     "params": {
-    #                         "max_depth": max_depth,
-    #                         "max_pages": max_pages,
-    #                     }
-    #                 }
-    #             }
-    #         }
-    #     }
-    #     response = await async_client.post("/crawl", json=payload)
-    #     response.raise_for_status()
-    #     data = response.json()
+        assert data["success"] is True
+        assert len(data["results"]) > 0
+        assert len(data["results"]) <= max_pages
 
-    #     assert data["success"] is True
-    #     assert len(data["results"]) == 1
-    #     result = data["results"][0]
+        found_llm_extraction = False
+        for result in data["results"]:
+            await assert_crawl_result_structure(result)
+            assert result["success"] is True
+            assert "extracted_content" in result
+            assert result["extracted_content"] is not None
+            try:
+                extracted = json.loads(result["extracted_content"])
+                if isinstance(extracted, list): extracted = extracted[0] # Handle list output
+                assert isinstance(extracted, dict)
+                assert "h1_title" in extracted # Check keys based on schema
+                assert "first_paragraph" in extracted
+                found_llm_extraction = True
+                print(f"LLM extracted from {result['url']}: Title='{extracted.get('h1_title')}'")
+            except (json.JSONDecodeError, AssertionError, IndexError, TypeError) as e:
+                pytest.fail(f"LLM extraction validation failed for {result['url']}: {e}\nContent: {result['extracted_content']}")
 
-    #     await assert_crawl_result_structure(result, check_ssl=True) # <-- Tell helper to check SSL field
-    #     assert result["success"] is True
-    #             # Check if SSL info was actually retrieved
-    #     if result["ssl_certificate"]:
-    #         # Assert directly using dictionary keys
-    #         assert isinstance(result["ssl_certificate"], dict) # Verify it's a dict
-    #         assert "issuer" in result["ssl_certificate"]
-    #         assert "subject" in result["ssl_certificate"]
-    #         # --- MODIFIED ASSERTIONS ---
-    #         assert "not_before" in result["ssl_certificate"] # Check for the actual key
-    #         assert "not_after" in result["ssl_certificate"]  # Check for the actual key
-    #         # --- END MODIFICATIONS ---
-    #         assert "fingerprint" in result["ssl_certificate"] # Check another key
+        assert found_llm_extraction, "LLM extraction did not yield expected data on any crawled page."
 
-    #         # This print statement using .get() already works correctly with dictionaries
-    #         print(f"SSL Issuer Org: {result['ssl_certificate'].get('issuer', {}).get('O', 'N/A')}")
-    #         print(f"SSL Valid From: {result['ssl_certificate'].get('not_before', 'N/A')}")
-    #     else:
-    #         # This part remains the same
-    #         print("SSL Certificate was null in the result.")
+
+    # 6. Deep Crawl with SSL Certificate Fetching
+    async def test_deep_crawl_with_ssl(self, async_client: httpx.AsyncClient):
+        """Test BFS deep crawl with fetch_ssl_certificate enabled."""
+        max_depth = 0 # Only fetch for start URL to keep test fast
+        max_pages = 1
+        payload = {
+            "urls": [DEEP_CRAWL_BASE_URL],
+            "browser_config": {"type": "BrowserConfig", "params": {"headless": True}},
+            "crawler_config": {
+                "type": "CrawlerRunConfig",
+                "params": {
+                    "stream": False,
+                    "cache_mode": "BYPASS",
+                    "fetch_ssl_certificate": True, # <-- Enable SSL fetching
+                    "deep_crawl_strategy": {
+                        "type": "BFSDeepCrawlStrategy",
+                        "params": {
+                            "max_depth": max_depth,
+                            "max_pages": max_pages,
+                        }
+                    }
+                }
+            }
+        }
+        response = await async_client.post("/crawl", json=payload)
+        response.raise_for_status()
+        data = response.json()
+
+        assert data["success"] is True
+        assert len(data["results"]) == 1
+        result = data["results"][0]
+
+        await assert_crawl_result_structure(result, check_ssl=True) # <-- Tell helper to check SSL field
+        assert result["success"] is True
+                # Check if SSL info was actually retrieved
+        if result["ssl_certificate"]:
+            # Assert directly using dictionary keys
+            assert isinstance(result["ssl_certificate"], dict) # Verify it's a dict
+            assert "issuer" in result["ssl_certificate"]
+            assert "subject" in result["ssl_certificate"]
+            # --- MODIFIED ASSERTIONS ---
+            assert "not_before" in result["ssl_certificate"] # Check for the actual key
+            assert "not_after" in result["ssl_certificate"]  # Check for the actual key
+            # --- END MODIFICATIONS ---
+            assert "fingerprint" in result["ssl_certificate"] # Check another key
+
+            # This print statement using .get() already works correctly with dictionaries
+            print(f"SSL Issuer Org: {result['ssl_certificate'].get('issuer', {}).get('O', 'N/A')}")
+            print(f"SSL Valid From: {result['ssl_certificate'].get('not_before', 'N/A')}")
+        else:
+            # This part remains the same
+            print("SSL Certificate was null in the result.")
 
 
     # 7. Deep Crawl with Proxy Rotation (Requires PROXIES env var)
