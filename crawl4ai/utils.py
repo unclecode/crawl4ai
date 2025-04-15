@@ -1656,44 +1656,22 @@ def perform_completion_with_backoff(
 
     for attempt in range(max_attempts):
         try:
-            response = completion(
+            return completion(
                 model=provider,
                 messages=[{"role": "user", "content": prompt_with_variables}],
                 **extra_args,
             )
-            return response  # Return the successful response
         except RateLimitError as e:
+            if attempt == max_attempts - 1:
+                # Last attempt failed, raise the error.
+                raise
+
             print("Rate limit error:", str(e))
 
-            # Check if we have exhausted our max attempts
-            if attempt < max_attempts - 1:
-                # Calculate the delay and wait
-                delay = base_delay * (2**attempt)  # Exponential backoff formula
-                print(f"Waiting for {delay} seconds before retrying...")
-                time.sleep(delay)
-            else:
-                # Return an error response after exhausting all retries
-                return [
-                    {
-                        "index": 0,
-                        "tags": ["error"],
-                        "content": ["Rate limit error. Please try again later."],
-                    }
-                ]
-        except Exception as e:
-            raise e  # Raise any other exceptions immediately
-            # print("Error during completion request:", str(e))
-            # error_message = e.message
-            # return [
-            #     {
-            #         "index": 0,
-            #         "tags": ["error"],
-            #         "content": [
-            #             f"Error during LLM completion request. {error_message}"
-            #         ],
-            #     }
-            # ]
-
+            # Otherwise, calculate delay and wait before the next attempt.
+            delay = base_delay * (2**attempt)  # Exponential backoff formula
+            print(f"Waiting for {delay} seconds before retrying...")
+            time.sleep(delay)
 
 def extract_blocks(url, html, provider=DEFAULT_PROVIDER, api_token=None, base_url=None):
     """
