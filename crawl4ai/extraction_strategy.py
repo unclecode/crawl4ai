@@ -492,7 +492,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
     """
     _UNWANTED_PROPS = {
             'provider' : 'Instead, use llm_config=LLMConfig(provider="...")',
-            'api_token' : 'Instead, use llm_config=LlMConfig(api_token="...")',
+            'api_token' : 'Instead, use llm_config=LLMConfig(api_token="...")',
             'base_url' : 'Instead, use llm_config=LLMConfig(base_url="...")',
             'api_base' : 'Instead, use llm_config=LLMConfig(base_url="...")',
         }
@@ -1074,7 +1074,7 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
 
     _GENERATE_SCHEMA_UNWANTED_PROPS = {
         'provider': 'Instead, use llm_config=LLMConfig(provider="...")',
-        'api_token': 'Instead, use llm_config=LlMConfig(api_token="...")',
+        'api_token': 'Instead, use llm_config=LLMConfig(api_token="...")',
     }
 
     @staticmethod
