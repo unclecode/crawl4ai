@@ -12,8 +12,8 @@ from dotenv import load_dotenv
 load_dotenv() # Load environment variables from .env file if present
 
 # --- Test Configuration ---
-BASE_URL = os.getenv("CRAWL4AI_TEST_URL", "http://localhost:11235") # Ensure this points to your running server
-BASE_URL = os.getenv("CRAWL4AI_TEST_URL", "http://localhost:8020") # Ensure this points to your running server
+BASE_URL = os.getenv("CRAWL4AI_TEST_URL", "http://localhost:11235") # If server is running in Docker, use the host's IP
+BASE_URL = os.getenv("CRAWL4AI_TEST_URL", "http://localhost:8020") # If server is running in dev debug mode
 DEEP_CRAWL_BASE_URL = "https://docs.crawl4ai.com/samples/deepcrawl/"
 DEEP_CRAWL_DOMAIN = "docs.crawl4ai.com" # Used for domain filter
 
