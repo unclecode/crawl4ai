@@ -4,6 +4,9 @@ from itertools import cycle
 import os
 
 
+########### ATTENTION PEOPLE OF EARTH ###########
+# I have moved this config to async_configs.py, kept it here, in case someone still importing it, however
+# be a dear and follow `from crawl4ai import ProxyConfig` instead :)
 class ProxyConfig:
     def __init__(
         self,
@@ -119,12 +122,12 @@ class ProxyRotationStrategy(ABC):
     """Base abstract class for proxy rotation strategies"""
     
     @abstractmethod
-    async def get_next_proxy(self) -> Optional[Dict]:
+    async def get_next_proxy(self) -> Optional[ProxyConfig]:
         """Get next proxy configuration from the strategy"""
         pass
 
     @abstractmethod
-    def add_proxies(self, proxies: List[Dict]):
+    def add_proxies(self, proxies: List[ProxyConfig]):
         """Add proxy configurations to the strategy"""
         pass
 

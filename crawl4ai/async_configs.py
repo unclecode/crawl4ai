@@ -5,6 +5,7 @@ from .config import (
     MIN_WORD_THRESHOLD,
     IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
     PROVIDER_MODELS,
+    PROVIDER_MODELS_PREFIXES,
     SCREENSHOT_HEIGHT_TRESHOLD,
     PAGE_TIMEOUT,
     IMAGE_SCORE_THRESHOLD,
@@ -27,11 +28,8 @@ import inspect
 from typing import Any, Dict, Optional
 from enum import Enum
 
-from .proxy_strategy import ProxyConfig
-try:
-    from .browser.models import DockerConfig
-except ImportError:
-    DockerConfig = None
+# from .proxy_strategy import ProxyConfig
+
 
 
 def to_serializable_dict(obj: Any, ignore_default_value : bool = False) -> Dict:
@@ -161,6 +159,117 @@ def is_empty_value(value: Any) -> bool:
         return True
     return False
 
+class ProxyConfig:
+    def __init__(
+        self,
+        server: str,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        ip: Optional[str] = None,
+    ):
+        """Configuration class for a single proxy.
+        
+        Args:
+            server: Proxy server URL (e.g., "http://127.0.0.1:8080")
+            username: Optional username for proxy authentication
+            password: Optional password for proxy authentication
+            ip: Optional IP address for verification purposes
+        """
+        self.server = server
+        self.username = username
+        self.password = password
+        
+        # Extract IP from server if not explicitly provided
+        self.ip = ip or self._extract_ip_from_server()
+    
+    def _extract_ip_from_server(self) -> Optional[str]:
+        """Extract IP address from server URL."""
+        try:
+            # Simple extraction assuming http://ip:port format
+            if "://" in self.server:
+                parts = self.server.split("://")[1].split(":")
+                return parts[0]
+            else:
+                parts = self.server.split(":")
+                return parts[0]
+        except Exception:
+            return None
+    
+    @staticmethod
+    def from_string(proxy_str: str) -> "ProxyConfig":
+        """Create a ProxyConfig from a string in the format 'ip:port:username:password'."""
+        parts = proxy_str.split(":")
+        if len(parts) == 4:  # ip:port:username:password
+            ip, port, username, password = parts
+            return ProxyConfig(
+                server=f"http://{ip}:{port}",
+                username=username,
+                password=password,
+                ip=ip
+            )
+        elif len(parts) == 2:  # ip:port only
+            ip, port = parts
+            return ProxyConfig(
+                server=f"http://{ip}:{port}",
+                ip=ip
+            )
+        else:
+            raise ValueError(f"Invalid proxy string format: {proxy_str}")
+    
+    @staticmethod
+    def from_dict(proxy_dict: Dict) -> "ProxyConfig":
+        """Create a ProxyConfig from a dictionary."""
+        return ProxyConfig(
+            server=proxy_dict.get("server"),
+            username=proxy_dict.get("username"),
+            password=proxy_dict.get("password"),
+            ip=proxy_dict.get("ip")
+        )
+    
+    @staticmethod
+    def from_env(env_var: str = "PROXIES") -> List["ProxyConfig"]:
+        """Load proxies from environment variable.
+        
+        Args:
+            env_var: Name of environment variable containing comma-separated proxy strings
+            
+        Returns:
+            List of ProxyConfig objects
+        """
+        proxies = []
+        try:
+            proxy_list = os.getenv(env_var, "").split(",")
+            for proxy in proxy_list:
+                if not proxy:
+                    continue
+                proxies.append(ProxyConfig.from_string(proxy))
+        except Exception as e:
+            print(f"Error loading proxies from environment: {e}")
+        return proxies
+    
+    def to_dict(self) -> Dict:
+        """Convert to dictionary representation."""
+        return {
+            "server": self.server,
+            "username": self.username,
+            "password": self.password,
+            "ip": self.ip
+        }
+    
+    def clone(self, **kwargs) -> "ProxyConfig":
+        """Create a copy of this configuration with updated values.
+
+        Args:
+            **kwargs: Key-value pairs of configuration options to update
+
+        Returns:
+            ProxyConfig: A new instance with the specified updates
+        """
+        config_dict = self.to_dict()
+        config_dict.update(kwargs)
+        return ProxyConfig.from_dict(config_dict)
+
+
 
 class BrowserConfig:
     """
@@ -197,8 +306,6 @@ class BrowserConfig:
                              Default: None.
         proxy_config (ProxyConfig or dict or None): Detailed proxy configuration, e.g. {"server": "...", "username": "..."}.
                                      If None, no additional proxy config. Default: None.
-        docker_config (DockerConfig or dict or None): Configuration for Docker-based browser automation.
-                                     Contains settings for Docker container operation. Default: None.
         viewport_width (int): Default viewport width for pages. Default: 1080.
         viewport_height (int): Default viewport height for pages. Default: 600.
         viewport (dict): Default viewport dimensions for pages. If set, overrides viewport_width and viewport_height.
@@ -244,7 +351,6 @@ class BrowserConfig:
         channel: str = "chromium",
         proxy: str = None,
         proxy_config: Union[ProxyConfig, dict, None] = None,
-        docker_config: Union[DockerConfig, dict, None] = None,
         viewport_width: int = 1080,
         viewport_height: int = 600,
         viewport: dict = None,
@@ -285,15 +391,7 @@ class BrowserConfig:
             self.chrome_channel = ""
         self.proxy = proxy
         self.proxy_config = proxy_config
-        
-        # Handle docker configuration
-        if isinstance(docker_config, dict) and DockerConfig is not None:
-            self.docker_config = DockerConfig.from_kwargs(docker_config)
-        else:
-            self.docker_config = docker_config
 
-        if self.docker_config:
-            self.user_data_dir = self.docker_config.user_data_dir
 
         self.viewport_width = viewport_width
         self.viewport_height = viewport_height
@@ -364,7 +462,6 @@ class BrowserConfig:
             channel=kwargs.get("channel", "chromium"),
             proxy=kwargs.get("proxy"),
             proxy_config=kwargs.get("proxy_config", None),
-            docker_config=kwargs.get("docker_config", None),
             viewport_width=kwargs.get("viewport_width", 1080),
             viewport_height=kwargs.get("viewport_height", 600),
             accept_downloads=kwargs.get("accept_downloads", False),
@@ -421,13 +518,7 @@ class BrowserConfig:
             "debugging_port": self.debugging_port,
             "host": self.host,
         }
-        
-        # Include docker_config if it exists
-        if hasattr(self, "docker_config") and self.docker_config is not None:
-            if hasattr(self.docker_config, "to_dict"):
-                result["docker_config"] = self.docker_config.to_dict()
-            else:
-                result["docker_config"] = self.docker_config
+
                 
         return result
 
@@ -1180,9 +1271,18 @@ class LLMConfig:
         elif api_token and api_token.startswith("env:"):
             self.api_token = os.getenv(api_token[4:])
         else:
-            self.api_token = PROVIDER_MODELS.get(provider, "no-token") or os.getenv(
-                DEFAULT_PROVIDER_API_KEY
-            )
+            # Check if given provider starts with any of key in PROVIDER_MODELS_PREFIXES
+            # If not, check if it is in PROVIDER_MODELS
+            prefixes = PROVIDER_MODELS_PREFIXES.keys()
+            if any(provider.startswith(prefix) for prefix in prefixes):
+                selected_prefix = next(
+                    (prefix for prefix in prefixes if provider.startswith(prefix)),
+                    None,
+                )
+                self.api_token = PROVIDER_MODELS_PREFIXES.get(selected_prefix)                    
+            else:
+                self.provider = DEFAULT_PROVIDER
+                self.api_token = os.getenv(DEFAULT_PROVIDER_API_KEY)
         self.base_url = base_url
         self.temprature = temprature
         self.max_tokens = max_tokens

@@ -36,7 +36,7 @@ from .markdown_generation_strategy import (
 )
 from .deep_crawling import DeepCrawlDecorator
 from .async_logger import AsyncLogger, AsyncLoggerBase
-from .async_configs import BrowserConfig, CrawlerRunConfig
+from .async_configs import BrowserConfig, CrawlerRunConfig, ProxyConfig
 from .async_dispatcher import *  # noqa: F403
 from .async_dispatcher import BaseDispatcher, MemoryAdaptiveDispatcher, RateLimiter
 
@@ -291,12 +291,12 @@ class AsyncWebCrawler:
 
                 # Update proxy configuration from rotation strategy if available
                 if config and config.proxy_rotation_strategy:
-                    next_proxy = await config.proxy_rotation_strategy.get_next_proxy()
+                    next_proxy : ProxyConfig = await config.proxy_rotation_strategy.get_next_proxy()
                     if next_proxy:
                         self.logger.info(
                             message="Switch proxy: {proxy}",
                             tag="PROXY",
-                            params={"proxy": next_proxy.server},
+                            params={"proxy": next_proxy.server} 
                         )
                         config.proxy_config = next_proxy
                         # config = config.clone(proxy_config=next_proxy)
