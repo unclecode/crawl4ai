@@ -1,5 +1,7 @@
 import sys
 import time
+import socket
+from typing import Generator, Any
 from httpx import codes
 import pytest
 
@@ -9,6 +11,7 @@ from crawl4ai.content_scraping_strategy import LXMLWebScrapingStrategy
 from crawl4ai.deep_crawling import BFSDeepCrawlStrategy
 
 from pytest_httpserver import HTTPServer
+from unittest.mock import patch
 
 
 URLS = [
@@ -19,6 +22,12 @@ URLS = [
 ]
 
 @pytest.fixture
+def mock_dns() -> Generator[None, Any, None]:
+    with patch('socket.gethostbyname') as mock_gethostbyname:
+        mock_gethostbyname.side_effect = lambda host: socket.gethostbyname('localhost' if host == 'www.localhost' else host)
+        yield
+
+@pytest.fixture
 def site(httpserver: HTTPServer) -> HTTPServer:
     """Fixture to serve multiple pages for a crawl."""
     httpserver.expect_request("/").respond_with_data(content_type="text/html", response_data="""
@@ -26,9 +35,12 @@ def site(httpserver: HTTPServer) -> HTTPServer:
         <a href="/level1">Go to level 1</a>
         </body></html>
     """)
-    httpserver.expect_request("/level1").respond_with_data(content_type="text/html", response_data="""
+    httpserver.expect_request("/level1").respond_with_data(content_type="text/html", response_data=f"""
         <html><body>
-        <a href="/level2/article1">Go to level 2 - Article 1</a>
+        <a href="/level2/article1">Go to level 2 - Article 1 (relative)</a>
+        <a href="{httpserver.url_for("/level2/article1")}">Go to level 2 - Article 1 (absolute)</a>
+        <a href="{httpserver.url_for("/level2/article1").replace("localhost", "www.localhost")}">Go to level 2 - Article 1 (absolute + www prefix)</a>
+        <a href="{httpserver.url_for("/level2/article1").replace("localhost", "localhost:80")}">Go to level 2 - Article 1 (absolute + schema port)</a>
         <a href="/level2/article2">Go to level 2 - Article 2</a>
         </body></html>
     """)
@@ -42,10 +54,12 @@ def site(httpserver: HTTPServer) -> HTTPServer:
         <p>This is level 2 - Article 2</p>
         </body></html>
     """)
+    httpserver.expect_request("/favicon.ico").respond_with_data(status=codes.NOT_FOUND)
+
     return httpserver
 
 @pytest.mark.asyncio
-async def test_deep_crawl_batch(site: HTTPServer):
+async def test_deep_crawl_batch(site: HTTPServer, mock_dns: Generator[None, Any, None]):
     config = CrawlerRunConfig(
         deep_crawl_strategy = BFSDeepCrawlStrategy(
             max_depth=2,
@@ -73,8 +87,10 @@ async def test_deep_crawl_batch(site: HTTPServer):
             assert result.url == site.url_for(URLS[idx])
             assert result.status_code == codes.OK
 
+    site.check_assertions()
+
 @pytest.mark.asyncio
-async def test_deep_crawl_stream(site: HTTPServer):
+async def test_deep_crawl_stream(site: HTTPServer, mock_dns: Generator[None, Any, None]):
     config = CrawlerRunConfig(
         deep_crawl_strategy = BFSDeepCrawlStrategy(
             max_depth=2,
@@ -105,6 +121,8 @@ async def test_deep_crawl_stream(site: HTTPServer):
             idx += 1
         print(f"Crawled {idx} pages")
         print(f"Duration: {time.perf_counter() - start_time:.2f} seconds")
+
+    site.check_assertions()
 
 if __name__ == "__main__":
     import subprocess

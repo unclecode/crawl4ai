@@ -10,7 +10,7 @@ from .filters import FilterChain
 from .scorers import URLScorer
 from . import DeepCrawlStrategy
 from ..types import AsyncWebCrawler, CrawlerRunConfig, CrawlResult
-from ..utils import normalize_url_for_deep_crawl
+from ..utils import normalize_url_for_deep_crawl, comparison_url
 from math import inf as infinity
 
 class BFSDeepCrawlStrategy(DeepCrawlStrategy):
@@ -96,34 +96,46 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
         if self.include_external:
             links += result.links.get("external", [])
 
-        valid_links = []
-        
+        valid_links: List[Tuple[str, float]] = []
+
         # First collect all valid links
+        seen: Set[str] = set()
         for link in links:
             url: Optional[str] = link.get("href")
             if not url:
                 continue
 
             # Strip URL fragments to avoid duplicate crawling
-            # base_url = url.split('#')[0] if url else url
-            base_url = normalize_url_for_deep_crawl(url, source_url)
-            if base_url in visited:
+            normalised_url = normalize_url_for_deep_crawl(url, source_url)
+            if normalised_url in visited or normalised_url in seen:
                 continue
+
+            # Check if we've seen this URL before, using the comparison URL.
+            comp_url: str = comparison_url(normalised_url)
+            if comp_url in visited or comp_url in seen:
+                continue
+
+            # Register as seen so we don't process it again, this avoids duplicates
+            # for URLs which have the same base domain, which would otherwise be
+            # added to next_depth multiple times. This also eliminates duplicate
+            # work in this loop processing the same URL multiple times.
+            seen.add(comp_url)
+
             if not await self.can_process_url(url, next_depth):
                 self.stats.urls_skipped += 1
                 continue
 
             # Score the URL if a scorer is provided
-            score = self.url_scorer.score(base_url) if self.url_scorer else 0
-            
+            score = self.url_scorer.score(normalised_url) if self.url_scorer else 0
+
             # Skip URLs with scores below the threshold
             if score < self.score_threshold:
                 self.logger.debug(f"URL {url} skipped: score {score} below threshold {self.score_threshold}")
                 self.stats.urls_skipped += 1
                 continue
-            
-            valid_links.append((base_url, score))
-        
+
+            valid_links.append((normalised_url, score))
+
         # If we have more valid links than capacity, sort by score and take the top ones
         if self.max_pages > 0 and len(valid_links) > remaining_capacity:
             if self.url_scorer:
@@ -162,7 +174,8 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
         while current_level and not self._cancel_event.is_set():
             next_level: List[Tuple[str, Optional[str]]] = []
             urls = [url for url, _ in current_level]
-            visited.update(urls)
+
+            visited.update([comparison_url(url) for url in urls])
 
             # Clone the config to disable deep crawling recursion and enforce batch mode.
             batch_config = config.clone(deep_crawl_strategy=None, stream=False)
@@ -204,7 +217,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
         while current_level and not self._cancel_event.is_set():
             next_level: List[Tuple[str, Optional[str]]] = []
             urls = [url for url, _ in current_level]
-            visited.update(urls)
+            visited.update([comparison_url(url) for url in urls])
 
             stream_config = config.clone(deep_crawl_strategy=None, stream=True)
             stream_gen = await crawler.arun_many(urls=urls, config=stream_config)

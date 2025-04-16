@@ -1974,8 +1974,6 @@ def fast_format_html(html_string):
 
 def normalize_url(href, base_url):
     """Normalize URLs to ensure consistent format"""
-    from urllib.parse import urljoin, urlparse
-
     # Parse base URL to get components
     parsed_base = urlparse(base_url)
     if not parsed_base.scheme or not parsed_base.netloc:
@@ -1988,46 +1986,25 @@ def normalize_url(href, base_url):
 
 def normalize_url_for_deep_crawl(href: str, base_url: str) -> str:
     """Normalize URLs to ensure consistent format"""
-    from urllib.parse import urljoin, urlparse, urlunparse, parse_qs, urlencode
 
     # Use urljoin to handle relative URLs
     full_url = urljoin(base_url, href.strip())
     
     # Parse the URL for normalization
-    parsed = urlparse(full_url)
-    
-    # Convert hostname to lowercase
-    netloc = parsed.netloc.lower()
-    
-    # Remove fragment entirely
-    fragment = ''
-    
-    # Normalize query parameters if needed
-    query = parsed.query
-    if query:
-        # Parse query parameters
-        params = parse_qs(query)
-        
-        # Remove tracking parameters (example - customize as needed)
-        tracking_params = ['utm_source', 'utm_medium', 'utm_campaign', 'ref', 'fbclid']
-        for param in tracking_params:
-            if param in params:
-                del params[param]
-                
-        # Rebuild query string, sorted for consistency
-        query = urlencode(params, doseq=True) if params else ''
-    
+    parsed: ParseResult = urlparse(full_url)
+
     # Build normalized URL
     normalized = urlunparse((
         parsed.scheme,
-        netloc,
+        normalize_netloc(parsed),
         parsed.path.rstrip('/') or '/',  # Normalize trailing slash
         parsed.params,
-        query,
-        fragment
+        normalize_query(parsed.query),
+        "", # Remove fragment entirely
     ))
-    
+
     return normalized
+
 
 @lru_cache(maxsize=10000)
 def efficient_normalize_url_for_deep_crawl(href, base_url):
@@ -2152,6 +2129,91 @@ def get_base_domain(url: str) -> str:
     except Exception:
         return ""
 
+def normalize_netloc(parsed: ParseResult, remove_www: bool = False) -> str:
+    """
+    Normalize the netloc (network location) of a parsed URL.
+
+    Ensures the netloc is in lowercase, removes the port if it matches the
+    default for the scheme, and optionally removes the 'www.' prefix.
+
+    If remove_www is True, the returned netloc may not result in a valid URL
+    or one which would result in the same content being fetched. If should
+    only be used for comparison purposes.
+
+    Args:
+        parsed (ParseResult): The parsed URL.
+        remove_www (bool): Whether to remove the 'www.' prefix. Defaults to False.
+    Returns:
+        str: The normalized netloc.
+    """
+    netloc: str = parsed.netloc.lower()
+    if not netloc:
+        return ""
+
+    # Remove port.
+    netloc = netloc.split(":")[0]
+    if remove_www:
+        netloc = netloc.removeprefix("www.")
+
+    port = parsed.port
+    if port is not None and port != DEFAULT_PORTS.get(parsed.scheme):
+        # Port needed.
+        netloc = f"{netloc}:{port}"
+
+    return netloc
+
+def normalize_query(query: str) -> str:
+    """
+    Normalize the query parameters of a parsed URL.
+    Ensures that tracking parameters are removed and the query string is
+    sorted for consistency.
+    Args:
+        parsed (ParseResult): The parsed URL.
+    Returns:
+        str: The normalized query string.
+    """
+    from urllib.parse import parse_qs, urlencode
+
+    if not query:
+        return ""
+
+    # Parse query parameters
+    params = parse_qs(query)
+
+    # Remove tracking parameters (example - customize as needed)
+    tracking_params = ['utm_source', 'utm_medium', 'utm_campaign', 'ref', 'fbclid']
+    for param in tracking_params:
+        if param in params:
+            del params[param]
+
+    # Rebuild query string, sorted for consistency
+    return urlencode(params, doseq=True) if params else ""
+
+def comparison_url(url: str) -> str:
+    """
+    Return a URL which can be used for comparison purposes only.
+
+    The returned URL is not guaranteed to be valid or to result in the
+    same content being fetched as the original.
+
+    Args:
+        url (str): The URL to normalize.
+
+    Returns:
+        str: The comparison URL or the original URL if parsing fails.
+    """
+    try:
+        parsed: ParseResult = urlparse(url)
+        return urlunparse((
+            "https",
+            normalize_netloc(parsed, remove_www=True),
+            parsed.path,
+            parsed.params,
+            normalize_query(parsed.query),
+            ""
+        ))
+    except Exception:
+        return url
 
 def is_external_url(url: str, base_domain: str) -> bool:
     """
@@ -2753,8 +2815,8 @@ def preprocess_html_for_schema(html_content, text_threshold=100, attr_value_thre
             return result[:max_size] + "..."
             
         return result
-    
-    except Exception as e:
+
+    except Exception:
         # Fallback for parsing errors
         return html_content[:max_size] if len(html_content) > max_size else html_content
     
