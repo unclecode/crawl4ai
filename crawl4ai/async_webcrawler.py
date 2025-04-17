@@ -47,6 +47,7 @@ from .utils import (
     create_box_message,
     get_error_context,
     RobotsParser,
+    preprocess_html_for_schema,
 )
 
 
@@ -512,13 +513,48 @@ class AsyncWebCrawler:
             config.markdown_generator or DefaultMarkdownGenerator()
         )
 
+        # --- SELECT HTML SOURCE BASED ON CONTENT_SOURCE ---
+        # Get the desired source from the generator config, default to 'cleaned_html'
+        selected_html_source = getattr(markdown_generator, 'content_source', 'cleaned_html')
+
+        # Define the source selection logic using dict dispatch
+        html_source_selector = {
+            "raw_html": lambda: html,  # The original raw HTML
+            "cleaned_html": lambda: cleaned_html,  # The HTML after scraping strategy
+            "fit_html": lambda: preprocess_html_for_schema(html_content=html),  # Preprocessed raw HTML
+        }
+
+        markdown_input_html = cleaned_html  # Default to cleaned_html
+
+        try:
+            # Get the appropriate lambda function, default to returning cleaned_html if key not found
+            source_lambda = html_source_selector.get(selected_html_source, lambda: cleaned_html)
+            # Execute the lambda to get the selected HTML
+            markdown_input_html = source_lambda()
+
+            # Log which source is being used (optional, but helpful for debugging)
+            if self.logger and verbose:
+                actual_source_used = selected_html_source if selected_html_source in html_source_selector else 'cleaned_html (default)'
+                self.logger.debug(f"Using '{actual_source_used}' as source for Markdown generation for {url}", tag="MARKDOWN_SRC")
+
+        except Exception as e:
+            # Handle potential errors, especially from preprocess_html_for_schema
+            if self.logger:
+                self.logger.warning(
+                    f"Error getting/processing '{selected_html_source}' for markdown source: {e}. Falling back to cleaned_html.",
+                    tag="MARKDOWN_SRC"
+                )
+            # Ensure markdown_input_html is still the default cleaned_html in case of error
+            markdown_input_html = cleaned_html
+        # --- END: HTML SOURCE SELECTION ---
+
         # Uncomment if by default we want to use PruningContentFilter
         # if not config.content_filter and not markdown_generator.content_filter:
         #     markdown_generator.content_filter = PruningContentFilter()
 
         markdown_result: MarkdownGenerationResult = (
             markdown_generator.generate_markdown(
-                cleaned_html=cleaned_html,
+                input_html=markdown_input_html,
                 base_url=url,
                 # html2text_options=kwargs.get('html2text', {})
             )
