@@ -111,7 +111,8 @@ class AsyncWebCrawler:
         self,
         crawler_strategy: AsyncCrawlerStrategy = None,
         config: BrowserConfig = None,
-        base_directory: str = str(os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home())),
+        base_directory: str = str(
+            os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home())),
         thread_safe: bool = False,
         logger: AsyncLoggerBase = None,
         **kwargs,
@@ -139,7 +140,8 @@ class AsyncWebCrawler:
         )
 
         # Initialize crawler strategy
-        params = {k: v for k, v in kwargs.items() if k in ["browser_config", "logger"]}
+        params = {k: v for k, v in kwargs.items() if k in [
+            "browser_config", "logger"]}
         self.crawler_strategy = crawler_strategy or AsyncPlaywrightCrawlerStrategy(
             browser_config=browser_config,
             logger=self.logger,
@@ -237,7 +239,8 @@ class AsyncWebCrawler:
 
         config = config or CrawlerRunConfig()
         if not isinstance(url, str) or not url:
-            raise ValueError("Invalid URL, make sure the URL is a non-empty string")
+            raise ValueError(
+                "Invalid URL, make sure the URL is a non-empty string")
 
         async with self._lock or self.nullcontext():
             try:
@@ -291,12 +294,12 @@ class AsyncWebCrawler:
 
                 # Update proxy configuration from rotation strategy if available
                 if config and config.proxy_rotation_strategy:
-                    next_proxy : ProxyConfig = await config.proxy_rotation_strategy.get_next_proxy()
+                    next_proxy: ProxyConfig = await config.proxy_rotation_strategy.get_next_proxy()
                     if next_proxy:
                         self.logger.info(
                             message="Switch proxy: {proxy}",
                             tag="PROXY",
-                            params={"proxy": next_proxy.server} 
+                            params={"proxy": next_proxy.server}
                         )
                         config.proxy_config = next_proxy
                         # config = config.clone(proxy_config=next_proxy)
@@ -306,7 +309,8 @@ class AsyncWebCrawler:
                     t1 = time.perf_counter()
 
                     if config.user_agent:
-                        self.crawler_strategy.update_user_agent(config.user_agent)
+                        self.crawler_strategy.update_user_agent(
+                            config.user_agent)
 
                     # Check robots.txt if enabled
                     if config and config.check_robots_txt:
@@ -372,7 +376,8 @@ class AsyncWebCrawler:
                     crawl_result.console_messages = async_response.console_messages
 
                     crawl_result.success = bool(html)
-                    crawl_result.session_id = getattr(config, "session_id", None)
+                    crawl_result.session_id = getattr(
+                        config, "session_id", None)
 
                     self.logger.success(
                         message="{url:.50}... | Status: {status} | Total: {timing}",
@@ -407,7 +412,8 @@ class AsyncWebCrawler:
                     )
 
                     cached_result.success = bool(html)
-                    cached_result.session_id = getattr(config, "session_id", None)
+                    cached_result.session_id = getattr(
+                        config, "session_id", None)
                     cached_result.redirected_url = cached_result.redirected_url or url
                     return CrawlResultContainer(cached_result)
 
@@ -474,12 +480,14 @@ class AsyncWebCrawler:
             params = config.__dict__.copy()
             params.pop("url", None)
             # add keys from kwargs to params that doesn't exist in params
-            params.update({k: v for k, v in kwargs.items() if k not in params.keys()})
+            params.update({k: v for k, v in kwargs.items()
+                          if k not in params.keys()})
 
             ################################
             # Scraping Strategy Execution  #
             ################################
-            result: ScrapingResult = scraping_strategy.scrap(url, html, **params)
+            result: ScrapingResult = scraping_strategy.scrap(
+                url, html, **params)
 
             if result is None:
                 raise ValueError(
@@ -495,7 +503,8 @@ class AsyncWebCrawler:
 
         # Extract results - handle both dict and ScrapingResult
         if isinstance(result, dict):
-            cleaned_html = sanitize_input_encode(result.get("cleaned_html", ""))
+            cleaned_html = sanitize_input_encode(
+                result.get("cleaned_html", ""))
             media = result.get("media", {})
             links = result.get("links", {})
             metadata = result.get("metadata", {})
