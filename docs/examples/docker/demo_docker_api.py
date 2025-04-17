@@ -16,8 +16,8 @@ load_dotenv()  # Load environment variables from .env file
 console = Console()
 
 # --- Configuration ---
-BASE_URL = os.getenv("CRAWL4AI_TEST_URL", "http://localhost:11235")
 BASE_URL = os.getenv("CRAWL4AI_TEST_URL", "http://localhost:8020")
+BASE_URL = os.getenv("CRAWL4AI_TEST_URL", "http://localhost:11235")
 # Target URLs
 SIMPLE_URL = "https://httpbin.org/html"
 LINKS_URL = "https://httpbin.org/links/10/0"
@@ -50,8 +50,14 @@ async def check_server_health(client: httpx.AsyncClient):
         return False
 
 def print_payload(payload: Dict[str, Any]):
-    """Prints the JSON payload nicely."""
-    syntax = Syntax(json.dumps(payload, indent=2), "json", theme="default", line_numbers=False)
+    """Prints the JSON payload nicely with a dark theme."""
+    syntax = Syntax(
+        json.dumps(payload, indent=2),
+        "json",
+        theme="monokai",  # <--- Changed theme here
+        line_numbers=False,
+        word_wrap=True      # Added word wrap for potentially long payloads
+    )
     console.print(Panel(syntax, title="Request Payload", border_style="blue", expand=False))
 
 def print_result_summary(results: List[Dict[str, Any]], title: str = "Crawl Results Summary", max_items: int = 3):
@@ -126,12 +132,15 @@ async def stream_request(client: httpx.AsyncClient, endpoint: str, payload: Dict
     print_payload(payload)
     console.print(f"Sending POST stream request to {client.base_url}{endpoint}...")
     all_results = []
+    initial_status_code = None # Store initial status code
+
     try:
         start_time = time.time()
         async with client.stream("POST", endpoint, json=payload) as response:
+            initial_status_code = response.status_code # Capture initial status
             duration = time.time() - start_time # Time to first byte potentially
-            console.print(f"Initial Response Status: [bold {'green' if response.status_code == 200 else 'red'}]{response.status_code}[/] (first byte ~{duration:.2f}s)")
-            response.raise_for_status()
+            console.print(f"Initial Response Status: [bold {'green' if response.is_success else 'red'}]{initial_status_code}[/] (first byte ~{duration:.2f}s)")
+            response.raise_for_status() # Raise exception for bad *initial* status codes
 
             console.print("[magenta]--- Streaming Results ---[/]")
             completed = False
@@ -143,11 +152,16 @@ async def stream_request(client: httpx.AsyncClient, endpoint: str, payload: Dict
                             completed = True
                             console.print("[bold green]--- Stream Completed ---[/]")
                             break
-                        elif data.get("url"): # Looks like a result
+                        elif data.get("url"): # Looks like a result dictionary
                             all_results.append(data)
+                            # Display summary info as it arrives
                             success_icon = "[green]✔[/]" if data.get('success') else "[red]✘[/]"
                             url = data.get('url', 'N/A')
-                            console.print(f"  {success_icon} Received: [link={url}]{url}[/link]")
+                            # Display status code FROM THE RESULT DATA if available
+                            result_status = data.get('status_code', 'N/A')
+                            console.print(f"  {success_icon} Received: [link={url}]{url}[/link] (Status: {result_status})")
+                            if not data.get('success') and data.get('error_message'):
+                                console.print(f"    [red]Error: {data['error_message']}[/]")
                         else:
                             console.print(f"  [yellow]Stream meta-data:[/yellow] {data}")
                     except json.JSONDecodeError:
@@ -156,8 +170,10 @@ async def stream_request(client: httpx.AsyncClient, endpoint: str, payload: Dict
                  console.print("[bold yellow]Warning: Stream ended without 'completed' marker.[/]")
 
     except httpx.HTTPStatusError as e:
-        console.print(f"[bold red]HTTP Error:[/]")
-        console.print(f"Status: {e.response.status_code}")
+        # Use the captured initial status code if available, otherwise from the exception
+        status = initial_status_code if initial_status_code is not None else e.response.status_code
+        console.print(f"[bold red]HTTP Error (Initial Request):[/]")
+        console.print(f"Status: {status}")
         try:
             console.print(Panel(Syntax(json.dumps(e.response.json(), indent=2), "json", theme="default"), title="Error Response"))
         except json.JSONDecodeError:
@@ -165,10 +181,11 @@ async def stream_request(client: httpx.AsyncClient, endpoint: str, payload: Dict
     except httpx.RequestError as e:
         console.print(f"[bold red]Request Error: {e}[/]")
     except Exception as e:
-        console.print(f"[bold red]Unexpected Error: {e}[/]")
+        console.print(f"[bold red]Unexpected Error during streaming: {e}[/]")
+        console.print_exception(show_locals=False) # Print stack trace for unexpected errors
 
+    # Call print_result_summary with the *collected* results AFTER the stream is done
     print_result_summary(all_results, title=f"{title} Collected Results")
-
 
 def load_proxies_from_env() -> List[Dict]:
     """
@@ -583,7 +600,7 @@ async def demo_extract_llm(client: httpx.AsyncClient):
 
             if isinstance(extracted_data, dict):
                  console.print("[cyan]Extracted Data (LLM):[/]")
-                 syntax = Syntax(json.dumps(extracted_data, indent=2), "json", theme="default", line_numbers=False)
+                 syntax = Syntax(json.dumps(extracted_data, indent=2), "json", theme="monokai", line_numbers=False)
                  console.print(Panel(syntax, border_style="cyan", expand=False))
             else:
                  console.print("[yellow]LLM extraction did not return expected dictionary.[/]")
@@ -618,6 +635,12 @@ async def demo_deep_basic(client: httpx.AsyncClient):
     }
     results = await make_request(client, "/crawl", payload, "Demo 5a: Basic Deep Crawl")
     # print_result_summary is called by make_request, showing URLs and depths
+    for result in results:
+        if result.get("success") and result.get("metadata"):
+            depth = result["metadata"].get("depth", "N/A")
+            console.print(f"  Depth: {depth}")
+        elif not result.get("success"):
+            console.print(f"  [red]Error: {result['error_message']}[/]")
 
 # 5. Streaming Deep Crawl
 async def demo_deep_streaming(client: httpx.AsyncClient):
@@ -645,6 +668,109 @@ async def demo_deep_streaming(client: httpx.AsyncClient):
     }
     # stream_request handles printing results as they arrive
     await stream_request(client, "/crawl/stream", payload, "Demo 5b: Streaming Deep Crawl")
+
+# 5a. Deep Crawl with Filtering & Scoring
+async def demo_deep_filtering_scoring(client: httpx.AsyncClient):
+    """Demonstrates deep crawl with advanced URL filtering and scoring."""
+    max_depth = 2 # Go a bit deeper to see scoring/filtering effects
+    max_pages = 6
+    excluded_pattern = "*/category-1/*" # Example pattern to exclude
+    keyword_to_score = "product"        # Example keyword to prioritize
+
+    payload = {
+        "urls": [DEEP_CRAWL_BASE_URL],
+        "browser_config": {"type": "BrowserConfig", "params": {"headless": True}},
+        "crawler_config": {
+            "type": "CrawlerRunConfig",
+            "params": {
+                "stream": False,
+                "cache_mode": "BYPASS",
+                "deep_crawl_strategy": {
+                    "type": "BFSDeepCrawlStrategy",
+                    "params": {
+                        "max_depth": max_depth,
+                        "max_pages": max_pages,
+                        "filter_chain": {
+                            "type": "FilterChain",
+                            "params": {
+                                "filters": [
+                                    {   # Stay on the allowed domain
+                                        "type": "DomainFilter",
+                                        "params": {"allowed_domains": [DEEP_CRAWL_DOMAIN]}
+                                    },
+                                    {   # Only crawl HTML pages
+                                        "type": "ContentTypeFilter",
+                                        "params": {"allowed_types": ["text/html"]}
+                                    },
+                                    {   # Exclude URLs matching the pattern
+                                        "type": "URLPatternFilter",
+                                        "params": {
+                                            "patterns": [excluded_pattern],
+                                            "reverse": True # Block if match
+                                        }
+                                    }
+                                ]
+                            }
+                        },
+                        "url_scorer": {
+                            "type": "CompositeScorer",
+                            "params": {
+                                "scorers": [
+                                    {   # Boost score for URLs containing the keyword
+                                        "type": "KeywordRelevanceScorer",
+                                        "params": {"keywords": [keyword_to_score], "weight": 1.5} # Higher weight
+                                    },
+                                    {   # Slightly penalize deeper pages
+                                        "type": "PathDepthScorer",
+                                        "params": {"optimal_depth": 1, "weight": -0.1}
+                                    }
+                                ]
+                            }
+                        },
+                        # Optional: Only crawl URLs scoring above a threshold
+                        # "score_threshold": 0.1
+                    }
+                }
+            }
+        }
+    }
+    results = await make_request(client, "/crawl", payload, "Demo 5c: Deep Crawl with Filtering & Scoring")
+
+    # --- Verification/Analysis ---
+    if results:
+        console.print("[cyan]Deep Crawl Filtering/Scoring Analysis:[/]")
+        excluded_found = False
+        prioritized_found_at_depth1 = False
+        prioritized_found_overall = False
+
+        for result in results:
+            url = result.get("url", "")
+            depth = result.get("metadata", {}).get("depth", -1)
+
+            # Check Filtering
+            if excluded_pattern.strip('*') in url: # Check if the excluded part is present
+                console.print(f"  [bold red]Filter FAILED:[/bold red] Excluded pattern part '{excluded_pattern.strip('*')}' found in URL: {url}")
+                excluded_found = True
+
+            # Check Scoring (Observation)
+            if keyword_to_score in url:
+                 prioritized_found_overall = True
+                 if depth == 1: # Check if prioritized keywords appeared early (depth 1)
+                     prioritized_found_at_depth1 = True
+
+        if not excluded_found:
+             console.print(f"  [green]Filter Check:[/green] No URLs matching excluded pattern '{excluded_pattern}' found.")
+        else:
+             console.print(f"  [red]Filter Check:[/red] URLs matching excluded pattern '{excluded_pattern}' were found (unexpected).")
+
+        if prioritized_found_at_depth1:
+            console.print(f"  [green]Scoring Check:[/green] URLs with keyword '{keyword_to_score}' were found at depth 1 (scoring likely influenced).")
+        elif prioritized_found_overall:
+            console.print(f"  [yellow]Scoring Check:[/yellow] URLs with keyword '{keyword_to_score}' found, but not necessarily prioritized early (check max_pages/depth limits).")
+        else:
+             console.print(f"  [yellow]Scoring Check:[/yellow] No URLs with keyword '{keyword_to_score}' found within crawl limits.")
+
+        # print_result_summary called by make_request already shows URLs and depths
 
 # 6. Deep Crawl with Extraction
 async def demo_deep_with_css_extraction(client: httpx.AsyncClient):
@@ -782,16 +908,26 @@ async def demo_deep_with_proxy(client: httpx.AsyncClient):
                 "deep_crawl_strategy": {
                     "type": "BFSDeepCrawlStrategy",
                     "params": {
-                        "max_depth": 0, # Just crawl start URL via proxy
-                        "max_pages": 1,
+                        "max_depth": 1, # Just crawl start URL via proxy
+                        "max_pages": 5,
                     }
                 }
             }
         }
     }
     # make_request calls print_result_summary, which shows URL and success status
-    await make_request(client, "/crawl", payload, "Demo 6c: Deep Crawl + Proxies")
+    results = await make_request(client, "/crawl", payload, "Demo 6c: Deep Crawl + Proxies")
+    if not results:
+        console.print("[red]No results returned from the crawl.[/]")
+        return
+    console.print("[cyan]Proxy Usage Summary from Deep Crawl:[/]")
     # Verification of specific proxy IP usage would require more complex setup or server logs.
+    for result in results:
+        if result.get("success") and result.get("metadata"):
+            proxy_ip = result["metadata"].get("proxy_ip", "N/A")
+            console.print(f"  Proxy IP used: {proxy_ip}")
+        elif not result.get("success"):
+            console.print(f"  [red]Error: {result['error_message']}[/]")
 
 
 # 6d. Deep Crawl with SSL Certificate Fetching
@@ -844,26 +980,26 @@ async def main_demo():
             return
 
         # --- Run Demos ---
-        # await demo_basic_single_url(client)
-        # await demo_basic_multi_url(client)
-        # await demo_streaming_multi_url(client)
+        await demo_basic_single_url(client)
+        await demo_basic_multi_url(client)
+        await demo_streaming_multi_url(client)
 
-        # await demo_markdown_default(client)
-        # await demo_markdown_pruning(client)
-        # await demo_markdown_bm25(client)
+        await demo_markdown_default(client)
+        await demo_markdown_pruning(client)
+        await demo_markdown_bm25(client)
 
-        # await demo_param_css_selector(client)
-        # await demo_param_js_execution(client)
-        # await demo_param_screenshot(client)
-        # await demo_param_ssl_fetch(client)
-        # await demo_param_proxy(client) # Skips if no PROXIES env var
+        await demo_param_css_selector(client)
+        await demo_param_js_execution(client)
+        await demo_param_screenshot(client)
+        await demo_param_ssl_fetch(client)
+        await demo_param_proxy(client) # Skips if no PROXIES env var
 
-        # await demo_extract_css(client)
+        await demo_extract_css(client)
         await demo_extract_llm(client) # Skips if no common LLM key env var
 
         await demo_deep_basic(client)
-        await demo_deep_streaming(client)
-        # demo_deep_filtering_scoring skipped for brevity, add if needed
+        await demo_deep_streaming(client) # This need extra work
+        
 
         await demo_deep_with_css_extraction(client)
         await demo_deep_with_llm_extraction(client) # Skips if no common LLM key env var
