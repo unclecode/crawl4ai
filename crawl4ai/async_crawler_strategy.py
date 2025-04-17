@@ -1162,11 +1162,31 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             num_segments = (page_height // viewport_height) + 1
             for i in range(num_segments):
                 y_offset = i * viewport_height
+                # Special handling for the last segment
+                if i == num_segments - 1:
+                    last_part_height = page_height % viewport_height
+                    
+                    # If page_height is an exact multiple of viewport_height,
+                    # we don't need an extra segment
+                    if last_part_height == 0:
+                        # Skip last segment if page height is exact multiple of viewport
+                        break
+                    
+                    # Adjust viewport to exactly match the remaining content height
+                    await page.set_viewport_size({"width": page_width, "height": last_part_height})
+                
                 await page.evaluate(f"window.scrollTo(0, {y_offset})")
                 await asyncio.sleep(0.01)  # wait for render
-                seg_shot = await page.screenshot(full_page=False)
+                
+                # Capture the current segment
+                # Note: Using compression options (format, quality) would go here
+                seg_shot = await page.screenshot(full_page=False, type="jpeg", quality=85)
+                # seg_shot = await page.screenshot(full_page=False)
                 img = Image.open(BytesIO(seg_shot)).convert("RGB")
                 segments.append(img)
+
+            # Reset viewport to original size after capturing segments
+            await page.set_viewport_size({"width": page_width, "height": viewport_height})
 
             total_height = sum(img.height for img in segments)
             stitched = Image.new("RGB", (segments[0].width, total_height))
