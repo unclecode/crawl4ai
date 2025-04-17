@@ -5,6 +5,13 @@ All notable changes to Crawl4AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+### [Added] 2025-04-17
+- Added content source selection feature for markdown generation
+  - New `content_source` parameter allows choosing between `cleaned_html`, `raw_html`, and `fit_html`
+  - Provides flexibility in how HTML content is processed before markdown conversion
+  - Added examples and documentation for the new feature
+  - Includes backward compatibility with default `cleaned_html` behavior
+  
 ## Version 0.5.0.post5 (2025-03-14)
 
 ### Added

@@ -2,6 +2,47 @@
 
 This journal tracks significant feature additions, bug fixes, and architectural decisions in the crawl4ai project. It serves as both documentation and a historical record of the project's evolution.
 
+## [2025-04-17] Added Content Source Selection for Markdown Generation
+
+**Feature:** Configurable content source for markdown generation
+
+**Changes Made:**
+1. Added `content_source: str = "cleaned_html"` parameter to `MarkdownGenerationStrategy` class
+2. Updated `DefaultMarkdownGenerator` to accept and pass the content source parameter
+3. Renamed the `cleaned_html` parameter to `input_html` in the `generate_markdown` method
+4. Modified `AsyncWebCrawler.aprocess_html` to select the appropriate HTML source based on the generator's config
+5. Added `preprocess_html_for_schema` import in `async_webcrawler.py`
+
+**Implementation Details:**
+- Added a new `content_source` parameter to specify which HTML input to use for markdown generation
+- Options include: "cleaned_html" (default), "raw_html", and "fit_html"
+- Used a dictionary dispatch pattern in `aprocess_html` to select the appropriate HTML source
+- Added proper error handling with fallback to cleaned_html if content source selection fails
+- Ensured backward compatibility by defaulting to "cleaned_html" option
+
+**Files Modified:**
+- `crawl4ai/markdown_generation_strategy.py`: Added content_source parameter and updated the method signature
+- `crawl4ai/async_webcrawler.py`: Added HTML source selection logic and updated imports
+
+**Examples:**
+- Created `docs/examples/content_source_example.py` demonstrating how to use the new parameter
+
+**Challenges:**
+- Maintaining backward compatibility while reorganizing the parameter flow
+- Ensuring proper error handling for all content source options
+- Making the change with minimal code modifications
+
+**Why This Feature:**
+The content source selection feature allows users to choose which HTML content to use as input for markdown generation:
+1. "cleaned_html" - Uses the post-processed HTML after scraping strategy (original behavior)
+2. "raw_html" - Uses the original raw HTML directly from the web page
+3. "fit_html" - Uses the preprocessed HTML optimized for schema extraction
+
+This feature provides greater flexibility in how users generate markdown, enabling them to:
+- Capture more detailed content from the original HTML when needed
+- Use schema-optimized HTML when working with structured data
+- Choose the approach that best suits their specific use case
+
 ## [2025-04-09] Added MHTML Capture Feature
 
 **Feature:** MHTML snapshot capture of crawled pages
