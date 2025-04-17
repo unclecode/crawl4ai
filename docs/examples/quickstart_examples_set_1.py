@@ -4,7 +4,7 @@ import json
 import base64
 from pathlib import Path
 from typing import List
-from crawl4ai.proxy_strategy import ProxyConfig
+from crawl4ai import ProxyConfig
 
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode, CrawlResult
 from crawl4ai import RoundRobinProxyStrategy

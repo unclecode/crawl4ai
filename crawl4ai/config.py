@@ -29,6 +29,14 @@ PROVIDER_MODELS = {
     'gemini/gemini-2.0-flash-lite-preview-02-05': os.getenv("GEMINI_API_KEY"),
     "deepseek/deepseek-chat": os.getenv("DEEPSEEK_API_KEY"),
 }
+PROVIDER_MODELS_PREFIXES = {
+    "ollama": "no-token-needed",  # Any model from Ollama no need for API token
+    "groq": os.getenv("GROQ_API_KEY"),
+    "openai": os.getenv("OPENAI_API_KEY"),
+    "anthropic": os.getenv("ANTHROPIC_API_KEY"),
+    "gemini": os.getenv("GEMINI_API_KEY"),
+    "deepseek": os.getenv("DEEPSEEK_API_KEY"),
+}
 
 # Chunk token threshold
 CHUNK_TOKEN_THRESHOLD = 2**11  # 2048 tokens

@@ -7,10 +7,11 @@ docs_dir: docs/md_v2
 
 nav:
   - Home: 'index.md'
+  - "Ask AI": "core/ask-ai.md"
+  - "Quick Start": "core/quickstart.md"
   - Setup & Installation:
     - "Installation": "core/installation.md"
     - "Docker Deployment": "core/docker-deployment.md"
-  - "Quick Start": "core/quickstart.md"
   - "Blog & Changelog":
     - "Blog Home": "blog/index.md"
     - "Changelog": "https://github.com/unclecode/crawl4ai/blob/main/CHANGELOG.md"
@@ -76,6 +77,7 @@ extra:
   version: !ENV [CRAWL4AI_VERSION, 'development']
 
 extra_css:
+  - assets/layout.css
   - assets/styles.css
   - assets/highlight.css
   - assets/dmvendor.css
@@ -84,3 +86,8 @@ extra_javascript:
   - assets/highlight.min.js
   - assets/highlight_init.js
   - https://buttons.github.io/buttons.js
+  - assets/toc.js
+  - assets/github_stats.js 
+  - assets/selection_ask_ai.js
+  - assets/copy_code.js
+  - assets/floating_ask_ai_button.js

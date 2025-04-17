@@ -40,10 +40,25 @@ def setup_home_directory():
             f.write("")
 
 def post_install():
-    """Run all post-installation tasks"""
+    """
+    Run all post-installation tasks.
+    Checks CRAWL4AI_MODE environment variable. If set to 'api',
+    skips Playwright browser installation.
+    """
     logger.info("Running post-installation setup...", tag="INIT")
     setup_home_directory()
-    install_playwright()
+
+    # Check environment variable to conditionally skip Playwright install
+    run_mode = os.getenv('CRAWL4AI_MODE')
+    if run_mode == 'api':
+        logger.warning(
+            "CRAWL4AI_MODE=api detected. Skipping Playwright browser installation.",
+            tag="SETUP"
+        )
+    else:
+        # Proceed with installation only if mode is not 'api'
+        install_playwright()
+
     run_migration()
     # TODO: Will be added in the future
     # setup_builtin_browser()

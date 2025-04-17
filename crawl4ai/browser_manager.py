@@ -94,6 +94,7 @@ class ManagedBrowser:
         host: str = "localhost",
         debugging_port: int = 9222,
         cdp_url: Optional[str] = None, 
+        browser_config: Optional[BrowserConfig] = None,
     ):
         """
         Initialize the ManagedBrowser instance.
@@ -109,17 +110,19 @@ class ManagedBrowser:
             host (str): Host for debugging the browser. Default: "localhost".
             debugging_port (int): Port for debugging the browser. Default: 9222.
             cdp_url (str or None): CDP URL to connect to the browser. Default: None.
+            browser_config (BrowserConfig): Configuration object containing all browser settings. Default: None.
         """
-        self.browser_type = browser_type
-        self.user_data_dir = user_data_dir
-        self.headless = headless
+        self.browser_type = browser_config.browser_type
+        self.user_data_dir = browser_config.user_data_dir
+        self.headless = browser_config.headless
         self.browser_process = None
         self.temp_dir = None
-        self.debugging_port = debugging_port
-        self.host = host
+        self.debugging_port = browser_config.debugging_port
+        self.host = browser_config.host
         self.logger = logger
         self.shutting_down = False
-        self.cdp_url = cdp_url
+        self.cdp_url = browser_config.cdp_url
+        self.browser_config = browser_config
 
     async def start(self) -> str:
         """
@@ -142,6 +145,9 @@ class ManagedBrowser:
         # Get browser path and args based on OS and browser type
         # browser_path = self._get_browser_path()
         args = await self._get_browser_args()
+        
+        if self.browser_config.extra_args:
+            args.extend(self.browser_config.extra_args)
 
         # Start browser process
         try:
@@ -477,6 +483,7 @@ class BrowserManager:
                 logger=self.logger,
                 debugging_port=self.config.debugging_port,
                 cdp_url=self.config.cdp_url,
+                browser_config=self.config,
             )
 
     async def start(self):
@@ -491,10 +498,12 @@ class BrowserManager:
 
         Note: This method should be called in a separate task to avoid blocking the main event loop.
         """
-        if self.playwright is None:
-            from playwright.async_api import async_playwright
+        if self.playwright is not None:
+            await self.close()
+            
+        from playwright.async_api import async_playwright
 
-            self.playwright = await async_playwright().start()
+        self.playwright = await async_playwright().start()
 
         if self.config.cdp_url or self.config.use_managed_browser:
             self.config.use_managed_browser = True
