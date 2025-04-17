@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Optional, Dict, Any
-from colorama import Fore, Style, init
+from colorama import Fore, Style
 import os
 from datetime import datetime
+from .utils import init_colorama_safe
 
 
 class LogLevel(Enum):
@@ -91,7 +92,7 @@ class AsyncLogger(AsyncLoggerBase):
             colors: Custom colors for different log levels
             verbose: Whether to output to console
         """
-        init()  # Initialize colorama
+        init_colorama_safe()  # Initialize colorama, if not already
         self.log_file = log_file
         self.log_level = log_level
         self.tag_width = tag_width
