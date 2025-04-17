@@ -582,7 +582,17 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     )
                     redirected_url = page.url
                 except Error as e:
-                    raise RuntimeError(f"Failed on navigating ACS-GOTO:\n{str(e)}")
+                    # Allow navigation to be aborted when downloading files
+                    # This is expected behavior for downloads in some browser engines
+                    if 'net::ERR_ABORTED' in str(e) and self.browser_config.accept_downloads:
+                        self.logger.info(
+                            message=f"Navigation aborted, likely due to file download: {url}",
+                            tag="GOTO",
+                            params={"url": url},
+                        )
+                        response = None
+                    else:
+                        raise RuntimeError(f"Failed on navigating ACS-GOTO:\n{str(e)}")
 
                 await self.execute_hook(
                     "after_goto", page, context=context, url=url, response=response, config=config
