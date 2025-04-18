@@ -542,9 +542,9 @@ class AsyncWebCrawler:
             markdown_input_html = source_lambda()
 
             # Log which source is being used (optional, but helpful for debugging)
-            if self.logger and verbose:
-                actual_source_used = selected_html_source if selected_html_source in html_source_selector else 'cleaned_html (default)'
-                self.logger.debug(f"Using '{actual_source_used}' as source for Markdown generation for {url}", tag="MARKDOWN_SRC")
+            # if self.logger and verbose:
+            #     actual_source_used = selected_html_source if selected_html_source in html_source_selector else 'cleaned_html (default)'
+            #     self.logger.debug(f"Using '{actual_source_used}' as source for Markdown generation for {url}", tag="MARKDOWN_SRC")
 
         except Exception as e:
             # Handle potential errors, especially from preprocess_html_for_schema

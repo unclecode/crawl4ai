@@ -37,8 +37,8 @@ from crawl4ai import (
 DEFAULT_SITE_PATH = "test_site"
 DEFAULT_PORT = 8000
 DEFAULT_MAX_SESSIONS = 16
-DEFAULT_URL_COUNT = 100
-DEFAULT_CHUNK_SIZE = 10 # Define chunk size for batch logging
+DEFAULT_URL_COUNT = 1
+DEFAULT_CHUNK_SIZE = 1 # Define chunk size for batch logging
 DEFAULT_REPORT_PATH = "reports"
 DEFAULT_STREAM_MODE = False
 DEFAULT_MONITOR_MODE = "DETAILED"
