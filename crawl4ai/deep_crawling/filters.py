@@ -186,7 +186,7 @@ class URLPatternFilter(URLFilter):
         elif pattern_type == self.PATTERN_TYPES["SUFFIX"]:
             self._simple_suffixes.add(pattern[2:])
         elif pattern_type == self.PATTERN_TYPES["PREFIX"]:
-            self._simple_prefixes.add(pattern[:-2])
+            self._simple_prefixes.add(pattern[:-1])
         elif pattern_type == self.PATTERN_TYPES["DOMAIN"]:
             self._domain_patterns.append(re.compile(pattern.replace("*.", r"[^/]+\.")))
         else:
