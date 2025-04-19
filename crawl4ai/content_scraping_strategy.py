@@ -900,7 +900,22 @@ class WebScrapingStrategy(ContentScrapingStrategy):
                     element.extract()
             else:
                 for element in body.select(excluded_selector):
-                    element.extract()     
+                    element.extract()
+
+        content_element = None
+        if target_elements:
+            try:
+                for_content_targeted_element = []
+                for target_element in target_elements:
+                    for_content_targeted_element.extend(body.select(target_element))
+                content_element = soup.new_tag("div")
+                for el in for_content_targeted_element:
+                    content_element.append(el)
+            except Exception as e:
+                self._log("error", f"Error with target element detection: {str(e)}", "SCRAPE")
+                return None
+        else:
+            content_element = body     
 
         kwargs["exclude_social_media_domains"] = set(
             kwargs.get("exclude_social_media_domains", []) + SOCIAL_MEDIA_DOMAINS
@@ -960,20 +975,6 @@ class WebScrapingStrategy(ContentScrapingStrategy):
 
         str_body = ""
         try:
-            content_element = None
-            if target_elements:
-                try:
-                    for_content_targeted_element = []
-                    for target_element in target_elements:
-                        for_content_targeted_element.extend(body.select(target_element))
-                    content_element = soup.new_tag("div")
-                    for el in for_content_targeted_element:
-                        content_element.append(el)
-                except Exception as e:
-                    self._log("error", f"Error with target element detection: {str(e)}", "SCRAPE")
-                    return None
-            else:
-                content_element = body
             str_body = content_element.encode_contents().decode("utf-8")
         except Exception:
             # Reset body to the original HTML
@@ -1530,6 +1531,20 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
                 self._log("error", f"Error extracting metadata: {str(e)}", "SCRAPE")
                 meta = {}
 
+            content_element = None
+            if target_elements:
+                try:
+                    for_content_targeted_element = []
+                    for target_element in target_elements:
+                        for_content_targeted_element.extend(body.cssselect(target_element))
+                    content_element = lhtml.Element("div")
+                    content_element.extend(for_content_targeted_element)
+                except Exception as e:
+                    self._log("error", f"Error with target element detection: {str(e)}", "SCRAPE")
+                    return None
+            else:
+                content_element = body
+
             # Remove script and style tags
             for tag in ["script", "style", "link", "meta", "noscript"]:
                 for element in body.xpath(f".//{tag}"):
@@ -1598,19 +1613,6 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
             )
 
             # Generate output HTML
-            content_element = None
-            if target_elements:
-                try:
-                    for_content_targeted_element = []
-                    for target_element in target_elements:
-                        for_content_targeted_element.extend(body.cssselect(target_element))
-                    content_element = lhtml.Element("div")
-                    content_element.extend(for_content_targeted_element)
-                except Exception as e:
-                    self._log("error", f"Error with target element detection: {str(e)}", "SCRAPE")
-                    return None
-            else:
-                content_element = body
             cleaned_html = lhtml.tostring(
                 # body,   
                 content_element,
