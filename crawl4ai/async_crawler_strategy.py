@@ -24,7 +24,7 @@ from .browser_manager import BrowserManager
 
 import aiofiles
 import aiohttp
-import cchardet
+import chardet
 from aiohttp.client import ClientTimeout
 from urllib.parse import urlparse
 from types import MappingProxyType
@@ -130,6 +130,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         Close the browser and clean up resources.
         """
         await self.browser_manager.close()
+        # Explicitly reset the static Playwright instance
+        BrowserManager._playwright_instance = None
 
     async def kill_session(self, session_id: str):
         """
@@ -679,14 +681,12 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 if console_log_type == "error":
                     self.logger.error(
                         message=f"Console error: {msg}",  # Use f-string for variable interpolation
-                        tag="CONSOLE",
-                        params={"msg": msg.text},
+                        tag="CONSOLE"
                     )
                 elif console_log_type == "debug":
                     self.logger.debug(
                         message=f"Console: {msg}",  # Use f-string for variable interpolation
-                        tag="CONSOLE",
-                        params={"msg": msg.text},
+                        tag="CONSOLE"
                     )
 
             page.on("console", log_consol)
@@ -967,7 +967,11 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     
                     for selector in selectors:
                         try:
-                            content = await page.evaluate(f"document.querySelector('{selector}')?.outerHTML || ''")
+                            content = await page.evaluate(
+                                f"""Array.from(document.querySelectorAll("{selector}"))
+                                    .map(el => el.outerHTML)
+                                    .join('')"""
+                            )
                             html_parts.append(content)
                         except Error as e:
                             print(f"Warning: Could not get content for selector '{selector}': {str(e)}")
@@ -1975,7 +1979,7 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
                 await self.start()
             yield self._session
         finally:
-            await self.close()
+            pass
 
     def set_hook(self, hook_type: str, hook_func: Callable) -> None:
         if hook_type in self.hooks:
@@ -2091,7 +2095,7 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
                     
                     encoding = response.charset
                     if not encoding:
-                        encoding = cchardet.detect(content.tobytes())['encoding'] or 'utf-8'                    
+                        encoding = chardet.detect(content.tobytes())['encoding'] or 'utf-8'                    
                     
                     result = AsyncCrawlResponse(
                         html=content.tobytes().decode(encoding, errors='replace'),

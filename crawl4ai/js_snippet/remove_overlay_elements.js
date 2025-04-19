@@ -115,5 +115,6 @@ async () => {
     document.body.style.overflow = "auto";
 
     // Wait a bit for any animations to complete
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    document.body.scrollIntoView(false);
+    await new Promise((resolve) => setTimeout(resolve, 50));
 };
