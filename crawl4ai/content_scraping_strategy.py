@@ -28,6 +28,7 @@ from lxml import etree
 from lxml import html as lhtml
 from typing import List
 from .models import ScrapingResult, MediaItem, Link, Media, Links
+import copy
 
 # Pre-compile regular expressions for Open Graph and Twitter metadata
 OG_REGEX = re.compile(r"^og:")
@@ -910,7 +911,7 @@ class WebScrapingStrategy(ContentScrapingStrategy):
                     for_content_targeted_element.extend(body.select(target_element))
                 content_element = soup.new_tag("div")
                 for el in for_content_targeted_element:
-                    content_element.append(el)
+                    content_element.append(copy.deepcopy(el))
             except Exception as e:
                 self._log("error", f"Error with target element detection: {str(e)}", "SCRAPE")
                 return None
@@ -1538,7 +1539,7 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
                     for target_element in target_elements:
                         for_content_targeted_element.extend(body.cssselect(target_element))
                     content_element = lhtml.Element("div")
-                    content_element.extend(for_content_targeted_element)
+                    content_element.extend(copy.deepcopy(for_content_targeted_element))
                 except Exception as e:
                     self._log("error", f"Error with target element detection: {str(e)}", "SCRAPE")
                     return None
