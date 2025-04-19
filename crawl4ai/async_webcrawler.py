@@ -47,6 +47,7 @@ from .utils import (
     create_box_message,
     get_error_context,
     RobotsParser,
+    preprocess_html_for_schema,
 )
 
 
@@ -111,7 +112,8 @@ class AsyncWebCrawler:
         self,
         crawler_strategy: AsyncCrawlerStrategy = None,
         config: BrowserConfig = None,
-        base_directory: str = str(os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home())),
+        base_directory: str = str(
+            os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home())),
         thread_safe: bool = False,
         logger: AsyncLoggerBase = None,
         **kwargs,
@@ -139,7 +141,8 @@ class AsyncWebCrawler:
         )
 
         # Initialize crawler strategy
-        params = {k: v for k, v in kwargs.items() if k in ["browser_config", "logger"]}
+        params = {k: v for k, v in kwargs.items() if k in [
+            "browser_config", "logger"]}
         self.crawler_strategy = crawler_strategy or AsyncPlaywrightCrawlerStrategy(
             browser_config=browser_config,
             logger=self.logger,
@@ -237,7 +240,8 @@ class AsyncWebCrawler:
 
         config = config or CrawlerRunConfig()
         if not isinstance(url, str) or not url:
-            raise ValueError("Invalid URL, make sure the URL is a non-empty string")
+            raise ValueError(
+                "Invalid URL, make sure the URL is a non-empty string")
 
         async with self._lock or self.nullcontext():
             try:
@@ -291,12 +295,12 @@ class AsyncWebCrawler:
 
                 # Update proxy configuration from rotation strategy if available
                 if config and config.proxy_rotation_strategy:
-                    next_proxy : ProxyConfig = await config.proxy_rotation_strategy.get_next_proxy()
+                    next_proxy: ProxyConfig = await config.proxy_rotation_strategy.get_next_proxy()
                     if next_proxy:
                         self.logger.info(
                             message="Switch proxy: {proxy}",
                             tag="PROXY",
-                            params={"proxy": next_proxy.server} 
+                            params={"proxy": next_proxy.server}
                         )
                         config.proxy_config = next_proxy
                         # config = config.clone(proxy_config=next_proxy)
@@ -306,7 +310,8 @@ class AsyncWebCrawler:
                     t1 = time.perf_counter()
 
                     if config.user_agent:
-                        self.crawler_strategy.update_user_agent(config.user_agent)
+                        self.crawler_strategy.update_user_agent(
+                            config.user_agent)
 
                     # Check robots.txt if enabled
                     if config and config.check_robots_txt:
@@ -373,7 +378,8 @@ class AsyncWebCrawler:
                     crawl_result.console_messages = async_response.console_messages
 
                     crawl_result.success = bool(html)
-                    crawl_result.session_id = getattr(config, "session_id", None)
+                    crawl_result.session_id = getattr(
+                        config, "session_id", None)
 
                     self.logger.url_status(
                         url=cache_context.display_url,
@@ -396,7 +402,8 @@ class AsyncWebCrawler:
                         tag="COMPLETE"
                     )
                     cached_result.success = bool(html)
-                    cached_result.session_id = getattr(config, "session_id", None)
+                    cached_result.session_id = getattr(
+                        config, "session_id", None)
                     cached_result.redirected_url = cached_result.redirected_url or url
                     return CrawlResultContainer(cached_result)
 
@@ -463,12 +470,14 @@ class AsyncWebCrawler:
             params = config.__dict__.copy()
             params.pop("url", None)
             # add keys from kwargs to params that doesn't exist in params
-            params.update({k: v for k, v in kwargs.items() if k not in params.keys()})
+            params.update({k: v for k, v in kwargs.items()
+                          if k not in params.keys()})
 
             ################################
             # Scraping Strategy Execution  #
             ################################
-            result: ScrapingResult = scraping_strategy.scrap(url, html, **params)
+            result: ScrapingResult = scraping_strategy.scrap(
+                url, html, **params)
 
             if result is None:
                 raise ValueError(
@@ -484,7 +493,8 @@ class AsyncWebCrawler:
 
         # Extract results - handle both dict and ScrapingResult
         if isinstance(result, dict):
-            cleaned_html = sanitize_input_encode(result.get("cleaned_html", ""))
+            cleaned_html = sanitize_input_encode(
+                result.get("cleaned_html", ""))
             media = result.get("media", {})
             links = result.get("links", {})
             metadata = result.get("metadata", {})
@@ -501,14 +511,49 @@ class AsyncWebCrawler:
             config.markdown_generator or DefaultMarkdownGenerator()
         )
 
+        # --- SELECT HTML SOURCE BASED ON CONTENT_SOURCE ---
+        # Get the desired source from the generator config, default to 'cleaned_html'
+        selected_html_source = getattr(markdown_generator, 'content_source', 'cleaned_html')
+
+        # Define the source selection logic using dict dispatch
+        html_source_selector = {
+            "raw_html": lambda: html,  # The original raw HTML
+            "cleaned_html": lambda: cleaned_html,  # The HTML after scraping strategy
+            "fit_html": lambda: preprocess_html_for_schema(html_content=html),  # Preprocessed raw HTML
+        }
+
+        markdown_input_html = cleaned_html  # Default to cleaned_html
+
+        try:
+            # Get the appropriate lambda function, default to returning cleaned_html if key not found
+            source_lambda = html_source_selector.get(selected_html_source, lambda: cleaned_html)
+            # Execute the lambda to get the selected HTML
+            markdown_input_html = source_lambda()
+
+            # Log which source is being used (optional, but helpful for debugging)
+            # if self.logger and verbose:
+            #     actual_source_used = selected_html_source if selected_html_source in html_source_selector else 'cleaned_html (default)'
+            #     self.logger.debug(f"Using '{actual_source_used}' as source for Markdown generation for {url}", tag="MARKDOWN_SRC")
+
+        except Exception as e:
+            # Handle potential errors, especially from preprocess_html_for_schema
+            if self.logger:
+                self.logger.warning(
+                    f"Error getting/processing '{selected_html_source}' for markdown source: {e}. Falling back to cleaned_html.",
+                    tag="MARKDOWN_SRC"
+                )
+            # Ensure markdown_input_html is still the default cleaned_html in case of error
+            markdown_input_html = cleaned_html
+        # --- END: HTML SOURCE SELECTION ---
+
         # Uncomment if by default we want to use PruningContentFilter
         # if not config.content_filter and not markdown_generator.content_filter:
         #     markdown_generator.content_filter = PruningContentFilter()
 
         markdown_result: MarkdownGenerationResult = (
             markdown_generator.generate_markdown(
-                cleaned_html=cleaned_html,
-                base_url=params.get("redirected_url", url),
+                input_html=markdown_input_html,
+                base_url=params.get("redirected_url", url)
                 # html2text_options=kwargs.get('html2text', {})
             )
         )
