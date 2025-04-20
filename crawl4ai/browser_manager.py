@@ -572,6 +572,9 @@ class BrowserManager:
         if self.config.extra_args:
             args.extend(self.config.extra_args)
 
+        # Deduplicate args
+        args = list(dict.fromkeys(args))
+        
         browser_args = {"headless": self.config.headless, "args": args}
 
         if self.config.chrome_channel:

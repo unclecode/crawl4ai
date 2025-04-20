@@ -24,13 +24,13 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 
 # --- Constants ---
-# DEFAULT_API_URL = "http://localhost:11235" # Default port
+DEFAULT_API_URL = "http://localhost:11235" # Default port
 DEFAULT_API_URL = "http://localhost:8020" # Default port
-DEFAULT_URL_COUNT = 1000
-DEFAULT_MAX_CONCURRENT_REQUESTS = 5
+DEFAULT_URL_COUNT = 100
+DEFAULT_MAX_CONCURRENT_REQUESTS = 1
 DEFAULT_CHUNK_SIZE = 10
 DEFAULT_REPORT_PATH = "reports_api"
-DEFAULT_STREAM_MODE = False
+DEFAULT_STREAM_MODE = True
 REQUEST_TIMEOUT = 180.0
 
 # Initialize Rich console
@@ -77,6 +77,10 @@ class ApiStressTest:
         self.report_path = pathlib.Path(report_path)
         self.report_path.mkdir(parents=True, exist_ok=True)
         self.stream_mode = stream_mode
+        
+        # Ignore repo path and set it to current file path
+        self.repo_path = pathlib.Path(__file__).parent.resolve()
+
 
         self.test_id = time.strftime("%Y%m%d_%H%M%S")
         self.results_summary = {

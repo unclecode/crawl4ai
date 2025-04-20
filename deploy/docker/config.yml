@@ -5,6 +5,7 @@ app:
   host: "0.0.0.0"
   port: 8020
   reload: False
+  workers: 4
   timeout_keep_alive: 300
 
 # Default LLM Configuration
@@ -48,53 +49,38 @@ security:
     content_security_policy: "default-src 'self'"
     strict_transport_security: "max-age=63072000; includeSubDomains"
 
-# Crawler Pool Configuration
-crawler_pool:
-  enabled: true # Set to false to disable the pool
-
-  # --- Option 1: Auto-calculate size ---
-  auto_calculate_size: true
-  calculation_params:
-    mem_headroom_mb: 512     # Memory reserved for OS/other apps
-    avg_page_mem_mb: 150     # Estimated MB per concurrent "tab"/page in browsers
-    fd_per_page: 20          # Estimated file descriptors per page
-    core_multiplier: 4       # Max crawlers per CPU core
-    min_pool_size: 2         # Minimum number of primary crawlers
-    max_pool_size: 16        # Maximum number of primary crawlers
-
-  # --- Option 2: Manual size (ignored if auto_calculate_size is true) ---
-  # pool_size: 8
-
-  # --- Other Pool Settings ---
-  backup_pool_size: 1        # Number of backup crawlers
-  max_wait_time_s: 30.0      # Max seconds a request waits for a free crawler
-  throttle_threshold_percent: 70.0 # Start throttling delay above this % usage
-  throttle_delay_min_s: 0.1  # Min throttle delay
-  throttle_delay_max_s: 0.5  # Max throttle delay
-
-  # --- Browser Config for Pooled Crawlers ---
-  browser_config:
-    # No need for "type": "BrowserConfig" here, just params
-    headless: true
-    verbose: false # Keep pool crawlers less verbose in production
-    # user_agent: "MyPooledCrawler/1.0" # Example
-    # Add other BrowserConfig params as needed (e.g., proxy, viewport)
-
 # Crawler Configuration
 crawler:
+  base_config:
+    simulate_user: true
   memory_threshold_percent: 95.0
   rate_limiter:
+    enabled: true
     base_delay: [1.0, 2.0]
   timeouts:
     stream_init: 30.0  # Timeout for stream initialization
     batch_process: 300.0  # Timeout for batch processing
+  pool:
+    max_pages: 40                          # ← GLOBAL_SEM permits
+    idle_ttl_sec: 1800                     # ← 30 min janitor cutoff
+  browser:
+    kwargs:
+      headless: true
+      text_mode: true
+    extra_args:
+      # - "--single-process"
+      - "--no-sandbox"
+      - "--disable-dev-shm-usage"
+      - "--disable-gpu"
+      - "--disable-software-rasterizer"
+      - "--disable-web-security"
+      - "--allow-insecure-localhost"
+      - "--ignore-certificate-errors"
 
 # Logging Configuration
 logging:
   level: "INFO"
   format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-  file: "logs/app.log"
-  verbose: true
 
 # Observability Configuration
 observability:

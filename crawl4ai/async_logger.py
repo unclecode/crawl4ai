@@ -7,11 +7,18 @@ from datetime import datetime
 
 
 class LogLevel(Enum):
+    DEFAULT = 0
     DEBUG = 1
     INFO = 2
     SUCCESS = 3
     WARNING = 4
     ERROR = 5
+    CRITICAL = 6
+    ALERT = 7
+    NOTICE = 8
+    EXCEPTION = 9
+    FATAL = 10
+    
 
 
 
@@ -61,6 +68,13 @@ class AsyncLogger(AsyncLoggerBase):
         "DEBUG": "⋯",
         "INFO": "ℹ",
         "WARNING": "⚠",
+        "SUCCESS": "✔",
+        "CRITICAL": "‼",
+        "ALERT": "⚡",
+        "NOTICE": "ℹ",
+        "EXCEPTION": "❗",
+        "FATAL": "☠",
+        "DEFAULT": "•",
     }
 
     DEFAULT_COLORS = {
@@ -69,6 +83,12 @@ class AsyncLogger(AsyncLoggerBase):
         LogLevel.SUCCESS: Fore.GREEN,
         LogLevel.WARNING: Fore.YELLOW,
         LogLevel.ERROR: Fore.RED,
+        LogLevel.CRITICAL: Fore.RED + Style.BRIGHT,
+        LogLevel.ALERT: Fore.RED + Style.BRIGHT,
+        LogLevel.NOTICE: Fore.BLUE,
+        LogLevel.EXCEPTION: Fore.RED + Style.BRIGHT,
+        LogLevel.FATAL: Fore.RED + Style.BRIGHT,
+        LogLevel.DEFAULT: Fore.WHITE,
     }
 
     def __init__(
@@ -212,6 +232,22 @@ class AsyncLogger(AsyncLoggerBase):
     def warning(self, message: str, tag: str = "WARNING", **kwargs):
         """Log a warning message."""
         self._log(LogLevel.WARNING, message, tag, **kwargs)
+        
+    def critical(self, message: str, tag: str = "CRITICAL", **kwargs):
+        """Log a critical message."""
+        self._log(LogLevel.ERROR, message, tag, **kwargs)
+    def exception(self, message: str, tag: str = "EXCEPTION", **kwargs):
+        """Log an exception message."""
+        self._log(LogLevel.ERROR, message, tag, **kwargs)
+    def fatal(self, message: str, tag: str = "FATAL", **kwargs):
+        """Log a fatal message."""
+        self._log(LogLevel.ERROR, message, tag, **kwargs)
+    def alert(self, message: str, tag: str = "ALERT", **kwargs):
+        """Log an alert message."""
+        self._log(LogLevel.ERROR, message, tag, **kwargs)
+    def notice(self, message: str, tag: str = "NOTICE", **kwargs):
+        """Log a notice message."""
+        self._log(LogLevel.INFO, message, tag, **kwargs)
 
     def error(self, message: str, tag: str = "ERROR", **kwargs):
         """Log an error message."""

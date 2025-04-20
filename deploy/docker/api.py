@@ -377,14 +377,14 @@ async def stream_results(crawler: AsyncWebCrawler, results_gen: AsyncGenerator) 
         
     except asyncio.CancelledError:
         logger.warning("Client disconnected during streaming")
-    # finally:
-    #     try:
-    #         await crawler.close()
-    #     except Exception as e:
-    #         logger.error(f"Crawler cleanup error: {e}")
+    finally:
+        # try:
+        #     await crawler.close()
+        # except Exception as e:
+        #     logger.error(f"Crawler cleanup error: {e}")
+        pass
 
 async def handle_crawl_request(
-    crawler: AsyncWebCrawler,
     urls: List[str],
     browser_config: dict,
     crawler_config: dict,
@@ -404,24 +404,29 @@ async def handle_crawl_request(
             memory_threshold_percent=config["crawler"]["memory_threshold_percent"],
             rate_limiter=RateLimiter(
                 base_delay=tuple(config["crawler"]["rate_limiter"]["base_delay"])
-            )
+            ) if config["crawler"]["rate_limiter"]["enabled"] else None
         )
+        
+        from crawler_pool import get_crawler
+        crawler = await get_crawler(browser_config)
 
         # crawler: AsyncWebCrawler = AsyncWebCrawler(config=browser_config)
         # await crawler.start()
+        
+        base_config = config["crawler"]["base_config"]
+        # Iterate on key-value pairs in global_config then use haseattr to set them 
+        for key, value in base_config.items():
+            if hasattr(crawler_config, key):
+                setattr(crawler_config, key, value)
+
         results = []
         func = getattr(crawler, "arun" if len(urls) == 1 else "arun_many")
         partial_func = partial(func, 
                                 urls[0] if len(urls) == 1 else urls, 
                                 config=crawler_config, 
                                 dispatcher=dispatcher)
-        
-        # Simulate work being done by the crawler
-        # logger.debug(f"Request (URLs: {len(urls)}) starting simulated work...") # Add log
-        # await asyncio.sleep(2) # <--- ADD ARTIFICIAL DELAY (e.g., 0.5 seconds)
-        # logger.debug(f"Request (URLs: {len(urls)}) finished simulated work.") 
-                
         results = await partial_func()
+
         # await crawler.close()
         
         end_mem_mb = _get_memory_mb() # <--- Get memory after
@@ -442,11 +447,12 @@ async def handle_crawl_request(
 
     except Exception as e:
         logger.error(f"Crawl error: {str(e)}", exc_info=True)
-        # if 'crawler' in locals() and crawler.ready: # Check if crawler was initialized and started
-        #      try:
-        #          await crawler.close()
-        #      except Exception as close_e:
-        #           logger.error(f"Error closing crawler during exception handling: {close_e}")
+        if 'crawler' in locals() and crawler.ready: # Check if crawler was initialized and started
+            #  try:
+            #      await crawler.close()
+            #  except Exception as close_e:
+            #       logger.error(f"Error closing crawler during exception handling: {close_e}")
+            logger.error(f"Error closing crawler during exception handling: {close_e}")
 
         # Measure memory even on error if possible
         end_mem_mb_error = _get_memory_mb()
@@ -463,7 +469,6 @@ async def handle_crawl_request(
         )
 
 async def handle_stream_crawl_request(
-    crawler: AsyncWebCrawler,
     urls: List[str],
     browser_config: dict,
     crawler_config: dict,
@@ -485,6 +490,9 @@ async def handle_stream_crawl_request(
             )
         )
 
+        from crawler_pool import get_crawler
+        crawler = await get_crawler(browser_config)
+
         # crawler = AsyncWebCrawler(config=browser_config)
         # await crawler.start()
 
@@ -494,17 +502,16 @@ async def handle_stream_crawl_request(
             dispatcher=dispatcher
         )
 
-        # Return the *same* crawler instance and the generator
-        # The caller (server.py) manages the crawler lifecycle via the pool context
         return crawler, results_gen
 
     except Exception as e:
         # Make sure to close crawler if started during an error here
-        # if 'crawler' in locals() and crawler.ready:
-        #      try:
-        #           await crawler.close()
-        #      except Exception as close_e:
-        #           logger.error(f"Error closing crawler during stream setup exception: {close_e}")
+        if 'crawler' in locals() and crawler.ready:
+            #  try:
+            #       await crawler.close()
+            #  except Exception as close_e:
+            #       logger.error(f"Error closing crawler during stream setup exception: {close_e}")
+            logger.error(f"Error closing crawler during stream setup exception: {close_e}")
         logger.error(f"Stream crawl error: {str(e)}", exc_info=True)
         # Raising HTTPException here will prevent streaming response
         raise HTTPException(
