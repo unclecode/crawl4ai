@@ -21,6 +21,7 @@ x-base-config: &base-config
   volumes:
     - /dev/shm:/dev/shm
     - ./logs:/app/logs  # 로그 볼륨 마운트 추가
+    - ./.profiles:/app/.profiles  # 프로필 마운트 추가
   deploy:
     resources:
       limits:
