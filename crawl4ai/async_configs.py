@@ -159,6 +159,55 @@ def is_empty_value(value: Any) -> bool:
         return True
     return False
 
+class GeolocationConfig:
+    def __init__(
+        self,
+        latitude: float,
+        longitude: float,
+        accuracy: Optional[float] = 0.0
+    ):
+        """Configuration class for geolocation settings.
+        
+        Args:
+            latitude: Latitude coordinate (e.g., 37.7749)
+            longitude: Longitude coordinate (e.g., -122.4194)
+            accuracy: Accuracy in meters. Default: 0.0
+        """
+        self.latitude = latitude
+        self.longitude = longitude
+        self.accuracy = accuracy
+    
+    @staticmethod
+    def from_dict(geo_dict: Dict) -> "GeolocationConfig":
+        """Create a GeolocationConfig from a dictionary."""
+        return GeolocationConfig(
+            latitude=geo_dict.get("latitude"),
+            longitude=geo_dict.get("longitude"),
+            accuracy=geo_dict.get("accuracy", 0.0)
+        )
+    
+    def to_dict(self) -> Dict:
+        """Convert to dictionary representation."""
+        return {
+            "latitude": self.latitude,
+            "longitude": self.longitude,
+            "accuracy": self.accuracy
+        }
+    
+    def clone(self, **kwargs) -> "GeolocationConfig":
+        """Create a copy of this configuration with updated values.
+
+        Args:
+            **kwargs: Key-value pairs of configuration options to update
+
+        Returns:
+            GeolocationConfig: A new instance with the specified updates
+        """
+        config_dict = self.to_dict()
+        config_dict.update(kwargs)
+        return GeolocationConfig.from_dict(config_dict)
+
+
 class ProxyConfig:
     def __init__(
         self,
@@ -680,6 +729,14 @@ class CrawlerRunConfig():
         proxy_config (ProxyConfig or dict or None): Detailed proxy configuration, e.g. {"server": "...", "username": "..."}.
                                      If None, no additional proxy config. Default: None.
 
+        # Browser Location and Identity Parameters
+        locale (str or None): Locale to use for the browser context (e.g., "en-US").
+                             Default: None.
+        timezone_id (str or None): Timezone identifier to use for the browser context (e.g., "America/New_York").
+                                  Default: None.
+        geolocation (GeolocationConfig or None): Geolocation configuration for the browser.
+                                                Default: None.
+
         # SSL Parameters
         fetch_ssl_certificate: bool = False,
         # Caching Parameters
@@ -829,6 +886,10 @@ class CrawlerRunConfig():
         scraping_strategy: ContentScrapingStrategy = None,
         proxy_config: Union[ProxyConfig, dict, None] = None,
         proxy_rotation_strategy: Optional[ProxyRotationStrategy] = None,
+        # Browser Location and Identity Parameters
+        locale: Optional[str] = None,
+        timezone_id: Optional[str] = None,
+        geolocation: Optional[GeolocationConfig] = None,
         # SSL Parameters
         fetch_ssl_certificate: bool = False,
         # Caching Parameters
@@ -917,6 +978,11 @@ class CrawlerRunConfig():
         self.scraping_strategy = scraping_strategy or WebScrapingStrategy()
         self.proxy_config = proxy_config
         self.proxy_rotation_strategy = proxy_rotation_strategy
+        
+        # Browser Location and Identity Parameters
+        self.locale = locale
+        self.timezone_id = timezone_id
+        self.geolocation = geolocation
 
         # SSL Parameters
         self.fetch_ssl_certificate = fetch_ssl_certificate
@@ -1057,6 +1123,10 @@ class CrawlerRunConfig():
             scraping_strategy=kwargs.get("scraping_strategy"),
             proxy_config=kwargs.get("proxy_config"),
             proxy_rotation_strategy=kwargs.get("proxy_rotation_strategy"),
+            # Browser Location and Identity Parameters
+            locale=kwargs.get("locale", None),
+            timezone_id=kwargs.get("timezone_id", None),
+            geolocation=kwargs.get("geolocation", None),
             # SSL Parameters
             fetch_ssl_certificate=kwargs.get("fetch_ssl_certificate", False),
             # Caching Parameters
@@ -1166,6 +1236,9 @@ class CrawlerRunConfig():
             "scraping_strategy": self.scraping_strategy,
             "proxy_config": self.proxy_config,
             "proxy_rotation_strategy": self.proxy_rotation_strategy,
+            "locale": self.locale,
+            "timezone_id": self.timezone_id,
+            "geolocation": self.geolocation,
             "fetch_ssl_certificate": self.fetch_ssl_certificate,
             "cache_mode": self.cache_mode,
             "session_id": self.session_id,
