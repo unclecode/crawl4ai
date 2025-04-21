@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added intelligent context search with query filtering
   - Added syntax-aware code function chunking
   - Implemented efficient HTML processing pipeline
+- Added support for controlling browser geolocation via new GeolocationConfig class
+  - Added locale and timezone configuration options to CrawlerRunConfig
+  - Added example script demonstrating geolocation and locale usage
+  - Added documentation for location-based identity features
 
 ### [Refactor] 2025-04-20
 - Replaced crawler_manager.py with simpler crawler_pool.py implementation
