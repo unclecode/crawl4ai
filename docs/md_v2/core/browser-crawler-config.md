@@ -137,6 +137,11 @@ class CrawlerRunConfig:
         screenshot=False,
         pdf=False,
         capture_mhtml=False,
+        # Location and Identity Parameters
+        locale=None,            # e.g. "en-US", "fr-FR"
+        timezone_id=None,       # e.g. "America/New_York"
+        geolocation=None,       # GeolocationConfig object
+        # Resource Management
         enable_rate_limiting=False,
         rate_limit_config=None,
         memory_threshold_percent=70.0,
