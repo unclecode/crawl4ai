@@ -5,6 +5,30 @@ All notable changes to Crawl4AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+### [Feature] 2025-04-21
+- Implemented MCP protocol for machine-to-machine communication
+  - Added WebSocket and SSE transport for MCP server
+  - Exposed server endpoints via MCP protocol
+  - Created tests for MCP socket and SSE communication
+- Enhanced Docker server with file handling and intelligent search
+  - Added PDF and screenshot endpoints with file saving capability
+  - Added JavaScript execution endpoint for page interaction
+  - Implemented advanced context search with BM25 and code chunking
+  - Added file path output support for generated assets
+- Improved server endpoints and API surface
+  - Added intelligent context search with query filtering
+  - Added syntax-aware code function chunking
+  - Implemented efficient HTML processing pipeline
+
+### [Refactor] 2025-04-20
+- Replaced crawler_manager.py with simpler crawler_pool.py implementation
+- Added global page semaphore for hard concurrency cap
+- Implemented browser pool with idle cleanup
+- Added playground UI for testing and stress testing
+- Updated API handlers to use pooled crawlers
+- Enhanced logging levels and symbols
+- Added memory tests and stress test utilities
+
 ### [Added] 2025-04-17
 - Added content source selection feature for markdown generation
   - New `content_source` parameter allows choosing between `cleaned_html`, `raw_html`, and `fit_html`
