@@ -265,7 +265,7 @@ In a typical scenario, you define **one** `BrowserConfig` for your crawler sessi
 
 ```python
 import asyncio
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, LLMConfig
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, LLMConfig, LLMContentFilter, DefaultMarkdownGenerator
 from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
 
 async def main():
@@ -290,7 +290,7 @@ async def main():
     # 3) Example LLM content filtering
 
     gemini_config = LLMConfig(
-        provider="gemini/gemini-1.5-pro" 
+        provider="gemini/gemini-1.5-pro", 
         api_token = "env:GEMINI_API_TOKEN"
     )
 
@@ -314,8 +314,9 @@ async def main():
     )
 
     md_generator = DefaultMarkdownGenerator(
-    content_filter=filter,
-    options={"ignore_links": True}
+        content_filter=filter,
+        options={"ignore_links": True}
+    )
 
     # 4) Crawler run config: skip cache, use extraction
     run_conf = CrawlerRunConfig(
