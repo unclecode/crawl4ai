@@ -5,7 +5,7 @@ All notable changes to Crawl4AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.6.0rc1‑r1] ‑ 2025‑04‑22
+## [0.6.0rc1] ‑ 2025‑04‑22
 
 ### Added
 - Browser pooling with page pre‑warming and fine‑grained **geolocation, locale, and timezone** controls  
