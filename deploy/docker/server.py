@@ -432,7 +432,7 @@ async def execute_js(
 async def llm_endpoint(
     request: Request,
     url: str = Path(...),
-    q: Optional[str] = Query(None),
+    q: str = Query(...),
     _td: Dict = Depends(token_dep),
 ):
     if not q:

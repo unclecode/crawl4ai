@@ -36,8 +36,6 @@ class BrowserConfig:
 
 ### Key Fields to Note
 
-
-
 1. **`browser_type`**  
 - Options: `"chromium"`, `"firefox"`, or `"webkit"`.  
 - Defaults to `"chromium"`.  
@@ -215,6 +213,7 @@ class CrawlerRunConfig:
     - The display mode for progress information (`DETAILED`, `BRIEF`, etc.).  
     - Affects how much information is printed during the crawl.
 
+
 ### Helper Methods
 
 The `clone()` method is particularly useful for creating variations of your crawler configuration:
@@ -246,9 +245,6 @@ The `clone()` method:
 - Perfect for creating variations without repeating all parameters
 
 ---
-
-
-
 
 
 ## 3. LLMConfig Essentials
