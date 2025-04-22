@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "🚀🤖 Crawl4AI: Open-source LLM Friendly Web Crawler & scraper"
 readme = "README.md"
 requires-python = ">=3.9"
-license = {text = "MIT"}
+license = {text = "Apache-2.0"}
 authors = [
     {name = "Unclecode", email = "unclecode@kidocode.com"}
 ]

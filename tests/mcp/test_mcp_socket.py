@@ -101,19 +101,19 @@ async def test_context(s: ClientSession):
 
 
 async def main() -> None:
-    async with websocket_client("ws://localhost:8020/mcp/ws") as (r, w):
+    async with websocket_client("ws://localhost:11235/mcp/ws") as (r, w):
         async with ClientSession(r, w) as s:
             await s.initialize()                       # handshake
             tools = (await s.list_tools()).tools
             print("tools:", [t.name for t in tools])
 
             # await test_list()
-            # await test_crawl(s)
-            # await test_md(s)
-            # await test_screenshot(s)
-            # await test_pdf(s)
-            # await test_execute_js(s)
-            # await test_html(s)
+            await test_crawl(s)
+            await test_md(s)
+            await test_screenshot(s)
+            await test_pdf(s)
+            await test_execute_js(s)
+            await test_html(s)
             await test_context(s)
 
 anyio.run(main)

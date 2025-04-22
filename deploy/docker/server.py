@@ -629,6 +629,7 @@ async def get_context(
     
 
 # attach MCP layer (adds /mcp/ws, /mcp/sse, /mcp/schema)
+print(f"MCP server running on {config['app']['host']}:{config['app']['port']}")
 attach_mcp(
     app,
     base_url=f"http://{config['app']['host']}:{config['app']['port']}"

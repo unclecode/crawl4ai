@@ -1,5 +1,10 @@
 FROM python:3.10-slim
 
+# C4ai version
+ARG C4AI_VER=0.6.0
+ENV C4AI_VERSION=$C4AI_VER
+LABEL c4ai.version=$C4AI_VER
+
 # Set build arguments
 ARG APP_HOME=/app
 ARG GITHUB_REPO=https://github.com/unclecode/crawl4ai.git

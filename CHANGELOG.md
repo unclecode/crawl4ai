@@ -5,6 +5,53 @@ All notable changes to Crawl4AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0rc1‑r1] ‑ 2025‑04‑22
+
+### Added
+- Browser pooling with page pre‑warming and fine‑grained **geolocation, locale, and timezone** controls  
+- Crawler pool manager (SDK + Docker API) for smarter resource allocation  
+- Network & console log capture plus MHTML snapshot export  
+- **Table extractor**: turn HTML `<table>`s into DataFrames or CSV with one flag  
+- High‑volume stress‑test framework in `tests/memory` and API load scripts  
+- MCP protocol endpoints with socket & SSE support; playground UI scaffold  
+- Docs v2 revamp: TOC, GitHub badge, copy‑code buttons, Docker API demo  
+- “Ask AI” helper button *(work‑in‑progress, shipping soon)*  
+- New examples: geo‑location usage, network/console capture, Docker API, markdown source selection, crypto analysis  
+- Expanded automated test suites for browser, Docker, MCP and memory benchmarks  
+
+### Changed
+- Consolidated and renamed browser strategies; legacy docker strategy modules removed  
+- `ProxyConfig` moved to `async_configs`  
+- Server migrated to pool‑based crawler management  
+- FastAPI validators replace custom query validation  
+- Docker build now uses Chromium base image  
+- Large‑scale repo tidy‑up (≈36 k insertions, ≈5 k deletions)  
+
+### Fixed
+- Async crawler session leak, duplicate‑visit handling, URL normalisation  
+- Target‑element regressions in scraping strategies  
+- Logged‑URL readability, encoded‑URL decoding, middle truncation for long URLs  
+- Closed issues: #701, #733, #756, #774, #804, #822, #839, #841, #842, #843, #867, #902, #911  
+
+### Removed
+- Obsolete modules under `crawl4ai/browser/*` superseded by the new pooled browser layer  
+
+### Deprecated
+- Old markdown generator names now alias `DefaultMarkdownGenerator` and emit warnings  
+
+---
+
+#### Upgrade notes
+1. Update any direct imports from `crawl4ai/browser/*` to the new pooled browser modules  
+2. If you override `AsyncPlaywrightCrawlerStrategy.get_page`, adopt the new signature  
+3. Rebuild Docker images to pull the new Chromium layer  
+4. Switch to `DefaultMarkdownGenerator` (or silence the deprecation warning)  
+
+---
+
+`121 files changed, ≈36 223 insertions, ≈4 975 deletions` :contentReference[oaicite:0]{index=0}&#8203;:contentReference[oaicite:1]{index=1}
+
+
 ### [Feature] 2025-04-21
 - Implemented MCP protocol for machine-to-machine communication
   - Added WebSocket and SSE transport for MCP server

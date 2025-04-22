@@ -1,19 +1,11 @@
-# docker-compose.yml
+version: '3.8'
 
-# Base configuration anchor for reusability
+# Shared configuration for all environments
 x-base-config: &base-config
   ports:
-    # Map host port 11235 to container port 11235 (where Gunicorn will listen)
-    - "11235:11235"
-    # - "8080:8080" # Uncomment if needed
-
-  # Load API keys primarily from .llm.env file
-  # Create .llm.env in the root directory .llm.env.example
+    - "11235:11235"  # Gunicorn port
   env_file:
-    - .llm.env
-
-  # Define environment variables, allowing overrides from host environment
-  # Syntax ${VAR:-} uses host env var 'VAR' if set, otherwise uses value from .llm.env
+    - .llm.env       # API keys (create from .llm.env.example)
   environment:
     - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
@@ -22,10 +14,8 @@ x-base-config: &base-config
     - TOGETHER_API_KEY=${TOGETHER_API_KEY:-}
     - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
     - GEMINI_API_TOKEN=${GEMINI_API_TOKEN:-}
-
   volumes:
-    # Mount /dev/shm for Chromium/Playwright performance
-    - /dev/shm:/dev/shm
+    - /dev/shm:/dev/shm  # Chromium performance
   deploy:
     resources:
       limits:
@@ -34,47 +24,26 @@ x-base-config: &base-config
         memory: 1G
   restart: unless-stopped
   healthcheck:
-    # IMPORTANT: Ensure Gunicorn binds to 11235 in supervisord.conf
     test: ["CMD", "curl", "-f", "http://localhost:11235/health"]
     interval: 30s
     timeout: 10s
     retries: 3
-    start_period: 40s # Give the server time to start
-  # Run the container as the non-root user defined in the Dockerfile
+    start_period: 40s
   user: "appuser"
 
 services:
-  # --- Local Build Services ---
-  crawl4ai-local-amd64:
+  crawl4ai:
+    # 1. Default: Pull multi-platform test image from Docker Hub
+    # 2. Override with local image via: IMAGE=local-test docker compose up
+    image: ${IMAGE:-unclecode/crawl4ai:${TAG:-latest}}
+    
+    # Local build config (used with --build)
     build:
-      context: . # Build context is the root directory
-      dockerfile: Dockerfile # Dockerfile is in the root directory
+      context: .
+      dockerfile: Dockerfile
       args:
         INSTALL_TYPE: ${INSTALL_TYPE:-default}
         ENABLE_GPU: ${ENABLE_GPU:-false}
-        # PYTHON_VERSION arg is omitted as it's fixed by 'FROM python:3.10-slim' in Dockerfile
-    platform: linux/amd64
-    profiles: ["local-amd64"]
-    <<: *base-config # Inherit base configuration
-
-  crawl4ai-local-arm64:
-    build:
-      context: . # Build context is the root directory
-      dockerfile: Dockerfile # Dockerfile is in the root directory
-      args:
-        INSTALL_TYPE: ${INSTALL_TYPE:-default}
-        ENABLE_GPU: ${ENABLE_GPU:-false}
-    platform: linux/arm64
-    profiles: ["local-arm64"]
-    <<: *base-config
-
-  # --- Docker Hub Image Services ---
-  crawl4ai-hub-amd64:
-    image: unclecode/crawl4ai:${VERSION:-latest}-amd64
-    profiles: ["hub-amd64"]
-    <<: *base-config
-
-  crawl4ai-hub-arm64:
-    image: unclecode/crawl4ai:${VERSION:-latest}-arm64
-    profiles: ["hub-arm64"]
+    
+    # Inherit shared config
     <<: *base-config
