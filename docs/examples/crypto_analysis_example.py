@@ -383,29 +383,29 @@ async def main():
             scroll_delay=0.2,
         )
 
-        # # Execute market data extraction
-        # results: List[CrawlResult] = await crawler.arun(
-        #     url="https://coinmarketcap.com/?page=1", config=crawl_config
-        # )
+        # Execute market data extraction
+        results: List[CrawlResult] = await crawler.arun(
+            url="https://coinmarketcap.com/?page=1", config=crawl_config
+        )
 
-        # # Process results
-        # raw_df = pd.DataFrame()
-        # for result in results:
-        #     if result.success and result.media["tables"]:
-        #         # Extract primary market table
-        #         # DataFrame
-        #         raw_df = pd.DataFrame(
-        #             result.media["tables"][0]["rows"],
-        #             columns=result.media["tables"][0]["headers"],
-        #         )
-        #         break
+        # Process results
+        raw_df = pd.DataFrame()
+        for result in results:
+            if result.success and result.media["tables"]:
+                # Extract primary market table
+                # DataFrame
+                raw_df = pd.DataFrame(
+                    result.media["tables"][0]["rows"],
+                    columns=result.media["tables"][0]["headers"],
+                )
+                break
 
 
         # This is for debugging only
         # ////// Remove this in production from here..
         # Save raw data for debugging
-        # raw_df.to_csv(f"{__current_dir__}/tmp/raw_crypto_data.csv", index=False)
-        # print("🔍 Raw data saved to 'raw_crypto_data.csv'")
+        raw_df.to_csv(f"{__current_dir__}/tmp/raw_crypto_data.csv", index=False)
+        print("🔍 Raw data saved to 'raw_crypto_data.csv'")
 
         # Read from file for debugging
         raw_df = pd.read_csv(f"{__current_dir__}/tmp/raw_crypto_data.csv")

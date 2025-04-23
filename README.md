@@ -523,8 +523,33 @@ async def test_news_crawl():
 
 - **📊 Table-to-DataFrame Extraction**: Extract HTML tables directly to CSV or pandas DataFrames:
   ```python
-  crawler_config = CrawlerRunConfig(extract_tables=True)
-  # Access tables via result.tables or result.tables_as_dataframe
+    crawler = AsyncWebCrawler(config=browser_config)
+    await crawler.start()
+
+    try:
+        # Set up scraping parameters
+        crawl_config = CrawlerRunConfig(
+            table_score_threshold=8,  # Strict table detection
+        )
+
+        # Execute market data extraction
+        results: List[CrawlResult] = await crawler.arun(
+            url="https://coinmarketcap.com/?page=1", config=crawl_config
+        )
+
+        # Process results
+        raw_df = pd.DataFrame()
+        for result in results:
+            if result.success and result.media["tables"]:
+                raw_df = pd.DataFrame(
+                    result.media["tables"][0]["rows"],
+                    columns=result.media["tables"][0]["headers"],
+                )
+                break
+        print(raw_df.head())
+
+    finally:
+        await crawler.stop()
   ```
 
 - **🚀 Browser Pooling**: Pages launch hot with pre-warmed browser instances for lower latency and memory usage
@@ -544,7 +569,7 @@ async def test_news_crawl():
   claude mcp add --transport sse c4ai-sse http://localhost:11235/mcp/sse
   ```
 
-- **🖥️ Interactive Playground**: Test configurations and generate API requests with the built-in web interface at `/playground`
+- **🖥️ Interactive Playground**: Test configurations and generate API requests with the built-in web interface at `http://localhost:11235//playground`
 
 - **🐳 Revamped Docker Deployment**: Streamlined multi-architecture Docker image with improved resource efficiency
 
