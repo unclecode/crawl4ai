@@ -412,17 +412,41 @@ footer {
     background-color: var(--primary-dimmed-color, #09b5a5);
     color: var(--background-color, #070708);
     border: none;
-    padding: 4px 8px;
+    padding: 6px 10px;
     font-size: 0.8em;
     border-radius: 4px;
     cursor: pointer;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
-    transition: background-color 0.2s ease;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+    transition: background-color 0.2s ease, transform 0.15s ease;
     white-space: nowrap;
+    display: flex;
+    align-items: center;
+    font-weight: 500;
+    animation: askAiButtonAppear 0.2s ease-out;
+}
+
+@keyframes askAiButtonAppear {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
 }
 
 .ask-ai-selection-button:hover {
     background-color: var(--primary-color, #50ffff);
+    transform: scale(1.05);
+}
+
+/* Mobile styles for Ask AI button */
+@media screen and (max-width: 768px) {
+    .ask-ai-selection-button {
+        padding: 8px 12px; /* Larger touch target on mobile */
+        font-size: 0.9em; /* Slightly larger text */
+    }
 }
 
 /* ==== File: docs/assets/layout.css (Additions) ==== */
