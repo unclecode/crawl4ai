@@ -64,7 +64,7 @@ body {
     /* Apply side padding within the centered block */
     padding-left: calc(var(--global-space) * 2);
     padding-right: calc(var(--global-space) * 2);
-    /* Add margin-left to clear the fixed sidebar */
+    /* Add margin-left to clear the fixed sidebar - ONLY ON DESKTOP */
     margin-left: var(--sidebar-width);
 }
 
@@ -81,7 +81,7 @@ body {
     z-index: 900;
     padding: 1em calc(var(--global-space) * 2);
     padding-bottom: 2em;
-    /* transition: left var(--layout-transition-speed) ease-in-out; */
+    transition: left var(--layout-transition-speed) ease-in-out;
 }
 
 /* --- 2. Main Content Area (Within Centered Grid) --- */
@@ -188,21 +188,133 @@ footer {
     }
 }
 
+/* --- Mobile Menu Styles --- */
+.mobile-menu-toggle {
+    display: none; /* Hidden by default, shown in mobile */
+    background: none;
+    border: none;
+    padding: 10px;
+    cursor: pointer;
+    z-index: 1200;
+    margin-right: 10px;
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    /* Make sure it doesn't get moved */
+    min-width: 30px;
+    min-height: 30px;
+}
+
+.hamburger-line {
+    display: block;
+    width: 22px;
+    height: 2px;
+    margin: 5px 0;
+    background-color: var(--font-color);
+    transition: transform 0.3s, opacity 0.3s;
+}
+
+/* Hamburger animation */
+.mobile-menu-toggle.is-active .hamburger-line:nth-child(1) {
+    transform: translateY(7px) rotate(45deg);
+}
+
+.mobile-menu-toggle.is-active .hamburger-line:nth-child(2) {
+    opacity: 0;
+}
+
+.mobile-menu-toggle.is-active .hamburger-line:nth-child(3) {
+    transform: translateY(-7px) rotate(-45deg);
+}
+
+.mobile-menu-close {
+    display: none; /* Hidden by default, shown in mobile */
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: none;
+    border: none;
+    color: var(--font-color);
+    font-size: 24px;
+    cursor: pointer;
+    z-index: 1200;
+    padding: 5px 10px;
+}
+
+.mobile-menu-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.7);
+    z-index: 1050;
+}
+
 /* --- Small screens: Hide left sidebar, full width content & footer --- */
 @media screen and (max-width: 768px) {
+    /* Hide the terminal-menu from theme */
+    .terminal-menu {
+        display: none !important;
+    }
+    
+    /* Add padding to site name to prevent hamburger overlap */
+    .terminal-mkdocs-site-name,
+    .terminal-logo a,
+    .terminal-nav .logo {
+        padding-left: 40px !important;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    /* Show mobile menu toggle button */
+    .mobile-menu-toggle {
+        display: block;
+    }
+    
+    /* Show mobile menu close button */
+    .mobile-menu-close {
+        display: block;
+    }
 
     #terminal-mkdocs-side-panel {
-        left: calc(-1 * var(--sidebar-width));
+        left: -100%; /* Hide completely off-screen */
         z-index: 1100;
         box-shadow: 2px 0 10px rgba(0,0,0,0.3);
+        top: 0; /* Start from top edge */
+        height: 100%; /* Full height */
+        transition: left 0.3s ease-in-out;
+        padding-top: 50px; /* Space for close button */
+        overflow-y: auto;
+        width: 85%; /* Wider on mobile */
+        max-width: 320px; /* Maximum width */
+        background-color: var(--background-color); /* Ensure solid background */
     }
+    
     #terminal-mkdocs-side-panel.sidebar-visible {
         left: 0;
+    }
+    
+    /* Make navigation links more touch-friendly */
+    #terminal-mkdocs-side-panel a {
+        padding: 6px 15px;
+        display: block;
+        /* No border as requested */
+    }
+    
+    #terminal-mkdocs-side-panel ul {
+        padding-left: 0;
+    }
+    
+    #terminal-mkdocs-side-panel ul ul a {
+        padding-left: 10px;
     }
 
     .terminal-mkdocs-main-grid {
         /* Grid now takes full width (minus body padding) */
-        margin-left: 0; /* Override sidebar margin */
+        margin-left: 0 !important; /* Override sidebar margin with !important */
         margin-right: 0; /* Override auto margin */
         max-width: 100%; /* Allow full width */
         padding-left: var(--global-space); /* Reduce padding */
@@ -224,7 +336,6 @@ footer {
          text-align: center;
          gap: 0.5em;
     }
-    /* Remember JS for toggle button & overlay */
 }
 
 

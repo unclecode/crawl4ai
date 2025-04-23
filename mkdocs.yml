@@ -92,3 +92,4 @@ extra_javascript:
   - assets/selection_ask_ai.js
   - assets/copy_code.js
   - assets/floating_ask_ai_button.js
+  - assets/mobile_menu.js

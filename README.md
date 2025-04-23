@@ -509,9 +509,16 @@ async def test_news_crawl():
 
 - **🌎 World-aware Crawling**: Set geolocation, language, and timezone for authentic locale-specific content:
   ```python
-  crawler_config = CrawlerRunConfig(
-      geo_locale={"city": "Tokyo", "lang": "ja", "timezone": "Asia/Tokyo"}
-  )
+    crun_cfg = CrawlerRunConfig(
+        url="https://browserleaks.com/geo",          # test page that shows your location
+        locale="en-US",                              # Accept-Language & UI locale
+        timezone_id="America/Los_Angeles",           # JS Date()/Intl timezone
+        geolocation=GeolocationConfig(                 # override GPS coords
+            latitude=34.0522,
+            longitude=-118.2437,
+            accuracy=10.0,
+        )
+    )
   ```
 
 - **📊 Table-to-DataFrame Extraction**: Extract HTML tables directly to CSV or pandas DataFrames:
