@@ -398,7 +398,6 @@ async def demo_param_js_execution(client: httpx.AsyncClient):
     elif results:
          console.print("[yellow]JS Execution Result not found in response.[/]")
 
-
 async def demo_param_screenshot(client: httpx.AsyncClient):
     payload = {
         "urls": [SIMPLE_URL],
@@ -429,8 +428,6 @@ async def demo_param_ssl_fetch(client: httpx.AsyncClient):
         console.print(results[0]["ssl_certificate"])
     elif results:
          console.print("[yellow]SSL Certificate data not found in response.[/]")
-
-
 
 async def demo_param_proxy(client: httpx.AsyncClient):
     proxy_params_list = load_proxies_from_env() # Get the list of parameter dicts

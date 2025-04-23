@@ -1,4 +1,4 @@
-FROM python:3.10-slim
+FROM python:3.12-slim-bookworm AS build
 
 # C4ai version
 ARG C4AI_VER=0.6.0
@@ -22,7 +22,7 @@ ENV PYTHONFAULTHANDLER=1 \
     REDIS_HOST=localhost \
     REDIS_PORT=6379
 
-ARG PYTHON_VERSION=3.10
+ARG PYTHON_VERSION=3.12
 ARG INSTALL_TYPE=default
 ARG ENABLE_GPU=false
 ARG TARGETARCH
@@ -69,6 +69,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libasound2 \
     libatspi2.0-0 \
     && apt-get clean \ 
+    && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && apt-get dist-upgrade -y \
     && rm -rf /var/lib/apt/lists/*
 
 RUN if [ "$ENABLE_GPU" = "true" ] && [ "$TARGETARCH" = "amd64" ] ; then \
