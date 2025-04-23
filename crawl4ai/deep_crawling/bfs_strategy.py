@@ -117,7 +117,8 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
                 self.logger.debug(f"URL {url} skipped: score {score} below threshold {self.score_threshold}")
                 self.stats.urls_skipped += 1
                 continue
-            
+
+            visited.add(base_url)
             valid_links.append((base_url, score))
         
         # If we have more valid links than capacity, sort by score and take the top ones
@@ -163,7 +164,6 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
             
             next_level: List[Tuple[str, Optional[str]]] = []
             urls = [url for url, _ in current_level]
-            visited.update(urls)
 
             # Clone the config to disable deep crawling recursion and enforce batch mode.
             batch_config = config.clone(deep_crawl_strategy=None, stream=False)

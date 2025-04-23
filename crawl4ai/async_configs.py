@@ -5,6 +5,7 @@ from .config import (
     MIN_WORD_THRESHOLD,
     IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
     PROVIDER_MODELS,
+    PROVIDER_MODELS_PREFIXES,
     SCREENSHOT_HEIGHT_TRESHOLD,
     PAGE_TIMEOUT,
     IMAGE_SCORE_THRESHOLD,
@@ -27,11 +28,8 @@ import inspect
 from typing import Any, Dict, Optional
 from enum import Enum
 
-from .proxy_strategy import ProxyConfig
-try:
-    from .browser.models import DockerConfig
-except ImportError:
-    DockerConfig = None
+# from .proxy_strategy import ProxyConfig
+
 
 
 def to_serializable_dict(obj: Any, ignore_default_value : bool = False) -> Dict:
@@ -122,23 +120,25 @@ def from_serializable_dict(data: Any) -> Any:
     # Handle typed data
     if isinstance(data, dict) and "type" in data:
         # Handle plain dictionaries
-        if data["type"] == "dict":
+        if data["type"] == "dict" and "value" in data:
             return {k: from_serializable_dict(v) for k, v in data["value"].items()}
 
         # Import from crawl4ai for class instances
         import crawl4ai
 
-        cls = getattr(crawl4ai, data["type"])
+        if hasattr(crawl4ai, data["type"]):
+            cls = getattr(crawl4ai, data["type"])
 
-        # Handle Enum
-        if issubclass(cls, Enum):
-            return cls(data["params"])
+            # Handle Enum
+            if issubclass(cls, Enum):
+                return cls(data["params"])
 
-        # Handle class instances
-        constructor_args = {
-            k: from_serializable_dict(v) for k, v in data["params"].items()
-        }
-        return cls(**constructor_args)
+            if "params" in data:
+                # Handle class instances
+                constructor_args = {
+                    k: from_serializable_dict(v) for k, v in data["params"].items()
+                }
+                return cls(**constructor_args)
 
     # Handle lists
     if isinstance(data, list):
@@ -158,6 +158,166 @@ def is_empty_value(value: Any) -> bool:
     if isinstance(value, (list, tuple, set, dict, str)) and len(value) == 0:
         return True
     return False
+
+class GeolocationConfig:
+    def __init__(
+        self,
+        latitude: float,
+        longitude: float,
+        accuracy: Optional[float] = 0.0
+    ):
+        """Configuration class for geolocation settings.
+        
+        Args:
+            latitude: Latitude coordinate (e.g., 37.7749)
+            longitude: Longitude coordinate (e.g., -122.4194)
+            accuracy: Accuracy in meters. Default: 0.0
+        """
+        self.latitude = latitude
+        self.longitude = longitude
+        self.accuracy = accuracy
+    
+    @staticmethod
+    def from_dict(geo_dict: Dict) -> "GeolocationConfig":
+        """Create a GeolocationConfig from a dictionary."""
+        return GeolocationConfig(
+            latitude=geo_dict.get("latitude"),
+            longitude=geo_dict.get("longitude"),
+            accuracy=geo_dict.get("accuracy", 0.0)
+        )
+    
+    def to_dict(self) -> Dict:
+        """Convert to dictionary representation."""
+        return {
+            "latitude": self.latitude,
+            "longitude": self.longitude,
+            "accuracy": self.accuracy
+        }
+    
+    def clone(self, **kwargs) -> "GeolocationConfig":
+        """Create a copy of this configuration with updated values.
+
+        Args:
+            **kwargs: Key-value pairs of configuration options to update
+
+        Returns:
+            GeolocationConfig: A new instance with the specified updates
+        """
+        config_dict = self.to_dict()
+        config_dict.update(kwargs)
+        return GeolocationConfig.from_dict(config_dict)
+
+
+class ProxyConfig:
+    def __init__(
+        self,
+        server: str,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        ip: Optional[str] = None,
+    ):
+        """Configuration class for a single proxy.
+        
+        Args:
+            server: Proxy server URL (e.g., "http://127.0.0.1:8080")
+            username: Optional username for proxy authentication
+            password: Optional password for proxy authentication
+            ip: Optional IP address for verification purposes
+        """
+        self.server = server
+        self.username = username
+        self.password = password
+        
+        # Extract IP from server if not explicitly provided
+        self.ip = ip or self._extract_ip_from_server()
+    
+    def _extract_ip_from_server(self) -> Optional[str]:
+        """Extract IP address from server URL."""
+        try:
+            # Simple extraction assuming http://ip:port format
+            if "://" in self.server:
+                parts = self.server.split("://")[1].split(":")
+                return parts[0]
+            else:
+                parts = self.server.split(":")
+                return parts[0]
+        except Exception:
+            return None
+    
+    @staticmethod
+    def from_string(proxy_str: str) -> "ProxyConfig":
+        """Create a ProxyConfig from a string in the format 'ip:port:username:password'."""
+        parts = proxy_str.split(":")
+        if len(parts) == 4:  # ip:port:username:password
+            ip, port, username, password = parts
+            return ProxyConfig(
+                server=f"http://{ip}:{port}",
+                username=username,
+                password=password,
+                ip=ip
+            )
+        elif len(parts) == 2:  # ip:port only
+            ip, port = parts
+            return ProxyConfig(
+                server=f"http://{ip}:{port}",
+                ip=ip
+            )
+        else:
+            raise ValueError(f"Invalid proxy string format: {proxy_str}")
+    
+    @staticmethod
+    def from_dict(proxy_dict: Dict) -> "ProxyConfig":
+        """Create a ProxyConfig from a dictionary."""
+        return ProxyConfig(
+            server=proxy_dict.get("server"),
+            username=proxy_dict.get("username"),
+            password=proxy_dict.get("password"),
+            ip=proxy_dict.get("ip")
+        )
+    
+    @staticmethod
+    def from_env(env_var: str = "PROXIES") -> List["ProxyConfig"]:
+        """Load proxies from environment variable.
+        
+        Args:
+            env_var: Name of environment variable containing comma-separated proxy strings
+            
+        Returns:
+            List of ProxyConfig objects
+        """
+        proxies = []
+        try:
+            proxy_list = os.getenv(env_var, "").split(",")
+            for proxy in proxy_list:
+                if not proxy:
+                    continue
+                proxies.append(ProxyConfig.from_string(proxy))
+        except Exception as e:
+            print(f"Error loading proxies from environment: {e}")
+        return proxies
+    
+    def to_dict(self) -> Dict:
+        """Convert to dictionary representation."""
+        return {
+            "server": self.server,
+            "username": self.username,
+            "password": self.password,
+            "ip": self.ip
+        }
+    
+    def clone(self, **kwargs) -> "ProxyConfig":
+        """Create a copy of this configuration with updated values.
+
+        Args:
+            **kwargs: Key-value pairs of configuration options to update
+
+        Returns:
+            ProxyConfig: A new instance with the specified updates
+        """
+        config_dict = self.to_dict()
+        config_dict.update(kwargs)
+        return ProxyConfig.from_dict(config_dict)
+
 
 
 class BrowserConfig:
@@ -195,8 +355,6 @@ class BrowserConfig:
                              Default: None.
         proxy_config (ProxyConfig or dict or None): Detailed proxy configuration, e.g. {"server": "...", "username": "..."}.
                                      If None, no additional proxy config. Default: None.
-        docker_config (DockerConfig or dict or None): Configuration for Docker-based browser automation.
-                                     Contains settings for Docker container operation. Default: None.
         viewport_width (int): Default viewport width for pages. Default: 1080.
         viewport_height (int): Default viewport height for pages. Default: 600.
         viewport (dict): Default viewport dimensions for pages. If set, overrides viewport_width and viewport_height.
@@ -242,7 +400,6 @@ class BrowserConfig:
         channel: str = "chromium",
         proxy: str = None,
         proxy_config: Union[ProxyConfig, dict, None] = None,
-        docker_config: Union[DockerConfig, dict, None] = None,
         viewport_width: int = 1080,
         viewport_height: int = 600,
         viewport: dict = None,
@@ -283,15 +440,7 @@ class BrowserConfig:
             self.chrome_channel = ""
         self.proxy = proxy
         self.proxy_config = proxy_config
-        
-        # Handle docker configuration
-        if isinstance(docker_config, dict) and DockerConfig is not None:
-            self.docker_config = DockerConfig.from_kwargs(docker_config)
-        else:
-            self.docker_config = docker_config
 
-        if self.docker_config:
-            self.user_data_dir = self.docker_config.user_data_dir
 
         self.viewport_width = viewport_width
         self.viewport_height = viewport_height
@@ -362,7 +511,6 @@ class BrowserConfig:
             channel=kwargs.get("channel", "chromium"),
             proxy=kwargs.get("proxy"),
             proxy_config=kwargs.get("proxy_config", None),
-            docker_config=kwargs.get("docker_config", None),
             viewport_width=kwargs.get("viewport_width", 1080),
             viewport_height=kwargs.get("viewport_height", 600),
             accept_downloads=kwargs.get("accept_downloads", False),
@@ -419,13 +567,7 @@ class BrowserConfig:
             "debugging_port": self.debugging_port,
             "host": self.host,
         }
-        
-        # Include docker_config if it exists
-        if hasattr(self, "docker_config") and self.docker_config is not None:
-            if hasattr(self.docker_config, "to_dict"):
-                result["docker_config"] = self.docker_config.to_dict()
-            else:
-                result["docker_config"] = self.docker_config
+
                 
         return result
 
@@ -587,6 +729,14 @@ class CrawlerRunConfig():
         proxy_config (ProxyConfig or dict or None): Detailed proxy configuration, e.g. {"server": "...", "username": "..."}.
                                      If None, no additional proxy config. Default: None.
 
+        # Browser Location and Identity Parameters
+        locale (str or None): Locale to use for the browser context (e.g., "en-US").
+                             Default: None.
+        timezone_id (str or None): Timezone identifier to use for the browser context (e.g., "America/New_York").
+                                  Default: None.
+        geolocation (GeolocationConfig or None): Geolocation configuration for the browser.
+                                                Default: None.
+
         # SSL Parameters
         fetch_ssl_certificate: bool = False,
         # Caching Parameters
@@ -736,6 +886,10 @@ class CrawlerRunConfig():
         scraping_strategy: ContentScrapingStrategy = None,
         proxy_config: Union[ProxyConfig, dict, None] = None,
         proxy_rotation_strategy: Optional[ProxyRotationStrategy] = None,
+        # Browser Location and Identity Parameters
+        locale: Optional[str] = None,
+        timezone_id: Optional[str] = None,
+        geolocation: Optional[GeolocationConfig] = None,
         # SSL Parameters
         fetch_ssl_certificate: bool = False,
         # Caching Parameters
@@ -772,10 +926,12 @@ class CrawlerRunConfig():
         screenshot_wait_for: float = None,
         screenshot_height_threshold: int = SCREENSHOT_HEIGHT_TRESHOLD,
         pdf: bool = False,
+        capture_mhtml: bool = False,
         image_description_min_word_threshold: int = IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
         image_score_threshold: int = IMAGE_SCORE_THRESHOLD,
         table_score_threshold: int = 7,
         exclude_external_images: bool = False,
+        exclude_all_images: bool = False,
         # Link and Domain Handling Parameters
         exclude_social_media_domains: list = None,
         exclude_external_links: bool = False,
@@ -785,6 +941,9 @@ class CrawlerRunConfig():
         # Debugging and Logging Parameters
         verbose: bool = True,
         log_console: bool = False,
+        # Network and Console Capturing Parameters
+        capture_network_requests: bool = False,
+        capture_console_messages: bool = False,
         # Connection Parameters
         method: str = "GET",
         stream: bool = False,
@@ -819,6 +978,11 @@ class CrawlerRunConfig():
         self.scraping_strategy = scraping_strategy or WebScrapingStrategy()
         self.proxy_config = proxy_config
         self.proxy_rotation_strategy = proxy_rotation_strategy
+        
+        # Browser Location and Identity Parameters
+        self.locale = locale
+        self.timezone_id = timezone_id
+        self.geolocation = geolocation
 
         # SSL Parameters
         self.fetch_ssl_certificate = fetch_ssl_certificate
@@ -860,9 +1024,11 @@ class CrawlerRunConfig():
         self.screenshot_wait_for = screenshot_wait_for
         self.screenshot_height_threshold = screenshot_height_threshold
         self.pdf = pdf
+        self.capture_mhtml = capture_mhtml
         self.image_description_min_word_threshold = image_description_min_word_threshold
         self.image_score_threshold = image_score_threshold
         self.exclude_external_images = exclude_external_images
+        self.exclude_all_images = exclude_all_images
         self.table_score_threshold = table_score_threshold
 
         # Link and Domain Handling Parameters
@@ -877,6 +1043,10 @@ class CrawlerRunConfig():
         # Debugging and Logging Parameters
         self.verbose = verbose
         self.log_console = log_console
+        
+        # Network and Console Capturing Parameters
+        self.capture_network_requests = capture_network_requests
+        self.capture_console_messages = capture_console_messages
 
         # Connection Parameters
         self.stream = stream
@@ -953,6 +1123,10 @@ class CrawlerRunConfig():
             scraping_strategy=kwargs.get("scraping_strategy"),
             proxy_config=kwargs.get("proxy_config"),
             proxy_rotation_strategy=kwargs.get("proxy_rotation_strategy"),
+            # Browser Location and Identity Parameters
+            locale=kwargs.get("locale", None),
+            timezone_id=kwargs.get("timezone_id", None),
+            geolocation=kwargs.get("geolocation", None),
             # SSL Parameters
             fetch_ssl_certificate=kwargs.get("fetch_ssl_certificate", False),
             # Caching Parameters
@@ -991,6 +1165,7 @@ class CrawlerRunConfig():
                 "screenshot_height_threshold", SCREENSHOT_HEIGHT_TRESHOLD
             ),
             pdf=kwargs.get("pdf", False),
+            capture_mhtml=kwargs.get("capture_mhtml", False),
             image_description_min_word_threshold=kwargs.get(
                 "image_description_min_word_threshold",
                 IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
@@ -999,6 +1174,7 @@ class CrawlerRunConfig():
                 "image_score_threshold", IMAGE_SCORE_THRESHOLD
             ),
             table_score_threshold=kwargs.get("table_score_threshold", 7),
+            exclude_all_images=kwargs.get("exclude_all_images", False),
             exclude_external_images=kwargs.get("exclude_external_images", False),
             # Link and Domain Handling Parameters
             exclude_social_media_domains=kwargs.get(
@@ -1011,6 +1187,9 @@ class CrawlerRunConfig():
             # Debugging and Logging Parameters
             verbose=kwargs.get("verbose", True),
             log_console=kwargs.get("log_console", False),
+            # Network and Console Capturing Parameters
+            capture_network_requests=kwargs.get("capture_network_requests", False),
+            capture_console_messages=kwargs.get("capture_console_messages", False),
             # Connection Parameters
             method=kwargs.get("method", "GET"),
             stream=kwargs.get("stream", False),
@@ -1057,6 +1236,9 @@ class CrawlerRunConfig():
             "scraping_strategy": self.scraping_strategy,
             "proxy_config": self.proxy_config,
             "proxy_rotation_strategy": self.proxy_rotation_strategy,
+            "locale": self.locale,
+            "timezone_id": self.timezone_id,
+            "geolocation": self.geolocation,
             "fetch_ssl_certificate": self.fetch_ssl_certificate,
             "cache_mode": self.cache_mode,
             "session_id": self.session_id,
@@ -1088,9 +1270,11 @@ class CrawlerRunConfig():
             "screenshot_wait_for": self.screenshot_wait_for,
             "screenshot_height_threshold": self.screenshot_height_threshold,
             "pdf": self.pdf,
+            "capture_mhtml": self.capture_mhtml,
             "image_description_min_word_threshold": self.image_description_min_word_threshold,
             "image_score_threshold": self.image_score_threshold,
             "table_score_threshold": self.table_score_threshold,
+            "exclude_all_images": self.exclude_all_images,
             "exclude_external_images": self.exclude_external_images,
             "exclude_social_media_domains": self.exclude_social_media_domains,
             "exclude_external_links": self.exclude_external_links,
@@ -1099,6 +1283,8 @@ class CrawlerRunConfig():
             "exclude_internal_links": self.exclude_internal_links,
             "verbose": self.verbose,
             "log_console": self.log_console,
+            "capture_network_requests": self.capture_network_requests,
+            "capture_console_messages": self.capture_console_messages,
             "method": self.method,
             "stream": self.stream,
             "check_robots_txt": self.check_robots_txt,
@@ -1158,9 +1344,18 @@ class LLMConfig:
         elif api_token and api_token.startswith("env:"):
             self.api_token = os.getenv(api_token[4:])
         else:
-            self.api_token = PROVIDER_MODELS.get(provider, "no-token") or os.getenv(
-                DEFAULT_PROVIDER_API_KEY
-            )
+            # Check if given provider starts with any of key in PROVIDER_MODELS_PREFIXES
+            # If not, check if it is in PROVIDER_MODELS
+            prefixes = PROVIDER_MODELS_PREFIXES.keys()
+            if any(provider.startswith(prefix) for prefix in prefixes):
+                selected_prefix = next(
+                    (prefix for prefix in prefixes if provider.startswith(prefix)),
+                    None,
+                )
+                self.api_token = PROVIDER_MODELS_PREFIXES.get(selected_prefix)                    
+            else:
+                self.provider = DEFAULT_PROVIDER
+                self.api_token = os.getenv(DEFAULT_PROVIDER_API_KEY)
         self.base_url = base_url
         self.temprature = temprature
         self.max_tokens = max_tokens

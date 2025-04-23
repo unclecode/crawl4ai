@@ -4,7 +4,35 @@ In this tutorial, you’ll learn how to:
 
 1. Extract links (internal, external) from crawled pages  
 2. Filter or exclude specific domains (e.g., social media or custom domains)  
-3. Access and manage media data (especially images) in the crawl result  
+3. Access and ma### 3.2 Excluding Images
+
+#### Excluding External Images
+
+If you're dealing with heavy pages or want to skip third-party images (advertisements, for example), you can turn on:
+
+```python
+crawler_cfg = CrawlerRunConfig(
+    exclude_external_images=True
+)
+```
+
+This setting attempts to discard images from outside the primary domain, keeping only those from the site you're crawling.
+
+#### Excluding All Images
+
+If you want to completely remove all images from the page to maximize performance and reduce memory usage, use:
+
+```python
+crawler_cfg = CrawlerRunConfig(
+    exclude_all_images=True
+)
+```
+
+This setting removes all images very early in the processing pipeline, which significantly improves memory efficiency and processing speed. This is particularly useful when:
+- You don't need image data in your results
+- You're crawling image-heavy pages that cause memory issues
+- You want to focus only on text content
+- You need to maximize crawling speeddata (especially images) in the crawl result  
 4. Configure your crawler to exclude or prioritize certain images
 
 > **Prerequisites**  
@@ -271,7 +299,40 @@ Each extracted table contains:
 
 - **`screenshot`**: Set to `True` if you want a full-page screenshot stored as `base64` in `result.screenshot`.  
 - **`pdf`**: Set to `True` if you want a PDF version of the page in `result.pdf`.  
+- **`capture_mhtml`**: Set to `True` if you want an MHTML snapshot of the page in `result.mhtml`. This format preserves the entire web page with all its resources (CSS, images, scripts) in a single file, making it perfect for archiving or offline viewing.
 - **`wait_for_images`**: If `True`, attempts to wait until images are fully loaded before final extraction.
+
+#### Example: Capturing Page as MHTML
+
+```python
+import asyncio
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
+
+async def main():
+    crawler_cfg = CrawlerRunConfig(
+        capture_mhtml=True  # Enable MHTML capture
+    )
+    
+    async with AsyncWebCrawler() as crawler:
+        result = await crawler.arun("https://example.com", config=crawler_cfg)
+        
+        if result.success and result.mhtml:
+            # Save the MHTML snapshot to a file
+            with open("example.mhtml", "w", encoding="utf-8") as f:
+                f.write(result.mhtml)
+            print("MHTML snapshot saved to example.mhtml")
+        else:
+            print("Failed to capture MHTML:", result.error_message)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+The MHTML format is particularly useful because:
+- It captures the complete page state including all resources
+- It can be opened in most modern browsers for offline viewing
+- It preserves the page exactly as it appeared during crawling
+- It's a single file, making it easy to store and transfer
 
 ---
 

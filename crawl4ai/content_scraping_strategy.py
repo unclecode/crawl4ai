@@ -28,6 +28,7 @@ from lxml import etree
 from lxml import html as lhtml
 from typing import List
 from .models import ScrapingResult, MediaItem, Link, Media, Links
+import copy
 
 # Pre-compile regular expressions for Open Graph and Twitter metadata
 OG_REGEX = re.compile(r"^og:")
@@ -48,7 +49,7 @@ def parse_srcset(s: str) -> List[Dict]:
         if len(parts) >= 1:
             url = parts[0]
             width = (
-                parts[1].rstrip("w")
+                parts[1].rstrip("w").split('.')[0]
                 if len(parts) > 1 and parts[1].endswith("w")
                 else None
             )
@@ -128,7 +129,8 @@ class WebScrapingStrategy(ContentScrapingStrategy):
         Returns:
             ScrapingResult: A structured result containing the scraped content.
         """
-        raw_result = self._scrap(url, html, is_async=False, **kwargs)
+        actual_url = kwargs.get("redirected_url", url)
+        raw_result = self._scrap(actual_url, html, is_async=False, **kwargs)
         if raw_result is None:
             return ScrapingResult(
                 cleaned_html="",
@@ -619,6 +621,9 @@ class WebScrapingStrategy(ContentScrapingStrategy):
                 return False
 
             keep_element = False
+            # Special case for table elements - always preserve structure
+            if element.name in ["tr", "td", "th"]:
+                keep_element = True
 
             exclude_domains = kwargs.get("exclude_domains", [])
             # exclude_social_media_domains = kwargs.get('exclude_social_media_domains', set(SOCIAL_MEDIA_DOMAINS))
@@ -859,7 +864,15 @@ class WebScrapingStrategy(ContentScrapingStrategy):
         parser_type = kwargs.get("parser", "lxml")
         soup = BeautifulSoup(html, parser_type)
         body = soup.body
+        if body is None:
+            raise Exception("'<body>' tag is not found in fetched html. Consider adding wait_for=\"css:body\" to wait for body tag to be loaded into DOM.")
         base_domain = get_base_domain(url)
+        
+        # Early removal of all images if exclude_all_images is set
+        # This happens before any processing to minimize memory usage
+        if kwargs.get("exclude_all_images", False):
+            for img in body.find_all('img'):
+                img.decompose()
 
         try:
             meta = extract_metadata("", soup)
@@ -891,23 +904,6 @@ class WebScrapingStrategy(ContentScrapingStrategy):
                 for element in body.select(excluded_selector):
                     element.extract()
 
-        # if False and css_selector:
-        #     selected_elements = body.select(css_selector)
-        #     if not selected_elements:
-        #         return {
-        #             "markdown": "",
-        #             "cleaned_html": "",
-        #             "success": True,
-        #             "media": {"images": [], "videos": [], "audios": []},
-        #             "links": {"internal": [], "external": []},
-        #             "metadata": {},
-        #             "message": f"No elements found for CSS selector: {css_selector}",
-        #         }
-        #         # raise InvalidCSSSelectorError(f"Invalid CSS selector, No elements found for CSS selector: {css_selector}")
-        #     body = soup.new_tag("div")
-        #     for el in selected_elements:
-        #         body.append(el)
-
         content_element = None
         if target_elements:
             try:
@@ -916,12 +912,12 @@ class WebScrapingStrategy(ContentScrapingStrategy):
                     for_content_targeted_element.extend(body.select(target_element))
                 content_element = soup.new_tag("div")
                 for el in for_content_targeted_element:
-                    content_element.append(el)
+                    content_element.append(copy.deepcopy(el))
             except Exception as e:
                 self._log("error", f"Error with target element detection: {str(e)}", "SCRAPE")
                 return None
         else:
-            content_element = body        
+            content_element = body     
 
         kwargs["exclude_social_media_domains"] = set(
             kwargs.get("exclude_social_media_domains", []) + SOCIAL_MEDIA_DOMAINS
@@ -1302,6 +1298,9 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
             "source",
             "track",
             "wbr",
+            "tr",
+            "td",
+            "th",
         }
 
         for el in reversed(list(root.iterdescendants())):
@@ -1491,6 +1490,13 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
             body = doc
 
             base_domain = get_base_domain(url)
+            
+            # Early removal of all images if exclude_all_images is set
+            # This is more efficient in lxml as we remove elements before any processing
+            if kwargs.get("exclude_all_images", False):
+                for img in body.xpath('//img'):
+                    if img.getparent() is not None:
+                        img.getparent().remove(img)
 
             # Add comment removal
             if kwargs.get("remove_comments", False):
@@ -1527,26 +1533,6 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
                 self._log("error", f"Error extracting metadata: {str(e)}", "SCRAPE")
                 meta = {}
 
-            # Handle CSS selector targeting
-            # if css_selector:
-            #     try:
-            #         selected_elements = body.cssselect(css_selector)
-            #         if not selected_elements:
-            #             return {
-            #                 "markdown": "",
-            #                 "cleaned_html": "",
-            #                 "success": True,
-            #                 "media": {"images": [], "videos": [], "audios": []},
-            #                 "links": {"internal": [], "external": []},
-            #                 "metadata": meta,
-            #                 "message": f"No elements found for CSS selector: {css_selector}",
-            #             }
-            #         body = lhtml.Element("div")
-            #         body.extend(selected_elements)
-            #     except Exception as e:
-            #         self._log("error", f"Error with CSS selector: {str(e)}", "SCRAPE")
-            #         return None
-
             content_element = None
             if target_elements:
                 try:
@@ -1554,7 +1540,7 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
                     for target_element in target_elements:
                         for_content_targeted_element.extend(body.cssselect(target_element))
                     content_element = lhtml.Element("div")
-                    content_element.extend(for_content_targeted_element)
+                    content_element.extend(copy.deepcopy(for_content_targeted_element))
                 except Exception as e:
                     self._log("error", f"Error with target element detection: {str(e)}", "SCRAPE")
                     return None
@@ -1623,7 +1609,7 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
             # Remove empty elements
             self.remove_empty_elements_fast(body, 1)
 
-            # Remvoe unneeded attributes
+            # Remove unneeded attributes
             self.remove_unwanted_attributes_fast(
                 body, keep_data_attributes=kwargs.get("keep_data_attributes", False)
             )

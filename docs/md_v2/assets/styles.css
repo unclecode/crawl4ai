@@ -6,8 +6,8 @@
 }
 
 :root {
-    --global-font-size: 16px;
-    --global-code-font-size: 16px;
+    --global-font-size: 14px;
+    --global-code-font-size: 13px;
     --global-line-height: 1.5em;
     --global-space: 10px;
     --font-stack: Menlo, Monaco, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono,
@@ -50,7 +50,16 @@
     --display-h1-decoration: none;
 
     --display-h1-decoration: none;
+
+    --header-height: 65px; /* Adjust based on your actual header height */
+    --sidebar-width: 280px; /* Adjust based on your desired sidebar width */
+    --toc-width: 240px; /* Adjust based on your desired ToC width */
+    --layout-transition-speed: 0.2s; /* For potential future animations */
+
+    --page-width : 100em; /* Adjust based on your design */
 }
+
+
 
 /* body {
     background-color: var(--background-color);
@@ -256,4 +265,9 @@ div.badges a {
 }
 div.badges a > img {
     width: auto;
+}
+
+
+table td, table th {
+    border: 1px solid var(--code-bg-color) !important;
 }

@@ -1,16 +1,21 @@
-# Base configuration (not a service, just a reusable config block)
+version: '3.8'
+
+# Shared configuration for all environments
 x-base-config: &base-config
   ports:
-    - "11235:11235"
-    - "8000:8000"
-    - "9222:9222"
-    - "8080:8080"
+    - "11235:11235"  # Gunicorn port
+  env_file:
+    - .llm.env       # API keys (create from .llm.env.example)
   environment:
-    - CRAWL4AI_API_TOKEN=${CRAWL4AI_API_TOKEN:-}
     - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-    - CLAUDE_API_KEY=${CLAUDE_API_KEY:-}
+    - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+    - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    - GROQ_API_KEY=${GROQ_API_KEY:-}
+    - TOGETHER_API_KEY=${TOGETHER_API_KEY:-}
+    - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
+    - GEMINI_API_TOKEN=${GEMINI_API_TOKEN:-}
   volumes:
-    - /dev/shm:/dev/shm
+    - /dev/shm:/dev/shm  # Chromium performance
   deploy:
     resources:
       limits:
@@ -24,42 +29,21 @@ x-base-config: &base-config
     timeout: 10s
     retries: 3
     start_period: 40s
+  user: "appuser"
 
 services:
-  # Local build services for different platforms
-  crawl4ai-amd64:
+  crawl4ai:
+    # 1. Default: Pull multi-platform test image from Docker Hub
+    # 2. Override with local image via: IMAGE=local-test docker compose up
+    image: ${IMAGE:-unclecode/crawl4ai:${TAG:-latest}}
+    
+    # Local build config (used with --build)
     build:
       context: .
       dockerfile: Dockerfile
       args:
-        PYTHON_VERSION: "3.10"
-        INSTALL_TYPE: ${INSTALL_TYPE:-basic}
-        ENABLE_GPU: false
-      platforms:
-        - linux/amd64
-    profiles: ["local-amd64"]
-    <<: *base-config  # extends yerine doğrudan yapılandırmayı dahil ettik
-
-  crawl4ai-arm64:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        PYTHON_VERSION: "3.10"
-        INSTALL_TYPE: ${INSTALL_TYPE:-basic}
-        ENABLE_GPU: false
-      platforms:
-        - linux/arm64
-    profiles: ["local-arm64"]
-    <<: *base-config
-
-  # Hub services for different platforms and versions
-  crawl4ai-hub-amd64:
-    image: unclecode/crawl4ai:${VERSION:-basic}-amd64
-    profiles: ["hub-amd64"]
-    <<: *base-config
-
-  crawl4ai-hub-arm64:
-    image: unclecode/crawl4ai:${VERSION:-basic}-arm64
-    profiles: ["hub-arm64"]
+        INSTALL_TYPE: ${INSTALL_TYPE:-default}
+        ENABLE_GPU: ${ENABLE_GPU:-false}
+    
+    # Inherit shared config
     <<: *base-config

@@ -24,7 +24,7 @@ from .browser_manager import BrowserManager
 
 import aiofiles
 import aiohttp
-import cchardet
+import chardet
 from aiohttp.client import ClientTimeout
 from urllib.parse import urlparse
 from types import MappingProxyType
@@ -130,6 +130,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         Close the browser and clean up resources.
         """
         await self.browser_manager.close()
+        # Explicitly reset the static Playwright instance
+        BrowserManager._playwright_instance = None
 
     async def kill_session(self, session_id: str):
         """
@@ -409,7 +411,11 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
         user_agent = kwargs.get("user_agent", self.user_agent)
         # Use browser_manager to get a fresh page & context assigned to this session_id
-        page, context = await self.browser_manager.get_page(session_id, user_agent)
+        page, context = await self.browser_manager.get_page(CrawlerRunConfig(
+            session_id=session_id,
+            user_agent=user_agent,
+            **kwargs,
+        ))
         return session_id
 
     async def crawl(
@@ -447,12 +453,17 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 html = f.read()
             if config.screenshot:
                 screenshot_data = await self._generate_screenshot_from_html(html)
+            if config.capture_console_messages:
+                page, context = await self.browser_manager.get_page(crawlerRunConfig=config)
+                captured_console = await self._capture_console_messages(page, url)
+
             return AsyncCrawlResponse(
                 html=html,
                 response_headers=response_headers,
                 status_code=status_code,
                 screenshot=screenshot_data,
                 get_delayed_content=None,
+                console_messages=captured_console,
             )
 
         elif url.startswith("raw:") or url.startswith("raw://"):
@@ -478,6 +489,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
     ) -> AsyncCrawlResponse:
         """
         Internal method to crawl web URLs with the specified configuration.
+        Includes optional network and console capturing.
 
         Args:
             url (str): The web URL to crawl
@@ -494,6 +506,10 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
         # Reset downloaded files list for new crawl
         self._downloaded_files = []
+        
+        # Initialize capture lists
+        captured_requests = []
+        captured_console = []
 
         # Handle user agent with magic mode
         user_agent_to_override = config.user_agent
@@ -505,10 +521,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             )
 
         # Get page for session
-        try:
-            page, context, _ = await self.browser_manager.get_page(crawlerRunConfig=config)
-        except Exception as e:
-            page, context = await self.browser_manager.get_page(crawlerRunConfig=config)
+        page, context = await self.browser_manager.get_page(crawlerRunConfig=config)
 
         # await page.goto(URL)
 
@@ -524,23 +537,156 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         # Call hook after page creation
         await self.execute_hook("on_page_context_created", page, context=context, config=config)
 
+        # Network Request Capturing
+        if config.capture_network_requests:
+            async def handle_request_capture(request):
+                try:
+                    post_data_str = None
+                    try:
+                        # Be cautious with large post data
+                        post_data = request.post_data_buffer
+                        if post_data:
+                             # Attempt to decode, fallback to base64 or size indication
+                             try:
+                                 post_data_str = post_data.decode('utf-8', errors='replace')
+                             except UnicodeDecodeError:
+                                 post_data_str = f"[Binary data: {len(post_data)} bytes]"
+                    except Exception:
+                        post_data_str = "[Error retrieving post data]"
+
+                    captured_requests.append({
+                        "event_type": "request",
+                        "url": request.url,
+                        "method": request.method,
+                        "headers": dict(request.headers), # Convert Header dict
+                        "post_data": post_data_str,
+                        "resource_type": request.resource_type,
+                        "is_navigation_request": request.is_navigation_request(),
+                        "timestamp": time.time()
+                    })
+                except Exception as e:
+                    if self.logger:
+                        self.logger.warning(f"Error capturing request details for {request.url}: {e}", tag="CAPTURE")
+                    captured_requests.append({"event_type": "request_capture_error", "url": request.url, "error": str(e), "timestamp": time.time()})
+
+            async def handle_response_capture(response):
+                try:
+                    captured_requests.append({
+                        "event_type": "response",
+                        "url": response.url,
+                        "status": response.status,
+                        "status_text": response.status_text,
+                        "headers": dict(response.headers), # Convert Header dict
+                        "from_service_worker": response.from_service_worker,
+                        "request_timing": response.request.timing, # Detailed timing info
+                        "timestamp": time.time()
+                    })
+                except Exception as e:
+                    if self.logger:
+                        self.logger.warning(f"Error capturing response details for {response.url}: {e}", tag="CAPTURE")
+                    captured_requests.append({"event_type": "response_capture_error", "url": response.url, "error": str(e), "timestamp": time.time()})
+
+            async def handle_request_failed_capture(request):
+                 try:
+                    captured_requests.append({
+                        "event_type": "request_failed",
+                        "url": request.url,
+                        "method": request.method,
+                        "resource_type": request.resource_type,
+                        "failure_text": str(request.failure) if request.failure else "Unknown failure",
+                        "timestamp": time.time()
+                    })
+                 except Exception as e:
+                    if self.logger:
+                        self.logger.warning(f"Error capturing request failed details for {request.url}: {e}", tag="CAPTURE")
+                    captured_requests.append({"event_type": "request_failed_capture_error", "url": request.url, "error": str(e), "timestamp": time.time()})
+
+            page.on("request", handle_request_capture)
+            page.on("response", handle_response_capture)
+            page.on("requestfailed", handle_request_failed_capture)
+
+        # Console Message Capturing
+        if config.capture_console_messages:
+            def handle_console_capture(msg):
+                try:
+                    message_type = "unknown"
+                    try:
+                        message_type = msg.type
+                    except:
+                        pass
+                        
+                    message_text = "unknown"
+                    try:
+                        message_text = msg.text
+                    except:
+                        pass
+                        
+                    # Basic console message with minimal content
+                    entry = {
+                        "type": message_type,
+                        "text": message_text,
+                        "timestamp": time.time()
+                    }
+                    
+                    captured_console.append(entry)
+                    
+                except Exception as e:
+                    if self.logger:
+                        self.logger.warning(f"Error capturing console message: {e}", tag="CAPTURE")
+                    # Still add something to the list even on error
+                    captured_console.append({
+                        "type": "console_capture_error", 
+                        "error": str(e), 
+                        "timestamp": time.time()
+                    })
+
+            def handle_pageerror_capture(err):
+                try:
+                    error_message = "Unknown error"
+                    try:
+                        error_message = err.message
+                    except:
+                        pass
+                        
+                    error_stack = ""
+                    try:
+                        error_stack = err.stack
+                    except:
+                        pass
+                        
+                    captured_console.append({
+                        "type": "error",
+                        "text": error_message,
+                        "stack": error_stack,
+                        "timestamp": time.time()
+                    })
+                except Exception as e:
+                    if self.logger:
+                        self.logger.warning(f"Error capturing page error: {e}", tag="CAPTURE")
+                    captured_console.append({
+                        "type": "pageerror_capture_error", 
+                        "error": str(e), 
+                        "timestamp": time.time()
+                    })
+
+            # Add event listeners directly
+            page.on("console", handle_console_capture)
+            page.on("pageerror", handle_pageerror_capture)
+
         # Set up console logging if requested
         if config.log_console:
-
             def log_consol(
                 msg, console_log_type="debug"
             ):  # Corrected the parameter syntax
                 if console_log_type == "error":
                     self.logger.error(
                         message=f"Console error: {msg}",  # Use f-string for variable interpolation
-                        tag="CONSOLE",
-                        params={"msg": msg.text},
+                        tag="CONSOLE"
                     )
                 elif console_log_type == "debug":
                     self.logger.debug(
                         message=f"Console: {msg}",  # Use f-string for variable interpolation
-                        tag="CONSOLE",
-                        params={"msg": msg.text},
+                        tag="CONSOLE"
                     )
 
             page.on("console", log_consol)
@@ -831,7 +977,11 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     
                     for selector in selectors:
                         try:
-                            content = await page.evaluate(f"document.querySelector('{selector}')?.outerHTML || ''")
+                            content = await page.evaluate(
+                                f"""Array.from(document.querySelectorAll("{selector}"))
+                                    .map(el => el.outerHTML)
+                                    .join('')"""
+                            )
                             html_parts.append(content)
                         except Error as e:
                             print(f"Warning: Could not get content for selector '{selector}': {str(e)}")
@@ -849,13 +999,17 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 "before_return_html", page=page, html=html, context=context, config=config
             )
 
-            # Handle PDF and screenshot generation
+            # Handle PDF, MHTML and screenshot generation
             start_export_time = time.perf_counter()
             pdf_data = None
             screenshot_data = None
+            mhtml_data = None
 
             if config.pdf:
                 pdf_data = await self.export_pdf(page)
+
+            if config.capture_mhtml:
+                mhtml_data = await self.capture_mhtml(page)
 
             if config.screenshot:
                 if config.screenshot_wait_for:
@@ -864,9 +1018,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     page, screenshot_height_threshold=config.screenshot_height_threshold
                 )
 
-            if screenshot_data or pdf_data:
+            if screenshot_data or pdf_data or mhtml_data:
                 self.logger.info(
-                    message="Exporting PDF and taking screenshot took {duration:.2f}s",
+                    message="Exporting media (PDF/MHTML/screenshot) took {duration:.2f}s",
                     tag="EXPORT",
                     params={"duration": time.perf_counter() - start_export_time},
                 )
@@ -889,12 +1043,16 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 status_code=status_code,
                 screenshot=screenshot_data,
                 pdf_data=pdf_data,
+                mhtml_data=mhtml_data,
                 get_delayed_content=get_delayed_content,
                 ssl_certificate=ssl_cert,
                 downloaded_files=(
                     self._downloaded_files if self._downloaded_files else None
                 ),
                 redirected_url=redirected_url,
+                # Include captured data if enabled
+                network_requests=captured_requests if config.capture_network_requests else None,
+                console_messages=captured_console if config.capture_console_messages else None,
             )
 
         except Exception as e:
@@ -903,6 +1061,15 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         finally:
             # If no session_id is given we should close the page
             if not config.session_id:
+                # Detach listeners before closing to prevent potential errors during close
+                if config.capture_network_requests:
+                    page.remove_listener("request", handle_request_capture)
+                    page.remove_listener("response", handle_response_capture)
+                    page.remove_listener("requestfailed", handle_request_failed_capture)
+                if config.capture_console_messages:
+                    page.remove_listener("console", handle_console_capture)
+                    page.remove_listener("pageerror", handle_pageerror_capture)
+                
                 await page.close()
 
     async def _handle_full_page_scan(self, page: Page, scroll_delay: float = 0.1):
@@ -1065,7 +1232,107 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         """
         pdf_data = await page.pdf(print_background=True)
         return pdf_data
+        
+    async def capture_mhtml(self, page: Page) -> Optional[str]:
+        """
+        Captures the current page as MHTML using CDP.
+        
+        MHTML (MIME HTML) is a web page archive format that combines the HTML content 
+        with its resources (images, CSS, etc.) into a single MIME-encoded file.
+        
+        Args:
+            page (Page): The Playwright page object
+            
+        Returns:
+            Optional[str]: The MHTML content as a string, or None if there was an error
+        """
+        try:
+            # Ensure the page is fully loaded before capturing
+            try:
+                # Wait for DOM content and network to be idle
+                await page.wait_for_load_state("domcontentloaded", timeout=5000)
+                await page.wait_for_load_state("networkidle", timeout=5000)
+                
+                # Give a little extra time for JavaScript execution
+                await page.wait_for_timeout(1000)
+                
+                # Wait for any animations to complete
+                await page.evaluate("""
+                    () => new Promise(resolve => {
+                        // First requestAnimationFrame gets scheduled after the next repaint
+                        requestAnimationFrame(() => {
+                            // Second requestAnimationFrame gets called after all animations complete
+                            requestAnimationFrame(resolve);
+                        });
+                    })
+                """)
+            except Error as e:
+                if self.logger:
+                    self.logger.warning(
+                        message="Wait for load state timed out: {error}",
+                        tag="MHTML",
+                        params={"error": str(e)},
+                    )
+            
+            # Create a new CDP session
+            cdp_session = await page.context.new_cdp_session(page)
+            
+            # Call Page.captureSnapshot with format "mhtml"
+            result = await cdp_session.send("Page.captureSnapshot", {"format": "mhtml"})
+            
+            # The result contains a 'data' field with the MHTML content
+            mhtml_content = result.get("data")
+            
+            # Detach the CDP session to clean up resources
+            await cdp_session.detach()
+            
+            return mhtml_content
+        except Exception as e:
+            # Log the error but don't raise it - we'll just return None for the MHTML
+            if self.logger:
+                self.logger.error(
+                    message="Failed to capture MHTML: {error}",
+                    tag="MHTML",
+                    params={"error": str(e)},
+                )
+            return None
 
+    async def _capture_console_messages(
+        self, page: Page, file_path: str
+    ) -> List[Dict[str, Union[str, float]]]:
+        """
+        Captures console messages from the page.
+        Args:
+
+            page (Page): The Playwright page object
+        Returns:
+            List[Dict[str, Union[str, float]]]: A list of captured console messages
+        """
+        captured_console = []
+
+        def handle_console_message(msg):
+            try:
+                message_type = msg.type
+                message_text = msg.text
+
+                entry = {
+                    "type": message_type,
+                    "text": message_text,
+                    "timestamp": time.time(),
+                }
+                captured_console.append(entry)
+            except Exception as e:
+                if self.logger:
+                    self.logger.warning(
+                        f"Error capturing console message: {e}", tag="CAPTURE"
+                    )
+
+        page.on("console", handle_console_message)
+        
+        await page.goto(file_path)
+
+        return captured_console
+        
     async def take_screenshot(self, page, **kwargs) -> str:
         """
         Take a screenshot of the current page.
@@ -1742,7 +2009,7 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
                 await self.start()
             yield self._session
         finally:
-            await self.close()
+            pass
 
     def set_hook(self, hook_type: str, hook_func: Callable) -> None:
         if hook_type in self.hooks:
@@ -1858,7 +2125,7 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
                     
                     encoding = response.charset
                     if not encoding:
-                        encoding = cchardet.detect(content.tobytes())['encoding'] or 'utf-8'                    
+                        encoding = chardet.detect(content.tobytes())['encoding'] or 'utf-8'                    
                     
                     result = AsyncCrawlResponse(
                         html=content.tobytes().decode(encoding, errors='replace'),

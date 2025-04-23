@@ -12,9 +12,10 @@ We’ve introduced a new feature that effortlessly handles even the biggest page
 
 **Simple Example:**
 ```python
-import os, sys
+import os
+import sys
 import asyncio
-from crawl4ai import AsyncWebCrawler, CacheMode
+from crawl4ai import AsyncWebCrawler, CacheMode, CrawlerRunConfig
 
 # Adjust paths as needed
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -26,9 +27,11 @@ async def main():
         # Request both PDF and screenshot
         result = await crawler.arun(
             url='https://en.wikipedia.org/wiki/List_of_common_misconceptions',
-            cache_mode=CacheMode.BYPASS,
-            pdf=True,
-            screenshot=True
+            config=CrawlerRunConfig(
+                cache_mode=CacheMode.BYPASS,
+                pdf=True,
+                screenshot=True
+            )
         )
         
         if result.success:
@@ -40,9 +43,8 @@ async def main():
             
             # Save PDF
             if result.pdf:
-                pdf_bytes = b64decode(result.pdf)
                 with open(os.path.join(__location__, "page.pdf"), "wb") as f:
-                    f.write(pdf_bytes)
+                    f.write(result.pdf)
 
 if __name__ == "__main__":
     asyncio.run(main())

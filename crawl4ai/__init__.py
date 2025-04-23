@@ -2,7 +2,7 @@
 import warnings
 
 from .async_webcrawler import AsyncWebCrawler, CacheMode
-from .async_configs import BrowserConfig, CrawlerRunConfig, HTTPCrawlerConfig, LLMConfig
+from .async_configs import BrowserConfig, CrawlerRunConfig, HTTPCrawlerConfig, LLMConfig, ProxyConfig, GeolocationConfig
 
 from .content_scraping_strategy import (
     ContentScrapingStrategy,
@@ -71,6 +71,7 @@ __all__ = [
     "AsyncWebCrawler",
     "BrowserProfiler",
     "LLMConfig",
+    "GeolocationConfig",
     "DeepCrawlStrategy",
     "BFSDeepCrawlStrategy",
     "BestFirstCrawlingStrategy",
@@ -121,6 +122,7 @@ __all__ = [
     "Crawl4aiDockerClient",
     "ProxyRotationStrategy",
     "RoundRobinProxyStrategy",
+    "ProxyConfig"
 ]
 
 

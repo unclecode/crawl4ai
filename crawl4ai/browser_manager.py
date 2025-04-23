@@ -76,6 +76,51 @@ class ManagedBrowser:
             _cleanup(): Terminates the browser process and removes the temporary directory.
             create_profile(): Static method to create a user profile by launching a browser for user interaction.
     """
+    
+    @staticmethod
+    def build_browser_flags(config: BrowserConfig) -> List[str]:
+        """Common CLI flags for launching Chromium"""
+        flags = [
+            "--disable-gpu",
+            "--disable-gpu-compositing",
+            "--disable-software-rasterizer",
+            "--no-sandbox",
+            "--disable-dev-shm-usage",
+            "--no-first-run",
+            "--no-default-browser-check",
+            "--disable-infobars",
+            "--window-position=0,0",
+            "--ignore-certificate-errors",
+            "--ignore-certificate-errors-spki-list",
+            "--disable-blink-features=AutomationControlled",
+            "--window-position=400,0",
+            "--disable-renderer-backgrounding",
+            "--disable-ipc-flooding-protection",
+            "--force-color-profile=srgb",
+            "--mute-audio",
+            "--disable-background-timer-throttling",
+        ]
+        if config.light_mode:
+            flags.extend(BROWSER_DISABLE_OPTIONS)
+        if config.text_mode:
+            flags.extend([
+                "--blink-settings=imagesEnabled=false",
+                "--disable-remote-fonts",
+                "--disable-images",
+                "--disable-javascript",
+                "--disable-software-rasterizer",
+                "--disable-dev-shm-usage",
+            ])
+        # proxy support
+        if config.proxy:
+            flags.append(f"--proxy-server={config.proxy}")
+        elif config.proxy_config:
+            creds = ""
+            if config.proxy_config.username and config.proxy_config.password:
+                creds = f"{config.proxy_config.username}:{config.proxy_config.password}@"
+            flags.append(f"--proxy-server={creds}{config.proxy_config.server}")
+        # dedupe
+        return list(dict.fromkeys(flags))
 
     browser_type: str
     user_data_dir: str
@@ -94,6 +139,7 @@ class ManagedBrowser:
         host: str = "localhost",
         debugging_port: int = 9222,
         cdp_url: Optional[str] = None, 
+        browser_config: Optional[BrowserConfig] = None,
     ):
         """
         Initialize the ManagedBrowser instance.
@@ -109,17 +155,19 @@ class ManagedBrowser:
             host (str): Host for debugging the browser. Default: "localhost".
             debugging_port (int): Port for debugging the browser. Default: 9222.
             cdp_url (str or None): CDP URL to connect to the browser. Default: None.
+            browser_config (BrowserConfig): Configuration object containing all browser settings. Default: None.
         """
-        self.browser_type = browser_type
-        self.user_data_dir = user_data_dir
-        self.headless = headless
+        self.browser_type = browser_config.browser_type
+        self.user_data_dir = browser_config.user_data_dir
+        self.headless = browser_config.headless
         self.browser_process = None
         self.temp_dir = None
-        self.debugging_port = debugging_port
-        self.host = host
+        self.debugging_port = browser_config.debugging_port
+        self.host = browser_config.host
         self.logger = logger
         self.shutting_down = False
-        self.cdp_url = cdp_url
+        self.cdp_url = browser_config.cdp_url
+        self.browser_config = browser_config
 
     async def start(self) -> str:
         """
@@ -142,6 +190,9 @@ class ManagedBrowser:
         # Get browser path and args based on OS and browser type
         # browser_path = self._get_browser_path()
         args = await self._get_browser_args()
+        
+        if self.browser_config.extra_args:
+            args.extend(self.browser_config.extra_args)
 
         # Start browser process
         try:
@@ -274,29 +325,29 @@ class ManagedBrowser:
         return browser_path
 
     async def _get_browser_args(self) -> List[str]:
-        """Returns browser-specific command line arguments"""
-        base_args = [await self._get_browser_path()]
-
+        """Returns full CLI args for launching the browser"""
+        base = [await self._get_browser_path()]
         if self.browser_type == "chromium":
-            args = [
+            flags = [
                 f"--remote-debugging-port={self.debugging_port}",
                 f"--user-data-dir={self.user_data_dir}",
             ]
             if self.headless:
-                args.append("--headless=new")
+                flags.append("--headless=new")
+            # merge common launch flags
+            flags.extend(self.build_browser_flags(self.browser_config))
         elif self.browser_type == "firefox":
-            args = [
+            flags = [
                 "--remote-debugging-port",
                 str(self.debugging_port),
                 "--profile",
                 self.user_data_dir,
             ]
             if self.headless:
-                args.append("--headless")
+                flags.append("--headless")
         else:
             raise NotImplementedError(f"Browser type {self.browser_type} not supported")
-
-        return base_args + args
+        return base + flags
 
     async def cleanup(self):
         """Cleanup browser process and temporary directory"""
@@ -440,8 +491,7 @@ class BrowserManager:
     @classmethod
     async def get_playwright(cls):
         from playwright.async_api import async_playwright
-        if cls._playwright_instance is None:
-            cls._playwright_instance = await async_playwright().start()
+        cls._playwright_instance = await async_playwright().start()
         return cls._playwright_instance    
 
     def __init__(self, browser_config: BrowserConfig, logger=None):
@@ -478,6 +528,7 @@ class BrowserManager:
                 logger=self.logger,
                 debugging_port=self.config.debugging_port,
                 cdp_url=self.config.cdp_url,
+                browser_config=self.config,
             )
 
     async def start(self):
@@ -492,11 +543,12 @@ class BrowserManager:
 
         Note: This method should be called in a separate task to avoid blocking the main event loop.
         """
-        self.playwright  = await self.get_playwright()
-        if self.playwright is None:
-            from playwright.async_api import async_playwright
+        if self.playwright is not None:
+            await self.close()
+            
+        from playwright.async_api import async_playwright
 
-            self.playwright = await async_playwright().start()
+        self.playwright = await async_playwright().start()
 
         if self.config.cdp_url or self.config.use_managed_browser:
             self.config.use_managed_browser = True
@@ -565,6 +617,9 @@ class BrowserManager:
         if self.config.extra_args:
             args.extend(self.config.extra_args)
 
+        # Deduplicate args
+        args = list(dict.fromkeys(args))
+        
         browser_args = {"headless": self.config.headless, "args": args}
 
         if self.config.chrome_channel:
@@ -660,7 +715,7 @@ class BrowserManager:
                     "name": "cookiesEnabled",
                     "value": "true",
                     "url": crawlerRunConfig.url
-                    if crawlerRunConfig
+                    if crawlerRunConfig and crawlerRunConfig.url
                     else "https://crawl4ai.com/",
                 }
             ]
@@ -779,6 +834,23 @@ class BrowserManager:
             # Update context settings with text mode settings
             context_settings.update(text_mode_settings)
 
+        # inject locale / tz / geo if user provided them
+        if crawlerRunConfig:
+            if crawlerRunConfig.locale:
+                context_settings["locale"] = crawlerRunConfig.locale
+            if crawlerRunConfig.timezone_id:
+                context_settings["timezone_id"] = crawlerRunConfig.timezone_id
+            if crawlerRunConfig.geolocation:
+                context_settings["geolocation"] = {
+                    "latitude": crawlerRunConfig.geolocation.latitude,
+                    "longitude": crawlerRunConfig.geolocation.longitude,
+                    "accuracy": crawlerRunConfig.geolocation.accuracy,
+                }
+                # ensure geolocation permission
+                perms = context_settings.get("permissions", [])
+                perms.append("geolocation")
+                context_settings["permissions"] = perms
+
         # Create and return the context with all settings
         context = await self.browser.new_context(**context_settings)
 
@@ -811,6 +883,10 @@ class BrowserManager:
             "semaphore_count",
             "url"
         ]
+        
+        # Do NOT exclude locale, timezone_id, or geolocation as these DO affect browser context
+        # and should cause a new context to be created if they change
+        
         for key in ephemeral_keys:
             if key in config_dict:
                 del config_dict[key]

@@ -258,3 +258,7 @@ continue_config.json
 
 CLAUDE_MONITOR.md
 CLAUDE.md
+
+tests/**/test_site
+tests/**/reports
+tests/**/benchmark_reports

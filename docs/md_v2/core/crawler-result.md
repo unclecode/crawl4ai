@@ -26,6 +26,7 @@ class CrawlResult(BaseModel):
     downloaded_files: Optional[List[str]] = None
     screenshot: Optional[str] = None
     pdf : Optional[bytes] = None
+    mhtml: Optional[str] = None
     markdown: Optional[Union[str, MarkdownGenerationResult]] = None
     extracted_content: Optional[str] = None
     metadata: Optional[dict] = None
@@ -51,6 +52,7 @@ class CrawlResult(BaseModel):
 | **downloaded_files (`Optional[List[str]]`)** | If `accept_downloads=True` in `BrowserConfig`, this lists the filepaths of saved downloads.         |
 | **screenshot (`Optional[str]`)**          | Screenshot of the page (base64-encoded) if `screenshot=True`.                                       |
 | **pdf (`Optional[bytes]`)**               | PDF of the page if `pdf=True`.                                                                      |
+| **mhtml (`Optional[str]`)**               | MHTML snapshot of the page if `capture_mhtml=True`. Contains the full page with all resources.      |
 | **markdown (`Optional[str or MarkdownGenerationResult]`)** | It holds a `MarkdownGenerationResult`. Over time, this will be consolidated into `markdown`. The generator can provide raw markdown, citations, references, and optionally `fit_markdown`. |
 | **extracted_content (`Optional[str]`)**   | The output of a structured extraction (CSS/LLM-based) stored as JSON string or other text.          |
 | **metadata (`Optional[dict]`)**           | Additional info about the crawl or extracted data.                                                  |
@@ -190,17 +192,26 @@ for img in images:
     print("Image URL:", img["src"], "Alt:", img.get("alt"))
 ```
 
-### 5.3 `screenshot` and `pdf`
+### 5.3 `screenshot`, `pdf`, and `mhtml`
 
-If you set `screenshot=True` or `pdf=True` in **`CrawlerRunConfig`**, then:
+If you set `screenshot=True`, `pdf=True`, or `capture_mhtml=True` in **`CrawlerRunConfig`**, then:
 
-- `result.screenshot` contains a base64-encoded PNG string.  
+- `result.screenshot` contains a base64-encoded PNG string.
 - `result.pdf` contains raw PDF bytes (you can write them to a file).
+- `result.mhtml` contains the MHTML snapshot of the page as a string (you can write it to a .mhtml file).
 
 ```python
+# Save the PDF
 with open("page.pdf", "wb") as f:
     f.write(result.pdf)
+
+# Save the MHTML
+if result.mhtml:
+    with open("page.mhtml", "w", encoding="utf-8") as f:
+        f.write(result.mhtml)
 ```
+
+The MHTML (MIME HTML) format is particularly useful as it captures the entire web page including all of its resources (CSS, images, scripts, etc.) in a single file, making it perfect for archiving or offline viewing.
 
 ### 5.4 `ssl_certificate`
 

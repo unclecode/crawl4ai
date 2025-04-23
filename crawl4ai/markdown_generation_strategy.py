@@ -31,22 +31,24 @@ class MarkdownGenerationStrategy(ABC):
         content_filter: Optional[RelevantContentFilter] = None,
         options: Optional[Dict[str, Any]] = None,
         verbose: bool = False,
+        content_source: str = "cleaned_html",
     ):
         self.content_filter = content_filter
         self.options = options or {}
         self.verbose = verbose
+        self.content_source = content_source
 
     @abstractmethod
     def generate_markdown(
         self,
-        cleaned_html: str,
+        input_html: str,
         base_url: str = "",
         html2text_options: Optional[Dict[str, Any]] = None,
         content_filter: Optional[RelevantContentFilter] = None,
         citations: bool = True,
         **kwargs,
     ) -> MarkdownGenerationResult:
-        """Generate markdown from cleaned HTML."""
+        """Generate markdown from the selected input HTML."""
         pass
 
 
@@ -63,6 +65,7 @@ class DefaultMarkdownGenerator(MarkdownGenerationStrategy):
     Args:
         content_filter (Optional[RelevantContentFilter]): Content filter for generating fit markdown.
         options (Optional[Dict[str, Any]]): Additional options for markdown generation. Defaults to None.
+        content_source (str): Source of content to generate markdown from. Options: "cleaned_html", "raw_html", "fit_html". Defaults to "cleaned_html".
 
     Returns:
         MarkdownGenerationResult: Result containing raw markdown, fit markdown, fit HTML, and references markdown.
@@ -72,8 +75,9 @@ class DefaultMarkdownGenerator(MarkdownGenerationStrategy):
         self,
         content_filter: Optional[RelevantContentFilter] = None,
         options: Optional[Dict[str, Any]] = None,
+        content_source: str = "cleaned_html",
     ):
-        super().__init__(content_filter, options)
+        super().__init__(content_filter, options, verbose=False, content_source=content_source)
 
     def convert_links_to_citations(
         self, markdown: str, base_url: str = ""
@@ -143,7 +147,7 @@ class DefaultMarkdownGenerator(MarkdownGenerationStrategy):
 
     def generate_markdown(
         self,
-        cleaned_html: str,
+        input_html: str,
         base_url: str = "",
         html2text_options: Optional[Dict[str, Any]] = None,
         options: Optional[Dict[str, Any]] = None,
@@ -152,16 +156,16 @@ class DefaultMarkdownGenerator(MarkdownGenerationStrategy):
         **kwargs,
     ) -> MarkdownGenerationResult:
         """
-        Generate markdown with citations from cleaned HTML.
+        Generate markdown with citations from the provided input HTML.
 
         How it works:
-        1. Generate raw markdown from cleaned HTML.
+        1. Generate raw markdown from the input HTML.
         2. Convert links to citations.
         3. Generate fit markdown if content filter is provided.
         4. Return MarkdownGenerationResult.
 
         Args:
-            cleaned_html (str): Cleaned HTML content.
+            input_html (str): The HTML content to process (selected based on content_source).
             base_url (str): Base URL for URL joins.
             html2text_options (Optional[Dict[str, Any]]): HTML2Text options.
             options (Optional[Dict[str, Any]]): Additional options for markdown generation.
@@ -196,14 +200,14 @@ class DefaultMarkdownGenerator(MarkdownGenerationStrategy):
             h.update_params(**default_options)
 
             # Ensure we have valid input
-            if not cleaned_html:
-                cleaned_html = ""
-            elif not isinstance(cleaned_html, str):
-                cleaned_html = str(cleaned_html)
+            if not input_html:
+                input_html = ""
+            elif not isinstance(input_html, str):
+                input_html = str(input_html)
 
             # Generate raw markdown
             try:
-                raw_markdown = h.handle(cleaned_html)
+                raw_markdown = h.handle(input_html)
             except Exception as e:
                 raw_markdown = f"Error converting HTML to markdown: {str(e)}"
 
@@ -228,7 +232,7 @@ class DefaultMarkdownGenerator(MarkdownGenerationStrategy):
             if content_filter or self.content_filter:
                 try:
                     content_filter = content_filter or self.content_filter
-                    filtered_html = content_filter.filter_content(cleaned_html)
+                    filtered_html = content_filter.filter_content(input_html)
                     filtered_html = "\n".join(
                         "<div>{}</div>".format(s) for s in filtered_html
                     )
