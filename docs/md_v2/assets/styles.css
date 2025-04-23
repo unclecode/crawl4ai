@@ -268,3 +268,6 @@ div.badges a > img {
 }
 
 
+table td, table th {
+    border: 1px solid var(--code-bg-color) !important;
+}

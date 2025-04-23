@@ -62,7 +62,7 @@ Our latest release candidate is `0.6.0rc1-r2`. Images are built with multi-arch 
 
 ```bash
 # Pull the release candidate (recommended for latest features)
-docker pull unclecode/crawl4ai:0.6.0rc1-r2
+docker pull unclecode/crawl4ai:0.6.0-r1
 
 # Or pull the latest stable version
 docker pull unclecode/crawl4ai:latest
@@ -99,7 +99,7 @@ EOL
       -p 11235:11235 \
       --name crawl4ai \
       --shm-size=1g \
-      unclecode/crawl4ai:0.6.0rc1-r2
+      unclecode/crawl4ai:latest
     ```
 
 *   **With LLM support:**
@@ -110,7 +110,7 @@ EOL
       --name crawl4ai \
       --env-file .llm.env \
       --shm-size=1g \
-      unclecode/crawl4ai:0.6.0rc1-r2
+      unclecode/crawl4ai:latest
     ```
 
 > The server will be available at `http://localhost:11235`. Visit `/playground` to access the interactive testing interface.
@@ -160,7 +160,7 @@ The `docker-compose.yml` file in the project root provides a simplified approach
     ```bash
     # Pulls and runs the release candidate from Docker Hub
     # Automatically selects the correct architecture
-    IMAGE=unclecode/crawl4ai:0.6.0rc1-r2 docker compose up -d
+    IMAGE=unclecode/crawl4ai:latest docker compose up -d
     ```
 
 *   **Build and Run Locally:**

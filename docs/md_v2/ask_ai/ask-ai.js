@@ -361,8 +361,10 @@ A code snippet: \`crawler.run()\`. Check the [quickstart](/core/quickstart).`;
         chatMessages.innerHTML = ""; // Start with clean slate for query
         if (!isFromQuery) {
             // Show welcome only if manually started
+            // chatMessages.innerHTML =
+            //     '<div class="message ai-message welcome-message">Started a new chat! Ask me anything about Crawl4AI.</div>';
             chatMessages.innerHTML =
-                '<div class="message ai-message welcome-message">Started a new chat! Ask me anything about Crawl4AI.</div>';
+                '<div class="message ai-message welcome-message">We will launch this feature very soon.</div>';
         }
         addCitations([]); // Clear citations
         updateCitationsDisplay(); // Clear UI
@@ -504,8 +506,10 @@ A code snippet: \`crawler.run()\`. Check the [quickstart](/core/quickstart).`;
             addMessageToChat(message, false);
         });
         if (messages.length === 0) {
+            // chatMessages.innerHTML =
+            //     '<div class="message ai-message welcome-message">Chat history loaded. Ask a question!</div>';
             chatMessages.innerHTML =
-                '<div class="message ai-message welcome-message">Chat history loaded. Ask a question!</div>';
+                '<div class="message ai-message welcome-message">We will launch this feature very soon.</div>';
         }
         // Scroll to bottom after loading messages
         scrollToBottom();
