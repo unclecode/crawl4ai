@@ -21,9 +21,9 @@
 
 Crawl4AI is the #1 trending GitHub repository, actively maintained by a vibrant community. It delivers blazing-fast, AI-ready web crawling tailored for LLMs, AI agents, and data pipelines. Open source, flexible, and built for real-time performance, Crawl4AI empowers developers with unmatched speed, precision, and deployment ease.  
 
-[✨ Check out latest update v0.6.0rc1](#-recent-updates)
+[✨ Check out latest update v0.6.0](#-recent-updates)
 
-🎉 **Version 0.6.0rc1 is now available!** This release candidate introduces World-aware Crawling with geolocation and locale settings, Table-to-DataFrame extraction, Browser pooling with pre-warming, Network and console traffic capture, MCP integration for AI tools, and a completely revamped Docker deployment! [Read the release notes →](https://docs.crawl4ai.com/blog)
+🎉 **Version 0.6.0 is now available!** This release candidate introduces World-aware Crawling with geolocation and locale settings, Table-to-DataFrame extraction, Browser pooling with pre-warming, Network and console traffic capture, MCP integration for AI tools, and a completely revamped Docker deployment! [Read the release notes →](https://docs.crawl4ai.com/blog)
 
 <details>
 <summary>🤓 <strong>My Personal Story</strong></summary>
@@ -505,7 +505,7 @@ async def test_news_crawl():
 
 ## ✨ Recent Updates
 
-### Version 0.6.0rc1 Release Highlights
+### Version 0.6.0 Release Highlights
 
 - **🌎 World-aware Crawling**: Set geolocation, language, and timezone for authentic locale-specific content:
   ```python
@@ -575,7 +575,7 @@ async def test_news_crawl():
 
 - **📱 Multi-stage Build System**: Optimized Dockerfile with platform-specific performance enhancements
 
-Read the full details in our [0.6.0rc1 Release Notes](https://docs.crawl4ai.com/blog/releases/0.6.0.html) or check the [CHANGELOG](https://github.com/unclecode/crawl4ai/blob/main/CHANGELOG.md).
+Read the full details in our [0.6.0 Release Notes](https://docs.crawl4ai.com/blog/releases/0.6.0.html) or check the [CHANGELOG](https://github.com/unclecode/crawl4ai/blob/main/CHANGELOG.md).
 
 ### Previous Version: 0.5.0 Major Release Highlights
 
@@ -606,7 +606,7 @@ We use different suffixes to indicate development stages:
 - `dev` (0.4.3dev1): Development versions, unstable
 - `a` (0.4.3a1): Alpha releases, experimental features
 - `b` (0.4.3b1): Beta releases, feature complete but needs testing
-- `rc` (0.4.3rc1): Release candidates, potential final version
+- `rc` (0.4.3): Release candidates, potential final version
 
 #### Installation
 - Regular installation (stable version):

@@ -58,7 +58,7 @@ Pull and run images directly from Docker Hub without building locally.
 
 #### 1. Pull the Image
 
-Our latest release candidate is `0.6.0rc1-r2`. Images are built with multi-arch manifests, so Docker automatically pulls the correct version for your system.
+Our latest release candidate is `0.6.0-r2`. Images are built with multi-arch manifests, so Docker automatically pulls the correct version for your system.
 
 ```bash
 # Pull the release candidate (recommended for latest features)
@@ -124,9 +124,9 @@ docker stop crawl4ai && docker rm crawl4ai
 #### Docker Hub Versioning Explained
 
 *   **Image Name:** `unclecode/crawl4ai`
-*   **Tag Format:** `LIBRARY_VERSION[-SUFFIX]` (e.g., `0.6.0rc1-r2`)
+*   **Tag Format:** `LIBRARY_VERSION[-SUFFIX]` (e.g., `0.6.0-r2`)
     *   `LIBRARY_VERSION`: The semantic version of the core `crawl4ai` Python library
-    *   `SUFFIX`: Optional tag for release candidates (`rc1`) and revisions (`r1`)
+    *   `SUFFIX`: Optional tag for release candidates (``) and revisions (`r1`)
 *   **`latest` Tag:** Points to the most recent stable version
 *   **Multi-Architecture Support:** All images support both `linux/amd64` and `linux/arm64` architectures through a single tag
 
