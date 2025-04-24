@@ -5,6 +5,15 @@ All notable changes to Crawl4AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2025-04-24
+
+### Added
+- New dedicated `tables` field in `CrawlResult` model for better table extraction handling
+- Updated crypto_analysis_example.py to use the new tables field with backward compatibility
+
+### Changed
+- Improved playground UI in Docker deployment with better endpoint handling and UI feedback
+
 ## [0.6.0] ‑ 2025‑04‑22
 
 ### Added

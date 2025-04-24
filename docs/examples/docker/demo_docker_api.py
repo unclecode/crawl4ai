@@ -4,6 +4,8 @@ import json
 import os
 import time
 from typing import List, Dict, Any, AsyncGenerator, Optional
+import textwrap          # ← new: for pretty code literals
+import urllib.parse  # ← needed for URL-safe /llm calls
 from dotenv import load_dotenv
 from rich.console import Console
 from rich.syntax import Syntax
@@ -969,13 +971,111 @@ async def demo_deep_with_ssl(client: httpx.AsyncClient):
             else:
                  console.print(f"  [red]✘[/] URL: [link={result['url']}]{result['url']}[/link] | Crawl failed.")
 
+# 7. Markdown helper endpoint
+async def demo_markdown_endpoint(client: httpx.AsyncClient):
+    """
+    One-shot helper around /md.
+    Fetches PYTHON_URL with FIT filter and prints the first 500 chars of Markdown.
+    """
+    target_url = PYTHON_URL
+    payload = {"url": target_url, "f": "fit", "q": None, "c": "0"}
+
+    console.rule("[bold blue]Demo 7a: /md Endpoint[/]", style="blue")
+    print_payload(payload)
+
+    try:
+        t0 = time.time()
+        resp = await client.post("/md", json=payload)
+        dt = time.time() - t0
+        console.print(f"Response Status: [bold {'green' if resp.is_success else 'red'}]{resp.status_code}[/] (took {dt:.2f}s)")
+        resp.raise_for_status()
+        md = resp.json().get("markdown", "")
+        snippet = (md[:500] + "...") if len(md) > 500 else md
+        console.print(Panel(snippet, title="Markdown snippet", border_style="cyan", expand=False))
+    except Exception as e:
+        console.print(f"[bold red]Error hitting /md:[/] {e}")
+
+# 8. LLM QA helper endpoint
+async def demo_llm_endpoint(client: httpx.AsyncClient):
+    """
+    Quick QA round-trip with /llm.
+    Asks a trivial question against SIMPLE_URL just to show wiring.
+    """
+    page_url = SIMPLE_URL
+    question = "What is the title of this page?"
+
+    console.rule("[bold magenta]Demo 7b: /llm Endpoint[/]", style="magenta")
+    enc = urllib.parse.quote_plus(page_url, safe="")
+    console.print(f"GET /llm/{enc}?q={question}")
+
+    try:
+        t0 = time.time()
+        resp = await client.get(f"/llm/{enc}", params={"q": question})
+        dt = time.time() - t0
+        console.print(f"Response Status: [bold {'green' if resp.is_success else 'red'}]{resp.status_code}[/] (took {dt:.2f}s)")
+        resp.raise_for_status()
+        answer = resp.json().get("answer", "")
+        console.print(Panel(answer or "No answer returned", title="LLM answer", border_style="magenta", expand=False))
+    except Exception as e:
+        console.print(f"[bold red]Error hitting /llm:[/] {e}")
+
+
+# 9. /config/dump helpers --------------------------------------------------
+
+async def demo_config_dump_valid(client: httpx.AsyncClient):
+    """
+    Send a single top-level CrawlerRunConfig(...) expression and show the dump.
+    """
+    code_snippet = "CrawlerRunConfig(cache_mode='BYPASS', screenshot=True)"
+    payload = {"code": code_snippet}
+
+    console.rule("[bold blue]Demo 8a: /config/dump (valid)[/]", style="blue")
+    print_payload(payload)
+
+    try:
+        t0 = time.time()
+        resp = await client.post("/config/dump", json=payload)
+        dt = time.time() - t0
+        console.print(f"Response Status: [bold {'green' if resp.is_success else 'red'}]{resp.status_code}[/] (took {dt:.2f}s)")
+        resp.raise_for_status()
+        dump_json = resp.json()
+        console.print(Panel(Syntax(json.dumps(dump_json, indent=2), "json", theme="monokai"), title="Dump()", border_style="cyan"))
+    except Exception as e:
+        console.print(f"[bold red]Error in valid /config/dump call:[/] {e}")
+
+
+async def demo_config_dump_invalid(client: httpx.AsyncClient):
+    """
+    Purposely break the rule (nested call) to show the 400 parse error.
+    """
+    bad_code = textwrap.dedent("""
+        BrowserConfig(headless=True); CrawlerRunConfig()
+    """).strip()
+    payload = {"code": bad_code}
+
+    console.rule("[bold magenta]Demo 8b: /config/dump (invalid)[/]", style="magenta")
+    print_payload(payload)
+
+    try:
+        resp = await client.post("/config/dump", json=payload)
+        console.print(f"Response Status: [bold {'green' if resp.is_success else 'red'}]{resp.status_code}[/]")
+        resp.raise_for_status()   # should throw -> except
+    except httpx.HTTPStatusError as e:
+        console.print("[cyan]Expected parse/validation failure captured:[/]")
+        try:
+            console.print(Panel(Syntax(json.dumps(e.response.json(), indent=2), "json", theme="fruity"), title="Error payload"))
+        except Exception:
+            console.print(e.response.text)
+    except Exception as e:
+        console.print(f"[bold red]Unexpected error during invalid test:[/] {e}")
+
 
 # --- Update Main Runner to include new demo ---
 async def main_demo():
     async with httpx.AsyncClient(base_url=BASE_URL, timeout=300.0) as client:
         if not await check_server_health(client):
             return
-
+        
         # --- Run Demos ---
         await demo_basic_single_url(client)
         await demo_basic_multi_url(client)
@@ -1001,7 +1101,15 @@ async def main_demo():
         await demo_deep_with_css_extraction(client)
         await demo_deep_with_llm_extraction(client) # Skips if no common LLM key env var
         await demo_deep_with_proxy(client) # Skips if no PROXIES env var
-        await demo_deep_with_ssl(client) # Added the new demo
+        await demo_deep_with_ssl(client)   # Added the new demo
+
+        # --- Helper endpoints ---
+        await demo_markdown_endpoint(client)
+        await demo_llm_endpoint(client)
+
+        # --- /config/dump sanity checks ---
+        await demo_config_dump_valid(client)
+        await demo_config_dump_invalid(client)
 
         console.rule("[bold green]Demo Complete[/]", style="green")
 

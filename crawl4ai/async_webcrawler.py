@@ -496,11 +496,13 @@ class AsyncWebCrawler:
             cleaned_html = sanitize_input_encode(
                 result.get("cleaned_html", ""))
             media = result.get("media", {})
+            tables = media.pop("tables", []) if isinstance(media, dict) else []
             links = result.get("links", {})
             metadata = result.get("metadata", {})
         else:
             cleaned_html = sanitize_input_encode(result.cleaned_html)
             media = result.media.model_dump()
+            tables = media.pop("tables", [])
             links = result.links.model_dump()
             metadata = result.metadata
 
@@ -627,6 +629,7 @@ class AsyncWebCrawler:
             cleaned_html=cleaned_html,
             markdown=markdown_result,
             media=media,
+            tables=tables,                       # NEW
             links=links,
             metadata=metadata,
             screenshot=screenshot_data,
