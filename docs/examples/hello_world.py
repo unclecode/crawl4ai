@@ -31,7 +31,7 @@ async def example_cdp():
                    
 
 async def main():
-    browser_config = BrowserConfig(headless=True, verbose=True)
+    browser_config = BrowserConfig(headless=False, verbose=True)
     async with AsyncWebCrawler(config=browser_config) as crawler:
         crawler_config = CrawlerRunConfig(
             cache_mode=CacheMode.BYPASS,
