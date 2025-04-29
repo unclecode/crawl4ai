@@ -140,13 +140,17 @@ class BrowserProfiler:
         self.logger.info("4. The profile will be saved and ready to use with Crawl4AI.", tag="PROFILE")
         self.logger.info(f"{border}\n", tag="PROFILE")
         
+        browser_config.headless = False
+        browser_config.user_data_dir = profile_path
+        
+        
         # Create managed browser instance
         managed_browser = ManagedBrowser(
-            browser_type=browser_config.browser_type,
-            user_data_dir=profile_path,
-            headless=False,  # Must be visible
+            browser_config=browser_config,
+            # user_data_dir=profile_path,
+            # headless=False,  # Must be visible
             logger=self.logger,
-            debugging_port=browser_config.debugging_port
+            # debugging_port=browser_config.debugging_port
         )
         
         # Set up signal handlers to ensure cleanup on interrupt
@@ -972,3 +976,30 @@ class BrowserProfiler:
             'info': browser_info
         }
 
+
+if __name__ == "__main__":
+    # Example usage
+    profiler = BrowserProfiler()
+    
+    # Create a new profile
+    import os
+    from pathlib import Path
+    home_dir = Path.home()
+    profile_path = asyncio.run(profiler.create_profile( str(home_dir / ".crawl4ai/profiles/test-profile")))
+
+        
+            
+    # Launch a standalone browser
+    asyncio.run(profiler.launch_standalone_browser())
+    
+    # List profiles
+    profiles = profiler.list_profiles()
+    for profile in profiles:
+        print(f"Profile: {profile['name']}, Path: {profile['path']}")
+    
+    # Delete a profile
+    success = profiler.delete_profile("my-profile")
+    if success:
+        print("Profile deleted successfully")
+    else:
+        print("Failed to delete profile")

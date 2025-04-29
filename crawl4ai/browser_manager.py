@@ -5,7 +5,10 @@ import os
 import sys
 import shutil
 import tempfile
+import psutil  
+import signal
 import subprocess
+import shlex
 from playwright.async_api import BrowserContext
 import hashlib
 from .js_snippet import load_js_script
@@ -193,6 +196,45 @@ class ManagedBrowser:
         
         if self.browser_config.extra_args:
             args.extend(self.browser_config.extra_args)
+            
+
+        # ── make sure no old Chromium instance is owning the same port/profile ──
+        try:
+            if sys.platform == "win32":
+                if psutil is None:
+                    raise RuntimeError("psutil not available, cannot clean old browser")
+                for p in psutil.process_iter(["pid", "name", "cmdline"]):
+                    cl = " ".join(p.info.get("cmdline") or [])
+                    if (
+                        f"--remote-debugging-port={self.debugging_port}" in cl
+                        and f"--user-data-dir={self.user_data_dir}" in cl
+                    ):
+                        p.kill()
+                        p.wait(timeout=5)
+            else:  # macOS / Linux
+                # kill any process listening on the same debugging port
+                pids = (
+                    subprocess.check_output(shlex.split(f"lsof -t -i:{self.debugging_port}"))
+                    .decode()
+                    .strip()
+                    .splitlines()
+                )
+                for pid in pids:
+                    try:
+                        os.kill(int(pid), signal.SIGTERM)
+                    except ProcessLookupError:
+                        pass
+
+                # remove Chromium singleton locks, or new launch exits with
+                # “Opening in existing browser session.”
+                for f in ("SingletonLock", "SingletonSocket", "SingletonCookie"):
+                    fp = os.path.join(self.user_data_dir, f)
+                    if os.path.exists(fp):
+                        os.remove(fp)
+        except Exception as _e:
+            # non-fatal — we'll try to start anyway, but log what happened
+            self.logger.warning(f"pre-launch cleanup failed: {_e}", tag="BROWSER")            
+            
 
         # Start browser process
         try:
@@ -922,7 +964,7 @@ class BrowserManager:
             pages = context.pages
             page = next((p for p in pages if p.url == crawlerRunConfig.url), None)
             if not page:
-                page = await context.new_page()
+                page = context.pages[0] # await context.new_page()
         else:
             # Otherwise, check if we have an existing context for this config
             config_signature = self._make_config_signature(crawlerRunConfig)
