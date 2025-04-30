@@ -24,3 +24,4 @@ cssselect>=1.2.0
 chardet>=5.2.0
 brotli>=1.1.0
 fake-useragent>=2.2.0
+pdf2image>=1.17.0
