@@ -744,12 +744,33 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     "after_goto", page, context=context, url=url, response=response, config=config
                 )
 
+                # ──────────────────────────────────────────────────────────────
+                # Walk the redirect chain.  Playwright returns only the last
+                # hop, so we trace the `request.redirected_from` links until the
+                # first response that differs from the final one and surface its
+                # status-code.
+                # ──────────────────────────────────────────────────────────────
                 if response is None:
                     status_code = 200
                     response_headers = {}
                 else:
-                    status_code = response.status
-                    response_headers = response.headers
+                    first_resp = response
+                    req = response.request
+                    while req and req.redirected_from:
+                        prev_req = req.redirected_from
+                        prev_resp = await prev_req.response()
+                        if prev_resp:                       # keep earliest
+                            first_resp = prev_resp
+                        req = prev_req
+                
+                    status_code = first_resp.status
+                    response_headers = first_resp.headers
+                # if response is None:
+                #     status_code = 200
+                #     response_headers = {}
+                # else:
+                #     status_code = response.status
+                #     response_headers = response.headers
 
             else:
                 status_code = 200
