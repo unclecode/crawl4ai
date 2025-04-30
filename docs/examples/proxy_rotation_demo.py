@@ -1,15 +1,17 @@
 import os
 import re
-from typing import List, Dict
+from typing import List
+
 from crawl4ai import (
     AsyncWebCrawler,
     BrowserConfig,
     CrawlerRunConfig,
     CacheMode,
+    ProxyConfig,
     RoundRobinProxyStrategy
 )
 
-def load_proxies_from_env() -> List[Dict]:
+def load_proxies_from_env() -> List[ProxyConfig]:
     """Load proxies from PROXIES environment variable"""
     proxies = []
     try:
@@ -18,12 +20,13 @@ def load_proxies_from_env() -> List[Dict]:
             if not proxy:
                 continue
             ip, port, username, password = proxy.split(":")
-            proxies.append({
+            proxy_config = ProxyConfig.from_dict({
                 "server": f"http://{ip}:{port}",
                 "username": username,
                 "password": password,
                 "ip": ip  # Store original IP for verification
             })
+            proxies.append(proxy_config)
     except Exception as e:
         print(f"Error loading proxies from environment: {e}")
     return proxies
@@ -64,10 +67,11 @@ async def demo_proxy_rotation():
                 current_proxy = run_config.proxy_config if run_config.proxy_config else None
                 
                 if current_proxy:
-                    print(f"Proxy {current_proxy['server']} -> Response IP: {ip_match.group(0) if ip_match else 'Not found'}")
-                    verified = ip_match and ip_match.group(0) == current_proxy['ip']
+                    print(
+                        f"Proxy {current_proxy.server} -> Response IP: {ip_match.group(0) if ip_match else 'Not found'}")
+                    verified = ip_match and ip_match.group(0) == current_proxy.ip
                     if verified:
-                        print(f"✅ Proxy working! IP matches: {current_proxy['ip']}")
+                        print(f"✅ Proxy working! IP matches: {current_proxy.ip}")
                     else:
                         print("❌ Proxy failed or IP mismatch!")
             else:
@@ -103,11 +107,11 @@ async def demo_proxy_rotation_batch():
 
         print("\n📈 Initializing crawler with proxy rotation...")
         async with AsyncWebCrawler(config=browser_config) as crawler:
-            monitor = CrawlerMonitor(
-                max_visible_rows=10,
-                display_mode=DisplayMode.DETAILED
-            )
-            
+            # monitor = CrawlerMonitor(
+            #     max_visible_rows=10,
+            #     display_mode=DisplayMode.DETAILED
+            # )
+
             dispatcher = MemoryAdaptiveDispatcher(
                 memory_threshold_percent=80.0,
                 check_interval=0.5,
@@ -131,10 +135,10 @@ async def demo_proxy_rotation_batch():
                     
                     if current_proxy and ip_match:
                         print(f"URL {result.url}")
-                        print(f"Proxy {current_proxy['server']} -> Response IP: {ip_match.group(0)}")
-                        verified = ip_match.group(0) == current_proxy['ip']
+                        print(f"Proxy {current_proxy.server} -> Response IP: {ip_match.group(0)}")
+                        verified = ip_match.group(0) == current_proxy.ip
                         if verified:
-                            print(f"✅ Proxy working! IP matches: {current_proxy['ip']}")
+                            print(f"✅ Proxy working! IP matches: {current_proxy.ip}")
                             success_count += 1
                         else:
                             print("❌ Proxy failed or IP mismatch!")
@@ -148,14 +152,14 @@ async def demo_proxy_rotation_batch():
 if __name__ == "__main__":
     import asyncio
     from crawl4ai import (
-        CrawlerMonitor, 
-        DisplayMode,
+        # CrawlerMonitor,
+        # DisplayMode,
         MemoryAdaptiveDispatcher,
         DefaultMarkdownGenerator
     )
     
     async def run_demos():
-        # await demo_proxy_rotation()  # Original single-request demo
+        await demo_proxy_rotation()  # Original single-request demo
         await demo_proxy_rotation_batch()  # New batch processing demo
         
     asyncio.run(run_demos())
