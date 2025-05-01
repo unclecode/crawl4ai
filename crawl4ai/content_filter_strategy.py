@@ -27,9 +27,7 @@ import json
 import hashlib
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
-from .async_logger import AsyncLogger, LogLevel
-from rich.console import Console
-from rich.text import Text
+from .async_logger import AsyncLogger, LogLevel, LogColor
 
 
 class RelevantContentFilter(ABC):
@@ -847,7 +845,7 @@ class LLMContentFilter(RelevantContentFilter):
                 },
                 colors={
                     **AsyncLogger.DEFAULT_COLORS,
-                    LogLevel.INFO: "dim magenta"  # Dimmed purple for LLM ops
+                    LogLevel.INFO: LogColor.DIM_MAGENTA  # Dimmed purple for LLM ops
                 },
             )
         else:
@@ -892,7 +890,7 @@ class LLMContentFilter(RelevantContentFilter):
                 "Starting LLM markdown content filtering process",
                 tag="LLM",
                 params={"provider": self.llm_config.provider},
-                colors={"provider": "cyan"},
+                colors={"provider": LogColor.CYAN},
             )
 
         # Cache handling
@@ -929,7 +927,7 @@ class LLMContentFilter(RelevantContentFilter):
                 "LLM markdown: Split content into {chunk_count} chunks",
                 tag="CHUNK",
                 params={"chunk_count": len(html_chunks)},
-                colors={"chunk_count": "yellow"},
+                colors={"chunk_count": LogColor.YELLOW},
             )
 
         start_time = time.time()
@@ -1038,7 +1036,7 @@ class LLMContentFilter(RelevantContentFilter):
                 "LLM markdown: Completed processing in {time:.2f}s",
                 tag="LLM",
                 params={"time": end_time - start_time},
-                colors={"time": "yellow"},
+                colors={"time": LogColor.YELLOW},
             )
 
         result = ordered_results if ordered_results else []

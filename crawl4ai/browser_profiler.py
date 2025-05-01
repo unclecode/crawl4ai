@@ -20,7 +20,7 @@ from rich.console import Console
 
 from .async_configs import BrowserConfig
 from .browser_manager import ManagedBrowser
-from .async_logger import AsyncLogger, AsyncLoggerBase
+from .async_logger import AsyncLogger, AsyncLoggerBase, LogColor
 from .utils import get_home_folder
 
 
@@ -129,16 +129,16 @@ class BrowserProfiler:
         
         # Print instructions for the user with rich formatting
         border = "{'='*80}"
-        self.logger.info("{border}", tag="PROFILE", params={"border": f"\n{border}"}, colors={"border": "cyan"})
-        self.logger.info("Creating browser profile: {profile_name}", tag="PROFILE", params={"profile_name": profile_name}, colors={"profile_name": "green"})
-        self.logger.info("Profile directory: {profile_path}", tag="PROFILE", params={"profile_path": profile_path}, colors={"profile_path": "yellow"})
+        self.logger.info("{border}", tag="PROFILE", params={"border": f"\n{border}"}, colors={"border": LogColor.CYAN})
+        self.logger.info("Creating browser profile: {profile_name}", tag="PROFILE", params={"profile_name": profile_name}, colors={"profile_name": LogColor.GREEN})
+        self.logger.info("Profile directory: {profile_path}", tag="PROFILE", params={"profile_path": profile_path}, colors={"profile_path": LogColor.YELLOW})
         
         self.logger.info("\nInstructions:", tag="PROFILE")
         self.logger.info("1. A browser window will open for you to set up your profile.", tag="PROFILE")
-        self.logger.info("{segment}, configure settings, etc. as needed.", tag="PROFILE", params={"segment": "2. Log in to websites"}, colors={"segment": "cyan"})
-        self.logger.info("3. When you're done, {segment} to close the browser.", tag="PROFILE", params={"segment": "press 'q' in this terminal"}, colors={"segment": "yellow"})
+        self.logger.info("{segment}, configure settings, etc. as needed.", tag="PROFILE", params={"segment": "2. Log in to websites"}, colors={"segment": LogColor.CYAN})
+        self.logger.info("3. When you're done, {segment} to close the browser.", tag="PROFILE", params={"segment": "press 'q' in this terminal"}, colors={"segment": LogColor.YELLOW})
         self.logger.info("4. The profile will be saved and ready to use with Crawl4AI.", tag="PROFILE")
-        self.logger.info("{border}", tag="PROFILE", params={"border": f"{border}\n"}, colors={"border": "cyan"})
+        self.logger.info("{border}", tag="PROFILE", params={"border": f"{border}\n"}, colors={"border": LogColor.CYAN})
         
         # Create managed browser instance
         managed_browser = ManagedBrowser(
@@ -197,7 +197,7 @@ class BrowserProfiler:
                     if readable:
                         key = sys.stdin.read(1)
                         if key.lower() == 'q':
-                            self.logger.info("Closing browser and saving profile...", tag="PROFILE", base_color="green")
+                            self.logger.info("Closing browser and saving profile...", tag="PROFILE", base_color=LogColor.GREEN)
                             user_done_event.set()
                             return
                     
@@ -223,7 +223,7 @@ class BrowserProfiler:
                 self.logger.error("Failed to start browser process.", tag="PROFILE")
                 return None
             
-            self.logger.info(f"Browser launched. Waiting for you to finish...", tag="PROFILE") 
+            self.logger.info("Browser launched. Waiting for you to finish...", tag="PROFILE") 
             
             # Start listening for keyboard input
             listener_task = asyncio.create_task(listen_for_quit_command())
@@ -440,18 +440,18 @@ class BrowserProfiler:
             ```
         """
         while True:
-            self.logger.info(f"\nProfile Management Options:", tag="MENU")
-            self.logger.info(f"1. Create a new profile", tag="MENU", base_color="green")
-            self.logger.info(f"2. List available profiles", tag="MENU", base_color="yellow")
-            self.logger.info(f"3. Delete a profile", tag="MENU", base_color="red")
+            self.logger.info("\nProfile Management Options:", tag="MENU")
+            self.logger.info("1. Create a new profile", tag="MENU", base_color=LogColor.GREEN)
+            self.logger.info("2. List available profiles", tag="MENU", base_color=LogColor.YELLOW)
+            self.logger.info("3. Delete a profile", tag="MENU", base_color=LogColor.RED)
             
             # Only show crawl option if callback provided
             if crawl_callback:
-                self.logger.info(f"4. Use a profile to crawl a website", tag="MENU", base_color="cyan")
-                self.logger.info(f"5. Exit", tag="MENU", base_color="magenta")
+                self.logger.info("4. Use a profile to crawl a website", tag="MENU", base_color=LogColor.CYAN)
+                self.logger.info("5. Exit", tag="MENU", base_color=LogColor.MAGENTA)
                 exit_option = "5"
             else:
-                self.logger.info(f"4. Exit", tag="MENU", base_color="magenta")
+                self.logger.info("4. Exit", tag="MENU", base_color=LogColor.MAGENTA)
                 exit_option = "4"
             
             self.logger.print(f"\n[cyan]Enter your choice (1-{exit_option}): [/cyan]", end="")
@@ -475,7 +475,7 @@ class BrowserProfiler:
                 self.logger.info("\nAvailable profiles:", tag="PROFILES")
                 for i, profile in enumerate(profiles):
                     self.logger.info(f"[{i+1}] {profile['name']}", tag="PROFILES")
-                    self.logger.info(f"    Path: {profile['path']}", tag="PROFILES", base_color="yellow")
+                    self.logger.info(f"    Path: {profile['path']}", tag="PROFILES", base_color=LogColor.YELLOW)
                     self.logger.info(f"    Created: {profile['created'].strftime('%Y-%m-%d %H:%M:%S')}", tag="PROFILES")
                     self.logger.info(f"    Browser type: {profile['type']}", tag="PROFILES")
                     self.logger.info("", tag="PROFILES")  # Empty line for spacing
@@ -488,7 +488,7 @@ class BrowserProfiler:
                     continue
                     
                 # Display numbered list
-                self.logger.info(f"\nAvailable profiles:", tag="PROFILES", base_color="yellow")
+                self.logger.info("\nAvailable profiles:", tag="PROFILES", base_color=LogColor.YELLOW)
                 for i, profile in enumerate(profiles):
                     self.logger.info(f"[{i+1}] {profile['name']}", tag="PROFILES")
                     
@@ -527,7 +527,7 @@ class BrowserProfiler:
                     continue
                     
                 # Display numbered list
-                self.logger.info(f"\nAvailable profiles:", tag="PROFILES", base_color="yellow")
+                self.logger.info("\nAvailable profiles:", tag="PROFILES", base_color=LogColor.YELLOW)
                 for i, profile in enumerate(profiles):
                     self.logger.info(f"[{i+1}] {profile['name']}", tag="PROFILES")
                     
@@ -605,9 +605,9 @@ class BrowserProfiler:
         # Print initial information
         border = f"{Fore.CYAN}{'='*80}{Style.RESET_ALL}"
         self.logger.info(f"\n{border}", tag="CDP")
-        self.logger.info(f"Launching standalone browser with CDP debugging", tag="CDP")
-        self.logger.info("Browser type: {browser_type}", tag="CDP", params={"browser_type": browser_type}, colors={"browser_type": "cyan"})
-        self.logger.info("Profile path: {profile_path}", tag="CDP", params={"profile_path": profile_path}, colors={"profile_path": "yellow"})
+        self.logger.info("Launching standalone browser with CDP debugging", tag="CDP")
+        self.logger.info("Browser type: {browser_type}", tag="CDP", params={"browser_type": browser_type}, colors={"browser_type": LogColor.CYAN})
+        self.logger.info("Profile path: {profile_path}", tag="CDP", params={"profile_path": profile_path}, colors={"profile_path": LogColor.YELLOW})
         self.logger.info(f"Debugging port: {debugging_port}", tag="CDP")
         self.logger.info(f"Headless mode: {headless}", tag="CDP")
         
@@ -722,7 +722,7 @@ class BrowserProfiler:
                 self.logger.error("Failed to start browser process.", tag="CDP")
                 return None
             
-            self.logger.info(f"Browser launched successfully. Retrieving CDP information...", tag="CDP") 
+            self.logger.info("Browser launched successfully. Retrieving CDP information...", tag="CDP") 
             
             # Get CDP URL and JSON config
             cdp_url, config_json = await get_cdp_json(debugging_port)
@@ -732,10 +732,10 @@ class BrowserProfiler:
                 
                 if config_json:
                     # Display relevant CDP information
-                    self.logger.info(f"Browser: {config_json.get('Browser', 'Unknown')}", tag="CDP", colors={"Browser": "cyan"})
-                    self.logger.info(f"Protocol Version: {config_json.get('Protocol-Version', 'Unknown')}", tag="CDP", colors={"Protocol-Version": "cyan"})
+                    self.logger.info(f"Browser: {config_json.get('Browser', 'Unknown')}", tag="CDP", colors={"Browser": LogColor.CYAN})
+                    self.logger.info(f"Protocol Version: {config_json.get('Protocol-Version', 'Unknown')}", tag="CDP", colors={"Protocol-Version": LogColor.CYAN})
                     if 'webSocketDebuggerUrl' in config_json:
-                        self.logger.info("WebSocket URL: {webSocketDebuggerUrl}", tag="CDP", params={"webSocketDebuggerUrl": config_json['webSocketDebuggerUrl']}, colors={"webSocketDebuggerUrl": "green"})
+                        self.logger.info("WebSocket URL: {webSocketDebuggerUrl}", tag="CDP", params={"webSocketDebuggerUrl": config_json['webSocketDebuggerUrl']}, colors={"webSocketDebuggerUrl": LogColor.GREEN})
                 else:
                     self.logger.warning("Could not retrieve CDP configuration JSON", tag="CDP")
             else:

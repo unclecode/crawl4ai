@@ -34,7 +34,7 @@ from .markdown_generation_strategy import (
     MarkdownGenerationStrategy,
 )
 from .deep_crawling import DeepCrawlDecorator
-from .async_logger import AsyncLogger, AsyncLoggerBase
+from .async_logger import AsyncLogger, AsyncLoggerBase, LogColor
 from .async_configs import BrowserConfig, CrawlerRunConfig
 from .async_dispatcher import *  # noqa: F403
 from .async_dispatcher import BaseDispatcher, MemoryAdaptiveDispatcher, RateLimiter
@@ -43,7 +43,6 @@ from .utils import (
     sanitize_input_encode,
     InvalidCSSSelectorError,
     fast_format_html,
-    create_box_message,
     get_error_context,
     RobotsParser,
 )
@@ -381,8 +380,8 @@ class AsyncWebCrawler:
                             "timing": f"{time.perf_counter() - start_time:.2f}s",
                         },
                         colors={
-                            "status": "green" if crawl_result.success else "red",
-                            "timing": "yellow",
+                            "status": LogColor.SUCCESS if crawl_result.success else LogColor.ERROR,
+                            "timing": LogColor.WARNING,
                         },
                     )
 
@@ -401,7 +400,10 @@ class AsyncWebCrawler:
                             "status": True,
                             "timing": f"{time.perf_counter() - start_time:.2f}s",
                         },
-                        colors={"status": "green", "timing": "yellow"},
+                        colors={
+                            "status": LogColor.SUCCESS if crawl_result.success else LogColor.ERROR,
+                            "timing": LogColor.WARNING,
+                        },
                     )
 
                     cached_result.success = bool(html)

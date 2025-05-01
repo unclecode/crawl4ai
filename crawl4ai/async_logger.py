@@ -18,6 +18,24 @@ class LogLevel(Enum):
     def __str__(self):
         return self.name.lower()
 
+class LogColor(str, Enum):
+    """Enum for log colors."""
+
+    DEBUG = "lightblack"
+    INFO = "cyan"
+    SUCCESS = "green"
+    WARNING = "yellow"
+    ERROR = "red"
+    CYAN = "cyan"
+    GREEN = "green"
+    YELLOW = "yellow"
+    MAGENTA = "magenta"
+    DIM_MAGENTA = "dim magenta"
+
+    def __str__(self):
+        """Automatically convert rich color to string."""
+        return self.value
+
 
 class AsyncLoggerBase(ABC):
     @abstractmethod
@@ -48,6 +66,7 @@ class AsyncLoggerBase(ABC):
     def error_status(self, url: str, error: str, tag: str = "ERROR", url_length: int = 50):
         pass
 
+
 class AsyncLogger(AsyncLoggerBase):
     """
     Asynchronous logger with support for colored console output and file logging.
@@ -68,11 +87,11 @@ class AsyncLogger(AsyncLoggerBase):
     }
 
     DEFAULT_COLORS = {
-        LogLevel.DEBUG: "lightblack",
-        LogLevel.INFO: "cyan",
-        LogLevel.SUCCESS: "green",
-        LogLevel.WARNING: "yellow",
-        LogLevel.ERROR: "red",
+        LogLevel.DEBUG: LogColor.DEBUG,
+        LogLevel.INFO: LogColor.INFO,
+        LogLevel.SUCCESS: LogColor.SUCCESS,
+        LogLevel.WARNING: LogColor.WARNING,
+        LogLevel.ERROR: LogColor.ERROR,
     }
 
     def __init__(
@@ -81,7 +100,7 @@ class AsyncLogger(AsyncLoggerBase):
         log_level: LogLevel = LogLevel.DEBUG,
         tag_width: int = 10,
         icons: Optional[Dict[str, str]] = None,
-        colors: Optional[Dict[LogLevel, str]] = None,
+        colors: Optional[Dict[LogLevel, LogColor]] = None,
         verbose: bool = True,
     ):
         """
@@ -130,9 +149,9 @@ class AsyncLogger(AsyncLoggerBase):
         message: str,
         tag: str,
         params: Optional[Dict[str, Any]] = None,
-        colors: Optional[Dict[str, str]] = None,
+        colors: Optional[Dict[str, LogColor]] = None,
         boxes: Optional[List[str]] = None,
-        base_color: Optional[str] = None,
+        base_color: Optional[LogColor] = None,
         **kwargs,
     ):
         """
@@ -152,8 +171,11 @@ class AsyncLogger(AsyncLoggerBase):
 
         # avoid conflict with rich formatting
         parsed_message = message.replace("[", "[[").replace("]", "]]")
-        raw_message = message.format(**params) if params else message
         if params:
+            # FIXME: If there are formatting strings in floating point format, 
+            # this may result in colors and boxes not being applied properly.
+            # such as {value:.2f}, the value is 0.23333 format it to 0.23,
+            # but we replace("0.23333", "[color]0.23333[/color]")
             formatted_message = parsed_message.format(**params)
             for key, value in params.items():
                 # value_str may discard `[` and `]`, so we need to replace it. 
@@ -163,17 +185,17 @@ class AsyncLogger(AsyncLoggerBase):
                     color_str = f"[{colors[key]}]{value_str}[/{colors[key]}]"
                     formatted_message = formatted_message.replace(value_str, color_str)
                     value_str = color_str
-                
+
                 # check is need apply box
                 if boxes and key in boxes:
-                    formatted_message = formatted_message.replace(value_str, 
+                    formatted_message = formatted_message.replace(value_str,
                         create_box_message(value_str, type=str(level)))
-            
+
         else:
             formatted_message = parsed_message
 
         # Construct the full log line
-        color = base_color or self.colors[level]
+        color: LogColor = base_color or self.colors[level]
         log_line = f"[{color}]{self._format_tag(tag)} {self._get_icon(tag)} {formatted_message} [/{color}]"
 
         # Output to console if verbose
@@ -223,17 +245,17 @@ class AsyncLogger(AsyncLoggerBase):
         """
         self._log(
             level=LogLevel.SUCCESS if success else LogLevel.ERROR,
-            message="{url:.{url_length}}... | Status: {status} | Time: {timing:.2f}s",
+            message="{url:.{url_length}}... | Status: {status} | Time: {timing}s",
             tag=tag,
             params={
                 "url": url,
                 "url_length": url_length,
                 "status": success,
-                "timing": timing,
+                "timing": f"{timing:.2f}",  # aviod a format string
             },
             colors={
-                "status": "green" if success else "red",
-                "timing": "yellow",
+                "status": LogColor.SUCCESS if success else LogColor.ERROR,
+                "timing": LogColor.WARNING,
             },
         )
 
