@@ -24,7 +24,7 @@ from colorama import Fore, Style, init
 import textwrap
 import cProfile
 import pstats
-from functools import wraps
+from functools import cache, wraps
 import asyncio
 from lxml import etree, html as lhtml
 import sqlite3
@@ -42,6 +42,12 @@ from typing import Sequence
 from itertools import chain
 from collections import deque
 from typing import  Generator, Iterable
+
+
+@cache
+def colorama_init_once():
+    init()
+
 
 def chunk_documents(
     documents: Iterable[str],
@@ -441,7 +447,7 @@ def create_box_message(
         str: A formatted string containing the styled message box.
     """
 
-    init()
+    colorama_init_once()
 
     # Define border and text colors for different types
     styles = {
