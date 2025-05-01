@@ -20,7 +20,6 @@ from urllib.parse import urljoin
 import requests
 from requests.exceptions import InvalidSchema
 import xxhash
-from colorama import Fore, Style, init
 import textwrap
 import cProfile
 import pstats
@@ -441,14 +440,13 @@ def create_box_message(
         str: A formatted string containing the styled message box.
     """
 
-    init()
-
     # Define border and text colors for different types
     styles = {
-        "warning": (Fore.YELLOW, Fore.LIGHTYELLOW_EX, "⚠"),
-        "info": (Fore.BLUE, Fore.LIGHTBLUE_EX, "ℹ"),
-        "success": (Fore.GREEN, Fore.LIGHTGREEN_EX, "✓"),
-        "error": (Fore.RED, Fore.LIGHTRED_EX, "×"),
+        "warning": ("yellow", "bright_yellow", "⚠"),
+        "info": ("blue", "bright_blue", "ℹ"),
+        "debug": ("lightblack", "bright_black", "⋯"),
+        "success": ("green", "bright_green", "✓"),
+        "error": ("red", "bright_red", "×"),
     }
 
     border_color, text_color, prefix = styles.get(type.lower(), styles["info"])
@@ -480,12 +478,12 @@ def create_box_message(
     # Create the box with colored borders and lighter text
     horizontal_line = h_line * (width - 1)
     box = [
-        f"{border_color}{tl}{horizontal_line}{tr}",
+        f"[{border_color}]{tl}{horizontal_line}{tr}[/{border_color}]",
         *[
-            f"{border_color}{v_line}{text_color} {line:<{width-2}}{border_color}{v_line}"
+            f"[{border_color}]{v_line}[{text_color}] {line:<{width-2}}[/{text_color}][{border_color}]{v_line}[/{border_color}]"
             for line in formatted_lines
         ],
-        f"{border_color}{bl}{horizontal_line}{br}{Style.RESET_ALL}",
+        f"[{border_color}]{bl}{horizontal_line}{br}[/{border_color}]",
     ]
 
     result = "\n".join(box)
@@ -2778,4 +2776,3 @@ def preprocess_html_for_schema(html_content, text_threshold=100, attr_value_thre
         # Fallback for parsing errors
         return html_content[:max_size] if len(html_content) > max_size else html_content
     
-

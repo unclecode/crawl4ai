@@ -2,7 +2,6 @@ from .__version__ import __version__ as crawl4ai_version
 import os
 import sys
 import time
-from colorama import Fore
 from pathlib import Path
 from typing import Optional, List
 import json
@@ -44,7 +43,6 @@ from .utils import (
     sanitize_input_encode,
     InvalidCSSSelectorError,
     fast_format_html,
-    create_box_message,
     get_error_context,
     RobotsParser,
     preprocess_html_for_schema,
@@ -419,7 +417,7 @@ class AsyncWebCrawler:
 
                 self.logger.error_status(
                     url=url,
-                    error=create_box_message(error_message, type="error"),
+                    error=error_message,
                     tag="ERROR",
                 )
 
