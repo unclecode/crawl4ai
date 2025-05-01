@@ -45,10 +45,10 @@ def datetime_handler(obj: any) -> Optional[str]:
         return obj.isoformat()
     raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
 
-def should_cleanup_task(created_at: str) -> bool:
+def should_cleanup_task(created_at: str, ttl_seconds: int = 3600) -> bool:
     """Check if task should be cleaned up based on creation time."""
     created = datetime.fromisoformat(created_at)
-    return (datetime.now() - created).total_seconds() > 3600
+    return (datetime.now() - created).total_seconds() > ttl_seconds
 
 def decode_redis_hash(hash_data: Dict[bytes, bytes]) -> Dict[str, str]:
     """Decode Redis hash data from bytes to strings."""
