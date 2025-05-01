@@ -21,7 +21,7 @@ pip install crawl4ai openai sentence-transformers networkx pandas vis-network ri
 
 ### 1.2  Create / warm a LinkedIn browser profile
 ```bash
-crwl profiler
+crwl profiles
 ```
 1. The interactive shell shows **New profile** – hit **enter**.
 2. Choose a name, e.g. `profile_linkedin_uc`.
@@ -37,13 +37,13 @@ crwl profiler
 python c4ai_discover.py full \ 
   --query "health insurance management" \ 
   --geo 102713980 \               # Malaysia geoUrn
-  --title_filters "" \            # or "Product,Engineering"
-  --max_companies 10 \            # default set small for workshops
-  --max_people 20 \               # \^ same
+  --title-filters "" \            # or "Product,Engineering"
+  --max-companies 10 \            # default set small for workshops
+  --max-people 20 \               # \^ same
   --profile-name profile_linkedin_uc \ 
   --outdir ./data \ 
   --concurrency 2 \ 
-  --log_level debug
+  --log-level debug
 ```
 **Outputs** in `./data/`:
 * `companies.jsonl` – one JSON per company
