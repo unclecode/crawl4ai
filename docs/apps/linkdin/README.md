@@ -121,6 +121,6 @@ The page fetches `data/company_graph.json` and the `org_chart_*.json` files auto
 ---
 
 ### TL;DR
-`crwl profiler` → `c4ai_discover.py` → `c4ai_insights.py` → open `graph_view_template.html`.  
+`crwl profiles` → `c4ai_discover.py` → `c4ai_insights.py` → open `graph_view_template.html`.  
 Live long and `import crawl4ai`.
 
