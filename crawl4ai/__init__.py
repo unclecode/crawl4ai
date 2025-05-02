@@ -23,7 +23,8 @@ from .extraction_strategy import (
     CosineStrategy,
     JsonCssExtractionStrategy,
     JsonXPathExtractionStrategy,
-    JsonLxmlExtractionStrategy
+    JsonLxmlExtractionStrategy,
+    RegexExtractionStrategy
 )
 from .chunking_strategy import ChunkingStrategy, RegexChunking
 from .markdown_generation_strategy import DefaultMarkdownGenerator
@@ -105,6 +106,7 @@ __all__ = [
     "JsonCssExtractionStrategy",
     "JsonXPathExtractionStrategy",
     "JsonLxmlExtractionStrategy",
+    "RegexExtractionStrategy",
     "ChunkingStrategy",
     "RegexChunking",
     "DefaultMarkdownGenerator",

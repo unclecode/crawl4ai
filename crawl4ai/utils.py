@@ -2735,33 +2735,67 @@ def preprocess_html_for_schema(html_content, text_threshold=100, attr_value_thre
             # Also truncate tail text if present
             if element.tail and len(element.tail.strip()) > text_threshold:
                 element.tail = element.tail.strip()[:text_threshold] + '...'
-        
-        # 4. Find repeated patterns and keep only a few examples
-        # This is a simplistic approach - more sophisticated pattern detection could be implemented
-        pattern_elements = {}
-        for element in tree.xpath('//*[contains(@class, "")]'):
-            parent = element.getparent()
+
+        # 4. Detect duplicates and drop them in a single pass
+        seen: dict[tuple, None] = {}
+        for el in list(tree.xpath('//*[@class]')):          # snapshot once, XPath is fast
+            parent = el.getparent()
             if parent is None:
                 continue
-                
-            # Create a signature based on tag and classes
-            classes = element.get('class', '')
-            if not classes:
+
+            cls = el.get('class')
+            if not cls:
                 continue
-            signature = f"{element.tag}.{classes}"
-            
-            if signature in pattern_elements:
-                pattern_elements[signature].append(element)
+
+            # ── build signature ───────────────────────────────────────────
+            h = xxhash.xxh64()                              # stream, no big join()
+            for txt in el.itertext():
+                h.update(txt)
+            sig = (el.tag, cls, h.intdigest())             # tuple cheaper & hashable
+
+            # ── first seen? keep – else drop ─────────────
+            if sig in seen and parent is not None:
+                parent.remove(el)                           # duplicate
             else:
-                pattern_elements[signature] = [element]
+                seen[sig] = None
         
-        # Keep only 3 examples of each repeating pattern
-        for signature, elements in pattern_elements.items():
-            if len(elements) > 3:
-                # Keep the first 2 and last elements
-                for element in elements[2:-1]:
-                    if element.getparent() is not None:
-                        element.getparent().remove(element)
+        # # 4. Find repeated patterns and keep only a few examples
+        # # This is a simplistic approach - more sophisticated pattern detection could be implemented
+        # pattern_elements = {}
+        # for element in tree.xpath('//*[contains(@class, "")]'):
+        #     parent = element.getparent()
+        #     if parent is None:
+        #         continue
+                
+        #     # Create a signature based on tag and classes
+        #     classes = element.get('class', '')
+        #     if not classes:
+        #         continue
+        #     innert_text = ''.join(element.xpath('.//text()'))
+        #     innert_text_hash = xxhash.xxh64(innert_text.encode()).hexdigest()
+        #     signature = f"{element.tag}.{classes}.{innert_text_hash}"
+            
+        #     if signature in pattern_elements:
+        #         pattern_elements[signature].append(element)
+        #     else:
+        #         pattern_elements[signature] = [element]
+        
+        # # Keep only first examples of each repeating pattern
+        # for signature, elements in pattern_elements.items():
+        #     if len(elements) > 1:
+        #         # Keep the first element and remove the rest
+        #         for element in elements[1:]:
+        #             if element.getparent() is not None:
+        #                 element.getparent().remove(element)
+
+
+        # # Keep only 3 examples of each repeating pattern
+        # for signature, elements in pattern_elements.items():
+        #     if len(elements) > 3:
+        #         # Keep the first 2 and last elements
+        #         for element in elements[2:-1]:
+        #             if element.getparent() is not None:
+        #                 element.getparent().remove(element)
         
         # 5. Convert back to string
         result = etree.tostring(tree, encoding='unicode', method='html')

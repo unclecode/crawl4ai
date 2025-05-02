@@ -475,7 +475,7 @@ class BrowserProfiler:
                     self.logger.warning("  No profiles found. Create one first with option 1.", tag="PROFILES")
                     continue
                 
-                # Print profile information with colorama formatting
+                # Print profile information 
                 self.logger.info("\nAvailable profiles:", tag="PROFILES")
                 for i, profile in enumerate(profiles):
                     self.logger.info(f"[{i+1}] {profile['name']}", tag="PROFILES")

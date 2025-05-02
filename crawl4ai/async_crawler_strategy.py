@@ -571,6 +571,14 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
             async def handle_response_capture(response):
                 try:
+                    try:
+                        # body = await response.body()
+                        # json_body = await response.json()
+                        text_body = await response.text()
+                    except Exception as e:
+                        body = None
+                        # json_body = None
+                        # text_body = None
                     captured_requests.append({
                         "event_type": "response",
                         "url": response.url,
@@ -579,7 +587,12 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         "headers": dict(response.headers), # Convert Header dict
                         "from_service_worker": response.from_service_worker,
                         "request_timing": response.request.timing, # Detailed timing info
-                        "timestamp": time.time()
+                        "timestamp": time.time(),
+                        "body" : {
+                            # "raw": body,
+                            # "json": json_body,
+                            "text": text_body
+                        }
                     })
                 except Exception as e:
                     if self.logger:
