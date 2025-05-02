@@ -69,11 +69,12 @@ _See more: <https://www.linkedin.com/search/results/companies/?geoUrn=XXX> – t
 python c4ai_insights.py \ 
   --in  ./data \ 
   --out ./data \ 
-  --embed_model all-MiniLM-L6-v2 \ 
-  --top_k 10 \ 
-  --openai_model gpt-4.1 \ 
-  --max_llm_tokens 8024 \ 
-  --llm_temperature 1.0 \ 
+  --embed_model all-MiniLM-L6-v2  \ 
+  --llm-provider gemini/gemini-2.0-flash \ 
+  --llm-api-key "" \ 
+  --top-k 10 \ 
+  --max-llm-tokens 8024 \ 
+  --llm-temperature 1.0 \ 
   --workers 4
 ```
 Emits next to the Stage‑1 files:
