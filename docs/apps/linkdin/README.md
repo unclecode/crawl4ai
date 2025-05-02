@@ -34,15 +34,15 @@ crwl profiles
 ## 2  Discovery – scrape companies & people
 
 ```bash
-python c4ai_discover.py full \ 
-  --query "health insurance management" \ 
+python c4ai_discover.py full \
+  --query "health insurance management" \
   --geo 102713980 \               # Malaysia geoUrn
   --title-filters "" \            # or "Product,Engineering"
   --max-companies 10 \            # default set small for workshops
   --max-people 20 \               # \^ same
-  --profile-name profile_linkedin_uc \ 
-  --outdir ./data \ 
-  --concurrency 2 \ 
+  --profile-name profile_linkedin_uc \
+  --outdir ./data \
+  --concurrency 2 \
   --log-level debug
 ```
 **Outputs** in `./data/`:
@@ -66,15 +66,15 @@ _See more: <https://www.linkedin.com/search/results/companies/?geoUrn=XXX> – t
 ## 3  Insights – embeddings, org‑charts, decision makers
 
 ```bash
-python c4ai_insights.py \ 
-  --in  ./data \ 
-  --out ./data \ 
-  --embed_model all-MiniLM-L6-v2  \ 
-  --llm-provider gemini/gemini-2.0-flash \ 
-  --llm-api-key "" \ 
-  --top-k 10 \ 
-  --max-llm-tokens 8024 \ 
-  --llm-temperature 1.0 \ 
+python c4ai_insights.py \
+  --in ./data \
+  --out ./data \
+  --embed-model all-MiniLM-L6-v2 \
+  --llm-provider gemini/gemini-2.0-flash \
+  --llm-api-key "" \
+  --top-k 10 \
+  --max-llm-tokens 8024 \
+  --llm-temperature 1.0 \
   --workers 4
 ```
 Emits next to the Stage‑1 files:
