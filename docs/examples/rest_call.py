@@ -46,8 +46,10 @@ data = {
     "urls": ["https://www.nbcnews.com/business"],
     "extraction_strategy": "LLMExtractionStrategy",
     "extraction_strategy_args": {
-        "provider": "groq/llama3-8b-8192",
-        "api_token": os.environ.get("GROQ_API_KEY"),
+        "llm_config": {
+            "provider": "groq/llama-3.3-70b-versatile",
+            "api_token": os.environ.get("GROQ_API_KEY"),
+        },
         "instruction": """I am interested in only financial news, 
         and translate them in French.""",
     },
