@@ -34,7 +34,7 @@ browser_cfg = BrowserConfig(
 | **`user_agent`**      | `str` (default: Chrome-based UA)       | Your custom or random user agent. `user_agent_mode="random"` can shuffle it.                                                          |
 | **`light_mode`**      | `bool` (default: `False`)              | Disables some background features for performance gains.                                                                              |
 | **`text_mode`**       | `bool` (default: `False`)              | If `True`, tries to disable images/other heavy content for speed.                                                                     |
-| **`use_managed_browser`** | `bool` (default: `False`)          | For advanced “managed” interactions (debugging, CDP usage). Typically set automatically if persistent context is on.                  |
+| **`use_managed_browser`** | `bool` (default: `False`)          | For advanced "managed" interactions (debugging, CDP usage). Typically set automatically if persistent context is on.                  |
 | **`extra_args`**      | `list` (default: `[]`)                 | Additional flags for the underlying browser process, e.g. `["--disable-extensions"]`.                                                |
 
 **Tips**:
@@ -101,7 +101,7 @@ Use these for controlling whether you read or write from a local content cache. 
 
 | **Parameter**              | **Type / Default**      | **What It Does**                                                                                                    |
 |----------------------------|-------------------------|----------------------------------------------------------------------------------------------------------------------|
-| **`wait_until`**           | `str` (domcontentloaded)| Condition for navigation to “complete”. Often `"networkidle"` or `"domcontentloaded"`.                               |
+| **`wait_until`**           | `str` (domcontentloaded)| Condition for navigation to "complete". Often `"networkidle"` or `"domcontentloaded"`.                               |
 | **`page_timeout`**         | `int` (60000 ms)        | Timeout for page navigation or JS steps. Increase for slow sites.                                                    |
 | **`wait_for`**             | `str or None`           | Wait for a CSS (`"css:selector"`) or JS (`"js:() => bool"`) condition before content extraction.                     |
 | **`wait_for_images`**      | `bool` (False)          | Wait for images to load before finishing. Slows down if you only want text.                                          |
@@ -117,7 +117,7 @@ Use these for controlling whether you read or write from a local content cache. 
 | **Parameter**              | **Type / Default**            | **What It Does**                                                                                                                       |
 |----------------------------|--------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------|
 | **`js_code`**              | `str or list[str]` (None)      | JavaScript to run after load. E.g. `"document.querySelector('button')?.click();"`.                                                     |
-| **`js_only`**              | `bool` (False)                 | If `True`, indicates we’re reusing an existing session and only applying JS. No full reload.                                           |
+| **`js_only`**              | `bool` (False)                 | If `True`, indicates we're reusing an existing session and only applying JS. No full reload.                                           |
 | **`ignore_body_visibility`** | `bool` (True)                | Skip checking if `<body>` is visible. Usually best to keep `True`.                                                                     |
 | **`scan_full_page`**       | `bool` (False)                 | If `True`, auto-scroll the page to load dynamic content (infinite scroll).                                                              |
 | **`scroll_delay`**         | `float` (0.2)                  | Delay between scroll steps if `scan_full_page=True`.                                                                                   |
@@ -141,7 +141,7 @@ If your page is a single-page app with repeated JS updates, set `js_only=True` i
 | **`screenshot_height_threshold`**          | `int` (~20000)      | If the page is taller than this, alternate screenshot strategies are used.                                |
 | **`pdf`**                                  | `bool` (False)      | If `True`, returns a PDF in `result.pdf`.                                                                 |
 | **`capture_mhtml`**                        | `bool` (False)      | If `True`, captures an MHTML snapshot of the page in `result.mhtml`. MHTML includes all page resources (CSS, images, etc.) in a single file. |
-| **`image_description_min_word_threshold`** | `int` (~50)         | Minimum words for an image’s alt text or description to be considered valid.                              |
+| **`image_description_min_word_threshold`** | `int` (~50)         | Minimum words for an image's alt text or description to be considered valid.                              |
 | **`image_score_threshold`**                | `int` (~3)          | Filter out low-scoring images. The crawler scores images by relevance (size, context, etc.).              |
 | **`exclude_external_images`**              | `bool` (False)      | Exclude images from other domains.                                                                        |
 
@@ -156,7 +156,7 @@ If your page is a single-page app with repeated JS updates, set `js_only=True` i
 | **`exclude_social_media_links`** | `bool` (False)      | Strips links specifically to social sites (like Facebook or Twitter).                                                      |
 | **`exclude_domains`**        | `list` ([])             | Provide a custom list of domains to exclude (like `["ads.com", "trackers.io"]`).                                            |
 
-Use these for link-level content filtering (often to keep crawls “internal” or to remove spammy domains).
+Use these for link-level content filtering (often to keep crawls "internal" or to remove spammy domains).
 
 ---
 
@@ -165,7 +165,7 @@ Use these for link-level content filtering (often to keep crawls “internal” 
 | **Parameter**  | **Type / Default** | **What It Does**                                                         |
 |----------------|--------------------|---------------------------------------------------------------------------|
 | **`verbose`**  | `bool` (True)     | Prints logs detailing each step of crawling, interactions, or errors.    |
-| **`log_console`** | `bool` (False) | Logs the page’s JavaScript console output if you want deeper JS debugging.|
+| **`log_console`** | `bool` (False) | Logs the page's JavaScript console output if you want deeper JS debugging.|
 
 ---
 
@@ -259,7 +259,7 @@ LLMConfig is useful to pass LLM provider config to strategies and functions that
 ## 3.1 Parameters
 | **Parameter**         | **Type / Default**                     | **What It Does**                                                                                                                     |
 |-----------------------|----------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
-| **`provider`**    | `"ollama/llama3","groq/llama3-70b-8192","groq/llama3-8b-8192", "openai/gpt-4o-mini" ,"openai/gpt-4o","openai/o1-mini","openai/o1-preview","openai/o3-mini","openai/o3-mini-high","anthropic/claude-3-haiku-20240307","anthropic/claude-3-opus-20240229","anthropic/claude-3-sonnet-20240229","anthropic/claude-3-5-sonnet-20240620","gemini/gemini-pro","gemini/gemini-1.5-pro","gemini/gemini-2.0-flash","gemini/gemini-2.0-flash-exp","gemini/gemini-2.0-flash-lite-preview-02-05","deepseek/deepseek-chat"`<br/>*(default: `"openai/gpt-4o-mini"`)* | Which LLM provoder to use. 
+| **`provider`**    | `"ollama/llama3","groq/llama-3.3-70b-versatile","groq/meta-llama/llama-4-scout-17b-16e-instruct", "openai/gpt-4o-mini" ,"openai/gpt-4o","openai/o1-mini","openai/o1-preview","openai/o3-mini","openai/o3-mini-high","anthropic/claude-3-haiku-20240307","anthropic/claude-3-opus-20240229","anthropic/claude-3-sonnet-20240229","anthropic/claude-3-5-sonnet-20240620","gemini/gemini-pro","gemini/gemini-1.5-pro","gemini/gemini-2.0-flash","gemini/gemini-2.0-flash-exp","gemini/gemini-2.0-flash-lite-preview-02-05","deepseek/deepseek-chat"`<br/>*(default: `"openai/gpt-4o-mini"`)* | Which LLM provoder to use. 
 | **`api_token`**         |1.Optional. When not provided explicitly, api_token will be read from environment variables based on provider. For example: If a gemini model is passed as provider then,`"GEMINI_API_KEY"` will be read from environment variables  <br/> 2. API token of LLM provider <br/> eg: `api_token = "gsk_1ClHGGJ7Lpn4WGybR7vNWGdyb3FY7zXEw3SCiy0BAVM9lL8CQv"` <br/> 3. Environment variable - use with prefix "env:" <br/> eg:`api_token = "env: GROQ_API_KEY"`              | API token to use for the given provider 
 | **`base_url`**         |Optional. Custom API endpoint | If your provider has a custom endpoint
 
@@ -271,7 +271,7 @@ llm_config = LLMConfig(provider="openai/gpt-4o-mini", api_token=os.getenv("OPENA
 ## 4. Putting It All Together
 
 - **Use** `BrowserConfig` for **global** browser settings: engine, headless, proxy, user agent.  
-- **Use** `CrawlerRunConfig` for each crawl’s **context**: how to filter content, handle caching, wait for dynamic elements, or run JS.  
+- **Use** `CrawlerRunConfig` for each crawl's **context**: how to filter content, handle caching, wait for dynamic elements, or run JS.  
 - **Pass** both configs to `AsyncWebCrawler` (the `BrowserConfig`) and then to `arun()` (the `CrawlerRunConfig`).  
 - **Use** `LLMConfig` for LLM provider configurations that can be used across all extraction, filtering, schema generation tasks. Can be used in - `LLMExtractionStrategy`, `LLMContentFilter`, `JsonCssExtractionStrategy.generate_schema` & `JsonXPathExtractionStrategy.generate_schema`
 
