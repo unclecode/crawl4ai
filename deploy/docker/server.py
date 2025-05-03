@@ -226,6 +226,13 @@ class MarkdownRequest(BaseModel):
     q:   Optional[str] = Field(None,  description="Query string used by BM25/LLM filters")
     c:   Optional[str] = Field("0",   description="Cache‑bust / revision counter")
 
+class LlmRequest(BaseModel):
+    """Request body for the /llm endpoint."""
+    url:            str           = Field(...,  description="Absolute http/https URL to fetch")
+    query:          Optional[str] = Field(None,  description="Question string used by BM25/LLM prompt")
+    sample_json:    Optional[str] = Field(None,  description="Sample json string to use to generate a schema for structured output")
+
+
 
 class RawCode(BaseModel):
     code: str
@@ -428,19 +435,28 @@ async def execute_js(
     return JSONResponse(data)
 
 
-@app.get("/llm/{url:path}")
+@app.post("/llm")
 async def llm_endpoint(
     request: Request,
-    url: str = Path(...),
-    q: str = Query(...),
+    body: LlmRequest,
     _td: Dict = Depends(token_dep),
 ):
-    if not q:
-        raise HTTPException(400, "Query parameter 'q' is required")
+    url = body.url
+    if not url:
+        raise HTTPException(400, "Body parameter 'url' is required")
+    if not body.query:
+        raise HTTPException(400, "Body parameter 'query' is required")
     if not url.startswith(("http://", "https://")):
         url = "https://" + url
-    answer = await handle_llm_qa(url, q, config)
-    return JSONResponse({"answer": answer})
+    [answer, schema] = await handle_llm_qa(url=url, query=body.query, sample_json=body.sample_json, config=config)
+    return JSONResponse({
+        "url": url,
+        "query": body.query,
+        "answer": answer, 
+        "sample_json": body.sample_json,
+        "schema": schema,
+        "success": True
+    })
 
 
 @app.get("/schema")
