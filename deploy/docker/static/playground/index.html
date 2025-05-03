@@ -52,28 +52,28 @@
             font-family: 'Fira Code', monospace;
             font-size: 0.9rem;
         }
-        
+
         .CodeMirror-gutters {
             background-color: #1E1E1E !important;
             border-right: 1px solid #3F3F44 !important;
         }
-        
+
         .CodeMirror-linenumber {
             color: #3F3F44 !important;
         }
-        
+
         .cm-s-darcula .cm-keyword {
             color: #4EFFFF !important;
         }
-        
+
         .cm-s-darcula .cm-string {
             color: #F380F5 !important;
         }
-        
+
         .cm-s-darcula .cm-number {
             color: #D5CEBF !important;
         }
-        
+
         /* Add to your <style> section or Tailwind config */
         .hljs {
             background: #1E1E1E !important;
@@ -144,24 +144,24 @@
 
             <!-- GitHub badges -->
             <a href="https://github.com/unclecode/crawl4ai" target="_blank" class="flex space-x-1">
-                <img src="https://img.shields.io/github/stars/unclecode/crawl4ai?style=social"
-                     alt="GitHub stars" class="h-5">
-                <img src="https://img.shields.io/github/forks/unclecode/crawl4ai?style=social"
-                     alt="GitHub forks" class="h-5">
+                <img src="https://img.shields.io/github/stars/unclecode/crawl4ai?style=social" alt="GitHub stars"
+                    class="h-5">
+                <img src="https://img.shields.io/github/forks/unclecode/crawl4ai?style=social" alt="GitHub forks"
+                    class="h-5">
             </a>
 
             <!-- Docs -->
             <a href="https://docs.crawl4ai.com" target="_blank"
-               class="text-xs text-secondary hover:text-primary underline flex items-center">
+                class="text-xs text-secondary hover:text-primary underline flex items-center">
                 Docs
             </a>
 
             <!-- X (Twitter) follow -->
-            <a href="https://x.com/unclecode" target="_blank"
-               class="hover:text-primary flex items-center" title="Follow @unclecode on X">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                     class="w-4 h-4 fill-current mr-1">
-                    <path d="M22.46 6c-.77.35-1.6.58-2.46.69a4.27 4.27 0 001.88-2.35 8.53 8.53 0 01-2.71 1.04 4.24 4.24 0 00-7.23 3.87A12.05 12.05 0 013 4.62a4.24 4.24 0 001.31 5.65 4.2 4.2 0 01-1.92-.53v.05a4.24 4.24 0 003.4 4.16 4.31 4.31 0 01-1.91.07 4.25 4.25 0 003.96 2.95A8.5 8.5 0 012 19.55a12.04 12.04 0 006.53 1.92c7.84 0 12.13-6.49 12.13-12.13 0-.18-.01-.36-.02-.54A8.63 8.63 0 0024 5.1a8.45 8.45 0 01-2.54.7z"/>
+            <a href="https://x.com/unclecode" target="_blank" class="hover:text-primary flex items-center"
+                title="Follow @unclecode on X">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="w-4 h-4 fill-current mr-1">
+                    <path
+                        d="M22.46 6c-.77.35-1.6.58-2.46.69a4.27 4.27 0 001.88-2.35 8.53 8.53 0 01-2.71 1.04 4.24 4.24 0 00-7.23 3.87A12.05 12.05 0 013 4.62a4.24 4.24 0 001.31 5.65 4.2 4.2 0 01-1.92-.53v.05a4.24 4.24 0 003.4 4.16 4.31 4.31 0 01-1.91.07 4.25 4.25 0 003.96 2.95A8.5 8.5 0 012 19.55a12.04 12.04 0 006.53 1.92c7.84 0 12.13-6.49 12.13-12.13 0-.18-.01-.36-.02-.54A8.63 8.63 0 0024 5.1a8.45 8.45 0 01-2.54.7z" />
                 </svg>
                 <span class="text-xs">@unclecode</span>
             </a>
@@ -199,7 +199,8 @@
                     <div class="mt-2 space-y-3 p-2 border border-border rounded">
                         <div>
                             <label for="md-filter" class="block text-xs text-secondary mb-1">Filter Type</label>
-                            <select id="md-filter" class="bg-dark border border-border rounded px-2 py-1 text-sm w-full">
+                            <select id="md-filter"
+                                class="bg-dark border border-border rounded px-2 py-1 text-sm w-full">
                                 <option value="fit">fit - Adaptive content filtering</option>
                                 <option value="raw">raw - No filtering</option>
                                 <option value="bm25">bm25 - BM25 keyword relevance</option>
@@ -207,8 +208,9 @@
                             </select>
                         </div>
                         <div>
-                            <label for="md-query" class="block text-xs text-secondary mb-1">Query (for BM25/LLM filters)</label>
-                            <input id="md-query" type="text" placeholder="Enter search terms or instructions" 
+                            <label for="md-query" class="block text-xs text-secondary mb-1">Query (for BM25/LLM
+                                filters)</label>
+                            <input id="md-query" type="text" placeholder="Enter search terms or instructions"
                                 class="bg-dark border border-border rounded px-2 py-1 text-sm w-full">
                         </div>
                         <div>
@@ -227,35 +229,56 @@
                     <div class="mt-2 space-y-3 p-2 border border-border rounded">
                         <div>
                             <label for="llm-question" class="block text-xs text-secondary mb-1">Question</label>
-                            <input id="llm-question" type="text" value="What is this page about?" 
+                            <input id="llm-question" type="text" value="What is this page about?"
                                 class="bg-dark border border-border rounded px-2 py-1 text-sm w-full">
                         </div>
+                        <div>
+                            <label for="llm-structured" class="block text-xs text-secondary mb-1">Return Structured
+                                JSON</label>
+                            <input id="llm-structured" type="checkbox"
+                                class="bg-dark border border-border rounded px-2 py-1 text-sm">
+                        </div>
+                        <div id="llm-sample-json" class="hidden">
+                            <label for="llm-sample" class="block text-xs text-secondary mb-1">Sample JSON Output</label>
+                            <textarea id="llm-sample" placeholder="Paste your sample JSON here"
+                                class="bg-dark border border-border rounded px-2 py-1 text-sm w-full h-32"></textarea>
+                            <p class="text-xs text-secondary mt-1">We will automatically generate a JSON schema from the
+                                provided sample.</p>
+                        </div>
+                        <script>
+                            // Toggle visibility of the sample JSON output field
+                            document.getElementById('llm-structured').addEventListener('change', function () {
+                                const sampleJsonDiv = document.getElementById('llm-sample-json');
+                                if (this.checked) {
+                                    sampleJsonDiv.classList.remove('hidden');
+                                } else {
+                                    sampleJsonDiv.classList.add('hidden');
+                                }
+                            });
+                        </script>
                     </div>
                 </details>
 
                 <!-- Advanced config for /crawl endpoints -->
                 <details id="adv-config" class="mb-4">
                     <summary class="text-sm text-secondary cursor-pointer">Advanced Config <span
-                        class="text-xs text-primary">(Python → auto‑JSON)</span></summary>
+                            class="text-xs text-primary">(Python → auto‑JSON)</span></summary>
 
                     <!-- Toolbar -->
                     <div class="flex items-center justify-end space-x-3 mt-2">
                         <label for="cfg-type" class="text-xs text-secondary">Type:</label>
-                        <select id="cfg-type"
-                                class="bg-dark border border-border rounded px-1 py-0.5 text-xs">
+                        <select id="cfg-type" class="bg-dark border border-border rounded px-1 py-0.5 text-xs">
                             <option value="CrawlerRunConfig">CrawlerRunConfig</option>
                             <option value="BrowserConfig">BrowserConfig</option>
                         </select>
 
                         <!-- help link -->
-                        <a href="https://docs.crawl4ai.com/api/parameters/"
-                           target="_blank"
-                           class="text-xs text-primary hover:underline flex items-center space-x-1"
-                           title="Open parameter reference in new tab">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                                 class="w-4 h-4 fill-current">
-                                 <path d="M13 3h8v8h-2V6.41l-9.29 9.3-1.42-1.42 9.3-9.29H13V3z"/>
-                                 <path d="M5 5h4V3H3v6h2V5zm0 14v-4H3v6h6v-2H5z"/>
+                        <a href="https://docs.crawl4ai.com/api/parameters/" target="_blank"
+                            class="text-xs text-primary hover:underline flex items-center space-x-1"
+                            title="Open parameter reference in new tab">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="w-4 h-4 fill-current">
+                                <path d="M13 3h8v8h-2V6.41l-9.29 9.3-1.42-1.42 9.3-9.29H13V3z" />
+                                <path d="M5 5h4V3H3v6h2V5zm0 14v-4H3v6h6v-2H5z" />
                             </svg>
                             <span>Docs</span>
                         </a>
@@ -478,19 +501,19 @@
             cm.setValue(TEMPLATES[e.target.value]);
             document.getElementById('cfg-status').textContent = '';
         });
-        
+
         // Handle endpoint selection change to show appropriate options
-        document.getElementById('endpoint').addEventListener('change', function(e) {
+        document.getElementById('endpoint').addEventListener('change', function (e) {
             const endpoint = e.target.value;
             const mdOptions = document.getElementById('md-options');
             const llmOptions = document.getElementById('llm-options');
             const advConfig = document.getElementById('adv-config');
-            
+
             // Hide all option sections first
             mdOptions.classList.add('hidden');
             llmOptions.classList.add('hidden');
             advConfig.classList.add('hidden');
-            
+
             // Show the appropriate section based on endpoint
             if (endpoint === 'md') {
                 mdOptions.classList.remove('hidden');
@@ -566,7 +589,7 @@
             // Python snippet
             const pyCodeEl = document.querySelector('#python-content code');
             let pySnippet;
-            
+
             if (method === 'GET') {
                 // GET request (for /llm endpoint)
                 pySnippet = `import httpx\n\nasync def crawl():\n    async with httpx.AsyncClient() as client:\n        response = await client.get(\n            "${window.location.origin}${api}"\n        )\n        return response.json()`;
@@ -582,7 +605,7 @@
             // cURL snippet
             const curlCodeEl = document.querySelector('#curl-content code');
             let curlSnippet;
-            
+
             if (method === 'GET') {
                 // GET request (for /llm endpoint)
                 curlSnippet = `curl -X GET "${window.location.origin}${api}"`;
@@ -627,14 +650,14 @@
 
             const api = endpointMap[endpoint];
             let payload;
-            
+
             // Create appropriate payload based on endpoint type
             if (endpoint === 'md') {
                 // Get values from the /md specific inputs
                 const filterType = document.getElementById('md-filter').value;
                 const query = document.getElementById('md-query').value.trim();
                 const cache = document.getElementById('md-cache').value;
-                
+
                 // MD endpoint expects: { url, f, q, c }
                 payload = {
                     url: urls[0], // Take first URL
@@ -643,9 +666,13 @@
                     c: cache
                 };
             } else if (endpoint === 'llm') {
-                // LLM endpoint has a different URL pattern and uses query params
-                // This will be handled directly in the fetch below
-                payload = null;
+                const structured = document.getElementById('llm-structured').checked;
+
+                payload = {
+                    url: urls[0], // Take first URL
+                    query: document.getElementById('llm-question').value.trim() || "What is this page about?",
+                    sample_json: structured ? (document.getElementById('llm-sample').value.trim() || null) : null,
+                }
             } else {
                 // Default payload for /crawl and /crawl/stream
                 payload = {
@@ -661,16 +688,22 @@
                 let response, responseData;
 
                 if (endpoint === 'llm') {
-                    // Special handling for LLM endpoint which uses URL pattern: /llm/{encoded_url}?q={query}
-                    const url = urls[0];
-                    const encodedUrl = encodeURIComponent(url);
-                    // Get the question from the LLM-specific input
-                    const question = document.getElementById('llm-question').value.trim() || "What is this page about?";
-                    
-                    response = await fetch(`${api}/${encodedUrl}?q=${encodeURIComponent(question)}`, {
-                        method: 'GET',
-                        headers: { 'Accept': 'application/json' }
+                    response = await fetch(api, {
+                        method: 'POST',
+                        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
                     });
+                    responseData = await response.json();
+                    const time = Math.round(performance.now() - startTime);
+                    updateStatus('success', time, null);
+                    document.querySelector('#response-content code').textContent = responseData.answer;
+                    if (responseData.schema) {
+                        document.querySelector('#response-content code').textContent = JSON.stringify(JSON.parse(responseData.answer), null, 2);
+                        document.querySelector('#response-content code').className = 'json hljs'; // Reset classes
+                    } else {
+                        document.querySelector('#response-content code').textContent = responseData.answer;
+                    }
+                    forceHighlightElement(document.querySelector('#response-content code'));
                 } else if (endpoint === 'crawl_stream') {
                     // Stream processing
                     response = await fetch(api, {
@@ -739,7 +772,7 @@
                 }
 
                 forceHighlightElement(document.querySelector('#response-content code'));
-                
+
                 // For generateSnippets, handle the LLM case specially
                 if (endpoint === 'llm') {
                     const url = urls[0];
@@ -903,7 +936,7 @@
         // Initialize clipboard for all copy buttons
         function initCopyButtons() {
             document.querySelectorAll('.copy-btn').forEach(btn => {
-                new  ClipboardJS(btn, {
+                new ClipboardJS(btn, {
                     text: () => {
                         const target = document.querySelector(btn.dataset.target);
                         return target ? target.textContent : '';
@@ -930,14 +963,14 @@
                 });
             });
         }
-        
+
         // Function to initialize UI based on selected endpoint
         function initUI() {
             // Trigger the endpoint change handler to set initial UI state
             const endpointSelect = document.getElementById('endpoint');
             const event = new Event('change');
             endpointSelect.dispatchEvent(event);
-            
+
             // Initialize copy buttons
             initCopyButtons();
         }

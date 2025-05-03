@@ -39,6 +39,7 @@ from utils import (
     should_cleanup_task,
     decode_redis_hash
 )
+from genson import SchemaBuilder
 
 import psutil, time
 
@@ -56,18 +57,53 @@ def _get_memory_mb():
 async def handle_llm_qa(
     url: str,
     query: str,
-    config: dict
+    config: dict,
+    sample_json: Optional[str] = None,
 ) -> str:
     """Process QA using LLM with crawled content as context."""
     try:
         if not url.startswith(('http://', 'https://')):
             url = 'https://' + url
-        # Extract base URL by finding last '?q=' occurrence
-        last_q_index = url.rfind('?q=')
-        if last_q_index != -1:
-            url = url[:last_q_index]
+        
+        # if sample_json is provided try to generate a schema from it and use it for structured extraction
+        if sample_json:
+            try:
+                json_data = json.loads(sample_json)
+                builder = SchemaBuilder()
+                builder.add_object(json_data)
+                # Extract the generated JSON schema
+                schema = builder.to_schema()                
 
-        # Get markdown content
+            except json.JSONDecodeError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid JSON provided for sample_json"
+                )
+            # If config['llm'] has api_key then ignore the api_key_env
+            llm_strategy = LLMExtractionStrategy(
+                llm_config=LLMConfig(
+                    provider=config["llm"]["provider"],
+                    api_token=os.environ.get(config["llm"].get("api_key_env", ""))
+                ),
+                instruction=query,
+                schema=schema
+            )
+            async with AsyncWebCrawler() as crawler:
+                result = await crawler.arun(
+                    url=url,
+                    config=CrawlerRunConfig(
+                        extraction_strategy=llm_strategy,
+                        scraping_strategy=LXMLWebScrapingStrategy(),
+                        cache_mode=CacheMode.WRITE_ONLY
+                    )
+                )
+                if not result.success:
+                    raise Error(result.error_message)
+
+                content = result.extracted_content
+                return [content, json.dumps(schema, indent=2)]
+
+        # fallback to simple q & a evaluation if no schema is provided
         async with AsyncWebCrawler() as crawler:
             result = await crawler.arun(url)
             if not result.success:
@@ -92,7 +128,7 @@ async def handle_llm_qa(
             api_token=os.environ.get(config["llm"].get("api_key_env", ""))
         )
 
-        return response.choices[0].message.content
+        return [response.choices[0].message.content, None]
     except Exception as e:
         logger.error(f"QA processing error: {str(e)}", exc_info=True)
         raise HTTPException(

@@ -1,3 +1,4 @@
+# syntax=docker.io/docker/dockerfile:1.7-labs
 FROM python:3.12-slim-bookworm AS build
 
 # C4ai version
@@ -120,7 +121,7 @@ else\n\
     pip install --no-cache-dir /tmp/crawl4ai\n\
 fi' > /tmp/install.sh && chmod +x /tmp/install.sh
 
-COPY . /tmp/project/
+COPY --exclude=**/deploy . /tmp/project/
 
 # Copy supervisor config first (might need root later, but okay for now)
 COPY deploy/docker/supervisord.conf .
