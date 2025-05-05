@@ -470,9 +470,20 @@ async def crawl(
 ):
     """
     Crawl a list of URLs and return the results as JSON.
+    For streaming responses, use /crawl/stream endpoint.
     """
     if not crawl_request.urls:
         raise HTTPException(400, "At least one URL required")
+        
+    # Check whether it is a redirection for a streaming request
+    crawler_config = CrawlerRunConfig.load(crawl_request.crawler_config)
+    if crawler_config.stream:
+        return RedirectResponse(
+            url="/crawl/stream",
+            status_code=307,
+            headers={"Content-Type": "application/json"}
+        )
+
     res = await handle_crawl_request(
         urls=crawl_request.urls,
         browser_config=crawl_request.browser_config,
