@@ -74,8 +74,7 @@ def dev_defaults() -> SimpleNamespace:
         llm_api_key=None,
         max_llm_tokens=8000,
         llm_temperature=1.0,
-        workers=4, 
-        stub=False
+        workers=4
     )
 
 # ───────────────────────────────────────────────────────────────────────────────
@@ -167,7 +166,7 @@ def build_company_graph(companies, embeds:np.ndarray, top_k:int) -> Dict[str,Any
 # ───────────────────────────────────────────────────────────────────────────────
 # Org-chart via LLM
 # ───────────────────────────────────────────────────────────────────────────────
-async def infer_org_chart_llm(company, people, llm_provider:str, api_key:str, max_tokens:int, temperature:float, stub:bool):
+async def infer_org_chart_llm(company, people, llm_provider:str, api_key:str, max_tokens:int, temperature:float, stub:bool=False, base_url:str=None):
     if stub:
         # Tiny fake org-chart when debugging offline
         chief = random.choice(people)
@@ -209,7 +208,8 @@ Return JSON: {{ "nodes":[{{id,name,title,dept,yoe_total,yoe_current,seniority_sc
         max_tokens=max_tokens,
         temperature=temperature,
         response_format={"type":"json_object"},
-        api_key=api_key
+        api_key=api_key,
+        base_url=base_url
     )
     chart = json.loads(resp.choices[0].message.content)
     chart["meta"] = dict(
@@ -315,10 +315,11 @@ async def run(opts):
                 chart = await infer_org_chart_llm(
                     comp, persons,
                     llm_provider=opts.llm_provider,
-                    api_key=getattr(opts, 'llm_api_key', None),
+                    api_key=opts.llm_api_key or None,
                     max_tokens=opts.max_llm_tokens,
                     temperature=opts.llm_temperature,
                     stub=opts.stub or False,
+                    base_url=opts.llm_base_url or None
                 )
                 chart["meta"]["company"] = comp["name"]
                 
@@ -359,6 +360,7 @@ def build_arg_parser():
     p.add_argument("--llm-provider", default="openai/gpt-4.1", 
                   help="LLM model to use in format 'provider/model_name' (e.g., 'anthropic/claude-3')")
     p.add_argument("--llm-api-key", help="API key for LLM provider (defaults to env vars)")
+    p.add_argument("--llm-base-url", help="Base URL for LLM API endpoint")
     p.add_argument("--max-llm-tokens", type=int, default=8024)
     p.add_argument("--llm-temperature", type=float, default=1.0)
     p.add_argument("--stub", action="store_true", help="Skip OpenAI call and generate tiny fake org charts")
