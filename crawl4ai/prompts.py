@@ -203,6 +203,62 @@ Avoid Common Mistakes:
 Result
 Output the final list of JSON objects, wrapped in <blocks>...</blocks> XML tags. Make sure to close the tag properly."""
 
+PROMPT_EXTRACT_INFERRED_SCHEMA = """Here is the content from the URL:
+<url>{URL}</url>
+
+<url_content>
+{HTML}
+</url_content>
+
+Please carefully read the URL content and the user's request. Analyze the page structure and infer the most appropriate JSON schema based on the content and request.
+
+Extraction Strategy:
+1. First, determine if the page contains repetitive items (like multiple products, articles, etc.) or a single content item (like a single article or page).
+2. For repetitive items: Identify the common pattern and extract each instance as a separate JSON object in an array.
+3. For single content: Extract the key information into a comprehensive JSON object that captures the essential details.
+
+Extraction instructions:
+Return the extracted information as a list of JSON objects. For repetitive content, each object in the list should correspond to a distinct item. For single content, you may return just one detailed JSON object. Wrap the entire JSON list in <blocks>...</blocks> XML tags.
+
+Schema Design Guidelines:
+- Create meaningful property names that clearly describe the data they contain
+- Use nested objects for hierarchical information
+- Use arrays for lists of related items
+- Include all information requested by the user
+- Maintain consistency in property names and data structures
+- Only include properties that are actually present in the content
+- For dates, prefer ISO format (YYYY-MM-DD)
+- For prices or numeric values, extract them without currency symbols when possible
+
+Quality Reflection:
+Before outputting your final answer, double check that:
+1. The inferred schema makes logical sense for the type of content
+2. All requested information is included
+3. The JSON is valid and could be parsed without errors
+4. Property names are consistent and descriptive
+5. The structure is optimal for the type of data being represented
+
+Avoid Common Mistakes:
+- Do NOT add any comments using "//" or "#" in the JSON output. It causes parsing errors.
+- Make sure the JSON is properly formatted with curly braces, square brackets, and commas in the right places.
+- Do not miss closing </blocks> tag at the end of the JSON output.
+- Do not generate Python code showing how to do the task; this is your task to extract the information and return it in JSON format.
+- Ensure consistency in property names across all objects
+- Don't include empty properties or null values unless they're meaningful
+- For repetitive content, ensure all objects follow the same schema
+
+Important: If user specific instruction is provided, then stress significantly on what user is requesting and describing about the schema of end result (if any). If user is requesting to extract specific information, then focus on that and ignore the rest of the content.
+<user_request>
+{REQUEST}
+</user_request>
+
+Result:
+Output the final list of JSON objects, wrapped in <blocks>...</blocks> XML tags. Make sure to close the tag properly.
+
+DO NOT ADD ANY PRE OR POST COMMENTS. JUST RETURN THE JSON OBJECTS INSIDE <blocks>...</blocks> TAGS.
+
+CRITICAL: The content inside the <blocks> tags MUST be a direct array of JSON objects (starting with '[' and ending with ']'), not a dictionary/object containing an array. For example, use <blocks>[{...}, {...}]</blocks> instead of <blocks>{"items": [{...}, {...}]}</blocks>. This is essential for proper parsing.
+"""
 
 PROMPT_FILTER_CONTENT = """Your task is to filter and convert HTML content into clean, focused markdown that's optimized for use with LLMs and information retrieval systems.
 

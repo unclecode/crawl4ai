@@ -415,7 +415,7 @@ The schema generator is available as a static method on both `JsonCssExtractionS
 
 ```python
 from crawl4ai.extraction_strategy import JsonCssExtractionStrategy, JsonXPathExtractionStrategy
-from crawl4ai.types import LLMConfig
+from crawl4ai import LLMConfig
 
 # Sample HTML with product information
 html = """

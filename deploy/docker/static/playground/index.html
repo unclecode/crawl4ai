@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crawl4AI Playground</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4EFFFF',
+                        primarydim: '#09b5a5',
+                        accent: '#F380F5',
+                        dark: '#070708',
+                        light: '#E8E9ED',
+                        secondary: '#D5CEBF',
+                        codebg: '#1E1E1E',
+                        surface: '#202020',
+                        border: '#3F3F44',
+                    },
+                    fontFamily: {
+                        mono: ['Fira Code', 'monospace'],
+                    },
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Highlight.js -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.11/clipboard.min.js"></script>
+    <!-- CodeMirror (python mode) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/selection/active-line.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/darcula.min.css">
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/bash.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/json.min.js"></script> -->
+    <style>
+        /* Custom CodeMirror styling to match theme */
+        .CodeMirror {
+            background-color: #1E1E1E !important;
+            color: #E8E9ED !important;
+            border-radius: 4px;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.9rem;
+        }
+        
+        .CodeMirror-gutters {
+            background-color: #1E1E1E !important;
+            border-right: 1px solid #3F3F44 !important;
+        }
+        
+        .CodeMirror-linenumber {
+            color: #3F3F44 !important;
+        }
+        
+        .cm-s-darcula .cm-keyword {
+            color: #4EFFFF !important;
+        }
+        
+        .cm-s-darcula .cm-string {
+            color: #F380F5 !important;
+        }
+        
+        .cm-s-darcula .cm-number {
+            color: #D5CEBF !important;
+        }
+        
+        /* Add to your <style> section or Tailwind config */
+        .hljs {
+            background: #1E1E1E !important;
+            border-radius: 4px;
+            padding: 1rem !important;
+        }
+
+        pre code.hljs {
+            display: block;
+            overflow-x: auto;
+        }
+
+        /* Language-specific colors */
+        .hljs-attr {
+            color: #4EFFFF;
+        }
+
+        /* JSON keys */
+        .hljs-string {
+            color: #F380F5;
+        }
+
+        /* Strings */
+        .hljs-number {
+            color: #D5CEBF;
+        }
+
+        /* Numbers */
+        .hljs-keyword {
+            color: #4EFFFF;
+        }
+
+        pre code {
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .copy-btn {
+            transition: all 0.2s ease;
+            opacity: 0.7;
+        }
+
+        .copy-btn:hover {
+            opacity: 1;
+        }
+
+        .tab-content:hover .copy-btn {
+            opacity: 0.7;
+        }
+
+        .tab-content:hover .copy-btn:hover {
+            opacity: 1;
+        }
+
+        /* copid text highlighted */
+        .highlighted {
+            background-color: rgba(78, 255, 255, 0.2) !important;
+            transition: background-color 0.5s ease;
+        }
+    </style>
+</head>
+
+<body class="bg-dark text-light font-mono min-h-screen flex flex-col" style="font-feature-settings: 'calt' 0;">
+    <!-- Header -->
+    <header class="border-b border-border px-4 py-2 flex items-center">
+        <h1 class="text-lg font-medium flex items-center space-x-4">
+            <span>🚀🤖 <span class="text-primary">Crawl4AI</span> Playground</span>
+
+            <!-- GitHub badges -->
+            <a href="https://github.com/unclecode/crawl4ai" target="_blank" class="flex space-x-1">
+                <img src="https://img.shields.io/github/stars/unclecode/crawl4ai?style=social"
+                     alt="GitHub stars" class="h-5">
+                <img src="https://img.shields.io/github/forks/unclecode/crawl4ai?style=social"
+                     alt="GitHub forks" class="h-5">
+            </a>
+
+            <!-- Docs -->
+            <a href="https://docs.crawl4ai.com" target="_blank"
+               class="text-xs text-secondary hover:text-primary underline flex items-center">
+                Docs
+            </a>
+
+            <!-- X (Twitter) follow -->
+            <a href="https://x.com/unclecode" target="_blank"
+               class="hover:text-primary flex items-center" title="Follow @unclecode on X">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                     class="w-4 h-4 fill-current mr-1">
+                    <path d="M22.46 6c-.77.35-1.6.58-2.46.69a4.27 4.27 0 001.88-2.35 8.53 8.53 0 01-2.71 1.04 4.24 4.24 0 00-7.23 3.87A12.05 12.05 0 013 4.62a4.24 4.24 0 001.31 5.65 4.2 4.2 0 01-1.92-.53v.05a4.24 4.24 0 003.4 4.16 4.31 4.31 0 01-1.91.07 4.25 4.25 0 003.96 2.95A8.5 8.5 0 012 19.55a12.04 12.04 0 006.53 1.92c7.84 0 12.13-6.49 12.13-12.13 0-.18-.01-.36-.02-.54A8.63 8.63 0 0024 5.1a8.45 8.45 0 01-2.54.7z"/>
+                </svg>
+                <span class="text-xs">@unclecode</span>
+            </a>
+        </h1>
+
+        <div class="ml-auto flex space-x-2">
+            <button id="play-tab"
+                class="px-3 py-1 rounded-t bg-surface border border-b-0 border-border text-primary">Playground</button>
+            <button id="stress-tab" class="px-3 py-1 rounded-t border border-border hover:bg-surface">Stress
+                Test</button>
+        </div>
+    </header>
+
+    <!-- Main Playground -->
+    <main id="playground" class="flex-1 flex flex-col p-4 space-y-4 max-w-5xl w-full mx-auto">
+        <!-- Request Builder -->
+        <section class="bg-surface rounded-lg border border-border overflow-hidden">
+            <div class="px-4 py-2 border-b border-border flex items-center">
+                <h2 class="font-medium">Request Builder</h2>
+                <select id="endpoint" class="ml-auto bg-dark border border-border rounded px-2 py-1 text-sm">
+                    <option value="crawl">/crawl (batch)</option>
+                    <option value="crawl_stream">/crawl/stream</option>
+                    <option value="md">/md</option>
+                    <option value="llm">/llm</option>
+                </select>
+            </div>
+            <div class="p-4">
+                <label class="block mb-2 text-sm">URL(s) - one per line</label>
+                <textarea id="urls" class="w-full bg-dark border border-border rounded p-2 h-32 text-sm mb-4"
+                    spellcheck="false">https://example.com</textarea>
+
+                <!-- Specific options for /md endpoint -->
+                <details id="md-options" class="mb-4 hidden">
+                    <summary class="text-sm text-secondary cursor-pointer">/md Options</summary>
+                    <div class="mt-2 space-y-3 p-2 border border-border rounded">
+                        <div>
+                            <label for="md-filter" class="block text-xs text-secondary mb-1">Filter Type</label>
+                            <select id="md-filter" class="bg-dark border border-border rounded px-2 py-1 text-sm w-full">
+                                <option value="fit">fit - Adaptive content filtering</option>
+                                <option value="raw">raw - No filtering</option>
+                                <option value="bm25">bm25 - BM25 keyword relevance</option>
+                                <option value="llm">llm - LLM-based filtering</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="md-query" class="block text-xs text-secondary mb-1">Query (for BM25/LLM filters)</label>
+                            <input id="md-query" type="text" placeholder="Enter search terms or instructions" 
+                                class="bg-dark border border-border rounded px-2 py-1 text-sm w-full">
+                        </div>
+                        <div>
+                            <label for="md-cache" class="block text-xs text-secondary mb-1">Cache Mode</label>
+                            <select id="md-cache" class="bg-dark border border-border rounded px-2 py-1 text-sm w-full">
+                                <option value="0">Write-Only (0)</option>
+                                <option value="1">Enabled (1)</option>
+                            </select>
+                        </div>
+                    </div>
+                </details>
+
+                <!-- Specific options for /llm endpoint -->
+                <details id="llm-options" class="mb-4 hidden">
+                    <summary class="text-sm text-secondary cursor-pointer">/llm Options</summary>
+                    <div class="mt-2 space-y-3 p-2 border border-border rounded">
+                        <div>
+                            <label for="llm-question" class="block text-xs text-secondary mb-1">Question</label>
+                            <input id="llm-question" type="text" value="What is this page about?" 
+                                class="bg-dark border border-border rounded px-2 py-1 text-sm w-full">
+                        </div>
+                    </div>
+                </details>
+
+                <!-- Advanced config for /crawl endpoints -->
+                <details id="adv-config" class="mb-4">
+                    <summary class="text-sm text-secondary cursor-pointer">Advanced Config <span
+                        class="text-xs text-primary">(Python → auto‑JSON)</span></summary>
+
+                    <!-- Toolbar -->
+                    <div class="flex items-center justify-end space-x-3 mt-2">
+                        <label for="cfg-type" class="text-xs text-secondary">Type:</label>
+                        <select id="cfg-type"
+                                class="bg-dark border border-border rounded px-1 py-0.5 text-xs">
+                            <option value="CrawlerRunConfig">CrawlerRunConfig</option>
+                            <option value="BrowserConfig">BrowserConfig</option>
+                        </select>
+
+                        <!-- help link -->
+                        <a href="https://docs.crawl4ai.com/api/parameters/"
+                           target="_blank"
+                           class="text-xs text-primary hover:underline flex items-center space-x-1"
+                           title="Open parameter reference in new tab">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                 class="w-4 h-4 fill-current">
+                                 <path d="M13 3h8v8h-2V6.41l-9.29 9.3-1.42-1.42 9.3-9.29H13V3z"/>
+                                 <path d="M5 5h4V3H3v6h2V5zm0 14v-4H3v6h6v-2H5z"/>
+                            </svg>
+                            <span>Docs</span>
+                        </a>
+
+                        <span id="cfg-status" class="text-xs text-secondary ml-2"></span>
+                    </div>
+
+                    <!-- CodeMirror host -->
+                    <div id="adv-editor" class="mt-2 border border-border rounded overflow-hidden h-40"></div>
+                </details>
+
+                <div class="flex space-x-2">
+                    <button id="run-btn" class="bg-primary text-dark px-4 py-2 rounded hover:bg-primarydim font-medium">
+                        Run (⌘/Ctrl+Enter)
+                    </button>
+                    <button id="export-btn" class="border border-border px-4 py-2 rounded hover:bg-surface hidden">
+                        Export Python Code
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Execution Status -->
+        <section id="execution-status" class="hidden bg-surface rounded-lg border border-border p-3 text-sm">
+            <div class="flex space-x-4">
+                <div id="status-badge" class="flex items-center">
+                    <span class="w-3 h-3 rounded-full mr-2"></span>
+                    <span>Ready</span>
+                </div>
+                <div>
+                    <span class="text-secondary">Time:</span>
+                    <span id="exec-time" class="text-light">-</span>
+                </div>
+                <div>
+                    <span class="text-secondary">Memory:</span>
+                    <span id="exec-mem" class="text-light">-</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Response Viewer -->
+        <!-- Update the Response Viewer section -->
+        <section class="bg-surface rounded-lg border border-border overflow-hidden flex-1 flex flex-col">
+            <div class="border-b border-border flex">
+                <button data-tab="response" class="tab-btn active px-4 py-2 border-r border-border">Response</button>
+                <button data-tab="python" class="tab-btn px-4 py-2 border-r border-border">Python</button>
+                <button data-tab="curl" class="tab-btn px-4 py-2">cURL</button>
+            </div>
+            <div class="flex-1 overflow-auto relative">
+                <!-- Response Tab -->
+                <div class="tab-content active h-full">
+                    <div class="absolute right-2 top-2">
+                        <button class="copy-btn bg-surface border border-border rounded px-2 py-1 text-xs hover:bg-dark"
+                            data-target="#response-content code">
+                            Copy
+                        </button>
+                    </div>
+                    <pre id="response-content" class="p-4 text-sm h-full"><code class="json hljs">{}</code></pre>
+                </div>
+
+                <!-- Python Tab -->
+                <div class="tab-content hidden h-full">
+                    <div class="absolute right-2 top-2">
+                        <button class="copy-btn bg-surface border border-border rounded px-2 py-1 text-xs hover:bg-dark"
+                            data-target="#python-content code">
+                            Copy
+                        </button>
+                    </div>
+                    <pre id="python-content" class="p-4 text-sm h-full"><code class="python hljs"></code></pre>
+                </div>
+
+                <!-- cURL Tab -->
+                <div class="tab-content hidden h-full">
+                    <div class="absolute right-2 top-2">
+                        <button class="copy-btn bg-surface border border-border rounded px-2 py-1 text-xs hover:bg-dark"
+                            data-target="#curl-content code">
+                            Copy
+                        </button>
+                    </div>
+                    <pre id="curl-content" class="p-4 text-sm h-full"><code class="bash hljs"></code></pre>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Stress Test Modal -->
+    <div id="stress-modal"
+        class="hidden fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4">
+        <div class="bg-surface rounded-lg border border-accent w-full max-w-3xl max-h-[90vh] flex flex-col">
+            <div class="px-4 py-2 border-b border-border flex items-center">
+                <h2 class="font-medium text-accent">🔥 Stress Test</h2>
+                <button id="close-stress" class="ml-auto text-secondary hover:text-light">&times;</button>
+            </div>
+
+            <div class="p-4 space-y-4 flex-1 overflow-auto">
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm mb-1">Total URLs</label>
+                        <input id="st-total" type="number" value="20"
+                            class="w-full bg-dark border border-border rounded px-3 py-1">
+                    </div>
+                    <div>
+                        <label class="block text-sm mb-1">Chunk Size</label>
+                        <input id="st-chunk" type="number" value="5"
+                            class="w-full bg-dark border border-border rounded px-3 py-1">
+                    </div>
+                    <div>
+                        <label class="block text-sm mb-1">Concurrency</label>
+                        <input id="st-conc" type="number" value="2"
+                            class="w-full bg-dark border border-border rounded px-3 py-1">
+                    </div>
+                </div>
+
+                <div class="flex items-center">
+                    <input id="st-stream" type="checkbox" class="mr-2">
+                    <label for="st-stream" class="text-sm">Use /crawl/stream</label>
+                    <button id="st-run"
+                        class="ml-auto bg-accent text-dark px-4 py-2 rounded hover:bg-opacity-90 font-medium">
+                        Run Stress Test
+                    </button>
+                </div>
+
+                <div class="mt-4">
+                    <div class="bg-dark rounded border border-border p-3 h-64 overflow-auto text-sm whitespace-break-spaces"
+                        id="stress-log"></div>
+                </div>
+            </div>
+
+            <div class="px-4 py-2 border-t border-border text-sm text-secondary">
+                <div class="flex justify-between">
+                    <span>Completed: <span id="stress-completed">0</span>/<span id="stress-total">0</span></span>
+                    <span>Avg. Time: <span id="stress-avg-time">0</span>ms</span>
+                    <span>Peak Memory: <span id="stress-peak-mem">0</span>MB</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+
+                btn.classList.add('active');
+                const tabName = btn.dataset.tab;
+                document.querySelector(`#${tabName}-content`).parentElement.classList.remove('hidden');
+
+                // Re-highlight content when switching tabs
+                const activeCode = document.querySelector(`#${tabName}-content code`);
+                if (activeCode) {
+                    forceHighlightElement(activeCode);
+                }
+            });
+        });
+
+        // View switching
+        document.getElementById('play-tab').addEventListener('click', () => {
+            document.getElementById('playground').classList.remove('hidden');
+            document.getElementById('stress-modal').classList.add('hidden');
+            document.getElementById('play-tab').classList.add('bg-surface', 'border-b-0');
+            document.getElementById('stress-tab').classList.remove('bg-surface', 'border-b-0');
+        });
+
+        document.getElementById('stress-tab').addEventListener('click', () => {
+            document.getElementById('stress-modal').classList.remove('hidden');
+            document.getElementById('stress-tab').classList.add('bg-surface', 'border-b-0');
+            document.getElementById('play-tab').classList.remove('bg-surface', 'border-b-0');
+        });
+
+        document.getElementById('close-stress').addEventListener('click', () => {
+            document.getElementById('stress-modal').classList.add('hidden');
+            document.getElementById('play-tab').classList.add('bg-surface', 'border-b-0');
+            document.getElementById('stress-tab').classList.remove('bg-surface', 'border-b-0');
+        });
+
+        // Initialize clipboard and highlight.js
+        new ClipboardJS('#export-btn');
+        hljs.highlightAll();
+
+        // Keyboard shortcut
+        window.addEventListener('keydown', e => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                document.getElementById('run-btn').click();
+            }
+        });
+
+        // ================ ADVANCED CONFIG EDITOR ================
+        const cm = CodeMirror(document.getElementById('adv-editor'), {
+            value: `CrawlerRunConfig(
+    stream=True,
+    cache_mode=CacheMode.BYPASS,
+)`,
+            mode: 'python',
+            lineNumbers: true,
+            theme: 'darcula',
+            tabSize: 4,
+            styleActiveLine: true,
+            matchBrackets: true,
+            gutters: ["CodeMirror-linenumbers"],
+            lineWrapping: true,
+        });
+
+        const TEMPLATES = {
+            CrawlerRunConfig: `CrawlerRunConfig(
+    stream=True,
+    cache_mode=CacheMode.BYPASS,
+)`,
+            BrowserConfig: `BrowserConfig(
+    headless=True,
+    extra_args=[
+        "--no-sandbox",
+        "--disable-gpu",
+    ],
+)`,
+        };
+
+        document.getElementById('cfg-type').addEventListener('change', (e) => {
+            cm.setValue(TEMPLATES[e.target.value]);
+            document.getElementById('cfg-status').textContent = '';
+        });
+        
+        // Handle endpoint selection change to show appropriate options
+        document.getElementById('endpoint').addEventListener('change', function(e) {
+            const endpoint = e.target.value;
+            const mdOptions = document.getElementById('md-options');
+            const llmOptions = document.getElementById('llm-options');
+            const advConfig = document.getElementById('adv-config');
+            
+            // Hide all option sections first
+            mdOptions.classList.add('hidden');
+            llmOptions.classList.add('hidden');
+            advConfig.classList.add('hidden');
+            
+            // Show the appropriate section based on endpoint
+            if (endpoint === 'md') {
+                mdOptions.classList.remove('hidden');
+                // Auto-open the /md options
+                mdOptions.setAttribute('open', '');
+            } else if (endpoint === 'llm') {
+                llmOptions.classList.remove('hidden');
+                // Auto-open the /llm options
+                llmOptions.setAttribute('open', '');
+            } else {
+                // For /crawl endpoints, show the advanced config
+                advConfig.classList.remove('hidden');
+            }
+        });
+
+        async function pyConfigToJson() {
+            const code = cm.getValue().trim();
+            if (!code) return {};
+
+            const res = await fetch('/config/dump', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code }),
+            });
+
+            const statusEl = document.getElementById('cfg-status');
+            if (!res.ok) {
+                const msg = await res.text();
+                statusEl.textContent = '✖ config error';
+                statusEl.className = 'text-xs text-red-400';
+                throw new Error(msg || 'Invalid config');
+            }
+
+            statusEl.textContent = '✓ parsed';
+            statusEl.className = 'text-xs text-green-400';
+
+            return await res.json();
+        }
+
+        // ================ SERVER COMMUNICATION ================
+
+        // Update status UI
+        function updateStatus(status, time, memory, peakMemory) {
+            const statusEl = document.getElementById('execution-status');
+            const badgeEl = document.querySelector('#status-badge span:first-child');
+            const textEl = document.querySelector('#status-badge span:last-child');
+
+            statusEl.classList.remove('hidden');
+            badgeEl.className = 'w-3 h-3 rounded-full mr-2';
+
+            if (status === 'success') {
+                badgeEl.classList.add('bg-green-500');
+                textEl.textContent = 'Success';
+            } else if (status === 'error') {
+                badgeEl.classList.add('bg-red-500');
+                textEl.textContent = 'Error';
+            } else {
+                badgeEl.classList.add('bg-yellow-500');
+                textEl.textContent = 'Processing...';
+            }
+
+            if (time) {
+                document.getElementById('exec-time').textContent = `${time}ms`;
+            }
+
+            if (memory !== undefined && peakMemory !== undefined) {
+                document.getElementById('exec-mem').textContent = `Δ${memory >= 0 ? '+' : ''}${memory}MB (Peak: ${peakMemory}MB)`;
+            }
+        }
+
+        // Generate code snippets
+        function generateSnippets(api, payload, method = 'POST') {
+            // Python snippet
+            const pyCodeEl = document.querySelector('#python-content code');
+            let pySnippet;
+            
+            if (method === 'GET') {
+                // GET request (for /llm endpoint)
+                pySnippet = `import httpx\n\nasync def crawl():\n    async with httpx.AsyncClient() as client:\n        response = await client.get(\n            "${window.location.origin}${api}"\n        )\n        return response.json()`;
+            } else {
+                // POST request (for /crawl and /md endpoints)
+                pySnippet = `import httpx\n\nasync def crawl():\n    async with httpx.AsyncClient() as client:\n        response = await client.post(\n            "${window.location.origin}${api}",\n            json=${JSON.stringify(payload, null, 4).replace(/\n/g, '\n            ')}\n        )\n        return response.json()`;
+            }
+
+            pyCodeEl.textContent = pySnippet;
+            pyCodeEl.className = 'python hljs'; // Reset classes
+            forceHighlightElement(pyCodeEl);
+
+            // cURL snippet
+            const curlCodeEl = document.querySelector('#curl-content code');
+            let curlSnippet;
+            
+            if (method === 'GET') {
+                // GET request (for /llm endpoint)
+                curlSnippet = `curl -X GET "${window.location.origin}${api}"`;
+            } else {
+                // POST request (for /crawl and /md endpoints)
+                curlSnippet = `curl -X POST ${window.location.origin}${api} \\\n  -H "Content-Type: application/json" \\\n  -d '${JSON.stringify(payload)}'`;
+            }
+
+            curlCodeEl.textContent = curlSnippet;
+            curlCodeEl.className = 'bash hljs'; // Reset classes
+            forceHighlightElement(curlCodeEl);
+        }
+
+        // Main run function
+        async function runCrawl() {
+            const endpoint = document.getElementById('endpoint').value;
+            const urls = document.getElementById('urls').value.trim().split(/\n/).filter(u => u);
+            // 1) grab python from CodeMirror, validate via /config/dump
+            let advConfig = {};
+            try {
+                const cfgJson = await pyConfigToJson(); // may throw
+                if (Object.keys(cfgJson).length) {
+                    const cfgType = document.getElementById('cfg-type').value;
+                    advConfig = cfgType === 'CrawlerRunConfig'
+                        ? { crawler_config: cfgJson }
+                        : { browser_config: cfgJson };
+                }
+            } catch (err) {
+                updateStatus('error');
+                document.querySelector('#response-content code').textContent =
+                    JSON.stringify({ error: err.message }, null, 2);
+                forceHighlightElement(document.querySelector('#response-content code'));
+                return; // stop run
+            }
+
+            const endpointMap = {
+                crawl: '/crawl',
+                // crawl_stream: '/crawl/stream',
+                md: '/md',
+                llm: '/llm'
+            };
+
+            const api = endpointMap[endpoint];
+            let payload;
+            
+            // Create appropriate payload based on endpoint type
+            if (endpoint === 'md') {
+                // Get values from the /md specific inputs
+                const filterType = document.getElementById('md-filter').value;
+                const query = document.getElementById('md-query').value.trim();
+                const cache = document.getElementById('md-cache').value;
+                
+                // MD endpoint expects: { url, f, q, c }
+                payload = {
+                    url: urls[0], // Take first URL
+                    f: filterType, // Lowercase filter type as required by server
+                    q: query || null, // Use the query if provided, otherwise null
+                    c: cache
+                };
+            } else if (endpoint === 'llm') {
+                // LLM endpoint has a different URL pattern and uses query params
+                // This will be handled directly in the fetch below
+                payload = null;
+            } else {
+                // Default payload for /crawl and /crawl/stream
+                payload = {
+                    urls,
+                    ...advConfig
+                };
+            }
+
+            updateStatus('processing');
+
+            try {
+                const startTime = performance.now();
+                let response, responseData;
+
+                if (endpoint === 'llm') {
+                    // Special handling for LLM endpoint which uses URL pattern: /llm/{encoded_url}?q={query}
+                    const url = urls[0];
+                    const encodedUrl = encodeURIComponent(url);
+                    // Get the question from the LLM-specific input
+                    const question = document.getElementById('llm-question').value.trim() || "What is this page about?";
+                    
+                    response = await fetch(`${api}/${encodedUrl}?q=${encodeURIComponent(question)}`, {
+                        method: 'GET',
+                        headers: { 'Accept': 'application/json' }
+                    });
+                } else if (endpoint === 'crawl_stream') {
+                    // Stream processing
+                    response = await fetch(api, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const reader = response.body.getReader();
+                    let text = '';
+                    let maxMemory = 0;
+
+                    while (true) {
+                        const { value, done } = await reader.read();
+                        if (done) break;
+
+                        const chunk = new TextDecoder().decode(value);
+                        text += chunk;
+
+                        // Process each line for memory updates
+                        chunk.trim().split('\n').forEach(line => {
+                            if (!line) return;
+                            try {
+                                const obj = JSON.parse(line);
+                                if (obj.server_memory_mb) {
+                                    maxMemory = Math.max(maxMemory, obj.server_memory_mb);
+                                }
+                            } catch (e) {
+                                console.error('Error parsing stream line:', e);
+                            }
+                        });
+                    }
+
+                    responseData = { stream: text };
+                    const time = Math.round(performance.now() - startTime);
+                    updateStatus('success', time, null, maxMemory);
+                    document.querySelector('#response-content code').textContent = text;
+                    document.querySelector('#response-content code').className = 'json hljs'; // Reset classes
+                    forceHighlightElement(document.querySelector('#response-content code'));
+                } else {
+                    // Regular request (handles /crawl and /md)
+                    response = await fetch(api, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    responseData = await response.json();
+                    const time = Math.round(performance.now() - startTime);
+
+                    if (!response.ok) {
+                        updateStatus('error', time);
+                        throw new Error(responseData.error || 'Request failed');
+                    }
+
+                    updateStatus(
+                        'success',
+                        time,
+                        responseData.server_memory_delta_mb,
+                        responseData.server_peak_memory_mb
+                    );
+
+                    document.querySelector('#response-content code').textContent = JSON.stringify(responseData, null, 2);
+                    document.querySelector('#response-content code').className = 'json hljs'; // Ensure class is set
+                    forceHighlightElement(document.querySelector('#response-content code'));
+                }
+
+                forceHighlightElement(document.querySelector('#response-content code'));
+                
+                // For generateSnippets, handle the LLM case specially
+                if (endpoint === 'llm') {
+                    const url = urls[0];
+                    const encodedUrl = encodeURIComponent(url);
+                    const question = document.getElementById('llm-question').value.trim() || "What is this page about?";
+                    generateSnippets(`${api}/${encodedUrl}?q=${encodeURIComponent(question)}`, null, 'GET');
+                } else {
+                    generateSnippets(api, payload);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                updateStatus('error');
+                document.querySelector('#response-content code').textContent = JSON.stringify(
+                    { error: error.message },
+                    null,
+                    2
+                );
+                forceHighlightElement(document.querySelector('#response-content code'));
+            }
+        }
+
+        // Stress test function
+        async function runStressTest() {
+            const total = parseInt(document.getElementById('st-total').value);
+            const chunkSize = parseInt(document.getElementById('st-chunk').value);
+            const concurrency = parseInt(document.getElementById('st-conc').value);
+            const useStream = document.getElementById('st-stream').checked;
+
+            const logEl = document.getElementById('stress-log');
+            logEl.textContent = '';
+
+            document.getElementById('stress-completed').textContent = '0';
+            document.getElementById('stress-total').textContent = total;
+            document.getElementById('stress-avg-time').textContent = '0';
+            document.getElementById('stress-peak-mem').textContent = '0';
+
+            const api = useStream ? '/crawl/stream' : '/crawl';
+            const urls = Array.from({ length: total }, (_, i) => `https://httpbin.org/anything/stress-${i}-${Date.now()}`);
+            const chunks = [];
+
+            for (let i = 0; i < urls.length; i += chunkSize) {
+                chunks.push(urls.slice(i, i + chunkSize));
+            }
+
+            let completed = 0;
+            let totalTime = 0;
+            let peakMemory = 0;
+
+            const processBatch = async (batch, index) => {
+                const payload = {
+                    urls: batch,
+                    browser_config: {},
+                    crawler_config: { cache_mode: 'BYPASS', stream: useStream }
+                };
+
+                const start = performance.now();
+                let time, memory;
+
+                try {
+                    if (useStream) {
+                        const response = await fetch(api, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+
+                        const reader = response.body.getReader();
+                        let maxMem = 0;
+                        while (true) {
+                            const { value, done } = await reader.read();
+                            if (done) break;
+                            const text = new TextDecoder().decode(value);
+                            text.split('\n').forEach(line => {
+                                try {
+                                    const obj = JSON.parse(line);
+                                    if (obj.server_memory_mb) {
+                                        maxMem = Math.max(maxMem, obj.server_memory_mb);
+                                    }
+                                } catch { }
+                            });
+                        }
+
+                        memory = maxMem;
+                    } else {
+                        const response = await fetch(api, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+
+                        const data = await response.json();
+                        memory = data.server_peak_memory_mb;
+                    }
+
+                    time = Math.round(performance.now() - start);
+                    peakMemory = Math.max(peakMemory, memory || 0);
+                    totalTime += time;
+
+                    logEl.textContent += `[${index + 1}/${chunks.length}] ✔ ${time}ms | Peak ${memory}MB\n`;
+                } catch (error) {
+                    time = Math.round(performance.now() - start);
+                    logEl.textContent += `[${index + 1}/${chunks.length}] ✖ ${time}ms | ${error.message}\n`;
+                }
+
+                completed += batch.length;
+                document.getElementById('stress-completed').textContent = completed;
+                document.getElementById('stress-peak-mem').textContent = peakMemory;
+                document.getElementById('stress-avg-time').textContent = Math.round(totalTime / (index + 1));
+
+                logEl.scrollTop = logEl.scrollHeight;
+            };
+
+            // Run with concurrency control
+            let active = 0;
+            let index = 0;
+
+            return new Promise(resolve => {
+                const runNext = () => {
+                    while (active < concurrency && index < chunks.length) {
+                        processBatch(chunks[index], index)
+                            .finally(() => {
+                                active--;
+                                runNext();
+                            });
+                        active++;
+                        index++;
+                    }
+
+                    if (active === 0 && index >= chunks.length) {
+                        logEl.textContent += '\n✅ Stress test completed\n';
+                        resolve();
+                    }
+                };
+
+                runNext();
+            });
+        }
+
+        // Event listeners
+        document.getElementById('run-btn').addEventListener('click', runCrawl);
+        document.getElementById('st-run').addEventListener('click', runStressTest);
+
+        function forceHighlightElement(element) {
+            if (!element) return;
+
+            // Save current scroll position (important for large code blocks)
+            const scrollTop = element.parentElement.scrollTop;
+
+            // Reset the element
+            const text = element.textContent;
+            element.innerHTML = text;
+            element.removeAttribute('data-highlighted');
+
+            // Reapply highlighting
+            hljs.highlightElement(element);
+
+            // Restore scroll position
+            element.parentElement.scrollTop = scrollTop;
+        }
+
+        // Initialize clipboard for all copy buttons
+        function initCopyButtons() {
+            document.querySelectorAll('.copy-btn').forEach(btn => {
+                new  ClipboardJS(btn, {
+                    text: () => {
+                        const target = document.querySelector(btn.dataset.target);
+                        return target ? target.textContent : '';
+                    }
+                }).on('success', e => {
+                    e.clearSelection();
+                    // make button text "copied" for 1 second
+                    const originalText = e.trigger.textContent;
+                    e.trigger.textContent = 'Copied!';
+                    setTimeout(() => {
+                        e.trigger.textContent = originalText;
+                    }, 1000);
+                    // Highlight the copied code
+                    const target = document.querySelector(btn.dataset.target);
+                    if (target) {
+                        target.classList.add('highlighted');
+                        setTimeout(() => {
+                            target.classList.remove('highlighted');
+                        }, 1000);
+                    }
+
+                }).on('error', e => {
+                    console.error('Error copying:', e);
+                });
+            });
+        }
+        
+        // Function to initialize UI based on selected endpoint
+        function initUI() {
+            // Trigger the endpoint change handler to set initial UI state
+            const endpointSelect = document.getElementById('endpoint');
+            const event = new Event('change');
+            endpointSelect.dispatchEvent(event);
+            
+            // Initialize copy buttons
+            initCopyButtons();
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', initUI);
+        // Also call it immediately in case the script runs after DOM is already loaded
+        if (document.readyState !== 'loading') {
+            initUI();
+        }
+
+    </script>
+</body>
+
+</html>

@@ -15,6 +15,7 @@ class CrawlResult(BaseModel):
     downloaded_files: Optional[List[str]] = None
     screenshot: Optional[str] = None
     pdf : Optional[bytes] = None
+    mhtml: Optional[str] = None
     markdown: Optional[Union[str, MarkdownGenerationResult]] = None
     extracted_content: Optional[str] = None
     metadata: Optional[dict] = None
@@ -236,7 +237,16 @@ if result.pdf:
         f.write(result.pdf)
 ```
 
-### 5.5 **`metadata`** *(Optional[dict])*  
+### 5.5 **`mhtml`** *(Optional[str])*  
+**What**: MHTML snapshot of the page if `capture_mhtml=True` in `CrawlerRunConfig`. MHTML (MIME HTML) format preserves the entire web page with all its resources (CSS, images, scripts, etc.) in a single file.  
+**Usage**:
+```python
+if result.mhtml:
+    with open("page.mhtml", "w", encoding="utf-8") as f:
+        f.write(result.mhtml)
+```
+
+### 5.6 **`metadata`** *(Optional[dict])*  
 **What**: Page-level metadata if discovered (title, description, OG data, etc.).  
 **Usage**:
 ```python
@@ -271,7 +281,69 @@ for result in results:
 
 ---
 
-## 7. Example: Accessing Everything
+## 7. Network Requests & Console Messages
+
+When you enable network and console message capturing in `CrawlerRunConfig` using `capture_network_requests=True` and `capture_console_messages=True`, the `CrawlResult` will include these fields:
+
+### 7.1 **`network_requests`** *(Optional[List[Dict[str, Any]]])*
+**What**: A list of dictionaries containing information about all network requests, responses, and failures captured during the crawl.
+**Structure**:
+- Each item has an `event_type` field that can be `"request"`, `"response"`, or `"request_failed"`.
+- Request events include `url`, `method`, `headers`, `post_data`, `resource_type`, and `is_navigation_request`.
+- Response events include `url`, `status`, `status_text`, `headers`, and `request_timing`.
+- Failed request events include `url`, `method`, `resource_type`, and `failure_text`.
+- All events include a `timestamp` field.
+
+**Usage**:
+```python
+if result.network_requests:
+    # Count different types of events
+    requests = [r for r in result.network_requests if r.get("event_type") == "request"]
+    responses = [r for r in result.network_requests if r.get("event_type") == "response"]
+    failures = [r for r in result.network_requests if r.get("event_type") == "request_failed"]
+    
+    print(f"Captured {len(requests)} requests, {len(responses)} responses, and {len(failures)} failures")
+    
+    # Analyze API calls
+    api_calls = [r for r in requests if "api" in r.get("url", "")]
+    
+    # Identify failed resources
+    for failure in failures:
+        print(f"Failed to load: {failure.get('url')} - {failure.get('failure_text')}")
+```
+
+### 7.2 **`console_messages`** *(Optional[List[Dict[str, Any]]])*
+**What**: A list of dictionaries containing all browser console messages captured during the crawl.
+**Structure**:
+- Each item has a `type` field indicating the message type (e.g., `"log"`, `"error"`, `"warning"`, etc.).
+- The `text` field contains the actual message text.
+- Some messages include `location` information (URL, line, column).
+- All messages include a `timestamp` field.
+
+**Usage**:
+```python
+if result.console_messages:
+    # Count messages by type
+    message_types = {}
+    for msg in result.console_messages:
+        msg_type = msg.get("type", "unknown")
+        message_types[msg_type] = message_types.get(msg_type, 0) + 1
+    
+    print(f"Message type counts: {message_types}")
+    
+    # Display errors (which are usually most important)
+    for msg in result.console_messages:
+        if msg.get("type") == "error":
+            print(f"Error: {msg.get('text')}")
+```
+
+These fields provide deep visibility into the page's network activity and browser console, which is invaluable for debugging, security analysis, and understanding complex web applications.
+
+For more details on network and console capturing, see the [Network & Console Capture documentation](../advanced/network-console-capture.md).
+
+---
+
+## 8. Example: Accessing Everything
 
 ```python
 async def handle_result(result: CrawlResult):
@@ -304,16 +376,36 @@ async def handle_result(result: CrawlResult):
     if result.extracted_content:
         print("Structured data:", result.extracted_content)
     
-    # Screenshot/PDF
+    # Screenshot/PDF/MHTML
     if result.screenshot:
         print("Screenshot length:", len(result.screenshot))
     if result.pdf:
         print("PDF bytes length:", len(result.pdf))
+    if result.mhtml:
+        print("MHTML length:", len(result.mhtml))
+        
+    # Network and console capturing
+    if result.network_requests:
+        print(f"Network requests captured: {len(result.network_requests)}")
+        # Analyze request types
+        req_types = {}
+        for req in result.network_requests:
+            if "resource_type" in req:
+                req_types[req["resource_type"]] = req_types.get(req["resource_type"], 0) + 1
+        print(f"Resource types: {req_types}")
+        
+    if result.console_messages:
+        print(f"Console messages captured: {len(result.console_messages)}")
+        # Count by message type
+        msg_types = {}
+        for msg in result.console_messages:
+            msg_types[msg.get("type", "unknown")] = msg_types.get(msg.get("type", "unknown"), 0) + 1
+        print(f"Message types: {msg_types}")
 ```
 
 ---
 
-## 8. Key Points & Future
+## 9. Key Points & Future
 
 1. **Deprecated legacy properties of CrawlResult**  
    - `markdown_v2` - Deprecated in v0.5. Just use `markdown`. It holds the `MarkdownGenerationResult` now!

@@ -3,8 +3,9 @@ app:
   title: "Crawl4AI API"
   version: "1.0.0"
   host: "0.0.0.0"
-  port: 8020
-  reload: True
+  port: 11235
+  reload: False
+  workers: 1
   timeout_keep_alive: 300
 
 # Default LLM Configuration
@@ -50,12 +51,31 @@ security:
 
 # Crawler Configuration
 crawler:
+  base_config:
+    simulate_user: true
   memory_threshold_percent: 95.0
   rate_limiter:
+    enabled: true
     base_delay: [1.0, 2.0]
   timeouts:
     stream_init: 30.0  # Timeout for stream initialization
     batch_process: 300.0  # Timeout for batch processing
+  pool:
+    max_pages: 40                          # ← GLOBAL_SEM permits
+    idle_ttl_sec: 1800                     # ← 30 min janitor cutoff
+  browser:
+    kwargs:
+      headless: true
+      text_mode: true
+    extra_args:
+      # - "--single-process"
+      - "--no-sandbox"
+      - "--disable-dev-shm-usage"
+      - "--disable-gpu"
+      - "--disable-software-rasterizer"
+      - "--disable-web-security"
+      - "--allow-insecure-localhost"
+      - "--ignore-certificate-errors"
 
 # Logging Configuration
 logging:

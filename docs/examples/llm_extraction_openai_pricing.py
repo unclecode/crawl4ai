@@ -1,4 +1,4 @@
-from crawl4ai.types import LLMConfig
+from crawl4ai import LLMConfig
 from crawl4ai import AsyncWebCrawler, LLMExtractionStrategy
 import asyncio
 import os

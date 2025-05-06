@@ -2,7 +2,7 @@
 import warnings
 
 from .async_webcrawler import AsyncWebCrawler, CacheMode
-from .async_configs import BrowserConfig, CrawlerRunConfig, HTTPCrawlerConfig, LLMConfig
+from .async_configs import BrowserConfig, CrawlerRunConfig, HTTPCrawlerConfig, LLMConfig, ProxyConfig, GeolocationConfig
 
 from .content_scraping_strategy import (
     ContentScrapingStrategy,
@@ -23,6 +23,7 @@ from .extraction_strategy import (
     CosineStrategy,
     JsonCssExtractionStrategy,
     JsonXPathExtractionStrategy,
+    JsonLxmlExtractionStrategy
 )
 from .chunking_strategy import ChunkingStrategy, RegexChunking
 from .markdown_generation_strategy import DefaultMarkdownGenerator
@@ -32,13 +33,12 @@ from .content_filter_strategy import (
     LLMContentFilter,
     RelevantContentFilter,
 )
-from .models import CrawlResult, MarkdownGenerationResult
+from .models import CrawlResult, MarkdownGenerationResult, DisplayMode
+from .components.crawler_monitor import CrawlerMonitor
 from .async_dispatcher import (
     MemoryAdaptiveDispatcher,
     SemaphoreDispatcher,
     RateLimiter,
-    CrawlerMonitor,
-    DisplayMode,
     BaseDispatcher,
 )
 from .docker_client import Crawl4aiDockerClient
@@ -71,6 +71,7 @@ __all__ = [
     "AsyncWebCrawler",
     "BrowserProfiler",
     "LLMConfig",
+    "GeolocationConfig",
     "DeepCrawlStrategy",
     "BFSDeepCrawlStrategy",
     "BestFirstCrawlingStrategy",
@@ -103,6 +104,7 @@ __all__ = [
     "CosineStrategy",
     "JsonCssExtractionStrategy",
     "JsonXPathExtractionStrategy",
+    "JsonLxmlExtractionStrategy",
     "ChunkingStrategy",
     "RegexChunking",
     "DefaultMarkdownGenerator",
@@ -120,6 +122,7 @@ __all__ = [
     "Crawl4aiDockerClient",
     "ProxyRotationStrategy",
     "RoundRobinProxyStrategy",
+    "ProxyConfig"
 ]
 
 

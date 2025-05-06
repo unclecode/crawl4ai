@@ -4,14 +4,22 @@ from typing import Optional, Dict, Any
 from colorama import Fore, Style, init
 import os
 from datetime import datetime
+from urllib.parse import unquote
 
 
 class LogLevel(Enum):
+    DEFAULT = 0
     DEBUG = 1
     INFO = 2
     SUCCESS = 3
     WARNING = 4
     ERROR = 5
+    CRITICAL = 6
+    ALERT = 7
+    NOTICE = 8
+    EXCEPTION = 9
+    FATAL = 10
+    
 
 
 
@@ -37,11 +45,11 @@ class AsyncLoggerBase(ABC):
         pass
 
     @abstractmethod
-    def url_status(self, url: str, success: bool, timing: float, tag: str = "FETCH", url_length: int = 50):
+    def url_status(self, url: str, success: bool, timing: float, tag: str = "FETCH", url_length: int = 100):
         pass
 
     @abstractmethod
-    def error_status(self, url: str, error: str, tag: str = "ERROR", url_length: int = 50):
+    def error_status(self, url: str, error: str, tag: str = "ERROR", url_length: int = 100):
         pass
 
 class AsyncLogger(AsyncLoggerBase):
@@ -61,6 +69,13 @@ class AsyncLogger(AsyncLoggerBase):
         "DEBUG": "⋯",
         "INFO": "ℹ",
         "WARNING": "⚠",
+        "SUCCESS": "✔",
+        "CRITICAL": "‼",
+        "ALERT": "⚡",
+        "NOTICE": "ℹ",
+        "EXCEPTION": "❗",
+        "FATAL": "☠",
+        "DEFAULT": "•",
     }
 
     DEFAULT_COLORS = {
@@ -69,6 +84,12 @@ class AsyncLogger(AsyncLoggerBase):
         LogLevel.SUCCESS: Fore.GREEN,
         LogLevel.WARNING: Fore.YELLOW,
         LogLevel.ERROR: Fore.RED,
+        LogLevel.CRITICAL: Fore.RED + Style.BRIGHT,
+        LogLevel.ALERT: Fore.RED + Style.BRIGHT,
+        LogLevel.NOTICE: Fore.BLUE,
+        LogLevel.EXCEPTION: Fore.RED + Style.BRIGHT,
+        LogLevel.FATAL: Fore.RED + Style.BRIGHT,
+        LogLevel.DEFAULT: Fore.WHITE,
     }
 
     def __init__(
@@ -110,6 +131,14 @@ class AsyncLogger(AsyncLoggerBase):
     def _get_icon(self, tag: str) -> str:
         """Get the icon for a tag, defaulting to info icon if not found."""
         return self.icons.get(tag, self.icons["INFO"])
+    
+    def _shorten(self, text, length, placeholder="..."):
+        """Truncate text in the middle if longer than length, or pad if shorter."""
+        if len(text) <= length:
+            return text.ljust(length)  # Pad with spaces to reach desired length
+        half = (length - len(placeholder)) // 2
+        shortened = text[:half] + placeholder + text[-half:]
+        return shortened.ljust(length)  # Also pad shortened text to consistent length
 
     def _write_to_file(self, message: str):
         """Write a message to the log file if configured."""
@@ -156,9 +185,22 @@ class AsyncLogger(AsyncLoggerBase):
                 formatted_message = message.format(**params)
 
                 # Then apply colors if specified
+                color_map = {
+                    "green": Fore.GREEN,
+                    "red": Fore.RED,
+                    "yellow": Fore.YELLOW,
+                    "blue": Fore.BLUE,
+                    "cyan": Fore.CYAN,
+                    "magenta": Fore.MAGENTA,
+                    "white": Fore.WHITE,
+                    "black": Fore.BLACK,
+                    "reset": Style.RESET_ALL,
+                }
                 if colors:
                     for key, color in colors.items():
                         # Find the formatted value in the message and wrap it with color
+                        if color in color_map:
+                            color = color_map[color]
                         if key in params:
                             value_str = str(params[key])
                             formatted_message = formatted_message.replace(
@@ -199,6 +241,22 @@ class AsyncLogger(AsyncLoggerBase):
     def warning(self, message: str, tag: str = "WARNING", **kwargs):
         """Log a warning message."""
         self._log(LogLevel.WARNING, message, tag, **kwargs)
+        
+    def critical(self, message: str, tag: str = "CRITICAL", **kwargs):
+        """Log a critical message."""
+        self._log(LogLevel.ERROR, message, tag, **kwargs)
+    def exception(self, message: str, tag: str = "EXCEPTION", **kwargs):
+        """Log an exception message."""
+        self._log(LogLevel.ERROR, message, tag, **kwargs)
+    def fatal(self, message: str, tag: str = "FATAL", **kwargs):
+        """Log a fatal message."""
+        self._log(LogLevel.ERROR, message, tag, **kwargs)
+    def alert(self, message: str, tag: str = "ALERT", **kwargs):
+        """Log an alert message."""
+        self._log(LogLevel.ERROR, message, tag, **kwargs)
+    def notice(self, message: str, tag: str = "NOTICE", **kwargs):
+        """Log a notice message."""
+        self._log(LogLevel.INFO, message, tag, **kwargs)
 
     def error(self, message: str, tag: str = "ERROR", **kwargs):
         """Log an error message."""
@@ -210,7 +268,7 @@ class AsyncLogger(AsyncLoggerBase):
         success: bool,
         timing: float,
         tag: str = "FETCH",
-        url_length: int = 50,
+        url_length: int = 100,
     ):
         """
         Convenience method for logging URL fetch status.
@@ -222,14 +280,15 @@ class AsyncLogger(AsyncLoggerBase):
             tag: Tag for the message
             url_length: Maximum length for URL in log
         """
+        decoded_url = unquote(url)
+        readable_url = self._shorten(decoded_url, url_length)
         self._log(
             level=LogLevel.SUCCESS if success else LogLevel.ERROR,
-            message="{url:.{url_length}}... | Status: {status} | Time: {timing:.2f}s",
+            message="{url} | {status} | ⏱: {timing:.2f}s",
             tag=tag,
             params={
-                "url": url,
-                "url_length": url_length,
-                "status": success,
+                "url": readable_url,
+                "status": "✓" if success else "✗",
                 "timing": timing,
             },
             colors={
@@ -250,11 +309,13 @@ class AsyncLogger(AsyncLoggerBase):
             tag: Tag for the message
             url_length: Maximum length for URL in log
         """
+        decoded_url = unquote(url)
+        readable_url = self._shorten(decoded_url, url_length)
         self._log(
             level=LogLevel.ERROR,
-            message="{url:.{url_length}}... | Error: {error}",
+            message="{url} | Error: {error}",
             tag=tag,
-            params={"url": url, "url_length": url_length, "error": error},
+            params={"url": readable_url, "error": error},
         )
 
 class AsyncFileLogger(AsyncLoggerBase):
@@ -298,13 +359,13 @@ class AsyncFileLogger(AsyncLoggerBase):
         """Log an error message to file."""
         self._write_to_file("ERROR", message, tag)
 
-    def url_status(self, url: str, success: bool, timing: float, tag: str = "FETCH", url_length: int = 50):
+    def url_status(self, url: str, success: bool, timing: float, tag: str = "FETCH", url_length: int = 100):
         """Log URL fetch status to file."""
         status = "SUCCESS" if success else "FAILED"
         message = f"{url[:url_length]}... | Status: {status} | Time: {timing:.2f}s"
         self._write_to_file("URL_STATUS", message, tag)
 
-    def error_status(self, url: str, error: str, tag: str = "ERROR", url_length: int = 50):
+    def error_status(self, url: str, error: str, tag: str = "ERROR", url_length: int = 100):
         """Log error status to file."""
         message = f"{url[:url_length]}... | Error: {error}"
         self._write_to_file("ERROR", message, tag)

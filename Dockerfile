@@ -1,4 +1,9 @@
-FROM python:3.10-slim
+FROM python:3.12-slim-bookworm AS build
+
+# C4ai version
+ARG C4AI_VER=0.6.0
+ENV C4AI_VERSION=$C4AI_VER
+LABEL c4ai.version=$C4AI_VER
 
 # Set build arguments
 ARG APP_HOME=/app
@@ -17,14 +22,14 @@ ENV PYTHONFAULTHANDLER=1 \
     REDIS_HOST=localhost \
     REDIS_PORT=6379
 
-ARG PYTHON_VERSION=3.10
+ARG PYTHON_VERSION=3.12
 ARG INSTALL_TYPE=default
 ARG ENABLE_GPU=false
 ARG TARGETARCH
 
 LABEL maintainer="unclecode"
 LABEL description="🔥🕷️ Crawl4AI: Open-source LLM Friendly Web Crawler & scraper"
-LABEL version="1.0"    
+LABEL version="1.0"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -38,6 +43,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libjpeg-dev \
     redis-server \
     supervisor \
+    && apt-get clean \ 
     && rm -rf /var/lib/apt/lists/*
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -62,11 +68,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcairo2 \
     libasound2 \
     libatspi2.0-0 \
+    && apt-get clean \ 
+    && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && apt-get dist-upgrade -y \
     && rm -rf /var/lib/apt/lists/*
 
 RUN if [ "$ENABLE_GPU" = "true" ] && [ "$TARGETARCH" = "amd64" ] ; then \
     apt-get update && apt-get install -y --no-install-recommends \
     nvidia-cuda-toolkit \
+    && apt-get clean \ 
     && rm -rf /var/lib/apt/lists/* ; \
 else \
     echo "Skipping NVIDIA CUDA Toolkit installation (unsupported platform or GPU disabled)"; \
@@ -76,15 +87,23 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
     echo "🦾 Installing ARM-specific optimizations"; \
     apt-get update && apt-get install -y --no-install-recommends \
     libopenblas-dev \
+    && apt-get clean \ 
     && rm -rf /var/lib/apt/lists/*; \
 elif [ "$TARGETARCH" = "amd64" ]; then \
     echo "🖥️ Installing AMD64-specific optimizations"; \
     apt-get update && apt-get install -y --no-install-recommends \
     libomp-dev \
+    && apt-get clean \ 
     && rm -rf /var/lib/apt/lists/*; \
 else \
     echo "Skipping platform-specific optimizations (unsupported platform)"; \
 fi
+
+# Create a non-root user and group
+RUN groupadd -r appuser && useradd --no-log-init -r -g appuser appuser
+
+# Create and set permissions for appuser home directory
+RUN mkdir -p /home/appuser && chown -R appuser:appuser /home/appuser
 
 WORKDIR ${APP_HOME}
 
@@ -103,6 +122,7 @@ fi' > /tmp/install.sh && chmod +x /tmp/install.sh
 
 COPY . /tmp/project/
 
+# Copy supervisor config first (might need root later, but okay for now)
 COPY deploy/docker/supervisord.conf .
 
 COPY deploy/docker/requirements.txt .
@@ -131,15 +151,33 @@ RUN if [ "$INSTALL_TYPE" = "all" ] ; then \
     else \
         pip install "/tmp/project" ; \
     fi
-    
+
 RUN pip install --no-cache-dir --upgrade pip && \
     /tmp/install.sh && \
     python -c "import crawl4ai; print('✅ crawl4ai is ready to rock!')" && \
     python -c "from playwright.sync_api import sync_playwright; print('✅ Playwright is feeling dramatic!')"
-    
-RUN playwright install --with-deps chromium
 
+RUN crawl4ai-setup
+
+RUN playwright install --with-deps
+
+RUN mkdir -p /home/appuser/.cache/ms-playwright \
+    && cp -r /root/.cache/ms-playwright/chromium-* /home/appuser/.cache/ms-playwright/ \
+    && chown -R appuser:appuser /home/appuser/.cache/ms-playwright
+
+RUN crawl4ai-doctor
+
+# Copy application code
 COPY deploy/docker/* ${APP_HOME}/
+
+# copy the playground + any future static assets
+COPY deploy/docker/static ${APP_HOME}/static
+
+# Change ownership of the application directory to the non-root user
+RUN chown -R appuser:appuser ${APP_HOME}
+
+# give permissions to redis persistence dirs if used
+RUN mkdir -p /var/lib/redis /var/log/redis && chown -R appuser:appuser /var/lib/redis /var/log/redis
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD bash -c '\
@@ -149,8 +187,14 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
         exit 1; \
     fi && \
     redis-cli ping > /dev/null && \
-    curl -f http://localhost:8000/health || exit 1'
+    curl -f http://localhost:11235/health || exit 1'
 
 EXPOSE 6379
+# Switch to the non-root user before starting the application
+USER appuser
+
+# Set environment variables to ptoduction
+ENV PYTHON_ENV=production 
+
+# Start the application using supervisord
 CMD ["supervisord", "-c", "supervisord.conf"]
-    

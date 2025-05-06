@@ -5,6 +5,130 @@ All notable changes to Crawl4AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2025-04-24
+
+### Added
+- New dedicated `tables` field in `CrawlResult` model for better table extraction handling
+- Updated crypto_analysis_example.py to use the new tables field with backward compatibility
+
+### Changed
+- Improved playground UI in Docker deployment with better endpoint handling and UI feedback
+
+## [0.6.0] ‑ 2025‑04‑22
+
+### Added
+- Browser pooling with page pre‑warming and fine‑grained **geolocation, locale, and timezone** controls  
+- Crawler pool manager (SDK + Docker API) for smarter resource allocation  
+- Network & console log capture plus MHTML snapshot export  
+- **Table extractor**: turn HTML `<table>`s into DataFrames or CSV with one flag  
+- High‑volume stress‑test framework in `tests/memory` and API load scripts  
+- MCP protocol endpoints with socket & SSE support; playground UI scaffold  
+- Docs v2 revamp: TOC, GitHub badge, copy‑code buttons, Docker API demo  
+- “Ask AI” helper button *(work‑in‑progress, shipping soon)*  
+- New examples: geo‑location usage, network/console capture, Docker API, markdown source selection, crypto analysis  
+- Expanded automated test suites for browser, Docker, MCP and memory benchmarks  
+
+### Changed
+- Consolidated and renamed browser strategies; legacy docker strategy modules removed  
+- `ProxyConfig` moved to `async_configs`  
+- Server migrated to pool‑based crawler management  
+- FastAPI validators replace custom query validation  
+- Docker build now uses Chromium base image  
+- Large‑scale repo tidy‑up (≈36 k insertions, ≈5 k deletions)  
+
+### Fixed
+- Async crawler session leak, duplicate‑visit handling, URL normalisation  
+- Target‑element regressions in scraping strategies  
+- Logged‑URL readability, encoded‑URL decoding, middle truncation for long URLs  
+- Closed issues: #701, #733, #756, #774, #804, #822, #839, #841, #842, #843, #867, #902, #911  
+
+### Removed
+- Obsolete modules under `crawl4ai/browser/*` superseded by the new pooled browser layer  
+
+### Deprecated
+- Old markdown generator names now alias `DefaultMarkdownGenerator` and emit warnings  
+
+---
+
+#### Upgrade notes
+1. Update any direct imports from `crawl4ai/browser/*` to the new pooled browser modules  
+2. If you override `AsyncPlaywrightCrawlerStrategy.get_page`, adopt the new signature  
+3. Rebuild Docker images to pull the new Chromium layer  
+4. Switch to `DefaultMarkdownGenerator` (or silence the deprecation warning)  
+
+---
+
+`121 files changed, ≈36 223 insertions, ≈4 975 deletions` :contentReference[oaicite:0]{index=0}&#8203;:contentReference[oaicite:1]{index=1}
+
+
+### [Feature] 2025-04-21
+- Implemented MCP protocol for machine-to-machine communication
+  - Added WebSocket and SSE transport for MCP server
+  - Exposed server endpoints via MCP protocol
+  - Created tests for MCP socket and SSE communication
+- Enhanced Docker server with file handling and intelligent search
+  - Added PDF and screenshot endpoints with file saving capability
+  - Added JavaScript execution endpoint for page interaction
+  - Implemented advanced context search with BM25 and code chunking
+  - Added file path output support for generated assets
+- Improved server endpoints and API surface
+  - Added intelligent context search with query filtering
+  - Added syntax-aware code function chunking
+  - Implemented efficient HTML processing pipeline
+- Added support for controlling browser geolocation via new GeolocationConfig class
+  - Added locale and timezone configuration options to CrawlerRunConfig
+  - Added example script demonstrating geolocation and locale usage
+  - Added documentation for location-based identity features
+
+### [Refactor] 2025-04-20
+- Replaced crawler_manager.py with simpler crawler_pool.py implementation
+- Added global page semaphore for hard concurrency cap
+- Implemented browser pool with idle cleanup
+- Added playground UI for testing and stress testing
+- Updated API handlers to use pooled crawlers
+- Enhanced logging levels and symbols
+- Added memory tests and stress test utilities
+
+### [Added] 2025-04-17
+- Added content source selection feature for markdown generation
+  - New `content_source` parameter allows choosing between `cleaned_html`, `raw_html`, and `fit_html`
+  - Provides flexibility in how HTML content is processed before markdown conversion
+  - Added examples and documentation for the new feature
+  - Includes backward compatibility with default `cleaned_html` behavior
+  
+## Version 0.5.0.post5 (2025-03-14)
+
+### Added
+
+- *(crawler)* Add experimental parameters dictionary to CrawlerRunConfig to support beta features
+- *(tables)* Add comprehensive table detection and extraction functionality with scoring system
+- *(monitor)* Add real-time crawler monitoring system with memory management
+- *(content)* Add target_elements parameter for selective content extraction
+- *(browser)* Add standalone CDP browser launch capability
+- *(schema)* Add preprocess_html_for_schema utility for better HTML cleaning
+- *(api)* Add special handling for single URL requests in Docker API
+
+### Changed
+
+- *(filters)* Add reverse option to URLPatternFilter for inverting filter logic
+- *(browser)* Make CSP nonce headers optional via experimental config
+- *(browser)* Remove default cookie injection from page initialization
+- *(crawler)* Optimize response handling for single-URL processing
+- *(api)* Refactor crawl request handling to streamline processing
+- *(config)* Update default provider to gpt-4o
+- *(cache)* Change default cache_mode from aggressive to bypass in examples
+
+### Fixed
+
+- *(browser)* Clean up browser context creation code
+- *(api)* Improve code formatting in API handler
+
+### Breaking Changes
+
+- WebScrapingStrategy no longer returns 'scraped_html' in its output dictionary
+- Table extraction logic has been modified to better handle thead/tbody structures
+- Default cookie injection has been removed from page initialization
+
 ## Version 0.5.0 (2025-03-02)
 
 ### Added

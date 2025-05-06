@@ -1,6 +1,7 @@
-from re import U
-from pydantic import BaseModel, HttpUrl, PrivateAttr
+from pydantic import BaseModel, HttpUrl, PrivateAttr, Field
 from typing import List, Dict, Optional, Callable, Awaitable, Union, Any
+from typing import AsyncGenerator
+from typing import Generic, TypeVar
 from enum import Enum
 from dataclasses import dataclass
 from .ssl_certificate import SSLCertificate
@@ -28,34 +29,18 @@ class CrawlerTaskResult:
     start_time: Union[datetime, float]
     end_time: Union[datetime, float]
     error_message: str = ""
-
+    retry_count: int = 0
+    wait_time: float = 0.0
+    
+    @property
+    def success(self) -> bool:
+        return self.result.success
 
 class CrawlStatus(Enum):
     QUEUED = "QUEUED"
     IN_PROGRESS = "IN_PROGRESS"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
-
-
-# @dataclass
-# class CrawlStats:
-#     task_id: str
-#     url: str
-#     status: CrawlStatus
-#     start_time: Optional[datetime] = None
-#     end_time: Optional[datetime] = None
-#     memory_usage: float = 0.0
-#     peak_memory: float = 0.0
-#     error_message: str = ""
-
-#     @property
-#     def duration(self) -> str:
-#         if not self.start_time:
-#             return "0:00"
-#         end = self.end_time or datetime.now()
-#         duration = end - self.start_time
-#         return str(timedelta(seconds=int(duration.total_seconds())))
-
 
 @dataclass
 class CrawlStats:
@@ -67,6 +52,9 @@ class CrawlStats:
     memory_usage: float = 0.0
     peak_memory: float = 0.0
     error_message: str = ""
+    wait_time: float = 0.0
+    retry_count: int = 0
+    counted_requeue: bool = False
 
     @property
     def duration(self) -> str:
@@ -103,21 +91,11 @@ class TokenUsage:
     completion_tokens_details: Optional[dict] = None
     prompt_tokens_details: Optional[dict] = None
 
-
 class UrlModel(BaseModel):
     url: HttpUrl
     forced: bool = False
 
 
-class MarkdownGenerationResult(BaseModel):
-    raw_markdown: str
-    markdown_with_citations: str
-    references_markdown: str
-    fit_markdown: Optional[str] = None
-    fit_html: Optional[str] = None
-
-    def __str__(self):
-        return self.raw_markdown
 
 @dataclass
 class TraversalStats:
@@ -138,6 +116,16 @@ class DispatchResult(BaseModel):
     end_time: Union[datetime, float]
     error_message: str = ""
 
+class MarkdownGenerationResult(BaseModel):
+    raw_markdown: str
+    markdown_with_citations: str
+    references_markdown: str
+    fit_markdown: Optional[str] = None
+    fit_html: Optional[str] = None
+
+    def __str__(self):
+        return self.raw_markdown
+    
 class CrawlResult(BaseModel):
     url: str
     html: str
@@ -149,6 +137,7 @@ class CrawlResult(BaseModel):
     js_execution_result: Optional[Dict[str, Any]] = None
     screenshot: Optional[str] = None
     pdf: Optional[bytes] = None
+    mhtml: Optional[str] = None
     _markdown: Optional[MarkdownGenerationResult] = PrivateAttr(default=None)
     extracted_content: Optional[str] = None
     metadata: Optional[dict] = None
@@ -159,6 +148,9 @@ class CrawlResult(BaseModel):
     ssl_certificate: Optional[SSLCertificate] = None
     dispatch_result: Optional[DispatchResult] = None
     redirected_url: Optional[str] = None
+    network_requests: Optional[List[Dict[str, Any]]] = None
+    console_messages: Optional[List[Dict[str, Any]]] = None
+    tables: List[Dict] = Field(default_factory=list)  # NEW – [{headers,rows,caption,summary}]
 
     class Config:
         arbitrary_types_allowed = True
@@ -275,6 +267,40 @@ class StringCompatibleMarkdown(str):
     def __getattr__(self, name):
         return getattr(self._markdown_result, name)
 
+CrawlResultT = TypeVar('CrawlResultT', bound=CrawlResult)
+
+class CrawlResultContainer(Generic[CrawlResultT]):
+    def __init__(self, results: Union[CrawlResultT, List[CrawlResultT]]):
+        # Normalize to a list
+        if isinstance(results, list):
+            self._results = results
+        else:
+            self._results = [results]
+
+    def __iter__(self):
+        return iter(self._results)
+
+    def __getitem__(self, index):
+        return self._results[index]
+
+    def __len__(self):
+        return len(self._results)
+
+    def __getattr__(self, attr):
+        # Delegate attribute access to the first element.
+        if self._results:
+            return getattr(self._results[0], attr)
+        raise AttributeError(f"{self.__class__.__name__} object has no attribute '{attr}'")
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self._results!r})"
+
+RunManyReturn = Union[
+    CrawlResultContainer[CrawlResultT],
+    AsyncGenerator[CrawlResultT, None]
+]
+
+
 # END of backward compatibility code for markdown/markdown_v2.
 # When removing this code in the future, make sure to:
 # 1. Replace the private attribute and property with a standard field
@@ -287,14 +313,16 @@ class AsyncCrawlResponse(BaseModel):
     status_code: int
     screenshot: Optional[str] = None
     pdf_data: Optional[bytes] = None
+    mhtml_data: Optional[str] = None
     get_delayed_content: Optional[Callable[[Optional[float]], Awaitable[str]]] = None
     downloaded_files: Optional[List[str]] = None
     ssl_certificate: Optional[SSLCertificate] = None
     redirected_url: Optional[str] = None
+    network_requests: Optional[List[Dict[str, Any]]] = None
+    console_messages: Optional[List[Dict[str, Any]]] = None
 
     class Config:
         arbitrary_types_allowed = True
-
 
 ###############################
 # Scraping Models
@@ -326,6 +354,7 @@ class Media(BaseModel):
     audios: List[
         MediaItem
     ] = []  # Using MediaItem model for now, can be extended with Audio model if needed
+    tables: List[Dict] = []  # Table data extracted from HTML tables
 
 
 class Links(BaseModel):

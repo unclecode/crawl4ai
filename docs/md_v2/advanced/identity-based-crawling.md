@@ -263,7 +263,102 @@ See the full example in `docs/examples/identity_based_browsing.py` for a complet
 
 ---
 
-## 7. Summary
+## 7. Locale, Timezone, and Geolocation Control
+
+In addition to using persistent profiles, Crawl4AI supports customizing your browser's locale, timezone, and geolocation settings. These features enhance your identity-based browsing experience by allowing you to control how websites perceive your location and regional settings.
+
+### Setting Locale and Timezone
+
+You can set the browser's locale and timezone through `CrawlerRunConfig`:
+
+```python
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
+
+async with AsyncWebCrawler() as crawler:
+    result = await crawler.arun(
+        url="https://example.com",
+        config=CrawlerRunConfig(
+            # Set browser locale (language and region formatting)
+            locale="fr-FR",  # French (France)
+            
+            # Set browser timezone
+            timezone_id="Europe/Paris",
+            
+            # Other normal options...
+            magic=True,
+            page_timeout=60000
+        )
+    )
+```
+
+**How it works:**
+- `locale` affects language preferences, date formats, number formats, etc.
+- `timezone_id` affects JavaScript's Date object and time-related functionality
+- These settings are applied when creating the browser context and maintained throughout the session
+
+### Configuring Geolocation
+
+Control the GPS coordinates reported by the browser's geolocation API:
+
+```python
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, GeolocationConfig
+
+async with AsyncWebCrawler() as crawler:
+    result = await crawler.arun(
+        url="https://maps.google.com",  # Or any location-aware site
+        config=CrawlerRunConfig(
+            # Configure precise GPS coordinates
+            geolocation=GeolocationConfig(
+                latitude=48.8566,   # Paris coordinates
+                longitude=2.3522,
+                accuracy=100        # Accuracy in meters (optional)
+            ),
+            
+            # This site will see you as being in Paris
+            page_timeout=60000
+        )
+    )
+```
+
+**Important notes:**
+- When `geolocation` is specified, the browser is automatically granted permission to access location
+- Websites using the Geolocation API will receive the exact coordinates you specify
+- This affects map services, store locators, delivery services, etc.
+- Combined with the appropriate `locale` and `timezone_id`, you can create a fully consistent location profile
+
+### Combining with Managed Browsers
+
+These settings work perfectly with managed browsers for a complete identity solution:
+
+```python
+from crawl4ai import (
+    AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, 
+    GeolocationConfig
+)
+
+browser_config = BrowserConfig(
+    use_managed_browser=True,
+    user_data_dir="/path/to/my-profile",
+    browser_type="chromium"
+)
+
+crawl_config = CrawlerRunConfig(
+    # Location settings
+    locale="es-MX",                  # Spanish (Mexico)
+    timezone_id="America/Mexico_City",
+    geolocation=GeolocationConfig(
+        latitude=19.4326,            # Mexico City
+        longitude=-99.1332
+    )
+)
+
+async with AsyncWebCrawler(config=browser_config) as crawler:
+    result = await crawler.arun(url="https://example.com", config=crawl_config)
+```
+
+Combining persistent profiles with precise geolocation and region settings gives you complete control over your digital identity.
+
+## 8. Summary
 
 - **Create** your user-data directory either:
   - By launching Chrome/Chromium externally with `--user-data-dir=/some/path` 
@@ -271,6 +366,7 @@ See the full example in `docs/examples/identity_based_browsing.py` for a complet
   - Or through the interactive interface with `profiler.interactive_manager()`
 - **Log in** or configure sites as needed, then close the browser
 - **Reference** that folder in `BrowserConfig(user_data_dir="...")` + `use_managed_browser=True`
+- **Customize** identity aspects with `locale`, `timezone_id`, and `geolocation`
 - **List and reuse** profiles with `BrowserProfiler.list_profiles()`
 - **Manage** your profiles with the dedicated `BrowserProfiler` class
 - Enjoy **persistent** sessions that reflect your real identity

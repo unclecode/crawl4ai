@@ -72,6 +72,14 @@ asyncio.run(main())
 
 ---
 
+## Video Tutorial
+
+<div align="center">
+  <iframe width="560" height="315" src="https://www.youtube.com/embed/xo3qK6Hg9AA?start=15" title="Crawl4AI Tutorial" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+</div>
+
+---
+
 ## What Does Crawl4AI Do?
 
 Crawl4AI is a feature-rich crawler and scraper that aims to:

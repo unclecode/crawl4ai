@@ -4,7 +4,35 @@ In this tutorial, you’ll learn how to:
 
 1. Extract links (internal, external) from crawled pages  
 2. Filter or exclude specific domains (e.g., social media or custom domains)  
-3. Access and manage media data (especially images) in the crawl result  
+3. Access and ma### 3.2 Excluding Images
+
+#### Excluding External Images
+
+If you're dealing with heavy pages or want to skip third-party images (advertisements, for example), you can turn on:
+
+```python
+crawler_cfg = CrawlerRunConfig(
+    exclude_external_images=True
+)
+```
+
+This setting attempts to discard images from outside the primary domain, keeping only those from the site you're crawling.
+
+#### Excluding All Images
+
+If you want to completely remove all images from the page to maximize performance and reduce memory usage, use:
+
+```python
+crawler_cfg = CrawlerRunConfig(
+    exclude_all_images=True
+)
+```
+
+This setting removes all images very early in the processing pipeline, which significantly improves memory efficiency and processing speed. This is particularly useful when:
+- You don't need image data in your results
+- You're crawling image-heavy pages that cause memory issues
+- You want to focus only on text content
+- You need to maximize crawling speeddata (especially images) in the crawl result  
 4. Configure your crawler to exclude or prioritize certain images
 
 > **Prerequisites**  
@@ -133,19 +161,28 @@ This approach is handy when you still want external links but need to block cert
 
 ### 3.1 Accessing `result.media`
 
-By default, Crawl4AI collects images, audio, and video URLs it finds on the page. These are stored in `result.media`, a dictionary keyed by media type (e.g., `images`, `videos`, `audio`).
+By default, Crawl4AI collects images, audio, video URLs, and data tables it finds on the page. These are stored in `result.media`, a dictionary keyed by media type (e.g., `images`, `videos`, `audio`, `tables`).
 
 **Basic Example**:
 
 ```python
 if result.success:
+    # Get images
     images_info = result.media.get("images", [])
     print(f"Found {len(images_info)} images in total.")
-    for i, img in enumerate(images_info[:5]):  # Inspect just the first 5
+    for i, img in enumerate(images_info[:3]):  # Inspect just the first 3
         print(f"[Image {i}] URL: {img['src']}")
         print(f"           Alt text: {img.get('alt', '')}")
         print(f"           Score: {img.get('score')}")
         print(f"           Description: {img.get('desc', '')}\n")
+    
+    # Get tables
+    tables = result.media.get("tables", [])
+    print(f"Found {len(tables)} data tables in total.")
+    for i, table in enumerate(tables):
+        print(f"[Table {i}] Caption: {table.get('caption', 'No caption')}")
+        print(f"           Columns: {len(table.get('headers', []))}")
+        print(f"           Rows: {len(table.get('rows', []))}")
 ```
 
 **Structure Example**:
@@ -171,6 +208,19 @@ result.media = {
   ],
   "audio": [
     # Similar structure but with audio-specific fields
+  ],
+  "tables": [
+    {
+      "headers": ["Name", "Age", "Location"],
+      "rows": [
+        ["John Doe", "34", "New York"],
+        ["Jane Smith", "28", "San Francisco"],
+        ["Alex Johnson", "42", "Chicago"]
+      ],
+      "caption": "Employee Directory",
+      "summary": "Directory of company employees"
+    },
+    # More tables if present
   ]
 }
 ```
@@ -199,11 +249,90 @@ crawler_cfg = CrawlerRunConfig(
 
 This setting attempts to discard images from outside the primary domain, keeping only those from the site you’re crawling.
 
-### 3.3 Additional Media Config
+### 3.3 Working with Tables
+
+Crawl4AI can detect and extract structured data from HTML tables. Tables are analyzed based on various criteria to determine if they are actual data tables (as opposed to layout tables), including:
+
+- Presence of thead and tbody sections
+- Use of th elements for headers
+- Column consistency
+- Text density
+- And other factors
+
+Tables that score above the threshold (default: 7) are extracted and stored in `result.media.tables`.
+
+**Accessing Table Data**:
+
+```python
+if result.success:
+    tables = result.media.get("tables", [])
+    print(f"Found {len(tables)} data tables on the page")
+    
+    if tables:
+        # Access the first table
+        first_table = tables[0]
+        print(f"Table caption: {first_table.get('caption', 'No caption')}")
+        print(f"Headers: {first_table.get('headers', [])}")
+        
+        # Print the first 3 rows
+        for i, row in enumerate(first_table.get('rows', [])[:3]):
+            print(f"Row {i+1}: {row}")
+```
+
+**Configuring Table Extraction**:
+
+You can adjust the sensitivity of the table detection algorithm with:
+
+```python
+crawler_cfg = CrawlerRunConfig(
+    table_score_threshold=5  # Lower value = more tables detected (default: 7)
+)
+```
+
+Each extracted table contains:
+- `headers`: Column header names
+- `rows`: List of rows, each containing cell values
+- `caption`: Table caption text (if available)
+- `summary`: Table summary attribute (if specified)
+
+### 3.4 Additional Media Config
 
 - **`screenshot`**: Set to `True` if you want a full-page screenshot stored as `base64` in `result.screenshot`.  
 - **`pdf`**: Set to `True` if you want a PDF version of the page in `result.pdf`.  
+- **`capture_mhtml`**: Set to `True` if you want an MHTML snapshot of the page in `result.mhtml`. This format preserves the entire web page with all its resources (CSS, images, scripts) in a single file, making it perfect for archiving or offline viewing.
 - **`wait_for_images`**: If `True`, attempts to wait until images are fully loaded before final extraction.
+
+#### Example: Capturing Page as MHTML
+
+```python
+import asyncio
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
+
+async def main():
+    crawler_cfg = CrawlerRunConfig(
+        capture_mhtml=True  # Enable MHTML capture
+    )
+    
+    async with AsyncWebCrawler() as crawler:
+        result = await crawler.arun("https://example.com", config=crawler_cfg)
+        
+        if result.success and result.mhtml:
+            # Save the MHTML snapshot to a file
+            with open("example.mhtml", "w", encoding="utf-8") as f:
+                f.write(result.mhtml)
+            print("MHTML snapshot saved to example.mhtml")
+        else:
+            print("Failed to capture MHTML:", result.error_message)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+The MHTML format is particularly useful because:
+- It captures the complete page state including all resources
+- It can be opened in most modern browsers for offline viewing
+- It preserves the page exactly as it appeared during crawling
+- It's a single file, making it easy to store and transfer
 
 ---
 
@@ -274,3 +403,10 @@ if __name__ == "__main__":
 ---
 
 **That’s it for Link & Media Analysis!** You’re now equipped to filter out unwanted sites and zero in on the images and videos that matter for your project.
+### Table Extraction Tips
+
+- Not all HTML tables are extracted - only those detected as "data tables" vs. layout tables.
+- Tables with inconsistent cell counts, nested tables, or those used purely for layout may be skipped.
+- If you're missing tables, try adjusting the `table_score_threshold` to a lower value (default is 7).
+
+The table detection algorithm scores tables based on features like consistent columns, presence of headers, text density, and more. Tables scoring above the threshold are considered data tables worth extracting.

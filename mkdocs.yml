@@ -1,4 +1,4 @@
-site_name: Crawl4AI Documentation (v0.5.x)
+site_name: Crawl4AI Documentation (v0.6.x)
 site_description:  🚀🤖 Crawl4AI, Open-source LLM-Friendly Web Crawler & Scraper
 site_url: https://docs.crawl4ai.com
 repo_url: https://github.com/unclecode/crawl4ai
@@ -7,10 +7,12 @@ docs_dir: docs/md_v2
 
 nav:
   - Home: 'index.md'
+  - "Ask AI": "core/ask-ai.md"
+  - "Quick Start": "core/quickstart.md"
+  - "Code Examples": "core/examples.md"
   - Setup & Installation:
     - "Installation": "core/installation.md"
     - "Docker Deployment": "core/docker-deployment.md"
-  - "Quick Start": "core/quickstart.md"
   - "Blog & Changelog":
     - "Blog Home": "blog/index.md"
     - "Changelog": "https://github.com/unclecode/crawl4ai/blob/main/CHANGELOG.md"
@@ -38,6 +40,7 @@ nav:
     - "Crawl Dispatcher": "advanced/crawl-dispatcher.md"
     - "Identity Based Crawling": "advanced/identity-based-crawling.md"
     - "SSL Certificate": "advanced/ssl-certificate.md"
+    - "Network & Console Capture": "advanced/network-console-capture.md"
   - Extraction:
     - "LLM-Free Strategies": "extraction/no-llm-strategies.md"
     - "LLM Strategies": "extraction/llm-strategies.md"
@@ -75,6 +78,7 @@ extra:
   version: !ENV [CRAWL4AI_VERSION, 'development']
 
 extra_css:
+  - assets/layout.css
   - assets/styles.css
   - assets/highlight.css
   - assets/dmvendor.css
@@ -83,3 +87,9 @@ extra_javascript:
   - assets/highlight.min.js
   - assets/highlight_init.js
   - https://buttons.github.io/buttons.js
+  - assets/toc.js
+  - assets/github_stats.js 
+  - assets/selection_ask_ai.js
+  - assets/copy_code.js
+  - assets/floating_ask_ai_button.js
+  - assets/mobile_menu.js

@@ -76,6 +76,51 @@ class ManagedBrowser:
             _cleanup(): Terminates the browser process and removes the temporary directory.
             create_profile(): Static method to create a user profile by launching a browser for user interaction.
     """
+    
+    @staticmethod
+    def build_browser_flags(config: BrowserConfig) -> List[str]:
+        """Common CLI flags for launching Chromium"""
+        flags = [
+            "--disable-gpu",
+            "--disable-gpu-compositing",
+            "--disable-software-rasterizer",
+            "--no-sandbox",
+            "--disable-dev-shm-usage",
+            "--no-first-run",
+            "--no-default-browser-check",
+            "--disable-infobars",
+            "--window-position=0,0",
+            "--ignore-certificate-errors",
+            "--ignore-certificate-errors-spki-list",
+            "--disable-blink-features=AutomationControlled",
+            "--window-position=400,0",
+            "--disable-renderer-backgrounding",
+            "--disable-ipc-flooding-protection",
+            "--force-color-profile=srgb",
+            "--mute-audio",
+            "--disable-background-timer-throttling",
+        ]
+        if config.light_mode:
+            flags.extend(BROWSER_DISABLE_OPTIONS)
+        if config.text_mode:
+            flags.extend([
+                "--blink-settings=imagesEnabled=false",
+                "--disable-remote-fonts",
+                "--disable-images",
+                "--disable-javascript",
+                "--disable-software-rasterizer",
+                "--disable-dev-shm-usage",
+            ])
+        # proxy support
+        if config.proxy:
+            flags.append(f"--proxy-server={config.proxy}")
+        elif config.proxy_config:
+            creds = ""
+            if config.proxy_config.username and config.proxy_config.password:
+                creds = f"{config.proxy_config.username}:{config.proxy_config.password}@"
+            flags.append(f"--proxy-server={creds}{config.proxy_config.server}")
+        # dedupe
+        return list(dict.fromkeys(flags))
 
     browser_type: str
     user_data_dir: str
@@ -94,6 +139,7 @@ class ManagedBrowser:
         host: str = "localhost",
         debugging_port: int = 9222,
         cdp_url: Optional[str] = None, 
+        browser_config: Optional[BrowserConfig] = None,
     ):
         """
         Initialize the ManagedBrowser instance.
@@ -109,17 +155,19 @@ class ManagedBrowser:
             host (str): Host for debugging the browser. Default: "localhost".
             debugging_port (int): Port for debugging the browser. Default: 9222.
             cdp_url (str or None): CDP URL to connect to the browser. Default: None.
+            browser_config (BrowserConfig): Configuration object containing all browser settings. Default: None.
         """
-        self.browser_type = browser_type
-        self.user_data_dir = user_data_dir
-        self.headless = headless
+        self.browser_type = browser_config.browser_type
+        self.user_data_dir = browser_config.user_data_dir
+        self.headless = browser_config.headless
         self.browser_process = None
         self.temp_dir = None
-        self.debugging_port = debugging_port
-        self.host = host
+        self.debugging_port = browser_config.debugging_port
+        self.host = browser_config.host
         self.logger = logger
         self.shutting_down = False
-        self.cdp_url = cdp_url
+        self.cdp_url = browser_config.cdp_url
+        self.browser_config = browser_config
 
     async def start(self) -> str:
         """
@@ -142,20 +190,66 @@ class ManagedBrowser:
         # Get browser path and args based on OS and browser type
         # browser_path = self._get_browser_path()
         args = await self._get_browser_args()
+        
+        if self.browser_config.extra_args:
+            args.extend(self.browser_config.extra_args)
 
         # Start browser process
         try:
-            self.browser_process = subprocess.Popen(
-                args, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-            )
-            # Monitor browser process output for errors
-            asyncio.create_task(self._monitor_browser_process())
+            # Use DETACHED_PROCESS flag on Windows to fully detach the process
+            # On Unix, we'll use preexec_fn=os.setpgrp to start the process in a new process group
+            if sys.platform == "win32":
+                self.browser_process = subprocess.Popen(
+                    args, 
+                    stdout=subprocess.PIPE, 
+                    stderr=subprocess.PIPE,
+                    creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+                )
+            else:
+                self.browser_process = subprocess.Popen(
+                    args, 
+                    stdout=subprocess.PIPE, 
+                    stderr=subprocess.PIPE,
+                    preexec_fn=os.setpgrp  # Start in a new process group
+                )
+                
+            # We'll monitor for a short time to make sure it starts properly, but won't keep monitoring
+            await asyncio.sleep(0.5)  # Give browser time to start
+            await self._initial_startup_check()
             await asyncio.sleep(2)  # Give browser time to start
             return f"http://{self.host}:{self.debugging_port}"
         except Exception as e:
             await self.cleanup()
             raise Exception(f"Failed to start browser: {e}")
 
+    async def _initial_startup_check(self):
+        """
+        Perform a quick check to make sure the browser started successfully.
+        This only runs once at startup rather than continuously monitoring.
+        """
+        if not self.browser_process:
+            return
+            
+        # Check that process started without immediate termination
+        await asyncio.sleep(0.5)
+        if self.browser_process.poll() is not None:
+            # Process already terminated
+            stdout, stderr = b"", b""
+            try:
+                stdout, stderr = self.browser_process.communicate(timeout=0.5)
+            except subprocess.TimeoutExpired:
+                pass
+                
+            self.logger.error(
+                message="Browser process terminated during startup | Code: {code} | STDOUT: {stdout} | STDERR: {stderr}",
+                tag="ERROR",
+                params={
+                    "code": self.browser_process.returncode,
+                    "stdout": stdout.decode() if stdout else "",
+                    "stderr": stderr.decode() if stderr else "",
+                },
+            )
+    
     async def _monitor_browser_process(self):
         """
         Monitor the browser process for unexpected termination.
@@ -167,6 +261,7 @@ class ManagedBrowser:
         4. If any other error occurs, log the error message.
 
         Note: This method should be called in a separate task to avoid blocking the main event loop.
+        This is DEPRECATED and should not be used for builtin browsers that need to outlive the Python process.
         """
         if self.browser_process:
             try:
@@ -230,29 +325,29 @@ class ManagedBrowser:
         return browser_path
 
     async def _get_browser_args(self) -> List[str]:
-        """Returns browser-specific command line arguments"""
-        base_args = [await self._get_browser_path()]
-
+        """Returns full CLI args for launching the browser"""
+        base = [await self._get_browser_path()]
         if self.browser_type == "chromium":
-            args = [
+            flags = [
                 f"--remote-debugging-port={self.debugging_port}",
                 f"--user-data-dir={self.user_data_dir}",
             ]
             if self.headless:
-                args.append("--headless=new")
+                flags.append("--headless=new")
+            # merge common launch flags
+            flags.extend(self.build_browser_flags(self.browser_config))
         elif self.browser_type == "firefox":
-            args = [
+            flags = [
                 "--remote-debugging-port",
                 str(self.debugging_port),
                 "--profile",
                 self.user_data_dir,
             ]
             if self.headless:
-                args.append("--headless")
+                flags.append("--headless")
         else:
             raise NotImplementedError(f"Browser type {self.browser_type} not supported")
-
-        return base_args + args
+        return base + flags
 
     async def cleanup(self):
         """Cleanup browser process and temporary directory"""
@@ -261,22 +356,33 @@ class ManagedBrowser:
 
         if self.browser_process:
             try:
-                self.browser_process.terminate()
-                # Wait for process to end gracefully
-                for _ in range(10):  # 10 attempts, 100ms each
-                    if self.browser_process.poll() is not None:
-                        break
-                    await asyncio.sleep(0.1)
+                # For builtin browsers that should persist, we should check if it's a detached process
+                # Only terminate if we have proper control over the process
+                if not self.browser_process.poll():
+                    # Process is still running
+                    self.browser_process.terminate()
+                    # Wait for process to end gracefully
+                    for _ in range(10):  # 10 attempts, 100ms each
+                        if self.browser_process.poll() is not None:
+                            break
+                        await asyncio.sleep(0.1)
 
-                # Force kill if still running
-                if self.browser_process.poll() is None:
-                    self.browser_process.kill()
-                    await asyncio.sleep(0.1)  # Brief wait for kill to take effect
+                    # Force kill if still running
+                    if self.browser_process.poll() is None:
+                        if sys.platform == "win32":
+                            # On Windows we might need taskkill for detached processes
+                            try:
+                                subprocess.run(["taskkill", "/F", "/PID", str(self.browser_process.pid)])
+                            except Exception:
+                                self.browser_process.kill()
+                        else:
+                            self.browser_process.kill()
+                        await asyncio.sleep(0.1)  # Brief wait for kill to take effect
 
             except Exception as e:
                 self.logger.error(
                     message="Error terminating browser: {error}",
-                    tag="ERROR",
+                    tag="ERROR", 
                     params={"error": str(e)},
                 )
 
@@ -379,7 +485,14 @@ class BrowserManager:
         sessions (dict): Dictionary to store session information
         session_ttl (int): Session timeout in seconds
     """
+
+    _playwright_instance = None
     
+    @classmethod
+    async def get_playwright(cls):
+        from playwright.async_api import async_playwright
+        cls._playwright_instance = await async_playwright().start()
+        return cls._playwright_instance    
 
     def __init__(self, browser_config: BrowserConfig, logger=None):
         """
@@ -415,6 +528,7 @@ class BrowserManager:
                 logger=self.logger,
                 debugging_port=self.config.debugging_port,
                 cdp_url=self.config.cdp_url,
+                browser_config=self.config,
             )
 
     async def start(self):
@@ -429,32 +543,22 @@ class BrowserManager:
 
         Note: This method should be called in a separate task to avoid blocking the main event loop.
         """
-        if self.playwright is None:
-            from playwright.async_api import async_playwright
+        if self.playwright is not None:
+            await self.close()
+            
+        from playwright.async_api import async_playwright
 
-            self.playwright = await async_playwright().start()
+        self.playwright = await async_playwright().start()
 
-        if self.config.use_managed_browser:
-            cdp_url = await self.managed_browser.start()
+        if self.config.cdp_url or self.config.use_managed_browser:
+            self.config.use_managed_browser = True
+            cdp_url = await self.managed_browser.start() if not self.config.cdp_url else self.config.cdp_url
             self.browser = await self.playwright.chromium.connect_over_cdp(cdp_url)
             contexts = self.browser.contexts
             if contexts:
                 self.default_context = contexts[0]
             else:
                 self.default_context = await self.create_browser_context()
-                # self.default_context = await self.browser.new_context(
-                #     viewport={
-                #         "width": self.config.viewport_width,
-                #         "height": self.config.viewport_height,
-                #     },
-                #     storage_state=self.config.storage_state,
-                #     user_agent=self.config.headers.get(
-                #         "User-Agent", self.config.user_agent
-                #     ),
-                #     accept_downloads=self.config.accept_downloads,
-                #     ignore_https_errors=self.config.ignore_https_errors,
-                #     java_script_enabled=self.config.java_script_enabled,
-                # )
             await self.setup_context(self.default_context)
         else:
             browser_args = self._build_browser_args()
@@ -468,6 +572,7 @@ class BrowserManager:
                 self.browser = await self.playwright.chromium.launch(**browser_args)
 
             self.default_context = self.browser
+
 
     def _build_browser_args(self) -> dict:
         """Build browser launch arguments from config."""
@@ -512,6 +617,9 @@ class BrowserManager:
         if self.config.extra_args:
             args.extend(self.config.extra_args)
 
+        # Deduplicate args
+        args = list(dict.fromkeys(args))
+        
         browser_args = {"headless": self.config.headless, "args": args}
 
         if self.config.chrome_channel:
@@ -530,9 +638,9 @@ class BrowserManager:
                 ProxySettings(server=self.config.proxy)
                 if self.config.proxy
                 else ProxySettings(
-                    server=self.config.proxy_config.get("server"),
-                    username=self.config.proxy_config.get("username"),
-                    password=self.config.proxy_config.get("password"),
+                    server=self.config.proxy_config.server,
+                    username=self.config.proxy_config.username,
+                    password=self.config.proxy_config.password,
                 )
             )
             browser_args["proxy"] = proxy_settings
@@ -607,7 +715,7 @@ class BrowserManager:
                     "name": "cookiesEnabled",
                     "value": "true",
                     "url": crawlerRunConfig.url
-                    if crawlerRunConfig
+                    if crawlerRunConfig and crawlerRunConfig.url
                     else "https://crawl4ai.com/",
                 }
             ]
@@ -726,6 +834,23 @@ class BrowserManager:
             # Update context settings with text mode settings
             context_settings.update(text_mode_settings)
 
+        # inject locale / tz / geo if user provided them
+        if crawlerRunConfig:
+            if crawlerRunConfig.locale:
+                context_settings["locale"] = crawlerRunConfig.locale
+            if crawlerRunConfig.timezone_id:
+                context_settings["timezone_id"] = crawlerRunConfig.timezone_id
+            if crawlerRunConfig.geolocation:
+                context_settings["geolocation"] = {
+                    "latitude": crawlerRunConfig.geolocation.latitude,
+                    "longitude": crawlerRunConfig.geolocation.longitude,
+                    "accuracy": crawlerRunConfig.geolocation.accuracy,
+                }
+                # ensure geolocation permission
+                perms = context_settings.get("permissions", [])
+                perms.append("geolocation")
+                context_settings["permissions"] = perms
+
         # Create and return the context with all settings
         context = await self.browser.new_context(**context_settings)
 
@@ -758,6 +883,10 @@ class BrowserManager:
             "semaphore_count",
             "url"
         ]
+        
+        # Do NOT exclude locale, timezone_id, or geolocation as these DO affect browser context
+        # and should cause a new context to be created if they change
+        
         for key in ephemeral_keys:
             if key in config_dict:
                 del config_dict[key]
@@ -790,7 +919,10 @@ class BrowserManager:
         # If using a managed browser, just grab the shared default_context
         if self.config.use_managed_browser:
             context = self.default_context
-            page = await context.new_page()
+            pages = context.pages
+            page = next((p for p in pages if p.url == crawlerRunConfig.url), None)
+            if not page:
+                page = await context.new_page()
         else:
             # Otherwise, check if we have an existing context for this config
             config_signature = self._make_config_signature(crawlerRunConfig)
@@ -840,6 +972,9 @@ class BrowserManager:
 
     async def close(self):
         """Close all browser resources and clean up."""
+        if self.config.cdp_url:
+            return
+        
         if self.config.sleep_on_close:
             await asyncio.sleep(0.5)
 

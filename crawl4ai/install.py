@@ -40,12 +40,55 @@ def setup_home_directory():
             f.write("")
 
 def post_install():
-    """Run all post-installation tasks"""
+    """
+    Run all post-installation tasks.
+    Checks CRAWL4AI_MODE environment variable. If set to 'api',
+    skips Playwright browser installation.
+    """
     logger.info("Running post-installation setup...", tag="INIT")
     setup_home_directory()
-    install_playwright()
+
+    # Check environment variable to conditionally skip Playwright install
+    run_mode = os.getenv('CRAWL4AI_MODE')
+    if run_mode == 'api':
+        logger.warning(
+            "CRAWL4AI_MODE=api detected. Skipping Playwright browser installation.",
+            tag="SETUP"
+        )
+    else:
+        # Proceed with installation only if mode is not 'api'
+        install_playwright()
+
     run_migration()
+    # TODO: Will be added in the future
+    # setup_builtin_browser()
     logger.success("Post-installation setup completed!", tag="COMPLETE")
+    
+def setup_builtin_browser():
+    """Set up a builtin browser for use with Crawl4AI"""
+    try:
+        logger.info("Setting up builtin browser...", tag="INIT")
+        asyncio.run(_setup_builtin_browser())
+        logger.success("Builtin browser setup completed!", tag="COMPLETE")
+    except Exception as e:
+        logger.warning(f"Failed to set up builtin browser: {e}")
+        logger.warning("You can manually set up a builtin browser using 'crawl4ai-doctor builtin-browser-start'")
+    
+async def _setup_builtin_browser():
+    try:
+        # Import BrowserProfiler here to avoid circular imports
+        from .browser_profiler import BrowserProfiler
+        profiler = BrowserProfiler(logger=logger)
+        
+        # Launch the builtin browser
+        cdp_url = await profiler.launch_builtin_browser(headless=True)
+        if cdp_url:
+            logger.success(f"Builtin browser launched at {cdp_url}", tag="BROWSER")
+        else:
+            logger.warning("Failed to launch builtin browser", tag="BROWSER")
+    except Exception as e:
+        logger.warning(f"Error setting up builtin browser: {e}", tag="BROWSER")
+        raise
 
 
 def install_playwright():

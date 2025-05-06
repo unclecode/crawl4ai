@@ -10,6 +10,7 @@ import asyncio
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 from crawl4ai.extraction_strategy import JsonCssExtractionStrategy, JsonXPathExtractionStrategy
+from crawl4ai.utils import preprocess_html_for_schema, JsonXPathExtractionStrategy
 import json
 
 # Test HTML - A complex job board with companies, departments, and positions

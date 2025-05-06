@@ -179,3 +179,9 @@ if TYPE_CHECKING:
         DFSDeepCrawlStrategy as DFSDeepCrawlStrategyType,
         DeepCrawlDecorator as DeepCrawlDecoratorType,
     )
+
+
+
+def create_llm_config(*args, **kwargs) -> 'LLMConfigType':
+    from .async_configs import LLMConfig
+    return LLMConfig(*args, **kwargs)

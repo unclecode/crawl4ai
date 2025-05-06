@@ -4,6 +4,32 @@ Welcome to the Crawl4AI blog! Here you'll find detailed release notes, technical
 
 ## Latest Release
 
+Here’s the blog index entry for **v0.6.0**, written to match the exact tone and structure of your previous entries:
+
+---
+
+### [Crawl4AI v0.6.0 – World-Aware Crawling, Pre-Warmed Browsers, and the MCP API](releases/0.6.0.md)
+*April 23, 2025*
+
+Crawl4AI v0.6.0 is our most powerful release yet. This update brings major architectural upgrades including world-aware crawling (set geolocation, locale, and timezone), real-time traffic capture, and a memory-efficient crawler pool with pre-warmed pages.  
+
+The Docker server now exposes a full-featured MCP socket + SSE interface, supports streaming, and comes with a new Playground UI. Plus, table extraction is now native, and the new stress-test framework supports crawling 1,000+ URLs.  
+
+Other key changes:  
+
+*   Native support for `result.media["tables"]` to export DataFrames  
+* Full network + console logs and MHTML snapshot per crawl  
+* Browser pooling and pre-warming for faster cold starts  
+* New streaming endpoints via MCP API and Playground  
+* Robots.txt support, proxy rotation, and improved session handling  
+* Deprecated old markdown names, legacy modules cleaned up  
+* Massive repo cleanup: ~36K insertions, ~5K deletions across 121 files
+
+[Read full release notes →](releases/0.6.0.md)
+
+---
+
+Let me know if you want me to auto-update the actual file or just paste this into the markdown.
 
 ### [Crawl4AI v0.5.0: Deep Crawling, Scalability, and a New CLI!](releases/0.5.0.md)
 
