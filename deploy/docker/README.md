@@ -669,6 +669,8 @@ llm:
   provider: "openai/gpt-4o-mini"
   api_key_env: "OPENAI_API_KEY"
   # api_key: sk-...  # If you pass the API key directly then api_key_env will be ignored
+  base_url_env: "https://api.openai.com/v1/chat/completions"
+  # base_url: sk-...  # If you pass the API key directly then base_url_env will be ignored
 
 # Redis Configuration (Used by internal Redis server managed by supervisord)
 redis:

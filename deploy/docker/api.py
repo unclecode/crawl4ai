@@ -89,7 +89,8 @@ async def handle_llm_qa(
         response = perform_completion_with_backoff(
             provider=config["llm"]["provider"],
             prompt_with_variables=prompt,
-            api_token=os.environ.get(config["llm"].get("api_key_env", ""))
+            api_token=llm_api_key(config),
+            base_url=llm_base_url(config)
         )
 
         return response.choices[0].message.content
@@ -111,17 +112,8 @@ async def process_llm_extraction(
 ) -> None:
     """Process LLM extraction in background."""
     try:
-        # If config['llm'] has api_key then ignore the api_key_env
-        api_key = ""
-        if "api_key" in config["llm"]:
-            api_key = config["llm"]["api_key"]
-        else:
-            api_key = os.environ.get(config["llm"].get("api_key_env", None), "")
         llm_strategy = LLMExtractionStrategy(
-            llm_config=LLMConfig(
-                provider=config["llm"]["provider"],
-                api_token=api_key
-            ),
+            llm_config=llm_config(config),
             instruction=instruction,
             schema=json.loads(schema) if schema else None,
         )
@@ -181,10 +173,7 @@ async def handle_markdown_request(
                 FilterType.FIT: PruningContentFilter(),
                 FilterType.BM25: BM25ContentFilter(user_query=query or ""),
                 FilterType.LLM: LLMContentFilter(
-                    llm_config=LLMConfig(
-                        provider=config["llm"]["provider"],
-                        api_token=os.environ.get(config["llm"].get("api_key_env", None), ""),
-                    ),
+                    llm_config=llm_config(config),
                     instruction=query or "Extract main content"
                 )
             }[filter_type]
@@ -521,3 +510,31 @@ async def handle_stream_crawl_request(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
+
+def llm_config(config: dict) -> LLMConfig:
+    """Get LLM Config from config."""
+    return LLMConfig(
+        provider=config["llm"]["provider"],
+        base_url=llm_base_url(config),
+        api_token=llm_api_key(config),
+    )
+
+def llm_api_key(config) -> str:
+    """Get LLM API key from config or environment variable."""
+    # If config['llm'] has api_key then ignore the api_key_env
+    api_key = ""
+    if "api_key" in config["llm"]:
+        api_key = config["llm"]["api_key"]
+    else:
+        api_key = os.environ.get(config["llm"].get("api_key_env", None), "")
+    return api_key
+
+def llm_base_url(config) -> str:
+    """Get LLM base URL from config or environment variable."""
+    # If config['llm'] has base_url then ignore the base_url_env
+    base_url = ""
+    if "base_url" in config["llm"]:
+        base_url = config["llm"]["base_url"]
+    else:
+        base_url = os.environ.get(config["llm"].get("base_url_env", None), "")
+    return base_url
