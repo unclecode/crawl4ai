@@ -43,7 +43,6 @@ from rich.console import Console
 from rich.logging import RichHandler
 
 from datetime import datetime, UTC
-from itertools import cycle
 from textwrap import dedent
 from types import SimpleNamespace
 from typing import Dict, List, Optional

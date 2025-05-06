@@ -16,7 +16,7 @@ prospect‑wizard/
 
 ### 1.1  Install dependencies
 ```bash
-pip install crawl4ai openai sentence-transformers networkx pandas vis-network rich
+pip install crawl4ai litellm sentence-transformers pandas rich
 ```
 
 ### 1.2  Create / warm a LinkedIn browser profile
