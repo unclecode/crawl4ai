@@ -6,8 +6,8 @@ description = ""
 authors = [{name = "Jan Buchar", email = "jan.buchar@apify.com"}]
 readme = "README.md"
 dependencies = [
-  "crawlee==0.6.5",
-  "Crawl4AI==0.5.0.post8",
+  "crawlee==0.6.9",
+  "Crawl4AI==0.6.2",
   "apify==2.5.0",
   "pydantic"
 ]

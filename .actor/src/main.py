@@ -13,14 +13,13 @@ from urllib.parse import urljoin
 
 from apify import Actor
 from apify.storages import RequestList
-from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, ProxyConfig
 from crawl4ai.async_webcrawler import CrawlResultContainer
 from crawl4ai.extraction_strategy import (
     CosineStrategy,
     JsonCssExtractionStrategy,
     LLMExtractionStrategy,
 )
-from crawl4ai.proxy_strategy import ProxyConfig
 from crawl4ai.types import CrawlResult
 from crawlee import Request
 from crawlee.crawlers import BasicCrawler, BasicCrawlingContext
