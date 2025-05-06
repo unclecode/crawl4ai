@@ -264,3 +264,4 @@ tests/**/reports
 tests/**/benchmark_reports
 
 docs/**/data
+.codecat/

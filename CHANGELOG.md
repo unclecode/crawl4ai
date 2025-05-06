@@ -5,6 +5,21 @@ All notable changes to Crawl4AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.2] - 2025-05-02
+
+### Added
+- New `RegexExtractionStrategy` for fast pattern-based extraction without requiring LLM
+  - Built-in patterns for emails, URLs, phone numbers, dates, and more
+  - Support for custom regex patterns
+  - `generate_pattern` utility for LLM-assisted pattern creation (one-time use)
+- Added `fit_html` as a top-level field in `CrawlResult` for optimized HTML extraction
+- Added support for network response body capture in network request tracking
+
+### Changed
+- Updated documentation for no-LLM extraction strategies
+- Enhanced API reference to include RegexExtractionStrategy examples and usage
+- Improved HTML preprocessing with optimized performance for extraction strategies
+
 ## [0.6.1] - 2025-04-24
 
 ### Added

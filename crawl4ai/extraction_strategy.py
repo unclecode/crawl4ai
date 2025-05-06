@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
 import inspect
-from typing import Any, List, Dict, Optional
+from typing import Any, List, Dict, Optional, Tuple, Pattern, Union
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import time
+from enum import IntFlag, auto
 
 from .prompts import PROMPT_EXTRACT_BLOCKS, PROMPT_EXTRACT_BLOCKS_WITH_INSTRUCTION, PROMPT_EXTRACT_SCHEMA_WITH_INSTRUCTION, JSON_SCHEMA_BUILDER_XPATH, PROMPT_EXTRACT_INFERRED_SCHEMA
 from .config import (
@@ -1668,3 +1669,303 @@ class JsonXPathExtractionStrategy(JsonElementExtractionStrategy):
     def _get_element_attribute(self, element, attribute: str):
         return element.get(attribute)
 
+"""
+RegexExtractionStrategy
+Fast, zero-LLM extraction of common entities via regular expressions.
+"""
+
+_CTRL = {c: rf"\x{ord(c):02x}" for c in map(chr, range(32)) if c not in "\t\n\r"}
+
+_WB_FIX = re.compile(r"\x08")               # stray back-space   →   word-boundary
+_NEEDS_ESCAPE = re.compile(r"(?<!\\)\\(?![\\u])")   # lone backslash
+
+def _sanitize_schema(schema: Dict[str, str]) -> Dict[str, str]:
+    """Fix common JSON-escape goofs coming from LLMs or manual edits."""
+    safe = {}
+    for label, pat in schema.items():
+        # 1️⃣ replace accidental control chars (inc. the infamous back-space)
+        pat = _WB_FIX.sub(r"\\b", pat).translate(_CTRL)
+
+        # 2️⃣ double any single backslash that JSON kept single
+        pat = _NEEDS_ESCAPE.sub(r"\\\\", pat)
+
+        # 3️⃣ quick sanity compile
+        try:
+            re.compile(pat)
+        except re.error as e:
+            raise ValueError(f"Regex for '{label}' won’t compile after fix: {e}") from None
+
+        safe[label] = pat
+    return safe
+
+
+class RegexExtractionStrategy(ExtractionStrategy):
+    """
+    A lean strategy that finds e-mails, phones, URLs, dates, money, etc.,
+    using nothing but pre-compiled regular expressions.
+
+    Extraction returns::
+
+        {
+            "url":   "<page-url>",
+            "label": "<pattern-label>",
+            "value": "<matched-string>",
+            "span":  [start, end]
+        }
+
+    Only `generate_schema()` touches an LLM, extraction itself is pure Python.
+    """
+
+    # -------------------------------------------------------------- #
+    # Built-in patterns exposed as IntFlag so callers can bit-OR them
+    # -------------------------------------------------------------- #
+    class _B(IntFlag):
+        EMAIL           = auto()
+        PHONE_INTL      = auto()
+        PHONE_US        = auto()
+        URL             = auto()
+        IPV4            = auto()
+        IPV6            = auto()
+        UUID            = auto()
+        CURRENCY        = auto()
+        PERCENTAGE      = auto()
+        NUMBER          = auto()
+        DATE_ISO        = auto()
+        DATE_US         = auto()
+        TIME_24H        = auto()
+        POSTAL_US       = auto()
+        POSTAL_UK       = auto()
+        HTML_COLOR_HEX  = auto()
+        TWITTER_HANDLE  = auto()
+        HASHTAG         = auto()
+        MAC_ADDR        = auto()
+        IBAN            = auto()
+        CREDIT_CARD     = auto()
+        NOTHING         = auto()
+        ALL             = (
+            EMAIL | PHONE_INTL | PHONE_US | URL | IPV4 | IPV6 | UUID
+            | CURRENCY | PERCENTAGE | NUMBER | DATE_ISO | DATE_US | TIME_24H
+            | POSTAL_US | POSTAL_UK | HTML_COLOR_HEX | TWITTER_HANDLE
+            | HASHTAG | MAC_ADDR | IBAN | CREDIT_CARD
+        )
+
+    # user-friendly aliases  (RegexExtractionStrategy.Email, .IPv4, …)
+    Email          = _B.EMAIL
+    PhoneIntl      = _B.PHONE_INTL
+    PhoneUS        = _B.PHONE_US
+    Url            = _B.URL
+    IPv4           = _B.IPV4
+    IPv6           = _B.IPV6
+    Uuid           = _B.UUID
+    Currency       = _B.CURRENCY
+    Percentage     = _B.PERCENTAGE
+    Number         = _B.NUMBER
+    DateIso        = _B.DATE_ISO
+    DateUS         = _B.DATE_US
+    Time24h        = _B.TIME_24H
+    PostalUS       = _B.POSTAL_US
+    PostalUK       = _B.POSTAL_UK
+    HexColor       = _B.HTML_COLOR_HEX
+    TwitterHandle  = _B.TWITTER_HANDLE
+    Hashtag        = _B.HASHTAG
+    MacAddr        = _B.MAC_ADDR
+    Iban           = _B.IBAN
+    CreditCard     = _B.CREDIT_CARD
+    All            = _B.ALL
+    Nothing        = _B(0)  # no patterns
+
+    # ------------------------------------------------------------------ #
+    # Built-in pattern catalog
+    # ------------------------------------------------------------------ #
+    DEFAULT_PATTERNS: Dict[str, str] = {
+        # Communication
+        "email":           r"[\w.+-]+@[\w-]+\.[\w.-]+",
+        "phone_intl":      r"\+?\d[\d .()-]{7,}\d",
+        "phone_us":        r"\(?\d{3}\)?[ -. ]?\d{3}[ -. ]?\d{4}",
+        # Web
+        "url":             r"https?://[^\s\"'<>]+",
+        "ipv4":            r"(?:\d{1,3}\.){3}\d{1,3}",
+        "ipv6":            r"[A-F0-9]{1,4}(?::[A-F0-9]{1,4}){7}",
+        # IDs
+        "uuid":            r"[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}",
+        # Money / numbers
+        "currency":        r"(?:USD|EUR|RM|\$|€|£)\s?\d+(?:[.,]\d{2})?",
+        "percentage":      r"\d+(?:\.\d+)?%",
+        "number":          r"\b\d{1,3}(?:[,.\s]\d{3})*(?:\.\d+)?\b",
+        # Dates / Times
+        "date_iso":        r"\d{4}-\d{2}-\d{2}",
+        "date_us":         r"\d{1,2}/\d{1,2}/\d{2,4}",
+        "time_24h":        r"\b(?:[01]?\d|2[0-3]):[0-5]\d(?:[:.][0-5]\d)?\b",
+        # Misc
+        "postal_us":       r"\b\d{5}(?:-\d{4})?\b",
+        "postal_uk":       r"\b[A-Z]{1,2}\d[A-Z\d]? ?\d[A-Z]{2}\b",
+        "html_color_hex":  r"#[0-9A-Fa-f]{6}\b",
+        "twitter_handle":  r"@[\w]{1,15}",
+        "hashtag":         r"#[\w-]+",
+        "mac_addr":        r"(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}",
+        "iban":            r"[A-Z]{2}\d{2}[A-Z0-9]{11,30}",
+        "credit_card":     r"\b(?:4\d{12}(?:\d{3})?|5[1-5]\d{14}|3[47]\d{13}|6(?:011|5\d{2})\d{12})\b",
+    }
+
+    _FLAGS = re.IGNORECASE | re.MULTILINE
+    _UNWANTED_PROPS = {
+        "provider": "Use llm_config instead",
+        "api_token": "Use llm_config instead",
+    }
+
+    # ------------------------------------------------------------------ #
+    # Construction
+    # ------------------------------------------------------------------ #
+    def __init__(
+        self,
+        pattern: "_B" = _B.NOTHING,
+        *,
+        custom: Optional[Union[Dict[str, str], List[Tuple[str, str]]]] = None,
+        input_format: str = "fit_html",
+        **kwargs,
+    ) -> None:
+        """
+        Args:
+            patterns: Custom patterns overriding or extending defaults.
+                      Dict[label, regex] or list[tuple(label, regex)].
+            input_format: "html", "markdown" or "text".
+            **kwargs: Forwarded to ExtractionStrategy.
+        """
+        super().__init__(input_format=input_format, **kwargs)
+
+        # 1️⃣  take only the requested built-ins
+        merged: Dict[str, str] = {
+            key: rx
+            for key, rx in self.DEFAULT_PATTERNS.items()
+            if getattr(self._B, key.upper()).value & pattern
+        }
+
+        # 2️⃣  apply user overrides / additions
+        if custom:
+            if isinstance(custom, dict):
+                merged.update(custom)
+            else:  # iterable of (label, regex)
+                merged.update({lbl: rx for lbl, rx in custom})
+
+        self._compiled: Dict[str, Pattern] = {
+            lbl: re.compile(rx, self._FLAGS) for lbl, rx in merged.items()
+        }
+
+    # ------------------------------------------------------------------ #
+    # Extraction
+    # ------------------------------------------------------------------ #
+    def extract(self, url: str, content: str, *q, **kw) -> List[Dict[str, Any]]:
+        # text = self._plain_text(html)
+        out: List[Dict[str, Any]] = []
+
+        for label, cre in self._compiled.items():
+            for m in cre.finditer(content):
+                out.append(
+                    {
+                        "url": url,
+                        "label": label,
+                        "value": m.group(0),
+                        "span": [m.start(), m.end()],
+                    }
+                )
+        return out
+
+    # ------------------------------------------------------------------ #
+    # Helpers
+    # ------------------------------------------------------------------ #
+    def _plain_text(self, content: str) -> str:
+        if self.input_format == "text":
+            return content
+        return BeautifulSoup(content, "lxml").get_text(" ", strip=True)
+
+    # ------------------------------------------------------------------ #
+    # LLM-assisted pattern generator
+    # ------------------------------------------------------------------ #
+    # ------------------------------------------------------------------ #
+    # LLM-assisted one-off pattern builder
+    # ------------------------------------------------------------------ #
+    @staticmethod
+    def generate_pattern(
+        label: str,
+        html: str,
+        *,
+        query: Optional[str] = None,
+        examples: Optional[List[str]] = None,
+        llm_config: Optional[LLMConfig] = None,
+        **kwargs,
+    ) -> Dict[str, str]:
+        """
+        Ask an LLM for a single page-specific regex and return
+            {label: pattern}   ── ready for RegexExtractionStrategy(custom=…)
+        """
+
+        # ── guard deprecated kwargs
+        for k in RegexExtractionStrategy._UNWANTED_PROPS:
+            if k in kwargs:
+                raise AttributeError(
+                    f"{k} is deprecated, {RegexExtractionStrategy._UNWANTED_PROPS[k]}"
+                )
+
+        # ── default LLM config
+        if llm_config is None:
+            llm_config = create_llm_config()
+
+        # ── system prompt – hardened
+        system_msg = (
+            "You are an expert Python-regex engineer.\n"
+            f"Return **one** JSON object whose single key is exactly \"{label}\", "
+            "and whose value is a raw-string regex pattern that works with "
+            "the standard `re` module in Python.\n\n"
+            "Strict rules (obey every bullet):\n"
+            "• If a *user query* is supplied, treat it as the precise semantic target and optimise the "
+            "  pattern to capture ONLY text that answers that query. If the query conflicts with the "
+            "  sample HTML, the HTML wins.\n"
+            "• Tailor the pattern to the *sample HTML* – reproduce its exact punctuation, spacing, "
+            "  symbols, capitalisation, etc. Do **NOT** invent a generic form.\n"
+            "• Keep it minimal and fast: avoid unnecessary capturing, prefer non-capturing `(?: … )`, "
+            "  and guard against catastrophic backtracking.\n"
+            "• Anchor with `^`, `$`, or `\\b` only when it genuinely improves precision.\n"
+            "• Use inline flags like `(?i)` when needed; no verbose flag comments.\n"
+            "• Output must be valid JSON – no markdown, code fences, comments, or extra keys.\n"
+            "• The regex value must be a Python string literal: **double every backslash** "
+            "(e.g. `\\\\b`, `\\\\d`, `\\\\\\\\`).\n\n"
+            "Example valid output:\n"
+            f"{{\"{label}\": \"(?:RM|rm)\\\\s?\\\\d{{1,3}}(?:,\\\\d{{3}})*(?:\\\\.\\\\d{{2}})?\"}}"
+        )
+
+        # ── user message: cropped HTML + optional hints
+        user_parts = ["```html", html[:5000], "```"]  # protect token budget
+        if query:
+            user_parts.append(f"\n\n## Query\n{query.strip()}")
+        if examples:
+            user_parts.append("## Examples\n" + "\n".join(examples[:20]))
+        user_msg = "\n\n".join(user_parts)
+
+        # ── LLM call (with retry/backoff)
+        resp = perform_completion_with_backoff(
+            provider=llm_config.provider,
+            prompt_with_variables="\n\n".join([system_msg, user_msg]),
+            json_response=True,
+            api_token=llm_config.api_token,
+            base_url=llm_config.base_url,
+            extra_args=kwargs,
+        )
+
+        # ── clean & load JSON (fix common escape mistakes *before* json.loads)
+        raw = resp.choices[0].message.content
+        raw = raw.replace("\x08", "\\b")                     # stray back-space → \b
+        raw = re.sub(r'(?<!\\)\\(?![\\u"])', r"\\\\", raw)   # lone \ → \\
+
+        try:
+            pattern_dict = json.loads(raw)
+        except Exception as exc:
+            raise ValueError(f"LLM did not return valid JSON: {raw}") from exc
+
+        # quick sanity-compile
+        for lbl, pat in pattern_dict.items():
+            try:
+                re.compile(pat)
+            except re.error as e:
+                raise ValueError(f"Invalid regex for '{lbl}': {e}") from None
+
+        return pattern_dict
