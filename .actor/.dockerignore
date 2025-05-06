@@ -1,5 +1,6 @@
 .git
 .mise.toml
+mise.toml
 .nvim.lua
 storage
 
