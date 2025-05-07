@@ -42,6 +42,29 @@ from itertools import chain
 from collections import deque
 from typing import  Generator, Iterable
 
+# Monkey patch to fix wildcard handling in urllib.robotparser
+from urllib.robotparser import RuleLine
+import re
+
+original_applies_to = RuleLine.applies_to
+
+def patched_applies_to(self, filename):
+   # Handle wildcards in paths
+   if '*' in self.path or '%2A' in self.path or self.path in ("*", "%2A"):
+       pattern = self.path.replace('%2A', '*')
+       pattern = re.escape(pattern).replace('\\*', '.*')
+       pattern = '^' + pattern
+       if pattern.endswith('\\$'):
+           pattern = pattern[:-2] + '$'
+       try:
+           return bool(re.match(pattern, filename))
+       except re.error:
+           return original_applies_to(self, filename)
+   return original_applies_to(self, filename)
+
+RuleLine.applies_to = patched_applies_to
+# Monkey patch ends
+
 def chunk_documents(
     documents: Iterable[str],
     chunk_token_threshold: int,
@@ -303,7 +326,7 @@ class RobotsParser:
                 robots_url = f"{scheme}://{domain}/robots.txt"
                 
                 async with aiohttp.ClientSession() as session:
-                    async with session.get(robots_url, timeout=2) as response:
+                    async with session.get(robots_url, timeout=2, ssl=False) as response:
                         if response.status == 200:
                             rules = await response.text()
                             self._cache_rules(domain, rules)
