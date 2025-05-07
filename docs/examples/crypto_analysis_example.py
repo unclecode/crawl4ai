@@ -391,12 +391,14 @@ async def main():
         # Process results
         raw_df = pd.DataFrame()
         for result in results:
-            if result.success and result.media["tables"]:
+            # Use the new tables field, falling back to media["tables"] for backward compatibility
+            tables = result.tables if hasattr(result, "tables") and result.tables else result.media.get("tables", [])
+            if result.success and tables:
                 # Extract primary market table
                 # DataFrame
                 raw_df = pd.DataFrame(
-                    result.media["tables"][0]["rows"],
-                    columns=result.media["tables"][0]["headers"],
+                    tables[0]["rows"],
+                    columns=tables[0]["headers"],
                 )
                 break
 

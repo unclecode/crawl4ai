@@ -1,0 +1,39 @@
+{
+  "name": "LinkedIn Company Card",
+  "baseSelector": "div.search-results-container ul[role='list'] > li",
+  "fields": [
+    {
+      "name": "handle",
+      "selector": "a[href*='/company/']",
+      "type": "attribute",
+      "attribute": "href"
+    },
+    {
+      "name": "profile_image",
+      "selector": "a[href*='/company/'] img",
+      "type": "attribute",
+      "attribute": "src"
+    },
+    {
+      "name": "name",
+      "selector": "span[class*='t-16'] a",
+      "type": "text"
+    },
+    {
+      "name": "descriptor",
+      "selector": "div[class*='t-black t-normal']",
+      "type": "text"
+    },
+    {
+      "name": "about",
+      "selector": "p[class*='entity-result__summary--2-lines']",
+      "type": "text"
+    },
+    {
+      "name": "followers",
+      "selector": "div:contains('followers')",
+      "type": "regex",
+      "pattern": "(\\d+)\\s*followers"
+    }
+  ]
+}

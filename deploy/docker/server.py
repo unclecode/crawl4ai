@@ -12,7 +12,7 @@ from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
 from auth import create_access_token, get_token_dependency, TokenRequest
 from pydantic import BaseModel
 from typing import Optional, List, Dict
-from fastapi import Request, Depends 
+from fastapi import Request, Depends
 from fastapi.responses import FileResponse
 import base64
 import re
@@ -22,6 +22,16 @@ from api import (
     handle_stream_crawl_request, handle_crawl_request,
     stream_results
 )
+from schemas import (
+    CrawlRequest,
+    MarkdownRequest,
+    RawCode,
+    HTMLRequest,
+    ScreenshotRequest,
+    PDFRequest,
+    JSEndpointRequest,
+)
+
 from utils import (
     FilterType, load_config, setup_logging, verify_email_domain
 )
@@ -37,23 +47,13 @@ from fastapi import (
     FastAPI, HTTPException, Request, Path, Query, Depends
 )
 from rank_bm25 import BM25Okapi
-
-def chunk_code_functions(code: str) -> List[str]:
-    tree = ast.parse(code)
-    lines = code.splitlines()
-    chunks = []
-    for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-            start = node.lineno - 1
-            end = getattr(node, 'end_lineno', start + 1)
-            chunks.append("\n".join(lines[start:end]))
-    return chunks
 from fastapi.responses import (
     StreamingResponse, RedirectResponse, PlainTextResponse, JSONResponse
 )
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.staticfiles import StaticFiles
+from job import init_job_router
 
 from mcp_bridge import attach_mcp, mcp_resource, mcp_template, mcp_tool
 
@@ -128,8 +128,6 @@ app.mount(
     StaticFiles(directory=STATIC_DIR, html=True),
     name="play",
 )
-
-# Optional nice‑to‑have: opening the root shows the playground
 
 
 @app.get("/")
@@ -211,48 +209,10 @@ def _safe_eval_config(expr: str) -> dict:
     return obj.dump()
 
 
-# ───────────────────────── Schemas ───────────────────────────
-class CrawlRequest(BaseModel):
-    urls: List[str] = Field(min_length=1, max_length=100)
-    browser_config: Optional[Dict] = Field(default_factory=dict)
-    crawler_config: Optional[Dict] = Field(default_factory=dict)
-
-# ────────────── Schemas ──────────────
-class MarkdownRequest(BaseModel):
-    """Request body for the /md endpoint."""
-    url: str                    = Field(...,  description="Absolute http/https URL to fetch")
-    f:   FilterType             = Field(FilterType.FIT,
-                                        description="Content‑filter strategy: FIT, RAW, BM25, or LLM")
-    q:   Optional[str] = Field(None,  description="Query string used by BM25/LLM filters")
-    c:   Optional[str] = Field("0",   description="Cache‑bust / revision counter")
-
-
-class RawCode(BaseModel):
-    code: str
-
-class HTMLRequest(BaseModel):
-    url: str
-    
-class ScreenshotRequest(BaseModel):
-    url: str
-    screenshot_wait_for: Optional[float] = 2
-    output_path: Optional[str] = None
-
-class PDFRequest(BaseModel):
-    url: str
-    output_path: Optional[str] = None
-
-
-class JSEndpointRequest(BaseModel):
-    url: str
-    scripts: List[str] = Field(
-        ...,
-        description="List of separated JavaScript snippets to execute"
-    )
+# ── job router ──────────────────────────────────────────────
+app.include_router(init_job_router(redis, config, token_dep))
 
 # ──────────────────────── Endpoints ──────────────────────────
-
-
 @app.post("/token")
 async def get_token(req: TokenRequest):
     if not verify_email_domain(req.email):
@@ -278,7 +238,8 @@ async def get_markdown(
     _td: Dict = Depends(token_dep),
 ):
     if not body.url.startswith(("http://", "https://")):
-        raise HTTPException(400, "URL must be absolute and start with http/https")
+        raise HTTPException(
+            400, "URL must be absolute and start with http/https")
     markdown = await handle_markdown_request(
         body.url, body.f, body.q, body.c, config
     )
@@ -314,12 +275,13 @@ async def generate_html(
 
 # Screenshot endpoint
 
+
 @app.post("/screenshot")
 @limiter.limit(config["rate_limiting"]["default_limit"])
 @mcp_tool("screenshot")
 async def generate_screenshot(
     request: Request,
-    body: ScreenshotRequest, 
+    body: ScreenshotRequest,
     _td: Dict = Depends(token_dep),
 ):
     """
@@ -327,7 +289,8 @@ async def generate_screenshot(
     Use when you need an image snapshot of the rendered page. Its recommened to provide an output path to save the screenshot.
     Then in result instead of the screenshot you will get a path to the saved file.
     """
-    cfg = CrawlerRunConfig(screenshot=True, screenshot_wait_for=body.screenshot_wait_for)
+    cfg = CrawlerRunConfig(
+        screenshot=True, screenshot_wait_for=body.screenshot_wait_for)
     async with AsyncWebCrawler(config=BrowserConfig()) as crawler:
         results = await crawler.arun(url=body.url, config=cfg)
     screenshot_data = results[0].screenshot
@@ -341,12 +304,13 @@ async def generate_screenshot(
 
 # PDF endpoint
 
+
 @app.post("/pdf")
 @limiter.limit(config["rate_limiting"]["default_limit"])
 @mcp_tool("pdf")
 async def generate_pdf(
     request: Request,
-    body: PDFRequest, 
+    body: PDFRequest,
     _td: Dict = Depends(token_dep),
 ):
     """
@@ -384,7 +348,7 @@ async def execute_js(
         Your script will replace '{script}' and execute in the browser context. So provide either an IIFE or a sync/async function that returns a value.
     Return Format:
         - The return result is an instance of CrawlResult, so you have access to markdown, links, and other stuff. If this is enough, you don't need to call again for other endpoints.
-        
+
         ```python
         class CrawlResult(BaseModel):
             url: str
@@ -418,7 +382,7 @@ async def execute_js(
             fit_markdown: Optional[str] = None
             fit_html: Optional[str] = None
         ```
-        
+
     """
     cfg = CrawlerRunConfig(js_code=body.scripts)
     async with AsyncWebCrawler(config=BrowserConfig()) as crawler:
@@ -507,6 +471,7 @@ async def crawl_stream(
         },
     )
 
+
 def chunk_code_functions(code_md: str) -> List[str]:
     """Extract each function/class from markdown code blocks per file."""
     pattern = re.compile(
@@ -530,6 +495,7 @@ def chunk_code_functions(code_md: str) -> List[str]:
                 chunks.append(f"# File: {file_path}\n{snippet}")
     return chunks
 
+
 def chunk_doc_sections(doc: str) -> List[str]:
     lines = doc.splitlines(keepends=True)
     sections = []
@@ -545,6 +511,7 @@ def chunk_doc_sections(doc: str) -> List[str]:
         sections.append("".join(current))
     return sections
 
+
 @app.get("/ask")
 @limiter.limit(config["rate_limiting"]["default_limit"])
 @mcp_tool("ask")
@@ -552,21 +519,24 @@ async def get_context(
     request: Request,
     _td: Dict = Depends(token_dep),
     context_type: str = Query("all", regex="^(code|doc|all)$"),
-    query: Optional[str] = Query(None, description="search query to filter chunks"),
-    score_ratio: float = Query(0.5, ge=0.0, le=1.0, description="min score as fraction of max_score"),
-    max_results: int = Query(20, ge=1, description="absolute cap on returned chunks"),
+    query: Optional[str] = Query(
+        None, description="search query to filter chunks"),
+    score_ratio: float = Query(
+        0.5, ge=0.0, le=1.0, description="min score as fraction of max_score"),
+    max_results: int = Query(
+        20, ge=1, description="absolute cap on returned chunks"),
 ):
     """
     This end point is design for any questions about Crawl4ai library. It returns a plain text markdown with extensive information about Crawl4ai. 
     You can use this as a context for any AI assistant. Use this endpoint for AI assistants to retrieve library context for decision making or code generation tasks.
     Alway is BEST practice you provide a query to filter the context. Otherwise the lenght of the response will be very long.
-    
+
     Parameters:
     - context_type: Specify "code" for code context, "doc" for documentation context, or "all" for both.
     - query: RECOMMENDED search query to filter paragraphs using BM25. You can leave this empty to get all the context.
     - score_ratio: Minimum score as a fraction of the maximum score for filtering results.
     - max_results: Maximum number of results to return. Default is 20.
-    
+
     Returns:
     - JSON response with the requested context.
     - If "code" is specified, returns the code context.
@@ -576,7 +546,7 @@ async def get_context(
     # load contexts
     base = os.path.dirname(__file__)
     code_path = os.path.join(base, "c4ai-code-context.md")
-    doc_path  = os.path.join(base, "c4ai-doc-context.md")
+    doc_path = os.path.join(base, "c4ai-doc-context.md")
     if not os.path.exists(code_path) or not os.path.exists(doc_path):
         raise HTTPException(404, "Context files not found")
 
@@ -626,7 +596,7 @@ async def get_context(
         ]
 
     return JSONResponse(results)
-    
+
 
 # attach MCP layer (adds /mcp/ws, /mcp/sse, /mcp/schema)
 print(f"MCP server running on {config['app']['host']}:{config['app']['port']}")

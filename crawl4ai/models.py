@@ -1,4 +1,4 @@
-from pydantic import BaseModel, HttpUrl, PrivateAttr
+from pydantic import BaseModel, HttpUrl, PrivateAttr, Field
 from typing import List, Dict, Optional, Callable, Awaitable, Union, Any
 from typing import AsyncGenerator
 from typing import Generic, TypeVar
@@ -129,6 +129,7 @@ class MarkdownGenerationResult(BaseModel):
 class CrawlResult(BaseModel):
     url: str
     html: str
+    fit_html: Optional[str] = None
     success: bool
     cleaned_html: Optional[str] = None
     media: Dict[str, List[Dict]] = {}
@@ -150,6 +151,7 @@ class CrawlResult(BaseModel):
     redirected_url: Optional[str] = None
     network_requests: Optional[List[Dict[str, Any]]] = None
     console_messages: Optional[List[Dict[str, Any]]] = None
+    tables: List[Dict] = Field(default_factory=list)  # NEW – [{headers,rows,caption,summary}]
 
     class Config:
         arbitrary_types_allowed = True

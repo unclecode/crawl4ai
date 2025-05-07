@@ -1,8 +1,10 @@
 import os
 import json
 import asyncio
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 from functools import partial
+from uuid import uuid4
+from datetime import datetime
 
 import logging
 from typing import Optional, AsyncGenerator
@@ -272,7 +274,9 @@ async def handle_llm_request(
 async def handle_task_status(
     redis: aioredis.Redis,
     task_id: str,
-    base_url: str
+    base_url: str,
+    *,
+    keep: bool = False
 ) -> JSONResponse:
     """Handle task status check requests."""
     task = await redis.hgetall(f"task:{task_id}")
@@ -286,7 +290,7 @@ async def handle_task_status(
     response = create_task_response(task, task_id, base_url)
 
     if task["status"] in [TaskStatus.COMPLETED, TaskStatus.FAILED]:
-        if should_cleanup_task(task["created_at"]):
+        if not keep and should_cleanup_task(task["created_at"]):
             await redis.delete(f"task:{task_id}")
 
     return JSONResponse(response)
@@ -521,3 +525,47 @@ async def handle_stream_crawl_request(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
+        
+async def handle_crawl_job(
+    redis,
+    background_tasks: BackgroundTasks,
+    urls: List[str],
+    browser_config: Dict,
+    crawler_config: Dict,
+    config: Dict,
+) -> Dict:
+    """
+    Fire-and-forget version of handle_crawl_request.
+    Creates a task in Redis, runs the heavy work in a background task,
+    lets /crawl/job/{task_id} polling fetch the result.
+    """
+    task_id = f"crawl_{uuid4().hex[:8]}"
+    await redis.hset(f"task:{task_id}", mapping={
+        "status": TaskStatus.PROCESSING,         # <-- keep enum values consistent
+        "created_at": datetime.utcnow().isoformat(),
+        "url": json.dumps(urls),                 # store list as JSON string
+        "result": "",
+        "error": "",
+    })
+
+    async def _runner():
+        try:
+            result = await handle_crawl_request(
+                urls=urls,
+                browser_config=browser_config,
+                crawler_config=crawler_config,
+                config=config,
+            )
+            await redis.hset(f"task:{task_id}", mapping={
+                "status": TaskStatus.COMPLETED,
+                "result": json.dumps(result),
+            })
+            await asyncio.sleep(5)  # Give Redis time to process the update
+        except Exception as exc:
+            await redis.hset(f"task:{task_id}", mapping={
+                "status": TaskStatus.FAILED,
+                "error": str(exc),
+            })
+
+    background_tasks.add_task(_runner)
+    return {"task_id": task_id}

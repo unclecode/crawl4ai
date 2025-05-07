@@ -10,6 +10,7 @@ class CrawlResult(BaseModel):
     html: str
     success: bool
     cleaned_html: Optional[str] = None
+    fit_html: Optional[str] = None  # Preprocessed HTML optimized for extraction
     media: Dict[str, List[Dict]] = {}
     links: Dict[str, List[Dict]] = {}
     downloaded_files: Optional[List[str]] = None
@@ -50,7 +51,7 @@ if not result.success:
 ```
 
 ### 1.3 **`status_code`** *(Optional[int])*  
-**What**: The page’s HTTP status code (e.g., 200, 404).  
+**What**: The page's HTTP status code (e.g., 200, 404).  
 **Usage**:
 ```python
 if result.status_code == 404:
@@ -82,7 +83,7 @@ if result.response_headers:
 ```
 
 ### 1.7 **`ssl_certificate`** *(Optional[SSLCertificate])*  
-**What**: If `fetch_ssl_certificate=True` in your CrawlerRunConfig, **`result.ssl_certificate`** contains a  [**`SSLCertificate`**](../advanced/ssl-certificate.md) object describing the site’s certificate. You can export the cert in multiple formats (PEM/DER/JSON) or access its properties like `issuer`, 
+**What**: If `fetch_ssl_certificate=True` in your CrawlerRunConfig, **`result.ssl_certificate`** contains a  [**`SSLCertificate`**](../advanced/ssl-certificate.md) object describing the site's certificate. You can export the cert in multiple formats (PEM/DER/JSON) or access its properties like `issuer`, 
  `subject`, `valid_from`, `valid_until`, etc. 
 **Usage**:
 ```python
@@ -109,14 +110,6 @@ print(len(result.html))
 print(result.cleaned_html[:500])  # Show a snippet
 ```
 
-### 2.3 **`fit_html`** *(Optional[str])*  
-**What**: If a **content filter** or heuristic (e.g., Pruning/BM25) modifies the HTML, the “fit” or post-filter version.  
-**When**: This is **only** present if your `markdown_generator` or `content_filter` produces it.  
-**Usage**:
-```python
-if result.markdown.fit_html:
-    print("High-value HTML content:", result.markdown.fit_html[:300])
-```
 
 ---
 
@@ -135,7 +128,7 @@ Crawl4AI can convert HTML→Markdown, optionally including:
 - **`raw_markdown`** *(str)*: The full HTML→Markdown conversion.  
 - **`markdown_with_citations`** *(str)*: Same markdown, but with link references as academic-style citations.  
 - **`references_markdown`** *(str)*: The reference list or footnotes at the end.  
-- **`fit_markdown`** *(Optional[str])*: If content filtering (Pruning/BM25) was applied, the filtered “fit” text.  
+- **`fit_markdown`** *(Optional[str])*: If content filtering (Pruning/BM25) was applied, the filtered "fit" text.  
 - **`fit_html`** *(Optional[str])*: The HTML that led to `fit_markdown`.
 
 **Usage**:
@@ -157,7 +150,7 @@ print(result.markdown.raw_markdown[:200])
 print(result.markdown.fit_markdown)
 print(result.markdown.fit_html)
 ```
-**Important**: “Fit” content (in `fit_markdown`/`fit_html`) exists in result.markdown, only if you used a **filter** (like **PruningContentFilter** or **BM25ContentFilter**) within a `MarkdownGenerationStrategy`.
+**Important**: "Fit" content (in `fit_markdown`/`fit_html`) exists in result.markdown, only if you used a **filter** (like **PruningContentFilter** or **BM25ContentFilter**) within a `MarkdownGenerationStrategy`.
 
 ---
 
@@ -169,7 +162,7 @@ print(result.markdown.fit_html)
 
 - `src` *(str)*: Media URL  
 - `alt` or `title` *(str)*: Descriptive text  
-- `score` *(float)*: Relevance score if the crawler’s heuristic found it “important”  
+- `score` *(float)*: Relevance score if the crawler's heuristic found it "important"  
 - `desc` or `description` *(Optional[str])*: Additional context extracted from surrounding text  
 
 **Usage**:
@@ -263,7 +256,7 @@ A `DispatchResult` object providing additional concurrency and resource usage in
 
 - **`task_id`**: A unique identifier for the parallel task.
 - **`memory_usage`** (float): The memory (in MB) used at the time of completion.
-- **`peak_memory`** (float): The peak memory usage (in MB) recorded during the task’s execution.
+- **`peak_memory`** (float): The peak memory usage (in MB) recorded during the task's execution.
 - **`start_time`** / **`end_time`** (datetime): Time range for this crawling task.
 - **`error_message`** (str): Any dispatcher- or concurrency-related error encountered.
 
@@ -358,7 +351,7 @@ async def handle_result(result: CrawlResult):
     # HTML
     print("Original HTML size:", len(result.html))
     print("Cleaned HTML size:", len(result.cleaned_html or ""))
-
+    
     # Markdown output
     if result.markdown:
         print("Raw Markdown:", result.markdown.raw_markdown[:300])
