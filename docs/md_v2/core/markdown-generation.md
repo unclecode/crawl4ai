@@ -233,7 +233,7 @@ prune_filter = PruningContentFilter(
 For intelligent content filtering and high-quality markdown generation, you can use the **LLMContentFilter**. This filter leverages LLMs to generate relevant markdown while preserving the original content's meaning and structure:
 
 ```python
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, LLMConfig
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, LLMConfig, DefaultMarkdownGenerator
 from crawl4ai.content_filter_strategy import LLMContentFilter
 
 async def main():
@@ -255,9 +255,12 @@ async def main():
         chunk_token_threshold=4096,  # Adjust based on your needs
         verbose=True
     )
-
+    md_generator = DefaultMarkdownGenerator(
+        content_filter=filter,
+        options={"ignore_links": True}
+    )
     config = CrawlerRunConfig(
-        content_filter=filter
+        markdown_generator=md_generator,
     )
 
     async with AsyncWebCrawler() as crawler:
