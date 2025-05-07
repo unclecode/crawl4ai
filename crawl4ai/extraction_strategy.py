@@ -540,7 +540,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
             api_token: The API token for the provider.
             base_url: The base URL for the API request.
             api_base: The base URL for the API request.
-            extra_args: Additional arguments for the API request, such as temprature, max_tokens, etc.
+            extra_args: Additional arguments for the API request, such as temperature, max_tokens, etc.
         """
         super().__init__( input_format=input_format, **kwargs)
         self.llm_config = llm_config
