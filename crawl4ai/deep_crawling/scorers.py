@@ -10,8 +10,8 @@ import ctypes
 import platform
 PLATFORM = platform.system()
 
-# Pre-computed scores for common year differences
-_SCORE_LOOKUP = [1.0, 0.5, 0.3333333333333333, 0.25]
+# Pre-computed scores for path distance differences
+_SCORE_LOOKUP = [0.0, 0.5, 0.6666666666666667, 0.75]
 
 # Pre-computed scores for common year differences
 _FRESHNESS_SCORES = [
@@ -241,8 +241,8 @@ class PathDepthScorer(URLScorer):
         
         if distance < 4:
             return _SCORE_LOOKUP[distance]
-            
-        return 1.0 / (1.0 + distance)                                             
+
+        return 1.0 - 1.0 / (1.0 + distance)                                            
 
 class ContentTypeScorer(URLScorer):
     __slots__ = ('_weight', '_exact_types', '_regex_types')
