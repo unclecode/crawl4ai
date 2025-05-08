@@ -9,7 +9,7 @@ from ..models import TraversalStats
 from .filters import FilterChain
 from .scorers import URLScorer
 from . import DeepCrawlStrategy
-from ..types import AsyncWebCrawler, CrawlerRunConfig, CrawlResult
+from ..types import AsyncWebCrawler, BaseDispatcher, CrawlerRunConfig, CrawlResult
 from ..utils import normalize_url_for_deep_crawl, comparison_url
 from math import inf as infinity
 
@@ -31,6 +31,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
         score_threshold: float = -infinity,
         max_pages: int = -1,
         logger: Optional[logging.Logger] = None,
+        dispatcher: Optional[BaseDispatcher] = None,
     ):
         self.max_depth = max_depth
         self.filter_chain = filter_chain
@@ -39,7 +40,8 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
         self.score_threshold = score_threshold
         self.max_pages = max_pages
         self.logger = logger or logging.getLogger(__name__)
-        self.stats = TraversalStats(start_time=datetime.now())
+        self.dispatcher: Optional[BaseDispatcher] = dispatcher
+        self.stats: TraversalStats = TraversalStats(start_time=datetime.now())
         self._cancel_event = asyncio.Event()
         self._pages_crawled = 0
 
@@ -179,7 +181,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
 
             # Clone the config to disable deep crawling recursion and enforce batch mode.
             batch_config = config.clone(deep_crawl_strategy=None, stream=False)
-            batch_results = await crawler.arun_many(urls=urls, config=batch_config)
+            batch_results = await crawler.arun_many(urls=urls, config=batch_config, dispatcher=self.dispatcher)
 
             for result in batch_results:
                 url = result.url
@@ -220,8 +222,8 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
             visited.update([comparison_url(url) for url in urls])
 
             stream_config = config.clone(deep_crawl_strategy=None, stream=True)
-            stream_gen = await crawler.arun_many(urls=urls, config=stream_config)
-            
+            stream_gen = await crawler.arun_many(urls=urls, config=stream_config, dispatcher=self.dispatcher)
+
             # Keep track of processed results for this batch
             results_count = 0
             async for result in stream_gen:
