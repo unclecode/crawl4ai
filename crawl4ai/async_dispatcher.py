@@ -1,5 +1,7 @@
 from typing import Dict, Optional, List, Tuple
 from enum import Enum, auto
+from datetime import datetime
+from email.utils import parsedate_to_datetime
 
 from .async_configs import CrawlerRunConfig
 from .models import (
@@ -97,10 +99,7 @@ class RateLimiter:
             if state.fail_count > self.max_retries:
                 return RateLimitStatus.NO_RETRY
 
-            # Exponential backoff with random jitter
-            state.current_delay = min(
-                state.current_delay * 2 * random.uniform(0.75, 1.25), self.max_delay
-            )
+            state.current_delay = self.retry_after(state.current_delay, result.response_headers)
             return RateLimitStatus.RETRY
 
         # Gradually reduce delay on success
@@ -110,6 +109,149 @@ class RateLimiter:
         return RateLimitStatus.CONTINUE
 
 
+    def limit_value(self, headers: dict[str, str], header: str, default: float = 0) -> float:
+        """Return a float representation of the header value.
+
+        This function attempts to convert the header value to a float.
+        If the conversion fails, it returns the default value.
+
+        :param headers: The headers dictionary.
+        :type headers: dict[str, str]
+        :param header: The header key to look for.
+        :type header: str
+        :param default: The default value to return if the header is not found or cannot be converted.
+        :type default: float
+        :return: The float value from the header or the default value.
+        :rtype: float
+        """
+        value: Optional[str] = headers.get(header)
+        if value is None:
+            return default
+
+        try:
+            return float(value)
+        except ValueError:
+            return default
+
+    def limit_delay(self, headers: dict[str, str], header: str, now: float, default: float = 0) -> float:
+        """Return limit delay from headers.
+
+        This function attempts to convert the header value to delay relative to the
+        current time. It handles HTTP date times (RFC 2616) and unix epoch timestamps
+        in seconds or milliseconds.
+
+        If all conversions fail, it returns the default value.
+
+        :param headers: The headers dictionary.
+        :type headers: dict[str, str]
+        :param header: The header key to look for.
+        :type header: str
+        :param now: The current time in seconds since the epoch.
+        :type now: float
+        :param default: The default value to return if the header is not found or cannot be converted.
+        :type default: float
+        :return: The float value from the header or the default value.
+        :rtype: float
+        """
+        value: Optional[str] = headers.get(header)
+        if value is None:
+            return default
+
+        try:
+            delay: float = float(value)
+            if delay > now:
+                # Timestamp, convert to delay.
+                if delay / 1000 > now:
+                    # Delay is in milliseconds, convert to seconds.
+                    delay /= 1000
+
+                return delay - now
+
+            return delay
+        except ValueError:
+            try:
+                dt: datetime = parsedate_to_datetime(value)
+                return dt.timestamp() - now
+            except ValueError:
+                return default
+
+    def remaining_reset(self, headers: dict[str, str], now: float, remaining_header: str, reset_header: str) -> float:
+        """Return the remaining time until reset.
+
+        :param headers: The headers dictionary.
+        :type headers: dict[str, str]
+        :param now: The current time in seconds since the epoch.
+        :type now: float
+        :param remaining_header: The header key for remaining requests.
+        :type remaining_header: str
+        :param reset_header: The header key for reset time.
+        :type reset_header: str
+        :return: The remaining time until reset in seconds or -1 if not applicable.
+        """
+        # We use a default value of 1 to handle missing remaining header.
+        if (value := self.limit_value(headers, remaining_header, 1)) <= 0:
+            if (value := self.limit_delay(headers, reset_header, now)) > 0:
+                return value
+
+        return -1
+
+    def retry_after(self, current_delay: float, headers: Optional[dict[str, str]]) -> float:
+        """Return the delay to wait before retrying.
+
+        This function checks the headers for rate limit information and calculates
+        the delay based on the values found. If no relevant headers are found, it
+        falls back to an exponential backoff strategy.
+
+        :param current_delay: The current delay to use for exponential backoff.
+        :type current_delay: float
+        :param headers: The headers dictionary.
+        :type headers: Optional[dict[str, str]]
+        :return: The delay in seconds to wait before retrying.
+        :rtype: float
+        """
+        if headers is not None:
+            # Check for know rate limit headers.
+            # https://medium.com/@guillaume.viguierjust/rate-limiting-your-restful-api-3148f8e77248
+            # https://datatracker.ietf.org/doc/draft-ietf-httpapi-ratelimit-headers/
+            now: float = time.time()
+            value: float
+
+            # https://datatracker.ietf.org/doc/html/rfc7231#section-7.1.3
+            if (value := self.limit_delay(headers, "retry-after", now)) > 0:
+                return value
+
+            # https://ioggstream.github.io/draft-polli-ratelimit-headers/draft-polli-ratelimit-headers.html
+            # We use a default value of 1 to handle missing remaining header.
+            if (value := self.limit_value(headers, "ratelimit-remaining", 1)) <= 0:
+                if (value := self.limit_delay(headers, "ratelimit-reset", now)) > 0:
+                    return value
+
+            # Handle missing remaining header.
+            # https://ioggstream.github.io/draft-polli-ratelimit-headers/draft-polli-ratelimit-headers.html#name-missing-remaining-informati
+            elif (value := self.limit_delay(headers, "ratelimit-reset", now)) > 0:
+                return value
+
+            # GitHub style headers.
+            if (value := self.remaining_reset(headers, now, "x-ratelimit-remaining", "x-ratelimit-reset")) > 0:
+                return value
+
+            # Twitter style headers.
+            if (value := self.remaining_reset(headers, now, "x-rate-limit-remaining", "x-rate-limit-reset")) > 0:
+                return value
+
+            # https://github.com/wraithgar/hapi-rate-limit/blob/main/README.md
+            if (value := self.remaining_reset(headers, now, "x-ratelimit-userremaining", "x-ratelimit-userreset")) > 0:
+                return value
+
+            if (
+                value := self.remaining_reset(
+                    headers, now, "x-ratelimit-userpathremaining", "x-ratelimit-userpathreset"
+                )
+            ) > 0:
+                return value
+
+        # Fallback to exponential backoff with random jitter.
+        return min(current_delay * 2 * random.uniform(0.75, 1.25), self.max_delay)
 
 class BaseDispatcher(ABC):
     def __init__(
