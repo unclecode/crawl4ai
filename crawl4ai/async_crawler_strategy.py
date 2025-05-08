@@ -614,7 +614,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     )
                     redirected_url = page.url
                 except Error as e:
-                    raise RuntimeError(f"Failed on navigating ACS-GOTO:\n{str(e)}")
+                    msg: str = f"Failed to navigate to {url}"
+                    raise RuntimeError(msg) from e
 
                 await self.execute_hook(
                     "after_goto", page, context=context, url=url, response=response, config=config
@@ -923,10 +924,6 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 downloaded_files=await gather_downloads(),
                 redirected_url=redirected_url,
             )
-
-        except Exception as e:
-            raise e
-
         finally:
             # If no session_id is given we should close the page
             if not config.session_id:

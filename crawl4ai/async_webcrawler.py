@@ -1,6 +1,5 @@
 from .__version__ import __version__ as crawl4ai_version
 import os
-import sys
 import time
 from colorama import Fore
 from pathlib import Path
@@ -32,7 +31,6 @@ from .utils import (
     InvalidCSSSelectorError,
     fast_format_html,
     create_box_message,
-    get_error_context,
     RobotsParser,
 )
 
@@ -469,15 +467,9 @@ class AsyncWebCrawler:
                     cached_result.redirected_url = cached_result.redirected_url or url
                     return CrawlResultContainer(cached_result)
 
-            except Exception as e:
-                error_context = get_error_context(sys.exc_info())
-
-                error_message = (
-                    f"Unexpected error in _crawl_web at line {error_context['line_no']} "
-                    f"in {error_context['function']} ({error_context['filename']}):\n"
-                    f"Error: {str(e)}\n\n"
-                    f"Code context:\n{error_context['code_context']}"
-                )
+            except Exception:
+                import traceback
+                error_message = traceback.format_exc()
 
                 self.logger.error_status(
                     url=url,
