@@ -282,6 +282,96 @@ class BaseDispatcher(ABC):
     ) -> AsyncGenerator[CrawlerTaskResult, None]:
         yield NotImplemented
 
+    def _start(self) -> None:
+        """
+        Start the dispatcher. This method should be called before running any tasks.
+        It initializes the monitor if provided.
+        """
+        if self.monitor:
+            self.monitor.start()
+
+    def _stop(self) -> None:
+        """
+        Stop the dispatcher. This method should be called after all tasks are completed.
+        It stops the monitor if configured.
+        """
+        if self.monitor:
+            self.monitor.stop()
+
+    def _add_task(self, task_id: str, url: str):
+        """
+        Register a new task with the monitor if configured.
+
+        Args:
+            task_id: Unique identifier for the task
+            url: URL being crawled
+
+        The task is initialized with:
+            - status: QUEUED
+            - url: The URL to crawl
+            - enqueue_time: Current time
+            - memory_usage: 0
+            - peak_memory: 0
+            - wait_time: 0
+            - retry_count: 0
+        """
+        if self.monitor:
+            self.monitor.add_task(task_id, url)
+
+    def _update_task(
+        self,
+        task_id: str,
+        status: Optional[CrawlStatus] = None,
+        start_time: Optional[float] = None,
+        end_time: Optional[float] = None,
+        memory_usage: Optional[float] = None,
+        peak_memory: Optional[float] = None,
+        error_message: Optional[str] = None,
+        retry_count: Optional[int] = None,
+        wait_time: Optional[float] = None
+    ):
+        """
+        Update monitor statistics for a specific task if configured.
+
+        Args:
+            task_id: Unique identifier for the task
+            status: New status (QUEUED, IN_PROGRESS, COMPLETED, FAILED)
+            start_time: When task execution started
+            end_time: When task execution ended
+            memory_usage: Current memory usage in MB
+            peak_memory: Maximum memory usage in MB
+            error_message: Error description if failed
+            retry_count: Number of retry attempts
+            wait_time: Time spent in queue
+
+        Updates task statistics and updates status counts.
+        If status changes, decrements old status count and
+        increments new status count.
+        """
+        if self.monitor:
+            self.monitor.update_task(
+                task_id,
+                status=status,
+                start_time=start_time,
+                end_time=end_time,
+                memory_usage=memory_usage,
+                peak_memory=peak_memory,
+                error_message=error_message,
+                retry_count=retry_count,
+                wait_time=wait_time,
+            )
+
+    def _update_memory_status(self, status: str):
+        """
+        Update the current memory status.
+
+        Args:
+            status: Memory status (NORMAL, PRESSURE, CRITICAL, or custom)
+
+        Also updates the UI to reflect the new status.
+        """
+        if self.monitor:
+            self.monitor.update_memory_status(status)
 
 class MemoryAdaptiveDispatcher(BaseDispatcher):
     def __init__(
@@ -315,19 +405,16 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
             # Enter memory pressure mode if we cross the threshold
             if not self.memory_pressure_mode and self.current_memory_percent >= self.memory_threshold_percent:
                 self.memory_pressure_mode = True
-                if self.monitor:
-                    self.monitor.update_memory_status("PRESSURE")
-            
+                self._update_memory_status("PRESSURE")
+
             # Exit memory pressure mode if we go below recovery threshold
             elif self.memory_pressure_mode and self.current_memory_percent <= self.recovery_threshold_percent:
                 self.memory_pressure_mode = False
-                if self.monitor:
-                    self.monitor.update_memory_status("NORMAL")
-            
+                self._update_memory_status("NORMAL")
+
             # In critical mode, we might need to take more drastic action
             if self.current_memory_percent >= self.critical_threshold_percent:
-                if self.monitor:
-                    self.monitor.update_memory_status("CRITICAL")
+                self._update_memory_status("CRITICAL")
                 # We could implement additional memory-saving measures here
                 
             await asyncio.sleep(self.check_interval)
@@ -360,14 +447,13 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
         start_memory = process.memory_info().rss / (1024 * 1024)
         
         try:
-            if self.monitor:
-                self.monitor.update_task(
-                    task_id, 
-                    status=CrawlStatus.IN_PROGRESS, 
-                    start_time=start_time,
-                    retry_count=retry_count
-                )
-                
+            self._update_task(
+                task_id,
+                status=CrawlStatus.IN_PROGRESS,
+                start_time=start_time,
+                retry_count=retry_count
+            )
+
             self.concurrent_sessions += 1
             
             if self.rate_limiter:
@@ -390,14 +476,13 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
             # Measure memory usage
             end_memory = process.memory_info().rss / (1024 * 1024)
             memory_usage = peak_memory = end_memory - start_memory
-            
+
             # Handle rate limiting
             if self.rate_limiter and result.status_code:
                 status: RateLimitStatus = self.rate_limiter.update_delay(result)
                 if status == RateLimitStatus.NO_RETRY:
                     error_message = f"Rate limit retry count exceeded for domain {urlparse(url).netloc}"
-                    if self.monitor:
-                        self.monitor.update_task(task_id, status=CrawlStatus.FAILED)
+                    self._update_task(task_id, status=CrawlStatus.FAILED)
                 elif status == RateLimitStatus.RETRY:
                     # Requeue the task with increased priority
                     await self._requeue_task(
@@ -412,15 +497,13 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
             # Update status based on result
             if not result.success:
                 error_message = result.error_message
-                if self.monitor:
-                    self.monitor.update_task(task_id, status=CrawlStatus.FAILED)
-            elif self.monitor:
-                self.monitor.update_task(task_id, status=CrawlStatus.COMPLETED)
-                
+                self._update_task(task_id, status=CrawlStatus.FAILED)
+            else:
+                self._update_task(task_id, status=CrawlStatus.COMPLETED)
+
         except Exception as e:
             error_message = str(e)
-            if self.monitor:
-                self.monitor.update_task(task_id, status=CrawlStatus.FAILED)
+            self._update_task(task_id, status=CrawlStatus.FAILED, error_message=error_message)
             result = CrawlResultContainer(
                 CrawlResult(
                     url=url, html="", metadata={}, success=False, error_message=str(e)
@@ -429,15 +512,14 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
             
         finally:
             end_time = time.time()
-            if self.monitor:
-                self.monitor.update_task(
-                    task_id,
-                    end_time=end_time,
-                    memory_usage=memory_usage,
-                    peak_memory=peak_memory,
-                    error_message=error_message,
-                    retry_count=retry_count
-                )
+            self._update_task(
+                task_id,
+                end_time=end_time,
+                memory_usage=memory_usage,
+                peak_memory=peak_memory,
+                error_message=error_message,
+                retry_count=retry_count
+            )
             self.concurrent_sessions -= 1
             
         return CrawlerTaskResult(
@@ -472,9 +554,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
         retry_count += 1
         priority = self._get_priority_score(enqueue_time - start_time, retry_count)
         await self.task_queue.put((priority, (url, task_id, retry_count, enqueue_time)))
-
-        if self.monitor:
-            self.monitor.update_task(task_id, status=CrawlStatus.QUEUED, error_message=reason)
+        self._update_task(task_id, status=CrawlStatus.QUEUED, error_message=reason)
 
     async def run_urls(
         self,
@@ -484,9 +564,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
     ) -> List[CrawlerTaskResult]:
         # Start the memory monitor task
         memory_monitor = asyncio.create_task(self._memory_monitor_task())
-        
-        if self.monitor:
-            self.monitor.start()
+        self._start()
 
         results: List[CrawlerTaskResult] = []
 
@@ -494,8 +572,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
             # Initialize task queue
             for url in urls:
                 task_id = str(uuid.uuid4())
-                if self.monitor:
-                    self.monitor.add_task(task_id, url)
+                self._add_task(task_id, url)
                 # Add to queue with initial priority 0, retry count 0, and current time
                 await self.task_queue.put((0, (url, task_id, 0, time.time())))
                 
@@ -518,14 +595,12 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
                         active_tasks.append(task)
                         
                         # Update waiting time in monitor
-                        if self.monitor:
-                            wait_time = time.time() - enqueue_time
-                            self.monitor.update_task(
-                                task_id, 
-                                wait_time=wait_time,
-                                status=CrawlStatus.IN_PROGRESS
-                            )
-                            
+                        self._update_task(
+                            task_id,
+                            wait_time=time.time() - enqueue_time,
+                            status=CrawlStatus.IN_PROGRESS
+                        )
+
                     except asyncio.TimeoutError:
                         # No tasks in queue, that's fine
                         pass
@@ -551,14 +626,12 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
                 # Update priorities for waiting tasks if needed
                 await self._update_queue_priorities()
         except Exception as e:
-            if self.monitor:
-                self.monitor.update_memory_status(f"QUEUE_ERROR: {str(e)}")                
-        
+            self._update_memory_status(f"QUEUE_ERROR: {str(e)}")
+
         finally:
             # Clean up
             memory_monitor.cancel()
-            if self.monitor:
-                self.monitor.stop()
+            self._stop()
 
         return results
 
@@ -590,16 +663,14 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
                     temp_items.append((new_priority, (url, task_id, retry_count, enqueue_time)))
                     
                     # Update monitoring stats for this task
-                    if self.monitor and task_id in self.monitor.stats:
-                        self.monitor.update_task(task_id, wait_time=wait_time)
-                        
+                    self._update_task(task_id, wait_time=wait_time)
+
                 except asyncio.TimeoutError:
                     # Queue might be empty or very slow
                     break
         except Exception as e:
             # If anything goes wrong, make sure we refill the queue with what we've got
-            if self.monitor:
-                self.monitor.update_memory_status(f"QUEUE_ERROR: {str(e)}")
+            self._update_memory_status(f"QUEUE_ERROR: {str(e)}")
 
         # Calculate queue statistics
         if temp_items and self.monitor:
@@ -630,16 +701,14 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
     ) -> AsyncGenerator[CrawlerTaskResult, None]:
         # Start the memory monitor task
         memory_monitor = asyncio.create_task(self._memory_monitor_task())
-        
-        if self.monitor:
-            self.monitor.start()
-            
+
+        self._start()
+
         try:
             # Initialize task queue
             for url in urls:
                 task_id = str(uuid.uuid4())
-                if self.monitor:
-                    self.monitor.add_task(task_id, url)
+                self._add_task(task_id, url)
                 # Add to queue with initial priority 0, retry count 0, and current time
                 await self.task_queue.put((0, (url, task_id, 0, time.time())))
                 
@@ -663,14 +732,12 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
                         active_tasks.append(task)
                         
                         # Update waiting time in monitor
-                        if self.monitor:
-                            wait_time = time.time() - enqueue_time
-                            self.monitor.update_task(
-                                task_id, 
-                                wait_time=wait_time,
-                                status=CrawlStatus.IN_PROGRESS
-                            )
-                            
+                        self._update_task(
+                            task_id,
+                            wait_time=time.time() - enqueue_time,
+                            status=CrawlStatus.IN_PROGRESS
+                        )
+
                     except asyncio.TimeoutError:
                         # No tasks in queue, that's fine
                         pass
@@ -699,9 +766,8 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
         finally:
             # Clean up
             memory_monitor.cancel()
-            if self.monitor:
-                self.monitor.stop()
-                
+            self._stop()
+
 
 class SemaphoreDispatcher(BaseDispatcher):
     def __init__(
@@ -731,10 +797,9 @@ class SemaphoreDispatcher(BaseDispatcher):
             if semaphore is None:
                 raise ValueError(f"Semaphore must be provided to {self.__class__.__name__}")
 
-            if self.monitor:
-                self.monitor.update_task(
-                    task_id, status=CrawlStatus.IN_PROGRESS, start_time=start_time
-                )
+            self._update_task(
+                task_id, status=CrawlStatus.IN_PROGRESS, start_time=start_time
+            )
 
             if self.rate_limiter:
                 await self.rate_limiter.wait_if_needed(url)
@@ -752,26 +817,22 @@ class SemaphoreDispatcher(BaseDispatcher):
                     if status == RateLimitStatus.NO_RETRY:
                         error_message = f"Rate limit retry count exceeded for domain {urlparse(url).netloc}"
 
-                        if self.monitor:
-                            self.monitor.update_task(task_id, status=CrawlStatus.FAILED)
+                        self._update_task(task_id, status=CrawlStatus.FAILED)
                     elif status == RateLimitStatus.RETRY:
                         # TODO: Requeue for retry
-                        if self.monitor:
-                            self.monitor.update_task(task_id, status=CrawlStatus.QUEUED, error_message="Requeued due to rate limit")
+                        self._update_task(task_id, status=CrawlStatus.QUEUED, error_message="Requeued due to rate limit")
 
                         return None
 
                 if not result.success:
                     error_message = result.error_message
-                    if self.monitor:
-                        self.monitor.update_task(task_id, status=CrawlStatus.FAILED)
-                elif self.monitor:
-                    self.monitor.update_task(task_id, status=CrawlStatus.COMPLETED)
+                    self._update_task(task_id, status=CrawlStatus.FAILED)
+                else:
+                    self._update_task(task_id, status=CrawlStatus.COMPLETED)
 
         except Exception as e:
             error_message = str(e)
-            if self.monitor:
-                self.monitor.update_task(task_id, status=CrawlStatus.FAILED)
+            self._update_task(task_id, status=CrawlStatus.FAILED, error_message=error_message)
             result = CrawlResultContainer(
                 CrawlResult(
                     url=url, html="", metadata={}, success=False, error_message=str(e)
@@ -779,15 +840,14 @@ class SemaphoreDispatcher(BaseDispatcher):
             )
 
         finally:
-            end_time = time.time()
-            if self.monitor:
-                self.monitor.update_task(
-                    task_id,
-                    end_time=end_time,
-                    memory_usage=memory_usage,
-                    peak_memory=peak_memory,
-                    error_message=error_message,
-                )
+            end_time: float = time.time()
+            self._update_task(
+                task_id,
+                end_time=end_time,
+                memory_usage=memory_usage,
+                peak_memory=peak_memory,
+                error_message=error_message,
+            )
 
         return CrawlerTaskResult(
             task_id=task_id,
@@ -806,8 +866,7 @@ class SemaphoreDispatcher(BaseDispatcher):
         crawler: AsyncWebCrawler,
         config: CrawlerRunConfig,
     ) -> List[CrawlerTaskResult]:
-        if self.monitor:
-            self.monitor.start()
+        self._start()
 
         try:
             semaphore = asyncio.Semaphore(self.semaphore_count)
@@ -815,8 +874,7 @@ class SemaphoreDispatcher(BaseDispatcher):
 
             for url in urls:
                 task_id = str(uuid.uuid4())
-                if self.monitor:
-                    self.monitor.add_task(task_id, url)
+                self._add_task(task_id, url)
                 task = asyncio.create_task(
                     self._crawl_url(crawler, url, config, task_id, semaphore)
                 )
@@ -825,8 +883,7 @@ class SemaphoreDispatcher(BaseDispatcher):
             results: List[Optional[CrawlerTaskResult]] = await asyncio.gather(*tasks)
             return [result for result in results if result is not None]
         finally:
-            if self.monitor:
-                self.monitor.stop()
+            self._stop()
 
     async def run_urls_stream(
         self,
@@ -834,8 +891,7 @@ class SemaphoreDispatcher(BaseDispatcher):
         crawler: AsyncWebCrawler,
         config: CrawlerRunConfig,
     ) -> AsyncGenerator[CrawlerTaskResult, None]:
-        if self.monitor:
-            self.monitor.start()
+        self._start()
 
         try:
             semaphore = asyncio.Semaphore(self.semaphore_count)
@@ -843,8 +899,7 @@ class SemaphoreDispatcher(BaseDispatcher):
 
             for url in urls:
                 task_id = str(uuid.uuid4())
-                if self.monitor:
-                    self.monitor.add_task(task_id, url)
+                self._add_task(task_id, url)
                 task = asyncio.create_task(
                     self._crawl_url(crawler, url, config, task_id, semaphore)
                 )
@@ -855,5 +910,4 @@ class SemaphoreDispatcher(BaseDispatcher):
                 if result is not None:
                     yield result
         finally:
-            if self.monitor:
-                self.monitor.stop()
+            self._stop()
