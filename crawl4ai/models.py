@@ -1,6 +1,6 @@
 from __future__ import annotations
 from pydantic import BaseModel, HttpUrl, PrivateAttr, Field
-from typing import List, Dict, Optional, Callable, Awaitable, Union, Any, AsyncGenerator, Iterator, AsyncIterator
+from typing import List, Dict, Optional, Callable, Awaitable, Union, Any, AsyncGenerator, Iterator, AsyncIterator, Self
 from enum import Enum
 from dataclasses import dataclass
 from .ssl_certificate import SSLCertificate
@@ -449,13 +449,13 @@ class CrawlResultContainer(CrawlResult):
 
 class StringCompatibleMarkdown(str):
     """A string subclass that also provides access to MarkdownGenerationResult attributes"""
-    def __new__(cls, markdown_result):
+    def __new__(cls, markdown_result: MarkdownGenerationResult) -> Self:
         return super().__new__(cls, markdown_result.raw_markdown)
-    
-    def __init__(self, markdown_result):
-        self.markdown_result = markdown_result
 
-    def __getattr__(self, name):
+    def __init__(self, markdown_result: MarkdownGenerationResult) -> None:
+        self.markdown_result: MarkdownGenerationResult = markdown_result
+
+    def __getattr__(self, name: str) -> Any:
         return getattr(self.markdown_result, name)
 
 
