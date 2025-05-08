@@ -118,11 +118,14 @@ test = [
 
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "function" # Prevent deprecation warning
-# Disable deprecation warnings for code we don't control.
+# Disable deprecation and user warnings for code we don't control.
 filterwarnings = [
     "ignore::DeprecationWarning",
     "default::DeprecationWarning:__main__",
     "default::DeprecationWarning:crawl4ai.*",
+    "ignore::UserWarning",
+    "default::UserWarning:__main__",
+    "default::UserWarning:crawl4ai.*",
 ]
 timeout = 20
 timeout_func_only = true
