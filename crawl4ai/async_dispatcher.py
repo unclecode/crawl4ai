@@ -1,4 +1,6 @@
 from typing import Dict, Optional, List, Tuple
+from enum import Enum, auto
+
 from .async_configs import CrawlerRunConfig
 from .models import (
     CrawlResult,
@@ -23,6 +25,13 @@ from urllib.parse import urlparse
 import random
 from abc import ABC, abstractmethod
 
+class RateLimitStatus(Enum):
+    """Enum for rate limit status."""
+
+    NO_RETRY = auto()
+    RETRY = auto()
+    CONTINUE = auto()
+
 
 class RateLimiter:
     def __init__(
@@ -32,6 +41,17 @@ class RateLimiter:
         max_retries: int = 3,
         rate_limit_codes: Optional[List[int]] = None,
     ):
+        """Initialize the rate limiter.
+
+        :param base_delay: Base delay range (min, max) in seconds.
+        :type base_delay: Tuple[float, float]
+        :param max_delay: Maximum delay in seconds for exponential backoff. Rate limit headers can exceed this.
+        :type max_delay: float
+        :param max_retries: Maximum number of retries before giving up.
+        :type max_retries: int
+        :param rate_limit_codes: List of HTTP status codes that indicate rate limiting (default: 429 and 503).
+        :type rate_limit_codes: Optional[List[int]]
+        """
         self.base_delay = base_delay
         self.max_delay = max_delay
         self.max_retries = max_retries
@@ -61,27 +81,33 @@ class RateLimiter:
 
         state.last_request_time = time.time()
 
-    def update_delay(self, url: str, status_code: int) -> bool:
-        domain = self.get_domain(url)
-        state = self.domains[domain]
+    def update_delay(self, result: CrawlResultContainer) -> RateLimitStatus:
+        """Update the delay based on the status code.
 
-        if status_code in self.rate_limit_codes:
+        :param result: The result of the crawl.
+        :type result: CrawlResultContainer
+        :return: Status indicating whether to retry, stop retrying, or continue.
+        :rtype: RateLimitStatus
+        """
+        domain = self.get_domain(result.url)
+        state: DomainState = self.domains[domain]
+
+        if result.status_code in self.rate_limit_codes:
             state.fail_count += 1
             if state.fail_count > self.max_retries:
-                return False
+                return RateLimitStatus.NO_RETRY
 
             # Exponential backoff with random jitter
             state.current_delay = min(
                 state.current_delay * 2 * random.uniform(0.75, 1.25), self.max_delay
             )
-        else:
-            # Gradually reduce delay on success
-            state.current_delay = max(
-                random.uniform(*self.base_delay), state.current_delay * 0.75
-            )
-            state.fail_count = 0
+            return RateLimitStatus.RETRY
 
-        return True
+        # Gradually reduce delay on success
+        state.current_delay = max(random.uniform(*self.base_delay), state.current_delay * 0.75)
+        state.fail_count = 0
+
+        return RateLimitStatus.CONTINUE
 
 
 
@@ -182,7 +208,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
         config: CrawlerRunConfig,
         task_id: str,
         retry_count: int = 0,
-    ) -> CrawlerTaskResult:
+    ) -> Optional[CrawlerTaskResult]:
         start_time = time.time()
         error_message = ""
         memory_usage = peak_memory = 0.0
@@ -207,37 +233,15 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
                 
             # Check if we're in critical memory state
             if self.current_memory_percent >= self.critical_threshold_percent:
-                # Requeue this task with increased priority and retry count
-                enqueue_time = time.time()
-                priority = self._get_priority_score(enqueue_time - start_time, retry_count + 1)
-                await self.task_queue.put((priority, (url, task_id, retry_count + 1, enqueue_time)))
-                
-                # Update monitoring
-                if self.monitor:
-                    self.monitor.update_task(
-                        task_id,
-                        status=CrawlStatus.QUEUED,
-                        error_message="Requeued due to critical memory pressure"
-                    )
-                
-                # Return placeholder result with requeued status
-                return CrawlerTaskResult(
-                    task_id=task_id,
-                    url=url,
-                    result=CrawlResultContainer(
-                        CrawlResult(
-                            url=url, html="", metadata={"status": "requeued"},
-                            success=False, error_message="Requeued due to critical memory pressure"
-                        )
-                    ),
-                    memory_usage=0,
-                    peak_memory=0,
+                await self._requeue_task(
+                    url,
+                    task_id,
+                    reason="Requeued due to critical memory pressure",
                     start_time=start_time,
-                    end_time=time.time(),
-                    error_message="Requeued due to critical memory pressure",
-                    retry_count=retry_count + 1
+                    retry_count=retry_count,
                 )
-            
+                return None
+
             # Execute the crawl
             result: CrawlResultContainer = await crawler.arun(url, config=config, session_id=task_id)
 
@@ -247,11 +251,22 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
             
             # Handle rate limiting
             if self.rate_limiter and result.status_code:
-                if not self.rate_limiter.update_delay(url, result.status_code):
+                status: RateLimitStatus = self.rate_limiter.update_delay(result)
+                if status == RateLimitStatus.NO_RETRY:
                     error_message = f"Rate limit retry count exceeded for domain {urlparse(url).netloc}"
                     if self.monitor:
                         self.monitor.update_task(task_id, status=CrawlStatus.FAILED)
-                        
+                elif status == RateLimitStatus.RETRY:
+                    # Requeue the task with increased priority
+                    await self._requeue_task(
+                        url=url,
+                        task_id=task_id,
+                        reason="Requeued due to rate limit",
+                        start_time=start_time,
+                        retry_count=retry_count,
+                    )
+                    return None
+
             # Update status based on result
             if not result.success:
                 error_message = result.error_message
@@ -294,7 +309,31 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
             error_message=error_message or "",
             retry_count=retry_count
         )
-        
+
+    async def _requeue_task(
+        self, url: str, task_id: str, reason: str, start_time: float, retry_count: int
+    ) -> None:
+        """Requeue the task with increased priority and retry count.
+
+        :param url: The URL to requeue.
+        :type url: str
+        :param task_id: The ID of the task.
+        :type task_id: str
+        :param reason: The reason for requeuing.
+        :type reason: str
+        :param start_time: The time the task started.
+        :type start_time: float
+        :param retry_count: The current retry count.
+        :type retry_count: int
+        """
+        enqueue_time: float = time.time()
+        retry_count += 1
+        priority = self._get_priority_score(enqueue_time - start_time, retry_count)
+        await self.task_queue.put((priority, (url, task_id, retry_count, enqueue_time)))
+
+        if self.monitor:
+            self.monitor.update_task(task_id, status=CrawlStatus.QUEUED, error_message=reason)
+
     async def run_urls(
         self,
         urls: List[str],
@@ -357,9 +396,10 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
                     
                     # Process completed tasks
                     for completed_task in done:
-                        result = await completed_task
-                        results.append(result)
-                        
+                        result: Optional[CrawlerTaskResult] = await completed_task
+                        if result is not None:
+                            results.append(result)
+
                     # Update active tasks list
                     active_tasks = list(pending)
                 else:
@@ -500,10 +540,8 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
                     )
                     
                     for completed_task in done:
-                        result = await completed_task
-                        
-                        # Only count as completed if it wasn't requeued
-                        if "requeued" not in result.error_message:
+                        result: Optional[CrawlerTaskResult] = await completed_task
+                        if result is not None:
                             completed_count += 1
                             yield result
                         
@@ -542,7 +580,7 @@ class SemaphoreDispatcher(BaseDispatcher):
         config: CrawlerRunConfig,
         task_id: str,
         semaphore: Optional[asyncio.Semaphore] = None,
-    ) -> CrawlerTaskResult:
+    ) -> Optional[CrawlerTaskResult]:
         start_time = time.time()
         error_message = ""
         memory_usage = peak_memory = 0.0
@@ -568,20 +606,18 @@ class SemaphoreDispatcher(BaseDispatcher):
                 memory_usage = peak_memory = end_memory - start_memory
 
                 if self.rate_limiter and result.status_code:
-                    if not self.rate_limiter.update_delay(url, result.status_code):
+                    status: RateLimitStatus = self.rate_limiter.update_delay(result)
+                    if status == RateLimitStatus.NO_RETRY:
                         error_message = f"Rate limit retry count exceeded for domain {urlparse(url).netloc}"
+
                         if self.monitor:
                             self.monitor.update_task(task_id, status=CrawlStatus.FAILED)
-                        return CrawlerTaskResult(
-                            task_id=task_id,
-                            url=url,
-                            result=result,
-                            memory_usage=memory_usage,
-                            peak_memory=peak_memory,
-                            start_time=start_time,
-                            end_time=time.time(),
-                            error_message=error_message,
-                        )
+                    elif status == RateLimitStatus.RETRY:
+                        # TODO: Requeue for retry
+                        if self.monitor:
+                            self.monitor.update_task(task_id, status=CrawlStatus.QUEUED, error_message="Requeued due to rate limit")
+
+                        return None
 
                 if not result.success:
                     error_message = result.error_message
@@ -644,7 +680,8 @@ class SemaphoreDispatcher(BaseDispatcher):
                 )
                 tasks.append(task)
 
-            return await asyncio.gather(*tasks)
+            results: List[Optional[CrawlerTaskResult]] = await asyncio.gather(*tasks)
+            return [result for result in results if result is not None]
         finally:
             if self.monitor:
                 self.monitor.stop()
@@ -672,8 +709,9 @@ class SemaphoreDispatcher(BaseDispatcher):
                 tasks.append(task)
 
             for task in asyncio.as_completed(tasks):
-                result = await task
-                yield result
+                result: Optional[CrawlerTaskResult] = await task
+                if result is not None:
+                    yield result
         finally:
             if self.monitor:
                 self.monitor.stop()
