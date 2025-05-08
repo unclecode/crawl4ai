@@ -248,6 +248,23 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
         while current_level and not self._cancel_event.is_set():
             next_level: List[Tuple[str, Optional[str]]] = []
             urls = [url for url, _ in current_level]
+
+            if self.max_pages > 0:
+                # Check if we have reached the max pages limit. link_discovery limits
+                # the number of URLs it adds to next_level to avoid the extra work, but
+                # it doesn't account for the URLs which are in flight, so we must re-check.
+                #
+                # This means that we might have less successful crawls than max_pages,
+                # but this is a trade-off to ensure we don't exceed the limit.
+                remaining_capacity: int = self.max_pages - self._pages_crawled
+                if remaining_capacity <= 0:
+                    self.logger.info(f"Max pages limit ({self.max_pages}) reached, stopping crawl")
+                    break
+
+                if len(urls) > remaining_capacity:
+                    self.logger.info(f"Limiting to {remaining_capacity} URLs due to max_pages limit")
+                    urls = urls[:remaining_capacity]
+
             visited.update([comparison_url(url) for url in urls])
 
             stream_config = config.clone(deep_crawl_strategy=None, stream=True)
