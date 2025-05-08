@@ -156,6 +156,32 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
             next_level.append((url, source_url))
             depths[url] = next_depth
 
+    def _skip_external(self, result: CrawlResult) -> bool:
+        """Skips external URLs if include_external is False.
+
+        Args:
+            result (CrawlResult): The crawl result to check.
+
+        Returns:
+            bool: True if the URL should be skipped, False otherwise.
+        """
+        if self.include_external:
+            # External links are included, so we don't skip any URLs.
+            return False
+
+        if result.url == result.redirected_url:
+            # No redirection, so we link_discovery would already have filtered if needed.
+            return False
+
+        # Check if the redirected URL is external and skip needed
+        if urlparse(result.url).netloc == urlparse(result.redirected_url).netloc:
+            return False
+
+        # External URL, skip it.
+        self.logger.debug(f"Skipping external result: {result.redirected_url:}")
+        return True
+
+
     async def _arun_batch(
         self,
         start_url: str,
@@ -184,6 +210,9 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
             batch_results = await crawler.arun_many(urls=urls, config=batch_config, dispatcher=self.dispatcher)
 
             for result in batch_results:
+                if self._skip_external(result):
+                    continue
+
                 url = result.url
                 depth = depths.get(url, 0)
                 result.metadata = result.metadata or {}
@@ -225,8 +254,12 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
             stream_gen = await crawler.arun_many(urls=urls, config=stream_config, dispatcher=self.dispatcher)
 
             # Keep track of processed results for this batch
-            results_count = 0
+            results_count: int = 0
+            result: CrawlResult
             async for result in stream_gen:
+                if self._skip_external(result):
+                    continue
+
                 url = result.url
                 depth = depths.get(url, 0)
                 result.metadata = result.metadata or {}
