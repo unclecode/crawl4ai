@@ -128,7 +128,7 @@ class BrowserProfiler:
         os.makedirs(profile_path, exist_ok=True)
         
         # Print instructions for the user with rich formatting
-        border = "{'='*80}"
+        border = f"{'='*80}"
         self.logger.info("{border}", tag="PROFILE", params={"border": f"\n{border}"}, colors={"border": LogColor.CYAN})
         self.logger.info("Creating browser profile: {profile_name}", tag="PROFILE", params={"profile_name": profile_name}, colors={"profile_name": LogColor.GREEN})
         self.logger.info("Profile directory: {profile_path}", tag="PROFILE", params={"profile_path": profile_path}, colors={"profile_path": LogColor.YELLOW})
@@ -607,8 +607,8 @@ class BrowserProfiler:
             os.makedirs(profile_path, exist_ok=True)
         
         # Print initial information
-        border = f"{Fore.CYAN}{'='*80}{Style.RESET_ALL}"
-        self.logger.info(f"\n{border}", tag="CDP")
+        border = f"{'='*80}"
+        self.logger.info("{border}", tag="CDP", params={"border": border}, colors={"border": LogColor.CYAN})
         self.logger.info("Launching standalone browser with CDP debugging", tag="CDP")
         self.logger.info("Browser type: {browser_type}", tag="CDP", params={"browser_type": browser_type}, colors={"browser_type": LogColor.CYAN})
         self.logger.info("Profile path: {profile_path}", tag="CDP", params={"profile_path": profile_path}, colors={"profile_path": LogColor.YELLOW})
