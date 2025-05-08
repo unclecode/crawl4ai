@@ -119,6 +119,7 @@ class TraversalStats:
     urls_skipped: int = 0
     total_depth_reached: int = 0
     current_depth: int = 0
+    end_time: Optional[datetime] = None
 
 class DispatchResult(BaseModel):
     task_id: str
