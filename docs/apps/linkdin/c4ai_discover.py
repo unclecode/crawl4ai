@@ -43,7 +43,6 @@ from rich.console import Console
 from rich.logging import RichHandler
 
 from datetime import datetime, UTC
-from itertools import cycle
 from textwrap import dedent
 from types import SimpleNamespace
 from typing import Dict, List, Optional
@@ -272,7 +271,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         parser.add_argument("--title-filters", default="Product,Engineering", help="comma list of job keywords")
         parser.add_argument("--max-companies", type=int, default=1000)
         parser.add_argument("--max-people", type=int, default=500)
-        parser.add_argument("--profile-path", default=str(pathlib.Path.home() / ".crawl4ai/profiles/profile_linkedin_uc"))
+        parser.add_argument("--profile-name", default=str(pathlib.Path.home() / ".crawl4ai/profiles/profile_linkedin_uc"))
         parser.add_argument("--outdir", default="./output")
         parser.add_argument("--concurrency", type=int, default=4)
         parser.add_argument("--log-level", default="info", choices=["debug", "info", "warn", "error"])
@@ -355,8 +354,7 @@ async def async_main(opts):
         user_agent_generator_config= {
             "platforms": "mobile",
             "os": "Android"
-        },
-        verbose=False,
+        }
     )
     crawler = AsyncWebCrawler(config=bc)
     
@@ -366,7 +364,7 @@ async def async_main(opts):
     # crawler = await next_crawler().start()
     try:
         # Build LinkedIn search URL
-        search_url = f"https://www.linkedin.com/search/results/companies/?keywords={quote(opts.query)}&geoUrn={opts.geo}"
+        search_url = f'https://www.linkedin.com/search/results/companies/?keywords={quote(opts.query)}&companyHqGeo="{opts.geo}"'
         logging.info("Seed URL => %s", search_url)
 
         companies: List[Dict] = []
@@ -426,13 +424,12 @@ def main():
         opts = detect_debug_defaults(force=True)
     else:
         env_defaults = detect_debug_defaults()
-        env_defaults = detect_debug_defaults()
         opts = env_defaults if env_defaults else cli_opts
 
     if not getattr(opts, "cmd", None):
         opts.cmd = "full"
 
-    exit_code = asyncio.run(async_main(opts))
+    exit_code = asyncio.run(async_main(cli_opts))
     sys.exit(exit_code)
 
 

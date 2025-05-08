@@ -16,12 +16,12 @@ prospect‑wizard/
 
 ### 1.1  Install dependencies
 ```bash
-pip install crawl4ai openai sentence-transformers networkx pandas vis-network rich
+pip install crawl4ai litellm sentence-transformers pandas rich
 ```
 
 ### 1.2  Create / warm a LinkedIn browser profile
 ```bash
-crwl profiler
+crwl profiles
 ```
 1. The interactive shell shows **New profile** – hit **enter**.
 2. Choose a name, e.g. `profile_linkedin_uc`.
@@ -34,16 +34,16 @@ crwl profiler
 ## 2  Discovery – scrape companies & people
 
 ```bash
-python c4ai_discover.py full \ 
-  --query "health insurance management" \ 
+python c4ai_discover.py full \
+  --query "health insurance management" \
   --geo 102713980 \               # Malaysia geoUrn
-  --title_filters "" \            # or "Product,Engineering"
-  --max_companies 10 \            # default set small for workshops
-  --max_people 20 \               # \^ same
-  --profile-name profile_linkedin_uc \ 
-  --outdir ./data \ 
-  --concurrency 2 \ 
-  --log_level debug
+  --title-filters "" \            # or "Product,Engineering"
+  --max-companies 10 \            # default set small for workshops
+  --max-people 20 \               # \^ same
+  --profile-name profile_linkedin_uc \
+  --outdir ./data \
+  --concurrency 2 \
+  --log-level debug
 ```
 **Outputs** in `./data/`:
 * `companies.jsonl` – one JSON per company
@@ -66,14 +66,15 @@ _See more: <https://www.linkedin.com/search/results/companies/?geoUrn=XXX> – t
 ## 3  Insights – embeddings, org‑charts, decision makers
 
 ```bash
-python c4ai_insights.py \ 
-  --in  ./data \ 
-  --out ./data \ 
-  --embed_model all-MiniLM-L6-v2 \ 
-  --top_k 10 \ 
-  --openai_model gpt-4.1 \ 
-  --max_llm_tokens 8024 \ 
-  --llm_temperature 1.0 \ 
+python c4ai_insights.py \
+  --in ./data \
+  --out ./data \
+  --embed-model all-MiniLM-L6-v2 \
+  --llm-provider gemini/gemini-2.0-flash \
+  --llm-api-key "" \
+  --top-k 10 \
+  --max-llm-tokens 8024 \
+  --llm-temperature 1.0 \
   --workers 4
 ```
 Emits next to the Stage‑1 files:
@@ -121,6 +122,6 @@ The page fetches `data/company_graph.json` and the `org_chart_*.json` files auto
 ---
 
 ### TL;DR
-`crwl profiler` → `c4ai_discover.py` → `c4ai_insights.py` → open `graph_view_template.html`.  
+`crwl profiles` → `c4ai_discover.py` → `c4ai_insights.py` → open `graph_view_template.html`.  
 Live long and `import crawl4ai`.
 
