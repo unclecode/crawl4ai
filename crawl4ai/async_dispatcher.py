@@ -97,16 +97,6 @@ class BaseDispatcher(ABC):
         self.monitor = monitor
 
     @abstractmethod
-    async def crawl_url(
-        self,
-        crawler: AsyncWebCrawler,
-        url: str,
-        config: CrawlerRunConfig,
-        task_id: str,
-    ) -> CrawlerTaskResult:
-        pass
-
-    @abstractmethod
     async def run_urls(
         self,
         urls: List[str],
@@ -184,8 +174,8 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
             return -wait_time
         # Standard priority based on retries
         return retry_count
-    
-    async def crawl_url(
+
+    async def _crawl_url(
         self,
         crawler: AsyncWebCrawler,
         url: str,
@@ -342,7 +332,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
                         
                         # Create and start the task
                         task = asyncio.create_task(
-                            self.crawl_url(crawler, url, config, task_id, retry_count)
+                            self._crawl_url(crawler, url, config, task_id, retry_count)
                         )
                         active_tasks.append(task)
                         
@@ -486,7 +476,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
                         
                         # Create and start the task
                         task = asyncio.create_task(
-                            self.crawl_url(crawler, url, config, task_id, retry_count)
+                            self._crawl_url(crawler, url, config, task_id, retry_count)
                         )
                         active_tasks.append(task)
                         
@@ -545,7 +535,7 @@ class SemaphoreDispatcher(BaseDispatcher):
         self.semaphore_count = semaphore_count
         self.max_session_permit = max_session_permit
 
-    async def crawl_url(
+    async def _crawl_url(
         self,
         crawler: AsyncWebCrawler,
         url: str,
@@ -650,7 +640,7 @@ class SemaphoreDispatcher(BaseDispatcher):
                 if self.monitor:
                     self.monitor.add_task(task_id, url)
                 task = asyncio.create_task(
-                    self.crawl_url(crawler, url, config, task_id, semaphore)
+                    self._crawl_url(crawler, url, config, task_id, semaphore)
                 )
                 tasks.append(task)
 
@@ -677,7 +667,7 @@ class SemaphoreDispatcher(BaseDispatcher):
                 if self.monitor:
                     self.monitor.add_task(task_id, url)
                 task = asyncio.create_task(
-                    self.crawl_url(crawler, url, config, task_id, semaphore)
+                    self._crawl_url(crawler, url, config, task_id, semaphore)
                 )
                 tasks.append(task)
 
