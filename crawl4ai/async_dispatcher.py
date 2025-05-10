@@ -1,7 +1,11 @@
-from typing import Dict, Optional, List, Tuple
+from dataclasses import dataclass
+import logging
+from typing import Dict, Optional, List, TypeVar
 from enum import Enum, auto
 from datetime import datetime
 from email.utils import parsedate_to_datetime
+from math import ceil
+
 
 from .async_configs import CrawlerRunConfig
 from .models import (
@@ -24,8 +28,9 @@ import asyncio
 import uuid
 
 from urllib.parse import urlparse
-import random
 from abc import ABC, abstractmethod
+
+_LOGGER = logging.getLogger(__name__)
 
 class RateLimitStatus(Enum):
     """Enum for rate limit status."""
@@ -34,86 +39,167 @@ class RateLimitStatus(Enum):
     RETRY = auto()
     CONTINUE = auto()
 
+@dataclass
+class RateLimitHeaders:
+    """Class to hold rate limit headers."""
+    remaining: str
+    reset: str
+    limit: str
+
+def default_ratelimit_headers() -> List[RateLimitHeaders]:
+    """Return a list of default rate limit headers.
+    This function returns a list of common rate limit headers used by various APIs.
+
+    :return: List of RateLimitHeaders.
+    :rtype: List[RateLimitHeaders]
+    """
+    return [
+        # GitHub style headers.
+        RateLimitHeaders(
+            remaining="x-ratelimit-remaining",
+            reset="x-ratelimit-reset",
+            limit="x-ratelimit-limit"
+        ),
+        # Twitter style headers.
+        RateLimitHeaders(
+            remaining="x-rate-limit-remaining",
+            reset="x-rate-limit-reset",
+            limit="x-rate-limit-limit"
+        ),
+        # https://ioggstream.github.io/draft-polli-ratelimit-headers/draft-polli-ratelimit-headers.html
+        RateLimitHeaders(
+            remaining="ratelimit-remaining",
+            reset="ratelimit-reset",
+            limit="ratelimit-limit"
+        ),
+        # https://github.com/wraithgar/hapi-rate-limit/blob/main/README.md
+        RateLimitHeaders(
+            remaining="x-ratelimit-userremaining",
+            reset="x-ratelimit-userreset",
+            limit="x-ratelimit-userlimit"
+        ),
+        RateLimitHeaders(
+            remaining="x-ratelimit-userpathremaining",
+            reset="x-ratelimit-userpathreset",
+            limit="x-ratelimit-userpathlimit"
+        ),
+    ]
+
+WorstValT = TypeVar('WorstValT', int, float)
 
 class RateLimiter:
     def __init__(
         self,
-        base_delay: Tuple[float, float] = (1.0, 3.0),
+        default_rate: float = 5,
+        max_burst: int = 20,
+        base_delay: float = 1.0,
         max_delay: float = 60.0,
-        max_retries: int = 3,
+        max_retries: Optional[int] = None,
         rate_limit_codes: Optional[List[int]] = None,
+        rate_limit_headers: Optional[List[RateLimitHeaders]] = None,
     ):
         """Initialize the rate limiter.
 
-        :param base_delay: Base delay range (min, max) in seconds.
-        :type base_delay: Tuple[float, float]
-        :param max_delay: Maximum delay in seconds for exponential backoff. Rate limit headers can exceed this.
+        :param default_rate: Default rate limit (requests per second).
+        :type default_rate: int
+        :param max_burst: Maximum burst size (number of requests allowed in a burst).
+        :type max_burst: int
+        :param base_delay: Base delay for exponential backoff (in seconds).
+        :type base_delay: float
+        :param max_delay: Maximum delay for exponential backoff (in seconds).
         :type max_delay: float
-        :param max_retries: Maximum number of retries before giving up.
-        :type max_retries: int
+        :param max_retries: Maximum number of domain retries before failing a request (default: no limit).
+        :type max_retries: Optional[int]
         :param rate_limit_codes: List of HTTP status codes that indicate rate limiting (default: 429 and 503).
         :type rate_limit_codes: Optional[List[int]]
+        :param rate_limit_headers: List of rate limit headers to check for rate limiting (default: `default_ratelimit_headers()`).
+        :type rate_limit_headers: Optional[List[RateLimitHeaders]]
+        :raises ValueError: If any of the parameters are invalid.
         """
-        self.base_delay = base_delay
-        self.max_delay = max_delay
-        self.max_retries = max_retries
-        self.rate_limit_codes = rate_limit_codes or [429, 503]
-        self.domains: Dict[str, DomainState] = {}
+        if max_retries is not None and max_retries < max_burst:
+            raise ValueError("max_retries must be greater than or equal to max_burst")
 
-    def get_domain(self, url: str) -> str:
-        return urlparse(url).netloc
+        if max_burst <= 0:
+            raise ValueError("max_burst must be positive")
+
+        if default_rate <= 0:
+            raise ValueError("default_rate must be positive")
+
+        if base_delay <= 0:
+            raise ValueError("base_delay must be positive")
+
+        if max_delay <= 0:
+            raise ValueError("max_delay must be positive")
+
+        if max_delay < base_delay:
+            raise ValueError("max_delay must be greater than or equal to base_delay")
+
+        self._max_retries: Optional[int] = max_retries
+        self._base_delay: float = base_delay
+        self._max_delay: float = max_delay
+        self._rate_limit_codes: List[int] = rate_limit_codes or [429, 503]
+        self._domains: Dict[str, DomainState] = {}
+        self._default_rate: float = default_rate
+        self._default_capacity: int = max_burst
+        self._rate_limit_headers: List[RateLimitHeaders] = rate_limit_headers or default_ratelimit_headers()
+
+    def _domain(self, url: str) -> DomainState:
+        """Get the domain state for the given URL.
+
+        :param url: The URL to get the domain state for.
+        :type url: str
+        :return: The domain state.
+        :rtype: DomainState
+        """
+        domain: str = urlparse(url).netloc
+        state: Optional[DomainState] = self._domains.get(domain)
+        if not state:
+            state = DomainState(
+                rate=self._default_rate,
+                max_burst=self._default_capacity,
+                base_delay=self._base_delay,
+                max_delay=self._max_delay,
+            )
+            self._domains[domain] = state
+
+        return state
 
     async def wait_if_needed(self, url: str) -> None:
-        domain = self.get_domain(url)
-        state = self.domains.get(domain)
+        """Wait for the rate limit to be available for the given URL."""
+        state: DomainState = self._domain(url)
+        await state.acquire()
 
-        if not state:
-            self.domains[domain] = DomainState()
-            state = self.domains[domain]
-
-        now = time.time()
-        if state.last_request_time:
-            wait_time = max(0, state.current_delay - (now - state.last_request_time))
-            if wait_time > 0:
-                await asyncio.sleep(wait_time)
-
-        # Random delay within base range if no current delay
-        if state.current_delay == 0:
-            state.current_delay = random.uniform(*self.base_delay)
-
-        state.last_request_time = time.time()
-
-    def update_delay(self, result: CrawlResultContainer) -> RateLimitStatus:
-        """Update the delay based on the status code.
+    async def update(self, result: CrawlResultContainer) -> RateLimitStatus:
+        """Update the rate limit based on details from the crawl result.
 
         :param result: The result of the crawl.
         :type result: CrawlResultContainer
         :return: Status indicating whether to retry, stop retrying, or continue.
         :rtype: RateLimitStatus
         """
-        domain = self.get_domain(result.url)
-        state: DomainState = self.domains[domain]
-
-        if result.status_code in self.rate_limit_codes:
-            state.fail_count += 1
-            if state.fail_count > self.max_retries:
+        # We might have been redirected, so prefer that url to ensure that we
+        # don't register stats against the wrong domain.
+        state: DomainState = self._domain(result.redirected_url or result.url)
+        if result.status_code in self._rate_limit_codes:
+            failures: int = await self._update_state(state, result, True)
+            if self._max_retries is not None and failures >= self._max_retries:
                 return RateLimitStatus.NO_RETRY
 
-            state.current_delay = self.retry_after(state.current_delay, result.response_headers)
             return RateLimitStatus.RETRY
 
-        # Gradually reduce delay on success
-        state.current_delay = max(random.uniform(*self.base_delay), state.current_delay * 0.75)
-        state.fail_count = 0
+        await self._update_state(state, result, False)
 
         return RateLimitStatus.CONTINUE
 
 
-    def limit_value(self, headers: dict[str, str], header: str, default: float = 0) -> float:
-        """Return a float representation of the header value.
+    def _count(self, headers: dict[str, str], header: str) -> Optional[int]:
+        """Update the state remaining field from header.
 
-        This function attempts to convert the header value to a float.
-        If the conversion fails, it returns the default value.
+        This function attempts to update the remaining field of state from
+        the header value converted to a int.
+
+        If the conversion fails, it returns the default value and does not
+        update the state.
 
         :param headers: The headers dictionary.
         :type headers: dict[str, str]
@@ -122,23 +208,23 @@ class RateLimiter:
         :param default: The default value to return if the header is not found or cannot be converted.
         :type default: float
         :return: The float value from the header or the default value.
-        :rtype: float
+        :rtype: Optional[int]
         """
         value: Optional[str] = headers.get(header)
         if value is None:
-            return default
+            return None
 
         try:
-            return float(value)
+            return int(value)
         except ValueError:
-            return default
+            return None
 
-    def limit_delay(self, headers: dict[str, str], header: str, now: float, default: float = 0) -> float:
-        """Return limit delay from headers.
+    def _reset_delay(self, headers: dict[str, str], header: str, now: float) -> Optional[int]:
+        """Return the reset delay determined from the header.
 
-        This function attempts to convert the header value to delay relative to the
-        current time. It handles HTTP date times (RFC 2616) and unix epoch timestamps
-        in seconds or milliseconds.
+        This function attempts to determine the reset delay from the header value.
+        It handles HTTP date times (RFC 2616) and unix epoch timestamps in seconds,
+        milliseconds, microseconds, and nanoseconds.
 
         If all conversions fail, it returns the default value.
 
@@ -149,109 +235,111 @@ class RateLimiter:
         :param now: The current time in seconds since the epoch.
         :type now: float
         :param default: The default value to return if the header is not found or cannot be converted.
-        :type default: float
-        :return: The float value from the header or the default value.
-        :rtype: float
+        :type default: int
+        :return: The float value relative to now as determined from the header or the default value.
+        :rtype: int
         """
         value: Optional[str] = headers.get(header)
         if value is None:
-            return default
+            return None
 
         try:
             delay: float = float(value)
-            if delay > now:
-                # Timestamp, convert to delay.
-                if delay / 1000 > now:
-                    # Delay is in milliseconds, convert to seconds.
-                    delay /= 1000
+            # Validated using https://www.epochconverter.com/
+            if delay >= 1e16:
+                # Timestamp in nanoseconds.
+                return ceil(delay / 1e9 - now)
 
-                return delay - now
+            if delay >= 1e14:
+                # Timestamp in microseconds.
+                return ceil(delay / 1e6 - now)
 
-            return delay
+            if delay >= 1e11:
+                # Timestamp in milliseconds.
+                return ceil(delay / 1000 - now)
+
+            if delay >= 1e9:
+                # Timestamp in seconds.
+                return ceil(delay - now)
+
+            # Delay in seconds.
+            return ceil(delay)
         except ValueError:
+            # Try to parse as HTTP date time.
             try:
                 dt: datetime = parsedate_to_datetime(value)
-                return dt.timestamp() - now
+                return ceil(dt.timestamp() - now)
             except ValueError:
-                return default
+                return None
 
-    def remaining_reset(self, headers: dict[str, str], now: float, remaining_header: str, reset_header: str) -> float:
-        """Return the remaining time until reset.
+    async def _update_state(self, state: DomainState, result: CrawlResultContainer, limited: bool) -> int:
+        """Update the state of the domain based on the headers if needed.
 
+        :param state: The current state of the domain.
+        :type state: DomainState
         :param headers: The headers dictionary.
         :type headers: dict[str, str]
-        :param now: The current time in seconds since the epoch.
-        :type now: float
-        :param remaining_header: The header key for remaining requests.
-        :type remaining_header: str
-        :param reset_header: The header key for reset time.
-        :type reset_header: str
-        :return: The remaining time until reset in seconds or -1 if not applicable.
+        :param limited: Whether the request was rate limited.
+        :type limited: bool
+        :return: The number of failures.
+        :rtype: int
         """
-        # We use a default value of 1 to handle missing remaining header.
-        if (value := self.limit_value(headers, remaining_header, 1)) <= 0:
-            if (value := self.limit_delay(headers, reset_header, now)) > 0:
-                return value
+        # TODO: Remove this just to check basic exponential backoff works.
+        #return await state.update(failure=failure)
 
-        return -1
+        if result.response_headers is None:
+            return await state.update(limited=limited)
 
-    def retry_after(self, current_delay: float, headers: Optional[dict[str, str]]) -> float:
-        """Return the delay to wait before retrying.
+        # Check for know rate limit headers.
+        # Some useful references:
+        # https://medium.com/@guillaume.viguierjust/rate-limiting-your-restful-api-3148f8e77248
+        # https://datatracker.ietf.org/doc/draft-ietf-httpapi-ratelimit-headers/
+        # https://developer.okta.com/docs/reference/rl-best-practices/
+        limit: Optional[int] = None
+        remaining: Optional[int] = None
+        reset: Optional[int] = None
+        rate: Optional[float] = None
+        now: float = time.time()
+        headers: dict[str, str] = result.response_headers
 
-        This function checks the headers for rate limit information and calculates
-        the delay based on the values found. If no relevant headers are found, it
-        falls back to an exponential backoff strategy.
+        # Find the worst case values for limit, remaining, reset and rate.
+        for rate_limit_headers in self._rate_limit_headers:
+            limit = self._min(limit, self._count(headers, rate_limit_headers.limit))
+            remaining = self._min(remaining, self._count(headers, rate_limit_headers.remaining))
+            reset = self._max(reset, self._reset_delay(headers, rate_limit_headers.reset, now))
+            rate = self._min(rate, limit / reset if reset and limit else None)
 
-        :param current_delay: The current delay to use for exponential backoff.
-        :type current_delay: float
-        :param headers: The headers dictionary.
-        :type headers: Optional[dict[str, str]]
-        :return: The delay in seconds to wait before retrying.
-        :rtype: float
-        """
-        if headers is not None:
-            # Check for know rate limit headers.
-            # https://medium.com/@guillaume.viguierjust/rate-limiting-your-restful-api-3148f8e77248
-            # https://datatracker.ietf.org/doc/draft-ietf-httpapi-ratelimit-headers/
-            now: float = time.time()
-            value: float
+        # Retry-After should only be present if we were rate limited
+        # but we always check it to keep the code simple.
+        # https://datatracker.ietf.org/doc/html/rfc7231#section-7.1.3
+        retry_after: Optional[int] = self._reset_delay(headers, "retry-after", now)
+        if retry_after:
+            # Ensure Retry-After is obeyed.
+            remaining = 0
+            retry_after = max(reset or 0, retry_after)
+        elif remaining is not None and remaining <= 0 and reset:
+            retry_after = reset
 
-            # https://datatracker.ietf.org/doc/html/rfc7231#section-7.1.3
-            if (value := self.limit_delay(headers, "retry-after", now)) > 0:
-                return value
+        _LOGGER.debug(
+            "Rate limit for %s: limit=%s, remaining=%s, reset=%s, rate=%s, retry_after=%s, limited=%s status_code=%s",
+            result.redirected_url or result.url,
+            limit,
+            remaining,
+            reset,
+            rate,
+            retry_after,
+            limited,
+            result.status_code,
+        )
+        return await state.update(limit=limit, remaining=remaining, retry_after=retry_after, rate=rate, limited=limited)
 
-            # https://ioggstream.github.io/draft-polli-ratelimit-headers/draft-polli-ratelimit-headers.html
-            # We use a default value of 1 to handle missing remaining header.
-            if (value := self.limit_value(headers, "ratelimit-remaining", 1)) <= 0:
-                if (value := self.limit_delay(headers, "ratelimit-reset", now)) > 0:
-                    return value
+    def _min(self, a: Optional[WorstValT], b: Optional[WorstValT]) -> Optional[WorstValT]:
+        """Return the minimum of two values or None if both are None."""
+        return min([x for x in [a, b] if x is not None], default=None)
 
-            # Handle missing remaining header.
-            # https://ioggstream.github.io/draft-polli-ratelimit-headers/draft-polli-ratelimit-headers.html#name-missing-remaining-informati
-            elif (value := self.limit_delay(headers, "ratelimit-reset", now)) > 0:
-                return value
-
-            # GitHub style headers.
-            if (value := self.remaining_reset(headers, now, "x-ratelimit-remaining", "x-ratelimit-reset")) > 0:
-                return value
-
-            # Twitter style headers.
-            if (value := self.remaining_reset(headers, now, "x-rate-limit-remaining", "x-rate-limit-reset")) > 0:
-                return value
-
-            # https://github.com/wraithgar/hapi-rate-limit/blob/main/README.md
-            if (value := self.remaining_reset(headers, now, "x-ratelimit-userremaining", "x-ratelimit-userreset")) > 0:
-                return value
-
-            if (
-                value := self.remaining_reset(
-                    headers, now, "x-ratelimit-userpathremaining", "x-ratelimit-userpathreset"
-                )
-            ) > 0:
-                return value
-
-        # Fallback to exponential backoff with random jitter.
-        return min(current_delay * 2 * random.uniform(0.75, 1.25), self.max_delay)
+    def _max(self, a: Optional[WorstValT], b: Optional[WorstValT]) -> Optional[WorstValT]:
+        """Return the maximum of two values or None if both are None."""
+        return max([x for x in [a, b] if x is not None], default=None)
 
 class BaseDispatcher(ABC):
     def __init__(
@@ -478,8 +566,8 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
             memory_usage = peak_memory = end_memory - start_memory
 
             # Handle rate limiting
-            if self.rate_limiter and result.status_code:
-                status: RateLimitStatus = self.rate_limiter.update_delay(result)
+            if self.rate_limiter:
+                status: RateLimitStatus = await self.rate_limiter.update(result)
                 if status == RateLimitStatus.NO_RETRY:
                     error_message = f"Rate limit retry count exceeded for domain {urlparse(url).netloc}"
                     self._update_task(task_id, status=CrawlStatus.FAILED)
@@ -812,8 +900,8 @@ class SemaphoreDispatcher(BaseDispatcher):
 
                 memory_usage = peak_memory = end_memory - start_memory
 
-                if self.rate_limiter and result.status_code:
-                    status: RateLimitStatus = self.rate_limiter.update_delay(result)
+                if self.rate_limiter:
+                    status: RateLimitStatus = await self.rate_limiter.update(result)
                     if status == RateLimitStatus.NO_RETRY:
                         error_message = f"Rate limit retry count exceeded for domain {urlparse(url).netloc}"
 

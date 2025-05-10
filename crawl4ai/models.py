@@ -1,22 +1,168 @@
 from __future__ import annotations
+import logging
 from pydantic import BaseModel, HttpUrl, PrivateAttr, Field
 from typing import List, Dict, Optional, Callable, Awaitable, Union, Any, AsyncGenerator, Iterator, AsyncIterator, Self
 from enum import Enum
 from dataclasses import dataclass
 from .ssl_certificate import SSLCertificate
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta
+import time
+import asyncio
+import random
 
+_LOGGER = logging.getLogger(__name__)
 
 ###############################
 # Dispatcher Models
 ###############################
-@dataclass
 class DomainState:
-    last_request_time: float = 0
-    current_delay: float = 0
-    fail_count: int = 0
+    """State of the domain in the dispatcher.
 
+    This class is used to track the state of the domain in the dispatcher.
+    """
+    def __init__(self, rate: float, max_burst: int, base_delay: float, max_delay: float) -> None:
+        """Create a new DomainState.
+
+        :param rate: Number of tokens added per second (refill rate).
+        :type rate: int
+        :param max_burst: The maximum number of tokens in the bucket (burst capacity).
+        :type max_burst: int
+        :param base_delay: The base delay for exponential backoff.
+        :type base_delay: float
+        :param max_delay: The maximum delay for exponential backoff.
+        :type max_delay: float
+        :raises ValueError: If rate is less than or equal to 0.
+        """
+        if rate <= 0:
+            raise ValueError("rate must be greater than 0")
+
+        now: float = time.monotonic()
+        self._rate: float = rate
+        self._capacity: int = max_burst
+        self._tokens: int = max_burst
+        self._base_delay: float = base_delay
+        self._max_delay: float = max_delay
+        self._last_check: float = now
+        self._lock: asyncio.Lock = asyncio.Lock()
+        self._consecutive_failures: int = 0
+        self._backoff_until: float = 0
+
+    async def failures(self) -> int:
+        """Return the number of consecutive failures.
+
+        :return: Return the number of consecutive failures.
+        :rtype: int
+        """
+        async with self._lock:
+            return self._consecutive_failures
+
+    async def update(
+        self,
+        *, # Enforce keyword-only arguments
+        limited: bool = False,
+        limit: Optional[int] = None,
+        remaining: Optional[int] = None,
+        retry_after: Optional[int] = None,
+        rate: Optional[float] = None,
+    ) -> int:
+        """Update the state of the domain based on the rate limit headers.
+
+        Updates internal state based on the headers returned by the server.
+
+        If the server is using fixed window rate limiting, the rate can change
+        when we enter the next window so this method should be called for every
+        request.
+
+        :param limited: Whether the request was rated limited e.g. status code 429 or 503.
+        :type limited: bool
+        :param limit: The rate limit.
+        :type limit: Optional[int]
+        :param remaining: The number of requests remaining.
+        :type remaining: Optional[int]
+        :param retry_after: The relative time (in seconds) when we're next allowed to make a request.
+        :type retry_after: Optional[int]
+        :param rate: The rate of requests per second.
+        :type rate: Optional[float]
+        :return: The number of consecutive failures.
+        :rtype: int
+        """
+        async with self._lock:
+            now: float = time.monotonic()
+            if retry_after:
+                # Respect retry after even if tokens are available.
+                # We tried limiting the backoff to _max_delay but increased the failures
+                # rate where it exceeded max_retries resulting in hard failures.
+                self._backoff_until = now + retry_after
+                self._tokens = 0
+            elif remaining is not None:
+                # Ensure _tokens doesn't go negative.
+                self._tokens = max(remaining, 0)
+
+            if rate:
+                self._rate = rate
+
+            if limit:
+                # Only allow reducing the bust capacity so we don't overload local resources.
+                self._capacity = min(self._capacity, limit)
+
+            if limited:
+                self._tokens = 0
+                self._consecutive_failures += 1
+                if self._backoff_until < now:
+                    # No header backoff information in headers so fallback to exponential backoff.
+                    self._backoff_until = now + random.uniform(0, min(self._max_delay, self._base_delay * 2 ** self._consecutive_failures))
+            else:
+                self._consecutive_failures = 0
+
+            return self._consecutive_failures
+
+
+    def _refill(self) -> float:
+        """Refill the bucket based on the time elapsed since the last refill.
+
+        This method is called lazily when `acquire()` is invoked.
+
+        :return: The current monotonic clock.
+        :rtype: float
+        """
+        now: float = time.monotonic()
+        elapsed: float = now - self._last_check
+        new_tokens: int = int(elapsed * self._rate)
+        self._tokens = min(self._capacity, self._tokens + new_tokens)
+        self._last_check = now
+
+        return now
+
+    async def acquire(self) -> float:
+        """Acquire a token from the bucket.
+
+        Waits until a token is available if the bucket is empty,
+        respecting any active backoff.
+
+        :return: The time spent waiting for a token.
+        """
+        total_wait: float = 0.0
+        while True:
+            wait: float
+            async with self._lock:
+                now: float = self._refill()
+                if now < self._backoff_until:
+                    # Respect backoff.
+                    wait = self._backoff_until - now
+                    _LOGGER.debug("Backoff waiting %s seconds", wait)
+                elif self._tokens > 0:
+                    # Token available.
+                    self._tokens -= 1
+                    _LOGGER.debug("Token acquired, %s tokens remaining", self._tokens)
+                    return total_wait
+                else:
+                    # No tokens available, wait for the next refill or at least 10ms.
+                    time_since_last: float = now - self._last_check
+                    wait = max((1 / self._rate) - time_since_last, 0.01)
+                    _LOGGER.debug("No tokens available, waiting %s seconds", wait)
+
+            await asyncio.sleep(wait)
+            total_wait += wait
 
 @dataclass
 class CrawlerTaskResult:

@@ -709,7 +709,7 @@ class AsyncWebCrawler:
         if dispatcher is None:
             dispatcher = MemoryAdaptiveDispatcher(
                 rate_limiter=RateLimiter(
-                    base_delay=(1.0, 3.0), max_delay=60.0, max_retries=3
+                    base_delay=1.0, max_delay=60.0, max_retries=3, max_burst=3
                 ),
             )
 
