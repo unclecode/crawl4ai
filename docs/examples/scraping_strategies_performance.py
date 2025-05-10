@@ -1,8 +1,8 @@
-import time, re
-from crawl4ai.content_scraping_strategy import WebScrapingStrategy,  LXMLWebScrapingStrategy
-import time
 import functools
+import time
 from collections import defaultdict
+
+from crawl4ai.content_scraping_strategy import WebScrapingStrategy,  LXMLWebScrapingStrategy
 
 class TimingStats:
     def __init__(self):
@@ -95,7 +95,7 @@ def test_scraping():
     
     # Time the scraping
     print("\nStarting scrape...")
-    start_time = time.time()
+    start_time = time.perf_counter()
     
     kwargs = {
         "url": "http://example.com",
@@ -117,7 +117,7 @@ def test_scraping():
     timing_stats.report()
     
     # Print stats of LXML output
-    print("\Turbo Output:")
+    print("\nTurbo Output:")
     print(f"\nExtracted links: {len(result_selected.links.internal) + len(result_selected.links.external)}")
     print(f"Extracted images: {len(result_selected.media.images)}")
     print(f"Clean HTML size: {len(result_selected.cleaned_html)/1024:.2f} KB")
