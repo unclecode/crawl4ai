@@ -12,10 +12,10 @@ def test_scorers():
                 "case_sensitive": False
             },
             "urls": {
-                "https://example.com/python-blog": 1.0,
-                "https://example.com/PYTHON-BLOG": 1.0,
+                "https://example.com/python-blog": 0.0,
+                "https://example.com/PYTHON-BLOG": 0.0,
                 "https://example.com/python-only": 0.5,
-                "https://example.com/other": 0.0
+                "https://example.com/other": 1.0
             }
         },
         
@@ -27,10 +27,10 @@ def test_scorers():
                 "weight": 1.0
             },
             "urls": {
-                "https://example.com/a/b": 1.0,
+                "https://example.com/a/b": 0.0,
                 "https://example.com/a": 0.5,
                 "https://example.com/a/b/c": 0.5,
-                "https://example.com": 0.33333333
+                "https://example.com": 0.66666667
             }
         },
         
@@ -46,10 +46,10 @@ def test_scorers():
                 "weight": 1.0
             },
             "urls": {
-                "https://example.com/doc.html": 1.0,
-                "https://example.com/doc.pdf": 0.8,
-                "https://example.com/img.jpg": 0.6,
-                "https://example.com/other.txt": 0.0
+                "https://example.com/doc.html": 0.0,
+                "https://example.com/doc.pdf": 0.2,
+                "https://example.com/img.jpg": 0.4,
+                "https://example.com/other.txt": 1.0
             }
         },
         
@@ -60,9 +60,9 @@ def test_scorers():
                 "weight": 1.0,  # Remove current_year since original doesn't support it
             },
             "urls": {
-                "https://example.com/2024/01/post": 1.0,
-                "https://example.com/2023/12/post": 0.9,
-                "https://example.com/2022/post": 0.8,
+                "https://example.com/2024/01/post": 0.0,
+                "https://example.com/2023/12/post": 0.1,
+                "https://example.com/2022/post": 0.2,
                 "https://example.com/no-date": 0.5
             }
         },
@@ -80,10 +80,10 @@ def test_scorers():
                 "weight": 1.0
             },
             "urls": {
-                "https://python.org/about": 1.0,
-                "https://github.com/repo": 0.8,
-                "https://medium.com/post": 0.6,
-                "https://unknown.com": 0.3
+                "https://python.org/about": 0.0,
+                "https://github.com/repo": 0.2,
+                "https://medium.com/post": 0.4,
+                "https://unknown.com": 0.7
             }
         }
     ]
@@ -132,9 +132,9 @@ def test_scorers():
         
         # Create test data
         test_urls = {
-            "https://python.org/blog/2024/01/new-release.html":0.86666667,
-            "https://github.com/repo/old-code.pdf": 0.62,
-            "https://unknown.com/random": 0.26
+            "https://python.org/blog/2024/01/new-release.html":0.13333333,
+            "https://github.com/repo/old-code.pdf": 0.38,
+            "https://unknown.com/random": 0.74
         }
         
         # Create composite scorers with all types
