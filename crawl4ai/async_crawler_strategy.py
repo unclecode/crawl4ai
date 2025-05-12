@@ -1467,8 +1467,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             buffered = BytesIO()
             img.save(buffered, format="JPEG")
             return base64.b64encode(buffered.getvalue()).decode("utf-8")
-        finally:
-            await page.close()
+        # finally:
+        #     await page.close()
 
     async def take_screenshot_naive(self, page: Page) -> str:
         """
@@ -1501,8 +1501,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             buffered = BytesIO()
             img.save(buffered, format="JPEG")
             return base64.b64encode(buffered.getvalue()).decode("utf-8")
-        finally:
-            await page.close()
+        # finally:
+        #     await page.close()
 
     async def export_storage_state(self, path: str = None) -> dict:
         """
