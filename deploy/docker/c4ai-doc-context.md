@@ -1687,7 +1687,7 @@ strategy = BFSDeepCrawlStrategy(
     max_depth=2,               # Crawl initial page + 2 levels deep
     include_external=False,    # Stay within the same domain
     max_pages=50,              # Maximum number of pages to crawl (optional)
-    score_threshold=0.3,       # Minimum score for URLs to be crawled (optional)
+    score_threshold=0.3,       # Maximum score for URLs to be crawled (optional)
 )
 ```
 
@@ -1695,7 +1695,7 @@ strategy = BFSDeepCrawlStrategy(
 - **`max_depth`**: Number of levels to crawl beyond the starting page
 - **`include_external`**: Whether to follow links to other domains
 - **`max_pages`**: Maximum number of pages to crawl (default: infinite)
-- **`score_threshold`**: Minimum score for URLs to be crawled (default: -inf)
+- **`score_threshold`**: Maximum score for URLs to be crawled (default: -inf)
 - **`filter_chain`**: FilterChain instance for URL filtering
 - **`url_scorer`**: Scorer instance for evaluating URLs
 
@@ -1711,7 +1711,7 @@ strategy = DFSDeepCrawlStrategy(
     max_depth=2,               # Crawl initial page + 2 levels deep
     include_external=False,    # Stay within the same domain
     max_pages=30,              # Maximum number of pages to crawl (optional)
-    score_threshold=0.5,       # Minimum score for URLs to be crawled (optional)
+    score_threshold=0.5,       # Maximum score for URLs to be crawled (optional)
 )
 ```
 
@@ -1719,7 +1719,7 @@ strategy = DFSDeepCrawlStrategy(
 - **`max_depth`**: Number of levels to crawl beyond the starting page
 - **`include_external`**: Whether to follow links to other domains
 - **`max_pages`**: Maximum number of pages to crawl (default: infinite)
-- **`score_threshold`**: Minimum score for URLs to be crawled (default: -inf)
+- **`score_threshold`**: Maximum score for URLs to be crawled (default: -inf)
 - **`filter_chain`**: FilterChain instance for URL filtering
 - **`url_scorer`**: Scorer instance for evaluating URLs
 
@@ -2067,7 +2067,7 @@ For BFS and DFS strategies, you can set a minimum score threshold to only crawl 
 strategy = DFSDeepCrawlStrategy(
     max_depth=2,
     url_scorer=KeywordRelevanceScorer(keywords=["api", "guide", "reference"]),
-    score_threshold=0.4  # Skip URLs with scores below this value
+    score_threshold=0.4  # Skip URLs with scores above this value
 )
 ```
 
