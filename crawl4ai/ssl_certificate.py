@@ -4,7 +4,6 @@ import ssl
 import socks
 import socket
 import base64
-import logging
 from datetime import datetime
 import json
 from typing import Dict, Any, Optional, Protocol, Tuple
@@ -14,22 +13,19 @@ from pathlib import Path
 from .proxy_strategy import ProxyConfig
 from .validators import SSLURLValidator
 
-# Setup logging
-logger = logging.getLogger(__name__)
-
 
 class ConnectionStrategy(Protocol):
     """Strategy interface for creating socket connections."""
-    
+
     def create_connection(self, hostname: str, port: int, timeout: int) -> socket.socket:
         """
         Create a socket connection to the specified host.
-        
+
         Args:
             hostname: Target hostname to connect to
             port: Target port to connect to
             timeout: Connection timeout in seconds
-            
+
         Returns:
             Connected socket object
         """
@@ -38,7 +34,7 @@ class ConnectionStrategy(Protocol):
 
 class DirectConnectionStrategy:
     """Direct connection strategy without using a proxy."""
-    
+
     def create_connection(self, hostname: str, port: int, timeout: int) -> socket.socket:
         """Create a direct socket connection without proxy."""
         return socket.create_connection((hostname, port), timeout=timeout)
@@ -46,21 +42,21 @@ class DirectConnectionStrategy:
 
 class HttpProxyConnectionStrategy:
     """HTTP/HTTPS proxy connection strategy."""
-    
+
     def __init__(self, proxy_config: ProxyConfig):
         """
         Initialize with proxy configuration.
-        
+
         Args:
             proxy_config: Proxy configuration object
         """
         self.proxy_config = proxy_config
-        
+
     def create_connection(self, hostname: str, port: int, timeout: int) -> socket.socket:
         """Create a socket connection through HTTP/HTTPS proxy."""
         sock = socks.socksocket()
         parsed = urlparse(self.proxy_config.server)
-        
+
         sock.set_proxy(
             socks.HTTP,
             parsed.hostname,
