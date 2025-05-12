@@ -638,9 +638,15 @@ class WebScrapingStrategy(ContentScrapingStrategy):
 
                     # url_base = url.split("/")[2]
 
+                    # Handle relative URLs that start with "/"
+                    if href.startswith("/"):
+                        url_base = "/".join(url.split("/")[:3])  # Get https://domain.com part
+                    else:
+                        url_base = url
+
                     # Normalize the URL
                     try:
-                        normalized_href = normalize_url(href, url)
+                        normalized_href = normalize_url(href, url_base)
                     except ValueError:
                         # logging.warning(f"Invalid URL format: {href}, Error: {str(e)}")
                         return False
