@@ -33,7 +33,6 @@ dependencies = [
     "psutil>=6.1.1",
     "nltk>=3.9.1",
     "playwright",
-    "aiofiles",
     "rich>=13.9.4",
     "cssselect>=1.2.0",
     "httpx>=0.27.2",
