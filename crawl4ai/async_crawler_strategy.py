@@ -441,7 +441,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         status_code = 200  # Default for local/raw HTML
         screenshot_data = None
 
-        if url.startswith(("http://", "https://")):
+        if url.startswith(("http://", "https://", "view-source:")):
             return await self._crawl_web(url, config)
 
         elif url.startswith("file://"):
@@ -816,7 +816,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             except Error:
                 visibility_info = await self.check_visibility(page)
 
-                if self.verbose:
+                if self.browser_config.config.verbose:
                     self.logger.debug(
                         message="Body visibility info: {info}",
                         tag="DEBUG",
@@ -1519,8 +1519,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             buffered = BytesIO()
             img.save(buffered, format="JPEG")
             return base64.b64encode(buffered.getvalue()).decode("utf-8")
-        finally:
-            await page.close()
+        # finally:
+        #     await page.close()
 
     async def take_screenshot_naive(self, page: Page) -> str:
         """
@@ -1553,8 +1553,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             buffered = BytesIO()
             img.save(buffered, format="JPEG")
             return base64.b64encode(buffered.getvalue()).decode("utf-8")
-        finally:
-            await page.close()
+        # finally:
+        #     await page.close()
 
     async def export_storage_state(self, path: str = None) -> dict:
         """
