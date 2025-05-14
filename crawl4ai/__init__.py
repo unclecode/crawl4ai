@@ -24,9 +24,19 @@ from .extraction_strategy import (
     JsonCssExtractionStrategy,
     JsonXPathExtractionStrategy,
     JsonLxmlExtractionStrategy,
-    RegexExtractionStrategy
+    JsonLxmlExtractionStrategy_naive,
+    RegexExtractionStrategy,
 )
-from .chunking_strategy import ChunkingStrategy, RegexChunking
+from .chunking_strategy import (
+    ChunkingStrategy,
+    RegexChunking,
+    IdentityChunking,
+    NlpSentenceChunking,
+    TopicSegmentationChunking,
+    FixedLengthWordChunking,
+    SlidingWindowChunking,
+    OverlappingWindowChunking
+)
 from .markdown_generation_strategy import DefaultMarkdownGenerator
 from .content_filter_strategy import (
     PruningContentFilter,
@@ -106,9 +116,15 @@ __all__ = [
     "JsonCssExtractionStrategy",
     "JsonXPathExtractionStrategy",
     "JsonLxmlExtractionStrategy",
-    "RegexExtractionStrategy",
+    "JsonLxmlExtractionStrategy_naive",
     "ChunkingStrategy",
     "RegexChunking",
+    "IdentityChunking",
+    "NlpSentenceChunking",
+    "TopicSegmentationChunking",
+    "FixedLengthWordChunking",
+    "SlidingWindowChunking",
+    "OverlappingWindowChunking",
     "DefaultMarkdownGenerator",
     "RelevantContentFilter",
     "PruningContentFilter",
