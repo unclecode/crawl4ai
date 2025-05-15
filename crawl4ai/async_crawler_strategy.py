@@ -445,6 +445,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             return await self._crawl_web(url, config)
 
         elif url.startswith("file://"):
+            # initialize empty lists for console messages
+            captured_console = []
+            
             # Process local file
             local_file_path = url[7:]  # Remove 'file://' prefix
             if not os.path.exists(local_file_path):
