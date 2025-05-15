@@ -680,7 +680,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
                     block["error"] = False
             except Exception:
                 parsed, unparsed = split_and_parse_json_objects(
-                    response.choices[0].message.content
+                    response
                 )
                 blocks = parsed
                 if unparsed:
