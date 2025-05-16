@@ -57,6 +57,7 @@ nav:
 theme:
   name: 'terminal'
   palette: 'dark'
+  custom_dir: docs/md_v2/overrides
   icon:
     repo: fontawesome/brands/github
 
@@ -82,6 +83,7 @@ extra_css:
   - assets/styles.css
   - assets/highlight.css
   - assets/dmvendor.css
+  - assets/feedback-overrides.css
 
 extra_javascript:
   - https://www.googletagmanager.com/gtag/js?id=G-58W0K2ZQ25
