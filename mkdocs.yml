@@ -58,6 +58,7 @@ theme:
   name: 'terminal'
   palette: 'dark'
   custom_dir: docs/md_v2/overrides
+  color_mode: 'dark'
   icon:
     repo: fontawesome/brands/github
 
