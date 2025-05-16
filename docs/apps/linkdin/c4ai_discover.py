@@ -235,6 +235,7 @@ async def crawl_people_page(
         cache_mode=CacheMode.BYPASS,
         magic=True,
         wait_for=".org-people-profile-card__card-spacing",
+        wait_for_images=5000,
         delay_before_return_html=1,
         session_id="people_search",
     )
@@ -420,8 +421,9 @@ def main():
     cli_opts = parser.parse_args()
 
     # decide on debug defaults
-    if cli_opts.debug:
+    if cli_opts.debug or True:
         opts = detect_debug_defaults(force=True)
+        cli_opts = opts
     else:
         env_defaults = detect_debug_defaults()
         opts = env_defaults if env_defaults else cli_opts

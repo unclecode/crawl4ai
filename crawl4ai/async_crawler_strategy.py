@@ -937,8 +937,10 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
             if config.wait_for:
                 try:
+                    # Use wait_for_timeout if specified, otherwise fall back to page_timeout
+                    timeout = config.wait_for_timeout if config.wait_for_timeout is not None else config.page_timeout
                     await self.smart_wait(
-                        page, config.wait_for, timeout=config.page_timeout
+                        page, config.wait_for, timeout=timeout
                     )
                 except Exception as e:
                     raise RuntimeError(f"Wait condition failed: {str(e)}")
