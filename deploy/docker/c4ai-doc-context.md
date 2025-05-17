@@ -1695,7 +1695,7 @@ strategy = BFSDeepCrawlStrategy(
 - **`max_depth`**: Number of levels to crawl beyond the starting page
 - **`include_external`**: Whether to follow links to other domains
 - **`max_pages`**: Maximum number of pages to crawl (default: infinite)
-- **`score_threshold`**: Maximum score for URLs to be crawled (default: -inf)
+- **`score_threshold`**: Maximum score for URLs to be crawled (default: infinite)
 - **`filter_chain`**: FilterChain instance for URL filtering
 - **`url_scorer`**: Scorer instance for evaluating URLs
 
@@ -1719,7 +1719,7 @@ strategy = DFSDeepCrawlStrategy(
 - **`max_depth`**: Number of levels to crawl beyond the starting page
 - **`include_external`**: Whether to follow links to other domains
 - **`max_pages`**: Maximum number of pages to crawl (default: infinite)
-- **`score_threshold`**: Maximum score for URLs to be crawled (default: -inf)
+- **`score_threshold`**: Maximum score for URLs to be crawled (default: infinite)
 - **`filter_chain`**: FilterChain instance for URL filtering
 - **`url_scorer`**: Scorer instance for evaluating URLs
 
