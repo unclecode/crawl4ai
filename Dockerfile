@@ -43,8 +43,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libjpeg-dev \
     redis-server \
     supervisor \
-    && apt-get clean \ 
+    xvfb \
+    x11vnc \
+    fluxbox \
+    websockify \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# Install noVNC for browser-based VNC access
+RUN git clone --depth 1 https://github.com/novnc/noVNC /opt/novnc \
+    && git clone --depth 1 https://github.com/novnc/websockify /opt/novnc/utils/websockify
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
