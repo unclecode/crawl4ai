@@ -150,7 +150,7 @@ def merge_chunks(
     total_tokens = 0
     
     for doc in docs:
-        tokens = doc.split()
+        tokens = splitter(doc)
         count = int(len(tokens) * word_token_ratio)
         if count:  # Skip empty docs
             token_counts.append(count)
@@ -1196,8 +1196,6 @@ def get_content_of_website_optimized(
                         return None
                 except InvalidSchema:
                     return None
-                finally:
-                    return
 
             image_height = img.get("height")
             height_value, height_unit = parse_dimension(image_height)
