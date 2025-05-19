@@ -615,11 +615,12 @@ class AsyncWebCrawler:
             )
 
             # Log extraction completion
-            self.logger.info(
-                message="Completed for {url:.50}... | Time: {timing}s",
-                tag="EXTRACT",
-                params={"url": _url, "timing": time.perf_counter() - t1},
-            )
+            self.logger.url_status(
+                        url=_url,
+                        success=bool(html),
+                        timing=time.perf_counter() - t1,
+                        tag="EXTRACT",
+                    )
 
         # Apply HTML formatting if requested
         if config.prettiify:
