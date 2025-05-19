@@ -54,7 +54,7 @@ class NBCNewsAPITest:
 async def test_basic_crawl():
     print("\n=== Testing Basic Crawl ===")
     async with NBCNewsAPITest() as api:
-        request = {"urls": "https://www.nbcnews.com/business", "priority": 10}
+        request = {"urls": ["https://www.nbcnews.com/business"], "priority": 10}
         task_id = await api.submit_crawl(request)
         result = await api.wait_for_task(task_id)
         print(f"Basic crawl result length: {len(result['result']['markdown'])}")
@@ -67,7 +67,7 @@ async def test_js_execution():
     print("\n=== Testing JS Execution ===")
     async with NBCNewsAPITest() as api:
         request = {
-            "urls": "https://www.nbcnews.com/business",
+            "urls": ["https://www.nbcnews.com/business"],
             "priority": 8,
             "js_code": [
                 "const loadMoreButton = Array.from(document.querySelectorAll('button')).find(button => button.textContent.includes('Load More')); loadMoreButton && loadMoreButton.click();"
@@ -86,7 +86,7 @@ async def test_css_selector():
     print("\n=== Testing CSS Selector ===")
     async with NBCNewsAPITest() as api:
         request = {
-            "urls": "https://www.nbcnews.com/business",
+            "urls": ["https://www.nbcnews.com/business"],
             "priority": 7,
             "css_selector": ".wide-tease-item__description",
         }
@@ -120,7 +120,7 @@ async def test_structured_extraction():
         }
 
         request = {
-            "urls": "https://www.nbcnews.com/business",
+            "urls": ["https://www.nbcnews.com/business"],
             "priority": 9,
             "extraction_config": {"type": "json_css", "params": {"schema": schema}},
         }
@@ -177,7 +177,7 @@ async def test_llm_extraction():
         }
 
         request = {
-            "urls": "https://www.nbcnews.com/business",
+            "urls": ["https://www.nbcnews.com/business"],
             "priority": 8,
             "extraction_config": {
                 "type": "llm",
@@ -209,7 +209,7 @@ async def test_screenshot():
     print("\n=== Testing Screenshot ===")
     async with NBCNewsAPITest() as api:
         request = {
-            "urls": "https://www.nbcnews.com/business",
+            "urls": ["https://www.nbcnews.com/business"],
             "priority": 5,
             "screenshot": True,
             "crawler_params": {"headless": True},
@@ -227,7 +227,7 @@ async def test_priority_handling():
     async with NBCNewsAPITest() as api:
         # Submit low priority task first
         low_priority = {
-            "urls": "https://www.nbcnews.com/business",
+            "urls": ["https://www.nbcnews.com/business"],
             "priority": 1,
             "crawler_params": {"headless": True},
         }
@@ -235,7 +235,7 @@ async def test_priority_handling():
 
         # Submit high priority task
         high_priority = {
-            "urls": "https://www.nbcnews.com/business/consumer",
+            "urls": ["https://www.nbcnews.com/business/consumer"],
             "priority": 10,
             "crawler_params": {"headless": True},
         }
