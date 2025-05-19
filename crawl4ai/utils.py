@@ -2012,14 +2012,16 @@ def normalize_url(href, base_url):
     parsed_base = urlparse(base_url)
     if not parsed_base.scheme or not parsed_base.netloc:
         raise ValueError(f"Invalid base URL format: {base_url}")
-
-    # Ensure base_url ends with a trailing slash if it's a directory path
-    if not base_url.endswith('/'):
-        base_url = base_url + '/'
+    
+    if  parsed_base.scheme.lower() not in ["http", "https"]:
+        # Handle special protocols
+        raise ValueError(f"Invalid base URL format: {base_url}")
+    cleaned_href = href.strip()
 
     # Use urljoin to handle all cases
-    normalized = urljoin(base_url, href.strip())
-    return normalized
+    return urljoin(base_url, cleaned_href)
+
+
 
 
 def normalize_url_for_deep_crawl(href, base_url):
