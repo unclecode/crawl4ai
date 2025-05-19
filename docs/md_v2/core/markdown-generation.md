@@ -187,7 +187,7 @@ from crawl4ai import CrawlerRunConfig
 bm25_filter = BM25ContentFilter(
     user_query="machine learning",
     bm25_threshold=1.2,
-    use_stemming=True
+    language="english"
 )
 
 md_generator = DefaultMarkdownGenerator(
@@ -200,7 +200,7 @@ config = CrawlerRunConfig(markdown_generator=md_generator)
 
 - **`user_query`**: The term you want to focus on. BM25 tries to keep only content blocks relevant to that query.  
 - **`bm25_threshold`**: Raise it to keep fewer blocks; lower it to keep more.  
-- **`use_stemming`**: If `True`, variations of words match (e.g., “learn,” “learning,” “learnt”).
+- **`language (str)`**: Language for stemming (default: 'english').
 
 **No query provided?** BM25 tries to glean a context from page metadata, or you can simply treat it as a scorched-earth approach that discards text with low generic score. Realistically, you want to supply a query for best results.
 
