@@ -1065,7 +1065,13 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
         finally:
             # If no session_id is given we should close the page
-            if not config.session_id:
+            all_contexts = page.context.browser.contexts
+            total_pages = sum(len(context.pages) for context in all_contexts)                
+            if config.session_id:
+                pass
+            elif total_pages <= 1 and (self.browser_config.use_managed_browser or self.browser_config.headless):
+                pass
+            else:
                 # Detach listeners before closing to prevent potential errors during close
                 if config.capture_network_requests:
                     page.remove_listener("request", handle_request_capture)
@@ -1075,6 +1081,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     page.remove_listener("console", handle_console_capture)
                     page.remove_listener("pageerror", handle_pageerror_capture)
                 
+                # Close the page
                 await page.close()
 
     async def _handle_full_page_scan(self, page: Page, scroll_delay: float = 0.1):

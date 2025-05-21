@@ -218,8 +218,18 @@ class BrowserProfiler:
                 termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
         
         try:
+            from playwright.async_api import async_playwright
+
             # Start the browser
-            await managed_browser.start()
+            # await managed_browser.start()
+            # 1. ── Start the browser ─────────────────────────────────────────
+            cdp_url = await managed_browser.start()
+
+            # 2. ── Attach Playwright to that running Chrome ──────────────────
+            pw       = await async_playwright().start()
+            browser  = await pw.chromium.connect_over_cdp(cdp_url)
+            # Grab the existing default context (there is always one)
+            context  = browser.contexts[0]
             
             # Check if browser started successfully
             browser_process = managed_browser.browser_process
@@ -244,6 +254,18 @@ class BrowserProfiler:
                 except asyncio.CancelledError:
                     pass
             
+            # 3. ── Persist storage state *before* we kill Chrome ─────────────
+            state_file = os.path.join(profile_path, "storage_state.json")
+            try:
+                await context.storage_state(path=state_file)
+                self.logger.info(f"[PROFILE].i  storage_state saved → {state_file}", tag="PROFILE")
+            except Exception as e:
+                self.logger.warning(f"[PROFILE].w  failed to save storage_state: {e}", tag="PROFILE")
+
+            # 4. ── Close everything cleanly ──────────────────────────────────
+            await browser.close()
+            await pw.stop()
+
             # If the browser is still running and the user pressed 'q', terminate it
             if browser_process.poll() is None and user_done_event.is_set():
                 self.logger.info("Terminating browser process...", tag="PROFILE")
