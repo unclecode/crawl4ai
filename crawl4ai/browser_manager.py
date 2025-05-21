@@ -1014,28 +1014,6 @@ class BrowserManager:
                 context = await self.create_browser_context(crawlerRunConfig)
                 ctx = self.default_context        # default context, one window only
                 ctx = await clone_runtime_state(context, ctx, crawlerRunConfig, self.config)
-                # import json
-                # with open(self.config.storage_state, "r") as fh:
-                #     state = json.load(fh)
-
-                # # 1. cookies
-                # await ctx.add_cookies(state["cookies"])
-
-                # # 2. local- / sessionStorage
-                # if state.get("origins"):
-                #     page = ctx.pages[0] if ctx.pages else await ctx.new_page()
-                #     for origin in state["origins"]:
-                #         url = origin["origin"]
-                #         for key, value in origin["localStorage"]:
-                #             await page.goto(url)
-                #             await page.evaluate(
-                #                 "(k, v) => localStorage.setItem(k, v)", key, value
-                #             )
-                
-                # If storage state is provided, create a new context
-                # context = await self.create_browser_context(crawlerRunConfig)
-                # await self.setup_context(context, crawlerRunConfig)
-                # self.default_context = context
                 page = await ctx.new_page()
             else:
                 context = self.default_context
