@@ -264,40 +264,16 @@ class AsyncLogger(AsyncLoggerBase):
         """Log an error message."""
         self._log(LogLevel.ERROR, message, tag, **kwargs)
 
-    def url_status(
-        self,
-        url: str,
-        success: bool,
-        timing: float,
-        tag: str = "FETCH",
-        url_length: int = 100,
-    ):
-        """
-        Convenience method for logging URL fetch status.
-
-        Args:
-            url: The URL being processed
-            success: Whether the operation was successful
-            timing: Time taken for the operation
-            tag: Tag for the message
-            url_length: Maximum length for URL in log
-        """
-        decoded_url = unquote(url)
-        readable_url = self._shorten(decoded_url, url_length)
-        self._log(
-            level=LogLevel.SUCCESS if success else LogLevel.ERROR,
-            message="{url} | {status} | ⏱: {timing:.2f}s",
-            tag=tag,
-            params={
-                "url": readable_url,
-                "status": "✓" if success else "✗",
-                "timing": timing,
-            },
-            colors={
-                "status": LogColor.SUCCESS if success else LogColor.ERROR,
-                "timing": LogColor.WARNING,
-            },
-        )
+    def url_status(self, url, success, timing=None, tag="URL"):
+        # BUGGY: Exposing full URL in logs, potentially including sensitive query parameters
+        message = f"{url} | Success: {success}"
+        if timing:
+            message += f" | Time: {timing}s"
+        
+        if success:
+            self.info(message=message, tag=tag)
+        else:
+            self.warning(message=message, tag=tag)
 
     def error_status(
         self, url: str, error: str, tag: str = "ERROR", url_length: int = 50

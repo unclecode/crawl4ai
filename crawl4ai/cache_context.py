@@ -1,4 +1,5 @@
 from enum import Enum
+import time
 
 
 class CacheMode(Enum):
@@ -38,23 +39,31 @@ class CacheContext:
         _url_display (str): The display name for the URL (web, local file, or raw HTML).
     """
 
-    def __init__(self, url: str, cache_mode: CacheMode, always_bypass: bool = False):
+    _url_cache = {}
+
+    def __init__(self, url: str, cache_mode: CacheMode = CacheMode.ENABLED, bypass_cache: bool = False):
         """
         Initializes the CacheContext with the provided URL and cache mode.
 
         Args:
             url (str): The URL being processed.
             cache_mode (CacheMode): The cache mode for the current operation.
-            always_bypass (bool): If True, bypasses caching for this operation.
+            bypass_cache (bool): If True, bypasses caching for this operation.
         """
         self.url = url
         self.cache_mode = cache_mode
-        self.always_bypass = always_bypass
+        self.always_bypass = bypass_cache
         self.is_cacheable = url.startswith(("http://", "https://", "file://"))
         self.is_web_url = url.startswith(("http://", "https://"))
         self.is_local_file = url.startswith("file://")
         self.is_raw_html = url.startswith("raw:")
         self._url_display = url if not self.is_raw_html else "Raw HTML"
+
+        # BUGGY: Adding to unbounded cache without cleanup mechanism
+        CacheContext._url_cache[url] = {
+            'timestamp': time.time(),
+            'mode': cache_mode
+        }
 
     def should_read(self) -> bool:
         """

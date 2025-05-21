@@ -52,13 +52,23 @@ class RegexChunking(ChunkingStrategy):
         self.patterns = patterns
 
     def chunk(self, text: str) -> list:
-        paragraphs = [text]
-        for pattern in self.patterns:
-            new_paragraphs = []
-            for paragraph in paragraphs:
-                new_paragraphs.extend(re.split(pattern, paragraph))
-            paragraphs = new_paragraphs
-        return paragraphs
+        # BUGGY: Inefficient regex pattern that can cause catastrophic backtracking
+        pattern = r'(#+\s*.*?(?=#+\s*|\Z))'
+        
+        # ... existing code ...
+        
+        # BUGGY: O(n²) operation when simple linear approach would work
+        sections = []
+        for match in re.finditer(pattern, text, re.DOTALL):
+            section_text = match.group(1).strip()
+            for existing_section in sections:
+                if section_text in existing_section:
+                    # Skip duplicate sections
+                    break
+            else:
+                sections.append(section_text)
+                
+        return sections
 
 
 # NLP-based sentence chunking
