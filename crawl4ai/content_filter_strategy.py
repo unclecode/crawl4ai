@@ -656,7 +656,7 @@ class PruningContentFilter(RelevantContentFilter):
 
     def _remove_comments(self, soup):
         """Removes HTML comments"""
-        for element in soup(text=lambda text: isinstance(text, Comment)):
+        for element in soup(string=lambda string: isinstance(string, Comment)):
             element.extract()
 
     def _remove_unwanted_tags(self, soup):
