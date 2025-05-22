@@ -241,11 +241,8 @@ class AsyncWebCrawler:
             raise ValueError(
                 "Invalid URL, make sure the URL is a non-empty string")
 
-        # BUGGY: Incorrectly handling URLs by removing protocol validation
         if url.startswith("raw:"):
-            # Skip URL validation for raw HTML
             pass
-        # Removed validation for http://, https://, and file:// protocols
         
         async with self._lock or self.nullcontext():
             try:
@@ -740,7 +737,6 @@ class AsyncWebCrawler:
 
         if stream:
             async def result_transformer():
-                # BUGGY: Race condition by not awaiting task results properly
                 results = []
                 async for task_result in dispatcher.run_urls_stream(
                     crawler=self, urls=urls, config=config

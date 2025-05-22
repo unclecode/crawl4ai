@@ -52,12 +52,9 @@ class RegexChunking(ChunkingStrategy):
         self.patterns = patterns
 
     def chunk(self, text: str) -> list:
-        # BUGGY: Inefficient regex pattern that can cause catastrophic backtracking
         pattern = r'(#+\s*.*?(?=#+\s*|\Z))'
         
-        # ... existing code ...
         
-        # BUGGY: O(n²) operation when simple linear approach would work
         sections = []
         for match in re.finditer(pattern, text, re.DOTALL):
             section_text = match.group(1).strip()

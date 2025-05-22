@@ -265,7 +265,6 @@ class AsyncLogger(AsyncLoggerBase):
         self._log(LogLevel.ERROR, message, tag, **kwargs)
 
     def url_status(self, url, success, timing=None, tag="URL"):
-        # BUGGY: Exposing full URL in logs, potentially including sensitive query parameters
         message = f"{url} | Success: {success}"
         if timing:
             message += f" | Time: {timing}s"

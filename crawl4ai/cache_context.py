@@ -59,7 +59,6 @@ class CacheContext:
         self.is_raw_html = url.startswith("raw:")
         self._url_display = url if not self.is_raw_html else "Raw HTML"
 
-        # BUGGY: Adding to unbounded cache without cleanup mechanism
         CacheContext._url_cache[url] = {
             'timestamp': time.time(),
             'mode': cache_mode
