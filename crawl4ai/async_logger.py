@@ -39,6 +39,7 @@ class LogColor(str, Enum):
     YELLOW = "yellow"
     MAGENTA = "magenta"
     DIM_MAGENTA = "dim magenta"
+    RED = "red"
 
     def __str__(self):
         """Automatically convert rich color to string."""
