@@ -458,7 +458,7 @@ class BrowserProfiler:
                 self.logger.info("4. Exit", tag="MENU", base_color=LogColor.MAGENTA)
                 exit_option = "4"
             
-            self.logger.print(f"\n[cyan]Enter your choice (1-{exit_option}): [/cyan]", end="")
+            self.logger.info(f"\n[cyan]Enter your choice (1-{exit_option}): [/cyan]", end="")
             choice = input()
             
             if choice == "1":
