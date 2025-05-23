@@ -6,6 +6,7 @@ from datetime import datetime
 from urllib.parse import unquote
 from rich.console import Console
 from rich.text import Text
+from loguru import logger as loguru_logger
 from .utils import create_box_message
 
 
@@ -137,9 +138,22 @@ class AsyncLogger(AsyncLoggerBase):
         self.verbose = verbose
         self.console = Console()
 
-        # Create log file directory if needed
+        # Initialize loguru logger for async file writing
+        self.loguru_logger = loguru_logger.bind()
         if log_file:
+            # Create log file directory if needed
             os.makedirs(os.path.dirname(os.path.abspath(log_file)), exist_ok=True)
+            # Remove default handler and add file sink with async processing
+            self.loguru_logger.remove()
+            self.loguru_logger.add(
+                log_file,
+                level="DEBUG" if self.log_level == LogLevel.DEBUG else "INFO",
+                backtrace=True,
+                diagnose=True,
+                rotation="50 MB",
+                enqueue=True,  # Enable async file writing
+                encoding="utf-8"
+            )
 
     def _format_tag(self, tag: str) -> str:
         """Format a tag with consistent width."""
@@ -156,15 +170,6 @@ class AsyncLogger(AsyncLoggerBase):
         half = (length - len(placeholder)) // 2
         shortened = text[:half] + placeholder + text[-half:]
         return shortened.ljust(length)  # Also pad shortened text to consistent length
-
-    def _write_to_file(self, message: str):
-        """Write a message to the log file if configured."""
-        if self.log_file:
-            text = Text.from_markup(message)
-            plain_text = text.plain
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-            with open(self.log_file, "a", encoding="utf-8") as f:
-                f.write(f"[{timestamp}] {plain_text}\n")
 
     def _log(
         self,
@@ -225,8 +230,12 @@ class AsyncLogger(AsyncLoggerBase):
         if self.verbose or kwargs.get("force_verbose", False):
             self.console.print(log_line)
 
-        # Write to file if configured
-        self._write_to_file(log_line)
+        # Write to file using loguru if configured
+        if self.log_file:
+            # Extract plain text from rich markup for file logging
+            text = Text.from_markup(log_line)
+            plain_text = text.plain
+            self.loguru_logger.info(plain_text)
 
     def debug(self, message: str, tag: str = "DEBUG", **kwargs):
         """Log a debug message."""
