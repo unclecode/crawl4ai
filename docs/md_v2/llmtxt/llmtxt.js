@@ -64,13 +64,9 @@ document.addEventListener('DOMContentLoaded', () => {
     setupActionHandlers();
     setupColumnHeaderHandlers();
     
-    // Initialize all components as selected with all context types
-    components.forEach(comp => {
-        if (!comp.special) {
-            state.selectedComponents.add(comp.id);
-            state.selectedContextTypes.set(comp.id, new Set(contextTypes));
-        }
-    });
+    // Initialize only core component as selected with all context types
+    state.selectedComponents.add('core');
+    state.selectedContextTypes.set('core', new Set(contextTypes));
     updateComponentUI();
 });
 

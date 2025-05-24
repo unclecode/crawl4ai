@@ -296,7 +296,9 @@ body {
     color: var(--background-color);
 }
 
-.component-selection-table th:not(:first-child) {
+.component-selection-table th:nth-child(3),
+.component-selection-table th:nth-child(4),
+.component-selection-table th:nth-child(5) {
     text-align: center;
     width: 120px;
 }
@@ -305,7 +307,9 @@ body {
     font-size: 13px;
 }
 
-.component-selection-table td:not(:first-child) {
+.component-selection-table td:nth-child(3),
+.component-selection-table td:nth-child(4),
+.component-selection-table td:nth-child(5) {
     text-align: center;
 }
 
