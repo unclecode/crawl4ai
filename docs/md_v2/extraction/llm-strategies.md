@@ -23,7 +23,7 @@ In some cases, you need to extract **complex or unstructured** information from 
 You can use LlmConfig, to quickly configure multiple variations of LLMs and experiment with them to find the optimal one for your use case. You can read more about LlmConfig [here](/api/parameters).
 
 ```python
-llmConfig = LlmConfig(provider="openai/gpt-4o-mini", api_token=os.getenv("OPENAI_API_KEY"))
+llmConfig = LLMConfig(provider="openai/gpt-4o-mini", api_token=os.getenv("OPENAI_API_KEY"))
 ```
 
 Crawl4AI uses a “provider string” (e.g., `"openai/gpt-4o"`, `"ollama/llama2.0"`, `"aws/titan"`) to identify your LLM. **Any** model that LiteLLM supports is fair game. You just provide:
@@ -218,7 +218,7 @@ import json
 import asyncio
 from typing import List
 from pydantic import BaseModel, Field
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, LLMConfig, CacheMode
 from crawl4ai.extraction_strategy import LLMExtractionStrategy
 
 class Entity(BaseModel):
@@ -238,7 +238,7 @@ class KnowledgeGraph(BaseModel):
 async def main():
     # LLM extraction strategy
     llm_strat = LLMExtractionStrategy(
-        llmConfig = LlmConfig(provider="openai/gpt-4", api_token=os.getenv('OPENAI_API_KEY')),
+        llm_config = LLMConfig(provider="openai/gpt-4", api_token=os.getenv('OPENAI_API_KEY')),
         schema=KnowledgeGraph.schema_json(),
         extraction_type="schema",
         instruction="Extract entities and relationships from the content. Return valid JSON.",
