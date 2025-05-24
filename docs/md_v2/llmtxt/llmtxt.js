@@ -3,6 +3,12 @@
 // Component definitions
 const components = [
     {
+        id: 'all',
+        name: 'All Components',
+        description: 'All components with all context types',
+        special: true
+    },
+    {
         id: 'core',
         name: 'Core Functionality',
         description: 'Basic crawling and scraping features'
