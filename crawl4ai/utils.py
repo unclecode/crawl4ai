@@ -2931,12 +2931,11 @@ echo "📦 Installing system dependencies..."
 apt-get update -y
 apt-get install -y xvfb x11vnc fluxbox websockify git
 
-echo "📥 Setting up noVNC..."
+echo "📥 Setting up virtual display..."
 git clone https://github.com/novnc/noVNC         /opt/novnc
 git clone https://github.com/novnc/websockify    /opt/novnc/utils/websockify
 
 pip install -q nest_asyncio google-colab
-
 echo "✅ Setup complete!"
 ''')
 
