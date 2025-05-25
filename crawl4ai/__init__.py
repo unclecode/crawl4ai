@@ -66,6 +66,11 @@ from .deep_crawling import (
     DeepCrawlDecorator,
 )
 
+from .utils import (
+    start_colab_display_server,
+    setup_colab_environment
+)
+
 __all__ = [
     "AsyncLoggerBase",
     "AsyncLogger",
@@ -124,7 +129,9 @@ __all__ = [
     "Crawl4aiDockerClient",
     "ProxyRotationStrategy",
     "RoundRobinProxyStrategy",
-    "ProxyConfig"
+    "ProxyConfig",
+    "start_colab_display_server",
+    "setup_colab_environment",
 ]
 
 

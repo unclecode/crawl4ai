@@ -2914,7 +2914,7 @@ def start_colab_display_server():
 
 
 
-def setup_colab_environment_ipython():
+def setup_colab_environment():
     """
     Alternative setup using IPython magic commands
     """
