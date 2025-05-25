@@ -187,7 +187,7 @@ from crawl4ai import CrawlerRunConfig
 bm25_filter = BM25ContentFilter(
     user_query="machine learning",
     bm25_threshold=1.2,
-    use_stemming=True
+    language="english"
 )
 
 md_generator = DefaultMarkdownGenerator(
