@@ -267,3 +267,4 @@ docs/**/data
 .codecat/
 
 docs/apps/linkdin/debug*/
+docs/apps/linkdin/samples/insights/*

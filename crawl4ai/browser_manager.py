@@ -255,6 +255,13 @@ class ManagedBrowser:
                     preexec_fn=os.setpgrp  # Start in a new process group
                 )
                 
+            # If verbose is True print args used to run the process
+            if self.logger and self.browser_config.verbose:
+                self.logger.debug(
+                    f"Starting browser with args: {' '.join(args)}",
+                    tag="BROWSER"
+                )    
+                
             # We'll monitor for a short time to make sure it starts properly, but won't keep monitoring
             await asyncio.sleep(0.5)  # Give browser time to start
             await self._initial_startup_check()

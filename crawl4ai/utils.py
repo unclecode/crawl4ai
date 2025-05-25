@@ -6,6 +6,7 @@ import html
 import lxml
 import re
 import os
+import subprocess
 import platform
 from .prompts import PROMPT_EXTRACT_BLOCKS
 from array import array
@@ -2868,5 +2869,74 @@ def preprocess_html_for_schema(html_content, text_threshold=100, attr_value_thre
     
     except Exception as e:
         # Fallback for parsing errors
-        return html_content[:max_size] if len(html_content) > max_size else html_content
+        return html_content[:max_size] if len(html_content) > max_size else html_content    
+
+def start_colab_display_server():
+    """
+    Start virtual display server in Google Colab.
+    Raises error if not running in Colab environment.
+    """
+    # Check if running in Google Colab
+    try:
+        import google.colab
+        from google.colab import output
+        from IPython.display import IFrame, display
+    except ImportError:
+        raise RuntimeError("This function must be run in Google Colab environment.")
     
+    import os, time, subprocess
+    
+    os.environ["DISPLAY"] = ":99"
+    
+    # Xvfb
+    xvfb = subprocess.Popen(["Xvfb", ":99", "-screen", "0", "1280x720x24"])
+    time.sleep(2)
+    
+    # minimal window manager
+    fluxbox = subprocess.Popen(["fluxbox"])
+    
+    # VNC → X
+    x11vnc = subprocess.Popen(["x11vnc",
+                              "-display", ":99",
+                              "-nopw", "-forever", "-shared",
+                              "-rfbport", "5900", "-quiet"])
+    
+    # websockify → VNC
+    novnc = subprocess.Popen(["/opt/novnc/utils/websockify/run",
+                              "6080", "localhost:5900",
+                              "--web", "/opt/novnc"])
+    
+    time.sleep(2)  # give ports a moment
+    
+    # Colab proxy url
+    url = output.eval_js("google.colab.kernel.proxyPort(6080)")
+    display(IFrame(f"{url}/vnc.html?autoconnect=true&resize=scale", width=1024, height=768))
+
+
+
+def setup_colab_environment_ipython():
+    """
+    Alternative setup using IPython magic commands
+    """
+    from IPython import get_ipython
+    ipython = get_ipython()
+    
+    print("🚀 Setting up Crawl4AI environment in Google Colab...")
+    
+    # Run the bash commands
+    ipython.run_cell_magic('bash', '', '''
+set -e
+
+echo "📦 Installing system dependencies..."
+apt-get update -y
+apt-get install -y xvfb x11vnc fluxbox websockify git
+
+echo "📥 Setting up noVNC..."
+git clone https://github.com/novnc/noVNC         /opt/novnc
+git clone https://github.com/novnc/websockify    /opt/novnc/utils/websockify
+
+pip install -q nest_asyncio google-colab
+
+echo "✅ Setup complete!"
+''')
+
