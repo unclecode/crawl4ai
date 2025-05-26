@@ -756,6 +756,12 @@ class CrawlerRunConfig():
                                Default: False.
         shared_data (dict or None): Shared data to be passed between hooks.
                                      Default: None.
+        check_content_changed (bool): If True, check if the content has changed before processing.
+                                      Default: False.
+        head_request_timeout (float): Timeout in seconds for the initial HEAD request.
+                                      Default: 3.0.
+        default_cache_ttl_seconds (int): Default time-to-live for cached responses in seconds.
+                                          Default: None.
 
         # Page Navigation and Timing Parameters
         wait_until (str): The condition to wait for when navigating, e.g. "domcontentloaded".
@@ -900,6 +906,9 @@ class CrawlerRunConfig():
         no_cache_read: bool = False,
         no_cache_write: bool = False,
         shared_data: dict = None,
+        check_content_changed: bool = False,
+        head_request_timeout: float = 3.0,
+        default_cache_ttl_seconds: int = None,
         # Page Navigation and Timing Parameters
         wait_until: str = "domcontentloaded",
         page_timeout: int = PAGE_TIMEOUT,
@@ -995,6 +1004,9 @@ class CrawlerRunConfig():
         self.no_cache_read = no_cache_read
         self.no_cache_write = no_cache_write
         self.shared_data = shared_data
+        self.check_content_changed = check_content_changed 
+        self.head_request_timeout = head_request_timeout
+        self.default_cache_ttl_seconds = default_cache_ttl_seconds
 
         # Page Navigation and Timing Parameters
         self.wait_until = wait_until
@@ -1247,6 +1259,9 @@ class CrawlerRunConfig():
             "no_cache_read": self.no_cache_read,
             "no_cache_write": self.no_cache_write,
             "shared_data": self.shared_data,
+            "check_content_changed": self.check_content_changed,  # Add this line
+            "head_request_timeout": self.head_request_timeout,
+            "default_cache_ttl_seconds": self.default_cache_ttl_seconds,
             "wait_until": self.wait_until,
             "page_timeout": self.page_timeout,
             "wait_for": self.wait_for,
