@@ -2662,7 +2662,7 @@ class HeadPeekr:
         return meta_tags
 
     def get_title(head_content: str):
-        title_match = re.search(r'<title>(.*?)</title>', head_content, re.IGNORECASE | re.DOTALL)
+        title_match = re.search(r'<title\b[^>]*>(.*?)</title>', head_content, re.IGNORECASE | re.DOTALL)
         return title_match.group(1) if title_match else None
 
 def preprocess_html_for_schema(html_content, text_threshold=100, attr_value_threshold=200, max_size=100000):
