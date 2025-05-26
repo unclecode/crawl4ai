@@ -1149,6 +1149,9 @@ class CrawlerRunConfig():
             no_cache_read=kwargs.get("no_cache_read", False),
             no_cache_write=kwargs.get("no_cache_write", False),
             shared_data=kwargs.get("shared_data", None),
+            check_content_changed=kwargs.get("check_content_changed", False),
+            head_request_timeout=kwargs.get("head_request_timeout", 3.0),
+            default_cache_ttl_seconds=kwargs.get("default_cache_ttl_seconds", None),
             # Page Navigation and Timing Parameters
             wait_until=kwargs.get("wait_until", "domcontentloaded"),
             page_timeout=kwargs.get("page_timeout", 60000),

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional, List
 import json
 import asyncio
-
+import aiohttp
 # from contextlib import nullcontext, asynccontextmanager
 from contextlib import asynccontextmanager
 from .models import (
@@ -266,10 +266,19 @@ class AsyncWebCrawler:
                 if cache_context.should_read():
                     cached_result = await async_db_manager.aget_cached_url(url)
 
-                # Try to get cached result if appropriate
-                if cache_context.should_read():
-                    cached_result = await async_db_manager.aget_cached_url(url)
-
+                # Update proxy configuration from rotation strategy if available
+                if config and config.proxy_rotation_strategy:
+                    next_proxy: ProxyConfig = await config.proxy_rotation_strategy.get_next_proxy()
+                    if next_proxy:
+                        self.logger.info(
+                            message="Switch proxy: {proxy}",
+                            tag="PROXY",
+                            params={"proxy": next_proxy.server}
+                        )
+                        config.proxy_config = next_proxy
+                        # config = config.clone(proxy_config=next_proxy)
+                
+                
                 if cached_result:
 
                     if config.check_content_changed:
@@ -318,18 +327,6 @@ class AsyncWebCrawler:
                             tag="CACHE",
                             params={"url": url},
                         )
-
-                    # Update proxy configuration from rotation strategy if available
-                    if config and config.proxy_rotation_strategy:
-                        next_proxy: ProxyConfig = await config.proxy_rotation_strategy.get_next_proxy()
-                        if next_proxy:
-                            self.logger.info(
-                                message="Switch proxy: {proxy}",
-                                tag="PROXY",
-                                params={"proxy": next_proxy.server}
-                            )
-                            config.proxy_config = next_proxy
-                            # config = config.clone(proxy_config=next_proxy)
 
                 # Fetch fresh content if needed
                 if (not cached_result or not html) and content_changed:
