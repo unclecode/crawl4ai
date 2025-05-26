@@ -9,7 +9,7 @@ from bs4 import NavigableString, Comment
 
 from .utils import (
     clean_tokens,
-    perform_completion_with_backoff,
+    aperform_completion_with_backoff,
     escape_json_string,
     sanitize_html,
     get_home_folder,
@@ -953,7 +953,7 @@ class LLMContentFilter(RelevantContentFilter):
                 for var, value in prompt_variables.items():
                     prompt = prompt.replace("{" + var + "}", value)
 
-                def _proceed_with_chunk(
+                async def _proceed_with_chunk(
                     provider: str,
                     prompt: str,
                     api_token: str,
@@ -966,7 +966,7 @@ class LLMContentFilter(RelevantContentFilter):
                             tag="CHUNK",
                             params={"chunk_num": i + 1},
                         )
-                    return perform_completion_with_backoff(
+                    return await aperform_completion_with_backoff(
                         provider,
                         prompt,
                         api_token,

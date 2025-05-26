@@ -1672,7 +1672,7 @@ def extract_xml_data(tags, string):
     return data
 
 
-def perform_completion_with_backoff(
+async def aperform_completion_with_backoff(
     provider,
     prompt_with_variables,
     api_token,
@@ -1700,7 +1700,7 @@ def perform_completion_with_backoff(
         dict: The API response or an error message after all retries.
     """
 
-    from litellm import completion
+    from litellm import acompletion
     from litellm.exceptions import RateLimitError
 
     max_attempts = 3
@@ -1715,7 +1715,7 @@ def perform_completion_with_backoff(
 
     for attempt in range(max_attempts):
         try:
-            response = completion(
+            response = await acompletion(
                 model=provider,
                 messages=[{"role": "user", "content": prompt_with_variables}],
                 **extra_args,
@@ -1754,7 +1754,7 @@ def perform_completion_with_backoff(
             # ]
 
 
-def extract_blocks(url, html, provider=DEFAULT_PROVIDER, api_token=None, base_url=None):
+async def extract_blocks(url, html, provider=DEFAULT_PROVIDER, api_token=None, base_url=None):
     """
     Extract content blocks from website HTML using an AI provider.
 
@@ -1788,7 +1788,7 @@ def extract_blocks(url, html, provider=DEFAULT_PROVIDER, api_token=None, base_ur
             "{" + variable + "}", variable_values[variable]
         )
 
-    response = perform_completion_with_backoff(
+    response = await aperform_completion_with_backoff(
         provider, prompt_with_variables, api_token, base_url=base_url
     )
 
