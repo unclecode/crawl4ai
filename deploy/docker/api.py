@@ -24,7 +24,7 @@ from crawl4ai import (
     RateLimiter, 
     LLMConfig
 )
-from crawl4ai.utils import perform_completion_with_backoff
+from crawl4ai.utils import aperform_completion_with_backoff
 from crawl4ai.content_filter_strategy import (
     PruningContentFilter,
     BM25ContentFilter,
@@ -88,7 +88,7 @@ async def handle_llm_qa(
 
     Answer:"""
 
-        response = perform_completion_with_backoff(
+        response = await aperform_completion_with_backoff(
             provider=config["llm"]["provider"],
             prompt_with_variables=prompt,
             api_token=os.environ.get(config["llm"].get("api_key_env", ""))
