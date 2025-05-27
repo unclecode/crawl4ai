@@ -79,6 +79,7 @@ crawl4ai-migrate = "crawl4ai.migrations:main"
 crawl4ai-setup = "crawl4ai.install:post_install"
 crawl4ai-doctor = "crawl4ai.install:doctor"
 crwl = "crawl4ai.cli:main"
+crawl4ai = "crawl4ai.cli:main"
 
 [tool.setuptools]
 packages = {find = {where = ["."], include = ["crawl4ai*"]}}
