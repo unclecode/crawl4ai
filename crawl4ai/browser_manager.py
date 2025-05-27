@@ -214,7 +214,7 @@ class ManagedBrowser:
             else:  # macOS / Linux
                 # kill any process listening on the same debugging port
                 pids = (
-                    subprocess.check_output(shlex.split(f"lsof -t -i:{self.debugging_port}"))
+                    subprocess.check_output(shlex.split(f"lsof -Q -t -i:{self.debugging_port}"))
                     .decode()
                     .strip()
                     .splitlines()
