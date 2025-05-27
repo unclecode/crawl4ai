@@ -6,7 +6,7 @@ from .async_configs import BrowserConfig, CrawlerRunConfig, HTTPCrawlerConfig, L
 
 from .content_scraping_strategy import (
     ContentScrapingStrategy,
-    WebScrapingStrategy,
+    # WebScrapingStrategy,
     LXMLWebScrapingStrategy,
 )
 from .async_logger import (
@@ -100,7 +100,7 @@ __all__ = [
     "CrawlerHub",
     "CacheMode",
     "ContentScrapingStrategy",
-    "WebScrapingStrategy",
+    # "WebScrapingStrategy",
     "LXMLWebScrapingStrategy",
     "BrowserConfig",
     "CrawlerRunConfig",

@@ -1,6 +1,12 @@
-import time, re
-from crawl4ai.content_scraping_strategy import WebScrapingStrategy,  LXMLWebScrapingStrategy
 import time
+import os
+import sys
+
+parent_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(parent_dir)
+__location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
+
+from crawl4ai.content_scraping_strategy import LXMLWebScrapingStrategy
 import functools
 from collections import defaultdict
 
@@ -57,7 +63,7 @@ methods_to_profile = [
 
 
 # Apply decorators to both strategies
-for strategy, name in [(WebScrapingStrategy, "Original"), (LXMLWebScrapingStrategy, "LXML")]:
+for strategy, name in [(LXMLWebScrapingStrategy, "Original"), (LXMLWebScrapingStrategy, "LXML")]:
     for method in methods_to_profile:
         apply_decorators(strategy, method, name)
 
@@ -85,7 +91,7 @@ def generate_large_html(n_elements=1000):
 
 def test_scraping():
     # Initialize both scrapers
-    original_scraper = WebScrapingStrategy()
+    original_scraper = LXMLWebScrapingStrategy()
     selected_scraper = LXMLWebScrapingStrategy()
     
     # Generate test HTML
