@@ -1487,8 +1487,29 @@ def extract_metadata_using_lxml(html, doc=None):
     head = head[0]
 
     # Title - using XPath
+    # title = head.xpath(".//title/text()")
+    # metadata["title"] = title[0].strip() if title else None
+
+    # === Title Extraction - New Approach ===
+    # Attempt to extract <title> using XPath
     title = head.xpath(".//title/text()")
-    metadata["title"] = title[0].strip() if title else None
+    title = title[0] if title else None
+
+    # Fallback: Use .find() in case XPath fails due to malformed HTML
+    if not title:
+        title_el = doc.find(".//title")
+        title = title_el.text if title_el is not None else None
+
+    # Final fallback: Use OpenGraph or Twitter title if <title> is missing or empty
+    if not title:
+        title_candidates = (
+            doc.xpath("//meta[@property='og:title']/@content") or
+            doc.xpath("//meta[@name='twitter:title']/@content")
+        )
+        title = title_candidates[0] if title_candidates else None
+
+    # Strip and assign title
+    metadata["title"] = title.strip() if title else None
 
     # Meta description - using XPath with multiple attribute conditions
     description = head.xpath('.//meta[@name="description"]/@content')

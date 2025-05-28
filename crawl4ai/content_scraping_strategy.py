@@ -696,6 +696,13 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
 
         success = True
         try:
+            # Extract metadata FIRST from the original HTML to avoid issues with modified content.
+            try:
+                meta = extract_metadata_using_lxml(html, None)  # Pass the original HTML
+            except Exception as e:
+                self._log("error", f"Error extracting metadata: {str(e)}", "SCRAPE")
+                meta = {}
+                
             doc = lhtml.document_fromstring(html)
             # Match BeautifulSoup's behavior of using body or full doc
             # body = doc.xpath('//body')[0] if doc.xpath('//body') else doc
@@ -736,14 +743,14 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                         "error", f"Error with excluded CSS selector: {str(e)}", "SCRAPE"
                     )
 
-            # Extract metadata before any content filtering
-            try:
-                meta = extract_metadata_using_lxml(
-                    "", doc
-                )  # Using same function as BeautifulSoup version
-            except Exception as e:
-                self._log("error", f"Error extracting metadata: {str(e)}", "SCRAPE")
-                meta = {}
+            # # Extract metadata before any content filtering
+            # try:
+            #     meta = extract_metadata_using_lxml(
+            #         "", doc
+            #     )  # Using same function as BeautifulSoup version
+            # except Exception as e:
+            #     self._log("error", f"Error extracting metadata: {str(e)}", "SCRAPE")
+            #     meta = {}
 
             content_element = None
             if target_elements:
