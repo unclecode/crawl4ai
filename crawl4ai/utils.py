@@ -1,33 +1,215 @@
 import time
-from urllib.parse import urlparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from bs4 import BeautifulSoup, Comment, element, Tag, NavigableString
 import json
 import html
+import lxml
 import re
 import os
 import platform
 from .prompts import PROMPT_EXTRACT_BLOCKS
-from .config import *
+from array import array
+from .html2text import html2text, CustomHTML2Text
+# from .config import *
+from .config import MIN_WORD_THRESHOLD, IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD, IMAGE_SCORE_THRESHOLD, DEFAULT_PROVIDER, PROVIDER_MODELS
+import httpx
+from socket import gaierror
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional, Callable
 from urllib.parse import urljoin
 import requests
 from requests.exceptions import InvalidSchema
-from typing import Dict, Any
 import xxhash
-from colorama import Fore, Style, init
 import textwrap
 import cProfile
 import pstats
 from functools import wraps
 import asyncio
-
+from lxml import etree, html as lhtml
 import sqlite3
 import hashlib
-from urllib.parse import urljoin, urlparse
+
 from urllib.robotparser import RobotFileParser
 import aiohttp
+from urllib.parse import urlparse, urlunparse
+from functools import lru_cache
+
+from packaging import version
+from . import __version__
+from typing import Sequence
+
+from itertools import chain
+from collections import deque
+from typing import  Generator, Iterable
+
+def chunk_documents(
+    documents: Iterable[str],
+    chunk_token_threshold: int,
+    overlap: int,
+    word_token_rate: float = 0.75,
+    tokenizer: Optional[Callable[[str], List[str]]] = None,
+) -> Generator[str, None, None]:
+    """
+    Efficiently chunks documents into token-limited sections with overlap between chunks.
+
+    Args:
+        documents: Iterable of document strings
+        chunk_token_threshold: Maximum tokens per chunk
+        overlap: Number of tokens to overlap between chunks
+        word_token_rate: Token estimate per word when not using a tokenizer
+        tokenizer: Function that splits text into tokens (if available)
+
+    Yields:
+        Text chunks as strings
+    """
+    token_queue = deque()
+    contribution_queue = deque()
+    current_token_count = 0.0
+
+    for doc in documents:
+        # Tokenize document
+        if tokenizer:
+            tokens = tokenizer(doc)
+            contributions = [1.0] * len(tokens)
+        else:
+            tokens = doc.split()
+            contributions = [word_token_rate] * len(tokens)
+
+        # Add to processing queues
+        token_queue.extend(tokens)
+        contribution_queue.extend(contributions)
+        current_token_count += sum(contributions)
+
+        # Process full chunks
+        while current_token_count >= chunk_token_threshold:
+            # Find chunk split point
+            chunk_tokens = []
+            chunk_contrib = []
+            chunk_total = 0.0
+            
+            # Build chunk up to threshold
+            while contribution_queue:
+                next_contrib = contribution_queue[0]
+                if chunk_total + next_contrib > chunk_token_threshold:
+                    break
+                
+                chunk_total += next_contrib
+                chunk_contrib.append(contribution_queue.popleft())
+                chunk_tokens.append(token_queue.popleft())
+
+            # Handle edge case where first token exceeds threshold
+            if not chunk_contrib:  # Single token exceeds threshold
+                chunk_contrib.append(contribution_queue.popleft())
+                chunk_tokens.append(token_queue.popleft())
+
+            # Calculate overlap
+            overlap_total = 0.0
+            overlap_idx = 0
+            for contrib in reversed(chunk_contrib):
+                if overlap_total + contrib > overlap:
+                    break
+                overlap_total += contrib
+                overlap_idx += 1
+
+            # Prepend overlap to queues
+            if overlap_idx > 0:
+                overlap_tokens = chunk_tokens[-overlap_idx:]
+                overlap_contrib = chunk_contrib[-overlap_idx:]
+                
+                token_queue.extendleft(reversed(overlap_tokens))
+                contribution_queue.extendleft(reversed(overlap_contrib))
+                current_token_count += overlap_total
+
+            # Update current token count and yield chunk
+            current_token_count -= sum(chunk_contrib)
+            yield " ".join(chunk_tokens[:len(chunk_tokens)-overlap_idx] if overlap_idx else chunk_tokens)
+
+    # Yield remaining tokens
+    if token_queue:
+        yield " ".join(token_queue)
+
+def merge_chunks(
+    docs: Sequence[str], 
+    target_size: int,
+    overlap: int = 0,
+    word_token_ratio: float = 1.0,
+    splitter: Callable = None
+) -> List[str]:
+    """Merges documents into chunks of specified token size.
+    
+    Args:
+        docs: Input documents
+        target_size: Desired token count per chunk
+        overlap: Number of tokens to overlap between chunks
+        word_token_ratio: Multiplier for word->token conversion
+    """
+    # Pre-tokenize all docs and store token counts
+    splitter = splitter or str.split
+    token_counts = array('I')
+    all_tokens: List[List[str]] = []
+    total_tokens = 0
+    
+    for doc in docs:
+        tokens = doc.split()
+        count = int(len(tokens) * word_token_ratio)
+        if count:  # Skip empty docs
+            token_counts.append(count)
+            all_tokens.append(tokens)
+            total_tokens += count
+    
+    if not total_tokens:
+        return []
+
+    # Pre-allocate chunks
+    num_chunks = max(1, (total_tokens + target_size - 1) // target_size)
+    chunks: List[List[str]] = [[] for _ in range(num_chunks)]
+    
+    curr_chunk = 0
+    curr_size = 0
+    
+    # Distribute tokens
+    for tokens in chain.from_iterable(all_tokens):
+        if curr_size >= target_size and curr_chunk < num_chunks - 1:
+            if overlap > 0:
+                overlap_tokens = chunks[curr_chunk][-overlap:]
+                curr_chunk += 1
+                chunks[curr_chunk].extend(overlap_tokens)
+                curr_size = len(overlap_tokens)
+            else:
+                curr_chunk += 1
+                curr_size = 0
+                
+        chunks[curr_chunk].append(tokens)
+        curr_size += 1
+
+    # Return only non-empty chunks
+    return [' '.join(chunk) for chunk in chunks if chunk]
+
+
+class VersionManager:
+    def __init__(self):
+        self.home_dir = Path.home() / ".crawl4ai"
+        self.version_file = self.home_dir / "version.txt"
+
+    def get_installed_version(self):
+        """Get the version recorded in home directory"""
+        if not self.version_file.exists():
+            return None
+        try:
+            return version.parse(self.version_file.read_text().strip())
+        except Exception as _ex:
+            return None
+
+    def update_version(self):
+        """Update the version file to current library version"""
+        self.version_file.write_text(__version__.__version__)
+
+    def needs_update(self):
+        """Check if database needs update based on version"""
+        installed = self.get_installed_version()
+        current = version.parse(__version__.__version__)
+        return installed is None or installed < current
+
 
 class RobotsParser:
     # Default 7 days cache TTL
@@ -107,7 +289,7 @@ class RobotsParser:
             domain = parsed.netloc
             if not domain:
                 return True
-        except:
+        except Exception as _ex:
             return True
 
         # Fast path - check cache first
@@ -127,7 +309,7 @@ class RobotsParser:
                             self._cache_rules(domain, rules)
                         else:
                             return True
-            except:
+            except Exception as _ex:
                 # On any error (timeout, connection failed, etc), allow access
                 return True
 
@@ -160,6 +342,77 @@ class InvalidCSSSelectorError(Exception):
     pass
 
 
+SPLITS = bytearray([
+    # Control chars (0-31) + space (32)
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    # Special chars (33-47): ! " # $ % & ' ( ) * + , - . /
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    # Numbers (48-57): Treat as non-splits
+    0,0,0,0,0,0,0,0,0,0,
+    # More special chars (58-64): : ; < = > ? @
+    1,1,1,1,1,1,1,
+    # Uppercase (65-90): Keep
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    # More special chars (91-96): [ \ ] ^ _ `
+    1,1,1,1,1,1,
+    # Lowercase (97-122): Keep
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    # Special chars (123-126): { | } ~
+    1,1,1,1,
+    # Extended ASCII
+    *([1] * 128)
+])
+
+# Additional split chars for HTML/code
+HTML_CODE_CHARS = {
+    # HTML specific
+    '•', '►', '▼', '©', '®', '™', '→', '⇒', '≈', '≤', '≥',
+    # Programming symbols  
+    '+=', '-=', '*=', '/=', '=>', '<=>', '!=', '==', '===',
+    '++', '--', '<<', '>>', '&&', '||', '??', '?:', '?.', 
+    # Common Unicode
+    '…', '"', '"', ''', ''', '«', '»', '—', '–',
+    # Additional splits
+    '+', '=', '~', '@', '#', '$', '%', '^', '&', '*',
+    '(', ')', '{', '}', '[', ']', '|', '\\', '/', '`',
+    '<', '>', ',', '.', '?', '!', ':', ';', '-', '_'
+}
+
+def advanced_split(text: str) -> list[str]:
+    result = []
+    word = array('u')
+    
+    i = 0
+    text_len = len(text)
+    
+    while i < text_len:
+        char = text[i]
+        o = ord(char)
+        
+        # Fast path for ASCII
+        if o < 256 and SPLITS[o]:
+            if word:
+                result.append(word.tounicode())
+                word = array('u')
+        # Check for multi-char symbols
+        elif i < text_len - 1:
+            two_chars = char + text[i + 1]
+            if two_chars in HTML_CODE_CHARS:
+                if word:
+                    result.append(word.tounicode())
+                    word = array('u')
+                i += 1  # Skip next char since we used it
+            else:
+                word.append(char)
+        else:
+            word.append(char)
+        i += 1
+            
+    if word:
+        result.append(word.tounicode())
+        
+    return result
+
 def create_box_message(
     message: str,
     type: str = "info",
@@ -187,14 +440,13 @@ def create_box_message(
         str: A formatted string containing the styled message box.
     """
 
-    init()
-
     # Define border and text colors for different types
     styles = {
-        "warning": (Fore.YELLOW, Fore.LIGHTYELLOW_EX, "⚠"),
-        "info": (Fore.BLUE, Fore.LIGHTBLUE_EX, "ℹ"),
-        "success": (Fore.GREEN, Fore.LIGHTGREEN_EX, "✓"),
-        "error": (Fore.RED, Fore.LIGHTRED_EX, "×"),
+        "warning": ("yellow", "bright_yellow", "⚠"),
+        "info": ("blue", "bright_blue", "ℹ"),
+        "debug": ("lightblack", "bright_black", "⋯"),
+        "success": ("green", "bright_green", "✓"),
+        "error": ("red", "bright_red", "×"),
     }
 
     border_color, text_color, prefix = styles.get(type.lower(), styles["info"])
@@ -226,12 +478,12 @@ def create_box_message(
     # Create the box with colored borders and lighter text
     horizontal_line = h_line * (width - 1)
     box = [
-        f"{border_color}{tl}{horizontal_line}{tr}",
+        f"[{border_color}]{tl}{horizontal_line}{tr}[/{border_color}]",
         *[
-            f"{border_color}{v_line}{text_color} {line:<{width-2}}{border_color}{v_line}"
+            f"[{border_color}]{v_line}[{text_color}] {line:<{width-2}}[/{text_color}][{border_color}]{v_line}[/{border_color}]"
             for line in formatted_lines
         ],
-        f"{border_color}{bl}{horizontal_line}{br}{Style.RESET_ALL}",
+        f"[{border_color}]{bl}{horizontal_line}{br}[/{border_color}]",
     ]
 
     result = "\n".join(box)
@@ -1124,7 +1376,7 @@ def get_content_of_website_optimized(
             src = img.get("src", "")
             if base64_pattern.match(src):
                 img["src"] = base64_pattern.sub("", src)
-        except:
+        except Exception as _ex:
             pass
 
     cleaned_html = str(body).replace("\n\n", "\n").replace("  ", " ")
@@ -1162,7 +1414,7 @@ def extract_metadata_using_lxml(html, doc=None):
 
     if doc is None:
         try:
-            doc = lhtml.document_fromstring(html)
+            doc = lxml.html.document_fromstring(html)
         except Exception:
             return {}
 
@@ -1297,7 +1549,7 @@ def extract_xml_tags(string):
     return list(set(tags))
 
 
-def extract_xml_data(tags, string):
+def extract_xml_data_legacy(tags, string):
     """
     Extract data for specified XML tags from a string.
 
@@ -1321,6 +1573,38 @@ def extract_xml_data(tags, string):
         match = re.search(pattern, string, re.DOTALL)
         if match:
             data[tag] = match.group(1).strip()
+        else:
+            data[tag] = ""
+
+    return data
+
+def extract_xml_data(tags, string):
+    """
+    Extract data for specified XML tags from a string, returning the longest content for each tag.
+
+    How it works:
+    1. Finds all occurrences of each tag in the string using regex.
+    2. For each tag, selects the occurrence with the longest content.
+    3. Returns a dictionary of tag-content pairs.
+
+    Args:
+        tags (List[str]): The list of XML tags to extract.
+        string (str): The input string containing XML data.
+
+    Returns:
+        Dict[str, str]: A dictionary with tag names as keys and longest extracted content as values.
+    """
+
+    data = {}
+
+    for tag in tags:
+        pattern = f"<{tag}>(.*?)</{tag}>"
+        matches = re.findall(pattern, string, re.DOTALL)
+        
+        if matches:
+            # Find the longest content for this tag
+            longest_content = max(matches, key=len).strip()
+            data[tag] = longest_content
         else:
             data[tag] = ""
 
@@ -1394,6 +1678,19 @@ def perform_completion_with_backoff(
                         "content": ["Rate limit error. Please try again later."],
                     }
                 ]
+        except Exception as e:
+            raise e  # Raise any other exceptions immediately
+            # print("Error during completion request:", str(e))
+            # error_message = e.message
+            # return [
+            #     {
+            #         "index": 0,
+            #         "tags": ["error"],
+            #         "content": [
+            #             f"Error during LLM completion request. {error_message}"
+            #         ],
+            #     }
+            # ]
 
 
 def extract_blocks(url, html, provider=DEFAULT_PROVIDER, api_token=None, base_url=None):
@@ -1478,10 +1775,10 @@ def extract_blocks_batch(batch_data, provider="groq/llama3-70b-8192", api_token=
 
     messages = []
 
-    for url, html in batch_data:
+    for url, _html in batch_data:
         variable_values = {
             "URL": url,
-            "HTML": html,
+            "HTML": _html,
         }
 
         prompt_with_variables = PROMPT_EXTRACT_BLOCKS
@@ -1663,7 +1960,7 @@ def fast_format_html(html_string):
     indent = 0
     indent_str = "  "  # Two spaces for indentation
     formatted = []
-    in_content = False
+    # in_content = False
 
     # Split by < and > to separate tags and content
     parts = html_string.replace(">", ">\n").replace("<", "\n<").split("\n")
@@ -1704,8 +2001,88 @@ def normalize_url(href, base_url):
     if not parsed_base.scheme or not parsed_base.netloc:
         raise ValueError(f"Invalid base URL format: {base_url}")
 
+    # Ensure base_url ends with a trailing slash if it's a directory path
+    if not base_url.endswith('/'):
+        base_url = base_url + '/'
+
     # Use urljoin to handle all cases
     normalized = urljoin(base_url, href.strip())
+    return normalized
+
+
+def normalize_url_for_deep_crawl(href, base_url):
+    """Normalize URLs to ensure consistent format"""
+    from urllib.parse import urljoin, urlparse, urlunparse, parse_qs, urlencode
+
+    # Handle None or empty values
+    if not href:
+        return None
+
+    # Use urljoin to handle relative URLs
+    full_url = urljoin(base_url, href.strip())
+    
+    # Parse the URL for normalization
+    parsed = urlparse(full_url)
+    
+    # Convert hostname to lowercase
+    netloc = parsed.netloc.lower()
+    
+    # Remove fragment entirely
+    fragment = ''
+    
+    # Normalize query parameters if needed
+    query = parsed.query
+    if query:
+        # Parse query parameters
+        params = parse_qs(query)
+        
+        # Remove tracking parameters (example - customize as needed)
+        tracking_params = ['utm_source', 'utm_medium', 'utm_campaign', 'ref', 'fbclid']
+        for param in tracking_params:
+            if param in params:
+                del params[param]
+                
+        # Rebuild query string, sorted for consistency
+        query = urlencode(params, doseq=True) if params else ''
+    
+    # Build normalized URL
+    normalized = urlunparse((
+        parsed.scheme,
+        netloc,
+        parsed.path.rstrip('/'),  # Normalize trailing slash
+        parsed.params,
+        query,
+        fragment
+    ))
+    
+    return normalized
+
+@lru_cache(maxsize=10000)
+def efficient_normalize_url_for_deep_crawl(href, base_url):
+    """Efficient URL normalization with proper parsing"""
+    from urllib.parse import urljoin
+    
+    if not href:
+        return None
+    
+    # Resolve relative URLs
+    full_url = urljoin(base_url, href.strip())
+    
+    # Use proper URL parsing
+    parsed = urlparse(full_url)
+    
+    # Only perform the most critical normalizations
+    # 1. Lowercase hostname
+    # 2. Remove fragment
+    normalized = urlunparse((
+        parsed.scheme,
+        parsed.netloc.lower(),
+        parsed.path.rstrip('/'),
+        parsed.params,
+        parsed.query,
+        ''  # Remove fragment
+    ))
+    
     return normalized
 
 
@@ -2207,3 +2584,229 @@ def get_error_context(exc_info, context_lines: int = 5):
         "function": func_name,
         "code_context": code_context,
     }
+
+def truncate(value, threshold):
+    if len(value) > threshold:
+        return value[:threshold] + '...'  # Add ellipsis to indicate truncation
+    return value
+
+def optimize_html(html_str, threshold=200):
+    root = lxml.html.fromstring(html_str)
+    
+    for _element in root.iter():
+        # Process attributes
+        for attr in list(_element.attrib):
+            _element.attrib[attr] = truncate(_element.attrib[attr], threshold)
+        
+        # Process text content
+        if _element.text and len(_element.text) > threshold:
+            _element.text = truncate(_element.text, threshold)
+            
+        # Process tail text
+        if _element.tail and len(_element.tail) > threshold:
+            _element.tail = truncate(_element.tail, threshold)
+    
+    return lxml.html.tostring(root, encoding='unicode', pretty_print=False)
+
+class HeadPeekr:
+    @staticmethod
+    async def fetch_head_section(url, timeout=0.3):
+        headers = {
+            "User-Agent": "Mozilla/5.0 (compatible; CrawlBot/1.0)",
+            "Accept": "text/html",
+            "Connection": "close"  # Force close after response
+        }
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.get(url, headers=headers, follow_redirects=True)
+                
+                # Handle redirects explicitly by using the final URL
+                if response.url != url:
+                    url = str(response.url)
+                    response = await client.get(url, headers=headers)
+                
+                content = b""
+                async for chunk in response.aiter_bytes():
+                    content += chunk
+                    if b"</head>" in content:
+                        break  # Stop after detecting </head>
+                return content.split(b"</head>")[0] + b"</head>"
+        except (httpx.HTTPError, gaierror) :
+            return None
+
+    @staticmethod
+    async def peek_html(url, timeout=0.3):
+        head_section = await HeadPeekr.fetch_head_section(url, timeout=timeout)
+        if head_section:
+            return head_section.decode("utf-8", errors="ignore")
+        return None
+
+    @staticmethod
+    def extract_meta_tags(head_content: str):
+        meta_tags = {}
+        
+        # Find all meta tags
+        meta_pattern = r'<meta[^>]+>'
+        for meta_tag in re.finditer(meta_pattern, head_content):
+            tag = meta_tag.group(0)
+            
+            # Extract name/property and content
+            name_match = re.search(r'name=["\'](.*?)["\']', tag)
+            property_match = re.search(r'property=["\'](.*?)["\']', tag)
+            content_match = re.search(r'content=["\'](.*?)["\']', tag)
+            
+            if content_match and (name_match or property_match):
+                key = name_match.group(1) if name_match else property_match.group(1)
+                meta_tags[key] = content_match.group(1)
+                
+        return meta_tags
+
+    def get_title(head_content: str):
+        title_match = re.search(r'<title>(.*?)</title>', head_content, re.IGNORECASE | re.DOTALL)
+        return title_match.group(1) if title_match else None
+
+def preprocess_html_for_schema(html_content, text_threshold=100, attr_value_threshold=200, max_size=100000):
+    """
+    Preprocess HTML to reduce size while preserving structure for schema generation.
+    
+    Args:
+        html_content (str): Raw HTML content
+        text_threshold (int): Maximum length for text nodes before truncation
+        attr_value_threshold (int): Maximum length for attribute values before truncation
+        max_size (int): Target maximum size for output HTML
+        
+    Returns:
+        str: Preprocessed HTML content
+    """
+    try:
+        # Parse HTML with error recovery
+        parser = etree.HTMLParser(remove_comments=True, remove_blank_text=True)
+        tree = lhtml.fromstring(html_content, parser=parser)
+        
+        # 1. Remove HEAD section (keep only BODY)
+        head_elements = tree.xpath('//head')
+        for head in head_elements:
+            if head.getparent() is not None:
+                head.getparent().remove(head)
+        
+        # 2. Define tags to remove completely
+        tags_to_remove = [
+            'script', 'style', 'noscript', 'iframe', 'canvas', 'svg',
+            'video', 'audio', 'source', 'track', 'map', 'area'
+        ]
+        
+        # Remove unwanted elements
+        for tag in tags_to_remove:
+            elements = tree.xpath(f'//{tag}')
+            for element in elements:
+                if element.getparent() is not None:
+                    element.getparent().remove(element)
+        
+        # 3. Process remaining elements to clean attributes and truncate text
+        for element in tree.iter():
+            # Skip if we're at the root level
+            if element.getparent() is None:
+                continue
+                
+            # Clean non-essential attributes but preserve structural ones
+            # attribs_to_keep = {'id', 'class', 'name', 'href', 'src', 'type', 'value', 'data-'}
+
+            # This is more aggressive than the previous version
+            attribs_to_keep = {'id', 'class', 'name', 'type', 'value'}
+
+            # attributes_hates_truncate = ['id', 'class', "data-"]
+
+            # This means, I don't care, if an attribute is too long, truncate it, go and find a better css selector to build a schema
+            attributes_hates_truncate = []
+            
+            # Process each attribute
+            for attrib in list(element.attrib.keys()):
+                # Keep if it's essential or starts with data-
+                if not (attrib in attribs_to_keep or attrib.startswith('data-')):
+                    element.attrib.pop(attrib)
+                # Truncate long attribute values except for selectors
+                elif attrib not in attributes_hates_truncate and len(element.attrib[attrib]) > attr_value_threshold:
+                    element.attrib[attrib] = element.attrib[attrib][:attr_value_threshold] + '...'
+            
+            # Truncate text content if it's too long
+            if element.text and len(element.text.strip()) > text_threshold:
+                element.text = element.text.strip()[:text_threshold] + '...'
+                
+            # Also truncate tail text if present
+            if element.tail and len(element.tail.strip()) > text_threshold:
+                element.tail = element.tail.strip()[:text_threshold] + '...'
+
+        # 4. Detect duplicates and drop them in a single pass
+        seen: dict[tuple, None] = {}
+        for el in list(tree.xpath('//*[@class]')):          # snapshot once, XPath is fast
+            parent = el.getparent()
+            if parent is None:
+                continue
+
+            cls = el.get('class')
+            if not cls:
+                continue
+
+            # ── build signature ───────────────────────────────────────────
+            h = xxhash.xxh64()                              # stream, no big join()
+            for txt in el.itertext():
+                h.update(txt)
+            sig = (el.tag, cls, h.intdigest())             # tuple cheaper & hashable
+
+            # ── first seen? keep – else drop ─────────────
+            if sig in seen and parent is not None:
+                parent.remove(el)                           # duplicate
+            else:
+                seen[sig] = None
+        
+        # # 4. Find repeated patterns and keep only a few examples
+        # # This is a simplistic approach - more sophisticated pattern detection could be implemented
+        # pattern_elements = {}
+        # for element in tree.xpath('//*[contains(@class, "")]'):
+        #     parent = element.getparent()
+        #     if parent is None:
+        #         continue
+                
+        #     # Create a signature based on tag and classes
+        #     classes = element.get('class', '')
+        #     if not classes:
+        #         continue
+        #     innert_text = ''.join(element.xpath('.//text()'))
+        #     innert_text_hash = xxhash.xxh64(innert_text.encode()).hexdigest()
+        #     signature = f"{element.tag}.{classes}.{innert_text_hash}"
+            
+        #     if signature in pattern_elements:
+        #         pattern_elements[signature].append(element)
+        #     else:
+        #         pattern_elements[signature] = [element]
+        
+        # # Keep only first examples of each repeating pattern
+        # for signature, elements in pattern_elements.items():
+        #     if len(elements) > 1:
+        #         # Keep the first element and remove the rest
+        #         for element in elements[1:]:
+        #             if element.getparent() is not None:
+        #                 element.getparent().remove(element)
+
+
+        # # Keep only 3 examples of each repeating pattern
+        # for signature, elements in pattern_elements.items():
+        #     if len(elements) > 3:
+        #         # Keep the first 2 and last elements
+        #         for element in elements[2:-1]:
+        #             if element.getparent() is not None:
+        #                 element.getparent().remove(element)
+        
+        # 5. Convert back to string
+        result = etree.tostring(tree, encoding='unicode', method='html')
+        
+        # If still over the size limit, apply more aggressive truncation
+        if len(result) > max_size:
+            return result[:max_size] + "..."
+            
+        return result
+    
+    except Exception as e:
+        # Fallback for parsing errors
+        return html_content[:max_size] if len(html_content) > max_size else html_content
+    

@@ -1,0 +1,91 @@
+# Application Configuration
+app:
+  title: "Crawl4AI API"
+  version: "1.0.0"
+  host: "0.0.0.0"
+  port: 11234
+  reload: False
+  workers: 1
+  timeout_keep_alive: 300
+
+# Default LLM Configuration
+llm:
+  provider: "openai/gpt-4o-mini"
+  api_key_env: "OPENAI_API_KEY"
+  # api_key: sk-...  # If you pass the API key directly then api_key_env will be ignored
+
+# Redis Configuration
+redis:
+  host: "localhost"
+  port: 6379
+  db: 0
+  password: ""
+  ssl: False
+  ssl_cert_reqs: None
+  ssl_ca_certs: None
+  ssl_certfile: None
+  ssl_keyfile: None
+  ssl_cert_reqs: None
+  ssl_ca_certs: None
+  ssl_certfile: None
+  ssl_keyfile: None
+
+# Rate Limiting Configuration
+rate_limiting:
+  enabled: True
+  default_limit: "1000/minute"
+  trusted_proxies: []
+  storage_uri: "memory://"  # Use "redis://localhost:6379" for production
+
+# Security Configuration
+security:
+  enabled: false 
+  jwt_enabled: false 
+  https_redirect: false
+  trusted_hosts: ["*"]
+  headers:
+    x_content_type_options: "nosniff"
+    x_frame_options: "DENY"
+    content_security_policy: "default-src 'self'"
+    strict_transport_security: "max-age=63072000; includeSubDomains"
+
+# Crawler Configuration
+crawler:
+  base_config:
+    simulate_user: true
+  memory_threshold_percent: 95.0
+  rate_limiter:
+    enabled: true
+    base_delay: [1.0, 2.0]
+  timeouts:
+    stream_init: 30.0  # Timeout for stream initialization
+    batch_process: 300.0  # Timeout for batch processing
+  pool:
+    max_pages: 40                          # ← GLOBAL_SEM permits
+    idle_ttl_sec: 1800                     # ← 30 min janitor cutoff
+  browser:
+    kwargs:
+      headless: true
+      text_mode: true
+    extra_args:
+      # - "--single-process"
+      - "--no-sandbox"
+      - "--disable-dev-shm-usage"
+      - "--disable-gpu"
+      - "--disable-software-rasterizer"
+      - "--disable-web-security"
+      - "--allow-insecure-localhost"
+      - "--ignore-certificate-errors"
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# Observability Configuration
+observability:
+  prometheus:
+    enabled: True
+    endpoint: "/metrics"
+  health_check:
+    endpoint: "/health"

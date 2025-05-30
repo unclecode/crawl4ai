@@ -5,10 +5,274 @@ All notable changes to Crawl4AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
----
+## [0.6.2] - 2025-05-02
+
+### Added
+- New `RegexExtractionStrategy` for fast pattern-based extraction without requiring LLM
+  - Built-in patterns for emails, URLs, phone numbers, dates, and more
+  - Support for custom regex patterns
+  - `generate_pattern` utility for LLM-assisted pattern creation (one-time use)
+- Added `fit_html` as a top-level field in `CrawlResult` for optimized HTML extraction
+- Added support for network response body capture in network request tracking
 
 ### Changed
-Okay, here's a detailed changelog in Markdown format, generated from the provided git diff and commit history. I've focused on user-facing changes, fixes, and features, and grouped them as requested:
+- Updated documentation for no-LLM extraction strategies
+- Enhanced API reference to include RegexExtractionStrategy examples and usage
+- Improved HTML preprocessing with optimized performance for extraction strategies
+
+## [0.6.1] - 2025-04-24
+
+### Added
+- New dedicated `tables` field in `CrawlResult` model for better table extraction handling
+- Updated crypto_analysis_example.py to use the new tables field with backward compatibility
+
+### Changed
+- Improved playground UI in Docker deployment with better endpoint handling and UI feedback
+
+## [0.6.0] ‑ 2025‑04‑22
+
+### Added
+- Browser pooling with page pre‑warming and fine‑grained **geolocation, locale, and timezone** controls  
+- Crawler pool manager (SDK + Docker API) for smarter resource allocation  
+- Network & console log capture plus MHTML snapshot export  
+- **Table extractor**: turn HTML `<table>`s into DataFrames or CSV with one flag  
+- High‑volume stress‑test framework in `tests/memory` and API load scripts  
+- MCP protocol endpoints with socket & SSE support; playground UI scaffold  
+- Docs v2 revamp: TOC, GitHub badge, copy‑code buttons, Docker API demo  
+- “Ask AI” helper button *(work‑in‑progress, shipping soon)*  
+- New examples: geo‑location usage, network/console capture, Docker API, markdown source selection, crypto analysis  
+- Expanded automated test suites for browser, Docker, MCP and memory benchmarks  
+
+### Changed
+- Consolidated and renamed browser strategies; legacy docker strategy modules removed  
+- `ProxyConfig` moved to `async_configs`  
+- Server migrated to pool‑based crawler management  
+- FastAPI validators replace custom query validation  
+- Docker build now uses Chromium base image  
+- Large‑scale repo tidy‑up (≈36 k insertions, ≈5 k deletions)  
+
+### Fixed
+- Async crawler session leak, duplicate‑visit handling, URL normalisation  
+- Target‑element regressions in scraping strategies  
+- Logged‑URL readability, encoded‑URL decoding, middle truncation for long URLs  
+- Closed issues: #701, #733, #756, #774, #804, #822, #839, #841, #842, #843, #867, #902, #911  
+
+### Removed
+- Obsolete modules under `crawl4ai/browser/*` superseded by the new pooled browser layer  
+
+### Deprecated
+- Old markdown generator names now alias `DefaultMarkdownGenerator` and emit warnings  
+
+---
+
+#### Upgrade notes
+1. Update any direct imports from `crawl4ai/browser/*` to the new pooled browser modules  
+2. If you override `AsyncPlaywrightCrawlerStrategy.get_page`, adopt the new signature  
+3. Rebuild Docker images to pull the new Chromium layer  
+4. Switch to `DefaultMarkdownGenerator` (or silence the deprecation warning)  
+
+---
+
+`121 files changed, ≈36 223 insertions, ≈4 975 deletions` :contentReference[oaicite:0]{index=0}&#8203;:contentReference[oaicite:1]{index=1}
+
+
+### [Feature] 2025-04-21
+- Implemented MCP protocol for machine-to-machine communication
+  - Added WebSocket and SSE transport for MCP server
+  - Exposed server endpoints via MCP protocol
+  - Created tests for MCP socket and SSE communication
+- Enhanced Docker server with file handling and intelligent search
+  - Added PDF and screenshot endpoints with file saving capability
+  - Added JavaScript execution endpoint for page interaction
+  - Implemented advanced context search with BM25 and code chunking
+  - Added file path output support for generated assets
+- Improved server endpoints and API surface
+  - Added intelligent context search with query filtering
+  - Added syntax-aware code function chunking
+  - Implemented efficient HTML processing pipeline
+- Added support for controlling browser geolocation via new GeolocationConfig class
+  - Added locale and timezone configuration options to CrawlerRunConfig
+  - Added example script demonstrating geolocation and locale usage
+  - Added documentation for location-based identity features
+
+### [Refactor] 2025-04-20
+- Replaced crawler_manager.py with simpler crawler_pool.py implementation
+- Added global page semaphore for hard concurrency cap
+- Implemented browser pool with idle cleanup
+- Added playground UI for testing and stress testing
+- Updated API handlers to use pooled crawlers
+- Enhanced logging levels and symbols
+- Added memory tests and stress test utilities
+
+### [Added] 2025-04-17
+- Added content source selection feature for markdown generation
+  - New `content_source` parameter allows choosing between `cleaned_html`, `raw_html`, and `fit_html`
+  - Provides flexibility in how HTML content is processed before markdown conversion
+  - Added examples and documentation for the new feature
+  - Includes backward compatibility with default `cleaned_html` behavior
+  
+## Version 0.5.0.post5 (2025-03-14)
+
+### Added
+
+- *(crawler)* Add experimental parameters dictionary to CrawlerRunConfig to support beta features
+- *(tables)* Add comprehensive table detection and extraction functionality with scoring system
+- *(monitor)* Add real-time crawler monitoring system with memory management
+- *(content)* Add target_elements parameter for selective content extraction
+- *(browser)* Add standalone CDP browser launch capability
+- *(schema)* Add preprocess_html_for_schema utility for better HTML cleaning
+- *(api)* Add special handling for single URL requests in Docker API
+
+### Changed
+
+- *(filters)* Add reverse option to URLPatternFilter for inverting filter logic
+- *(browser)* Make CSP nonce headers optional via experimental config
+- *(browser)* Remove default cookie injection from page initialization
+- *(crawler)* Optimize response handling for single-URL processing
+- *(api)* Refactor crawl request handling to streamline processing
+- *(config)* Update default provider to gpt-4o
+- *(cache)* Change default cache_mode from aggressive to bypass in examples
+
+### Fixed
+
+- *(browser)* Clean up browser context creation code
+- *(api)* Improve code formatting in API handler
+
+### Breaking Changes
+
+- WebScrapingStrategy no longer returns 'scraped_html' in its output dictionary
+- Table extraction logic has been modified to better handle thead/tbody structures
+- Default cookie injection has been removed from page initialization
+
+## Version 0.5.0 (2025-03-02)
+
+### Added
+
+- *(profiles)* Add BrowserProfiler class for dedicated browser profile management
+- *(cli)* Add interactive profile management to CLI with rich UI
+- *(profiles)* Add ability to crawl directly from profile management interface
+- *(browser)* Support identity-based browsing with persistent profiles
+- *(deep-crawling)* Add max_pages parameter to limit the number of pages crawled in all deep crawling strategies
+- *(deep-crawling)* Add score_threshold parameter to BFS and DFS strategies to filter URLs by score
+
+### Changed
+
+- *(browser)* Refactor profile management from ManagedBrowser to BrowserProfiler class
+- *(cli)* Enhance CLI with profile selection and status display for crawling
+- *(examples)* Update identity-based browsing example to use BrowserProfiler class
+- *(docs)* Update identity-based crawling documentation
+- *(docs)* Update deep crawling documentation with max_pages and score_threshold parameters
+- *(examples)* Add example demonstrating the use of max_pages and score_threshold parameters
+
+### Fixed
+
+- *(browser)* Fix profile detection and management on different platforms
+- *(cli)* Fix CLI command structure for better user experience
+- *(deep-crawling)* Improve BFS and DFS strategies to handle page count limits more efficiently
+
+
+## Version 0.5.0 (2025-02-21)
+
+### Added
+
+- *(crawler)* [**breaking**] Add memory-adaptive dispatcher with rate limiting
+- *(scraping)* [**breaking**] Add LXML-based scraping mode for improved performance
+- *(content-filter)* Add LLMContentFilter for intelligent markdown generation
+- *(dispatcher)* [**breaking**] Add streaming support for URL processing
+- *(browser)* [**breaking**] Improve browser context management and add shared data support
+- *(config)* [**breaking**] Add streaming support and config cloning
+- *(crawler)* Add URL redirection tracking
+- *(extraction)* Add LLM-powered schema generation utility
+- *(proxy)* Add proxy configuration support to CrawlerRunConfig
+- *(robots)* Add robots.txt compliance support
+- *(release)* [**breaking**] Prepare v0.4.3 beta release
+- *(proxy)* Add proxy rotation support and documentation
+- *(browser)* Add CDP URL configuration support
+- *(demo)* Uncomment feature demos and add fake-useragent dependency
+- *(pdf)* Add PDF processing capabilities
+- *(crawler)* [**breaking**] Enhance JavaScript execution and PDF processing
+- *(docker)* Add Docker deployment configuration and API server
+- *(docker)* Add Docker service integration and config serialization
+- *(docker)* [**breaking**] Enhance Docker deployment setup and configuration
+- *(api)* Improve cache handling and add API tests
+- *(crawler)* [**breaking**] Add deep crawling capabilities with BFS strategy
+- *(proxy)* [**breaking**] Add proxy rotation strategy
+- *(deep-crawling)* Add DFS strategy and update exports; refactor CLI entry point
+- *(cli)* Add command line interface with comprehensive features
+- *(config)* Enhance serialization and add deep crawling exports
+- *(crawler)* Add HTTP crawler strategy for lightweight web scraping
+- *(docker)* [**breaking**] Implement supervisor and secure API endpoints
+- *(docker)* [**breaking**] Add JWT authentication and improve server architecture
+
+### Changed
+
+- *(browser)* Update browser channel default to 'chromium' in BrowserConfig.from_args method
+- *(crawler)* Optimize response handling and default settings
+- *(crawler)* - Update hello_world example with proper content filtering
+- - Update hello_world.py example
+- *(docs)* [**breaking**] Reorganize documentation structure and update styles
+- *(dispatcher)* [**breaking**] Migrate to modular dispatcher system with enhanced monitoring
+- *(scraping)* [**breaking**] Replace ScrapingMode enum with strategy pattern
+- *(browser)* Improve browser path management
+- *(models)* Rename final_url to redirected_url for consistency
+- *(core)* [**breaking**] Improve type hints and remove unused file
+- *(docs)* Improve code formatting in features demo
+- *(user-agent)* Improve user agent generation system
+- *(core)* [**breaking**] Reorganize project structure and remove legacy code
+- *(docker)* Clean up import statements in server.py
+- *(docker)* Remove unused models and utilities for cleaner codebase
+- *(docker)* [**breaking**] Improve server architecture and configuration
+- *(deep-crawl)* [**breaking**] Reorganize deep crawling functionality into dedicated module
+- *(deep-crawling)* [**breaking**] Reorganize deep crawling strategies and add new implementations
+- *(crawling)* [**breaking**] Improve type hints and code cleanup
+- *(crawler)* [**breaking**] Improve HTML handling and cleanup codebase
+- *(crawler)* [**breaking**] Remove content filter functionality
+- *(examples)* Update API usage in features demo
+- *(config)* [**breaking**] Enhance serialization and config handling
+
+### Docs
+
+- Add Code of Conduct for the project (#410)
+
+### Documentation
+
+- *(extraction)* Add clarifying comments for CSS selector behavior
+- *(readme)* Update personal story and project vision
+- *(urls)* [**breaking**] Update documentation URLs to new domain
+- *(api)* Add streaming mode documentation and examples
+- *(readme)* Update version and feature announcements for v0.4.3b1
+- *(examples)* Update demo scripts and fix output formats
+- *(examples)* Update v0.4.3 features demo to v0.4.3b2
+- *(readme)* Update version references and fix links
+- *(multi-url)* [**breaking**] Improve documentation clarity and update examples
+- *(examples)* Update proxy rotation demo and disable other demos
+- *(api)* Improve formatting and readability of API documentation
+- *(examples)* Add SERP API project example
+- *(urls)* Update documentation URLs to new domain
+- *(readme)* Resolve merge conflict and update version info
+
+### Fixed
+
+- *(browser)* Update default browser channel to chromium and simplify channel selection logic
+- *(browser)* [**breaking**] Default to Chromium channel for new headless mode (#387)
+- *(browser)* Resolve merge conflicts in browser channel configuration
+- Prevent memory leaks by ensuring proper closure of Playwright pages
+- Not working long page screenshot (#403)
+- *(extraction)* JsonCss selector and crawler improvements
+- *(models)* [**breaking**] Make model fields optional with default values
+- *(dispatcher)* Adjust memory threshold and fix dispatcher initialization
+- *(install)* Ensure proper exit after running doctor command
+
+### Miscellaneous Tasks
+
+- *(cleanup)* Remove unused files and improve type hints
+- Add .gitattributes file
+
+## License Update
+
+Crawl4AI v0.5.0 updates the license to Apache 2.0 *with a required attribution clause*.  This means you are free to use, modify, and distribute Crawl4AI (even commercially), but you *must* clearly attribute the project in any public use or distribution.  See the updated `LICENSE` file for the full legal text and specific requirements.
+
+---
 
 ## Version 0.4.3b2 (2025-01-21)
 
@@ -285,12 +549,6 @@ This release introduces several powerful new features, including robots.txt comp
 ### **Bug Fixes**
 - Fixed potential viewport mismatches by ensuring consistent use of `self.viewport_width` and `self.viewport_height` throughout the code.
 - Improved robustness of dynamic content loading to avoid timeouts and failed evaluations.
-
-
-
-
-
-
 
 ## [0.3.75] December 1, 2024
 

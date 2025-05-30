@@ -52,7 +52,7 @@ async def crawl_sequential(urls: List[str]):
             )
             if result.success:
                 print(f"Successfully crawled {url}")
-                print(f"Content length: {len(result.markdown_v2.raw_markdown)}")
+                print(f"Content length: {len(result.markdown.raw_markdown)}")
     finally:
         await crawler.close()
 
@@ -101,7 +101,7 @@ async def crawl_parallel(urls: List[str], max_concurrent: int = 3):
                     print(f"Error crawling {url}: {str(result)}")
                 elif result.success:
                     print(f"Successfully crawled {url}")
-                    print(f"Content length: {len(result.markdown_v2.raw_markdown)}")
+                    print(f"Content length: {len(result.markdown.raw_markdown)}")
     finally:
         await crawler.close()
 

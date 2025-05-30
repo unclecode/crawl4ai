@@ -4,19 +4,14 @@ import aiosqlite
 import asyncio
 from typing import Optional, Dict
 from contextlib import asynccontextmanager
-import logging
-import json  # Added for serialization/deserialization
-from .utils import ensure_content_dirs, generate_content_hash
-from .models import CrawlResult, MarkdownGenerationResult
+import json  
+from .models import CrawlResult, MarkdownGenerationResult, StringCompatibleMarkdown
 import aiofiles
-from .version_manager import VersionManager
 from .async_logger import AsyncLogger
-from .utils import get_error_context, create_box_message
 
-# Set up logging
-# logging.basicConfig(level=logging.INFO)
-# logger = logging.getLogger(__name__)
-# logger.setLevel(logging.INFO)
+from .utils import ensure_content_dirs, generate_content_hash
+from .utils import VersionManager
+from .utils import get_error_context, create_box_message
 
 base_directory = DB_PATH = os.path.join(
     os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home()), ".crawl4ai"
@@ -176,7 +171,10 @@ class AsyncDatabaseManager:
                             f"Code context:\n{error_context['code_context']}"
                         )
                         self.logger.error(
-                            message=create_box_message(error_message, type="error"),
+                            message="{error}",
+                            tag="ERROR",
+                            params={"error": str(error_message)},
+                            boxes=["error"],
                         )
 
                         raise
@@ -194,7 +192,10 @@ class AsyncDatabaseManager:
                 f"Code context:\n{error_context['code_context']}"
             )
             self.logger.error(
-                message=create_box_message(error_message, type="error"),
+                message="{error}",
+                tag="ERROR",
+                params={"error": str(error_message)},
+                boxes=["error"],
             )
             raise
         finally:
@@ -336,12 +337,17 @@ class AsyncDatabaseManager:
                     except json.JSONDecodeError:
                         # Very UGLY, never mention it to me please
                         if field == "markdown" and isinstance(row_dict[field], str):
-                            row_dict[field] = row_dict[field]
+                            row_dict[field] = MarkdownGenerationResult(
+                                raw_markdown=row_dict[field] or "",
+                                markdown_with_citations="",
+                                references_markdown="",
+                                fit_markdown="",
+                                fit_html="",
+                            )
                         else:
                             row_dict[field] = {}
 
                 if isinstance(row_dict["markdown"], Dict):
-                    row_dict["markdown_v2"] = row_dict["markdown"]
                     if row_dict["markdown"].get("raw_markdown"):
                         row_dict["markdown"] = row_dict["markdown"]["raw_markdown"]
 
@@ -358,7 +364,7 @@ class AsyncDatabaseManager:
                 # Remove any fields not in CrawlResult model
                 valid_fields = CrawlResult.__annotations__.keys()
                 filtered_dict = {k: v for k, v in row_dict.items() if k in valid_fields}
-
+                filtered_dict["markdown"] = row_dict["markdown"]
                 return CrawlResult(**filtered_dict)
 
         try:
@@ -384,14 +390,14 @@ class AsyncDatabaseManager:
         }
 
         try:
-            if isinstance(result.markdown, MarkdownGenerationResult):
+            if isinstance(result.markdown, StringCompatibleMarkdown):
                 content_map["markdown"] = (
-                    result.markdown.model_dump_json(),
+                    result.markdown,
                     "markdown",
                 )
-            elif hasattr(result, "markdown_v2"):
+            elif isinstance(result.markdown, MarkdownGenerationResult):
                 content_map["markdown"] = (
-                    result.markdown_v2.model_dump_json(),
+                    result.markdown.model_dump_json(),
                     "markdown",
                 )
             elif isinstance(result.markdown, str):

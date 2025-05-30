@@ -1,6 +1,7 @@
 import os
 import asyncio
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
+from crawl4ai import LLMConfig
 from crawl4ai.content_filter_strategy import LLMContentFilter
 
 async def test_llm_filter():
@@ -22,8 +23,7 @@ async def test_llm_filter():
 
         # Initialize LLM filter with focused instruction
         filter = LLMContentFilter(
-            provider="openai/gpt-4o",
-            api_token=os.getenv('OPENAI_API_KEY'),
+            llm_config=LLMConfig(provider="openai/gpt-4o", api_token=os.getenv('OPENAI_API_KEY')),
             instruction="""
             Focus on extracting the core educational content about Python classes.
             Include:
@@ -43,9 +43,9 @@ async def test_llm_filter():
         )
         
         filter = LLMContentFilter(
-            provider="openai/gpt-4o",
-            api_token=os.getenv('OPENAI_API_KEY'),
+            llm_config=LLMConfig(provider="openai/gpt-4o",api_token=os.getenv('OPENAI_API_KEY')),
             chunk_token_threshold=2 ** 12 * 2, # 2048 * 2
+            ignore_cache = True,
             instruction="""
             Extract the main educational content while preserving its original wording and substance completely. Your task is to:
 
@@ -68,7 +68,7 @@ async def test_llm_filter():
         )        
 
         # Apply filtering
-        filtered_content = filter.filter_content(html, ignore_cache = True)
+        filtered_content = filter.filter_content(html)
         
         # Show results
         print("\nFiltered Content Length:", len(filtered_content))

@@ -128,6 +128,7 @@ Crawl4AI can also extract structured data (JSON) using CSS or XPath selectors. B
 
 ```python
 from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import LLMConfig
 
 # Generate a schema (one-time cost)
 html = "<div class='product'><h2>Gaming Laptop</h2><span class='price'>$999.99</span></div>"
@@ -135,15 +136,13 @@ html = "<div class='product'><h2>Gaming Laptop</h2><span class='price'>$999.99</
 # Using OpenAI (requires API token)
 schema = JsonCssExtractionStrategy.generate_schema(
     html,
-    llm_provider="openai/gpt-4o",  # Default provider
-    api_token="your-openai-token"  # Required for OpenAI
+    llm_config = LLMConfig(provider="openai/gpt-4o",api_token="your-openai-token")  # Required for OpenAI
 )
 
 # Or using Ollama (open source, no token needed)
 schema = JsonCssExtractionStrategy.generate_schema(
     html,
-    llm_provider="ollama/llama3.3",  # Open source alternative
-    api_token=None  # Not needed for Ollama
+    llm_config = LLMConfig(provider="ollama/llama3.3", api_token=None)  # Not needed for Ollama
 )
 
 # Use the schema for fast, repeated extractions
@@ -212,7 +211,7 @@ import os
 import json
 import asyncio
 from pydantic import BaseModel, Field
-from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, LLMConfig
 from crawl4ai.extraction_strategy import LLMExtractionStrategy
 
 class OpenAIModelFee(BaseModel):
@@ -242,8 +241,7 @@ async def extract_structured_data_using_llm(
         word_count_threshold=1,
         page_timeout=80000,
         extraction_strategy=LLMExtractionStrategy(
-            provider=provider,
-            api_token=api_token,
+            llm_config = LLMConfig(provider=provider,api_token=api_token),
             schema=OpenAIModelFee.model_json_schema(),
             extraction_type="schema",
             instruction="""From the crawled content, extract all mentioned model names along with their fees for input and output tokens. 
@@ -259,12 +257,6 @@ async def extract_structured_data_using_llm(
         print(result.extracted_content)
 
 if __name__ == "__main__":
-    # Use ollama with llama3.3
-    # asyncio.run(
-    #     extract_structured_data_using_llm(
-    #         provider="ollama/llama3.3", api_token="no-token"
-    #     )
-    # )
 
     asyncio.run(
         extract_structured_data_using_llm(
@@ -304,7 +296,7 @@ async def quick_parallel_example():
         # Stream results as they complete
         async for result in await crawler.arun_many(urls, config=run_conf):
             if result.success:
-                print(f"[OK] {result.url}, length: {len(result.markdown_v2.raw_markdown)}")
+                print(f"[OK] {result.url}, length: {len(result.markdown.raw_markdown)}")
             else:
                 print(f"[ERROR] {result.url} => {result.error_message}")
 
@@ -313,7 +305,7 @@ async def quick_parallel_example():
         results = await crawler.arun_many(urls, config=run_conf)
         for res in results:
             if res.success:
-                print(f"[OK] {res.url}, length: {len(res.markdown_v2.raw_markdown)}")
+                print(f"[OK] {res.url}, length: {len(res.markdown.raw_markdown)}")
             else:
                 print(f"[ERROR] {res.url} => {res.error_message}")
 

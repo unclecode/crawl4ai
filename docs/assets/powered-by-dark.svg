@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="35" viewBox="0 0 120 35">
+  <!-- Dark Theme -->
+  <g>
+    <defs>
+      <pattern id="halftoneDark" width="4" height="4" patternUnits="userSpaceOnUse">
+        <circle cx="2" cy="2" r="1" fill="#eee" opacity="0.1"/>
+      </pattern>
+      <pattern id="halftoneTextDark" width="3" height="3" patternUnits="userSpaceOnUse">
+        <circle cx="1.5" cy="1.5" r="2" fill="#aaa" opacity="0.2"/>
+      </pattern>
+    </defs>
+    <!-- White border - added as outer rectangle -->
+    <rect width="120" height="35" rx="5" fill="#111"/>
+    <!-- Dark background slightly smaller to show thicker border -->
+    <rect x="2" y="2" width="116" height="31" rx="4" fill="#1a1a1a"/>
+    <rect x="2" y="2" width="116" height="31" rx="4" fill="url(#halftoneDark)"/>
+    
+    <!-- Logo with halftone -->
+    <path d="M30 17.5 a7.5 7.5 0 1 1 -15 0 a7.5 7.5 0 1 1 15 0" fill="none" stroke="#eee" stroke-width="2"/>
+    <path d="M18 17.5 L27 17.5" stroke="#eee" stroke-width="2"/>
+    <circle cx="22.5" cy="17.5" r="2" fill="#eee"/>
+    
+    <text x="40" y="23" fill="#eee" font-family="Arial, sans-serif" font-weight="500" font-size="14">Crawl4AI</text>
+  </g>
+</svg>

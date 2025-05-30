@@ -26,8 +26,8 @@ class CrawlResult(BaseModel):
     downloaded_files: Optional[List[str]] = None
     screenshot: Optional[str] = None
     pdf : Optional[bytes] = None
+    mhtml: Optional[str] = None
     markdown: Optional[Union[str, MarkdownGenerationResult]] = None
-    markdown_v2: Optional[MarkdownGenerationResult] = None
     extracted_content: Optional[str] = None
     metadata: Optional[dict] = None
     error_message: Optional[str] = None
@@ -52,8 +52,8 @@ class CrawlResult(BaseModel):
 | **downloaded_files (`Optional[List[str]]`)** | If `accept_downloads=True` in `BrowserConfig`, this lists the filepaths of saved downloads.         |
 | **screenshot (`Optional[str]`)**          | Screenshot of the page (base64-encoded) if `screenshot=True`.                                       |
 | **pdf (`Optional[bytes]`)**               | PDF of the page if `pdf=True`.                                                                      |
-| **markdown (`Optional[str or MarkdownGenerationResult]`)** | For now, `markdown_v2` holds a `MarkdownGenerationResult`. Over time, this will be consolidated into `markdown`. The generator can provide raw markdown, citations, references, and optionally `fit_markdown`. |
-| **markdown_v2 (`Optional[MarkdownGenerationResult]`)** | Legacy field for detailed markdown output. This will be replaced by `markdown` soon.                |
+| **mhtml (`Optional[str]`)**               | MHTML snapshot of the page if `capture_mhtml=True`. Contains the full page with all resources.      |
+| **markdown (`Optional[str or MarkdownGenerationResult]`)** | It holds a `MarkdownGenerationResult`. Over time, this will be consolidated into `markdown`. The generator can provide raw markdown, citations, references, and optionally `fit_markdown`. |
 | **extracted_content (`Optional[str]`)**   | The output of a structured extraction (CSS/LLM-based) stored as JSON string or other text.          |
 | **metadata (`Optional[dict]`)**           | Additional info about the crawl or extracted data.                                                  |
 | **error_message (`Optional[str]`)**       | If `success=False`, contains a short description of what went wrong.                                |
@@ -90,10 +90,10 @@ print(result.cleaned_html)  # Freed of forms, header, footer, data-* attributes
 
 ## 3. Markdown Generation
 
-### 3.1 `markdown_v2` (Legacy) vs `markdown`
+### 3.1 `markdown`
 
-- **`markdown_v2`**: The current location for detailed markdown output, returning a **`MarkdownGenerationResult`** object.  
-- **`markdown`**: Eventually, we’re merging these fields. For now, you might see `result.markdown_v2` used widely in code examples.
+- **`markdown`**: The current location for detailed markdown output, returning a **`MarkdownGenerationResult`** object.  
+- **`markdown_v2`**: Deprecated since v0.5.
 
 **`MarkdownGenerationResult`** Fields:
 
@@ -118,7 +118,7 @@ config = CrawlerRunConfig(
 )
 result = await crawler.arun(url="https://example.com", config=config)
 
-md_res = result.markdown_v2  # or eventually 'result.markdown'
+md_res = result.markdown  # or eventually 'result.markdown'
 print(md_res.raw_markdown[:500])
 print(md_res.markdown_with_citations)
 print(md_res.references_markdown)
@@ -192,17 +192,26 @@ for img in images:
     print("Image URL:", img["src"], "Alt:", img.get("alt"))
 ```
 
-### 5.3 `screenshot` and `pdf`
+### 5.3 `screenshot`, `pdf`, and `mhtml`
 
-If you set `screenshot=True` or `pdf=True` in **`CrawlerRunConfig`**, then:
+If you set `screenshot=True`, `pdf=True`, or `capture_mhtml=True` in **`CrawlerRunConfig`**, then:
 
-- `result.screenshot` contains a base64-encoded PNG string.  
+- `result.screenshot` contains a base64-encoded PNG string.
 - `result.pdf` contains raw PDF bytes (you can write them to a file).
+- `result.mhtml` contains the MHTML snapshot of the page as a string (you can write it to a .mhtml file).
 
 ```python
+# Save the PDF
 with open("page.pdf", "wb") as f:
     f.write(result.pdf)
+
+# Save the MHTML
+if result.mhtml:
+    with open("page.mhtml", "w", encoding="utf-8") as f:
+        f.write(result.mhtml)
 ```
+
+The MHTML (MIME HTML) format is particularly useful as it captures the entire web page including all of its resources (CSS, images, scripts, etc.) in a single file, making it perfect for archiving or offline viewing.
 
 ### 5.4 `ssl_certificate`
 
@@ -224,15 +233,17 @@ Check any field:
 if result.success:
     print(result.status_code, result.response_headers)
     print("Links found:", len(result.links.get("internal", [])))
-    if result.markdown_v2:
-        print("Markdown snippet:", result.markdown_v2.raw_markdown[:200])
+    if result.markdown:
+        print("Markdown snippet:", result.markdown.raw_markdown[:200])
     if result.extracted_content:
         print("Structured JSON:", result.extracted_content)
 else:
     print("Error:", result.error_message)
 ```
 
-**Remember**: Use `result.markdown_v2` for now. It will eventually become `result.markdown`.
+**Deprecation**: Since v0.5 `result.markdown_v2`, `result.fit_html`,`result.fit_markdown` are deprecated. Use `result.markdown` instead! It holds `MarkdownGenerationResult`, which includes `fit_html` and `fit_markdown`
+as it's properties.
+
 
 ---
 

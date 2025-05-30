@@ -1,14 +1,13 @@
+from __future__ import annotations
+
 import asyncio
 import base64
 import time
 from abc import ABC, abstractmethod
-from typing import Callable, Dict, Any, List, Optional, Union
+from typing import Callable, Dict, Any, List, Union
+from typing import Optional, AsyncGenerator, Final
 import os
-import sys
-import shutil
-import tempfile
-import subprocess
-from playwright.async_api import Page, Error, BrowserContext
+from playwright.async_api import Page, Error
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
@@ -16,796 +15,21 @@ import hashlib
 import uuid
 from .js_snippet import load_js_script
 from .models import AsyncCrawlResponse
-from .user_agent_generator import UserAgentGenerator
-from .config import SCREENSHOT_HEIGHT_TRESHOLD, DOWNLOAD_PAGE_TIMEOUT
-from .async_configs import BrowserConfig, CrawlerRunConfig
+from .config import SCREENSHOT_HEIGHT_TRESHOLD
+from .async_configs import BrowserConfig, CrawlerRunConfig, HTTPCrawlerConfig
 from .async_logger import AsyncLogger
-from playwright_stealth import StealthConfig
 from .ssl_certificate import SSLCertificate
-from .utils import get_home_folder, get_chromium_path
-from .user_agent_generator import ValidUAGenerator, OnlineUAGenerator
-
-stealth_config = StealthConfig(
-    webdriver=True,
-    chrome_app=True,
-    chrome_csi=True,
-    chrome_load_times=True,
-    chrome_runtime=True,
-    navigator_languages=True,
-    navigator_plugins=True,
-    navigator_permissions=True,
-    webgl_vendor=True,
-    outerdimensions=True,
-    navigator_hardware_concurrency=True,
-    media_codecs=True,
-)
-
-BROWSER_DISABLE_OPTIONS = [
-    "--disable-background-networking",
-    "--disable-background-timer-throttling",
-    "--disable-backgrounding-occluded-windows",
-    "--disable-breakpad",
-    "--disable-client-side-phishing-detection",
-    "--disable-component-extensions-with-background-pages",
-    "--disable-default-apps",
-    "--disable-extensions",
-    "--disable-features=TranslateUI",
-    "--disable-hang-monitor",
-    "--disable-ipc-flooding-protection",
-    "--disable-popup-blocking",
-    "--disable-prompt-on-repost",
-    "--disable-sync",
-    "--force-color-profile=srgb",
-    "--metrics-recording-only",
-    "--no-first-run",
-    "--password-store=basic",
-    "--use-mock-keychain",
-]
-
-
-class ManagedBrowser:
-    """
-    Manages the browser process and context. This class allows to connect to the browser using CDP protocol.
-
-    Attributes:
-        browser_type (str): The type of browser to launch. Supported values: "chromium", "firefox", "webkit".
-                            Default: "chromium".
-        user_data_dir (str or None): Path to a user data directory for persistent sessions. If None, a
-                                     temporary directory may be used. Default: None.
-        headless (bool): Whether to run the browser in headless mode (no visible GUI).
-                         Default: True.
-        browser_process (subprocess.Popen): The process object for the browser.
-        temp_dir (str): Temporary directory for user data if not provided.
-        debugging_port (int): Port for debugging the browser.
-        host (str): Host for debugging the browser.
-
-        Methods:
-            start(): Starts the browser process and returns the CDP endpoint URL.
-            _get_browser_path(): Returns the browser executable path based on OS and browser type.
-            _get_browser_args(): Returns browser-specific command line arguments.
-            _get_user_data_dir(): Returns the user data directory path.
-            _cleanup(): Terminates the browser process and removes the temporary directory.
-    """
-
-    browser_type: str
-    user_data_dir: str
-    headless: bool
-    browser_process: subprocess.Popen
-    temp_dir: str
-    debugging_port: int
-    host: str
-
-    def __init__(
-        self,
-        browser_type: str = "chromium",
-        user_data_dir: Optional[str] = None,
-        headless: bool = False,
-        logger=None,
-        host: str = "localhost",
-        debugging_port: int = 9222,
-        cdp_url: Optional[str] = None, 
-    ):
-        """
-        Initialize the ManagedBrowser instance.
-
-        Args:
-            browser_type (str): The type of browser to launch. Supported values: "chromium", "firefox", "webkit".
-                                Default: "chromium".
-            user_data_dir (str or None): Path to a user data directory for persistent sessions. If None, a
-                                         temporary directory may be used. Default: None.
-            headless (bool): Whether to run the browser in headless mode (no visible GUI).
-                             Default: True.
-            logger (logging.Logger): Logger instance for logging messages. Default: None.
-            host (str): Host for debugging the browser. Default: "localhost".
-            debugging_port (int): Port for debugging the browser. Default: 9222.
-            cdp_url (str or None): CDP URL to connect to the browser. Default: None.
-        """
-        self.browser_type = browser_type
-        self.user_data_dir = user_data_dir
-        self.headless = headless
-        self.browser_process = None
-        self.temp_dir = None
-        self.debugging_port = debugging_port
-        self.host = host
-        self.logger = logger
-        self.shutting_down = False
-        self.cdp_url = cdp_url
-
-    async def start(self) -> str:
-        """
-        Starts the browser process or returns CDP endpoint URL.
-        If cdp_url is provided, returns it directly.
-        If user_data_dir is not provided for local browser, creates a temporary directory.
-        
-        Returns:
-            str: CDP endpoint URL
-        """
-        # If CDP URL provided, just return it
-        if self.cdp_url:
-            return self.cdp_url
-
-        # Create temp dir if needed
-        if not self.user_data_dir:
-            self.temp_dir = tempfile.mkdtemp(prefix="browser-profile-")
-            self.user_data_dir = self.temp_dir
-
-        # Get browser path and args based on OS and browser type
-        # browser_path = self._get_browser_path()
-        args = await self._get_browser_args()
-
-        # Start browser process
-        try:
-            self.browser_process = subprocess.Popen(
-                args, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-            )
-            # Monitor browser process output for errors
-            asyncio.create_task(self._monitor_browser_process())
-            await asyncio.sleep(2)  # Give browser time to start
-            return f"http://{self.host}:{self.debugging_port}"
-        except Exception as e:
-            await self.cleanup()
-            raise Exception(f"Failed to start browser: {e}")
-
-    async def _monitor_browser_process(self):
-        """
-        Monitor the browser process for unexpected termination.
-
-        How it works:
-        1. Read stdout and stderr from the browser process.
-        2. If the process has terminated, log the error message and terminate the browser.
-        3. If the shutting_down flag is set, log the normal termination message.
-        4. If any other error occurs, log the error message.
-
-        Note: This method should be called in a separate task to avoid blocking the main event loop.
-        """
-        if self.browser_process:
-            try:
-                stdout, stderr = await asyncio.gather(
-                    asyncio.to_thread(self.browser_process.stdout.read),
-                    asyncio.to_thread(self.browser_process.stderr.read),
-                )
-
-                # Check shutting_down flag BEFORE logging anything
-                if self.browser_process.poll() is not None:
-                    if not self.shutting_down:
-                        self.logger.error(
-                            message="Browser process terminated unexpectedly | Code: {code} | STDOUT: {stdout} | STDERR: {stderr}",
-                            tag="ERROR",
-                            params={
-                                "code": self.browser_process.returncode,
-                                "stdout": stdout.decode(),
-                                "stderr": stderr.decode(),
-                            },
-                        )
-                        await self.cleanup()
-                    else:
-                        self.logger.info(
-                            message="Browser process terminated normally | Code: {code}",
-                            tag="INFO",
-                            params={"code": self.browser_process.returncode},
-                        )
-            except Exception as e:
-                if not self.shutting_down:
-                    self.logger.error(
-                        message="Error monitoring browser process: {error}",
-                        tag="ERROR",
-                        params={"error": str(e)},
-                    )
-
-    def _get_browser_path_WIP(self) -> str:
-        """Returns the browser executable path based on OS and browser type"""
-        if sys.platform == "darwin":  # macOS
-            paths = {
-                "chromium": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-                "firefox": "/Applications/Firefox.app/Contents/MacOS/firefox",
-                "webkit": "/Applications/Safari.app/Contents/MacOS/Safari",
-            }
-        elif sys.platform == "win32":  # Windows
-            paths = {
-                "chromium": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-                "firefox": "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
-                "webkit": None,  # WebKit not supported on Windows
-            }
-        else:  # Linux
-            paths = {
-                "chromium": "google-chrome",
-                "firefox": "firefox",
-                "webkit": None,  # WebKit not supported on Linux
-            }
-
-        return paths.get(self.browser_type)
-
-    async def _get_browser_path(self) -> str:
-        browser_path = await get_chromium_path(self.browser_type)
-        return browser_path
-
-    async def _get_browser_args(self) -> List[str]:
-        """Returns browser-specific command line arguments"""
-        base_args = [await self._get_browser_path()]
-
-        if self.browser_type == "chromium":
-            args = [
-                f"--remote-debugging-port={self.debugging_port}",
-                f"--user-data-dir={self.user_data_dir}",
-            ]
-            if self.headless:
-                args.append("--headless=new")
-        elif self.browser_type == "firefox":
-            args = [
-                "--remote-debugging-port",
-                str(self.debugging_port),
-                "--profile",
-                self.user_data_dir,
-            ]
-            if self.headless:
-                args.append("--headless")
-        else:
-            raise NotImplementedError(f"Browser type {self.browser_type} not supported")
-
-        return base_args + args
-
-    async def cleanup(self):
-        """Cleanup browser process and temporary directory"""
-        # Set shutting_down flag BEFORE any termination actions
-        self.shutting_down = True
-
-        if self.browser_process:
-            try:
-                self.browser_process.terminate()
-                # Wait for process to end gracefully
-                for _ in range(10):  # 10 attempts, 100ms each
-                    if self.browser_process.poll() is not None:
-                        break
-                    await asyncio.sleep(0.1)
-
-                # Force kill if still running
-                if self.browser_process.poll() is None:
-                    self.browser_process.kill()
-                    await asyncio.sleep(0.1)  # Brief wait for kill to take effect
-
-            except Exception as e:
-                self.logger.error(
-                    message="Error terminating browser: {error}",
-                    tag="ERROR",
-                    params={"error": str(e)},
-                )
-
-        if self.temp_dir and os.path.exists(self.temp_dir):
-            try:
-                shutil.rmtree(self.temp_dir)
-            except Exception as e:
-                self.logger.error(
-                    message="Error removing temporary directory: {error}",
-                    tag="ERROR",
-                    params={"error": str(e)},
-                )
-
-
-class BrowserManager:
-    """
-    Manages the browser instance and context.
-
-    Attributes:
-        config (BrowserConfig): Configuration object containing all browser settings
-        logger: Logger instance for recording events and errors
-        browser (Browser): The browser instance
-        default_context (BrowserContext): The default browser context
-        managed_browser (ManagedBrowser): The managed browser instance
-        playwright (Playwright): The Playwright instance
-        sessions (dict): Dictionary to store session information
-        session_ttl (int): Session timeout in seconds
-    """
-
-    def __init__(self, browser_config: BrowserConfig, logger=None):
-        """
-        Initialize the BrowserManager with a browser configuration.
-
-        Args:
-            browser_config (BrowserConfig): Configuration object containing all browser settings
-            logger: Logger instance for recording events and errors
-        """
-        self.config: BrowserConfig = browser_config
-        self.logger = logger
-
-        # Browser state
-        self.browser = None
-        self.default_context = None
-        self.managed_browser = None
-        self.playwright = None
-
-        # Session management
-        self.sessions = {}
-        self.session_ttl = 1800  # 30 minutes
-
-        # Keep track of contexts by a "config signature," so each unique config reuses a single context
-        self.contexts_by_config = {}
-        self._contexts_lock = asyncio.Lock() 
-
-        # Initialize ManagedBrowser if needed
-        if self.config.use_managed_browser:
-            self.managed_browser = ManagedBrowser(
-                browser_type=self.config.browser_type,
-                user_data_dir=self.config.user_data_dir,
-                headless=self.config.headless,
-                logger=self.logger,
-                debugging_port=self.config.debugging_port,
-            )
-
-    async def start(self):
-        """
-        Start the browser instance and set up the default context.
-
-        How it works:
-        1. Check if Playwright is already initialized.
-        2. If not, initialize Playwright.
-        3. If managed browser is used, start it and connect to the CDP endpoint.
-        4. If managed browser is not used, launch the browser and set up the default context.
-
-        Note: This method should be called in a separate task to avoid blocking the main event loop.
-        """
-        if self.playwright is None:
-            from playwright.async_api import async_playwright
-
-            self.playwright = await async_playwright().start()
-
-        if self.config.use_managed_browser:
-            cdp_url = await self.managed_browser.start()
-            self.browser = await self.playwright.chromium.connect_over_cdp(cdp_url)
-            contexts = self.browser.contexts
-            if contexts:
-                self.default_context = contexts[0]
-            else:
-                self.default_context = await self.create_browser_context()
-                # self.default_context = await self.browser.new_context(
-                #     viewport={
-                #         "width": self.config.viewport_width,
-                #         "height": self.config.viewport_height,
-                #     },
-                #     storage_state=self.config.storage_state,
-                #     user_agent=self.config.headers.get(
-                #         "User-Agent", self.config.user_agent
-                #     ),
-                #     accept_downloads=self.config.accept_downloads,
-                #     ignore_https_errors=self.config.ignore_https_errors,
-                #     java_script_enabled=self.config.java_script_enabled,
-                # )
-            await self.setup_context(self.default_context)
-        else:
-            browser_args = self._build_browser_args()
-
-            # Launch appropriate browser type
-            if self.config.browser_type == "firefox":
-                self.browser = await self.playwright.firefox.launch(**browser_args)
-            elif self.config.browser_type == "webkit":
-                self.browser = await self.playwright.webkit.launch(**browser_args)
-            else:
-                self.browser = await self.playwright.chromium.launch(**browser_args)
-
-            self.default_context = self.browser
-
-    def _build_browser_args(self) -> dict:
-        """Build browser launch arguments from config."""
-        args = [
-            "--disable-gpu",
-            "--disable-gpu-compositing",
-            "--disable-software-rasterizer",
-            "--no-sandbox",
-            "--disable-dev-shm-usage",
-            "--no-first-run",
-            "--no-default-browser-check",
-            "--disable-infobars",
-            "--window-position=0,0",
-            "--ignore-certificate-errors",
-            "--ignore-certificate-errors-spki-list",
-            "--disable-blink-features=AutomationControlled",
-            "--window-position=400,0",
-            "--disable-renderer-backgrounding",
-            "--disable-ipc-flooding-protection",
-            "--force-color-profile=srgb",
-            "--mute-audio",
-            "--disable-background-timer-throttling",
-            # "--single-process",
-            f"--window-size={self.config.viewport_width},{self.config.viewport_height}",
-        ]
-
-        if self.config.light_mode:
-            args.extend(BROWSER_DISABLE_OPTIONS)
-
-        if self.config.text_mode:
-            args.extend(
-                [
-                    "--blink-settings=imagesEnabled=false",
-                    "--disable-remote-fonts",
-                    "--disable-images",
-                    "--disable-javascript",
-                    "--disable-software-rasterizer",
-                    "--disable-dev-shm-usage",
-                ]
-            )
-
-        if self.config.extra_args:
-            args.extend(self.config.extra_args)
-
-        browser_args = {"headless": self.config.headless, "args": args}
-
-        if self.config.chrome_channel:
-            browser_args["channel"] = self.config.chrome_channel
-
-        if self.config.accept_downloads:
-            browser_args["downloads_path"] = self.config.downloads_path or os.path.join(
-                os.getcwd(), "downloads"
-            )
-            os.makedirs(browser_args["downloads_path"], exist_ok=True)
-
-        if self.config.proxy or self.config.proxy_config:
-            from playwright.async_api import ProxySettings
-
-            proxy_settings = (
-                ProxySettings(server=self.config.proxy)
-                if self.config.proxy
-                else ProxySettings(
-                    server=self.config.proxy_config.get("server"),
-                    username=self.config.proxy_config.get("username"),
-                    password=self.config.proxy_config.get("password"),
-                )
-            )
-            browser_args["proxy"] = proxy_settings
-
-        return browser_args
-
-    async def setup_context(
-        self,
-        context: BrowserContext,
-        crawlerRunConfig: CrawlerRunConfig = None,
-        is_default=False,
-    ):
-        """
-        Set up a browser context with the configured options.
-
-        How it works:
-        1. Set extra HTTP headers if provided.
-        2. Add cookies if provided.
-        3. Load storage state if provided.
-        4. Accept downloads if enabled.
-        5. Set default timeouts for navigation and download.
-        6. Set user agent if provided.
-        7. Set browser hints if provided.
-        8. Set proxy if provided.
-        9. Set downloads path if provided.
-        10. Set storage state if provided.
-        11. Set cache if provided.
-        12. Set extra HTTP headers if provided.
-        13. Add cookies if provided.
-        14. Set default timeouts for navigation and download if enabled.
-        15. Set user agent if provided.
-        16. Set browser hints if provided.
-
-        Args:
-            context (BrowserContext): The browser context to set up
-            crawlerRunConfig (CrawlerRunConfig): Configuration object containing all browser settings
-            is_default (bool): Flag indicating if this is the default context
-        Returns:
-            None
-        """
-        if self.config.headers:
-            await context.set_extra_http_headers(self.config.headers)
-
-        if self.config.cookies:
-            await context.add_cookies(self.config.cookies)
-
-        if self.config.storage_state:
-            await context.storage_state(path=None)
-
-        if self.config.accept_downloads:
-            context.set_default_timeout(DOWNLOAD_PAGE_TIMEOUT)
-            context.set_default_navigation_timeout(DOWNLOAD_PAGE_TIMEOUT)
-            if self.config.downloads_path:
-                context._impl_obj._options["accept_downloads"] = True
-                context._impl_obj._options[
-                    "downloads_path"
-                ] = self.config.downloads_path
-
-        # Handle user agent and browser hints
-        if self.config.user_agent:
-            combined_headers = {
-                "User-Agent": self.config.user_agent,
-                "sec-ch-ua": self.config.browser_hint,
-            }
-            combined_headers.update(self.config.headers)
-            await context.set_extra_http_headers(combined_headers)
-
-        # Add default cookie
-        await context.add_cookies(
-            [
-                {
-                    "name": "cookiesEnabled",
-                    "value": "true",
-                    "url": crawlerRunConfig.url
-                    if crawlerRunConfig
-                    else "https://crawl4ai.com/",
-                }
-            ]
-        )
-
-        # Handle navigator overrides
-        if crawlerRunConfig:
-            if (
-                crawlerRunConfig.override_navigator
-                or crawlerRunConfig.simulate_user
-                or crawlerRunConfig.magic
-            ):
-                await context.add_init_script(load_js_script("navigator_overrider"))        
-
-    async def create_browser_context(self, crawlerRunConfig: CrawlerRunConfig = None):
-        """
-        Creates and returns a new browser context with configured settings.
-        Applies text-only mode settings if text_mode is enabled in config.
-
-        Returns:
-            Context: Browser context object with the specified configurations
-        """
-        # Base settings
-        user_agent = self.config.headers.get("User-Agent", self.config.user_agent) 
-        viewport_settings = {
-            "width": self.config.viewport_width,
-            "height": self.config.viewport_height,
-        }
-        proxy_settings = {"server": self.config.proxy} if self.config.proxy else None
-
-        blocked_extensions = [
-            # Images
-            "jpg",
-            "jpeg",
-            "png",
-            "gif",
-            "webp",
-            "svg",
-            "ico",
-            "bmp",
-            "tiff",
-            "psd",
-            # Fonts
-            "woff",
-            "woff2",
-            "ttf",
-            "otf",
-            "eot",
-            # Styles
-            # 'css', 'less', 'scss', 'sass',
-            # Media
-            "mp4",
-            "webm",
-            "ogg",
-            "avi",
-            "mov",
-            "wmv",
-            "flv",
-            "m4v",
-            "mp3",
-            "wav",
-            "aac",
-            "m4a",
-            "opus",
-            "flac",
-            # Documents
-            "pdf",
-            "doc",
-            "docx",
-            "xls",
-            "xlsx",
-            "ppt",
-            "pptx",
-            # Archives
-            "zip",
-            "rar",
-            "7z",
-            "tar",
-            "gz",
-            # Scripts and data
-            "xml",
-            "swf",
-            "wasm",
-        ]
-
-        # Common context settings
-        context_settings = {
-            "user_agent": user_agent,
-            "viewport": viewport_settings,
-            "proxy": proxy_settings,
-            "accept_downloads": self.config.accept_downloads,
-            "storage_state": self.config.storage_state,
-            "ignore_https_errors": self.config.ignore_https_errors,
-            "device_scale_factor": 1.0,
-            "java_script_enabled": self.config.java_script_enabled,
-        }
-        
-        if crawlerRunConfig:
-            # Check if there is value for crawlerRunConfig.proxy_config set add that to context
-            if crawlerRunConfig.proxy_config:
-                proxy_settings = {
-                    "server": crawlerRunConfig.proxy_config.get("server"),
-                }
-                if crawlerRunConfig.proxy_config.get("username"):
-                    proxy_settings.update({
-                        "username": crawlerRunConfig.proxy_config.get("username"),
-                        "password": crawlerRunConfig.proxy_config.get("password"),
-                    })
-                context_settings["proxy"] = proxy_settings
-
-        if self.config.text_mode:
-            text_mode_settings = {
-                "has_touch": False,
-                "is_mobile": False,
-            }
-            # Update context settings with text mode settings
-            context_settings.update(text_mode_settings)
-
-        # Create and return the context with all settings
-        context = await self.browser.new_context(**context_settings)
-
-        # Apply text mode settings if enabled
-        if self.config.text_mode:
-            # Create and apply route patterns for each extension
-            for ext in blocked_extensions:
-                await context.route(f"**/*.{ext}", lambda route: route.abort())
-        return context
-
-    def _make_config_signature(self, crawlerRunConfig: CrawlerRunConfig) -> str:
-        """
-        Converts the crawlerRunConfig into a dict, excludes ephemeral fields,
-        then returns a hash of the sorted JSON. This yields a stable signature
-        that identifies configurations requiring a unique browser context.
-        """
-        import json, hashlib
-
-        config_dict = crawlerRunConfig.__dict__.copy()
-        # Exclude items that do not affect browser-level setup.
-        # Expand or adjust as needed, e.g. chunking_strategy is purely for data extraction, not for browser config.
-        ephemeral_keys = [
-            "session_id",
-            "js_code",
-            "scraping_strategy",
-            "extraction_strategy",
-            "chunking_strategy",
-            "cache_mode",
-            "content_filter",
-            "semaphore_count",
-            "url"
-        ]
-        for key in ephemeral_keys:
-            if key in config_dict:
-                del config_dict[key]
-        # Convert to canonical JSON string
-        signature_json = json.dumps(config_dict, sort_keys=True, default=str)
-
-        # Hash the JSON so we get a compact, unique string
-        signature_hash = hashlib.sha256(signature_json.encode("utf-8")).hexdigest()
-        return signature_hash
-
-    async def get_page(self, crawlerRunConfig: CrawlerRunConfig):
-        """
-        Get a page for the given session ID, creating a new one if needed.
-
-        Args:
-            crawlerRunConfig (CrawlerRunConfig): Configuration object containing all browser settings
-
-        Returns:
-            (page, context): The Page and its BrowserContext
-        """
-        self._cleanup_expired_sessions()
-
-        # If a session_id is provided and we already have it, reuse that page + context
-        if crawlerRunConfig.session_id and crawlerRunConfig.session_id in self.sessions:
-            context, page, _ = self.sessions[crawlerRunConfig.session_id]
-            # Update last-used timestamp
-            self.sessions[crawlerRunConfig.session_id] = (context, page, time.time())
-            return page, context
-
-        # If using a managed browser, just grab the shared default_context
-        if self.config.use_managed_browser:
-            context = self.default_context
-            page = await context.new_page()
-        else:
-            # Otherwise, check if we have an existing context for this config
-            config_signature = self._make_config_signature(crawlerRunConfig)
-
-            async with self._contexts_lock:
-                if config_signature in self.contexts_by_config:
-                    context = self.contexts_by_config[config_signature]
-                else:
-                    # Create and setup a new context
-                    context = await self.create_browser_context(crawlerRunConfig)
-                    await self.setup_context(context, crawlerRunConfig)
-                    self.contexts_by_config[config_signature] = context
-
-            # Create a new page from the chosen context
-            page = await context.new_page()
-
-        # If a session_id is specified, store this session so we can reuse later
-        if crawlerRunConfig.session_id:
-            self.sessions[crawlerRunConfig.session_id] = (context, page, time.time())
-
-        return page, context
-
-    async def kill_session(self, session_id: str):
-        """
-        Kill a browser session and clean up resources.
-
-        Args:
-            session_id (str): The session ID to kill.
-        """
-        if session_id in self.sessions:
-            context, page, _ = self.sessions[session_id]
-            await page.close()
-            if not self.config.use_managed_browser:
-                await context.close()
-            del self.sessions[session_id]
-
-    def _cleanup_expired_sessions(self):
-        """Clean up expired sessions based on TTL."""
-        current_time = time.time()
-        expired_sessions = [
-            sid
-            for sid, (_, _, last_used) in self.sessions.items()
-            if current_time - last_used > self.session_ttl
-        ]
-        for sid in expired_sessions:
-            asyncio.create_task(self.kill_session(sid))
-
-    async def close(self):
-        """Close all browser resources and clean up."""
-        if self.config.sleep_on_close:
-            await asyncio.sleep(0.5)
-
-        session_ids = list(self.sessions.keys())
-        for session_id in session_ids:
-            await self.kill_session(session_id)
-
-        # Now close all contexts we created. This reclaims memory from ephemeral contexts.
-        for ctx in self.contexts_by_config.values():
-            try:
-                await ctx.close()
-            except Exception as e:
-                self.logger.error(
-                    message="Error closing context: {error}",
-                    tag="ERROR",
-                    params={"error": str(e)}
-                )
-        self.contexts_by_config.clear()
-
-        if self.browser:
-            await self.browser.close()
-            self.browser = None
-
-        if self.managed_browser:
-            await asyncio.sleep(0.5)
-            await self.managed_browser.cleanup()
-            self.managed_browser = None
-
-        if self.playwright:
-            await self.playwright.stop()
-            self.playwright = None
-
+from .user_agent_generator import ValidUAGenerator
+from .browser_manager import BrowserManager
+
+import aiofiles
+import aiohttp
+import chardet
+from aiohttp.client import ClientTimeout
+from urllib.parse import urlparse
+from types import MappingProxyType
+import contextlib
+from functools import partial
 
 class AsyncCrawlerStrategy(ABC):
     """
@@ -816,7 +40,6 @@ class AsyncCrawlerStrategy(ABC):
     @abstractmethod
     async def crawl(self, url: str, **kwargs) -> AsyncCrawlResponse:
         pass  # 4 + 3
-
 
 class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
     """
@@ -872,6 +95,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             "on_page_context_created": None,
             "on_user_agent_updated": None,
             "on_execution_started": None,
+            "on_execution_ended": None,
             "before_goto": None,
             "after_goto": None,
             "before_return_html": None,
@@ -906,6 +130,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         Close the browser and clean up resources.
         """
         await self.browser_manager.close()
+        # Explicitly reset the static Playwright instance
+        BrowserManager._playwright_instance = None
 
     async def kill_session(self, session_id: str):
         """
@@ -1185,7 +411,11 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
         user_agent = kwargs.get("user_agent", self.user_agent)
         # Use browser_manager to get a fresh page & context assigned to this session_id
-        page, context = await self.browser_manager.get_page(session_id, user_agent)
+        page, context = await self.browser_manager.get_page(CrawlerRunConfig(
+            session_id=session_id,
+            user_agent=user_agent,
+            **kwargs,
+        ))
         return session_id
 
     async def crawl(
@@ -1211,7 +441,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         status_code = 200  # Default for local/raw HTML
         screenshot_data = None
 
-        if url.startswith(("http://", "https://")):
+        if url.startswith(("http://", "https://", "view-source:")):
             return await self._crawl_web(url, config)
 
         elif url.startswith("file://"):
@@ -1223,12 +453,17 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 html = f.read()
             if config.screenshot:
                 screenshot_data = await self._generate_screenshot_from_html(html)
+            if config.capture_console_messages:
+                page, context = await self.browser_manager.get_page(crawlerRunConfig=config)
+                captured_console = await self._capture_console_messages(page, url)
+
             return AsyncCrawlResponse(
                 html=html,
                 response_headers=response_headers,
                 status_code=status_code,
                 screenshot=screenshot_data,
                 get_delayed_content=None,
+                console_messages=captured_console,
             )
 
         elif url.startswith("raw:"):
@@ -1254,6 +489,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
     ) -> AsyncCrawlResponse:
         """
         Internal method to crawl web URLs with the specified configuration.
+        Includes optional network and console capturing.
 
         Args:
             url (str): The web URL to crawl
@@ -1264,11 +500,16 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         """
         config.url = url
         response_headers = {}
+        execution_result = None
         status_code = None
         redirected_url = url 
 
         # Reset downloaded files list for new crawl
         self._downloaded_files = []
+        
+        # Initialize capture lists
+        captured_requests = []
+        captured_console = []
 
         # Handle user agent with magic mode
         user_agent_to_override = config.user_agent
@@ -1282,10 +523,12 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         # Get page for session
         page, context = await self.browser_manager.get_page(crawlerRunConfig=config)
 
+        # await page.goto(URL)
+
         # Add default cookie
-        await context.add_cookies(
-            [{"name": "cookiesEnabled", "value": "true", "url": url}]
-        )
+        # await context.add_cookies(
+        #     [{"name": "cookiesEnabled", "value": "true", "url": url}]
+        # )
 
         # Handle navigator overrides
         if config.override_navigator or config.simulate_user or config.magic:
@@ -1294,23 +537,169 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         # Call hook after page creation
         await self.execute_hook("on_page_context_created", page, context=context, config=config)
 
+        # Network Request Capturing
+        if config.capture_network_requests:
+            async def handle_request_capture(request):
+                try:
+                    post_data_str = None
+                    try:
+                        # Be cautious with large post data
+                        post_data = request.post_data_buffer
+                        if post_data:
+                             # Attempt to decode, fallback to base64 or size indication
+                             try:
+                                 post_data_str = post_data.decode('utf-8', errors='replace')
+                             except UnicodeDecodeError:
+                                 post_data_str = f"[Binary data: {len(post_data)} bytes]"
+                    except Exception:
+                        post_data_str = "[Error retrieving post data]"
+
+                    captured_requests.append({
+                        "event_type": "request",
+                        "url": request.url,
+                        "method": request.method,
+                        "headers": dict(request.headers), # Convert Header dict
+                        "post_data": post_data_str,
+                        "resource_type": request.resource_type,
+                        "is_navigation_request": request.is_navigation_request(),
+                        "timestamp": time.time()
+                    })
+                except Exception as e:
+                    if self.logger:
+                        self.logger.warning(f"Error capturing request details for {request.url}: {e}", tag="CAPTURE")
+                    captured_requests.append({"event_type": "request_capture_error", "url": request.url, "error": str(e), "timestamp": time.time()})
+
+            async def handle_response_capture(response):
+                try:
+                    try:
+                        # body = await response.body()
+                        # json_body = await response.json()
+                        text_body = await response.text()
+                    except Exception as e:
+                        body = None
+                        # json_body = None
+                        # text_body = None
+                    captured_requests.append({
+                        "event_type": "response",
+                        "url": response.url,
+                        "status": response.status,
+                        "status_text": response.status_text,
+                        "headers": dict(response.headers), # Convert Header dict
+                        "from_service_worker": response.from_service_worker,
+                        "request_timing": response.request.timing, # Detailed timing info
+                        "timestamp": time.time(),
+                        "body" : {
+                            # "raw": body,
+                            # "json": json_body,
+                            "text": text_body
+                        }
+                    })
+                except Exception as e:
+                    if self.logger:
+                        self.logger.warning(f"Error capturing response details for {response.url}: {e}", tag="CAPTURE")
+                    captured_requests.append({"event_type": "response_capture_error", "url": response.url, "error": str(e), "timestamp": time.time()})
+
+            async def handle_request_failed_capture(request):
+                 try:
+                    captured_requests.append({
+                        "event_type": "request_failed",
+                        "url": request.url,
+                        "method": request.method,
+                        "resource_type": request.resource_type,
+                        "failure_text": str(request.failure) if request.failure else "Unknown failure",
+                        "timestamp": time.time()
+                    })
+                 except Exception as e:
+                    if self.logger:
+                        self.logger.warning(f"Error capturing request failed details for {request.url}: {e}", tag="CAPTURE")
+                    captured_requests.append({"event_type": "request_failed_capture_error", "url": request.url, "error": str(e), "timestamp": time.time()})
+
+            page.on("request", handle_request_capture)
+            page.on("response", handle_response_capture)
+            page.on("requestfailed", handle_request_failed_capture)
+
+        # Console Message Capturing
+        if config.capture_console_messages:
+            def handle_console_capture(msg):
+                try:
+                    message_type = "unknown"
+                    try:
+                        message_type = msg.type
+                    except:
+                        pass
+                        
+                    message_text = "unknown"
+                    try:
+                        message_text = msg.text
+                    except:
+                        pass
+                        
+                    # Basic console message with minimal content
+                    entry = {
+                        "type": message_type,
+                        "text": message_text,
+                        "timestamp": time.time()
+                    }
+                    
+                    captured_console.append(entry)
+                    
+                except Exception as e:
+                    if self.logger:
+                        self.logger.warning(f"Error capturing console message: {e}", tag="CAPTURE")
+                    # Still add something to the list even on error
+                    captured_console.append({
+                        "type": "console_capture_error", 
+                        "error": str(e), 
+                        "timestamp": time.time()
+                    })
+
+            def handle_pageerror_capture(err):
+                try:
+                    error_message = "Unknown error"
+                    try:
+                        error_message = err.message
+                    except:
+                        pass
+                        
+                    error_stack = ""
+                    try:
+                        error_stack = err.stack
+                    except:
+                        pass
+                        
+                    captured_console.append({
+                        "type": "error",
+                        "text": error_message,
+                        "stack": error_stack,
+                        "timestamp": time.time()
+                    })
+                except Exception as e:
+                    if self.logger:
+                        self.logger.warning(f"Error capturing page error: {e}", tag="CAPTURE")
+                    captured_console.append({
+                        "type": "pageerror_capture_error", 
+                        "error": str(e), 
+                        "timestamp": time.time()
+                    })
+
+            # Add event listeners directly
+            page.on("console", handle_console_capture)
+            page.on("pageerror", handle_pageerror_capture)
+
         # Set up console logging if requested
         if config.log_console:
-
             def log_consol(
                 msg, console_log_type="debug"
             ):  # Corrected the parameter syntax
                 if console_log_type == "error":
                     self.logger.error(
                         message=f"Console error: {msg}",  # Use f-string for variable interpolation
-                        tag="CONSOLE",
-                        params={"msg": msg.text},
+                        tag="CONSOLE"
                     )
                 elif console_log_type == "debug":
                     self.logger.debug(
                         message=f"Console: {msg}",  # Use f-string for variable interpolation
-                        tag="CONSOLE",
-                        params={"msg": msg.text},
+                        tag="CONSOLE"
                     )
 
             page.on("console", log_consol)
@@ -1337,14 +726,15 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
                 try:
                     # Generate a unique nonce for this request
-                    nonce = hashlib.sha256(os.urandom(32)).hexdigest()
+                    if config.experimental.get("use_csp_nonce", False):
+                        nonce = hashlib.sha256(os.urandom(32)).hexdigest()
 
-                    # Add CSP headers to the request
-                    await page.set_extra_http_headers(
-                        {
-                            "Content-Security-Policy": f"default-src 'self'; script-src 'self' 'nonce-{nonce}' 'strict-dynamic'"
-                        }
-                    )
+                        # Add CSP headers to the request
+                        await page.set_extra_http_headers(
+                            {
+                                "Content-Security-Policy": f"default-src 'self'; script-src 'self' 'nonce-{nonce}' 'strict-dynamic'"
+                            }
+                        )
 
                     response = await page.goto(
                         url, wait_until=config.wait_until, timeout=config.page_timeout
@@ -1394,7 +784,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             except Error:
                 visibility_info = await self.check_visibility(page)
 
-                if self.config.verbose:
+                if self.browser_config.config.verbose:
                     self.logger.debug(
                         message="Body visibility info: {info}",
                         tag="DEBUG",
@@ -1521,6 +911,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 execution_result = await self.robust_execute_user_script(
                     page, config.js_code
                 )
+
                 if not execution_result["success"]:
                     self.logger.warning(
                         message="User script execution had issues: {error}",
@@ -1529,6 +920,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     )
 
                 await self.execute_hook("on_execution_started", page, context=context, config=config)
+                await self.execute_hook("on_execution_ended", page, context=context, config=config, result=execution_result)
 
             # Handle user simulation
             if config.simulate_user or config.magic:
@@ -1540,6 +932,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             # Handle wait_for condition
             # Todo: Decide how to handle this
             if not config.wait_for and config.css_selector and False:
+            # if not config.wait_for and config.css_selector:
                 config.wait_for = f"css:{config.css_selector}"
 
             if config.wait_for:
@@ -1579,19 +972,47 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             if config.remove_overlay_elements:
                 await self.remove_overlay_elements(page)
 
-            # Get final HTML content
-            html = await page.content()
+            if config.css_selector:
+                try:
+                    # Handle comma-separated selectors by splitting them
+                    selectors = [s.strip() for s in config.css_selector.split(',')]
+                    html_parts = []
+                    
+                    for selector in selectors:
+                        try:
+                            content = await page.evaluate(
+                                f"""Array.from(document.querySelectorAll("{selector}"))
+                                    .map(el => el.outerHTML)
+                                    .join('')"""
+                            )
+                            html_parts.append(content)
+                        except Error as e:
+                            print(f"Warning: Could not get content for selector '{selector}': {str(e)}")
+                    
+                    # Wrap in a div to create a valid HTML structure
+                    html = f"<div class='crawl4ai-result'>\n" + "\n".join(html_parts) + "\n</div>"                    
+                except Error as e:
+                    raise RuntimeError(f"Failed to extract HTML content: {str(e)}")
+            else:
+                html = await page.content()
+            
+            # # Get final HTML content
+            # html = await page.content()
             await self.execute_hook(
                 "before_return_html", page=page, html=html, context=context, config=config
             )
 
-            # Handle PDF and screenshot generation
+            # Handle PDF, MHTML and screenshot generation
             start_export_time = time.perf_counter()
             pdf_data = None
             screenshot_data = None
+            mhtml_data = None
 
             if config.pdf:
                 pdf_data = await self.export_pdf(page)
+
+            if config.capture_mhtml:
+                mhtml_data = await self.capture_mhtml(page)
 
             if config.screenshot:
                 if config.screenshot_wait_for:
@@ -1600,9 +1021,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     page, screenshot_height_threshold=config.screenshot_height_threshold
                 )
 
-            if screenshot_data or pdf_data:
+            if screenshot_data or pdf_data or mhtml_data:
                 self.logger.info(
-                    message="Exporting PDF and taking screenshot took {duration:.2f}s",
+                    message="Exporting media (PDF/MHTML/screenshot) took {duration:.2f}s",
                     tag="EXPORT",
                     params={"duration": time.perf_counter() - start_export_time},
                 )
@@ -1621,15 +1042,20 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             return AsyncCrawlResponse(
                 html=html,
                 response_headers=response_headers,
+                js_execution_result=execution_result,
                 status_code=status_code,
                 screenshot=screenshot_data,
                 pdf_data=pdf_data,
+                mhtml_data=mhtml_data,
                 get_delayed_content=get_delayed_content,
                 ssl_certificate=ssl_cert,
                 downloaded_files=(
                     self._downloaded_files if self._downloaded_files else None
                 ),
                 redirected_url=redirected_url,
+                # Include captured data if enabled
+                network_requests=captured_requests if config.capture_network_requests else None,
+                console_messages=captured_console if config.capture_console_messages else None,
             )
 
         except Exception as e:
@@ -1638,6 +1064,15 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         finally:
             # If no session_id is given we should close the page
             if not config.session_id:
+                # Detach listeners before closing to prevent potential errors during close
+                if config.capture_network_requests:
+                    page.remove_listener("request", handle_request_capture)
+                    page.remove_listener("response", handle_response_capture)
+                    page.remove_listener("requestfailed", handle_request_failed_capture)
+                if config.capture_console_messages:
+                    page.remove_listener("console", handle_console_capture)
+                    page.remove_listener("pageerror", handle_pageerror_capture)
+                
                 await page.close()
 
     async def _handle_full_page_scan(self, page: Page, scroll_delay: float = 0.1):
@@ -1658,7 +1093,14 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
         """
         try:
-            viewport_height = page.viewport_size.get(
+            viewport_size = page.viewport_size
+            if viewport_size is None:
+                await page.set_viewport_size(
+                    {"width": self.browser_config.viewport_width, "height": self.browser_config.viewport_height}
+                )
+                viewport_size = page.viewport_size
+
+            viewport_height = viewport_size.get(
                 "height", self.browser_config.viewport_height
             )
             current_position = viewport_height
@@ -1718,7 +1160,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         """
         try:
             suggested_filename = download.suggested_filename
-            download_path = os.path.join(self.downloads_path, suggested_filename)
+            download_path = os.path.join(self.browser_config.downloads_path, suggested_filename)
 
             self.logger.info(
                 message="Downloading {filename} to {path}",
@@ -1793,7 +1235,107 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         """
         pdf_data = await page.pdf(print_background=True)
         return pdf_data
+        
+    async def capture_mhtml(self, page: Page) -> Optional[str]:
+        """
+        Captures the current page as MHTML using CDP.
+        
+        MHTML (MIME HTML) is a web page archive format that combines the HTML content 
+        with its resources (images, CSS, etc.) into a single MIME-encoded file.
+        
+        Args:
+            page (Page): The Playwright page object
+            
+        Returns:
+            Optional[str]: The MHTML content as a string, or None if there was an error
+        """
+        try:
+            # Ensure the page is fully loaded before capturing
+            try:
+                # Wait for DOM content and network to be idle
+                await page.wait_for_load_state("domcontentloaded", timeout=5000)
+                await page.wait_for_load_state("networkidle", timeout=5000)
+                
+                # Give a little extra time for JavaScript execution
+                await page.wait_for_timeout(1000)
+                
+                # Wait for any animations to complete
+                await page.evaluate("""
+                    () => new Promise(resolve => {
+                        // First requestAnimationFrame gets scheduled after the next repaint
+                        requestAnimationFrame(() => {
+                            // Second requestAnimationFrame gets called after all animations complete
+                            requestAnimationFrame(resolve);
+                        });
+                    })
+                """)
+            except Error as e:
+                if self.logger:
+                    self.logger.warning(
+                        message="Wait for load state timed out: {error}",
+                        tag="MHTML",
+                        params={"error": str(e)},
+                    )
+            
+            # Create a new CDP session
+            cdp_session = await page.context.new_cdp_session(page)
+            
+            # Call Page.captureSnapshot with format "mhtml"
+            result = await cdp_session.send("Page.captureSnapshot", {"format": "mhtml"})
+            
+            # The result contains a 'data' field with the MHTML content
+            mhtml_content = result.get("data")
+            
+            # Detach the CDP session to clean up resources
+            await cdp_session.detach()
+            
+            return mhtml_content
+        except Exception as e:
+            # Log the error but don't raise it - we'll just return None for the MHTML
+            if self.logger:
+                self.logger.error(
+                    message="Failed to capture MHTML: {error}",
+                    tag="MHTML",
+                    params={"error": str(e)},
+                )
+            return None
 
+    async def _capture_console_messages(
+        self, page: Page, file_path: str
+    ) -> List[Dict[str, Union[str, float]]]:
+        """
+        Captures console messages from the page.
+        Args:
+
+            page (Page): The Playwright page object
+        Returns:
+            List[Dict[str, Union[str, float]]]: A list of captured console messages
+        """
+        captured_console = []
+
+        def handle_console_message(msg):
+            try:
+                message_type = msg.type
+                message_text = msg.text
+
+                entry = {
+                    "type": message_type,
+                    "text": message_text,
+                    "timestamp": time.time(),
+                }
+                captured_console.append(entry)
+            except Exception as e:
+                if self.logger:
+                    self.logger.warning(
+                        f"Error capturing console message: {e}", tag="CAPTURE"
+                    )
+
+        page.on("console", handle_console_message)
+        
+        await page.goto(file_path)
+
+        return captured_console
+        
     async def take_screenshot(self, page, **kwargs) -> str:
         """
         Take a screenshot of the current page.
@@ -1925,8 +1467,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             buffered = BytesIO()
             img.save(buffered, format="JPEG")
             return base64.b64encode(buffered.getvalue()).decode("utf-8")
-        finally:
-            await page.close()
+        # finally:
+        #     await page.close()
 
     async def take_screenshot_naive(self, page: Page) -> str:
         """
@@ -1959,8 +1501,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             buffered = BytesIO()
             img.save(buffered, format="JPEG")
             return base64.b64encode(buffered.getvalue()).decode("utf-8")
-        finally:
-            await page.close()
+        # finally:
+        #     await page.close()
 
     async def export_storage_state(self, path: str = None) -> dict:
         """
@@ -2028,8 +1570,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                             f"""
                         (async () => {{
                             try {{
-                                {script}
-                                return {{ success: true }};
+                                const script_result = {script};
+                                return {{ success: true, result: script_result }};
                             }} catch (err) {{
                                 return {{ success: false, error: err.toString(), stack: err.stack }};
                             }}
@@ -2364,3 +1906,267 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 params={"error": str(e)},
             )
             return True  # Default to scrolling if check fails
+
+
+####################################################################################################
+# HTTP Crawler Strategy
+####################################################################################################
+
+class HTTPCrawlerError(Exception):
+    """Base error class for HTTP crawler specific exceptions"""
+    pass
+
+
+class ConnectionTimeoutError(HTTPCrawlerError):
+    """Raised when connection timeout occurs"""
+    pass
+
+
+class HTTPStatusError(HTTPCrawlerError):
+    """Raised for unexpected status codes"""
+    def __init__(self, status_code: int, message: str):
+        self.status_code = status_code
+        super().__init__(f"HTTP {status_code}: {message}")
+
+
+class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
+    """
+    Fast, lightweight HTTP-only crawler strategy optimized for memory efficiency.
+    """
+    
+    __slots__ = ('logger', 'max_connections', 'dns_cache_ttl', 'chunk_size', '_session', 'hooks', 'browser_config')
+
+    DEFAULT_TIMEOUT: Final[int] = 30
+    DEFAULT_CHUNK_SIZE: Final[int] = 64 * 1024  
+    DEFAULT_MAX_CONNECTIONS: Final[int] = min(32, (os.cpu_count() or 1) * 4)
+    DEFAULT_DNS_CACHE_TTL: Final[int] = 300
+    VALID_SCHEMES: Final = frozenset({'http', 'https', 'file', 'raw'})
+
+    _BASE_HEADERS: Final = MappingProxyType({
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    })
+    
+    def __init__(
+        self, 
+        browser_config: Optional[HTTPCrawlerConfig] = None,
+        logger: Optional[AsyncLogger] = None,
+        max_connections: int = DEFAULT_MAX_CONNECTIONS,
+        dns_cache_ttl: int = DEFAULT_DNS_CACHE_TTL,
+        chunk_size: int = DEFAULT_CHUNK_SIZE
+    ):
+        """Initialize the HTTP crawler with config"""
+        self.browser_config = browser_config or HTTPCrawlerConfig()
+        self.logger = logger
+        self.max_connections = max_connections
+        self.dns_cache_ttl = dns_cache_ttl
+        self.chunk_size = chunk_size
+        self._session: Optional[aiohttp.ClientSession] = None
+        
+        self.hooks = {
+            k: partial(self._execute_hook, k) 
+            for k in ('before_request', 'after_request', 'on_error')
+        }
+
+        # Set default hooks
+        self.set_hook('before_request', lambda *args, **kwargs: None)
+        self.set_hook('after_request', lambda *args, **kwargs: None)
+        self.set_hook('on_error', lambda *args, **kwargs: None)
+                      
+
+    async def __aenter__(self) -> AsyncHTTPCrawlerStrategy:
+        await self.start()
+        return self
+        
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        await self.close()
+
+    @contextlib.asynccontextmanager
+    async def _session_context(self):
+        try:
+            if not self._session:
+                await self.start()
+            yield self._session
+        finally:
+            pass
+
+    def set_hook(self, hook_type: str, hook_func: Callable) -> None:
+        if hook_type in self.hooks:
+            self.hooks[hook_type] = partial(self._execute_hook, hook_type, hook_func)
+        else:
+            raise ValueError(f"Invalid hook type: {hook_type}")
+
+    async def _execute_hook(
+        self, 
+        hook_type: str, 
+        hook_func: Callable,
+        *args: Any, 
+        **kwargs: Any
+    ) -> Any:
+        if asyncio.iscoroutinefunction(hook_func):
+            return await hook_func(*args, **kwargs)
+        return hook_func(*args, **kwargs)
+
+    async def start(self) -> None:
+        if not self._session:
+            connector = aiohttp.TCPConnector(
+                limit=self.max_connections,
+                ttl_dns_cache=self.dns_cache_ttl,
+                use_dns_cache=True,
+                force_close=False
+            )
+            self._session = aiohttp.ClientSession(
+                headers=dict(self._BASE_HEADERS),
+                connector=connector,
+                timeout=ClientTimeout(total=self.DEFAULT_TIMEOUT)
+            )
+
+    async def close(self) -> None:
+        if self._session and not self._session.closed:
+            try:
+                await asyncio.wait_for(self._session.close(), timeout=5.0)
+            except asyncio.TimeoutError:
+                if self.logger:
+                    self.logger.warning(
+                        message="Session cleanup timed out",
+                        tag="CLEANUP"
+                    )
+            finally:
+                self._session = None
+
+    async def _stream_file(self, path: str) -> AsyncGenerator[memoryview, None]:
+        async with aiofiles.open(path, mode='rb') as f:
+            while chunk := await f.read(self.chunk_size):
+                yield memoryview(chunk)
+
+    async def _handle_file(self, path: str) -> AsyncCrawlResponse:
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"Local file not found: {path}")
+            
+        chunks = []
+        async for chunk in self._stream_file(path):
+            chunks.append(chunk.tobytes().decode('utf-8', errors='replace'))
+            
+        return AsyncCrawlResponse(
+            html=''.join(chunks),
+            response_headers={},
+            status_code=200
+        )
+
+    async def _handle_raw(self, content: str) -> AsyncCrawlResponse:
+        return AsyncCrawlResponse(
+            html=content,
+            response_headers={},
+            status_code=200
+        )
+
+
+    async def _handle_http(
+        self, 
+        url: str, 
+        config: CrawlerRunConfig
+    ) -> AsyncCrawlResponse:
+        async with self._session_context() as session:
+            timeout = ClientTimeout(
+                total=config.page_timeout or self.DEFAULT_TIMEOUT,
+                connect=10,
+                sock_read=30
+            )
+            
+            headers = dict(self._BASE_HEADERS)
+            if self.browser_config.headers:
+                headers.update(self.browser_config.headers)
+
+            request_kwargs = {
+                'timeout': timeout,
+                'allow_redirects': self.browser_config.follow_redirects,
+                'ssl': self.browser_config.verify_ssl,
+                'headers': headers
+            }
+
+            if self.browser_config.method == "POST":
+                if self.browser_config.data:
+                    request_kwargs['data'] = self.browser_config.data
+                if self.browser_config.json:
+                    request_kwargs['json'] = self.browser_config.json
+
+            await self.hooks['before_request'](url, request_kwargs)
+
+            try:
+                async with session.request(self.browser_config.method, url, **request_kwargs) as response:
+                    content = memoryview(await response.read())
+                    
+                    if not (200 <= response.status < 300):
+                        raise HTTPStatusError(
+                            response.status,
+                            f"Unexpected status code for {url}"
+                        )
+                    
+                    encoding = response.charset
+                    if not encoding:
+                        encoding = chardet.detect(content.tobytes())['encoding'] or 'utf-8'                    
+                    
+                    result = AsyncCrawlResponse(
+                        html=content.tobytes().decode(encoding, errors='replace'),
+                        response_headers=dict(response.headers),
+                        status_code=response.status,
+                        redirected_url=str(response.url)
+                    )
+                    
+                    await self.hooks['after_request'](result)
+                    return result
+
+            except aiohttp.ServerTimeoutError as e:
+                await self.hooks['on_error'](e)
+                raise ConnectionTimeoutError(f"Request timed out: {str(e)}")
+                
+            except aiohttp.ClientConnectorError as e:
+                await self.hooks['on_error'](e)
+                raise ConnectionError(f"Connection failed: {str(e)}")
+                
+            except aiohttp.ClientError as e:
+                await self.hooks['on_error'](e)
+                raise HTTPCrawlerError(f"HTTP client error: {str(e)}")
+            
+            except asyncio.exceptions.TimeoutError as e:
+                await self.hooks['on_error'](e)
+                raise ConnectionTimeoutError(f"Request timed out: {str(e)}")
+            
+            except Exception as e:
+                await self.hooks['on_error'](e)
+                raise HTTPCrawlerError(f"HTTP request failed: {str(e)}")
+
+    async def crawl(
+        self, 
+        url: str, 
+        config: Optional[CrawlerRunConfig] = None, 
+        **kwargs
+    ) -> AsyncCrawlResponse:
+        config = config or CrawlerRunConfig.from_kwargs(kwargs)
+        
+        parsed = urlparse(url)
+        scheme = parsed.scheme.rstrip('/')
+        
+        if scheme not in self.VALID_SCHEMES:
+            raise ValueError(f"Unsupported URL scheme: {scheme}")
+            
+        try:
+            if scheme == 'file':
+                return await self._handle_file(parsed.path)
+            elif scheme == 'raw':
+                return await self._handle_raw(parsed.path)
+            else:  # http or https
+                return await self._handle_http(url, config)
+                
+        except Exception as e:
+            if self.logger:
+                self.logger.error(
+                    message="Crawl failed: {error}",
+                    tag="CRAWL",
+                    params={"error": str(e), "url": url}
+                )
+            raise

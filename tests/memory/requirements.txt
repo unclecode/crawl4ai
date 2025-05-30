@@ -1,0 +1,4 @@
+pandas>=1.5.0
+matplotlib>=3.5.0
+seaborn>=0.12.0
+rich>=12.0.0

@@ -1,0 +1,11 @@
+type: "llm"
+provider: "openai/gpt-4o-mini"
+api_token: "env:OPENAI_API_KEY"
+instruction: "Extract all articles with their titles, authors, publication dates and main topics in a structured format"
+params:
+  chunk_token_threshold: 4096
+  overlap_rate: 0.1
+  word_token_rate: 0.75
+  temperature: 0.3
+  max_tokens: 1000
+  verbose: true
