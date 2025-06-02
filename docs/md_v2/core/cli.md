@@ -17,6 +17,9 @@
 - [Configuration Reference](#configuration-reference)
 - [Best Practices & Tips](#best-practices--tips)
 
+## Installation
+The Crawl4AI CLI will be installed automatically when you install the library.
+
 ## Basic Usage
 
 The Crawl4AI CLI (`crwl`) provides a simple interface to the Crawl4AI library:

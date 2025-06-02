@@ -360,7 +360,7 @@ class AsyncWebCrawler:
                         pdf_data=pdf_data,
                         verbose=config.verbose,
                         is_raw_html=True if url.startswith("raw:") else False,
-                        redirected_url=async_response.redirected_url, 
+                        redirected_url=async_response.redirected_url,
                         **kwargs,
                     )
 
@@ -503,7 +503,7 @@ class AsyncWebCrawler:
             tables = media.pop("tables", [])
             links = result.links.model_dump()
             metadata = result.metadata
-            
+
         fit_html = preprocess_html_for_schema(html_content=html, text_threshold= 500, max_size= 300_000)
 
         ################################
@@ -585,11 +585,13 @@ class AsyncWebCrawler:
             # Choose content based on input_format
             content_format = config.extraction_strategy.input_format
             if content_format == "fit_markdown" and not markdown_result.fit_markdown:
-                self.logger.warning(
-                    message="Fit markdown requested but not available. Falling back to raw markdown.",
-                    tag="EXTRACT",
-                    params={"url": _url},
-                )
+
+                self.logger.url_status(
+                        url=_url,
+                        success=bool(html),
+                        timing=time.perf_counter() - t1,
+                        tag="EXTRACT",
+                    )
                 content_format = "markdown"
 
             content = {
@@ -613,11 +615,12 @@ class AsyncWebCrawler:
             )
 
             # Log extraction completion
-            self.logger.info(
-                message="Completed for {url:.50}... | Time: {timing}s",
-                tag="EXTRACT",
-                params={"url": _url, "timing": time.perf_counter() - t1},
-            )
+            self.logger.url_status(
+                        url=_url,
+                        success=bool(html),
+                        timing=time.perf_counter() - t1,
+                        tag="EXTRACT",
+                    )
 
         # Apply HTML formatting if requested
         if config.prettiify:

@@ -615,9 +615,18 @@ class BrowserProfiler:
         self.logger.info(f"Debugging port: {debugging_port}", tag="CDP")
         self.logger.info(f"Headless mode: {headless}", tag="CDP")
         
+        # create browser config
+        browser_config = BrowserConfig(
+            browser_type=browser_type,
+            headless=headless,
+            user_data_dir=profile_path,
+            debugging_port=debugging_port,
+            verbose=True
+        )
+        
         # Create managed browser instance
         managed_browser = ManagedBrowser(
-            browser_type=browser_type,
+            browser_config=browser_config,
             user_data_dir=profile_path,
             headless=headless,
             logger=self.logger,
