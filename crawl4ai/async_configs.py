@@ -764,6 +764,9 @@ class CrawlerRunConfig():
                             Default: 60000 (60 seconds).
         wait_for (str or None): A CSS selector or JS condition to wait for before extracting content.
                                 Default: None.
+        wait_for_timeout (int or None): Specific timeout in ms for the wait_for condition.
+                                       If None, uses page_timeout instead.
+                                       Default: None.
         wait_for_images (bool): If True, wait for images to load before extracting content.
                                 Default: False.
         delay_before_return_html (float): Delay in seconds before retrieving final HTML.
@@ -904,6 +907,7 @@ class CrawlerRunConfig():
         wait_until: str = "domcontentloaded",
         page_timeout: int = PAGE_TIMEOUT,
         wait_for: str = None,
+        wait_for_timeout: int = None,
         wait_for_images: bool = False,
         delay_before_return_html: float = 0.1,
         mean_delay: float = 0.1,
@@ -1000,6 +1004,7 @@ class CrawlerRunConfig():
         self.wait_until = wait_until
         self.page_timeout = page_timeout
         self.wait_for = wait_for
+        self.wait_for_timeout = wait_for_timeout
         self.wait_for_images = wait_for_images
         self.delay_before_return_html = delay_before_return_html
         self.mean_delay = mean_delay
@@ -1141,6 +1146,7 @@ class CrawlerRunConfig():
             wait_until=kwargs.get("wait_until", "domcontentloaded"),
             page_timeout=kwargs.get("page_timeout", 60000),
             wait_for=kwargs.get("wait_for"),
+            wait_for_timeout=kwargs.get("wait_for_timeout"),
             wait_for_images=kwargs.get("wait_for_images", False),
             delay_before_return_html=kwargs.get("delay_before_return_html", 0.1),
             mean_delay=kwargs.get("mean_delay", 0.1),
@@ -1250,6 +1256,7 @@ class CrawlerRunConfig():
             "wait_until": self.wait_until,
             "page_timeout": self.page_timeout,
             "wait_for": self.wait_for,
+            "wait_for_timeout": self.wait_for_timeout,
             "wait_for_images": self.wait_for_images,
             "delay_before_return_html": self.delay_before_return_html,
             "mean_delay": self.mean_delay,
@@ -1329,7 +1336,7 @@ class LLMConfig:
         provider: str = DEFAULT_PROVIDER,
         api_token: Optional[str] = None,
         base_url: Optional[str] = None,
-        temprature: Optional[float] = None,
+        temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
         top_p: Optional[float] = None,
         frequency_penalty: Optional[float] = None,
@@ -1357,7 +1364,7 @@ class LLMConfig:
                 self.provider = DEFAULT_PROVIDER
                 self.api_token = os.getenv(DEFAULT_PROVIDER_API_KEY)
         self.base_url = base_url
-        self.temprature = temprature
+        self.temperature = temperature
         self.max_tokens = max_tokens
         self.top_p = top_p
         self.frequency_penalty = frequency_penalty
@@ -1371,7 +1378,7 @@ class LLMConfig:
             provider=kwargs.get("provider", DEFAULT_PROVIDER),
             api_token=kwargs.get("api_token"),
             base_url=kwargs.get("base_url"),
-            temprature=kwargs.get("temprature"),
+            temperature=kwargs.get("temperature"),
             max_tokens=kwargs.get("max_tokens"),
             top_p=kwargs.get("top_p"),
             frequency_penalty=kwargs.get("frequency_penalty"),
@@ -1385,7 +1392,7 @@ class LLMConfig:
             "provider": self.provider,
             "api_token": self.api_token,
             "base_url": self.base_url,
-            "temprature": self.temprature,
+            "temperature": self.temperature,
             "max_tokens": self.max_tokens,
             "top_p": self.top_p,
             "frequency_penalty": self.frequency_penalty,

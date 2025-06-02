@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crawl4AI LLM Context Builder</title>
+    <link rel="stylesheet" href="llmtxt.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1><span class="logo">🚀🤖</span> Crawl4AI LLM Context Builder</h1>
+        </header>
+
+        <section class="intro">
+            <div class="intro-header">
+                <h2>🧠 A New Approach to LLM Context</h2>
+                <p>
+                    Traditional <code>llm.txt</code> files often fail with complex libraries like Crawl4AI. They dump massive amounts of API documentation, causing <strong>information overload</strong> and <strong>lost focus</strong>. They provide the "what" but miss the crucial "how" and "why" that makes AI assistants truly helpful.
+                </p>
+            </div>
+            
+            <div class="intro-solution">
+                <h3>💡 The Solution: Multi-Dimensional, Modular Contexts</h3>
+                <p>
+                    Inspired by modular libraries like Lodash, I've redesigned how we provide context to AI assistants. Instead of one monolithic file, Crawl4AI's documentation is organized by <strong>components</strong> and <strong>perspectives</strong>.
+                </p>
+                
+                <div class="dimensions">
+                    <div class="dimension">
+                        <span class="badge memory">Memory</span>
+                        <h4>The "What"</h4>
+                        <p>Precise API facts, parameters, signatures, and configuration objects. Your unambiguous reference.</p>
+                    </div>
+                    <div class="dimension">
+                        <span class="badge reasoning">Reasoning</span>
+                        <h4>The "How" & "Why"</h4>
+                        <p>Design principles, best practices, trade-offs, and workflows. Teaches AI to think like an expert.</p>
+                    </div>
+                    <div class="dimension">
+                        <span class="badge examples">Examples</span>
+                        <h4>The "Show Me"</h4>
+                        <p>Runnable code snippets demonstrating patterns in action. Pure practical implementation.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="intro-benefits">
+                <p>
+                    <strong>Why this matters:</strong> You can now give your AI assistant exactly what it needs - whether that's quick API lookups, help designing solutions, or seeing practical implementations. No more information overload, just focused, relevant context.
+                </p>
+                <p class="learn-more">
+                    <a href="/blog/articles/llm-context-revolution" class="learn-more-link" target="_parent">📖 Read the full story behind this approach →</a>
+                </p>
+            </div>
+        </section>
+
+        <section class="builder">
+            <div class="special-contexts">
+                <h2>Quick Presets</h2>
+                <div class="preset-options">
+                    <label class="preset-option">
+                        <input type="radio" name="preset" value="vibe" id="preset-vibe">
+                        <div class="preset-card">
+                            <h3>🎯 Vibe Coding</h3>
+                            <p>Curated context for general AI prompting - perfect for exploring capabilities</p>
+                        </div>
+                    </label>
+                    <label class="preset-option">
+                        <input type="radio" name="preset" value="all" id="preset-all">
+                        <div class="preset-card">
+                            <h3>📚 Complete Library</h3>
+                            <p>Comprehensive context including all components and perspectives</p>
+                        </div>
+                    </label>
+                    <label class="preset-option">
+                        <input type="radio" name="preset" value="custom" id="preset-custom" checked>
+                        <div class="preset-card">
+                            <h3>🔧 Custom Selection</h3>
+                            <p>Choose specific components and context types</p>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <div class="component-selector" id="component-selector">
+                <h2>Select Components & Context Types</h2>
+                <div class="select-all-controls">
+                    <button class="btn-small" id="select-all">Select All</button>
+                    <button class="btn-small" id="deselect-all">Deselect All</button>
+                </div>
+                
+                <div class="component-table-wrapper">
+                    <table class="component-selection-table">
+                        <thead>
+                            <tr>
+                                <th width="50"></th>
+                                <th>Component</th>
+                                <th class="clickable-header" data-type="memory">Memory</th>
+                                <th class="clickable-header" data-type="reasoning">Reasoning</th>
+                                <th class="clickable-header" data-type="examples">Examples</th>
+                            </tr>
+                        </thead>
+                        <tbody id="components-tbody">
+                            <!-- Components will be dynamically inserted here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="action-area">
+                <button class="download-btn" id="download-btn">
+                    <span class="icon">⬇</span> Generate & Download Context
+                </button>
+                <div class="status" id="status"></div>
+            </div>
+        </section>
+
+        <section class="reference-table">
+            <h2>Available Context Files</h2>
+            <div class="table-wrapper">
+                <table class="context-table">
+                    <thead>
+                        <tr>
+                            <th>Component</th>
+                            <th>Memory</th>
+                            <th>Reasoning</th>
+                            <th>Examples</th>
+                            <th>Full</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reference-table-body">
+                        <!-- Table rows will be dynamically inserted here -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+    
+    <script src="llmtxt.js"></script>
+</body>
+</html>

@@ -1,6 +1,10 @@
 # Crawl4AI Prospect‑Wizard – step‑by‑step guide
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/10nRCwmfxPjVrRUHyJsYlX7BH5bvPoGpx?usp=sharing)
+
 A three‑stage demo that goes from **LinkedIn scraping** ➜ **LLM reasoning** ➜ **graph visualisation**.
+
+**Try it in Google Colab!** Click the badge above to run this demo in a cloud environment with zero setup required.
 
 ```
 prospect‑wizard/

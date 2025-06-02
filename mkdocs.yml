@@ -1,4 +1,5 @@
 site_name: Crawl4AI Documentation (v0.6.x)
+site_favicon: docs/md_v2/favicon.ico
 site_description:  🚀🤖 Crawl4AI, Open-source LLM-Friendly Web Crawler & Scraper
 site_url: https://docs.crawl4ai.com
 repo_url: https://github.com/unclecode/crawl4ai
@@ -8,6 +9,7 @@ docs_dir: docs/md_v2
 nav:
   - Home: 'index.md'
   - "Ask AI": "core/ask-ai.md"
+  - "LLM Context": "core/llmtxt.md"
   - "Quick Start": "core/quickstart.md"
   - "Code Examples": "core/examples.md"
   - Setup & Installation:
@@ -57,6 +59,8 @@ nav:
 theme:
   name: 'terminal'
   palette: 'dark'
+  custom_dir: docs/md_v2/overrides
+  color_mode: 'dark'
   icon:
     repo: fontawesome/brands/github
 
@@ -82,8 +86,11 @@ extra_css:
   - assets/styles.css
   - assets/highlight.css
   - assets/dmvendor.css
+  - assets/feedback-overrides.css
 
 extra_javascript:
+  - https://www.googletagmanager.com/gtag/js?id=G-58W0K2ZQ25
+  - assets/gtag.js
   - assets/highlight.min.js
   - assets/highlight_init.js
   - https://buttons.github.io/buttons.js

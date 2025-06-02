@@ -107,7 +107,14 @@ _COMPANY_SCHEMA_QUERY = dedent(
       
     IMPORTANT: Do not use the base64 kind of classes to target element. It's not reliable.
     The main div parent contains these li element is "div.search-results-container" you can use this.
-    The <ul> parent has "role" equal to "list". Using these two should be enough to target the <li> elements."
+    The <ul> parent has "role" equal to "list". Using these two should be enough to target the <li> elements.    
+
+    IMPORTANT: Remember there might be multiple <a> tags that start with https://www.linkedin.com/company/[NAME], 
+    so in case you refer to them for different fields, make sure to be more specific. One has the image, and one 
+    has the person's name.
+    
+    IMPORTANT: Be very smart in selecting the correct and unique way to address the element. You should ensure 
+    your selector points to a single element and is unique to the place that contains the information.
     """
 )
 
@@ -235,6 +242,7 @@ async def crawl_people_page(
         cache_mode=CacheMode.BYPASS,
         magic=True,
         wait_for=".org-people-profile-card__card-spacing",
+        wait_for_images=5000,
         delay_before_return_html=1,
         session_id="people_search",
     )
@@ -422,6 +430,7 @@ def main():
     # decide on debug defaults
     if cli_opts.debug:
         opts = detect_debug_defaults(force=True)
+        cli_opts = opts
     else:
         env_defaults = detect_debug_defaults()
         opts = env_defaults if env_defaults else cli_opts
