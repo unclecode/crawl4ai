@@ -335,6 +335,9 @@ class AsyncWebCrawler:
                         config=config,  # Pass the entire config object
                     )
 
+                    if url.startswith("raw:") or url.startswith("raw://"):
+                        url = "RAW html"
+
                     html = sanitize_input_encode(async_response.html)
                     screenshot_data = async_response.screenshot
                     pdf_data = async_response.pdf_data
@@ -360,7 +363,7 @@ class AsyncWebCrawler:
                         pdf_data=pdf_data,
                         verbose=config.verbose,
                         is_raw_html=True if url.startswith("raw:") else False,
-                        redirected_url=async_response.redirected_url, 
+                        redirected_url=async_response.redirected_url,
                         **kwargs,
                     )
 
@@ -503,7 +506,7 @@ class AsyncWebCrawler:
             tables = media.pop("tables", [])
             links = result.links.model_dump()
             metadata = result.metadata
-            
+
         fit_html = preprocess_html_for_schema(html_content=html, text_threshold= 500, max_size= 300_000)
 
         ################################
