@@ -5,6 +5,42 @@ All notable changes to Crawl4AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **AsyncUrlSeeder**: High-performance URL discovery system for intelligent crawling at scale
+  - Discover URLs from sitemaps and Common Crawl index
+  - Extract and analyze page metadata without full crawling
+  - BM25 relevance scoring for query-based URL filtering
+  - Multi-domain parallel discovery with `many_urls()` method
+  - Automatic caching with TTL for discovered URLs
+  - Rate limiting and concurrent request management
+  - Live URL validation with HEAD requests
+  - JSON-LD and Open Graph metadata extraction
+- **SeedingConfig**: Configuration class for URL seeding operations
+  - Support for multiple discovery sources (`sitemap`, `cc`, `sitemap+cc`)
+  - Pattern-based URL filtering with wildcards
+  - Configurable concurrency and rate limiting
+  - Query-based relevance scoring with BM25
+  - Score threshold filtering for quality control
+- Comprehensive documentation for URL seeding feature
+  - Detailed comparison with deep crawling approaches
+  - Complete API reference with examples
+  - Integration guide with AsyncWebCrawler
+  - Performance benchmarks and best practices
+- Example scripts demonstrating URL seeding:
+  - `url_seeder_demo.py`: Interactive Rich-based demonstration
+  - `url_seeder_quick_demo.py`: Screenshot-friendly examples
+- Test suite for URL seeding with BM25 scoring
+
+### Changed
+- Updated `__init__.py` to export AsyncUrlSeeder and SeedingConfig
+- Enhanced documentation with URL seeding integration examples
+
+### Fixed
+- Corrected examples to properly extract URLs from seeder results before passing to `arun_many()`
+- Fixed logger color compatibility issue (changed `lightblack` to `bright_black`)
+
 ## [0.6.2] - 2025-05-02
 
 ### Added
