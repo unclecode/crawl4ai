@@ -2,7 +2,8 @@
 import warnings
 
 from .async_webcrawler import AsyncWebCrawler, CacheMode
-from .async_configs import BrowserConfig, CrawlerRunConfig, HTTPCrawlerConfig, LLMConfig, ProxyConfig, GeolocationConfig
+# MODIFIED: Add SeedingConfig here
+from .async_configs import BrowserConfig, CrawlerRunConfig, HTTPCrawlerConfig, LLMConfig, ProxyConfig, GeolocationConfig, SeedingConfig
 
 from .content_scraping_strategy import (
     ContentScrapingStrategy,
@@ -65,6 +66,8 @@ from .deep_crawling import (
     DFSDeepCrawlStrategy,
     DeepCrawlDecorator,
 )
+# NEW: Import AsyncUrlSeeder
+from .async_url_seeder import AsyncUrlSeeder
 
 from .utils import (
     start_colab_display_server,
@@ -78,6 +81,10 @@ __all__ = [
     "BrowserProfiler",
     "LLMConfig",
     "GeolocationConfig",
+    # NEW: Add SeedingConfig
+    "SeedingConfig",
+    # NEW: Add AsyncUrlSeeder
+    "AsyncUrlSeeder",
     "DeepCrawlStrategy",
     "BFSDeepCrawlStrategy",
     "BestFirstCrawlingStrategy",

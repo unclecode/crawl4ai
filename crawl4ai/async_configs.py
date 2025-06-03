@@ -207,7 +207,6 @@ class GeolocationConfig:
         config_dict.update(kwargs)
         return GeolocationConfig.from_dict(config_dict)
 
-
 class ProxyConfig:
     def __init__(
         self,
@@ -317,8 +316,6 @@ class ProxyConfig:
         config_dict = self.to_dict()
         config_dict.update(kwargs)
         return ProxyConfig.from_dict(config_dict)
-
-
 
 class BrowserConfig:
     """
@@ -596,7 +593,6 @@ class BrowserConfig:
         if isinstance(config, BrowserConfig):
             return config
         return BrowserConfig.from_kwargs(config)
-
 
 class HTTPCrawlerConfig:
     """HTTP-specific crawler configuration"""
@@ -1329,7 +1325,6 @@ class CrawlerRunConfig():
         config_dict.update(kwargs)
         return CrawlerRunConfig.from_kwargs(config_dict)
 
-
 class LLMConfig:
     def __init__(
         self,
@@ -1414,4 +1409,51 @@ class LLMConfig:
         config_dict.update(kwargs)
         return LLMConfig.from_kwargs(config_dict)
 
+class SeedingConfig:
+    """
+    Configuration class for URL discovery and pre-validation via AsyncUrlSeeder.
+    """
+    def __init__(
+        self,
+        source: str = "sitemap+cc",  # Options: "sitemap", "cc", "sitemap+cc"
+        pattern: Optional[str] = "*", # URL pattern to filter discovered URLs (e.g., "*example.com/blog/*")
+        live_check: bool = False,    # Whether to perform HEAD requests to verify URL liveness
+        extract_head: bool = False,  # Whether to fetch and parse <head> section for metadata
+        max_urls: int = -1, # Maximum number of URLs to discover (default: -1 for no limit)
+        concurrency: int = 1000,      # Maximum concurrent requests for live checks/head extraction
+        hits_per_sec: int = 5,      # Rate limit in requests per second
+        force: bool = False, # If True, bypasses the AsyncUrlSeeder's internal .jsonl cache
+        base_directory: Optional[str] = None, # Base directory for UrlSeeder's cache files (.jsonl)
+        llm_config: Optional[LLMConfig] = None, # Forward LLM config for future use (e.g., relevance scoring)
+        verbose: Optional[bool] = None, # Override crawler's general verbose setting
+        query: Optional[str] = None,  # Search query for relevance scoring
+        score_threshold: Optional[float] = None,  # Minimum relevance score to include URL (0.0-1.0)
+        scoring_method: str = "bm25",  # Scoring method: "bm25" (default), future: "semantic"
+    ):
+        self.source = source
+        self.pattern = pattern
+        self.live_check = live_check
+        self.extract_head = extract_head
+        self.max_urls = max_urls
+        self.concurrency = concurrency
+        self.hits_per_sec = hits_per_sec
+        self.force = force
+        self.base_directory = base_directory
+        self.llm_config = llm_config
+        self.verbose = verbose
+        self.query = query
+        self.score_threshold = score_threshold
+        self.scoring_method = scoring_method
 
+    # Add to_dict, from_kwargs, and clone methods for consistency
+    def to_dict(self) -> Dict[str, Any]:
+        return {k: v for k, v in self.__dict__.items() if k != 'llm_config' or v is not None}
+
+    @staticmethod
+    def from_kwargs(kwargs: Dict[str, Any]) -> 'SeedingConfig':
+        return SeedingConfig(**kwargs)
+
+    def clone(self, **kwargs: Any) -> 'SeedingConfig':
+        config_dict = self.to_dict()
+        config_dict.update(kwargs)
+        return SeedingConfig.from_kwargs(config_dict)

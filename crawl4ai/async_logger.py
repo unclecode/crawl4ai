@@ -29,7 +29,7 @@ class LogLevel(Enum):
 class LogColor(str, Enum):
     """Enum for log colors."""
 
-    DEBUG = "lightblack"
+    DEBUG = "bright_black"
     INFO = "cyan"
     SUCCESS = "green"
     WARNING = "yellow"
