@@ -7,16 +7,15 @@ from urllib.parse import urlparse, parse_qs
 from crawl4ai.deep_crawling.filters import CallbackURLFilter
 
 
-async def test_callback_filter():
-    """Test CallbackURLFilter with various callback functions."""
-    
+async def test_path_based_filter():
+    """Test path-based filtering logic."""
     # Test Case 1: Simple path-based filter
     def path_filter(url: str) -> bool:
         """Only allow URLs containing '/docs/' in the path."""
         try:
             parsed = urlparse(url)
             return '/docs/' in parsed.path
-        except:
+        except (ValueError, AttributeError):
             return False
     
     path_test_cases = {
@@ -42,6 +41,16 @@ async def test_callback_filter():
         else:
             print(f"✅ Passed: URL '{url}'")
     
+    # Display filter statistics
+    print(f"\nPath Filter Stats: Total={path_callback_filter.stats.total_urls}, "
+          f"Passed={path_callback_filter.stats.passed_urls}, "
+          f"Rejected={path_callback_filter.stats.rejected_urls}")
+    
+    return all_passed
+
+
+async def test_query_parameter_filter():
+    """Test query parameter filtering logic."""
     # Test Case 2: Query parameter filter
     def query_filter(url: str) -> bool:
         """Filter based on query parameters."""
@@ -59,7 +68,7 @@ async def test_callback_filter():
                 return version in ['v2', 'v3']
             
             return True
-        except:
+        except (ValueError, AttributeError, IndexError):
             return False
     
     query_test_cases = {
@@ -75,6 +84,7 @@ async def test_callback_filter():
     print("-" * 50)
     
     query_callback_filter = CallbackURLFilter(callback=query_filter, name="QueryFilter")
+    all_passed = True
     
     for url, expected in query_test_cases.items():
         result = await query_callback_filter.apply(url)
@@ -85,6 +95,16 @@ async def test_callback_filter():
         else:
             print(f"✅ Passed: URL '{url}'")
     
+    # Display filter statistics
+    print(f"\nQuery Filter Stats: Total={query_callback_filter.stats.total_urls}, "
+          f"Passed={query_callback_filter.stats.passed_urls}, "
+          f"Rejected={query_callback_filter.stats.rejected_urls}")
+    
+    return all_passed
+
+
+async def test_complex_multi_condition_filter():
+    """Test complex multi-condition filtering logic."""
     # Test Case 3: Complex multi-condition filter
     def complex_filter(url: str) -> bool:
         """Complex filter with multiple conditions."""
@@ -105,11 +125,8 @@ async def test_callback_filter():
                 return False
             
             # Must be HTTPS
-            if parsed.scheme != 'https':
-                return False
-            
-            return True
-        except:
+            return parsed.scheme == 'https'
+        except (ValueError, AttributeError):
             return False
     
     complex_test_cases = {
@@ -125,6 +142,7 @@ async def test_callback_filter():
     print("-" * 50)
     
     complex_callback_filter = CallbackURLFilter(callback=complex_filter, name="ComplexFilter")
+    all_passed = True
     
     for url, expected in complex_test_cases.items():
         display_url = url if len(url) <= 80 else url[:77] + "..."
@@ -136,6 +154,16 @@ async def test_callback_filter():
         else:
             print(f"✅ Passed: URL '{display_url}'")
     
+    # Display filter statistics
+    print(f"\nComplex Filter Stats: Total={complex_callback_filter.stats.total_urls}, "
+          f"Passed={complex_callback_filter.stats.passed_urls}, "
+          f"Rejected={complex_callback_filter.stats.rejected_urls}")
+    
+    return all_passed
+
+
+async def test_async_callback_filter():
+    """Test async callback filtering logic."""
     # Test Case 4: Async callback filter
     async def async_filter(url: str) -> bool:
         """Async filter that simulates async operations."""
@@ -147,7 +175,7 @@ async def test_callback_filter():
             # Only allow specific domains asynchronously
             allowed_domains = ['example.com', 'test.com', 'docs.example.com']
             return parsed.netloc in allowed_domains
-        except:
+        except (ValueError, AttributeError):
             return False
     
     async_test_cases = {
@@ -162,6 +190,7 @@ async def test_callback_filter():
     print("-" * 50)
     
     async_callback_filter = CallbackURLFilter(callback=async_filter, name="AsyncFilter")
+    all_passed = True
     
     for url, expected in async_test_cases.items():
         result = await async_callback_filter.apply(url)
@@ -172,7 +201,17 @@ async def test_callback_filter():
         else:
             print(f"✅ Passed: URL '{url}'")
     
-    # Test Case 5: Path scope filter (similar to user's use case)
+    # Display filter statistics
+    print(f"\nAsync Filter Stats: Total={async_callback_filter.stats.total_urls}, "
+          f"Passed={async_callback_filter.stats.passed_urls}, "
+          f"Rejected={async_callback_filter.stats.rejected_urls}")
+    
+    return all_passed
+
+
+async def test_path_scope_filter():
+    """Test path scope filtering logic (similar to user's use case)."""
+    # Test Case 5: Path scope filter
     def create_path_scope_filter(start_url: str):
         """Create a filter that only allows URLs under the starting path."""
         parsed_start = urlparse(start_url)
@@ -187,7 +226,7 @@ async def test_callback_filter():
                 
                 url_path = parsed.path.rstrip('/')
                 return url_path.startswith(start_path + '/') or url_path == start_path
-            except:
+            except (ValueError, AttributeError):
                 return False
         
         return filter_func
@@ -208,6 +247,7 @@ async def test_callback_filter():
         "https://github.com/docs": False,
     }
     
+    all_passed = True
     for url, expected in scope_test_cases.items():
         result = await scope_callback_filter.apply(url)
         if result != expected:
@@ -218,13 +258,29 @@ async def test_callback_filter():
             print(f"✅ Passed: URL '{url}'")
     
     # Display filter statistics
-    print("\nFilter Statistics:")
-    print("-"*50)
-    print(f"Path Filter: Total={path_callback_filter.stats.total_urls}, Passed={path_callback_filter.stats.passed_urls}, Rejected={path_callback_filter.stats.rejected_urls}")
-    print(f"Query Filter: Total={query_callback_filter.stats.total_urls}, Passed={query_callback_filter.stats.passed_urls}, Rejected={query_callback_filter.stats.rejected_urls}")
-    print(f"Complex Filter: Total={complex_callback_filter.stats.total_urls}, Passed={complex_callback_filter.stats.passed_urls}, Rejected={complex_callback_filter.stats.rejected_urls}")
-    print(f"Async Filter: Total={async_callback_filter.stats.total_urls}, Passed={async_callback_filter.stats.passed_urls}, Rejected={async_callback_filter.stats.rejected_urls}")
-    print(f"Path Scope Filter: Total={scope_callback_filter.stats.total_urls}, Passed={scope_callback_filter.stats.passed_urls}, Rejected={scope_callback_filter.stats.rejected_urls}")
+    print(f"\nPath Scope Filter Stats: Total={scope_callback_filter.stats.total_urls}, "
+          f"Passed={scope_callback_filter.stats.passed_urls}, "
+          f"Rejected={scope_callback_filter.stats.rejected_urls}")
+    
+    return all_passed
+
+
+async def test_callback_filter():
+    """Run all callback filter tests."""
+    print("\nRunning All Callback Filter Tests...")
+    print("=" * 70)
+    
+    results = []
+    
+    # Run all test cases
+    results.append(await test_path_based_filter())
+    results.append(await test_query_parameter_filter())
+    results.append(await test_complex_multi_condition_filter())
+    results.append(await test_async_callback_filter())
+    results.append(await test_path_scope_filter())
+    
+    # Overall result
+    all_passed = all(results)
     
     if all_passed:
         print("\n✨ All callback filter tests passed!")
@@ -273,5 +329,8 @@ async def test_callback_filter_error_handling():
 
 
 if __name__ == "__main__":
+    # Run all callback filter tests
     asyncio.run(test_callback_filter())
+    
+    # Run error handling tests
     asyncio.run(test_callback_filter_error_handling()) 

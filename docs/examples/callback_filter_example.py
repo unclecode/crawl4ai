@@ -51,7 +51,7 @@ def create_path_scope_filter(start_url: str, scope: str = "same_path"):
                 # entire_domain - allow any path on the same domain
                 return True
                 
-        except Exception:
+        except (ValueError, TypeError, AttributeError):
             return False
     
     return path_filter
@@ -144,10 +144,7 @@ async def example_custom_filter():
             return False
         
         # Exclude non-documentation file types
-        if path.endswith(('.pdf', '.zip', '.tar.gz', '.json', '.xml')):
-            return False
-        
-        return True
+        return not path.endswith(('.pdf', '.zip', '.tar.gz', '.json', '.xml'))
     
     # Create the filter
     api_filter = CallbackURLFilter(
@@ -161,11 +158,13 @@ async def example_custom_filter():
         api_filter
     ])
     
+    # Example strategy configuration (would be used in actual crawling)
     strategy = BFSDeepCrawlStrategy(
         max_depth=3,
         max_pages=50,
         filter_chain=filter_chain
     )
+    # In practice: config = CrawlerRunConfig(deep_crawl_strategy=strategy)
     
     print("Filter configured for API documentation crawling:")
     print("- Only /api/ paths")
@@ -209,10 +208,12 @@ async def example_dynamic_filter():
         crawled_paths.add(parsed.path)
         return True
     
+    # Example dynamic filter (would be used in FilterChain)
     dynamic_callback_filter = CallbackURLFilter(
         callback=dynamic_filter,
         name="DynamicDiversityFilter"
     )
+    # In practice: FilterChain([dynamic_callback_filter])
     
     print("Dynamic filter configured to:")
     print("- Limit to 3 pages per section")
