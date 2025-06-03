@@ -2,9 +2,11 @@
 🚀 URL Seeder + AsyncWebCrawler = Magic!
 Quick demo showing discovery → filter → crawl pipeline
 """
-import asyncio
+import asyncio, os
 from crawl4ai import AsyncUrlSeeder, AsyncWebCrawler, SeedingConfig, CrawlerRunConfig, AsyncLogger, DefaultMarkdownGenerator 
 from crawl4ai.content_filter_strategy import PruningContentFilter
+
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # 🔍 Example 1: Discover ALL → Filter → Crawl
 async def discover_and_crawl():
@@ -57,6 +59,7 @@ async def discover_and_crawl():
             if result.success:
                 # Save each tutorial (name from URL)
                 name = result.url.split("/")[-2] + ".md"
+                name = os.path.join(CURRENT_DIR, name)
                 with open(name, "w") as f:
                     f.write(result.markdown.fit_markdown)
                 saved += 1
@@ -117,11 +120,11 @@ async def smart_search_with_bm25():
 
 # 🎬 Run the show!
 async def main():
-    # print("=" * 60)
-    # await discover_and_crawl()
-    # print("\n" + "=" * 60 + "\n")
-    # await explore_beautifulsoup()
-    # print("\n" + "=" * 60 + "\n")
+    print("=" * 60)
+    await discover_and_crawl()
+    print("\n" + "=" * 60 + "\n")
+    await explore_beautifulsoup()
+    print("\n" + "=" * 60 + "\n")
     await smart_search_with_bm25()
 
 if __name__ == "__main__":
