@@ -337,6 +337,15 @@ class ContentTypeFilter(URLFilter):
         "sqlite": "application/vnd.sqlite3",
         # Placeholder
         "unknown": "application/octet-stream",  # Fallback for unknown file types
+        # php
+        "php": "application/x-httpd-php",
+        "php3": "application/x-httpd-php",
+        "php4": "application/x-httpd-php",
+        "php5": "application/x-httpd-php",
+        "php7": "application/x-httpd-php",
+        "phtml": "application/x-httpd-php",
+        "phps": "application/x-httpd-php-source",
+
     }
 
     @staticmethod
