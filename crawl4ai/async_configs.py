@@ -789,6 +789,8 @@ class CrawlerRunConfig():
                                Default: False.
         scroll_delay (float): Delay in seconds between scroll steps if scan_full_page is True.
                               Default: 0.2.
+        max_scroll_steps (Optional[int]): Maximum number of scroll steps to perform during full page scan.
+                                         If None, scrolls until the entire page is loaded. Default: None.
         process_iframes (bool): If True, attempts to process and inline iframe content.
                                 Default: False.
         remove_overlay_elements (bool): If True, remove overlays/popups before extracting HTML.
@@ -919,6 +921,7 @@ class CrawlerRunConfig():
         ignore_body_visibility: bool = True,
         scan_full_page: bool = False,
         scroll_delay: float = 0.2,
+        max_scroll_steps: Optional[int] = None,
         process_iframes: bool = False,
         remove_overlay_elements: bool = False,
         simulate_user: bool = False,
@@ -1017,6 +1020,7 @@ class CrawlerRunConfig():
         self.ignore_body_visibility = ignore_body_visibility
         self.scan_full_page = scan_full_page
         self.scroll_delay = scroll_delay
+        self.max_scroll_steps = max_scroll_steps
         self.process_iframes = process_iframes
         self.remove_overlay_elements = remove_overlay_elements
         self.simulate_user = simulate_user
@@ -1158,6 +1162,7 @@ class CrawlerRunConfig():
             ignore_body_visibility=kwargs.get("ignore_body_visibility", True),
             scan_full_page=kwargs.get("scan_full_page", False),
             scroll_delay=kwargs.get("scroll_delay", 0.2),
+            max_scroll_steps=kwargs.get("max_scroll_steps"),
             process_iframes=kwargs.get("process_iframes", False),
             remove_overlay_elements=kwargs.get("remove_overlay_elements", False),
             simulate_user=kwargs.get("simulate_user", False),
@@ -1267,6 +1272,7 @@ class CrawlerRunConfig():
             "ignore_body_visibility": self.ignore_body_visibility,
             "scan_full_page": self.scan_full_page,
             "scroll_delay": self.scroll_delay,
+            "max_scroll_steps": self.max_scroll_steps,
             "process_iframes": self.process_iframes,
             "remove_overlay_elements": self.remove_overlay_elements,
             "simulate_user": self.simulate_user,

@@ -902,7 +902,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
             # Handle full page scanning
             if config.scan_full_page:
-                await self._handle_full_page_scan(page, config.scroll_delay)
+                # await self._handle_full_page_scan(page, config.scroll_delay)
+                await self._handle_full_page_scan(page, config.scroll_delay, config.max_scroll_steps)
 
             # Execute JavaScript if provided
             # if config.js_code:
@@ -1090,7 +1091,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 # Close the page
                 await page.close()
 
-    async def _handle_full_page_scan(self, page: Page, scroll_delay: float = 0.1):
+    # async def _handle_full_page_scan(self, page: Page, scroll_delay: float = 0.1):
+    async def _handle_full_page_scan(self, page: Page, scroll_delay: float = 0.1, max_scroll_steps: Optional[int] = None):
         """
         Helper method to handle full page scanning.
 
@@ -1105,6 +1107,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         Args:
             page (Page): The Playwright page object
             scroll_delay (float): The delay between page scrolls
+            max_scroll_steps (Optional[int]): Maximum number of scroll steps to perform. If None, scrolls until end.
 
         """
         try:
@@ -1129,9 +1132,21 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             dimensions = await self.get_page_dimensions(page)
             total_height = dimensions["height"]
 
+            scroll_step_count = 0
             while current_position < total_height:
+                #### 
+                # NEW FEATURE: Check if we've reached the maximum allowed scroll steps
+                # This prevents infinite scrolling on very long pages or infinite scroll scenarios
+                # If max_scroll_steps is None, this check is skipped (unlimited scrolling - original behavior)
+                ####
+                if max_scroll_steps is not None and scroll_step_count >= max_scroll_steps:
+                    break
                 current_position = min(current_position + viewport_height, total_height)
                 await self.safe_scroll(page, 0, current_position, delay=scroll_delay)
+
+                # Increment the step counter for max_scroll_steps tracking
+                scroll_step_count += 1
+                
                 # await page.evaluate(f"window.scrollTo(0, {current_position})")
                 # await asyncio.sleep(scroll_delay)
 
