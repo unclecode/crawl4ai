@@ -10,6 +10,8 @@ parent_dir = os.path.dirname(
 sys.path.append(parent_dir)
 
 from crawl4ai.async_webcrawler import AsyncWebCrawler
+from crawl4ai.async_configs import CrawlerRunConfig
+from crawl4ai.cache_context import CacheMode
 
 
 @pytest.mark.asyncio
@@ -52,7 +54,8 @@ async def test_javascript_execution():
     async with AsyncWebCrawler(verbose=True) as crawler:
         js_code = "document.body.innerHTML = '<h1>Modified by JS</h1>';"
         url = "https://www.example.com"
-        result = await crawler.arun(url=url, bypass_cache=True, js_code=js_code)
+        config = CrawlerRunConfig(js_code=js_code, cache_mode=CacheMode.BYPASS)
+        result = await crawler.arun(url=url, config=config)
         assert result.success
         assert "<h1>Modified by JS</h1>" in result.html
 
@@ -83,6 +86,17 @@ async def test_concurrent_crawling_performance():
         assert (
             total_time < len(urls) * 5
         ), f"Concurrent crawling not significantly faster: {total_time:.2f} seconds"
+
+
+@pytest.mark.asyncio
+async def test_crawl_austindurban_endpoint():
+    async with AsyncWebCrawler(verbose=True) as crawler:
+        url = "https://crawl.austindurban.com/crawl/"
+        result = await crawler.arun(url=url, bypass_cache=True)
+        assert result.success
+        assert result.url == url
+        assert result.html
+        assert result.markdown
 
 
 # Entry point for debugging
