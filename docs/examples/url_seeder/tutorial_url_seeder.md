@@ -1,5 +1,7 @@
 # 🔬 Building an AI Research Assistant with Crawl4AI: Smart URL Discovery
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1QIwVYrQaZGPJQGHQBvMSbkdnc5usqoGw#scrollTo=xbV1w9YM4LkW)
+
 ## Welcome to the Research Pipeline Workshop!
 
 In this tutorial, we'll build an **AI-powered research assistant** that intelligently discovers, filters, and analyzes web content. Instead of blindly crawling hundreds of pages, we'll use Crawl4AI's URL Seeder to:
@@ -985,6 +987,188 @@ You've built a complete AI research assistant that:
 - 🐙 **GitHub**: [github.com/unclecode/crawl4ai](https://github.com/unclecode/crawl4ai)
 - 📚 **Documentation**: [crawl4ai.com/docs](https://crawl4ai.com/docs)
 - 💬 **Discord**: [Join our community](https://discord.gg/crawl4ai)
+
+---
+
+## 🚀 Beyond the Basics: Advanced Agentic Patterns
+
+### The Power of Agentic Research Pipelines
+
+What you've built is just the beginning! The beauty of Crawl4AI's URL Seeder is that it enables sophisticated agentic workflows. Let's explore an advanced pattern with reflection and iterative discovery:
+
+### Advanced Pattern: Multi-Query Reflection Loop
+
+Instead of a linear pipeline, imagine an intelligent agent that:
+1. Generates multiple search strategies from your query
+2. Discovers URLs from different angles
+3. Evaluates if it has enough information
+4. Iteratively searches for missing pieces
+5. Only stops when confident in its findings
+
+Here's how this advanced flow works:
+
+```mermaid
+graph TD
+    A[🔍 User Query] --> B[🤖 Generate Multiple<br/>Search Strategies]
+    B --> C1[Query 1]
+    B --> C2[Query 2]
+    B --> C3[Query N]
+    
+    C1 --> D[🌐 Parallel URL<br/>Discovery]
+    C2 --> D
+    C3 --> D
+    
+    D --> E[🎯 Aggregate &<br/>Score All URLs]
+    E --> F[🕷️ Smart Crawling]
+    
+    F --> G{📊 Sufficient<br/>Information?}
+    G -->|No| H[🔄 Analyze Gaps]
+    H --> B
+    
+    G -->|Yes| K[🧠 AI Synthesis]
+    K --> L[📄 Comprehensive<br/>Report]
+    
+    style A fill:#e3f2fd
+    style B fill:#f3e5f5
+    style D fill:#e8f5e9
+    style G fill:#fff3e0
+    style K fill:#f3e5f5
+    style L fill:#e3f2fd
+```
+
+### Example Implementation Sketch
+
+```python
+async def advanced_research_pipeline(query: str, confidence_threshold: float = 0.8):
+    """
+    Advanced pipeline with reflection and iterative discovery
+    """
+    original_query = query
+    all_content = []
+    iteration = 0
+    max_iterations = 3
+    
+    while iteration < max_iterations:
+        # Generate multiple search strategies based on current understanding
+        search_strategies = await generate_search_strategies(
+            original_query, 
+            previous_content=all_content,
+            iteration=iteration
+        )
+        
+        # Parallel discovery from multiple angles
+        discoveries = await asyncio.gather(*[
+            discover_urls(strategy) for strategy in search_strategies
+        ])
+        
+        # Aggregate and deduplicate
+        unique_urls = aggregate_discoveries(discoveries)
+        
+        # Crawl new content
+        new_content = await crawl_selected_urls(unique_urls)
+        all_content.extend(new_content)
+        
+        # Check if we have enough information
+        confidence = await evaluate_information_completeness(
+            original_query, all_content
+        )
+        
+        if confidence >= confidence_threshold:
+            break
+            
+        # Analyze gaps to inform better queries next iteration
+        console.print(f"[yellow]Iteration {iteration + 1}: Confidence {confidence:.2f} < {confidence_threshold}[/yellow]")
+        console.print("[cyan]Generating more detailed queries based on gaps...[/cyan]")
+        
+        iteration += 1
+    
+    # Generate comprehensive synthesis
+    return await generate_final_synthesis(original_query, all_content)
+
+async def generate_search_strategies(query: str, previous_content: List = None, iteration: int = 0):
+    """Generate search strategies that get better with each iteration"""
+    
+    if iteration == 0:
+        # First iteration: broad strategies
+        prompt = f"Generate 3-5 search strategies for: {query}"
+    else:
+        # Subsequent iterations: refined based on gaps
+        gaps = analyze_content_gaps(query, previous_content)
+        prompt = f"""
+        Original query: {query}
+        
+        We've gathered some information but have gaps in:
+        {gaps}
+        
+        Generate 3-5 MORE SPECIFIC search strategies to fill these gaps.
+        """
+    
+    # Use LLM to generate strategies
+    strategies = await generate_with_llm(prompt)
+    return strategies
+```
+
+### More Agentic Patterns to Explore
+
+1. **Comparative Research Agent**
+   - Discover URLs from multiple domains
+   - Compare and contrast findings
+   - Identify consensus and disagreements
+
+2. **Fact-Checking Pipeline**
+   - Primary source discovery
+   - Cross-reference validation
+   - Confidence scoring for claims
+
+3. **Trend Analysis Agent**
+   - Time-based URL discovery
+   - Historical pattern detection
+   - Future prediction synthesis
+
+4. **Deep Dive Specialist**
+   - Start with broad discovery
+   - Identify most promising subtopics
+   - Recursive deep exploration
+
+5. **Multi-Modal Research**
+   - Discover text content
+   - Find related images/videos
+   - Synthesize across media types
+
+### Your Turn to Innovate! 🎨
+
+The URL Seeder opens up endless possibilities for intelligent web research. Here are some challenges to try:
+
+1. **Build a Research Assistant with Memory**
+   - Store previous searches
+   - Use context from past queries
+   - Build knowledge over time
+
+2. **Create a Real-Time Monitor**
+   - Periodic URL discovery
+   - Detect new content
+   - Alert on significant changes
+
+3. **Design a Competitive Intelligence Agent**
+   - Monitor multiple competitor sites
+   - Track product/feature changes
+   - Generate strategic insights
+
+4. **Implement a Learning Pipeline**
+   - Improve search strategies based on results
+   - Optimize crawling patterns
+   - Personalize to user preferences
+
+The key insight: **You're not limited to linear pipelines!** With Crawl4AI's efficient URL discovery, you can build complex agentic systems that think, reflect, and adapt.
+
+### Share Your Creations!
+
+We'd love to see what you build! Share your innovative pipelines:
+- Post in our [Discord community](https://discord.gg/crawl4ai)
+- Submit examples to our [GitHub repo](https://github.com/unclecode/crawl4ai)
+- Tag us on social media with #Crawl4AI
+
+Remember: The best AI agents are those that augment human intelligence, not replace it. Build tools that help you think better, research faster, and discover insights you might have missed.
 
 Thank you for learning with Crawl4AI! 🙏
 
