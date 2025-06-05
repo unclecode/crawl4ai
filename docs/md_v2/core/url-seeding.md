@@ -173,12 +173,19 @@ Creating a URL seeder is simple:
 ```python
 from crawl4ai import AsyncUrlSeeder
 
-# Create a seeder instance
+# Method 1: Manual cleanup
 seeder = AsyncUrlSeeder()
+try:
+    config = SeedingConfig(source="sitemap")
+    urls = await seeder.urls("example.com", config)
+finally:
+    await seeder.close()
 
-# Discover URLs from a domain
-config = SeedingConfig(source="sitemap")
-urls = await seeder.urls("example.com", config)
+# Method 2: Context manager (recommended)
+async with AsyncUrlSeeder() as seeder:
+    config = SeedingConfig(source="sitemap")
+    urls = await seeder.urls("example.com", config)
+    # Automatically cleaned up on exit
 ```
 
 The seeder can discover URLs from two powerful sources:
@@ -192,6 +199,23 @@ urls = await seeder.urls("example.com", config)
 ```
 
 Sitemaps are XML files that websites create specifically to list all their URLs. It's like getting a menu at a restaurant - everything is listed upfront.
+
+**Sitemap Index Support**: For large websites like TechCrunch that use sitemap indexes (a sitemap of sitemaps), the seeder automatically detects and processes all sub-sitemaps in parallel:
+
+```xml
+<!-- Example sitemap index -->
+<sitemapindex>
+  <sitemap>
+    <loc>https://techcrunch.com/sitemap-1.xml</loc>
+  </sitemap>
+  <sitemap>
+    <loc>https://techcrunch.com/sitemap-2.xml</loc>
+  </sitemap>
+  <!-- ... more sitemaps ... -->
+</sitemapindex>
+```
+
+The seeder handles this transparently - you'll get all URLs from all sub-sitemaps automatically!
 
 #### 2. Common Crawl (Most Comprehensive)
 
@@ -348,6 +372,35 @@ The head extraction gives you a treasure trove of information:
 ```
 
 This metadata is gold for filtering! You can find exactly what you need without crawling a single page.
+
+### Smart URL-Based Filtering (No Head Extraction)
+
+When `extract_head=False` but you still provide a query, the seeder uses intelligent URL-based scoring:
+
+```python
+# Fast filtering based on URL structure alone
+config = SeedingConfig(
+    source="sitemap",
+    extract_head=False,  # Don't fetch page metadata
+    query="python tutorial async",
+    scoring_method="bm25",
+    score_threshold=0.3
+)
+
+urls = await seeder.urls("example.com", config)
+
+# URLs are scored based on:
+# 1. Domain parts matching (e.g., 'python' in python.example.com)
+# 2. Path segments (e.g., '/tutorials/python-async/')
+# 3. Query parameters (e.g., '?topic=python')
+# 4. Fuzzy matching using character n-grams
+
+# Example URL scoring:
+# https://example.com/tutorials/python/async-guide.html - High score
+# https://example.com/blog/javascript-tips.html - Low score
+```
+
+This approach is much faster than head extraction while still providing intelligent filtering!
 
 ### Understanding Results
 
@@ -710,7 +763,16 @@ from crawl4ai import AsyncUrlSeeder, AsyncWebCrawler, SeedingConfig, CrawlerRunC
 
 class ResearchAssistant:
     def __init__(self):
+        self.seeder = None
+    
+    async def __aenter__(self):
         self.seeder = AsyncUrlSeeder()
+        await self.seeder.__aenter__()
+        return self
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if self.seeder:
+            await self.seeder.__aexit__(exc_type, exc_val, exc_tb)
         
     async def research_topic(self, topic, domains, max_articles=20):
         """Research a topic across multiple domains."""
@@ -812,18 +874,17 @@ class ResearchAssistant:
 
 # Use the research assistant
 async def main():
-    assistant = ResearchAssistant()
-    
-    # Research Python async programming across multiple sources
-    topic = "python asyncio best practices performance optimization"
-    domains = [
-        "realpython.com",
-        "python.org",
-        "stackoverflow.com",
-        "medium.com"
-    ]
-    
-    summary = await assistant.research_topic(topic, domains, max_articles=15)
+    async with ResearchAssistant() as assistant:
+        # Research Python async programming across multiple sources
+        topic = "python asyncio best practices performance optimization"
+        domains = [
+            "realpython.com",
+            "python.org",
+            "stackoverflow.com",
+            "medium.com"
+        ]
+        
+        summary = await assistant.research_topic(topic, domains, max_articles=15)
     
     # Display results
     print("\n" + "="*60)
@@ -876,6 +937,24 @@ async with AsyncWebCrawler() as crawler:
     # Process as they arrive
     async for result in results:
         process_immediately(result)  # Don't wait for all
+```
+
+4. **Memory protection for large domains**
+
+The seeder uses bounded queues to prevent memory issues when processing domains with millions of URLs:
+
+```python
+# Safe for domains with 1M+ URLs
+config = SeedingConfig(
+    source="cc+sitemap",
+    concurrency=50,  # Queue size adapts to concurrency
+    max_urls=100000  # Process in batches if needed
+)
+
+# The seeder automatically manages memory by:
+# - Using bounded queues (prevents RAM spikes)
+# - Applying backpressure when queue is full
+# - Processing URLs as they're discovered
 ```
 
 ## Best Practices & Tips
@@ -975,6 +1054,8 @@ config = SeedingConfig(
 | Missing metadata | Ensure `extract_head=True` |
 | Low relevance scores | Refine query, lower `score_threshold` |
 | Rate limit errors | Reduce `hits_per_sec` and `concurrency` |
+| Memory issues with large sites | Use `max_urls` to limit results, reduce `concurrency` |
+| Connection not closed | Use context manager or call `await seeder.close()` |
 
 ### Performance Benchmarks
 
@@ -996,5 +1077,13 @@ URL seeding transforms web crawling from a blind expedition into a surgical stri
 - Scale across multiple domains effortlessly
 
 Whether you're building a research tool, monitoring competitors, or creating a content aggregator, URL seeding gives you the intelligence to crawl smarter, not harder.
+
+### Key Features Summary
+
+1. **Parallel Sitemap Index Processing**: Automatically detects and processes sitemap indexes in parallel
+2. **Memory Protection**: Bounded queues prevent RAM issues with large domains (1M+ URLs)
+3. **Context Manager Support**: Automatic cleanup with `async with` statement
+4. **URL-Based Scoring**: Smart filtering even without head extraction
+5. **Dual Caching**: Separate caches for URL lists and metadata
 
 Now go forth and seed intelligently! 🌱🚀

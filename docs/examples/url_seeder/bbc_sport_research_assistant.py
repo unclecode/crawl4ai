@@ -23,6 +23,8 @@ Requirements:
 Usage:
 - Run normally: python bbc_sport_research_assistant.py
 - Run test mode: python bbc_sport_research_assistant.py test
+
+Note: AsyncUrlSeeder now uses context manager for automatic cleanup.
 """
 
 import asyncio
@@ -269,44 +271,43 @@ async def discover_urls(domain: str, query: str, config: ResearchConfig) -> List
     
     console.print(f"\n[cyan]🔍 Discovering URLs from {domain}...[/cyan]")
     
-    # Initialize URL seeder
-    seeder = AsyncUrlSeeder(logger=AsyncLogger(verbose=config.verbose))
-    
-    # Configure seeding
-    seeding_config = SeedingConfig(
-        source="sitemap+cc",  # Use both sitemap and Common Crawl
-        extract_head=config.extract_head_metadata,
-        query=query,
-        scoring_method=config.scoring_method,
-        score_threshold=config.score_threshold,
-        max_urls=config.max_urls_discovery,
-        live_check=config.live_check,
-        force=config.force_refresh
-    )
-    
-    try:
-        # Discover URLs
-        urls = await seeder.urls(domain, seeding_config)
-        
-        # Sort by relevance score (descending)
-        sorted_urls = sorted(
-            urls, 
-            key=lambda x: x.get('relevance_score', 0), 
-            reverse=True
+    # Initialize URL seeder with context manager
+    async with AsyncUrlSeeder(logger=AsyncLogger(verbose=config.verbose)) as seeder:
+        # Configure seeding
+        seeding_config = SeedingConfig(
+            source="sitemap+cc",  # Use both sitemap and Common Crawl
+            extract_head=config.extract_head_metadata,
+            query=query,
+            scoring_method=config.scoring_method,
+            score_threshold=config.score_threshold,
+            max_urls=config.max_urls_discovery,
+            live_check=config.live_check,
+            force=config.force_refresh
         )
         
-        # Take top K
-        top_urls = sorted_urls[:config.top_k_urls]
-        
-        console.print(f"[green]✅ Discovered {len(urls)} URLs, selected top {len(top_urls)}[/green]")
-        
-        # Cache the result
-        save_to_cache(cache_key, top_urls)
-        return top_urls
-        
-    except Exception as e:
-        console.print(f"[red]❌ URL discovery failed: {e}[/red]")
-        return []
+        try:
+            # Discover URLs
+            urls = await seeder.urls(domain, seeding_config)
+            
+            # Sort by relevance score (descending)
+            sorted_urls = sorted(
+                urls, 
+                key=lambda x: x.get('relevance_score', 0), 
+                reverse=True
+            )
+            
+            # Take top K
+            top_urls = sorted_urls[:config.top_k_urls]
+            
+            console.print(f"[green]✅ Discovered {len(urls)} URLs, selected top {len(top_urls)}[/green]")
+            
+            # Cache the result
+            save_to_cache(cache_key, top_urls)
+            return top_urls
+            
+        except Exception as e:
+            console.print(f"[red]❌ URL discovery failed: {e}[/red]")
+            return []
 
 
 async def crawl_selected_urls(urls: List[str], query: str, config: ResearchConfig) -> List[Dict]:
