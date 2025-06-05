@@ -403,7 +403,7 @@ async def main():
 
     md_generator = DefaultMarkdownGenerator(
     content_filter=filter,
-    options={"ignore_links": True}
+    options={"ignore_links": True})
 
     # 4) Crawler run config: skip cache, use extraction
     run_conf = CrawlerRunConfig(
@@ -4152,7 +4152,7 @@ prune_filter = PruningContentFilter(
 For intelligent content filtering and high-quality markdown generation, you can use the **LLMContentFilter**. This filter leverages LLMs to generate relevant markdown while preserving the original content's meaning and structure:
 
 ```python
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, LLMConfig
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, LLMConfig, DefaultMarkdownGenerator
 from crawl4ai.content_filter_strategy import LLMContentFilter
 
 async def main():
@@ -4175,8 +4175,13 @@ async def main():
         verbose=True
     )
 
+    md_generator = DefaultMarkdownGenerator(
+        content_filter=filter,
+        options={"ignore_links": True}
+    )
+
     config = CrawlerRunConfig(
-        content_filter=filter
+        markdown_generator=md_generator
     )
 
     async with AsyncWebCrawler() as crawler:
