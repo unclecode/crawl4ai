@@ -1429,6 +1429,7 @@ class SeedingConfig:
         query: Optional[str] = None,  # Search query for relevance scoring
         score_threshold: Optional[float] = None,  # Minimum relevance score to include URL (0.0-1.0)
         scoring_method: str = "bm25",  # Scoring method: "bm25" (default), future: "semantic"
+        filter_nonsense_urls: bool = True,  # Filter out utility URLs like robots.txt, sitemap.xml, etc.
     ):
         self.source = source
         self.pattern = pattern
@@ -1444,6 +1445,7 @@ class SeedingConfig:
         self.query = query
         self.score_threshold = score_threshold
         self.scoring_method = scoring_method
+        self.filter_nonsense_urls = filter_nonsense_urls
 
     # Add to_dict, from_kwargs, and clone methods for consistency
     def to_dict(self) -> Dict[str, Any]:

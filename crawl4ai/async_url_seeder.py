@@ -338,6 +338,7 @@ class AsyncUrlSeeder:
         producer_done = asyncio.Event()
         stop_event = asyncio.Event()
         seen: set[str] = set()
+        filter_nonsense = config.filter_nonsense_urls  # Extract this for passing to workers
 
         async def producer():
             try:
@@ -398,10 +399,12 @@ class AsyncUrlSeeder:
                 if self._rate_sem:  # global QPS control
                     async with self._rate_sem:
                         await self._validate(url, res_list, live_check, extract_head,
-                                             head_timeout, verbose, query, score_threshold, scoring_method)
+                                             head_timeout, verbose, query, score_threshold, scoring_method,
+                                             filter_nonsense)
                 else:
                     await self._validate(url, res_list, live_check, extract_head,
-                                         head_timeout, verbose, query, score_threshold, scoring_method)
+                                         head_timeout, verbose, query, score_threshold, scoring_method,
+                                         filter_nonsense)
                 queue.task_done()  # Mark task as done for queue.join() if ever used
 
         # launch
@@ -746,9 +749,16 @@ class AsyncUrlSeeder:
     # ─────────────────────────────── validate helpers
     async def _validate(self, url: str, res_list: List[Dict[str, Any]], live: bool,
                         extract: bool, timeout: int, verbose: bool, query: Optional[str] = None,
-                        score_threshold: Optional[float] = None, scoring_method: str = "bm25"):
+                        score_threshold: Optional[float] = None, scoring_method: str = "bm25",
+                        filter_nonsense: bool = True):
         # Local verbose parameter for this function is used to decide if intermediate logs should be printed
         # The main logger's verbose status should be controlled by the caller.
+        
+        # First check if this is a nonsense URL (if filtering is enabled)
+        if filter_nonsense and self._is_nonsense_url(url):
+            self._log("debug", "Filtered out nonsense URL: {url}", 
+                      params={"url": url}, tag="URL_SEED")
+            return
 
         cache_kind = "head" if extract else "live"
 
@@ -1106,6 +1116,102 @@ class AsyncUrlSeeder:
         final_score = weighted_score / total_weight if total_weight > 0 else 0
         return min(final_score, 1.0)  # Cap at 1.0
 
+    def _is_nonsense_url(self, url: str) -> bool:
+        """
+        Check if URL is a utility/nonsense URL that shouldn't be crawled.
+        Returns True if the URL should be filtered out.
+        """
+        url_lower = url.lower()
+        
+        # Extract path and filename
+        from urllib.parse import urlparse
+        parsed = urlparse(url)
+        path = parsed.path.lower()
+        
+        # 1. Robot and sitemap files
+        if path.endswith(('/robots.txt', '/sitemap.xml', '/sitemap_index.xml')):
+            return True
+        
+        # 2. Sitemap variations
+        if '/sitemap' in path and path.endswith(('.xml', '.xml.gz', '.txt')):
+            return True
+        
+        # 3. Common utility files
+        utility_files = [
+            'ads.txt', 'humans.txt', 'security.txt', '.well-known/security.txt',
+            'crossdomain.xml', 'browserconfig.xml', 'manifest.json',
+            'apple-app-site-association', '.well-known/apple-app-site-association',
+            'favicon.ico', 'apple-touch-icon.png', 'android-chrome-192x192.png'
+        ]
+        if any(path.endswith(f'/{file}') for file in utility_files):
+            return True
+        
+        # # 4. Feed files
+        # if path.endswith(('.rss', '.atom', '/feed', '/rss', '/atom', '/feed.xml', '/rss.xml')):
+        #     return True
+        
+        # # 5. API endpoints and data files
+        # api_patterns = ['/api/', '/v1/', '/v2/', '/v3/', '/graphql', '/.json', '/.xml']
+        # if any(pattern in path for pattern in api_patterns):
+        #     return True
+        
+        # # 6. Archive and download files
+        # download_extensions = [
+        #     '.zip', '.tar', '.gz', '.rar', '.7z', '.bz2',
+        #     '.exe', '.dmg', '.pkg', '.deb', '.rpm',
+        #     '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+        #     '.csv', '.tsv', '.sql', '.db', '.sqlite'
+        # ]
+        # if any(path.endswith(ext) for ext in download_extensions):
+        #     return True
+        
+        # # 7. Media files (often not useful for text content)
+        # media_extensions = [
+        #     '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg', '.webp', '.ico',
+        #     '.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm',
+        #     '.mp3', '.wav', '.ogg', '.m4a', '.flac',
+        #     '.woff', '.woff2', '.ttf', '.eot', '.otf'
+        # ]
+        # if any(path.endswith(ext) for ext in media_extensions):
+        #     return True
+        
+        # # 8. Source code and config files
+        # code_extensions = [
+        #     '.js', '.css', '.scss', '.sass', '.less',
+        #     '.map', '.min.js', '.min.css',
+        #     '.py', '.rb', '.php', '.java', '.cpp', '.h',
+        #     '.yaml', '.yml', '.toml', '.ini', '.conf', '.config'
+        # ]
+        # if any(path.endswith(ext) for ext in code_extensions):
+        #     return True
+        
+        # 9. Hidden files and directories
+        path_parts = path.split('/')
+        if any(part.startswith('.') for part in path_parts if part):
+            return True
+        
+        # 10. Common non-content paths
+        non_content_paths = [
+            '/wp-admin', '/wp-includes', '/wp-content/uploads',
+            '/admin', '/login', '/signin', '/signup', '/register',
+            '/checkout', '/cart', '/account', '/profile',
+            '/search', '/404', '/error',
+            '/.git', '/.svn', '/.hg',
+            '/cgi-bin', '/scripts', '/includes'
+        ]
+        if any(ncp in path for ncp in non_content_paths):
+            return True
+        
+        # 11. URL patterns that indicate non-content
+        if any(pattern in url_lower for pattern in ['?print=', '&print=', '/print/', '_print.']):
+            return True
+        
+        # 12. Very short paths (likely homepage redirects or errors)
+        if len(path.strip('/')) < 3 and path not in ['/', '/en', '/de', '/fr', '/es', '/it']:
+            return True
+        
+        return False
+    
     def _calculate_bm25_score(self, query: str, documents: List[str]) -> List[float]:
         """Calculate BM25 scores for documents against a query."""
         if not HAS_BM25:

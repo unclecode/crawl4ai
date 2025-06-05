@@ -253,6 +253,7 @@ The `SeedingConfig` object is your control panel. Here's everything you can conf
 | `query` | str | None | Search query for BM25 scoring |
 | `scoring_method` | str | None | Scoring method (currently "bm25") |
 | `score_threshold` | float | None | Minimum score to include URL |
+| `filter_nonsense_urls` | bool | True | Filter out utility URLs (robots.txt, etc.) |
 
 #### Pattern Matching Examples
 
@@ -1078,12 +1079,43 @@ URL seeding transforms web crawling from a blind expedition into a surgical stri
 
 Whether you're building a research tool, monitoring competitors, or creating a content aggregator, URL seeding gives you the intelligence to crawl smarter, not harder.
 
+### Smart URL Filtering
+
+The seeder automatically filters out nonsense URLs that aren't useful for content crawling:
+
+```python
+# Enabled by default
+config = SeedingConfig(
+    source="sitemap",
+    filter_nonsense_urls=True  # Default: True
+)
+
+# URLs that get filtered:
+# - robots.txt, sitemap.xml, ads.txt
+# - API endpoints (/api/, /v1/, .json)
+# - Media files (.jpg, .mp4, .pdf)
+# - Archives (.zip, .tar.gz)
+# - Source code (.js, .css)
+# - Admin/login pages
+# - And many more...
+```
+
+To disable filtering (not recommended):
+
+```python
+config = SeedingConfig(
+    source="sitemap",
+    filter_nonsense_urls=False  # Include ALL URLs
+)
+```
+
 ### Key Features Summary
 
 1. **Parallel Sitemap Index Processing**: Automatically detects and processes sitemap indexes in parallel
 2. **Memory Protection**: Bounded queues prevent RAM issues with large domains (1M+ URLs)
 3. **Context Manager Support**: Automatic cleanup with `async with` statement
 4. **URL-Based Scoring**: Smart filtering even without head extraction
-5. **Dual Caching**: Separate caches for URL lists and metadata
+5. **Smart URL Filtering**: Automatically excludes utility/nonsense URLs
+6. **Dual Caching**: Separate caches for URL lists and metadata
 
 Now go forth and seed intelligently! 🌱🚀
