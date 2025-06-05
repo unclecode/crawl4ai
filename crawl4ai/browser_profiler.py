@@ -480,7 +480,7 @@ class BrowserProfiler:
                 self.logger.info("4. Exit", tag="MENU", base_color=LogColor.MAGENTA)
                 exit_option = "4"
             
-            self.logger.print(f"\n[cyan]Enter your choice (1-{exit_option}): [/cyan]", end="")
+            self.logger.info(f"\n[cyan]Enter your choice (1-{exit_option}): [/cyan]", end="")
             choice = input()
             
             if choice == "1":
@@ -637,9 +637,18 @@ class BrowserProfiler:
         self.logger.info(f"Debugging port: {debugging_port}", tag="CDP")
         self.logger.info(f"Headless mode: {headless}", tag="CDP")
         
+        # create browser config
+        browser_config = BrowserConfig(
+            browser_type=browser_type,
+            headless=headless,
+            user_data_dir=profile_path,
+            debugging_port=debugging_port,
+            verbose=True
+        )
+        
         # Create managed browser instance
         managed_browser = ManagedBrowser(
-            browser_type=browser_type,
+            browser_config=browser_config,
             user_data_dir=profile_path,
             headless=headless,
             logger=self.logger,

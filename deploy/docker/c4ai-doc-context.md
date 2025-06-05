@@ -403,7 +403,7 @@ async def main():
 
     md_generator = DefaultMarkdownGenerator(
     content_filter=filter,
-    options={"ignore_links": True}
+    options={"ignore_links": True})
 
     # 4) Crawler run config: skip cache, use extraction
     run_conf = CrawlerRunConfig(
@@ -3760,11 +3760,11 @@ To crawl a live web page, provide the URL starting with `http://` or `https://`,
 
 ```python
 import asyncio
-from crawl4ai import AsyncWebCrawler
+from crawl4ai import AsyncWebCrawler, CacheMode
 from crawl4ai.async_configs import CrawlerRunConfig
 
 async def crawl_web():
-    config = CrawlerRunConfig(bypass_cache=True)
+    config = CrawlerRunConfig(cache_mode=CacheMode.BYPASS)
     async with AsyncWebCrawler() as crawler:
         result = await crawler.arun(
             url="https://en.wikipedia.org/wiki/apple", 
@@ -3785,13 +3785,13 @@ To crawl a local HTML file, prefix the file path with `file://`.
 
 ```python
 import asyncio
-from crawl4ai import AsyncWebCrawler
+from crawl4ai import AsyncWebCrawler, CacheMode
 from crawl4ai.async_configs import CrawlerRunConfig
 
 async def crawl_local_file():
     local_file_path = "/path/to/apple.html"  # Replace with your file path
     file_url = f"file://{local_file_path}"
-    config = CrawlerRunConfig(bypass_cache=True)
+    config = CrawlerRunConfig(cache_mode=CacheMode.BYPASS)
     
     async with AsyncWebCrawler() as crawler:
         result = await crawler.arun(url=file_url, config=config)
@@ -3810,13 +3810,13 @@ To crawl raw HTML content, prefix the HTML string with `raw:`.
 
 ```python
 import asyncio
-from crawl4ai import AsyncWebCrawler
+from crawl4ai import AsyncWebCrawler, CacheMode
 from crawl4ai.async_configs import CrawlerRunConfig
 
 async def crawl_raw_html():
     raw_html = "<html><body><h1>Hello, World!</h1></body></html>"
     raw_html_url = f"raw:{raw_html}"
-    config = CrawlerRunConfig(bypass_cache=True)
+    config = CrawlerRunConfig(cache_mode=CacheMode.BYPASS)
     
     async with AsyncWebCrawler() as crawler:
         result = await crawler.arun(url=raw_html_url, config=config)
@@ -3845,7 +3845,7 @@ import os
 import sys
 import asyncio
 from pathlib import Path
-from crawl4ai import AsyncWebCrawler
+from crawl4ai import AsyncWebCrawler, CacheMode
 from crawl4ai.async_configs import CrawlerRunConfig
 
 async def main():
@@ -3856,7 +3856,7 @@ async def main():
     async with AsyncWebCrawler() as crawler:
         # Step 1: Crawl the Web URL
         print("\n=== Step 1: Crawling the Wikipedia URL ===")
-        web_config = CrawlerRunConfig(bypass_cache=True)
+        web_config = CrawlerRunConfig(cache_mode=CacheMode.BYPASS)
         result = await crawler.arun(url=wikipedia_url, config=web_config)
 
         if not result.success:
@@ -3871,7 +3871,7 @@ async def main():
         # Step 2: Crawl from the Local HTML File
         print("=== Step 2: Crawling from the Local HTML File ===")
         file_url = f"file://{html_file_path.resolve()}"
-        file_config = CrawlerRunConfig(bypass_cache=True)
+        file_config = CrawlerRunConfig(cache_mode=CacheMode.BYPASS)
         local_result = await crawler.arun(url=file_url, config=file_config)
 
         if not local_result.success:
@@ -3887,7 +3887,7 @@ async def main():
         with open(html_file_path, 'r', encoding='utf-8') as f:
             raw_html_content = f.read()
         raw_html_url = f"raw:{raw_html_content}"
-        raw_config = CrawlerRunConfig(bypass_cache=True)
+        raw_config = CrawlerRunConfig(cache_mode=CacheMode.BYPASS)
         raw_result = await crawler.arun(url=raw_html_url, config=raw_config)
 
         if not raw_result.success:
@@ -4152,7 +4152,7 @@ prune_filter = PruningContentFilter(
 For intelligent content filtering and high-quality markdown generation, you can use the **LLMContentFilter**. This filter leverages LLMs to generate relevant markdown while preserving the original content's meaning and structure:
 
 ```python
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, LLMConfig
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, LLMConfig, DefaultMarkdownGenerator
 from crawl4ai.content_filter_strategy import LLMContentFilter
 
 async def main():
@@ -4175,8 +4175,13 @@ async def main():
         verbose=True
     )
 
+    md_generator = DefaultMarkdownGenerator(
+        content_filter=filter,
+        options={"ignore_links": True}
+    )
+
     config = CrawlerRunConfig(
-        content_filter=filter
+        markdown_generator=md_generator
     )
 
     async with AsyncWebCrawler() as crawler:

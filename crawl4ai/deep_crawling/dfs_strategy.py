@@ -49,6 +49,10 @@ class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
                 # Count only successful crawls toward max_pages limit
                 if result.success:
                     self._pages_crawled += 1
+                    # Check if we've reached the limit during batch processing
+                    if self._pages_crawled >= self.max_pages:
+                        self.logger.info(f"Max pages limit ({self.max_pages}) reached during batch, stopping crawl")
+                        break  # Exit the generator
                     
                     # Only discover links from successful crawls
                     new_links: List[Tuple[str, Optional[str]]] = []
@@ -94,6 +98,10 @@ class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
                 # and only discover links from successful crawls
                 if result.success:
                     self._pages_crawled += 1
+                    # Check if we've reached the limit during batch processing
+                    if self._pages_crawled >= self.max_pages:
+                        self.logger.info(f"Max pages limit ({self.max_pages}) reached during batch, stopping crawl")
+                        break  # Exit the generator
                     
                     new_links: List[Tuple[str, Optional[str]]] = []
                     await self.link_discovery(result, url, depth, visited, new_links, depths)
