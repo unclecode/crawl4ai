@@ -1,0 +1,7 @@
+GO https://responsive.site.com
+WAIT 2
+IF (`window.innerWidth < 768`) THEN CLICK `.mobile-menu`
+IF (`window.innerWidth < 768`) THEN WAIT `.mobile-nav` 3
+IF (`window.innerWidth >= 768`) THEN CLICK `.desktop-menu li:nth-child(2)`
+REPEAT (CLICK `.next-slide`, 5)
+IF (EXISTS `.cookie-banner`) THEN CLICK `.accept-cookies`

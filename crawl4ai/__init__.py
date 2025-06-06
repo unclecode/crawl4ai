@@ -69,6 +69,16 @@ from .deep_crawling import (
 # NEW: Import AsyncUrlSeeder
 from .async_url_seeder import AsyncUrlSeeder
 
+# C4A Script Language Support
+from .script import (
+    compile as c4a_compile,
+    validate as c4a_validate,
+    compile_file as c4a_compile_file,
+    CompilationResult,
+    ValidationResult,
+    ErrorDetail
+)
+
 from .utils import (
     start_colab_display_server,
     setup_colab_environment
@@ -139,6 +149,13 @@ __all__ = [
     "ProxyConfig",
     "start_colab_display_server",
     "setup_colab_environment",
+    # C4A Script additions
+    "c4a_compile",
+    "c4a_validate", 
+    "c4a_compile_file",
+    "CompilationResult",
+    "ValidationResult",
+    "ErrorDetail",
 ]
 
 
