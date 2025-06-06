@@ -1,3 +1,9 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(cd:*)",
+      "Bash(python3:*)"
+    ]
+  },
   "enableAllProjectMcpServers": false
 }

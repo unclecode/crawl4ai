@@ -133,8 +133,8 @@ start           : line*
 ?line           : command | proc_def | include | comment
 
 command         : wait | nav | click_cmd | double_click | right_click | move | drag | scroll
-                | type | press | key_down | key_up
-                | eval_cmd | set_var | proc_call | if_cmd | repeat_cmd
+                | type | clear | set_input | press | key_down | key_up
+                | eval_cmd | setvar | proc_call | if_cmd | repeat_cmd
 
 wait            : "WAIT" (ESCAPED_STRING|BACKTICK_STRING|NUMBER) NUMBER? -> wait_cmd
 nav             : "GO" URL                             -> go
@@ -151,12 +151,14 @@ drag            : "DRAG" coords coords                 -> drag
 scroll          : "SCROLL" DIR NUMBER?                 -> scroll
 
 type            : "TYPE" (ESCAPED_STRING | NAME)       -> type
+clear           : "CLEAR" BACKTICK_STRING              -> clear
+set_input       : "SET" BACKTICK_STRING (ESCAPED_STRING | BACKTICK_STRING | NAME) -> set_input
 press           : "PRESS" WORD                         -> press
 key_down        : "KEY_DOWN" WORD                      -> key_down
 key_up          : "KEY_UP" WORD                        -> key_up
 
 eval_cmd        : "EVAL" BACKTICK_STRING               -> eval_cmd
-set_var         : "SET" NAME "=" value                 -> set_var
+setvar          : "SETVAR" NAME "=" value              -> setvar
 proc_call       : NAME                                 -> proc_call
 proc_def        : "PROC" NAME line* "ENDPROC"          -> proc_def
 include         : "USE" ESCAPED_STRING                 -> include
@@ -165,14 +167,15 @@ comment         : /#.*/                                -> comment
 if_cmd          : "IF" "(" condition ")" "THEN" command ("ELSE" command)?  -> if_cmd
 repeat_cmd      : "REPEAT" "(" command "," repeat_count ")"  -> repeat_cmd
 
-condition       : exists_cond | js_cond
+condition       : not_cond | exists_cond | js_cond
+not_cond        : "NOT" condition                      -> not_cond
 exists_cond     : "EXISTS" BACKTICK_STRING             -> exists_cond
 js_cond         : BACKTICK_STRING                      -> js_cond
 
 repeat_count    : NUMBER | BACKTICK_STRING
 
 coords          : NUMBER NUMBER
-value           : ESCAPED_STRING | NUMBER
+value           : ESCAPED_STRING | BACKTICK_STRING | NUMBER
 DIR             : /(UP|DOWN|LEFT|RIGHT)/i
 REST            : /[^\n]+/
 
@@ -270,13 +273,15 @@ class ASTBuilder(Transformer):
 
     # KEYS
     def type(self,tok):     return Cmd("TYPE",[self._strip(str(tok))])
+    def clear(self,sel):    return Cmd("CLEAR",[self._strip(str(sel))])
+    def set_input(self,sel,val): return Cmd("SET",[self._strip(str(sel)), self._strip(str(val))])
     def press(self,w):      return Cmd("PRESS",[str(w)])
     def key_down(self,w):   return Cmd("KEYDOWN",[str(w)])
     def key_up(self,w):     return Cmd("KEYUP",[str(w)])
 
     # FLOW
     def eval_cmd(self,txt):     return Cmd("EVAL",[self._strip(str(txt))])
-    def set_var(self,n,v):      
+    def setvar(self,n,v):      
         # v might be a Token or a Tree, extract value properly
         if hasattr(v, 'value'):
             value = v.value
@@ -284,7 +289,7 @@ class ASTBuilder(Transformer):
             value = v.children[0].value
         else:
             value = str(v)
-        return Cmd("SET",[str(n), self._strip(value)])
+        return Cmd("SETVAR",[str(n), self._strip(value)])
     def proc_call(self,n):      return Cmd("CALL",[str(n)])
     def proc_def(self,n,*body): return Proc(str(n),[b for b in body if isinstance(b,Cmd)])
     def include(self,p):        return Cmd("INCLUDE",[self._strip(p)])
@@ -296,6 +301,9 @@ class ASTBuilder(Transformer):
     
     def condition(self, cond):
         return cond
+    
+    def not_cond(self, cond):
+        return ("NOT", cond)
     
     def exists_cond(self, selector):
         return ("EXISTS", self._strip(str(selector)))
@@ -366,19 +374,22 @@ class Compiler:
         out=[]
         for c in ir:
             if isinstance(c,Cmd):
-                if c.op=="SET": self.vars[c.args[0].lstrip('$')]=c.args[1]
+                if c.op=="SETVAR":
+                    # Store variable
+                    self.vars[c.args[0].lstrip('$')]=c.args[1]
                 else:
-                    if c.op in("TYPE","EVAL"): c.args=[sub(a) for a in c.args]
+                    # Apply variable substitution to commands that use them
+                    if c.op in("TYPE","EVAL","SET"): c.args=[sub(a) for a in c.args]
                     out.append(c)
         return out
 
     # JS emitter
     def _emit_js(self, cmd: Cmd) -> str:
         op, a = cmd.op, cmd.args
-        if op == "GO":         return f"location.href = '{a[0]}';"
-        if op == "RELOAD":     return "location.reload();"
-        if op == "BACK":       return "history.back();"
-        if op == "FORWARD":    return "history.forward();"
+        if op == "GO":         return f"window.location.href = '{a[0]}';"
+        if op == "RELOAD":     return "window.location.reload();"
+        if op == "BACK":       return "window.history.back();"
+        if op == "FORWARD":    return "window.history.forward();"
 
         if op == "WAIT":
             arg, kind = a[0]
@@ -411,13 +422,24 @@ class Compiler:
         # click-style helpers
         def _js_click(sel, evt="click", button=0, detail=1):
             sel = sel.replace("'", "\\'")
-            return f"document.querySelector('{sel}')?.dispatchEvent(new MouseEvent('{evt}',{{bubbles:true,button:{button},detail:{detail}}}));"
+            return textwrap.dedent(f"""
+                (()=>{{
+                  const el=document.querySelector('{sel}');
+                  if(el){{
+                    el.focus&&el.focus();
+                    el.dispatchEvent(new MouseEvent('{evt}',{{bubbles:true,button:{button},detail:{detail}}}));
+                  }}
+                }})();
+            """).strip()
 
         def _js_click_xy(x, y, evt="click", button=0, detail=1):
             return textwrap.dedent(f"""
                 (()=>{{
                   const el=document.elementFromPoint({x},{y});
-                  el&&el.dispatchEvent(new MouseEvent('{evt}',{{bubbles:true,button:{button},detail:{detail}}}));
+                  if(el){{
+                    el.focus&&el.focus();
+                    el.dispatchEvent(new MouseEvent('{evt}',{{bubbles:true,button:{button},detail:{detail}}}));
+                  }}
                 }})();
             """).strip()
 
@@ -463,23 +485,57 @@ class Compiler:
                 }})();
             """).strip()
 
+        if op == "CLEAR":
+            sel = a[0].replace("'", "\\'")
+            return textwrap.dedent(f"""
+                (()=>{{
+                  const el=document.querySelector('{sel}');
+                  if(el && 'value' in el){{
+                    el.value = '';
+                    el.dispatchEvent(new Event('input',{{bubbles:true}}));
+                    el.dispatchEvent(new Event('change',{{bubbles:true}}));
+                  }}
+                }})();
+            """).strip()
+
+        if op == "SET" and len(a) == 2:
+            # This is SET for input fields (SET `#field` "value")
+            sel = a[0].replace("'", "\\'")
+            val = a[1].replace("'", "\\'")
+            return textwrap.dedent(f"""
+                (()=>{{
+                  const el=document.querySelector('{sel}');
+                  if(el && 'value' in el){{
+                    el.value = '';
+                    el.focus&&el.focus();
+                    el.value = '{val}';
+                    el.dispatchEvent(new Event('input',{{bubbles:true}}));
+                    el.dispatchEvent(new Event('change',{{bubbles:true}}));
+                  }}
+                }})();
+            """).strip()
+
         if op in ("PRESS","KEYDOWN","KEYUP"):
             key = a[0]
             evs = {"PRESS":("keydown","keyup"),"KEYDOWN":("keydown",),"KEYUP":("keyup",)}[op]
             return ";".join([f"document.dispatchEvent(new KeyboardEvent('{e}',{{key:'{key}',bubbles:true}}))" for e in evs]) + ";"
 
         if op == "EVAL":
-            return a[0]
+            return textwrap.dedent(f"""
+                (()=>{{
+                  try {{
+                    {a[0]};
+                  }} catch (e) {{
+                    console.error('C4A-Script EVAL error:', e);
+                  }}
+                }})();
+            """).strip()
         
         if op == "IF":
             condition, then_cmd, else_cmd = a
-            cond_type, cond_value = condition
             
             # Generate condition JavaScript
-            if cond_type == "EXISTS":
-                js_condition = f"!!document.querySelector('{cond_value}')"
-            else:  # JS condition
-                js_condition = cond_value
+            js_condition = self._emit_condition(condition)
             
             # Generate commands - handle both regular commands and procedure calls
             then_js = self._handle_cmd_or_proc(then_cmd)
@@ -530,6 +586,19 @@ class Compiler:
                 """).strip()
 
         raise ValueError(f"Unhandled op {op}")
+    
+    def _emit_condition(self, condition):
+        """Convert a condition tuple to JavaScript"""
+        cond_type = condition[0]
+        
+        if cond_type == "EXISTS":
+            return f"!!document.querySelector('{condition[1]}')"
+        elif cond_type == "NOT":
+            # Recursively handle the negated condition
+            inner_condition = self._emit_condition(condition[1])
+            return f"!({inner_condition})"
+        else:  # JS condition
+            return condition[1]
     
     def _handle_cmd_or_proc(self, cmd):
         """Handle a command that might be a regular command or a procedure call"""
@@ -596,15 +665,13 @@ def compile_lines(lines: List[str], *, root: Union[pathlib.Path, None] = None) -
 DEMO = """
 # quick sanity demo
 PROC login
-  CLICK `input[name="username"]`
-  TYPE $user
-  PRESS Tab
-  TYPE $pass
+  SET `input[name="username"]` $user
+  SET `input[name="password"]` $pass
   CLICK `button.submit`
 ENDPROC
 
-SET user = "tom@crawl4ai.com"
-SET pass = "hunter2"
+SETVAR user = "tom@crawl4ai.com"
+SETVAR pass = "hunter2"
 
 GO https://example.com/login
 WAIT `input[name="username"]` 10

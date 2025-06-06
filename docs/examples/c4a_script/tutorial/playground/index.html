@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>C4A-Script Playground</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Cookie Banner -->
+    <div class="cookie-banner" id="cookie-banner">
+        <div class="cookie-content">
+            <p>🍪 We use cookies to enhance your experience. By continuing, you agree to our cookie policy.</p>
+            <div class="cookie-actions">
+                <button class="btn accept">Accept All</button>
+                <button class="btn btn-secondary decline">Decline</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Newsletter Popup (appears after 3 seconds) -->
+    <div class="modal" id="newsletter-popup" style="display: none;">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>📬 Subscribe to Our Newsletter</h2>
+            <p>Get the latest updates on web automation!</p>
+            <input type="email" placeholder="Enter your email" class="input">
+            <button class="btn subscribe">Subscribe</button>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="site-header">
+        <nav class="nav-menu">
+            <a href="#home" class="nav-link active">Home</a>
+            <a href="#catalog" class="nav-link" id="catalog-link">Products</a>
+            <a href="#forms" class="nav-link">Forms</a>
+            <a href="#data-tables" class="nav-link">Data Tables</a>
+            <div class="dropdown">
+                <a href="#" class="nav-link dropdown-toggle">More ▼</a>
+                <div class="dropdown-content">
+                    <a href="#tabs">Tabs Demo</a>
+                    <a href="#accordion">FAQ</a>
+                    <a href="#gallery">Gallery</a>
+                </div>
+            </div>
+        </nav>
+        <div class="auth-section">
+            <button class="btn btn-sm" id="inspector-btn" title="Toggle Inspector">🔍</button>
+            <button class="btn btn-sm" id="login-btn">Login</button>
+            <div class="user-info" id="user-info" style="display: none;">
+                <span class="user-avatar">👤</span>
+                <span class="welcome-message">Welcome, <span id="username-display">User</span>!</span>
+                <button class="btn btn-sm btn-secondary" id="logout-btn">Logout</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Home Section -->
+        <section id="home" class="section active">
+            <h1>Welcome to C4A-Script Playground</h1>
+            <p>This is an interactive demo for testing C4A-Script commands. Each section contains different challenges for web automation.</p>
+            
+            <button class="btn btn-primary" id="start-tutorial">Start Tutorial</button>
+            
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h3>🔐 Authentication</h3>
+                    <p>Test login forms and user sessions</p>
+                </div>
+                <div class="feature-card">
+                    <h3>📜 Dynamic Content</h3>
+                    <p>Infinite scroll and pagination</p>
+                </div>
+                <div class="feature-card">
+                    <h3>📝 Forms</h3>
+                    <p>Complex form interactions</p>
+                </div>
+                <div class="feature-card">
+                    <h3>📊 Data Tables</h3>
+                    <p>Sortable and filterable data</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Login Modal -->
+        <div class="modal" id="login-modal" style="display: none;">
+            <div class="modal-content login-form">
+                <span class="close">&times;</span>
+                <h2>Login</h2>
+                <form id="login-form">
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="email" class="input" placeholder="demo@example.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="password" class="input" placeholder="demo123">
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="remember-me">
+                            Remember me
+                        </label>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Login</button>
+                    <div class="form-message" id="login-message"></div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Product Catalog Section -->
+        <section id="catalog" class="section">
+            <h1>Product Catalog</h1>
+            
+            <div class="view-toggle">
+                <button class="btn btn-sm active" id="infinite-scroll-btn">Infinite Scroll</button>
+                <button class="btn btn-sm" id="pagination-btn">Pagination</button>
+            </div>
+
+            <!-- Filters Sidebar -->
+            <div class="catalog-layout">
+                <aside class="filters-sidebar">
+                    <h3>Filters</h3>
+                    <div class="filter-group">
+                        <h4 class="collapsible">Category <span class="toggle">▼</span></h4>
+                        <div class="filter-content">
+                            <label><input type="checkbox"> Electronics</label>
+                            <label><input type="checkbox"> Clothing</label>
+                            <label><input type="checkbox"> Books</label>
+                        </div>
+                    </div>
+                    <div class="filter-group">
+                        <h4 class="collapsible">Price Range <span class="toggle">▼</span></h4>
+                        <div class="filter-content">
+                            <input type="range" min="0" max="1000" value="500">
+                            <span>$0 - $500</span>
+                        </div>
+                    </div>
+                </aside>
+
+                <!-- Products Grid -->
+                <div class="products-container">
+                    <div class="product-grid" id="product-grid">
+                        <!-- Products will be loaded here -->
+                    </div>
+                    
+                    <!-- Infinite Scroll View -->
+                    <div id="infinite-scroll-view" class="view-mode">
+                        <div class="loading-indicator" id="loading-indicator" style="display: none;">
+                            <div class="spinner"></div>
+                            <p>Loading more products...</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Pagination View -->
+                    <div id="pagination-view" class="view-mode" style="display: none;">
+                        <button class="btn load-more">Load More</button>
+                        <div class="pagination">
+                            <button class="page-btn">1</button>
+                            <button class="page-btn">2</button>
+                            <button class="page-btn">3</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Forms Section -->
+        <section id="forms" class="section">
+            <h1>Form Examples</h1>
+            
+            <!-- Contact Form -->
+            <div class="form-card">
+                <h2>Contact Form</h2>
+                <form id="contact-form">
+                    <div class="form-group">
+                        <label>Name</label>
+                        <input type="text" class="input" id="contact-name">
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" class="input" id="contact-email">
+                    </div>
+                    <div class="form-group">
+                        <label>Subject</label>
+                        <select class="input" id="contact-subject">
+                            <option value="">Select a subject</option>
+                            <option value="support">Support</option>
+                            <option value="sales">Sales</option>
+                            <option value="feedback">Feedback</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="department-group" style="display: none;">
+                        <label>Department</label>
+                        <select class="input" id="department">
+                            <option value="">Select department</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Message</label>
+                        <textarea class="input" id="contact-message" rows="4"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Send Message</button>
+                    <div class="form-message" id="contact-message-display"></div>
+                </form>
+            </div>
+
+            <!-- Multi-step Form -->
+            <div class="form-card">
+                <h2>Multi-step Survey</h2>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill" style="width: 33%"></div>
+                </div>
+                <form id="survey-form">
+                    <!-- Step 1 -->
+                    <div class="form-step active" data-step="1">
+                        <h3>Step 1: Basic Information</h3>
+                        <div class="form-group">
+                            <label>Full Name</label>
+                            <input type="text" class="input" id="full-name">
+                        </div>
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="email" class="input" id="survey-email">
+                        </div>
+                        <button type="button" class="btn next-step">Next</button>
+                    </div>
+
+                    <!-- Step 2 -->
+                    <div class="form-step" data-step="2" style="display: none;">
+                        <h3>Step 2: Preferences</h3>
+                        <div class="form-group">
+                            <label>Interests (select multiple)</label>
+                            <select multiple class="input" id="interests">
+                                <option value="tech">Technology</option>
+                                <option value="sports">Sports</option>
+                                <option value="music">Music</option>
+                                <option value="travel">Travel</option>
+                            </select>
+                        </div>
+                        <button type="button" class="btn prev-step">Previous</button>
+                        <button type="button" class="btn next-step">Next</button>
+                    </div>
+
+                    <!-- Step 3 -->
+                    <div class="form-step" data-step="3" style="display: none;">
+                        <h3>Step 3: Confirmation</h3>
+                        <p>Please review your information and submit.</p>
+                        <button type="button" class="btn prev-step">Previous</button>
+                        <button type="submit" class="btn btn-primary" id="submit-survey">Submit Survey</button>
+                    </div>
+                </form>
+                <div class="form-message success-message" id="survey-success" style="display: none;">
+                    ✅ Survey submitted successfully!
+                </div>
+            </div>
+        </section>
+
+        <!-- Tabs Section -->
+        <section id="tabs" class="section">
+            <h1>Tabs Demo</h1>
+            <div class="tabs-container">
+                <div class="tabs-header">
+                    <button class="tab-btn active" data-tab="description">Description</button>
+                    <button class="tab-btn" data-tab="reviews">Reviews</button>
+                    <button class="tab-btn" data-tab="specs">Specifications</button>
+                </div>
+                <div class="tabs-content">
+                    <div class="tab-pane active" id="description">
+                        <h3>Product Description</h3>
+                        <p>This is a detailed description of the product...</p>
+                        <div class="expandable-text">
+                            <p class="text-preview">Lorem ipsum dolor sit amet, consectetur adipiscing elit...</p>
+                            <button class="btn btn-sm show-more">Show More</button>
+                            <div class="hidden-text" style="display: none;">
+                                <p>This is the hidden text that appears when you click "Show More". It contains additional details about the product that weren't visible initially.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="tab-pane" id="reviews" style="display: none;">
+                        <h3>Customer Reviews</h3>
+                        <button class="btn btn-sm load-comments">Load Comments</button>
+                        <div class="comments-section" style="display: none;">
+                            <!-- Comments will be loaded here -->
+                        </div>
+                    </div>
+                    <div class="tab-pane" id="specs" style="display: none;">
+                        <h3>Technical Specifications</h3>
+                        <table class="specs-table">
+                            <tr><td>Model</td><td>XYZ-2000</td></tr>
+                            <tr><td>Weight</td><td>2.5 kg</td></tr>
+                            <tr><td>Dimensions</td><td>30 x 20 x 10 cm</td></tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Data Tables Section -->
+        <section id="data-tables" class="section">
+            <h1>Data Tables</h1>
+            <div class="table-controls">
+                <input type="text" class="input search-input" placeholder="Search...">
+                <button class="btn btn-sm" id="export-btn">Export</button>
+            </div>
+            <table class="data-table" id="data-table">
+                <thead>
+                    <tr>
+                        <th class="sortable" data-sort="name">Name ↕</th>
+                        <th class="sortable" data-sort="email">Email ↕</th>
+                        <th class="sortable" data-sort="date">Date ↕</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                    <!-- Table rows will be loaded here -->
+                </tbody>
+            </table>
+            <button class="btn load-more-rows">Load More Rows</button>
+        </section>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>
