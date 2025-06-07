@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blockly Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #0e0e10;
+            color: #e0e0e0;
+            font-family: monospace;
+        }
+        #blocklyDiv {
+            height: 600px;
+            width: 100%;
+            border: 1px solid #2a2a2c;
+        }
+        #output {
+            margin-top: 20px;
+            padding: 15px;
+            background: #1a1a1b;
+            border: 1px solid #2a2a2c;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>C4A-Script Blockly Test</h1>
+    <div id="blocklyDiv"></div>
+    <div id="output">
+        <h3>Generated C4A-Script:</h3>
+        <pre id="code-output"></pre>
+    </div>
+    
+    <script src="https://unpkg.com/blockly/blockly.min.js"></script>
+    <script src="assets/c4a-blocks.js"></script>
+    <script>
+        // Simple test
+        const workspace = Blockly.inject('blocklyDiv', {
+            toolbox: `
+                <xml>
+                    <category name="Test" colour="#1E88E5">
+                        <block type="c4a_go"></block>
+                        <block type="c4a_wait_time"></block>
+                        <block type="c4a_click"></block>
+                    </category>
+                </xml>
+            `,
+            theme: Blockly.Theme.defineTheme('dark', {
+                'base': Blockly.Themes.Classic,
+                'componentStyles': {
+                    'workspaceBackgroundColour': '#0e0e10',
+                    'toolboxBackgroundColour': '#1a1a1b',
+                    'toolboxForegroundColour': '#e0e0e0',
+                    'flyoutBackgroundColour': '#1a1a1b',
+                    'flyoutForegroundColour': '#e0e0e0',
+                }
+            })
+        });
+        
+        workspace.addChangeListener((event) => {
+            const code = Blockly.JavaScript.workspaceToCode(workspace);
+            document.getElementById('code-output').textContent = code;
+        });
+    </script>
+</body>
+</html>

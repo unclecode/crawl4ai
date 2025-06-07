@@ -8,12 +8,20 @@ import pathlib
 import re
 from typing import Union, List, Optional
 
+# JSON_SCHEMA_BUILDER is still used elsewhere,
+# but we now also need the new script-builder prompt.
+from ..prompts import GENERATE_JS_SCRIPT_PROMPT, GENERATE_SCRIPT_PROMPT
+import logging
+import re
+
 from .c4a_result import (
     CompilationResult, ValidationResult, ErrorDetail, WarningDetail,
     ErrorType, Severity, Suggestion
 )
 from .c4ai_script import Compiler
 from lark.exceptions import UnexpectedToken, UnexpectedCharacters, VisitError
+from ..async_configs import LLMConfig
+from ..utils import perform_completion_with_backoff
 
 
 class C4ACompiler:
@@ -310,6 +318,68 @@ class C4ACompiler:
             column=1,
             source_line=script_lines[0] if script_lines else ""
         )
+
+    @staticmethod
+    def generate_script(
+        html: str,
+        query: str | None = None,
+        mode: str = "c4a",
+        llm_config: LLMConfig | None = None,
+        **completion_kwargs,
+    ) -> str:
+        """
+        One-shot helper that calls the LLM exactly once to convert a
+        natural-language goal + HTML snippet into either:
+
+        1. raw JavaScript (`mode="js"`)
+        2. Crawl4ai DSL (`mode="c4a"`)
+
+        The returned string is guaranteed to be free of markdown wrappers
+        or explanatory text, ready for direct execution.
+        """
+        if llm_config is None:
+            llm_config = LLMConfig()  # falls back to env vars / defaults
+
+        # Build the user chunk
+        user_prompt = "\n".join(
+            [
+                "## GOAL",
+                "<<goael>>",
+                (query or "Prepare the page for crawling."),
+                "<</goal>>",
+                "",
+                "## HTML",
+                "<<html>>",
+                html[:100000],  # guardrail against token blast
+                "<</html>>",
+                "",
+                "## MODE",
+                mode,
+            ]
+        )
+
+        # Call the LLM with retry/back-off logic
+        full_prompt =  f"{GENERATE_SCRIPT_PROMPT}\n\n{user_prompt}" if mode == "c4a" else f"{GENERATE_JS_SCRIPT_PROMPT}\n\n{user_prompt}"
+        
+        response = perform_completion_with_backoff(
+            provider=llm_config.provider,
+            prompt_with_variables=full_prompt,
+            api_token=llm_config.api_token,
+            json_response=False,
+            base_url=getattr(llm_config, 'base_url', None),
+            **completion_kwargs,
+        )
+        
+        # Extract content from the response
+        raw_response = response.choices[0].message.content.strip()
+
+        # Strip accidental markdown fences (```js … ```)
+        clean = re.sub(r"^```(?:[a-zA-Z0-9_-]+)?\s*|```$", "", raw_response, flags=re.MULTILINE).strip()
+
+        if not clean:
+            raise RuntimeError("LLM returned empty script.")
+
+        return clean
 
 
 # Convenience functions for direct use

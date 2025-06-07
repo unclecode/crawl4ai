@@ -1,17 +1,37 @@
 # C4A-Script Interactive Tutorial
 
-Welcome to the C4A-Script Interactive Tutorial! This hands-on tutorial teaches you how to write web automation scripts using C4A-Script, a domain-specific language for Crawl4AI.
+A comprehensive web-based tutorial for learning and experimenting with C4A-Script - Crawl4AI's visual web automation language.
 
 ## 🚀 Quick Start
 
-### 1. Start the Tutorial Server
+### Prerequisites
+- Python 3.7+
+- Modern web browser (Chrome, Firefox, Safari, Edge)
 
-```bash
-cd docs/examples/c4a_script/tutorial
-python server.py
-```
+### Running the Tutorial
 
-Then open your browser to: http://localhost:8080
+1. **Clone and Navigate**
+   ```bash
+   git clone https://github.com/unclecode/crawl4ai.git
+   cd crawl4ai/docs/examples/c4a_script/tutorial/
+   ```
+
+2. **Install Dependencies**
+   ```bash
+   pip install flask
+   ```
+
+3. **Launch the Server**
+   ```bash
+   python server.py
+   ```
+
+4. **Open in Browser**
+   ```
+   http://localhost:8080
+   ```
+
+**🌐 Try Online**: [Live Demo](https://docs.crawl4ai.com/c4a-script/demo)
 
 ### 2. Try Your First Script
 
@@ -23,7 +43,16 @@ IF (EXISTS `.cookie-banner`) THEN CLICK `.accept`
 CLICK `#start-tutorial`
 ```
 
-## 📚 What You'll Learn
+## 🎯 What You'll Learn
+
+### Core Features
+- **📝 Text Editor**: Write C4A-Script with syntax highlighting
+- **🧩 Visual Editor**: Build scripts using drag-and-drop Blockly interface  
+- **🎬 Recording Mode**: Capture browser actions and auto-generate scripts
+- **⚡ Live Execution**: Run scripts in real-time with instant feedback
+- **📊 Timeline View**: Visualize and edit automation steps
+
+## 📚 Tutorial Content
 
 ### Basic Commands
 - **Navigation**: `GO url`
@@ -237,10 +266,131 @@ Check the `scripts/` folder for complete examples:
 - `04-multi-step-form.c4a` - Complex forms
 - `05-complex-workflow.c4a` - Full automation
 
+## 🏗️ Developer Guide
+
+### Project Architecture
+
+```
+tutorial/
+├── server.py              # Flask application server
+├── assets/               # Tutorial-specific assets
+│   ├── app.js            # Main application logic
+│   ├── c4a-blocks.js     # Custom Blockly blocks
+│   ├── c4a-generator.js  # Code generation
+│   ├── blockly-manager.js # Blockly integration
+│   └── styles.css        # Main styling
+├── playground/           # Interactive demo environment
+│   ├── index.html        # Demo web application
+│   ├── app.js           # Demo app logic
+│   └── styles.css       # Demo styling
+├── scripts/             # Example C4A scripts
+└── index.html           # Main tutorial interface
+```
+
+### Key Components
+
+#### 1. TutorialApp (`assets/app.js`)
+Main application controller managing:
+- Code editor integration (CodeMirror)
+- Script execution and browser preview
+- Tutorial navigation and lessons
+- State management and persistence
+
+#### 2. BlocklyManager (`assets/blockly-manager.js`)
+Visual programming interface:
+- Custom C4A-Script block definitions
+- Bidirectional sync between visual blocks and text
+- Real-time code generation
+- Dark theme integration
+
+#### 3. Recording System
+Powers the recording functionality:
+- Browser event capture
+- Smart event grouping and filtering
+- Automatic C4A-Script generation
+- Timeline visualization
+
+### Customization
+
+#### Adding New Commands
+1. **Define Block** (`assets/c4a-blocks.js`)
+2. **Add Generator** (`assets/c4a-generator.js`)
+3. **Update Parser** (`assets/blockly-manager.js`)
+
+#### Themes and Styling
+- Main styles: `assets/styles.css`
+- Theme variables: CSS custom properties
+- Dark mode: Auto-applied based on system preference
+
+### Configuration
+```python
+# server.py configuration
+PORT = 8080
+DEBUG = True
+THREADED = True
+```
+
+### API Endpoints
+- `GET /` - Main tutorial interface
+- `GET /playground/` - Interactive demo environment
+- `POST /execute` - Script execution endpoint
+- `GET /examples/<script>` - Load example scripts
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+**Port Already in Use**
+```bash
+# Kill existing process
+lsof -ti:8080 | xargs kill -9
+# Or use different port
+python server.py --port 8081
+```
+
+**Blockly Not Loading**
+- Check browser console for JavaScript errors
+- Verify all static files are served correctly
+- Ensure proper script loading order
+
+**Recording Issues**
+- Verify iframe permissions
+- Check cross-origin communication
+- Ensure event listeners are attached
+
+### Debug Mode
+Enable detailed logging by setting `DEBUG = True` in `assets/app.js`
+
+## 📚 Additional Resources
+
+- **[C4A-Script Documentation](../../md_v2/core/c4a-script.md)** - Complete language guide
+- **[API Reference](../../md_v2/api/c4a-script-reference.md)** - Detailed command documentation
+- **[Live Demo](https://docs.crawl4ai.com/c4a-script/demo)** - Try without installation
+- **[Example Scripts](../)** - More automation examples
+
 ## 🤝 Contributing
 
-Found a bug or have a suggestion? Please open an issue on GitHub!
+### Bug Reports
+1. Check existing issues on GitHub
+2. Provide minimal reproduction steps
+3. Include browser and system information
+4. Add relevant console logs
+
+### Feature Requests
+1. Fork the repository
+2. Create feature branch: `git checkout -b feature/my-feature`
+3. Test thoroughly with different browsers
+4. Update documentation
+5. Submit pull request
+
+### Code Style
+- Use consistent indentation (2 spaces for JS, 4 for Python)
+- Add comments for complex logic
+- Follow existing naming conventions
+- Test with multiple browsers
 
 ---
 
-Happy automating with C4A-Script! 🎉
+**Happy Automating!** 🎉
+
+Need help? Check our [documentation](https://docs.crawl4ai.com) or open an issue on [GitHub](https://github.com/unclecode/crawl4ai).

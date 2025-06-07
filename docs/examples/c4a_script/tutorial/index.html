@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>C4A-Script Interactive Tutorial | Crawl4AI</title>
     <link rel="stylesheet" href="assets/app.css">
+    <link rel="stylesheet" href="assets/blockly-theme.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/codemirror.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/theme/material-darker.min.css">
 </head>
@@ -23,6 +24,45 @@
                 <button id="start-tutorial-btn" class="intro-btn primary">Start Tutorial</button>
                 <button id="skip-tutorial-btn" class="intro-btn">Skip</button>
             </div>
+        </div>
+    </div>
+    
+    <!-- Event Editor Modal -->
+    <div id="event-editor-overlay" class="modal-overlay hidden"></div>
+    <div id="event-editor-modal" class="event-editor-modal hidden">
+        <h4>Edit Event</h4>
+        <div class="editor-field">
+            <label>Command Type</label>
+            <select id="edit-command-type" disabled>
+                <option value="CLICK">CLICK</option>
+                <option value="DOUBLE_CLICK">DOUBLE_CLICK</option>
+                <option value="RIGHT_CLICK">RIGHT_CLICK</option>
+                <option value="TYPE">TYPE</option>
+                <option value="SET">SET</option>
+                <option value="SCROLL">SCROLL</option>
+                <option value="WAIT">WAIT</option>
+            </select>
+        </div>
+        <div id="edit-selector-field" class="editor-field">
+            <label>Selector</label>
+            <input type="text" id="edit-selector" placeholder=".class or #id">
+        </div>
+        <div id="edit-value-field" class="editor-field">
+            <label>Value</label>
+            <input type="text" id="edit-value" placeholder="Text or number">
+        </div>
+        <div id="edit-direction-field" class="editor-field hidden">
+            <label>Direction</label>
+            <select id="edit-direction">
+                <option value="UP">UP</option>
+                <option value="DOWN">DOWN</option>
+                <option value="LEFT">LEFT</option>
+                <option value="RIGHT">RIGHT</option>
+            </select>
+        </div>
+        <div class="editor-actions">
+            <button id="edit-cancel" class="mini-btn">Cancel</button>
+            <button id="edit-save" class="mini-btn primary">Save</button>
         </div>
     </div>
 
@@ -45,11 +85,35 @@
                     <button id="run-btn" class="action-btn primary">
                         <span class="icon">▶</span>Run
                     </button>
+                    <button id="record-btn" class="action-btn record">
+                        <span class="icon">⏺</span>Record
+                    </button>
+                    <button id="timeline-btn" class="action-btn timeline hidden" title="View Timeline">
+                        <span class="icon">📊</span>
+                    </button>
                 </div>
             </div>
             
-            <div class="editor-wrapper">
-                <textarea id="c4a-editor" placeholder="# Write your C4A script here..."></textarea>
+            <div class="editor-container">
+                <div id="editor-view" class="editor-wrapper">
+                    <textarea id="c4a-editor" placeholder="# Write your C4A script here..."></textarea>
+                </div>
+                
+                <!-- Recording Timeline -->
+                <div id="timeline-view" class="recording-timeline hidden">
+                    <div class="timeline-header">
+                        <h3>Recording Timeline</h3>
+                        <div class="timeline-actions">
+                            <button id="back-to-editor" class="mini-btn">← Back</button>
+                            <button id="select-all-events" class="mini-btn">Select All</button>
+                            <button id="clear-events" class="mini-btn">Clear</button>
+                            <button id="generate-script" class="mini-btn primary">Generate Script</button>
+                        </div>
+                    </div>
+                    <div id="timeline-events" class="timeline-events">
+                        <!-- Events will be added here dynamically -->
+                    </div>
+                </div>
             </div>
             
             <!-- Bottom: Output Tabs -->
@@ -129,6 +193,13 @@
     <!-- Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/codemirror.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/mode/javascript/javascript.min.js"></script>
+    
+    <!-- Blockly -->
+    <script src="https://unpkg.com/blockly/blockly.min.js"></script>
+    <script src="assets/c4a-blocks.js"></script>
+    <script src="assets/c4a-generator.js"></script>
+    <script src="assets/blockly-manager.js"></script>
+    
     <script src="assets/app.js"></script>
 </body>
 </html>
