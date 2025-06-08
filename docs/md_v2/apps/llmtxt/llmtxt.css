@@ -1,5 +1,30 @@
 /* Terminal Theme CSS for LLM Context Builder */
 
+/* Font Face Definitions */
+@font-face {
+  font-family: 'Dank Mono';
+  src: url('../assets/DankMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Dank Mono';
+  src: url('../assets/DankMono-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Dank Mono';
+  src: url('../assets/DankMono-Italic.woff2') format('woff2');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
 :root {
     --background-color: #070708;
     --font-color: #e8e9ed;
@@ -13,6 +38,9 @@
     --border-color: #3f3f44;
     --hover-bg: #1a1a1c;
     --success-color: #50ff50;
+    --bg-secondary: #1a1a1a;
+    --primary-green: #0fbbaa;
+    --font-primary: 'Dank Mono', dm, Monaco, Courier New, monospace;
 }
 
 * {
@@ -22,38 +50,88 @@
 body {
     margin: 0;
     padding: 0;
-    font-family: dm, Monaco, Courier New, monospace;
+    font-family: var(--font-primary);
     font-size: 14px;
     line-height: 1.5;
     background-color: var(--background-color);
     color: var(--font-color);
 }
 
-.container {
+/* Terminal Container */
+.terminal-container {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Header - matching assistant layout */
+.header {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    padding: 1.5rem 0;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(10px);
+    background: rgba(26, 26, 26, 0.95);
+}
+
+.header-content {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 20px;
+    padding: 0 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
-/* Header */
-.header {
-    text-align: center;
-    margin-bottom: 40px;
-    border-bottom: 1px dashed var(--tertiary-color);
-    padding-bottom: 20px;
-}
-
-.header h1 {
-    font-size: 24px;
-    color: var(--primary-color);
-    margin: 0;
-    text-transform: uppercase;
-    letter-spacing: 2px;
+.logo-section {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
 }
 
 .logo {
-    font-size: 28px;
-    vertical-align: middle;
+    width: 48px;
+    height: 48px;
+}
+
+.logo-section h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--font-color);
+    margin: 0;
+}
+
+.tagline {
+    font-size: 0.875rem;
+    color: var(--tertiary-color);
+    margin-top: 0.25rem;
+}
+
+.nav-links {
+    display: flex;
+    gap: 2rem;
+}
+
+.nav-link {
+    color: var(--tertiary-color);
+    text-decoration: none;
+    font-size: 0.875rem;
+    transition: color 0.2s ease;
+}
+
+.nav-link:hover {
+    color: var(--primary-green);
+}
+
+/* Content */
+.content {
+    flex: 1;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+    width: 100%;
 }
 
 /* Intro Section */
@@ -446,6 +524,15 @@ body {
 
 /* Responsive Design */
 @media (max-width: 768px) {
+    .header-content {
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+    
+    .nav-links {
+        gap: 1rem;
+    }
+    
     .preset-options {
         flex-direction: column;
     }
@@ -454,7 +541,7 @@ body {
         grid-template-columns: 1fr;
     }
     
-    .container {
-        padding: 10px;
+    .content {
+        padding: 1rem;
     }
 }

@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crawl4AI Assistant - Chrome Extension for Visual Web Scraping</title>
+    <link rel="stylesheet" href="assistant.css">
+</head>
+<body>
+    <div class="terminal-container">
+        <div class="header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <img src="../../img/favicon-32x32.png" alt="Crawl4AI Logo" class="logo">
+                    <div>
+                        <h1>Crawl4AI Assistant</h1>
+                        <p class="tagline">Chrome Extension for Visual Web Scraping</p>
+                    </div>
+                </div>
+                <nav class="nav-links">
+                    <a href="../../" class="nav-link">← Back to Docs</a>
+                    <a href="../" class="nav-link">All Apps</a>
+                    <a href="https://github.com/unclecode/crawl4ai" class="nav-link" target="_blank">GitHub</a>
+                </nav>
+            </div>
+        </div>
+
+        <div class="content">
+            <!-- Video Section -->
+            <section class="video-section">
+                <div class="video-wrapper">
+                    <video autoplay loop muted playsinline class="demo-video">
+                        <source src="demo.mp4" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+            </section>
+
+            <!-- Introduction -->
+            <section class="intro-section">
+                <div class="terminal-window">
+                    <div class="terminal-header">
+                        <span class="terminal-title">About Crawl4AI Assistant</span>
+                    </div>
+                    <div class="terminal-content">
+                        <p>Transform any website into structured data with just a few clicks! The Crawl4AI Assistant Chrome Extension lets you visually select elements on any webpage and automatically generates Python code for web scraping.</p>
+                        
+                        <div class="features-grid">
+                            <div class="feature-card">
+                                <span class="feature-icon">🎯</span>
+                                <h3>Visual Selection</h3>
+                                <p>Click on any element to select it - no CSS selectors needed</p>
+                            </div>
+                            <div class="feature-card">
+                                <span class="feature-icon">📊</span>
+                                <h3>Schema Builder</h3>
+                                <p>Build extraction schemas by clicking on container and field elements</p>
+                            </div>
+                            <div class="feature-card">
+                                <span class="feature-icon">🐍</span>
+                                <h3>Python Code</h3>
+                                <p>Get production-ready Crawl4AI code with LLM extraction</p>
+                            </div>
+                            <div class="feature-card">
+                                <span class="feature-icon">🎨</span>
+                                <h3>Beautiful UI</h3>
+                                <p>Draggable toolbar with macOS-style interface</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Quick Start -->
+            <section class="quickstart-section">
+                <h2>Quick Start</h2>
+                <div class="terminal-window">
+                    <div class="terminal-header">
+                        <span class="terminal-title">Installation</span>
+                    </div>
+                    <div class="terminal-content">
+                        <div class="installation-steps">
+                            <div class="step">
+                                <span class="step-number">1</span>
+                                <div class="step-content">
+                                    <h4>Download the Extension</h4>
+                                    <p>Get the latest release from GitHub or use the button below</p>
+                                    <a href="crawl4ai-assistant-v1.0.1.zip" class="download-button" download>
+                                        <span class="button-icon">↓</span>
+                                        Download Extension (v1.0.1)
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="step">
+                                <span class="step-number">2</span>
+                                <div class="step-content">
+                                    <h4>Load in Chrome</h4>
+                                    <p>Navigate to <code>chrome://extensions/</code> and enable Developer Mode</p>
+                                </div>
+                            </div>
+                            <div class="step">
+                                <span class="step-number">3</span>
+                                <div class="step-content">
+                                    <h4>Load Unpacked</h4>
+                                    <p>Click "Load unpacked" and select the extracted extension folder</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Usage Guide -->
+            <section class="usage-section">
+                <h2>How to Use</h2>
+                <div class="terminal-window">
+                    <div class="terminal-header">
+                        <span class="terminal-title">Step-by-Step Guide</span>
+                    </div>
+                    <div class="terminal-content">
+                        <div class="usage-flow">
+                            <div class="usage-step">
+                                <div class="usage-header">
+                                    <span class="usage-icon">1️⃣</span>
+                                    <h4>Start Schema Builder</h4>
+                                </div>
+                                <p>Click the extension icon and select "Schema Builder" to begin</p>
+                            </div>
+                            
+                            <div class="usage-step">
+                                <div class="usage-header">
+                                    <span class="usage-icon">2️⃣</span>
+                                    <h4>Select Container</h4>
+                                </div>
+                                <p>Click on a container element (e.g., product card, article, listing)</p>
+                                <div class="code-snippet">
+                                    <span class="comment"># Container will be highlighted in green</span>
+                                </div>
+                            </div>
+                            
+                            <div class="usage-step">
+                                <div class="usage-header">
+                                    <span class="usage-icon">3️⃣</span>
+                                    <h4>Select Fields</h4>
+                                </div>
+                                <p>Click on individual fields inside the container and name them</p>
+                                <div class="code-snippet">
+                                    <span class="comment"># Fields will be highlighted in pink</span>
+                                    <span class="comment"># Examples: title, price, description, image</span>
+                                </div>
+                            </div>
+                            
+                            <div class="usage-step">
+                                <div class="usage-header">
+                                    <span class="usage-icon">4️⃣</span>
+                                    <h4>Generate Code</h4>
+                                </div>
+                                <p>Click "Stop & Generate" to create your Python extraction code</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Generated Code Example -->
+            <section class="code-section">
+                <h2>Generated Code Example</h2>
+                <div class="terminal-window">
+                    <div class="terminal-header">
+                        <span class="terminal-title">example_extraction.py</span>
+                    </div>
+                    <div class="terminal-content">
+                        <pre><code><span class="keyword">import</span> asyncio
+<span class="keyword">import</span> json
+<span class="keyword">from</span> crawl4ai <span class="keyword">import</span> AsyncWebCrawler, CrawlerRunConfig
+<span class="keyword">from</span> crawl4ai.extraction_strategy <span class="keyword">import</span> JsonCssExtractionStrategy
+
+<span class="keyword">async</span> <span class="keyword">def</span> <span class="function">extract_products</span>():
+    <span class="comment"># Schema generated from your visual selection</span>
+    schema = {
+        <span class="string">"name"</span>: <span class="string">"Product Catalog"</span>,
+        <span class="string">"baseSelector"</span>: <span class="string">"div.product-card"</span>,  <span class="comment"># Container you clicked</span>
+        <span class="string">"fields"</span>: [
+            {
+                <span class="string">"name"</span>: <span class="string">"title"</span>,
+                <span class="string">"selector"</span>: <span class="string">"h3.product-title"</span>,
+                <span class="string">"type"</span>: <span class="string">"text"</span>
+            },
+            {
+                <span class="string">"name"</span>: <span class="string">"price"</span>,
+                <span class="string">"selector"</span>: <span class="string">"span.price"</span>,
+                <span class="string">"type"</span>: <span class="string">"text"</span>
+            },
+            {
+                <span class="string">"name"</span>: <span class="string">"description"</span>,
+                <span class="string">"selector"</span>: <span class="string">"p.description"</span>,
+                <span class="string">"type"</span>: <span class="string">"text"</span>
+            },
+            {
+                <span class="string">"name"</span>: <span class="string">"image"</span>,
+                <span class="string">"selector"</span>: <span class="string">"img.product-image"</span>,
+                <span class="string">"type"</span>: <span class="string">"attribute"</span>,
+                <span class="string">"attribute"</span>: <span class="string">"src"</span>
+            }
+        ]
+    }
+
+    <span class="comment"># Create extraction strategy</span>
+    extraction_strategy = JsonCssExtractionStrategy(schema, verbose=<span class="keyword">True</span>)
+    
+    <span class="comment"># Configure the crawler</span>
+    config = CrawlerRunConfig(
+        extraction_strategy=extraction_strategy
+    )
+
+    <span class="keyword">async</span> <span class="keyword">with</span> AsyncWebCrawler() <span class="keyword">as</span> crawler:
+        result = <span class="keyword">await</span> crawler.arun(
+            url=<span class="string">"https://example.com/products"</span>,
+            config=config
+        )
+        
+        <span class="comment"># Parse the extracted data</span>
+        products = json.loads(result.extracted_content)
+        <span class="keyword">print</span>(<span class="string">f"Extracted {len(products)} products"</span>)
+        
+        <span class="comment"># Display first product</span>
+        <span class="keyword">if</span> products:
+            <span class="keyword">print</span>(json.dumps(products[0], indent=2))
+        
+        <span class="keyword">return</span> products
+
+<span class="comment"># Run the extraction</span>
+<span class="keyword">if</span> __name__ == <span class="string">"__main__"</span>:
+    asyncio.run(extract_products())</code></pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Coming Soon Section -->
+            <section class="coming-soon-section">
+                <h2>Coming Soon: Even More Power</h2>
+                <div class="terminal-window">
+                    <div class="terminal-header">
+                        <span class="terminal-title">Future Features</span>
+                    </div>
+                    <div class="terminal-content">
+                        <p class="intro-text">We're continuously expanding C4AI Assistant with powerful new features to make web scraping even easier:</p>
+                        
+                        <div class="coming-features">
+                            <div class="coming-feature">
+                                <div class="feature-header">
+                                    <span class="feature-badge">Cloud</span>
+                                    <h3>Run on C4AI Cloud</h3>
+                                </div>
+                                <p>Execute your extraction directly in the cloud without setting up any local environment. Just click "Run on Cloud" and get your data instantly.</p>
+                                <div class="feature-preview">
+                                    <code>☁️ Instant results • Auto-scaling</code>
+                                </div>
+                            </div>
+                            
+                            <div class="coming-feature">
+                                <div class="feature-header">
+                                    <span class="feature-badge">Direct</span>
+                                    <h3>Get CrawlResult Without Code</h3>
+                                </div>
+                                <p>Skip the code generation entirely! Get extracted data directly in the extension as a CrawlResult object, ready to download as JSON.</p>
+                                <div class="feature-preview">
+                                    <code>📊 One-click extraction • No Python needed • Export to JSON/CSV</code>
+                                </div>
+                            </div>
+                            
+                            <div class="coming-feature">
+                                <div class="feature-header">
+                                    <span class="feature-badge">AI</span>
+                                    <h3>Smart Schema Suggestions</h3>
+                                </div>
+                                <p>AI-powered field detection that automatically suggests the most likely data fields on any page, making schema building even faster.</p>
+                                <div class="feature-preview">
+                                    <code>🤖 Auto-detect fields • Smart naming • Pattern recognition</code>
+                                </div>
+                            </div>
+                            
+                            <div class="coming-feature">
+                                <div class="feature-header">
+                                    <span class="feature-badge">Script</span>
+                                    <h3>C4A Script Builder</h3>
+                                </div>
+                                <p>Visual automation script builder for complex interactions - fill forms, click buttons, handle pagination, all without writing code.</p>
+                                <div class="feature-preview">
+                                    <code>🎯 Visual automation • Record & replay • Export as C4A script</code>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="stay-tuned">
+                            <p>🚀 Stay tuned for updates! Follow our <a href="https://github.com/unclecode/crawl4ai" target="_blank">GitHub</a> for the latest releases.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Footer -->
+            <footer class="footer">
+                <div class="footer-content">
+                    <div class="footer-section">
+                        <h4>Resources</h4>
+                        <ul>
+                            <li><a href="https://github.com/unclecode/crawl4ai">GitHub Repository</a></li>
+                            <li><a href="../../">Documentation</a></li>
+                            <li><a href="https://discord.gg/jP8KfhDhyN">Discord Community</a></li>
+                        </ul>
+                    </div>
+                    <div class="footer-section">
+                        <h4>Connect</h4>
+                        <ul>
+                            <li><a href="https://twitter.com/unclecode">Twitter @unclecode</a></li>
+                            <li><a href="https://github.com/unclecode">GitHub @unclecode</a></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="footer-bottom">
+                    <p>Made with 🚀 by the Crawl4AI team</p>
+                </div>
+            </footer>
+        </div>
+    </div>
+</body>
+</html>

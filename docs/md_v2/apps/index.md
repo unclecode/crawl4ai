@@ -186,19 +186,20 @@ Our apps are designed to make Crawl4AI more accessible and powerful. Whether you
 </div>
 
 <div class="app-card">
-    <span class="app-status status-coming-soon">Coming Soon</span>
-    <h3>🏗️ Schema Builder</h3>
+    <span class="app-status status-available">Available</span>
+    <h3>🔍 Crawl4AI Assistant (Chrome Extension)</h3>
     <p class="app-description">
-        Visually design JSON extraction schemas by pointing and clicking on webpage elements. No more guessing CSS selectors!
+        Visual schema builder Chrome extension - click on webpage elements to generate extraction schemas and Python code!
     </p>
     <ul class="app-features">
-        <li>Point-and-click selector generation</li>
-        <li>Automatic schema inference</li>
-        <li>Live extraction preview</li>
-        <li>Export to multiple formats</li>
+        <li>Visual element selection</li>
+        <li>Container & field selection modes</li>
+        <li>Smart selector generation</li>
+        <li>Complete Python code generation</li>
+        <li>One-click installation</li>
     </ul>
     <div class="app-action">
-        <a href="#" class="app-btn disabled">Coming Soon</a>
+        <a href="crawl4ai-assistant/" class="app-btn">Install Extension →</a>
     </div>
 </div>
 

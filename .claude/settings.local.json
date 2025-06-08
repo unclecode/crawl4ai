@@ -4,7 +4,11 @@
       "Bash(cd:*)",
       "Bash(python3:*)",
       "Bash(python:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(mkdir:*)",
+      "Bash(cp:*)",
+      "Bash(rm:*)",
+      "Bash(true)"
     ]
   },
   "enableAllProjectMcpServers": false

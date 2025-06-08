@@ -1,0 +1,561 @@
+/* Crawl4AI Assistant Overlay Styles */
+
+/* Font Face Definitions */
+@font-face {
+  font-family: 'Dank Mono';
+  src: url('../assets/DankMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Dank Mono';
+  src: url('../assets/DankMono-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Dank Mono';
+  src: url('../assets/DankMono-Italic.woff2') format('woff2');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+:root {
+  --font-primary: 'Dank Mono', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-code: 'Dank Mono', 'Monaco', 'Menlo', 'Consolas', monospace;
+}
+
+/* Highlight box for hovering */
+.c4ai-highlight-box {
+  position: absolute;
+  pointer-events: none;
+  z-index: 999999;
+  transition: all 0.1s ease;
+  display: none;
+}
+
+.c4ai-highlight-box.c4ai-container-mode {
+  border: 3px dashed #0fbbaa;
+  background: rgba(15, 187, 170, 0.1);
+  box-shadow: 0 0 0 2px rgba(15, 187, 170, 0.3);
+}
+
+.c4ai-highlight-box.c4ai-field-mode {
+  border: 2px dashed #f380f5;
+  background: rgba(243, 128, 245, 0.1);
+  box-shadow: 0 0 0 2px rgba(243, 128, 245, 0.3);
+}
+
+/* Selected elements */
+.c4ai-selected-container {
+  outline: 3px solid #0fbbaa !important;
+  outline-offset: 2px;
+  background: rgba(15, 187, 170, 0.05) !important;
+}
+
+.c4ai-selected-field {
+  outline: 2px solid #f380f5 !important;
+  outline-offset: 1px;
+  background: rgba(243, 128, 245, 0.1) !important;
+  position: relative;
+}
+
+.c4ai-selected-field::after {
+  content: attr(data-c4ai-field);
+  position: absolute;
+  top: -24px;
+  left: 0;
+  background: #f380f5;
+  color: #000;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: bold;
+  font-family: var(--font-primary);
+  z-index: 999999;
+  white-space: nowrap;
+}
+
+/* Toolbar */
+.c4ai-toolbar {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: #070708;
+  border: 1px solid #3f3f44;
+  border-radius: 8px;
+  z-index: 999999;
+  font-family: var(--font-primary);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+  width: 320px;
+  color: #e8e9ed;
+  overflow: hidden;
+}
+
+.c4ai-toolbar * {
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+/* macOS-style titlebar */
+.c4ai-toolbar-titlebar {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  background: #1a1a1a;
+  border-bottom: 1px solid #3f3f44;
+  cursor: grab;
+  user-select: none;
+}
+
+.c4ai-titlebar-dots {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.c4ai-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+  padding: 0;
+}
+
+.c4ai-dot-close {
+  background: #ff5f57;
+}
+
+.c4ai-dot-close:hover {
+  background: #ff3030;
+}
+
+.c4ai-dot-minimize {
+  background: #ffbd2e;
+}
+
+.c4ai-dot-minimize:hover {
+  background: #ffaa00;
+}
+
+.c4ai-dot-maximize {
+  background: #28ca42;
+}
+
+.c4ai-dot-maximize:hover {
+  background: #1eb533;
+}
+
+.c4ai-titlebar-icon {
+  width: 16px;
+  height: 16px;
+  margin-left: 8px;
+  margin-right: 8px;
+}
+
+.c4ai-titlebar-title {
+  flex: 1;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 600;
+  color: #e8e9ed;
+}
+
+.c4ai-toolbar-content {
+  padding: 16px;
+}
+
+.c4ai-toolbar-status {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #3f3f44;
+  border-radius: 8px;
+}
+
+.c4ai-status-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.c4ai-status-label {
+  font-size: 12px;
+  color: #a3abba;
+  text-transform: uppercase;
+}
+
+.c4ai-status-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e8e9ed;
+}
+
+.c4ai-toolbar-hint {
+    margin-top: 16px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #d5cec0;
+  padding: 12px;
+  background: #3f3f44;
+  border-radius: 8px;
+  border-left: 3px solid #0fbbaa;
+}
+
+.c4ai-toolbar-hint strong {
+  color: #0fbbaa;
+  font-weight: 600;
+}
+
+/* Fields list */
+.c4ai-fields-list {
+  margin-top: 16px;
+  padding: 12px;
+  background: #3f3f44;
+  border-radius: 8px;
+  border: 1px solid #3f3f44;
+}
+
+.c4ai-fields-header {
+  font-size: 12px;
+  text-transform: uppercase;
+  color: #a3abba;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.c4ai-fields-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.c4ai-field-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  background: #070708;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.c4ai-field-name {
+  font-weight: 600;
+  color: #f380f5;
+  margin-right: 8px;
+}
+
+.c4ai-field-value {
+  color: #a3abba;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  text-align: right;
+}
+
+/* Field naming dialog */
+.c4ai-field-dialog {
+  position: absolute;
+  background: #070708;
+  border: 2px solid #f380f5;
+  border-radius: 12px;
+  padding: 16px;
+  z-index: 999999;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  color: #e8e9ed;
+  min-width: 300px;
+}
+
+.c4ai-field-dialog h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  color: #e8e9ed;
+}
+
+.c4ai-field-dialog input {
+  width: 100%;
+  padding: 8px 12px;
+  background: #3f3f44;
+  border: 1px solid #3f3f44;
+  border-radius: 6px;
+  color: #e8e9ed;
+  font-size: 14px;
+  margin-bottom: 12px;
+  outline: none;
+}
+
+.c4ai-field-dialog input:focus {
+  border-color: #f380f5;
+  box-shadow: 0 0 0 2px rgba(243, 128, 245, 0.2);
+}
+
+.c4ai-field-preview {
+  font-size: 12px;
+  color: #999;
+  margin-bottom: 12px;
+  padding: 8px;
+  background: #1a1a1a;
+  border-radius: 6px;
+  word-break: break-word;
+}
+
+.c4ai-field-preview strong {
+  color: #ccc;
+}
+
+.c4ai-field-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.c4ai-field-actions button {
+  padding: 6px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+#c4ai-field-save {
+  background: #f380f5;
+  color: #070708;
+}
+
+#c4ai-field-save:hover {
+  background: #e370e5;
+  transform: translateY(-1px);
+}
+
+#c4ai-field-cancel {
+  background: #3f3f44;
+  color: #e8e9ed;
+}
+
+#c4ai-field-cancel:hover {
+  background: #4f4f54;
+}
+
+/* Toolbar action buttons */
+.c4ai-toolbar-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #2a2a2a;
+}
+
+.c4ai-action-btn {
+  flex: 1;
+  padding: 8px 16px;
+  background: #3f3f44;
+  border: 1px solid #3f3f44;
+  border-radius: 6px;
+  color: #e8e9ed;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.c4ai-action-btn:hover {
+  background: #4f4f54;
+  border-color: #5f5f64;
+  transform: translateY(-1px);
+}
+
+.c4ai-pause-btn {
+  background: #09b5a5;
+  border-color: #09b5a5;
+  color: #070708;
+}
+
+.c4ai-pause-btn:hover {
+  background: #0ac5b5;
+}
+
+.c4ai-pause-btn.c4ai-paused {
+  background: #ff3c74;
+  border-color: #ff3c74;
+}
+
+.c4ai-generate-btn {
+  background: #0fbbaa;
+  border-color: #0fbbaa;
+  color: #070708;
+}
+
+.c4ai-generate-btn:hover {
+  background: #1fcbba;
+}
+
+/* Code modal */
+.c4ai-code-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.c4ai-code-modal-content {
+  background: #070708;
+  border: 2px solid #3f3f44;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 900px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 16px 64px rgba(0, 0, 0, 0.9);
+}
+
+.c4ai-code-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.c4ai-code-modal-header h2 {
+  margin: 0;
+  font-size: 20px;
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.c4ai-close-modal {
+  background: none;
+  border: none;
+  color: #999;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.c4ai-close-modal:hover {
+  background: #2a2a2a;
+  color: #fff;
+}
+
+.c4ai-code-modal-body {
+  flex: 1;
+  overflow: auto;
+  padding: 24px;
+}
+
+.c4ai-code-block {
+  background: #3f3f44;
+  border: 1px solid #3f3f44;
+  border-radius: 8px;
+  padding: 20px;
+  overflow-x: auto;
+  margin: 0;
+}
+
+.c4ai-code-block code {
+  font-family: var(--font-code);
+  font-size: 13px;
+  line-height: 1.6;
+  color: #e8e9ed;
+  white-space: pre;
+  display: block;
+}
+
+/* Syntax highlighting */
+.c4ai-keyword {
+  color: #0fbbaa;
+  font-weight: bold;
+}
+
+.c4ai-string {
+  color: #f380f5;
+}
+
+.c4ai-comment {
+  color: #a3abba;
+  font-style: italic;
+}
+
+.c4ai-function {
+  color: #ff3c74;
+}
+
+.c4ai-code-modal-footer {
+  display: flex;
+  gap: 12px;
+  padding: 20px 24px;
+  border-top: 1px solid #2a2a2a;
+  justify-content: flex-end;
+}
+
+.c4ai-download-btn {
+  background: #0fbbaa;
+  color: #070708;
+  border: none;
+}
+
+.c4ai-download-btn:hover {
+  background: #1fcbba;
+}
+
+.c4ai-copy-btn {
+  background: #3f3f44;
+  border-color: #3f3f44;
+}
+
+.c4ai-copy-btn:hover {
+  background: #4f4f54;
+  border-color: #5f5f64;
+}
+
+.c4ai-cloud-btn {
+  background: #3f3f44;
+  border-color: #3f3f44;
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.c4ai-cloud-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.c4ai-cloud-btn:hover:disabled {
+  background: #3f3f44;
+  transform: none;
+}

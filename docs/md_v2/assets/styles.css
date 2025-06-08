@@ -28,7 +28,8 @@
     --secondary-color: #d5cec0;
     --tertiary-color: #a3abba;
     --primary-dimmed-color: #09b5a5; /* Updated to the brand color */
-    --primary-color: #0fbbaa; /* Updated to the brand color */
+    /* --primary-color: #0fbbaa; */
+    --primary-color: #50ffff; /* Updated to the brand color */
     --accent-color: rgb(243, 128, 245);
     --error-color: #ff3c74;
     --progress-bar-background: #3f3f44;
