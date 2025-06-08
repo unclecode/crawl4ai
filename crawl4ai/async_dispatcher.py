@@ -126,6 +126,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
         check_interval: float = 1.0,
         max_session_permit: int = 20,
         fairness_timeout: float = 600.0,  # 10 minutes before prioritizing long-waiting URLs
+        memory_wait_timeout: Optional[float] = 600.0,
         rate_limiter: Optional[RateLimiter] = None,
         monitor: Optional[CrawlerMonitor] = None,
     ):
@@ -136,27 +137,46 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
         self.check_interval = check_interval
         self.max_session_permit = max_session_permit
         self.fairness_timeout = fairness_timeout
+        self.memory_wait_timeout = memory_wait_timeout
         self.result_queue = asyncio.Queue()
         self.task_queue = asyncio.PriorityQueue()  # Priority queue for better management
         self.memory_pressure_mode = False  # Flag to indicate when we're in memory pressure mode
         self.current_memory_percent = 0.0  # Track current memory usage
+        self._high_memory_start_time: Optional[float] = None
         
     async def _memory_monitor_task(self):
         """Background task to continuously monitor memory usage and update state"""
         while True:
             self.current_memory_percent = psutil.virtual_memory().percent
-            
+
             # Enter memory pressure mode if we cross the threshold
-            if not self.memory_pressure_mode and self.current_memory_percent >= self.memory_threshold_percent:
-                self.memory_pressure_mode = True
-                if self.monitor:
-                    self.monitor.update_memory_status("PRESSURE")
-            
+            if self.current_memory_percent >= self.memory_threshold_percent:
+                if not self.memory_pressure_mode:
+                    self.memory_pressure_mode = True
+                    self._high_memory_start_time = time.time()
+                    if self.monitor:
+                        self.monitor.update_memory_status("PRESSURE")
+                else:
+                    if self._high_memory_start_time is None:
+                        self._high_memory_start_time = time.time()
+                    if (
+                        self.memory_wait_timeout is not None
+                        and self._high_memory_start_time is not None
+                        and time.time() - self._high_memory_start_time >= self.memory_wait_timeout
+                    ):
+                        raise MemoryError(
+                            "Memory usage exceeded threshold for"
+                            f" {self.memory_wait_timeout} seconds"
+                        )
+
             # Exit memory pressure mode if we go below recovery threshold
             elif self.memory_pressure_mode and self.current_memory_percent <= self.recovery_threshold_percent:
                 self.memory_pressure_mode = False
+                self._high_memory_start_time = None
                 if self.monitor:
                     self.monitor.update_memory_status("NORMAL")
+            elif self.current_memory_percent < self.memory_threshold_percent:
+                self._high_memory_start_time = None
             
             # In critical mode, we might need to take more drastic action
             if self.current_memory_percent >= self.critical_threshold_percent:
@@ -307,7 +327,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
             self.monitor.start()
             
         results = []
-        
+
         try:
             # Initialize task queue
             for url in urls:
@@ -316,11 +336,18 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
                     self.monitor.add_task(task_id, url)
                 # Add to queue with initial priority 0, retry count 0, and current time
                 await self.task_queue.put((0, (url, task_id, 0, time.time())))
-                
+
             active_tasks = []
-            
+
             # Process until both queues are empty
             while not self.task_queue.empty() or active_tasks:
+                if memory_monitor.done():
+                    exc = memory_monitor.exception()
+                    if exc:
+                        for t in active_tasks:
+                            t.cancel()
+                        raise exc
+
                 # If memory pressure is low, start new tasks
                 if not self.memory_pressure_mode and len(active_tasks) < self.max_session_permit:
                     try:
@@ -465,8 +492,14 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
             active_tasks = []
             completed_count = 0
             total_urls = len(urls)
-            
+
             while completed_count < total_urls:
+                if memory_monitor.done():
+                    exc = memory_monitor.exception()
+                    if exc:
+                        for t in active_tasks:
+                            t.cancel()
+                        raise exc
                 # If memory pressure is low, start new tasks
                 if not self.memory_pressure_mode and len(active_tasks) < self.max_session_permit:
                     try:
