@@ -32,7 +32,7 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) 
     """Verify the JWT token from the Authorization header."""
 
     if credentials is None:
-        return None
+        raise HTTPException(status_code=401, detail="No credentials provided")
     token = credentials.credentials
     verifying_key = get_jwk_from_secret(SECRET_KEY)
     try:
