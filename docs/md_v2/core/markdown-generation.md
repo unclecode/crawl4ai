@@ -200,7 +200,7 @@ config = CrawlerRunConfig(markdown_generator=md_generator)
 
 - **`user_query`**: The term you want to focus on. BM25 tries to keep only content blocks relevant to that query.  
 - **`bm25_threshold`**: Raise it to keep fewer blocks; lower it to keep more.  
-- **`use_stemming`**: If `True`, variations of words match (e.g., “learn,” “learning,” “learnt”).
+- **`use_stemming`** *(default `True`)*: If enabled, variations of words match (e.g., “learn,” “learning,” “learnt”).
 
 **No query provided?** BM25 tries to glean a context from page metadata, or you can simply treat it as a scorched-earth approach that discards text with low generic score. Realistically, you want to supply a query for best results.
 

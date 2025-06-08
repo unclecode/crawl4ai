@@ -1073,7 +1073,8 @@ def crawl_cmd(url: str, browser_config: str, crawler_config: str, filter_config:
                 crawler_cfg.markdown_generator = DefaultMarkdownGenerator(
                     content_filter = BM25ContentFilter(
                         user_query=filter_conf.get("query"),
-                        bm25_threshold=filter_conf.get("threshold", 1.0)
+                        bm25_threshold=filter_conf.get("threshold", 1.0),
+                        use_stemming=filter_conf.get("use_stemming", True),
                     )
                 )
             elif filter_conf["type"] == "pruning":
