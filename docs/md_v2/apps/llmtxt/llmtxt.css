@@ -363,6 +363,15 @@ body {
     font-weight: bold;
 }
 
+.header-subtitle {
+    font-size: 10px;
+    color: var(--tertiary-color);
+    text-transform: none;
+    font-weight: normal;
+    display: block;
+    margin-top: 2px;
+}
+
 .component-selection-table th.clickable-header {
     cursor: pointer;
     user-select: none;
@@ -372,6 +381,16 @@ body {
 .component-selection-table th.clickable-header:hover {
     background-color: var(--primary-dimmed);
     color: var(--background-color);
+}
+
+.component-selection-table th.clickable-header[data-type="examples"] {
+    cursor: default;
+    opacity: 0.5;
+}
+
+.component-selection-table th.clickable-header[data-type="examples"]:hover {
+    background-color: var(--hover-bg);
+    color: var(--primary-color);
 }
 
 .component-selection-table th:nth-child(3),
@@ -400,10 +419,23 @@ body {
     font-weight: bold;
 }
 
+/* Token display in table cells */
+.token-info {
+    display: block;
+    font-size: 11px;
+    color: var(--tertiary-color);
+    margin-top: 2px;
+}
+
 .component-selection-table input[type="checkbox"] {
     cursor: pointer;
     width: 16px;
     height: 16px;
+}
+
+.component-selection-table input[type="checkbox"]:disabled {
+    cursor: not-allowed;
+    opacity: 0.3;
 }
 
 /* Disabled row state */
@@ -416,6 +448,30 @@ body {
 .action-area {
     text-align: center;
     margin: 40px 0;
+}
+
+/* Token Summary */
+.token-summary {
+    margin-bottom: 20px;
+    font-size: 16px;
+}
+
+.token-label {
+    color: var(--tertiary-color);
+    margin-right: 10px;
+}
+
+.token-count {
+    color: var(--primary-color);
+    font-weight: bold;
+    font-size: 20px;
+}
+
+.token-count::after {
+    content: " est.";
+    font-size: 12px;
+    color: var(--tertiary-color);
+    margin-left: 4px;
 }
 
 .download-btn {

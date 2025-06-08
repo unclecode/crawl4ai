@@ -18,6 +18,10 @@ document.addEventListener('DOMContentLoaded', () => {
     startSchemaCapture();
   });
 
+  document.getElementById('script-mode').addEventListener('click', () => {
+    startScriptCapture();
+  });
+
   // Session actions
   document.getElementById('generate-code').addEventListener('click', () => {
     generateCode();
@@ -53,6 +57,19 @@ function startSchemaCapture() {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     chrome.tabs.sendMessage(tabs[0].id, {
       action: 'startSchemaCapture'
+    }, (response) => {
+      if (response && response.success) {
+        // Close the popup to let user interact with the page
+        window.close();
+      }
+    });
+  });
+}
+
+function startScriptCapture() {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    chrome.tabs.sendMessage(tabs[0].id, {
+      action: 'startScriptCapture'
     }, (response) => {
       if (response && response.success) {
         // Close the popup to let user interact with the page

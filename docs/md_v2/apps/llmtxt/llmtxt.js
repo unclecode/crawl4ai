@@ -1,17 +1,16 @@
 // Crawl4AI LLM Context Builder JavaScript
 
-// Component definitions
+// Component definitions - order matters
 const components = [
     {
-        id: 'all',
-        name: 'All Components',
-        description: 'All components with all context types',
-        special: true
+        id: 'installation',
+        name: 'Installation',
+        description: 'Setup and installation options'
     },
     {
-        id: 'core',
-        name: 'Core Functionality',
-        description: 'Basic crawling and scraping features'
+        id: 'simple_crawling',
+        name: 'Simple Crawling',
+        description: 'Basic web crawling operations'
     },
     {
         id: 'config_objects',
@@ -19,30 +18,44 @@ const components = [
         description: 'Browser and crawler configuration'
     },
     {
-        id: 'deep_crawling',
-        name: 'Deep Crawling',
-        description: 'Multi-page crawling strategies'
-    },
-    {
-        id: 'deployment',
-        name: 'Deployment',
-        description: 'Installation and Docker setup'
-    },
-    {
         id: 'extraction',
         name: 'Data Extraction',
         description: 'Structured data extraction strategies'
     },
     {
-        id: 'markdown',
-        name: 'Markdown Generation',
-        description: 'Content-to-markdown conversion'
+        id: 'multi_urls_crawling',
+        name: 'Multi URLs Crawling',
+        description: 'Crawling multiple URLs efficiently'
     },
     {
-        id: 'vibe',
-        name: 'Vibe Coding',
-        description: 'General-purpose AI context',
-        special: false
+        id: 'deep_crawling',
+        name: 'Deep Crawling',
+        description: 'Multi-page crawling strategies'
+    },
+    {
+        id: 'docker',
+        name: 'Docker',
+        description: 'Docker deployment and configuration'
+    },
+    {
+        id: 'cli',
+        name: 'CLI',
+        description: 'Command-line interface usage'
+    },
+    {
+        id: 'http_based_crawler_strategy',
+        name: 'HTTP-based Crawler',
+        description: 'HTTP crawler strategy implementation'
+    },
+    {
+        id: 'url_seeder',
+        name: 'URL Seeder',
+        description: 'URL seeding and discovery'
+    },
+    {
+        id: 'deep_crawl_advanced_filters_scorers',
+        name: 'Advanced Filters & Scorers',
+        description: 'Deep crawl filtering and scoring'
     }
 ];
 
@@ -51,45 +64,47 @@ const contextTypes = ['memory', 'reasoning', 'examples'];
 
 // State management
 const state = {
-    preset: 'custom',
     selectedComponents: new Set(),
-    selectedContextTypes: new Map()
+    selectedContextTypes: new Map(),
+    tokenCounts: new Map() // Store token counts for each file
 };
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', () => {
-    setupPresetHandlers();
     renderComponents();
     renderReferenceTable();
     setupActionHandlers();
     setupColumnHeaderHandlers();
     
-    // Initialize only core component as selected with all context types
-    state.selectedComponents.add('core');
-    state.selectedContextTypes.set('core', new Set(contextTypes));
+    // Initialize first component as selected with available context types
+    const firstComponent = components[0];
+    state.selectedComponents.add(firstComponent.id);
+    state.selectedContextTypes.set(firstComponent.id, new Set(['memory', 'reasoning']));
     updateComponentUI();
 });
 
-// Setup preset radio button handlers
-function setupPresetHandlers() {
-    const presetRadios = document.querySelectorAll('input[name="preset"]');
-    presetRadios.forEach(radio => {
-        radio.addEventListener('change', (e) => {
-            state.preset = e.target.value;
-            updatePresetSelection();
-        });
-    });
+// Helper function to count tokens (words × 2.5)
+function estimateTokens(text) {
+    if (!text) return 0;
+    const words = text.trim().split(/\s+/).length;
+    return Math.round(words * 2.5);
 }
 
-// Update UI based on preset selection
-function updatePresetSelection() {
-    const componentSelector = document.getElementById('component-selector');
+// Update total token count display
+function updateTotalTokenCount() {
+    let totalTokens = 0;
     
-    if (state.preset === 'custom') {
-        componentSelector.style.display = 'block';
-    } else {
-        componentSelector.style.display = 'none';
-    }
+    state.selectedComponents.forEach(compId => {
+        const types = state.selectedContextTypes.get(compId);
+        if (types) {
+            types.forEach(type => {
+                const key = `${compId}-${type}`;
+                totalTokens += state.tokenCounts.get(key) || 0;
+            });
+        }
+    });
+    
+    document.getElementById('total-tokens').textContent = totalTokens.toLocaleString();
 }
 
 // Render component selection table
@@ -97,10 +112,13 @@ function renderComponents() {
     const tbody = document.getElementById('components-tbody');
     tbody.innerHTML = '';
     
-    components.filter(c => !c.special).forEach(component => {
+    components.forEach(component => {
         const row = createComponentRow(component);
         tbody.appendChild(row);
     });
+    
+    // Fetch token counts for all files
+    fetchAllTokenCounts();
 }
 
 // Create a component table row
@@ -124,9 +142,17 @@ function createComponentRow(component) {
     // Context type cells
     contextTypes.forEach(type => {
         const td = document.createElement('td');
+        const key = `${component.id}-${type}`;
+        const tokenCount = state.tokenCounts.get(key) || 0;
+        const isDisabled = type === 'examples' ? 'disabled' : '';
+        
         td.innerHTML = `
             <input type="checkbox" id="check-${component.id}-${type}" 
-                   data-component="${component.id}" data-type="${type}">
+                   data-component="${component.id}" data-type="${type}"
+                   ${isDisabled}>
+            <span class="token-info" id="tokens-${component.id}-${type}">
+                ${tokenCount > 0 ? `${tokenCount.toLocaleString()} tokens` : ''}
+            </span>
         `;
         tr.appendChild(td);
     });
@@ -140,9 +166,11 @@ function createComponentRow(component) {
     // Add event listeners for context type checkboxes
     contextTypes.forEach(type => {
         const typeCheckbox = tr.querySelector(`#check-${component.id}-${type}`);
-        typeCheckbox.addEventListener('change', (e) => {
-            handleContextTypeToggle(component.id, type, e.target.checked);
-        });
+        if (!typeCheckbox.disabled) {
+            typeCheckbox.addEventListener('change', (e) => {
+                handleContextTypeToggle(component.id, type, e.target.checked);
+            });
+        }
     });
     
     return tr;
@@ -152,12 +180,12 @@ function createComponentRow(component) {
 function handleComponentToggle(componentId, checked) {
     if (checked) {
         state.selectedComponents.add(componentId);
-        // Select all context types when component is selected
+        // Select only available context types when component is selected
         if (!state.selectedContextTypes.has(componentId)) {
-            state.selectedContextTypes.set(componentId, new Set(contextTypes));
+            state.selectedContextTypes.set(componentId, new Set(['memory', 'reasoning']));
         } else {
-            // If component was already partially selected, select all
-            state.selectedContextTypes.set(componentId, new Set(contextTypes));
+            // If component was already partially selected, select all available
+            state.selectedContextTypes.set(componentId, new Set(['memory', 'reasoning']));
         }
     } else {
         state.selectedComponents.delete(componentId);
@@ -195,8 +223,10 @@ function handleContextTypeToggle(componentId, type, checked) {
 
 // Update UI to reflect current state
 function updateComponentUI() {
-    components.filter(c => !c.special).forEach(component => {
+    components.forEach(component => {
         const row = document.getElementById(`component-${component.id}`);
+        if (!row) return;
+        
         const mainCheckbox = row.querySelector(`#check-${component.id}`);
         const hasSelection = state.selectedComponents.has(component.id);
         const selectedTypes = state.selectedContextTypes.get(component.id) || new Set();
@@ -213,15 +243,93 @@ function updateComponentUI() {
             typeCheckbox.checked = selectedTypes.has(type);
         });
     });
+    
+    updateTotalTokenCount();
+}
+
+// Fetch token counts for all files
+async function fetchAllTokenCounts() {
+    const promises = [];
+    
+    components.forEach(component => {
+        contextTypes.forEach(type => {
+            promises.push(fetchTokenCount(component.id, type));
+        });
+    });
+    
+    await Promise.all(promises);
+    updateComponentUI();
+    renderReferenceTable(); // Update reference table with token counts
+}
+
+// Fetch token count for a specific file
+async function fetchTokenCount(componentId, type) {
+    const key = `${componentId}-${type}`;
+    
+    try {
+        const fileName = getFileName(componentId, type);
+        const baseUrl = getBaseUrl(type);
+        const response = await fetch(baseUrl + fileName);
+        
+        if (response.ok) {
+            const content = await response.text();
+            const tokens = estimateTokens(content);
+            state.tokenCounts.set(key, tokens);
+            
+            // Update UI
+            const tokenSpan = document.getElementById(`tokens-${componentId}-${type}`);
+            if (tokenSpan) {
+                tokenSpan.textContent = `${tokens.toLocaleString()} tokens`;
+            }
+        } else if (type === 'examples') {
+            // Examples might not exist yet
+            state.tokenCounts.set(key, 0);
+            const tokenSpan = document.getElementById(`tokens-${componentId}-${type}`);
+            if (tokenSpan) {
+                tokenSpan.textContent = '';
+            }
+        }
+    } catch (error) {
+        console.warn(`Failed to fetch token count for ${componentId}-${type}`);
+        if (type === 'examples') {
+            const tokenSpan = document.getElementById(`tokens-${componentId}-${type}`);
+            if (tokenSpan) {
+                tokenSpan.textContent = '';
+            }
+        }
+    }
+}
+
+// Get file name based on component and type
+function getFileName(componentId, type) {
+    // For new structure, all files are just [componentId].txt
+    return `${componentId}.txt`;
+}
+
+// Get base URL based on context type
+function getBaseUrl(type) {
+    // For MkDocs, we need to go up to the root level
+    const basePrefix = window.location.pathname.includes('/apps/') ? '../../' : '/';
+    
+    switch(type) {
+        case 'memory':
+            return basePrefix + 'assets/llm.txt/txt/';
+        case 'reasoning':
+            return basePrefix + 'assets/llm.txt/diagrams/';
+        case 'examples':
+            return basePrefix + 'assets/llm.txt/examples/'; // Will return 404 for now
+        default:
+            return basePrefix + 'assets/llm.txt/txt/';
+    }
 }
 
 // Setup action button handlers
 function setupActionHandlers() {
     // Select/Deselect all buttons
     document.getElementById('select-all').addEventListener('click', () => {
-        components.filter(c => !c.special).forEach(comp => {
+        components.forEach(comp => {
             state.selectedComponents.add(comp.id);
-            state.selectedContextTypes.set(comp.id, new Set(contextTypes));
+            state.selectedContextTypes.set(comp.id, new Set(['memory', 'reasoning']));
         });
         updateComponentUI();
     });
@@ -249,9 +357,12 @@ function setupColumnHeaderHandlers() {
 
 // Toggle all checkboxes in a column
 function toggleColumnSelection(type) {
+    // Don't toggle examples column
+    if (type === 'examples') return;
+    
     // Check if all are currently selected
     let allSelected = true;
-    components.filter(c => !c.special).forEach(comp => {
+    components.forEach(comp => {
         const types = state.selectedContextTypes.get(comp.id);
         if (!types || !types.has(type)) {
             allSelected = false;
@@ -259,7 +370,7 @@ function toggleColumnSelection(type) {
     });
     
     // Toggle all
-    components.filter(c => !c.special).forEach(comp => {
+    components.forEach(comp => {
         if (!state.selectedContextTypes.has(comp.id)) {
             state.selectedContextTypes.set(comp.id, new Set());
         }
@@ -314,46 +425,50 @@ async function handleDownload() {
 function getSelectedFiles() {
     const files = [];
     
-    if (state.preset === 'vibe') {
-        files.push('crawl4ai_vibe.llm.full.md');
-    } else if (state.preset === 'all') {
-        // Use the dedicated aggregated files for all components
-        files.push('crawl4ai_all_memory_content.llm.md');
-        files.push('crawl4ai_all_reasoning_content.llm.md');
-        files.push('crawl4ai_all_examples_content.llm.md');
-    } else {
-        // Custom selection
-        state.selectedComponents.forEach(compId => {
-            const types = state.selectedContextTypes.get(compId);
-            if (types) {
-                types.forEach(type => {
-                    files.push(`crawl4ai_${compId}_${type}_content.llm.md`);
+    // Build list of selected files with their context info
+    state.selectedComponents.forEach(compId => {
+        const types = state.selectedContextTypes.get(compId);
+        if (types) {
+            types.forEach(type => {
+                files.push({
+                    componentId: compId,
+                    type: type,
+                    fileName: getFileName(compId, type),
+                    baseUrl: getBaseUrl(type)
                 });
-            }
-        });
-    }
+            });
+        }
+    });
     
     return files;
 }
 
 // Fetch multiple files
-async function fetchFiles(fileNames) {
-    // Use /assets/llmtxt/ path with .txt extension
-    const baseUrl = '/assets/llmtxt/';
-    const promises = fileNames.map(async (fileName) => {
-        // Convert .md to .txt for fetching
-        const txtFileName = fileName.replace('.md', '.txt');
+async function fetchFiles(fileInfos) {
+    const promises = fileInfos.map(async (fileInfo) => {
         try {
-            const response = await fetch(baseUrl + txtFileName);
+            const response = await fetch(fileInfo.baseUrl + fileInfo.fileName);
             if (!response.ok) {
-                console.warn(`Failed to fetch ${txtFileName} from ${baseUrl + txtFileName}`);
-                return { fileName, content: `<!-- Failed to load ${fileName} -->` };
+                if (fileInfo.type === 'examples') {
+                    return { 
+                        fileInfo, 
+                        content: `<!-- Examples for ${fileInfo.componentId} coming soon -->\n\nExamples are currently being developed for this component.` 
+                    };
+                }
+                console.warn(`Failed to fetch ${fileInfo.fileName} from ${fileInfo.baseUrl + fileInfo.fileName}`);
+                return { fileInfo, content: `<!-- Failed to load ${fileInfo.fileName} -->` };
             }
             const content = await response.text();
-            return { fileName, content };
+            return { fileInfo, content };
         } catch (error) {
-            console.warn(`Error fetching ${txtFileName} from ${baseUrl + txtFileName}:`, error);
-            return { fileName, content: `<!-- Error loading ${fileName} -->` };
+            if (fileInfo.type === 'examples') {
+                return { 
+                    fileInfo, 
+                    content: `<!-- Examples for ${fileInfo.componentId} coming soon -->\n\nExamples are currently being developed for this component.` 
+                };
+            }
+            console.warn(`Error fetching ${fileInfo.fileName}:`, error);
+            return { fileInfo, content: `<!-- Error loading ${fileInfo.fileName} -->` };
         }
     });
     
@@ -362,20 +477,31 @@ async function fetchFiles(fileNames) {
 
 // Combine file contents with headers
 function combineContents(fileContents) {
+    // Calculate total tokens
+    let totalTokens = 0;
+    fileContents.forEach(({ content }) => {
+        totalTokens += estimateTokens(content);
+    });
+    
     const header = `# Crawl4AI Custom LLM Context
 Generated on: ${new Date().toISOString()}
 Total files: ${fileContents.length}
+Estimated tokens: ${totalTokens.toLocaleString()}
 
 ---
 
 `;
     
-    const sections = fileContents.map(({ fileName, content }) => {
-        const componentName = extractComponentName(fileName);
-        const contextType = extractContextType(fileName);
+    const sections = fileContents.map(({ fileInfo, content }) => {
+        const component = components.find(c => c.id === fileInfo.componentId);
+        const componentName = component ? component.name : fileInfo.componentId;
+        const contextType = getContextTypeName(fileInfo.type);
+        const tokens = estimateTokens(content);
         
         return `## ${componentName} - ${contextType}
-Source: ${fileName}
+Component ID: ${fileInfo.componentId}
+Context Type: ${fileInfo.type}
+Estimated tokens: ${tokens.toLocaleString()}
 
 ${content}
 
@@ -387,25 +513,14 @@ ${content}
     return header + sections.join('\n');
 }
 
-// Extract component name from filename
-function extractComponentName(fileName) {
-    // Pattern: crawl4ai_{component}_{type}_content.llm.md
-    const match = fileName.match(/crawl4ai_(.+?)_(memory|reasoning|examples|llm\.full)/);
-    if (match) {
-        const compId = match[1];
-        const component = components.find(c => c.id === compId);
-        return component ? component.name : compId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+// Get display name for context type
+function getContextTypeName(type) {
+    switch(type) {
+        case 'memory': return 'Full Content';
+        case 'reasoning': return 'Diagrams & Workflows';
+        case 'examples': return 'Code Examples';
+        default: return type;
     }
-    return 'Unknown Component';
-}
-
-// Extract context type from filename
-function extractContextType(fileName) {
-    if (fileName.includes('_memory_')) return 'Memory';
-    if (fileName.includes('_reasoning_')) return 'Reasoning';
-    if (fileName.includes('_examples_')) return 'Examples';
-    if (fileName.includes('.llm.full')) return 'Complete Context';
-    return 'Context';
 }
 
 // Download file to user's computer
@@ -426,33 +541,35 @@ function renderReferenceTable() {
     const tbody = document.getElementById('reference-table-body');
     tbody.innerHTML = '';
     
-    // Since vibe is no longer special, just show all components the same way
+    // Get base path for links
+    const basePrefix = window.location.pathname.includes('/apps/') ? '../../' : '/';
+    
     components.forEach(component => {
         const row = document.createElement('tr');
+        const memoryTokens = state.tokenCounts.get(`${component.id}-memory`) || 0;
+        const reasoningTokens = state.tokenCounts.get(`${component.id}-reasoning`) || 0;
+        const examplesTokens = state.tokenCounts.get(`${component.id}-examples`) || 0;
+        
         row.innerHTML = `
             <td><strong>${component.name}</strong></td>
-            <td><a href="/assets/llmtxt/crawl4ai_${component.id}_memory_content.llm.txt" class="file-link" target="_blank">Memory</a></td>
-            <td><a href="/assets/llmtxt/crawl4ai_${component.id}_reasoning_content.llm.txt" class="file-link" target="_blank">Reasoning</a></td>
-            <td><a href="/assets/llmtxt/crawl4ai_${component.id}_examples_content.llm.txt" class="file-link" target="_blank">Examples</a></td>
-            <td><a href="/assets/llmtxt/crawl4ai_${component.id}.llm.full.txt" class="file-link" target="_blank">Full</a></td>
+            <td>
+                <a href="${basePrefix}assets/llm.txt/txt/${component.id}.txt" class="file-link" target="_blank">Memory</a>
+                ${memoryTokens > 0 ? `<span class="file-size">${memoryTokens.toLocaleString()} tokens</span>` : ''}
+            </td>
+            <td>
+                <a href="${basePrefix}assets/llm.txt/diagrams/${component.id}.txt" class="file-link" target="_blank">Reasoning</a>
+                ${reasoningTokens > 0 ? `<span class="file-size">${reasoningTokens.toLocaleString()} tokens</span>` : ''}
+            </td>
+            <td>
+                ${examplesTokens > 0 
+                    ? `<a href="${basePrefix}assets/llm.txt/examples/${component.id}.txt" class="file-link" target="_blank">Examples</a>
+                       <span class="file-size">${examplesTokens.toLocaleString()} tokens</span>`
+                    : '-'
+                }
+            </td>
+            <td>-</td>
         `;
         tbody.appendChild(row);
     });
 }
 
-// Check if examples file exists (all components have examples)
-function hasExamplesFile(componentId) {
-    // All components have examples files
-    return true;
-}
-
-// Check if full file exists (all components have full files)
-function hasFullFile(componentId) {
-    // All components have full files
-    return true;
-}
-
-// Utility function to capitalize first letter
-function capitalizeFirst(str) {
-    return str.charAt(0).toUpperCase() + str.slice(1);
-}

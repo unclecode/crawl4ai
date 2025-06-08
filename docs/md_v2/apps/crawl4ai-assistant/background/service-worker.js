@@ -2,7 +2,7 @@
 
 // Handle messages from content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === 'downloadCode') {
+  if (message.action === 'downloadCode' || message.action === 'downloadScript') {
     try {
       // Create a data URL for the Python code
       const dataUrl = 'data:text/plain;charset=utf-8,' + encodeURIComponent(message.code);

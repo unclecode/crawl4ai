@@ -11,8 +11,8 @@ Welcome to the Crawl4AI Apps Hub - your gateway to interactive tools and demos t
 }
 
 .app-card {
-    background: var(--md-code-bg-color);
-    border: 1px solid var(--md-default-fg-color--lightest);
+    background: #3f3f44;
+    border: 1px solid #3f3f44;
     border-radius: 8px;
     padding: 1.5rem;
     transition: all 0.3s ease;
@@ -23,7 +23,7 @@ Welcome to the Crawl4AI Apps Hub - your gateway to interactive tools and demos t
 .app-card:hover {
     transform: translateY(-4px);
     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
-    border-color: var(--md-primary-fg-color);
+    border-color: #50ffff;
 }
 
 .app-card h3 {
@@ -31,36 +31,38 @@ Welcome to the Crawl4AI Apps Hub - your gateway to interactive tools and demos t
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    color: #e8e9ed;
 }
 
 .app-status {
     display: inline-block;
-    padding: 0.2rem 0.6rem;
-    border-radius: 4px;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
     font-size: 0.7rem;
-    font-weight: bold;
+    font-weight: 600;
     text-transform: uppercase;
     margin-bottom: 1rem;
 }
 
 .status-available {
-    background: #22c55e;
-    color: #000;
+    background: #50ffff;
+    color: #070708;
 }
 
 .status-beta {
     background: #f59e0b;
-    color: #000;
+    color: #070708;
 }
 
 .status-coming-soon {
-    background: var(--md-default-fg-color--lightest);
-    color: var(--md-default-bg-color);
+    background: #2a2a2a;
+    color: #888;
 }
 
 .app-description {
     margin: 1rem 0;
     line-height: 1.6;
+    color: #a3abba;
 }
 
 .app-features {
@@ -73,13 +75,15 @@ Welcome to the Crawl4AI Apps Hub - your gateway to interactive tools and demos t
     padding-left: 1.5rem;
     position: relative;
     margin-bottom: 0.5rem;
+    color: #d5cec0;
+    font-size: 0.9rem;
 }
 
 .app-features li:before {
-    content: "✓";
+    content: "▸";
     position: absolute;
     left: 0;
-    color: var(--md-primary-fg-color);
+    color: #50ffff;
     font-weight: bold;
 }
 
@@ -89,35 +93,49 @@ Welcome to the Crawl4AI Apps Hub - your gateway to interactive tools and demos t
 
 .app-btn {
     display: inline-block;
-    padding: 0.8rem 1.5rem;
-    background: var(--md-primary-fg-color);
-    color: var(--md-primary-bg-color);
+    padding: 0.75rem 1.5rem;
+    background: #50ffff;
+    color: #070708;
     text-decoration: none;
     border-radius: 6px;
-    font-weight: bold;
+    font-weight: 600;
     transition: all 0.2s ease;
+    font-family: dm, Monaco, monospace;
 }
 
 .app-btn:hover {
-    background: var(--md-primary-fg-color--dark);
+    background: #09b5a5;
     transform: scale(1.05);
+    color: #070708;
 }
 
 .app-btn.disabled {
-    background: var(--md-default-fg-color--lightest);
+    background: #2a2a2a;
+    color: #666;
     cursor: not-allowed;
     transform: none;
 }
 
+.app-btn.disabled:hover {
+    background: #2a2a2a;
+    transform: none;
+}
+
 .intro-section {
-    background: var(--md-code-bg-color);
+    background: #3f3f44;
     border-radius: 8px;
     padding: 2rem;
     margin-bottom: 3rem;
+    border: 1px solid #3f3f44;
 }
 
 .intro-section h2 {
     margin-top: 0;
+    color: #50ffff;
+}
+
+.intro-section p {
+    color: #d5cec0;
 }
 </style>
 

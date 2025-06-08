@@ -71,33 +71,6 @@
         </section>
 
         <section class="builder">
-            <div class="special-contexts">
-                <h2>Quick Presets</h2>
-                <div class="preset-options">
-                    <label class="preset-option">
-                        <input type="radio" name="preset" value="vibe" id="preset-vibe">
-                        <div class="preset-card">
-                            <h3>🎯 Vibe Coding</h3>
-                            <p>Curated context for general AI prompting - perfect for exploring capabilities</p>
-                        </div>
-                    </label>
-                    <label class="preset-option">
-                        <input type="radio" name="preset" value="all" id="preset-all">
-                        <div class="preset-card">
-                            <h3>📚 Complete Library</h3>
-                            <p>Comprehensive context including all components and perspectives</p>
-                        </div>
-                    </label>
-                    <label class="preset-option">
-                        <input type="radio" name="preset" value="custom" id="preset-custom" checked>
-                        <div class="preset-card">
-                            <h3>🔧 Custom Selection</h3>
-                            <p>Choose specific components and context types</p>
-                        </div>
-                    </label>
-                </div>
-            </div>
-
             <div class="component-selector" id="component-selector">
                 <h2>Select Components & Context Types</h2>
                 <div class="select-all-controls">
@@ -111,9 +84,9 @@
                             <tr>
                                 <th width="50"></th>
                                 <th>Component</th>
-                                <th class="clickable-header" data-type="memory">Memory</th>
-                                <th class="clickable-header" data-type="reasoning">Reasoning</th>
-                                <th class="clickable-header" data-type="examples">Examples</th>
+                                <th class="clickable-header" data-type="memory">Memory<br><span class="header-subtitle">Full Content</span></th>
+                                <th class="clickable-header" data-type="reasoning">Reasoning<br><span class="header-subtitle">Diagrams</span></th>
+                                <th class="clickable-header" data-type="examples">Examples<br><span class="header-subtitle">Code</span></th>
                             </tr>
                         </thead>
                         <tbody id="components-tbody">
@@ -124,6 +97,10 @@
             </div>
 
             <div class="action-area">
+                <div class="token-summary" id="token-summary">
+                    <span class="token-label">Estimated Tokens:</span>
+                    <span class="token-count" id="total-tokens">0</span>
+                </div>
                 <button class="download-btn" id="download-btn">
                     <span class="icon">⬇</span> Generate & Download Context
                 </button>
