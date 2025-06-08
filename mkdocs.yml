@@ -9,9 +9,12 @@ docs_dir: docs/md_v2
 nav:
   - Home: 'index.md'
   - "Ask AI": "core/ask-ai.md"
-  - "LLM Context": "core/llmtxt.md"
   - "Quick Start": "core/quickstart.md"
   - "Code Examples": "core/examples.md"
+  - Apps:
+    - "Demo Apps": "apps/index.md"
+    - "C4A-Script Editor": "apps/c4a-script/index.html"
+    - "LLM Context Builder": "apps/llmtxt/index.html"
   - Setup & Installation:
     - "Installation": "core/installation.md"
     - "Docker Deployment": "core/docker-deployment.md"
