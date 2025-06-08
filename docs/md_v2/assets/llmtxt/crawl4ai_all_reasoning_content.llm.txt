@@ -6732,7 +6732,7 @@ dispatcher = MemoryAdaptiveDispatcher(
 3. **`max_session_permit`** (`int`, default: `10`)  
   The maximum number of concurrent crawling tasks allowed. This ensures resource limits are respected while maintaining concurrency.
 
-4. **`memory_wait_timeout`** (`float`, default: `300.0`)  
+4. **`memory_wait_timeout`** (`float`, default: `600.0`)
   Optional timeout (in seconds). If memory usage exceeds `memory_threshold_percent` for longer than this duration, a `MemoryError` is raised.
 
 5. **`rate_limiter`** (`RateLimiter`, default: `None`)  
