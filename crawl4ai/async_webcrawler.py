@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional, List
 import json
 import asyncio
-
+import aiohttp
 # from contextlib import nullcontext, asynccontextmanager
 from contextlib import asynccontextmanager
 from .models import (
@@ -255,6 +255,8 @@ class AsyncWebCrawler:
                 # Initialize processing variables
                 async_response: AsyncCrawlResponse = None
                 cached_result: CrawlResult = None
+                html = None
+                content_changed = True
                 screenshot_data = None
                 pdf_data = None
                 extracted_content = None
@@ -263,33 +265,6 @@ class AsyncWebCrawler:
                 # Try to get cached result if appropriate
                 if cache_context.should_read():
                     cached_result = await async_db_manager.aget_cached_url(url)
-
-                if cached_result:
-                    html = sanitize_input_encode(cached_result.html)
-                    extracted_content = sanitize_input_encode(
-                        cached_result.extracted_content or ""
-                    )
-                    extracted_content = (
-                        None
-                        if not extracted_content or extracted_content == "[]"
-                        else extracted_content
-                    )
-                    # If screenshot is requested but its not in cache, then set cache_result to None
-                    screenshot_data = cached_result.screenshot
-                    pdf_data = cached_result.pdf
-                    # if config.screenshot and not screenshot or config.pdf and not pdf:
-                    if config.screenshot and not screenshot_data:
-                        cached_result = None
-
-                    if config.pdf and not pdf_data:
-                        cached_result = None
-
-                    self.logger.url_status(
-                        url=cache_context.display_url,
-                        success=bool(html),
-                        timing=time.perf_counter() - start_time,
-                        tag="FETCH",
-                    )
 
                 # Update proxy configuration from rotation strategy if available
                 if config and config.proxy_rotation_strategy:
@@ -302,9 +277,59 @@ class AsyncWebCrawler:
                         )
                         config.proxy_config = next_proxy
                         # config = config.clone(proxy_config=next_proxy)
+                
+                
+                if cached_result:
+
+                    if config.check_content_changed:
+                        # check if content change
+                        content_changed = await self._check_content_changed(
+                            cached_result, url, config
+                        )
+                    else:
+                        content_changed = False
+
+                    if not content_changed:
+                        # Content has not changed, use cached version
+                        html = sanitize_input_encode(cached_result.html)
+                        extracted_content = sanitize_input_encode(
+                            cached_result.extracted_content or ""
+                        )
+                        extracted_content = (
+                            None
+                            if not extracted_content or extracted_content == "[]"
+                            else extracted_content
+                        )
+                        screenshot_data = cached_result.screenshot
+                        pdf_data = cached_result.pdf
+
+                        # Check if requested media is missing from cache
+                        if (config.screenshot and not screenshot_data) or (
+                            config.pdf and not pdf_data
+                        ):
+                            cached_result = None
+                            content_changed = True  # Force recrawl for missing media
+                        else:
+                            self.logger.url_status(
+                                url=cache_context.display_url,
+                                success=bool(html),
+                                timing=time.perf_counter() - start_time,
+                                tag="FETCH-CACHED",
+                            )
+
+                    else:
+                        # Content has changed, invalidate cache
+                        await async_db_manager.adelete_data_point(url=url)
+                        
+                        cached_result = None
+                        self.logger.info(
+                            message="Content changed, recrawling",
+                            tag="CACHE",
+                            params={"url": url},
+                        )
 
                 # Fetch fresh content if needed
-                if not cached_result or not html:
+                if (not cached_result or not html) and content_changed:
                     t1 = time.perf_counter()
 
                     if config.user_agent:
@@ -744,3 +769,112 @@ class AsyncWebCrawler:
         else:
             _results = await dispatcher.run_urls(crawler=self, urls=urls, config=config)
             return [transform_result(res) for res in _results]
+
+    async def _check_content_changed(self, cached_result: CrawlResult, url:str, config:CrawlerRunConfig) -> bool:
+        """
+        Determines if the content at a URL has changed since it was last cached.
+        Uses a multi-tiered approach prioritizing low-latency methods.
+        
+        Args:
+            cached_result (CrawlResult): The cached result containing metadata and headers
+            url (str): The URL to check
+            config (CrawlerRunConfig): Configuration object controlling cache behavior
+
+        Returns:
+            bool: True if content has changed (or we can't determine), False if unchanged
+        """
+        # Skip change detection for certain protocols or configurations
+        if url.startswith(("file:", "raw:")) or config.cache_mode == CacheMode.DISABLED:
+            return True
+
+        try:
+            # Extract cached response metadata
+            cached_headers = cached_result.response_headers or {}
+            etag = cached_headers.get("etag")
+            last_modified = cached_headers.get("last-modified")
+            # Get timestamp from metadata
+            cached_time = 0
+            if hasattr(cached_result, "metadata") and cached_result.metadata:
+                cached_time = cached_result.metadata.get("_timestamp", 0)
+
+            # Strategy 1: Use max-age from Cache-Control if available
+            cache_control = cached_headers.get("cache-control", "")
+            if "max-age=" in cache_control:
+                try:
+                    max_age = int(cache_control.split("max-age=")[1].split(",")[0])
+                    current_time = time.time()
+                    if current_time - cached_time < max_age:
+                        self.logger.debug(
+                            message="Content fresh according to max-age",
+                            tag="CACHE",
+                            params={"url": url, "max_age": max_age},
+                        )
+                        return False
+                except (ValueError, IndexError):
+                    pass  # Invalid max-age format, continue to other strategies
+
+            # Strategy 2: Conditional request with ETag/Last-Modified
+            headers = {}
+            if etag:
+                headers["If-None-Match"] = etag
+            if last_modified:
+                headers["If-Modified-Since"] = last_modified
+
+            if headers:
+                # Use HEAD request with a short timeout to minimize latency
+                timeout = aiohttp.ClientTimeout(total=config.head_request_timeout)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    try:
+                        async with session.head(
+                            url, headers=headers, allow_redirects=True
+                        ) as response:
+                            # 304 Not Modified means content is unchanged
+                            if response.status == 304:
+                                self.logger.debug(
+                                    message="Content unchanged (304 Not Modified)",
+                                    tag="CACHE",
+                                    params={"url": url},
+                                )
+                                return False
+
+                            # Check if ETag matches
+                            new_etag = response.headers.get("etag")
+                            if etag and new_etag and etag == new_etag:
+                                self.logger.debug(
+                                    message="Content unchanged (ETag match)",
+                                    tag="CACHE",
+                                    params={"url": url},
+                                )
+                                return False
+                    except Exception as e:
+                        # If HEAD request fails, fallback to using cache
+                        self.logger.warning(
+                            message="HEAD request failed, assuming content unchanged",
+                            tag="CACHE",
+                            params={"url": url, "error": str(e)},
+                        )
+                        return False
+
+            # Strategy 3: Check default cache TTL
+            # If no cache headers or ETag/Last-Modified, check default TTL
+            if config.default_cache_ttl_seconds:
+                current_time = time.time()
+                if current_time - cached_time < config.default_cache_ttl_seconds:
+                    self.logger.debug(
+                        message="Using cached content based on TTL",
+                        tag="CACHE",
+                        params={"url": url, "ttl": config.default_cache_ttl_seconds},
+                    )
+                    return False
+
+            # Default: assume content has changed if we can't prove otherwise
+            return True
+
+        except Exception as e:
+            self.logger.error(
+                message="Error checking content change",
+                tag="CACHE",
+                params={"url": url, "error": str(e)},
+            )
+            # On error, assume content has changed to be safe
+            return True
