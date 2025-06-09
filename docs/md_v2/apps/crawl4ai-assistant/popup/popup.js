@@ -22,6 +22,10 @@ document.addEventListener('DOMContentLoaded', () => {
     startScriptCapture();
   });
 
+  document.getElementById('c2c-mode').addEventListener('click', () => {
+    startClick2Crawl();
+  });
+
   // Session actions
   document.getElementById('generate-code').addEventListener('click', () => {
     generateCode();
@@ -70,6 +74,19 @@ function startScriptCapture() {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     chrome.tabs.sendMessage(tabs[0].id, {
       action: 'startScriptCapture'
+    }, (response) => {
+      if (response && response.success) {
+        // Close the popup to let user interact with the page
+        window.close();
+      }
+    });
+  });
+}
+
+function startClick2Crawl() {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    chrome.tabs.sendMessage(tabs[0].id, {
+      action: 'startClick2Crawl'
     }, (response) => {
       if (response && response.success) {
         // Close the popup to let user interact with the page

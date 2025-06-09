@@ -22,7 +22,16 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content/content.js"],
+      "js": [
+        "libs/marked.min.js",
+        "content/shared/utils.js",
+        "content/schemaBuilder.js",
+        "content/scriptBuilder.js",
+        "content/contentAnalyzer.js",
+        "content/markdownConverter.js",
+        "content/click2CrawlBuilder.js",
+        "content/content.js"
+      ],
       "css": ["content/overlay.css"],
       "run_at": "document_idle"
     }

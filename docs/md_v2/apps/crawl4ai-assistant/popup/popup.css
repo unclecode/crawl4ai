@@ -145,6 +145,10 @@ header h1 {
   background: #3a1e5f;
 }
 
+.mode-button.c2c .icon {
+  background: #1e5f3a;
+}
+
 .mode-info h3 {
   font-size: 16px;
   color: #fff;

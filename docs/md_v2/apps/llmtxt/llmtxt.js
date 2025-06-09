@@ -18,9 +18,14 @@ const components = [
         description: 'Browser and crawler configuration'
     },
     {
-        id: 'extraction',
-        name: 'Data Extraction',
-        description: 'Structured data extraction strategies'
+        id: 'extraction-llm',
+        name: 'Data Extraction Using LLM',
+        description: 'Structured data extraction strategies using LLMs'
+    },
+    {
+        id: 'extraction-no-llm',
+        name: 'Data Extraction Without LLM',
+        description: 'Structured data extraction strategies without LLMs'
     },
     {
         id: 'multi_urls_crawling',

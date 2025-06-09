@@ -626,6 +626,16 @@ code {
   background: var(--primary-pink);
 }
 
+.tool-status.new {
+  background: var(--primary-green);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+}
+
 /* Tool Details Panel */
 .tool-details {
   background: var(--bg-secondary);
@@ -1025,5 +1035,517 @@ code {
   
   .coming-soon-section h2 {
     font-size: 1.5rem;
+  }
+}
+/* Code Examples Grid Layout */
+.code-example > div[style*="grid"] {
+  min-height: 500px;
+}
+
+.code-example > div[style*="grid"] .terminal-window {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.code-example > div[style*="grid"] .terminal-content {
+  flex: 1;
+  overflow: auto;
+  max-height: 450px;
+}
+
+@media (max-width: 1200px) {
+  .code-example > div[style*="grid"] {
+    grid-template-columns: 1fr \!important;
+    gap: 12px \!important;
+  }
+}
+
+/* Cloud Banner Section (Thin Version) */
+.cloud-banner-section {
+  margin: 2rem 0 3rem 0;
+}
+
+.cloud-banner {
+  background: linear-gradient(135deg, rgba(15, 187, 170, 0.05) 0%, rgba(243, 128, 245, 0.05) 100%);
+  border: 1px solid rgba(15, 187, 170, 0.3);
+  border-radius: 12px;
+  padding: 1.5rem 2rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.cloud-banner::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 200%;
+  height: 100%;
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    rgba(15, 187, 170, 0.1) 25%, 
+    transparent 50%,
+    rgba(15, 187, 170, 0.1) 75%,
+    transparent 100%
+  );
+  animation: cloud-shimmer 4s linear infinite;
+}
+
+@keyframes cloud-shimmer {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.cloud-banner-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  position: relative;
+  z-index: 1;
+}
+
+
+.cloud-banner-text {
+  flex: 1;
+  text-align: left;
+}
+
+.cloud-banner-text h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--text-primary);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.cloud-banner-text p {
+  margin: 0.25rem 0 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.cloud-banner-btn {
+  background: var(--primary-green);
+  color: var(--bg-dark);
+  border: none;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: 25px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: var(--font-primary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.cloud-banner-btn:hover {
+  background: #1fcbba;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(15, 187, 170, 0.3);
+}
+
+@media (max-width: 768px) {
+  .cloud-banner-content {
+    flex-direction: column;
+    text-align: center;
+    gap: 1rem;
+  }
+  
+  .cloud-banner-text {
+    text-align: center;
+  }
+  
+  .cloud-banner-icon {
+    font-size: 2rem;
+  }
+  
+  .cloud-banner-text h3 {
+    font-size: 1.25rem;
+  }
+}
+
+/* Crawl4AI Cloud Section */
+.cloud-section {
+  margin: 5rem 0;
+}
+
+.cloud-announcement {
+  background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+  border: 2px solid var(--primary-green);
+  border-radius: 20px;
+  padding: 4rem 3rem;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(15, 187, 170, 0.2);
+  text-align: center;
+}
+
+.cloud-announcement::before {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 450%;
+  background: radial-gradient(circle, rgba(15, 187, 170, 0.1) 0%, transparent 70%);
+  animation: rotate 20s linear infinite;
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.cloud-announcement h2 {
+  font-size: 2.5rem;
+  margin: 0 0 0.5rem 0;
+  color: var(--text-primary);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  position: relative;
+  z-index: 1;
+}
+
+.cloud-tagline {
+  font-size: 1.25rem;
+  color: var(--text-secondary);
+  margin: 0.5rem 0 2rem;
+  position: relative;
+  z-index: 1;
+}
+
+.cloud-features-preview {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  margin: 2rem 0 3rem;
+  flex-wrap: wrap;
+  position: relative;
+  z-index: 1;
+}
+
+.cloud-feature-item {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-family: var(--font-code);
+  padding: 0.5rem 1rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+.cloud-cta-button {
+  background: var(--primary-green);
+  color: var(--bg-dark);
+  border: none;
+  padding: 0.875rem 2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  z-index: 1;
+  font-family: var(--font-primary);
+  text-transform: none;
+  letter-spacing: -0.01em;
+}
+
+
+.cloud-cta-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(15, 187, 170, 0.4);
+  background: #1fcbba;
+}
+
+.cloud-hint {
+  margin-top: 1.5rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  position: relative;
+  z-index: 1;
+  font-style: italic;
+}
+
+/* Signup Overlay */
+.signup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  backdrop-filter: blur(10px);
+  z-index: 10000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.signup-overlay.active {
+  display: flex;
+}
+
+.signup-container {
+  background: var(--bg-secondary);
+  border: 2px solid var(--primary-green);
+  border-radius: 16px;
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow: auto;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(15, 187, 170, 0.3);
+}
+
+.close-signup {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: var(--bg-tertiary);
+  border: none;
+  color: var(--text-secondary);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  font-size: 24px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.close-signup:hover {
+  background: var(--primary-pink);
+  color: var(--bg-dark);
+  transform: rotate(90deg);
+}
+
+.signup-content {
+  padding: 3rem;
+}
+
+.signup-content h3 {
+  font-size: 1.75rem;
+  margin: 0 0 0.5rem;
+  color: var(--text-primary);
+}
+
+.signup-content p {
+  color: var(--text-secondary);
+  margin-bottom: 2rem;
+}
+
+.waitlist-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-field label {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.form-field input,
+.form-field select {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-family: var(--font-primary);
+  transition: all 0.2s ease;
+}
+
+.form-field input:focus,
+.form-field select:focus {
+  outline: none;
+  border-color: var(--primary-green);
+  box-shadow: 0 0 0 3px rgba(15, 187, 170, 0.2);
+}
+
+.submit-button {
+  background: var(--primary-green);
+  color: var(--bg-dark);
+  border: none;
+  padding: 1rem 2rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: var(--font-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.submit-button:hover {
+  background: #1fcbba;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(15, 187, 170, 0.3);
+}
+
+/* Crawling Animation */
+.crawl-animation {
+  padding: 3rem;
+  text-align: left;
+}
+
+.crawl-terminal {
+  margin-bottom: 2rem;
+}
+
+.crawl-terminal .terminal-content {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.crawl-terminal code {
+  white-space: pre;
+  display: block;
+  line-height: 1.6;
+}
+
+.crawl-log {
+  color: var(--text-primary);
+  font-family: var(--font-code);
+}
+
+.crawl-log .log-init { color: #0fbbaa; }
+.crawl-log .log-fetch { color: #4169e1; }
+.crawl-log .log-scrape { color: #f380f5; }
+.crawl-log .log-extract { color: #ffbd2e; }
+.crawl-log .log-complete { color: #0fbbaa; }
+.crawl-log .log-success { color: #0fbbaa; }
+.crawl-log .log-time { color: #666; }
+
+.extracted-preview {
+  background: var(--bg-tertiary);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.extracted-preview h4 {
+  margin: 0 0 1rem;
+  color: var(--primary-green);
+  font-size: 1.25rem;
+}
+
+.json-preview {
+  background: var(--bg-dark);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1rem;
+  overflow-x: auto;
+  max-height: 300px;
+}
+
+.json-preview code {
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.success-message {
+  text-align: center;
+  padding: 2rem;
+}
+
+.continue-button {
+  background: var(--primary-green);
+  color: var(--bg-dark);
+  border: none;
+  padding: 1rem 2rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: var(--font-primary);
+  margin-top: 2rem;
+}
+
+.continue-button:hover {
+  background: #1fcbba;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(15, 187, 170, 0.3);
+}
+
+.success-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  animation: bounce 0.5s ease;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-20px); }
+}
+
+.success-message h3 {
+  font-size: 2rem;
+  margin: 0 0 1rem;
+  color: var(--primary-green);
+}
+
+.success-message ul {
+  list-style: none;
+  margin: 1.5rem 0;
+  padding: 0;
+  text-align: left;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.success-message li {
+  padding: 0.5rem 0;
+  color: var(--text-primary);
+  font-size: 1.125rem;
+}
+
+.success-note {
+  color: var(--text-secondary);
+  font-size: 1rem;
+  margin-top: 2rem;
+  padding: 1rem;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+}
+
+@media (max-width: 768px) {
+  .cloud-announcement h2 {
+    font-size: 2rem;
+  }
+  
+  .cloud-features-preview {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .signup-content {
+    padding: 2rem;
   }
 }
