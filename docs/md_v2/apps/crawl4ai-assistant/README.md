@@ -1,14 +1,15 @@
 # Crawl4AI Chrome Extension
 
-Visual schema and script builder for Crawl4AI - Build extraction schemas by clicking on webpage elements!
+Visual extraction tools for Crawl4AI - Click to extract data and content from any webpage!
 
 ## 🚀 Features
 
-- **Visual Schema Builder**: Click on elements to build extraction schemas
+- **Click2Crawl**: Click on elements to build data extraction schemas instantly
+- **Markdown Extraction**: Select elements and export as clean markdown
+- **Script Builder (Alpha)**: Record browser actions to create automation scripts
 - **Smart Element Selection**: Container and field selection with visual feedback
-- **Code Generation**: Generates complete Python code with LLM integration
+- **Code Generation**: Generates complete Python code for Crawl4AI
 - **Beautiful Dark UI**: Consistent with Crawl4AI's design language
-- **One-Click Download**: Get your generated code instantly
 
 ## 📦 Installation
 
@@ -33,11 +34,11 @@ If you want proper icons:
 
 ## 🎯 How to Use
 
-### Building a Schema
+### Using Click2Crawl
 
 1. **Navigate to any website** you want to extract data from
 2. **Click the Crawl4AI extension icon** in your toolbar
-3. **Click "Schema Builder"** to start the capture mode
+3. **Click "Click2Crawl"** to start the capture mode
 4. **Select a container element**:
    - Hover over elements (they'll highlight in blue)
    - Click on a repeating container (e.g., product card, article block)
@@ -45,9 +46,9 @@ If you want proper icons:
    - Elements will now highlight in green
    - Click on each piece of data you want to extract
    - Name each field (e.g., "title", "price", "description")
-6. **Generate the code**:
-   - Click "Generate Code" in the extension popup
-   - A Python file will automatically download
+6. **Test and Export**:
+   - Click "Test Schema" to see extracted data instantly
+   - Export as Python code, JSON schema, or markdown
 
 ### Running the Generated Code
 

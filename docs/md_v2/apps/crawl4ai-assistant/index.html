@@ -61,14 +61,14 @@
                         <p>Transform any website into structured data with just a few clicks! The Crawl4AI Assistant Chrome Extension provides three powerful tools for web scraping and data extraction.</p>
                         
                         <div style="background: #0fbbaa; color: #070708; padding: 12px 16px; border-radius: 8px; margin: 16px 0; font-weight: 600;">
-                            🎉 NEW: Schema Builder now extracts data INSTANTLY without any LLM! Test your schema and see JSON results immediately in the browser!
+                            🎉 NEW: Click2Crawl extracts data INSTANTLY without any LLM! Test your schema and see JSON results immediately in the browser!
                         </div>
                         
                         <div class="features-grid">
                             <div class="feature-card">
                                 <span class="feature-icon">🎯</span>
-                                <h3>Schema Builder</h3>
-                                <p>Extract data instantly without LLMs - see results in real-time!</p>
+                                <h3>Click2Crawl</h3>
+                                <p>Visual data extraction - click elements to build schemas instantly!</p>
                             </div>
                             <div class="feature-card">
                                 <span class="feature-icon">🔴</span>
@@ -77,8 +77,8 @@
                             </div>
                             <div class="feature-card">
                                 <span class="feature-icon">📝</span>
-                                <h3>Click2Crawl <span style="color: #0fbbaa; font-size: 0.75rem;">(New!)</span></h3>
-                                <p>Select multiple elements to extract clean markdown "as you see"</p>
+                                <h3>Markdown Extraction <span style="color: #0fbbaa; font-size: 0.75rem;">(New!)</span></h3>
+                                <p>Convert any webpage content to clean markdown with Visual Text Mode</p>
                             </div>
                             <!-- <div class="feature-card">
                                 <span class="feature-icon">🐍</span>
@@ -104,9 +104,9 @@
                                 <div class="step-content">
                                     <h4>Download the Extension</h4>
                                     <p>Get the latest release from GitHub or use the button below</p>
-                                    <a href="crawl4ai-assistant-v1.2.1.zip" class="download-button" download>
+                                    <a href="crawl4ai-assistant-v1.3.0.zip" class="download-button" download>
                                         <span class="button-icon">↓</span>
-                                        Download Extension (v1.2.1)
+                                        Download Extension (v1.3.0)
                                     </a>
                                 </div>
                             </div>
@@ -136,10 +136,10 @@
                 <div class="tools-container">
                     <!-- Left Panel - Tool Selector -->
                     <div class="tools-panel">
-                        <div class="tool-selector active" data-tool="schema-builder">
-                            <div class="tool-icon">📊</div>
+                        <div class="tool-selector active" data-tool="click2crawl">
+                            <div class="tool-icon">🎯</div>
                             <div class="tool-info">
-                                <h3>Schema Builder</h3>
+                                <h3>Click2Crawl</h3>
                                 <p>Visual data extraction</p>
                             </div>
                             <div class="tool-status">Available</div>
@@ -154,11 +154,11 @@
                             <div class="tool-status alpha">Alpha</div>
                         </div>
                         
-                        <div class="tool-selector" data-tool="click2crawl">
+                        <div class="tool-selector" data-tool="markdown-extraction">
                             <div class="tool-icon">📝</div>
                             <div class="tool-info">
-                                <h3>Click2Crawl</h3>
-                                <p>Markdown extraction</p>
+                                <h3>Markdown Extraction</h3>
+                                <p>Content to markdown</p>
                             </div>
                             <div class="tool-status new">New!</div>
                         </div>
@@ -166,11 +166,11 @@
                     
                     <!-- Right Panel - Tool Details -->
                     <div class="tool-details">
-                        <!-- Schema Builder Details -->
-                        <div class="tool-content active" id="schema-builder">
+                        <!-- Click2Crawl Details -->
+                        <div class="tool-content active" id="click2crawl">
                             <div class="tool-header">
-                                <h3>📊 Schema Builder</h3>
-                                <span class="tool-tagline">No LLM needed - Extract data instantly!</span>
+                                <h3>🎯 Click2Crawl</h3>
+                                <span class="tool-tagline">Click elements to build extraction schemas - No LLM needed!</span>
                             </div>
                             
                             <div class="tool-steps">
@@ -199,8 +199,8 @@
                                 <div class="step-item">
                                     <div class="step-number">3</div>
                                     <div class="step-content">
-                                        <h4>Test & Extract Data NOW!</h4>
-                                        <p>🎉 Click "Test Schema" to extract ALL matching data instantly - no coding required!</p>
+                                        <h4>Test & Extract Data Instantly!</h4>
+                                        <p>🎉 Click "Test Schema" to see extracted JSON immediately - no LLM or coding required!</p>
                                         <div class="step-visual">
                                             <span class="highlight-accent">⚡</span> See extracted JSON immediately
                                         </div>
@@ -210,11 +210,12 @@
                             
                             <div class="tool-features">
                                 <div class="feature-tag">🚀 Zero LLM dependency</div>
-                                <div class="feature-tag">📊 Instant data extraction</div>
-                                <div class="feature-tag">🎯 Smart selector generation</div>
-                                <div class="feature-tag">🐍 Ready-to-run Python code</div>
-                                <div class="feature-tag">✨ Preview matching elements</div>
-                                <div class="feature-tag">📥 Download JSON results</div>
+                                <div class="feature-tag">📊 Instant JSON extraction</div>
+                                <div class="feature-tag">🎯 Visual element selection</div>
+                                <div class="feature-tag">🐍 Export Python code</div>
+                                <div class="feature-tag">✨ Live preview</div>
+                                <div class="feature-tag">📥 Download results</div>
+                                <div class="feature-tag">📝 Export to markdown</div>
                             </div>
                         </div>
                         
@@ -268,11 +269,11 @@
                             </div>
                         </div>
                         
-                        <!-- Click2Crawl Details -->
-                        <div class="tool-content" id="click2crawl">
+                        <!-- Markdown Extraction Details -->
+                        <div class="tool-content" id="markdown-extraction">
                             <div class="tool-header">
-                                <h3>📝 Click2Crawl</h3>
-                                <span class="tool-tagline">Select multiple elements to extract clean markdown</span>
+                                <h3>📝 Markdown Extraction</h3>
+                                <span class="tool-tagline">Convert webpage content to clean markdown "as you see"</span>
                             </div>
                             
                             <div class="tool-steps">
@@ -312,9 +313,9 @@
                             
                             <div class="tool-features">
                                 <div class="feature-tag">Multi-select with Ctrl/Cmd</div>
-                                <div class="feature-tag">Visual Text Mode</div>
-                                <div class="feature-tag">Smart formatting</div>
-                                <div class="feature-tag">Cloud export (soon)</div>
+                                <div class="feature-tag">Visual Text Mode (As You See)</div>
+                                <div class="feature-tag">Clean markdown output</div>
+                                <div class="feature-tag">Export to Crawl4AI Cloud (soon)</div>
                             </div>
                         </div>
                     </div>
@@ -326,26 +327,26 @@
                 <h2>See the Generated Code & Extracted Data</h2>
                 
                 <div class="code-tabs">
-                    <button class="code-tab active" data-example="schema">📊 Schema Builder</button>
+                    <button class="code-tab active" data-example="schema">🎯 Click2Crawl</button>
                     <button class="code-tab" data-example="script">🔴 Script Builder</button>
-                    <button class="code-tab" data-example="markdown">📝 Click2Crawl</button>
+                    <button class="code-tab" data-example="markdown">📝 Markdown Extraction</button>
                 </div>
                 
                 <div class="code-examples">
-                    <!-- Schema Builder Code -->
+                    <!-- Click2Crawl Code -->
                     <div class="code-example active" id="code-schema">
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                             <!-- Python Code -->
                             <div class="terminal-window">
                                 <div class="terminal-header">
-                                    <span class="terminal-title">schema_extraction.py</span>
+                                    <span class="terminal-title">click2crawl_extraction.py</span>
                                     <button class="copy-button" data-code="schema-python">Copy</button>
                                 </div>
                                 <div class="terminal-content">
                                     <pre><code><span class="comment">#!/usr/bin/env python3</span>
 <span class="comment">"""
 🎉 NO LLM NEEDED! Direct extraction with CSS selectors
-Generated by Crawl4AI Chrome Extension
+Generated by Crawl4AI Chrome Extension - Click2Crawl
 """</span>
 
 <span class="keyword">import</span> asyncio
@@ -353,7 +354,7 @@ Generated by Crawl4AI Chrome Extension
 <span class="keyword">from</span> crawl4ai <span class="keyword">import</span> AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
 <span class="keyword">from</span> crawl4ai.extraction_strategy <span class="keyword">import</span> JsonCssExtractionStrategy
 
-<span class="comment"># The EXACT schema from your visual clicks - no guessing!</span>
+<span class="comment"># The EXACT schema from Click2Crawl - no guessing!</span>
 EXTRACTION_SCHEMA = {
     <span class="string">"name"</span>: <span class="string">"Product Catalog"</span>,
     <span class="string">"baseSelector"</span>: <span class="string">"div.product-card"</span>,  <span class="comment"># The container you selected</span>
@@ -515,7 +516,7 @@ asyncio.run(automate_shopping())</code></pre>
                         </div>
                     </div>
                     
-                    <!-- Click2Crawl Markdown Output -->
+                    <!-- Markdown Extraction Output -->
                     <div class="code-example" id="code-markdown">
                         <div class="terminal-window">
                             <div class="terminal-header">
@@ -692,20 +693,20 @@ Today, finding a 24-hour restaurant in Manhattan requires genuine effort. The pa
                             <div class="coming-feature">
                                 <div class="feature-header">
                                     <span class="feature-badge">Direct</span>
-                                    <h3>Get CrawlResult Without Code</h3>
+                                    <h3>Direct Data Download</h3>
                                 </div>
-                                <p>Skip the code generation entirely! Get extracted data directly in the extension as a CrawlResult object, ready to download as JSON.</p>
+                                <p>Skip the code generation entirely! Download extracted data directly from Click2Crawl as JSON or CSV files.</p>
                                 <div class="feature-preview">
-                                    <code>📊 One-click extraction • No Python needed • Export to JSON/CSV</code>
+                                    <code>📊 One-click download • No Python needed • Multiple export formats</code>
                                 </div>
                             </div>
                             
                             <div class="coming-feature">
                                 <div class="feature-header">
                                     <span class="feature-badge">AI</span>
-                                    <h3>Smart Schema Suggestions</h3>
+                                    <h3>Smart Field Detection</h3>
                                 </div>
-                                <p>AI-powered field detection that automatically suggests the most likely data fields on any page, making schema building even faster.</p>
+                                <p>AI-powered field detection for Click2Crawl that automatically suggests the most likely data fields on any page.</p>
                                 <div class="feature-preview">
                                     <code>🤖 Auto-detect fields • Smart naming • Pattern recognition</code>
                                 </div>
@@ -758,7 +759,10 @@ Today, finding a 24-hour restaurant in Manhattan requires genuine effort. The pa
                 
                 // Show corresponding content
                 const toolId = this.getAttribute('data-tool');
-                document.getElementById(toolId).classList.add('active');
+                const contentElement = document.getElementById(toolId);
+                if (contentElement) {
+                    contentElement.classList.add('active');
+                }
             });
         });
         

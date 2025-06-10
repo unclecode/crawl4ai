@@ -20,7 +20,8 @@
       "Bash(docker logs:*)",
       "Bash(curl:*)",
       "Bash(docker compose:*)",
-      "Bash(./test-final-integration.sh:*)"
+      "Bash(./test-final-integration.sh:*)",
+      "Bash(mv:*)"
     ]
   },
   "enableAllProjectMcpServers": false

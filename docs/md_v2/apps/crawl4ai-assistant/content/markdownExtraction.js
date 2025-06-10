@@ -1,25 +1,13 @@
-class Click2CrawlBuilder {
+class MarkdownExtraction {
   constructor() {
     this.selectedElements = new Set();
     this.highlightBoxes = new Map();
     this.selectionMode = false;
     this.toolbar = null;
-    this.previewPanel = null;
+    this.markdownPreviewModal = null;
     this.selectionCounter = 0;
     this.markdownConverter = null;
     this.contentAnalyzer = null;
-    
-    // Configuration options
-    this.options = {
-      includeImages: true,
-      preserveTables: true,
-      keepCodeFormatting: true,
-      simplifyLayout: false,
-      preserveLinks: true,
-      addSeparators: true,
-      includeXPath: false,
-      textOnly: false
-    };
     
     this.init();
   }
@@ -44,7 +32,7 @@ class Click2CrawlBuilder {
           <span class="c4ai-dot c4ai-dot-yellow"></span>
           <span class="c4ai-dot c4ai-dot-green"></span>
         </div>
-        <span class="c4ai-toolbar-title">Click2Crawl</span>
+        <span class="c4ai-toolbar-title">Markdown Extraction</span>
         <button class="c4ai-close-btn" title="Close">×</button>
       </div>
       <div class="c4ai-toolbar-content">
@@ -363,19 +351,18 @@ class Click2CrawlBuilder {
   }
   
   async showPreview() {
-    // Generate markdown from selected elements
-    const markdown = await this.generateMarkdown();
-    
-    // Create or update preview panel
-    if (!this.previewPanel) {
-      this.createPreviewPanel();
+    // Initialize markdown preview modal if not already done
+    if (!this.markdownPreviewModal) {
+      this.markdownPreviewModal = new MarkdownPreviewModal();
     }
     
-    await this.updatePreviewContent(markdown);
-    this.previewPanel.style.display = 'block';
+    // Show modal with callback to generate markdown
+    this.markdownPreviewModal.show(async (options) => {
+      return await this.generateMarkdown(options);
+    });
   }
   
-  createPreviewPanel() {
+  /* createPreviewPanel() {
     this.previewPanel = document.createElement('div');
     this.previewPanel.className = 'c4ai-c2c-preview';
     this.previewPanel.innerHTML = `
@@ -425,9 +412,9 @@ class Click2CrawlBuilder {
     this.previewPanel.style.zIndex = '999999';
     
     this.setupPreviewEventListeners();
-  }
+  } */
   
-  setupPreviewEventListeners() {
+  /* setupPreviewEventListeners() {
     // Close button
     this.previewPanel.querySelector('.c4ai-preview-close').addEventListener('click', () => {
       this.previewPanel.style.display = 'none';
@@ -496,9 +483,9 @@ class Click2CrawlBuilder {
     this.previewPanel.querySelector('.c4ai-download-btn').addEventListener('click', () => {
       this.downloadMarkdown();
     });
-  }
+  } */
   
-  switchPreviewTab(tabName) {
+  /* switchPreviewTab(tabName) {
     // Update active tab
     this.previewPanel.querySelectorAll('.c4ai-tab').forEach(tab => {
       tab.classList.toggle('active', tab.dataset.tab === tabName);
@@ -508,9 +495,9 @@ class Click2CrawlBuilder {
     this.previewPanel.querySelectorAll('.c4ai-preview-pane').forEach(pane => {
       pane.classList.toggle('active', pane.dataset.pane === tabName);
     });
-  }
+  } */
   
-  async updatePreviewContent(markdown) {
+  /* async updatePreviewContent(markdown) {
     // Update markdown pane
     const markdownPane = this.previewPanel.querySelector('[data-pane="markdown"]');
     markdownPane.innerHTML = `<pre><code>${this.escapeHtml(markdown)}</code></pre>`;
@@ -535,19 +522,19 @@ class Click2CrawlBuilder {
       // Fallback if marked.js is not available
       previewPane.innerHTML = `<div class="c4ai-markdown-preview"><pre>${this.escapeHtml(markdown)}</pre></div>`;
     }
-  }
+  } */
   
   
-  escapeHtml(unsafe) {
+  /* escapeHtml(unsafe) {
     return unsafe
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#039;");
-  }
+  } */
   
-  async generateMarkdown() {
+  async generateMarkdown(options) {
     // Get selected elements as array
     const elements = Array.from(this.selectedElements);
     
@@ -565,7 +552,7 @@ class Click2CrawlBuilder {
       const element = sortedElements[i];
       
       // Add XPath header if enabled
-      if (this.options.includeXPath) {
+      if (options.includeXPath) {
         const xpath = this.getXPath(element);
         markdownParts.push(`### Element ${i + 1} - XPath: \`${xpath}\`\n`);
       }
@@ -574,7 +561,7 @@ class Click2CrawlBuilder {
       let elementsToConvert = [element];
       
       // If text-only mode and element is a TR, process the entire table for better context
-      if (this.options.textOnly && element.tagName === 'TR') {
+      if (options.textOnly && element.tagName === 'TR') {
         const table = element.closest('table');
         if (table && !sortedElements.includes(table)) {
           // Only include this table row, not the whole table
@@ -585,19 +572,21 @@ class Click2CrawlBuilder {
       // Analyze and convert individual element
       const analysis = await this.contentAnalyzer.analyze(elementsToConvert);
       const markdown = await this.markdownConverter.convert(elementsToConvert, {
-        ...this.options,
+        ...options,
         analysis
       });
       
-      markdownParts.push(markdown.trim());
+      // Trim the markdown before adding
+      const trimmedMarkdown = markdown.trim();
+      markdownParts.push(trimmedMarkdown);
       
       // Add separator if enabled and not last element
-      if (this.options.addSeparators && i < sortedElements.length - 1) {
-        markdownParts.push('\n\n---\n\n');
+      if (options.addSeparators && i < sortedElements.length - 1) {
+        markdownParts.push('\n---\n');
       }
     }
     
-    return markdownParts.join('\n\n');
+    return markdownParts.join('\n');
   }
   
   getXPath(element) {
@@ -642,35 +631,15 @@ class Click2CrawlBuilder {
   }
   
   async copyToClipboard() {
-    const markdown = await this.generateMarkdown();
-    
-    try {
-      await navigator.clipboard.writeText(markdown);
-      this.showNotification('Markdown copied to clipboard!');
-    } catch (err) {
-      console.error('Failed to copy:', err);
-      this.showNotification('Failed to copy. Please try again.', 'error');
+    if (this.markdownPreviewModal) {
+      await this.markdownPreviewModal.copyToClipboard();
     }
   }
   
   async downloadMarkdown() {
-    const markdown = await this.generateMarkdown();
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-    const filename = `crawl4ai-export-${timestamp}.md`;
-    
-    // Create blob and download
-    const blob = new Blob([markdown], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    this.showNotification(`Downloaded ${filename}`);
+    if (this.markdownPreviewModal) {
+      await this.markdownPreviewModal.downloadMarkdown();
+    }
   }
   
   showNotification(message, type = 'success') {
@@ -707,9 +676,9 @@ class Click2CrawlBuilder {
       this.toolbar = null;
     }
     
-    if (this.previewPanel) {
-      this.previewPanel.remove();
-      this.previewPanel = null;
+    if (this.markdownPreviewModal) {
+      this.markdownPreviewModal.destroy();
+      this.markdownPreviewModal = null;
     }
     
     // Remove hover styles
@@ -726,7 +695,7 @@ class Click2CrawlBuilder {
       }
     } catch (error) {
       // Extension context might be invalidated, ignore the error
-      console.log('Click2Crawl deactivated (extension context unavailable)');
+      console.log('Markdown Extraction deactivated (extension context unavailable)');
     }
   }
 }

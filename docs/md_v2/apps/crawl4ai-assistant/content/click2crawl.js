@@ -1,15 +1,16 @@
-// Enhanced SchemaBuilder class for Crawl4AI Chrome Extension
+// Click2Crawl class for Crawl4AI Chrome Extension
+// Click elements to build extraction schemas
 
 // Singleton instance to prevent multiple toolbars
-let schemaBuilderInstance = null;
+let click2CrawlInstance = null;
 
-class SchemaBuilder {
+class Click2Crawl {
   constructor() {
     // Prevent multiple instances
-    if (schemaBuilderInstance) {
-      schemaBuilderInstance.stop();
+    if (click2CrawlInstance) {
+      click2CrawlInstance.stop();
     }
-    schemaBuilderInstance = this;
+    click2CrawlInstance = this;
     
     this.container = null;
     this.fields = [];
@@ -57,9 +58,15 @@ class SchemaBuilder {
     this.inspectingFields = false;
     this.parentLevels = 1;
     
+    // Clean up markdown preview modal
+    if (this.markdownPreviewModal) {
+      this.markdownPreviewModal.destroy();
+      this.markdownPreviewModal = null;
+    }
+    
     // Clear singleton reference
-    if (schemaBuilderInstance === this) {
-      schemaBuilderInstance = null;
+    if (click2CrawlInstance === this) {
+      click2CrawlInstance = null;
     }
   }
   
@@ -97,8 +104,8 @@ class SchemaBuilder {
           <button class="c4ai-dot c4ai-dot-minimize"></button>
           <button class="c4ai-dot c4ai-dot-maximize"></button>
         </div>
-        <img src="${chrome.runtime.getURL('icons/icon-16.png')}" class="c4ai-titlebar-icon" alt="Crawl4AI">
-        <div class="c4ai-titlebar-title">🔧 Schema Builder</div>
+        <div class="c4ai-titlebar-title">  Click2Crawl</div>
+        <img src="${chrome.runtime.getURL('icons/icon-16.png')}" class="c4ai-titlebar-icon" alt="Crawl4AI" style="margin-left: auto;">
       </div>
       <div class="c4ai-toolbar-content">
         <div class="c4ai-toolbar-status">
@@ -151,6 +158,9 @@ class SchemaBuilder {
             <button id="c4ai-export-data" class="c4ai-action-btn c4ai-export-btn" disabled>
               <span>📊</span> Data
             </button>
+            <button id="c4ai-export-markdown" class="c4ai-action-btn c4ai-export-btn" disabled>
+              <span>📝</span> Markdown
+            </button>
           </div>
         </div>
         
@@ -202,6 +212,7 @@ class SchemaBuilder {
       addClickHandler('c4ai-test', () => this.testSchema());
       addClickHandler('c4ai-export-schema', () => this.exportSchema());
       addClickHandler('c4ai-export-data', () => this.exportData());
+      addClickHandler('c4ai-export-markdown', () => this.exportMarkdown());
       addClickHandler('c4ai-deploy-cloud', () => this.deployToCloud());
       addClickHandler('c4ai-close', () => this.stop());
       
@@ -273,9 +284,14 @@ class SchemaBuilder {
   handleClick(e) {
     const element = e.target;
     
-    // Check if clicking on our UI elements
+    // Check if clicking on our UI elements (including markdown preview modal)
     if (this.isOurElement(element)) {
       return; // Let toolbar clicks work normally
+    }
+    
+    // Additional check for markdown preview modal classes
+    if (element.closest('.c4ai-c2c-preview') || element.closest('.c4ai-preview-options')) {
+      return; // Don't interfere with markdown preview modal
     }
 
     // Use current element
@@ -303,7 +319,9 @@ class SchemaBuilder {
 
   isOurElement(element) {
     return window.C4AI_Utils.isOurElement(element) || 
-           (this.selectedBox && element === this.selectedBox);
+           (this.selectedBox && element === this.selectedBox) ||
+           (this.markdownPreviewModal && this.markdownPreviewModal.modal && 
+            (element === this.markdownPreviewModal.modal || this.markdownPreviewModal.modal.contains(element)));
   }
   
   showSelectedBox(element) {
@@ -499,6 +517,9 @@ class SchemaBuilder {
   }
 
   showFieldDialog(element) {
+    // Remove any existing field dialogs first
+    document.querySelectorAll('.c4ai-field-dialog').forEach(d => d.remove());
+    
     const dialog = document.createElement('div');
     dialog.className = 'c4ai-field-dialog';
     
@@ -922,6 +943,7 @@ class SchemaBuilder {
       document.getElementById('c4ai-test').disabled = false;
       document.getElementById('c4ai-export-schema').disabled = false;
       document.getElementById('c4ai-export-data').disabled = false;
+      document.getElementById('c4ai-export-markdown').disabled = false;
       document.getElementById('c4ai-deploy-cloud').disabled = false;
     } else {
       schemaSection.style.display = 'none';
@@ -975,6 +997,9 @@ class SchemaBuilder {
   editField(index) {
     const field = this.fields[index];
     if (!field) return;
+    
+    // Remove any existing field dialogs first
+    document.querySelectorAll('.c4ai-field-dialog').forEach(d => d.remove());
     
     // Re-show the field dialog with existing values
     const dialog = document.createElement('div');
@@ -1476,6 +1501,137 @@ class SchemaBuilder {
     await this.testSchema();
   }
   
+  async exportMarkdown() {
+    // Initialize markdown converter if not already done
+    if (!this.markdownConverter) {
+      this.markdownConverter = new MarkdownConverter();
+    }
+    if (!this.contentAnalyzer) {
+      this.contentAnalyzer = new ContentAnalyzer();
+    }
+    
+    // Initialize markdown preview modal if not already done
+    if (!this.markdownPreviewModal) {
+      this.markdownPreviewModal = new MarkdownPreviewModal();
+    }
+    
+    // Get all matching containers
+    const containers = document.querySelectorAll(this.container.selector);
+    if (containers.length === 0) {
+      this.showNotification('No matching containers found', 'error');
+      return;
+    }
+    
+    // Show modal with callback to generate markdown
+    this.markdownPreviewModal.show(async (options) => {
+      return await this.generateMarkdownFromSchema(options);
+    });
+  }
+  
+  
+  
+  
+  
+  async generateMarkdownFromSchema(options) {
+    // Get all matching containers
+    const containers = document.querySelectorAll(this.container.selector);
+    const markdownParts = [];
+    
+    for (let i = 0; i < containers.length; i++) {
+      const container = containers[i];
+      
+      // Add XPath header if enabled
+      if (options.includeXPath) {
+        const xpath = this.getXPath(container);
+        markdownParts.push(`### Container ${i + 1} - XPath: \`${xpath}\`\n`);
+      }
+      
+      // Extract data based on schema fields
+      const extractedData = {};
+      this.fields.forEach(field => {
+        try {
+          const element = container.querySelector(field.selector);
+          if (element) {
+            if (field.type === 'text') {
+              extractedData[field.name] = element.textContent.trim();
+            } else if (field.type === 'attribute' && field.attribute) {
+              extractedData[field.name] = element.getAttribute(field.attribute);
+            }
+          }
+        } catch (e) {
+          // Skip invalid selectors
+        }
+      });
+      
+      // Convert container to markdown based on options
+      const analysis = await this.contentAnalyzer.analyze([container]);
+      const containerMarkdown = await this.markdownConverter.convert([container], {
+        ...options,
+        analysis,
+        extractedData // Pass extracted data for context
+      });
+      
+      // Trim the markdown before adding
+      const trimmedMarkdown = containerMarkdown.trim();
+      markdownParts.push(trimmedMarkdown);
+      
+      // Add separator if enabled and not last element
+      if (options.addSeparators && i < containers.length - 1) {
+        markdownParts.push('\n---\n');
+      }
+    }
+    
+    return markdownParts.join('\n');
+  }
+  
+  getXPath(element) {
+    if (element.id) {
+      return `//*[@id="${element.id}"]`;
+    }
+    
+    const parts = [];
+    let current = element;
+    
+    while (current && current.nodeType === Node.ELEMENT_NODE) {
+      let index = 0;
+      let sibling = current.previousSibling;
+      
+      while (sibling) {
+        if (sibling.nodeType === Node.ELEMENT_NODE && sibling.nodeName === current.nodeName) {
+          index++;
+        }
+        sibling = sibling.previousSibling;
+      }
+      
+      const tagName = current.nodeName.toLowerCase();
+      const part = index > 0 ? `${tagName}[${index + 1}]` : tagName;
+      parts.unshift(part);
+      
+      current = current.parentNode;
+    }
+    
+    return '/' + parts.join('/');
+  }
+  
+  
+  
+  showNotification(message, type = 'success') {
+    const notification = document.createElement('div');
+    notification.className = `c4ai-notification c4ai-notification-${type}`;
+    notification.textContent = message;
+    
+    document.body.appendChild(notification);
+    
+    // Animate in
+    setTimeout(() => notification.classList.add('show'), 10);
+    
+    // Remove after 3 seconds
+    setTimeout(() => {
+      notification.classList.remove('show');
+      setTimeout(() => notification.remove(), 300);
+    }, 3000);
+  }
+  
   deployToCloud() {
     // Create cloud deployment modal
     const modal = document.createElement('div');
@@ -1808,5 +1964,5 @@ if __name__ == "__main__":
 
 // Export for use in content script
 if (typeof window !== 'undefined') {
-  window.SchemaBuilder = SchemaBuilder;
+  window.Click2Crawl = Click2Crawl;
 }

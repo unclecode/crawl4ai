@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Crawl4AI Assistant",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "description": "Visual schema and script builder for Crawl4AI - Build extraction schemas and automation scripts by clicking and recording actions",
   "permissions": [
     "activeTab",
@@ -25,11 +25,12 @@
       "js": [
         "libs/marked.min.js",
         "content/shared/utils.js",
-        "content/schemaBuilder.js",
+        "content/markdownPreviewModal.js",
+        "content/click2crawl.js",
         "content/scriptBuilder.js",
         "content/contentAnalyzer.js",
         "content/markdownConverter.js",
-        "content/click2CrawlBuilder.js",
+        "content/markdownExtraction.js",
         "content/content.js"
       ],
       "css": ["content/overlay.css"],

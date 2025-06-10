@@ -1,5 +1,5 @@
 // Main content script for Crawl4AI Assistant
-// Coordinates between SchemaBuilder and ScriptBuilder
+// Coordinates between Click2Crawl, ScriptBuilder, and MarkdownExtraction
 
 let activeBuilder = null;
 
@@ -13,8 +13,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 
     if (request.mode === 'schema') {
-      console.log('Starting Schema Builder');
-      activeBuilder = new SchemaBuilder();
+      console.log('Starting Click2Crawl');
+      activeBuilder = new Click2Crawl();
       activeBuilder.start();
     } else if (request.mode === 'script') {
       console.log('Starting Script Builder');
@@ -34,8 +34,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       activeBuilder.deactivate?.();
       activeBuilder = null;
     }
-    console.log('Starting Schema Builder');
-    activeBuilder = new SchemaBuilder();
+    console.log('Starting Click2Crawl');
+    activeBuilder = new Click2Crawl();
     activeBuilder.start();
     sendResponse({ success: true });
   } else if (request.action === 'startScriptCapture') {
@@ -52,8 +52,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       activeBuilder.deactivate?.();
       activeBuilder = null;
     }
-    console.log('Starting Click2Crawl');
-    activeBuilder = new Click2CrawlBuilder();
+    console.log('Starting Markdown Extraction');
+    activeBuilder = new MarkdownExtraction();
     sendResponse({ success: true });
   } else if (request.action === 'generateCode') {
     if (activeBuilder && activeBuilder.generateCode) {

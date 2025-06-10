@@ -127,6 +127,7 @@
 
 /* macOS-style titlebar */
 .c4ai-toolbar-titlebar {
+    gap: 1em;
     display: flex;
     align-items: center;
     padding: 12px;

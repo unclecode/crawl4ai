@@ -38,6 +38,8 @@ body {
   font-family: var(--font-primary);
   background: #0a0a0a;
   color: #e0e0e0;
+  border-radius: 16px;
+  overflow: hidden;
 }
 
 .popup-container {
