@@ -215,7 +215,7 @@ Below is a snippet combining many parameters:
 ```python
 import asyncio
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 async def main():
     # Example schema

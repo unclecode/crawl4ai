@@ -2437,7 +2437,7 @@ Generated: ${timestamp}
 import asyncio
 from pathlib import Path
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 # C4A Script commands
 C4A_SCRIPT = """

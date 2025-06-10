@@ -1701,7 +1701,7 @@ Generated: ${new Date().toISOString()}
 import asyncio
 import json
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 # The extraction schema generated from your selections
 EXTRACTION_SCHEMA = ${schemaJson}
@@ -1782,7 +1782,7 @@ import asyncio
 import json
 from pathlib import Path
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 # HTML snippet of the selected container element
 HTML_SNIPPET = """

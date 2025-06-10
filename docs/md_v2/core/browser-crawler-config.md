@@ -274,7 +274,7 @@ In a typical scenario, you define **one** `BrowserConfig` for your crawler sessi
 ```python
 import asyncio
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, LLMConfig
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 async def main():
     # 1) Browser config: headless, bigger viewport, no proxy

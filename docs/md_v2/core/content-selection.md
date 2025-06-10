@@ -191,7 +191,7 @@ You can combine content selection with a more advanced extraction strategy. For 
 import asyncio
 import json
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 async def main():
     # Minimal schema for repeated items
@@ -243,7 +243,7 @@ import asyncio
 import json
 from pydantic import BaseModel, Field
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, LLMConfig
-from crawl4ai.extraction_strategy import LLMExtractionStrategy
+from crawl4ai import LLMExtractionStrategy
 
 class ArticleData(BaseModel):
     headline: str
@@ -288,7 +288,7 @@ Below is a short function that unifies **CSS selection**, **exclusion** logic, a
 import asyncio
 import json
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 async def extract_main_articles(url: str):
     schema = {

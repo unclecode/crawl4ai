@@ -127,7 +127,7 @@ Crawl4AI can also extract structured data (JSON) using CSS or XPath selectors. B
 > **New!** Crawl4AI now provides a powerful utility to automatically generate extraction schemas using LLM. This is a one-time cost that gives you a reusable schema for fast, LLM-free extractions:
 
 ```python
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 from crawl4ai import LLMConfig
 
 # Generate a schema (one-time cost)
@@ -157,7 +157,7 @@ Here's a basic extraction example:
 import asyncio
 import json
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 async def main():
     schema = {
@@ -212,7 +212,7 @@ import json
 import asyncio
 from pydantic import BaseModel, Field
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, LLMConfig
-from crawl4ai.extraction_strategy import LLMExtractionStrategy
+from crawl4ai import LLMExtractionStrategy
 
 class OpenAIModelFee(BaseModel):
     model_name: str = Field(..., description="Name of the OpenAI model.")
@@ -328,7 +328,7 @@ Some sites require multiple “page clicks” or dynamic JavaScript updates. Bel
 ```python
 import asyncio
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 async def extract_structured_data_using_css_extractor():
     print("\n--- Using JsonCssExtractionStrategy for Fast Structured Output ---")

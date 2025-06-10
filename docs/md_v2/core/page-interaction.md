@@ -296,7 +296,7 @@ if __name__ == "__main__":
 Once dynamic content is loaded, you can attach an **`extraction_strategy`** (like `JsonCssExtractionStrategy` or `LLMExtractionStrategy`). For example:
 
 ```python
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 schema = {
     "name": "Commits",

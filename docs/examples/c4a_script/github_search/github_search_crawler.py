@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import List, Dict, Any
 
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 from crawl4ai.script.c4a_compile import C4ACompiler
 
 

@@ -37,7 +37,7 @@ import json
 from pydantic import BaseModel, Field
 from typing import List
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, LLMConfig
-from crawl4ai.extraction_strategy import LLMExtractionStrategy
+from crawl4ai import LLMExtractionStrategy
 
 class SentimentAnalysis(BaseModel):
     """Use LLM when you need semantic understanding"""

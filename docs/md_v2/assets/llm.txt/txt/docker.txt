@@ -476,7 +476,7 @@ services:
 ```python
 # Method 1: Create config objects and dump to see expected JSON structure
 from crawl4ai import BrowserConfig, CrawlerRunConfig, LLMConfig, CacheMode
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy, LLMExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy, LLMExtractionStrategy
 import json
 
 # Create browser config and see JSON structure

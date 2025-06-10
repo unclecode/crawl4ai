@@ -9,7 +9,7 @@ __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file
 import asyncio
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy, JsonXPathExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy, JsonXPathExtractionStrategy
 from crawl4ai.utils import preprocess_html_for_schema, JsonXPathExtractionStrategy
 import json
 

@@ -352,7 +352,7 @@ if __name__ == "__main__":
 ```python
 import asyncio
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 import json
 
 async def main():
@@ -426,7 +426,7 @@ if __name__ == "__main__":
 import os
 import asyncio
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, LLMConfig
-from crawl4ai.extraction_strategy import LLMExtractionStrategy
+from crawl4ai import LLMExtractionStrategy
 from pydantic import BaseModel, Field
 
 class OpenAIModelFee(BaseModel):

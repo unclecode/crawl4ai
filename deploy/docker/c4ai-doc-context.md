@@ -354,7 +354,7 @@ In a typical scenario, you define **one** `BrowserConfig` for your crawler sessi
 ```python
 import asyncio
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, LLMConfig
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 async def main():
     # 1) Browser config: headless, bigger viewport, no proxy
@@ -1042,7 +1042,7 @@ You can combine content selection with a more advanced extraction strategy. For 
 import asyncio
 import json
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 async def main():
     # Minimal schema for repeated items
@@ -1094,7 +1094,7 @@ import asyncio
 import json
 from pydantic import BaseModel, Field
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, LLMConfig
-from crawl4ai.extraction_strategy import LLMExtractionStrategy
+from crawl4ai import LLMExtractionStrategy
 
 class ArticleData(BaseModel):
     headline: str
@@ -1139,7 +1139,7 @@ Below is a short function that unifies **CSS selection**, **exclusion** logic, a
 import asyncio
 import json
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 async def extract_main_articles(url: str):
     schema = {
@@ -1488,7 +1488,7 @@ If you run a JSON-based extraction strategy (CSS, XPath, LLM, etc.), the structu
 import asyncio
 import json
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 async def main():
     schema = {
@@ -4722,7 +4722,7 @@ if __name__ == "__main__":
 Once dynamic content is loaded, you can attach an **`extraction_strategy`** (like `JsonCssExtractionStrategy` or `LLMExtractionStrategy`). For example:
 
 ```python
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 schema = {
     "name": "Commits",
@@ -4902,7 +4902,7 @@ Crawl4AI can also extract structured data (JSON) using CSS or XPath selectors. B
 > **New!** Crawl4AI now provides a powerful utility to automatically generate extraction schemas using LLM. This is a one-time cost that gives you a reusable schema for fast, LLM-free extractions:
 
 ```python
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 from crawl4ai import LLMConfig
 
 # Generate a schema (one-time cost)
@@ -4932,7 +4932,7 @@ Here's a basic extraction example:
 import asyncio
 import json
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 async def main():
     schema = {
@@ -4987,7 +4987,7 @@ import json
 import asyncio
 from pydantic import BaseModel, Field
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, LLMConfig
-from crawl4ai.extraction_strategy import LLMExtractionStrategy
+from crawl4ai import LLMExtractionStrategy
 
 class OpenAIModelFee(BaseModel):
     model_name: str = Field(..., description="Name of the OpenAI model.")
@@ -5103,7 +5103,7 @@ Some sites require multiple “page clicks” or dynamic JavaScript updates. Bel
 ```python
 import asyncio
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 async def extract_structured_data_using_css_extractor():
     print("\n--- Using JsonCssExtractionStrategy for Fast Structured Output ---")
@@ -7300,7 +7300,7 @@ Here's an example of crawling GitHub commits across multiple pages while preserv
 
 ```python
 from crawl4ai.async_configs import CrawlerRunConfig
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 from crawl4ai.cache_context import CacheMode
 
 async def crawl_dynamic_content():
@@ -7850,7 +7850,7 @@ The Cosine Strategy:
 ## Basic Usage
 
 ```python
-from crawl4ai.extraction_strategy import CosineStrategy
+from crawl4ai import CosineStrategy
 
 strategy = CosineStrategy(
     semantic_filter="product reviews",    # Target content type
@@ -8161,7 +8161,7 @@ import json
 from pydantic import BaseModel, Field
 from typing import List
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, LLMConfig
-from crawl4ai.extraction_strategy import LLMExtractionStrategy
+from crawl4ai import LLMExtractionStrategy
 
 class Product(BaseModel):
     name: str
@@ -8278,7 +8278,7 @@ import asyncio
 from typing import List
 from pydantic import BaseModel, Field
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
-from crawl4ai.extraction_strategy import LLMExtractionStrategy
+from crawl4ai import LLMExtractionStrategy
 
 class Entity(BaseModel):
     name: str
@@ -8423,7 +8423,7 @@ Let’s begin with a **simple** schema-based extraction using the `JsonCssExtrac
 import json
 import asyncio
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 async def extract_crypto_prices():
     # 1. Define a simple extraction schema
@@ -8493,7 +8493,7 @@ Below is a short example demonstrating **XPath** extraction plus the **`raw://`*
 import json
 import asyncio
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
-from crawl4ai.extraction_strategy import JsonXPathExtractionStrategy
+from crawl4ai import JsonXPathExtractionStrategy
 
 async def extract_crypto_prices_xpath():
     # 1. Minimal dummy HTML with some repeating rows
@@ -8694,7 +8694,7 @@ Key Takeaways:
 import json
 import asyncio
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 ecommerce_schema = {
     # ... the advanced schema from above ...
@@ -8804,7 +8804,7 @@ While manually crafting schemas is powerful and precise, Crawl4AI now offers a c
 The schema generator is available as a static method on both `JsonCssExtractionStrategy` and `JsonXPathExtractionStrategy`. You can choose between OpenAI's GPT-4 or the open-source Ollama for schema generation:
 
 ```python
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy, JsonXPathExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy, JsonXPathExtractionStrategy
 from crawl4ai import LLMConfig
 
 # Sample HTML with product information

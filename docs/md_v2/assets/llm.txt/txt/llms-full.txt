@@ -1835,7 +1835,7 @@ import json
 from pydantic import BaseModel, Field
 from typing import List
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, LLMConfig
-from crawl4ai.extraction_strategy import LLMExtractionStrategy
+from crawl4ai import LLMExtractionStrategy
 
 class SentimentAnalysis(BaseModel):
     """Use LLM when you need semantic understanding"""
@@ -2743,7 +2743,7 @@ import json
 import asyncio
 from pathlib import Path
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, LLMConfig
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 async def smart_extraction_workflow():
     """
@@ -2880,7 +2880,7 @@ social_schema = JsonCssExtractionStrategy.generate_schema(
 import json
 import asyncio
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 # Manual schema for consistent product pages
 simple_schema = {
@@ -3046,7 +3046,7 @@ asyncio.run(extract_complex_ecommerce())
 ### XPath Alternative (When CSS Isn't Enough)
 
 ```python
-from crawl4ai.extraction_strategy import JsonXPathExtractionStrategy
+from crawl4ai import JsonXPathExtractionStrategy
 
 # XPath for more complex selections
 xpath_schema = {
@@ -3091,7 +3091,7 @@ strategy = JsonXPathExtractionStrategy(xpath_schema, verbose=True)
 import json
 import asyncio
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
-from crawl4ai.extraction_strategy import RegexExtractionStrategy
+from crawl4ai import RegexExtractionStrategy
 
 async def extract_common_patterns():
     # Use built-in patterns for common data types
@@ -4711,7 +4711,7 @@ services:
 ```python
 # Method 1: Create config objects and dump to see expected JSON structure
 from crawl4ai import BrowserConfig, CrawlerRunConfig, LLMConfig, CacheMode
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy, LLMExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy, LLMExtractionStrategy
 import json
 
 # Create browser config and see JSON structure
@@ -5792,7 +5792,7 @@ import json
 import asyncio
 from pathlib import Path
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, LLMConfig
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 async def smart_extraction_workflow():
     """
@@ -5929,7 +5929,7 @@ social_schema = JsonCssExtractionStrategy.generate_schema(
 import json
 import asyncio
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 # Manual schema for consistent product pages
 simple_schema = {
@@ -6095,7 +6095,7 @@ asyncio.run(extract_complex_ecommerce())
 ### XPath Alternative (When CSS Isn't Enough)
 
 ```python
-from crawl4ai.extraction_strategy import JsonXPathExtractionStrategy
+from crawl4ai import JsonXPathExtractionStrategy
 
 # XPath for more complex selections
 xpath_schema = {
@@ -6140,7 +6140,7 @@ strategy = JsonXPathExtractionStrategy(xpath_schema, verbose=True)
 import json
 import asyncio
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
-from crawl4ai.extraction_strategy import RegexExtractionStrategy
+from crawl4ai import RegexExtractionStrategy
 
 async def extract_common_patterns():
     # Use built-in patterns for common data types
