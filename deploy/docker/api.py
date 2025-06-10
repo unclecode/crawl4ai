@@ -170,8 +170,20 @@ async def handle_markdown_request(
     cache: str = "0",
     config: Optional[dict] = None 
 ) -> tuple[list[dict], float | None, float | None, float | None]:
-    """Handle markdown generation requests."""
+    """ Handle markdown generation requests
 
+    Args:
+        urls: URLs to process.
+        filter_type: Content filtering type (RAW, FIT, BM25, LLM).
+        query: Optional query for filtering (BM25, LLM).
+        cache: "1" to enable caching.
+        config: docker Configuration.
+
+    Returns:
+        Tuple: (List of {url, markdown}, total_time, mem_delta_mb, peak_mem_mb).
+    Raises:
+        HTTPException: On crawling or processing errors, including memory usage details.
+    """
 
     start_mem_mb = _get_memory_mb() # <--- Get memory before
     start_time = time.time()
@@ -203,7 +215,7 @@ async def handle_markdown_request(
                     cache_mode=cache_mode
                 )
         
-        # Initialize the dispatcher
+        # set the dispatcher
         dispatcher = MemoryAdaptiveDispatcher(
             memory_threshold_percent=config["crawler"]["memory_threshold_percent"],
             rate_limiter=RateLimiter(
@@ -211,7 +223,7 @@ async def handle_markdown_request(
             ) if config["crawler"]["rate_limiter"]["enabled"] else None
         )
         
-        # initialize the browser
+        # set the browser config
         browser_config = BrowserConfig(
             headless=True,
             extra_args=[
