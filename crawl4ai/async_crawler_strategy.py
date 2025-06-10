@@ -1429,7 +1429,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             viewport_size = page.viewport_size
             viewport_height = viewport_size["height"]
 
-            num_segments = (page_height // viewport_height) + 1
+            num_segments = (page_height + viewport_height - 1) // viewport_height
             for i in range(num_segments):
                 y_offset = i * viewport_height
                 await page.evaluate(f"window.scrollTo(0, {y_offset})")
