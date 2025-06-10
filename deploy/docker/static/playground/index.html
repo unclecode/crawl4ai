@@ -637,7 +637,7 @@
                 
                 // MD endpoint expects: { url, f, q, c }
                 payload = {
-                    url: urls[0], // Take first URL
+                    urls, // URLs from the textarea
                     f: filterType, // Lowercase filter type as required by server
                     q: query || null, // Use the query if provided, otherwise null
                     c: cache

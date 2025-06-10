@@ -237,18 +237,31 @@ async def get_markdown(
     body: MarkdownRequest,
     _td: Dict = Depends(token_dep),
 ):
-    if not body.url.startswith(("http://", "https://")):
-        raise HTTPException(
-            400, "URL must be absolute and start with http/https")
-    markdown = await handle_markdown_request(
-        body.url, body.f, body.q, body.c, config
+    
+    """ Crawl a list of URLs, retrieve their content, filter it based on a specified content‑filter strategy, 
+        and return a list of markdown snippets along with some performance metrics """
+
+    for url in body.urls:
+        if not url.startswith(("http://", "https://")):
+            raise HTTPException(
+                400, "URL must be absolute and start with http/https")
+
+    markdowns, server_processing_time_s, server_memory_delta_mb, server_peak_memory_mb = await handle_markdown_request(
+        body.urls,
+        body.f,
+        body.q,
+        body.c,
+        config,
     )
+    
     return JSONResponse({
-        "url": body.url,
+        "results": markdowns, # { url: str, markdown: str }
         "filter": body.f,
         "query": body.q,
         "cache": body.c,
-        "markdown": markdown,
+        "server_processing_time_s": server_processing_time_s,
+        "server_memory_delta_mb": server_memory_delta_mb,
+        "server_peak_memory_mb": server_peak_memory_mb,
         "success": True
     })
 

@@ -164,17 +164,21 @@ async def process_llm_extraction(
         })
 
 async def handle_markdown_request(
-    url: str,
+    urls: List[str],
     filter_type: FilterType,
     query: Optional[str] = None,
     cache: str = "0",
-    config: Optional[dict] = None
-) -> str:
+    config: Optional[dict] = None 
+) -> tuple[list[dict], float | None, float | None, float | None]:
     """Handle markdown generation requests."""
+
+
+    start_mem_mb = _get_memory_mb() # <--- Get memory before
+    start_time = time.time()
+    mem_delta_mb = None
+    peak_mem_mb = start_mem_mb
     try:
-        decoded_url = unquote(url)
-        if not decoded_url.startswith(('http://', 'https://')):
-            decoded_url = 'https://' + decoded_url
+        urls = [('https://' + unquote(url)) if not url.startswith(('http://', 'https://')) else url for url in urls]
 
         if filter_type == FilterType.RAW:
             md_generator = DefaultMarkdownGenerator()
@@ -193,32 +197,98 @@ async def handle_markdown_request(
             md_generator = DefaultMarkdownGenerator(content_filter=content_filter)
 
         cache_mode = CacheMode.ENABLED if cache == "1" else CacheMode.WRITE_ONLY
-
-        async with AsyncWebCrawler() as crawler:
-            result = await crawler.arun(
-                url=decoded_url,
-                config=CrawlerRunConfig(
+        crawler_config = CrawlerRunConfig(
                     markdown_generator=md_generator,
                     scraping_strategy=LXMLWebScrapingStrategy(),
                     cache_mode=cache_mode
                 )
-            )
+        
+        # Initialize the dispatcher
+        dispatcher = MemoryAdaptiveDispatcher(
+            memory_threshold_percent=config["crawler"]["memory_threshold_percent"],
+            rate_limiter=RateLimiter(
+                base_delay=tuple(config["crawler"]["rate_limiter"]["base_delay"])
+            ) if config["crawler"]["rate_limiter"]["enabled"] else None
+        )
+        
+        # initialize the browser
+        browser_config = BrowserConfig(
+            headless=True,
+            extra_args=[
+            "--disable-gpu",  # Disable GPU acceleration
+            "--disable-dev-shm-usage",  # Disable /dev/shm usage
+            "--no-sandbox",  # Required for Docker
+            ],
+            viewport={
+                "width": 800,
+                "height": 600,
+            },  # Smaller viewport for better performance
+        )
+        # Initialize the crawler, use the browser pool system
+        from crawler_pool import get_crawler
+        crawler = await get_crawler(browser_config)
+
+        results = []
+        func = getattr(crawler, "arun" if len(urls) == 1 else "arun_many")
+        partial_func = partial(func, 
+                                urls[0] if len(urls) == 1 else urls, 
+                                config=crawler_config, 
+                                dispatcher=dispatcher)
+        results = await partial_func()
+
+        end_mem_mb = _get_memory_mb() # <--- Get memory after
+        end_time = time.time()
+        total_time = end_time - start_time
+
+        # It retrieves memory usage before and after the execution of the target code, 
+        # calculates the memory delta, determines the peak memory usage, and 
+        # logs these metrics along with the total execution time
+        if start_mem_mb is not None and end_mem_mb is not None:
+            mem_delta_mb = end_mem_mb - start_mem_mb # <--- Calculate delta
+            peak_mem_mb = max(peak_mem_mb if peak_mem_mb else 0, end_mem_mb) # <--- Get peak memory
             
+            logger.info(f"""Memory usage: Start: {start_mem_mb} MB, End: {end_mem_mb} MB, Delta: {mem_delta_mb} MB,
+                        Peak: {peak_mem_mb} MB, Total Time: {total_time}""" )
+
+        # Check each result
+        for result in results:
             if not result.success:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=result.error_message
                 )
-
-            return (result.markdown.raw_markdown 
-                   if filter_type == FilterType.RAW 
-                   else result.markdown.fit_markdown)
+                
+        # Return the results
+        return (
+            [{"url": url,
+              "markdown": result.markdown.raw_markdown if filter_type == FilterType.RAW else result.markdown.fit_markdown,
+             } for url, result in zip(urls, results)],           
+            total_time,
+            mem_delta_mb,
+            peak_mem_mb
+        )
 
     except Exception as e:
         logger.error(f"Markdown error: {str(e)}", exc_info=True)
+        if 'crawler' in locals() and crawler.ready: # Check if crawler was initialized and started
+            #  try:
+            #      await crawler.close()
+            #  except Exception as close_e:
+            #       logger.error(f"Error closing crawler during exception handling: {close_e}")
+            logger.error(f"Error closing crawler during exception handling: {str(e)}")
+
+        # Measure memory even on error if possible
+        end_mem_mb_error = _get_memory_mb()
+        if start_mem_mb is not None and end_mem_mb_error is not None:
+            mem_delta_mb = end_mem_mb_error - start_mem_mb
+
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail=json.dumps({ # Send structured error
+                "error": str(e),
+                "server_memory_delta_mb": mem_delta_mb,
+                "server_peak_memory_mb": max(peak_mem_mb if peak_mem_mb else 0, end_mem_mb_error or 0)
+            })
         )
 
 async def handle_llm_request(
