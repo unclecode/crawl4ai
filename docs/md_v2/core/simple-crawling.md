@@ -31,16 +31,9 @@ if __name__ == "__main__":
 The `arun()` method returns a `CrawlResult` object with several useful properties. Here's a quick overview (see [CrawlResult](../api/crawl-result.md) for complete details):
 
 ```python
-config = CrawlerRunConfig(
-    markdown_generator=DefaultMarkdownGenerator(
-        content_filter=PruningContentFilter(threshold=0.6),
-        options={"ignore_links": True}
-    )
-)
-
 result = await crawler.arun(
     url="https://example.com",
-    config=config
+    config=CrawlerRunConfig(fit_markdown=True)
 )
 
 # Different content formats
