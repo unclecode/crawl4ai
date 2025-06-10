@@ -15,7 +15,7 @@ from .config import (
 )
 from bs4 import NavigableString, Comment
 from bs4 import PageElement, Tag
-from urllib.parse import urljoin
+from urllib.parse import urljoin , urlparse
 from requests.exceptions import InvalidSchema
 from .utils import (
     extract_metadata,
@@ -24,8 +24,7 @@ from .utils import (
     get_base_domain,
     extract_metadata_using_lxml,
 )
-from lxml import etree
-from lxml import html as lhtml
+from lxml import etree, html as lhtml
 from typing import List
 from .models import ScrapingResult, MediaItem, Link, Media, Links
 import copy
@@ -130,7 +129,27 @@ class WebScrapingStrategy(ContentScrapingStrategy):
             ScrapingResult: A structured result containing the scraped content.
         """
         actual_url = kwargs.get("redirected_url", url)
-        raw_result = self._scrap(actual_url, html, is_async=False, **kwargs)
+        # raw_result = self._scrap(actual_url, html, is_async=False, **kwargs)
+        effective_base_url = actual_url
+        try:
+            soup_for_base_check = BeautifulSoup(html, "html.parser")
+            base_tag = soup_for_base_check.find("base", href=True)
+            if base_tag:
+                base_href_val = base_tag.get("href")
+                if base_href_val is not None:
+                    resolved_base_href = urljoin(actual_url, base_href_val)
+                    parsed_resolved_base = urlparse(resolved_base_href)
+                    if parsed_resolved_base.scheme and parsed_resolved_base.netloc:
+                        effective_base_url = resolved_base_href
+        except Exception as e:
+            self._log(
+                "error",
+                message="Error resolving base URL: {error}",
+                tag="SCRAPE",
+                params={"error": str(e)},
+            )
+        kwargs_for_scrap = {**kwargs, '_effective_base_url_override': effective_base_url }
+        raw_result = self._scrap(actual_url, html, is_async=False, **kwargs_for_scrap)
         if raw_result is None:
             return ScrapingResult(
                 cleaned_html="",
@@ -1487,6 +1506,27 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
             doc = lhtml.document_fromstring(html)
             # Match BeautifulSoup's behavior of using body or full doc
             # body = doc.xpath('//body')[0] if doc.xpath('//body') else doc
+            # Determine effective base URL considering <base href="...">
+            base_tag_element = doc.find(".//base[@href]")
+            if base_tag_element is not None:
+                base_href_value = base_tag_element.get("href")
+                if base_href_value is not None:
+                    resolved_base_href = urljoin(url, base_href_value)
+                    parse_resolved_base_href = urlparse(resolved_base_href)
+                    if parse_resolved_base_href.scheme and parse_resolved_base_href.netloc:
+                        effective_base_url = resolved_base_href
+                        self._log(
+                            "debug",
+                            f"Using <base href='{base_href_value}'>, resolved effective base URL for links: {effective_base_url}",
+                            url=url, # Log against original document URL 
+                            tag="SCRAPE_BASE_URL")
+                    else:
+                        effective_base_url = url
+                        self._log(
+                            "warning",
+                            f"<base href='{base_href_value}'> resolved to non-absolute URL '{resolved_base_href}'. Using document URL '{actual_url}' as base.",
+                            url=url, # Log against original document URL 
+                            tag="SCRAPE_BASE_URL")
             body = doc
 
             base_domain = get_base_domain(url)

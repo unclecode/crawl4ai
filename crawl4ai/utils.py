@@ -15,9 +15,10 @@ from .html2text import html2text, CustomHTML2Text
 from .config import MIN_WORD_THRESHOLD, IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD, IMAGE_SCORE_THRESHOLD, DEFAULT_PROVIDER, PROVIDER_MODELS
 import httpx
 from socket import gaierror
-from pathlib import Path
+from pathlib import Path , PurePath
 from typing import Dict, Any, List, Optional, Callable
 from urllib.parse import urljoin
+
 import requests
 from requests.exceptions import InvalidSchema
 import xxhash
@@ -2056,18 +2057,29 @@ def fast_format_html(html_string):
 def normalize_url(href, base_url):
     """Normalize URLs to ensure consistent format"""
     from urllib.parse import urljoin, urlparse
-
+    if href is None:
+        return None
+    
+    href_str = str(href).strip()
+    if not href_str:
+        # Empty href, conventionally resolves to the base URL itself.
+        return base_url
     # Parse base URL to get components
+    parsed_href = urlparse(href_str)
+    if parsed_href.scheme and parsed_href.scheme.lower() in ["mailto", "tel", "javascript", "data", "file"]:
+        # If href is already a full URL, return it as is
+        return href_str
+    
     parsed_base = urlparse(base_url)
     if not parsed_base.scheme or not parsed_base.netloc:
         raise ValueError(f"Invalid base URL format: {base_url}")
 
-    # Ensure base_url ends with a trailing slash if it's a directory path
-    if not base_url.endswith('/'):
-        base_url = base_url + '/'
+    # # Ensure base_url ends with a trailing slash if it's a directory path
+    # if not base_url.endswith('/'):
+    #     base_url = base_url + '/'
 
     # Use urljoin to handle all cases
-    normalized = urljoin(base_url, href.strip())
+    normalized = urljoin(base_url, href_str)
     return normalized
 
 
@@ -2080,7 +2092,7 @@ def normalize_url_for_deep_crawl(href, base_url):
         return None
 
     # Use urljoin to handle relative URLs
-    full_url = urljoin(base_url, href.strip())
+    full_url = urljoin(base_url, str(href).strip())
     
     # Parse the URL for normalization
     parsed = urlparse(full_url)
@@ -2110,7 +2122,7 @@ def normalize_url_for_deep_crawl(href, base_url):
     normalized = urlunparse((
         parsed.scheme,
         netloc,
-        parsed.path.rstrip('/'),  # Normalize trailing slash
+        str(PurePath(parsed.path)).rstrip('/'),  # Normalize path to remove duplicate slashes
         parsed.params,
         query,
         fragment
@@ -2127,7 +2139,7 @@ def efficient_normalize_url_for_deep_crawl(href, base_url):
         return None
     
     # Resolve relative URLs
-    full_url = urljoin(base_url, href.strip())
+    full_url = urljoin(base_url, str(href).strip())
     
     # Use proper URL parsing
     parsed = urlparse(full_url)
@@ -2135,52 +2147,51 @@ def efficient_normalize_url_for_deep_crawl(href, base_url):
     # Only perform the most critical normalizations
     # 1. Lowercase hostname
     # 2. Remove fragment
+    path = parsed.path
+    if len(path) > 1 and path.endswith('/'):
+        path = path.rstrip('/')
     normalized = urlunparse((
         parsed.scheme,
         parsed.netloc.lower(),
-        parsed.path.rstrip('/'),
-        parsed.params,
-        parsed.query,
-        ''  # Remove fragment
     ))
     
     return normalized
 
 
-def normalize_url_tmp(href, base_url):
-    """Normalize URLs to ensure consistent format"""
-    # Extract protocol and domain from base URL
-    try:
-        base_parts = base_url.split("/")
-        protocol = base_parts[0]
-        domain = base_parts[2]
-    except IndexError:
-        raise ValueError(f"Invalid base URL format: {base_url}")
+# def normalize_url_tmp(href, base_url):
+#     """Normalize URLs to ensure consistent format"""
+#     # Extract protocol and domain from base URL
+#     try:
+#         base_parts = base_url.split("/")
+#         protocol = base_parts[0]
+#         domain = base_parts[2]
+#     except IndexError:
+#         raise ValueError(f"Invalid base URL format: {base_url}")
 
-    # Handle special protocols
-    special_protocols = {"mailto:", "tel:", "ftp:", "file:", "data:", "javascript:"}
-    if any(href.lower().startswith(proto) for proto in special_protocols):
-        return href.strip()
+#     # Handle special protocols
+#     special_protocols = {"mailto:", "tel:", "ftp:", "file:", "data:", "javascript:"}
+#     if any(href.lower().startswith(proto) for proto in special_protocols):
+#         return href.strip()
 
-    # Handle anchor links
-    if href.startswith("#"):
-        return f"{base_url}{href}"
+#     # Handle anchor links
+#     if href.startswith("#"):
+#         return f"{base_url}{href}"
 
-    # Handle protocol-relative URLs
-    if href.startswith("//"):
-        return f"{protocol}{href}"
+#     # Handle protocol-relative URLs
+#     if href.startswith("//"):
+#         return f"{protocol}{href}"
 
-    # Handle root-relative URLs
-    if href.startswith("/"):
-        return f"{protocol}//{domain}{href}"
+#     # Handle root-relative URLs
+#     if href.startswith("/"):
+#         return f"{protocol}//{domain}{href}"
 
-    # Handle relative URLs
-    if not href.startswith(("http://", "https://")):
-        # Remove leading './' if present
-        href = href.lstrip("./")
-        return f"{protocol}//{domain}/{href}"
+#     # Handle relative URLs
+#     if not href.startswith(("http://", "https://")):
+#         # Remove leading './' if present
+#         href = href.lstrip("./")
+#         return f"{protocol}//{domain}/{href}"
 
-    return href.strip()
+#     return href.strip()
 
 
 def get_base_domain(url: str) -> str:
