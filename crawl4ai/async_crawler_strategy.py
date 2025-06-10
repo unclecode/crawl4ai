@@ -1068,6 +1068,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             )
 
         except Exception as e:
+            # Handle exceptions and return error responsen in case if stream is enabled
+            # raising the error will cause streaming to stop instead of continuing with upcoming pages during the crawl
             if config.stream:
                 self.logger.error(
                     message=f"Error during crawl: {str(e)}",
