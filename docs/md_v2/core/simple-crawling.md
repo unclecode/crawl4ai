@@ -122,7 +122,6 @@ async def main():
             url="https://example.com",
             config=run_config
         )
-
         if result.success:
             # Print clean content
             print("Content:", result.markdown[:500])  # First 500 chars
@@ -132,7 +131,6 @@ async def main():
             # Process links
             for link in result.links["internal"]:
                 print(f"Internal link: {link['href']}")
-
         else:
             print(f"Crawl failed: {result.error_message}")
 
