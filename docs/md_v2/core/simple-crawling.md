@@ -31,9 +31,16 @@ if __name__ == "__main__":
 The `arun()` method returns a `CrawlResult` object with several useful properties. Here's a quick overview (see [CrawlResult](../api/crawl-result.md) for complete details):
 
 ```python
+config = CrawlerRunConfig(
+    markdown_generator=DefaultMarkdownGenerator(
+        content_filter=PruningContentFilter(threshold=0.6),
+        options={"ignore_links": True}
+    )
+)
+
 result = await crawler.arun(
     url="https://example.com",
-    config=CrawlerRunConfig(fit_markdown=True)
+    config=config
 )
 
 # Different content formats
@@ -110,9 +117,11 @@ async def main():
         word_count_threshold=10,
         excluded_tags=['form', 'header'],
         exclude_external_links=True,
+        
         # Content processing
         process_iframes=True,
         remove_overlay_elements=True,
+        
         # Cache control
         cache_mode=CacheMode.ENABLED  # Use cache if available
     )
@@ -122,15 +131,19 @@ async def main():
             url="https://example.com",
             config=run_config
         )
+        
         if result.success:
             # Print clean content
             print("Content:", result.markdown[:500])  # First 500 chars
+            
             # Process images
             for image in result.media["images"]:
                 print(f"Found image: {image['src']}")
+            
             # Process links
             for link in result.links["internal"]:
                 print(f"Internal link: {link['href']}")
+                
         else:
             print(f"Crawl failed: {result.error_message}")
 
