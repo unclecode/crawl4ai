@@ -7,6 +7,7 @@ Crawl4AI FastAPI entry‑point
 """
 
 # ── stdlib & 3rd‑party imports ───────────────────────────────
+import contextlib
 from crawler_pool import get_crawler, close_all, janitor
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
 from auth import create_access_token, get_token_dependency, TokenRequest
@@ -33,14 +34,14 @@ from schemas import (
 )
 
 from utils import (
-    FilterType, load_config, setup_logging, verify_email_domain
+    FilterType, combine_lifespans, load_config, setup_logging, verify_email_domain
 )
 import os
 import sys
 import time
 import asyncio
 from typing import List
-from contextlib import asynccontextmanager
+from contextlib import _AsyncGeneratorContextManager, asynccontextmanager, AsyncExitStack
 import pathlib
 
 from fastapi import (
@@ -104,8 +105,8 @@ AsyncWebCrawler.arun = capped_arun
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     await get_crawler(BrowserConfig(
-        extra_args=config["crawler"]["browser"].get("extra_args", []),
-        **config["crawler"]["browser"].get("kwargs", {}),
+            extra_args=config["crawler"]["browser"].get("extra_args", []),
+            **config["crawler"]["browser"].get("kwargs", {}),
     ))           # warm‑up
     app.state.janitor = asyncio.create_task(janitor())        # idle GC
     yield
@@ -116,8 +117,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(
     title=config["app"]["title"],
     version=config["app"]["version"],
-    lifespan=lifespan,
-)
+) #all lifespans will be added just before passing app to asgi server
 
 # ── static playground ──────────────────────────────────────
 STATIC_DIR = pathlib.Path(__file__).parent / "static" / "playground"
@@ -244,11 +244,11 @@ async def get_markdown(
         body.url, body.f, body.q, body.c, config
     )
     return JSONResponse({
-        "url": body.url,
-        "filter": body.f,
-        "query": body.q,
-        "cache": body.c,
-        "markdown": markdown,
+            "url": body.url,
+            "filter": body.f,
+            "query": body.q,
+            "cache": body.c,
+            "markdown": markdown,
         "success": True
     })
 
@@ -527,7 +527,7 @@ async def get_context(
         20, ge=1, description="absolute cap on returned chunks"),
 ):
     """
-    This end point is design for any questions about Crawl4ai library. It returns a plain text markdown with extensive information about Crawl4ai. 
+    This end point is design for any questions about Crawl4ai library. It returns a plain text markdown with extensive information about Crawl4ai.
     You can use this as a context for any AI assistant. Use this endpoint for AI assistants to retrieve library context for decision making or code generation tasks.
     Alway is BEST practice you provide a query to filter the context. Otherwise the lenght of the response will be very long.
 
@@ -562,8 +562,8 @@ async def get_context(
         if context_type == "doc":
             return JSONResponse({"doc_context": doc_content})
         return JSONResponse({
-            "code_context": code_content,
-            "doc_context": doc_content,
+                "code_context": code_content,
+                "doc_context": doc_content,
         })
 
     tokens = query.split()
@@ -598,12 +598,21 @@ async def get_context(
     return JSONResponse(results)
 
 
-# attach MCP layer (adds /mcp/ws, /mcp/sse, /mcp/schema)
+# attach MCP layer (adds /mcp/ws, /mcp/sse, /mcp/schema, /mcp/http)
 print(f"MCP server running on {config['app']['host']}:{config['app']['port']}")
-attach_mcp(
+mcp_lifespan = attach_mcp(
     app,
     base_url=f"http://{config['app']['host']}:{config['app']['port']}"
 )
+
+
+
+
+
+
+# ───────────────────── Combined FastAPI lifespan ──────────────────────
+
+app.router.lifespan_context = combine_lifespans(lifespan, mcp_lifespan)
 
 # ────────────────────────── cli ──────────────────────────────
 if __name__ == "__main__":
