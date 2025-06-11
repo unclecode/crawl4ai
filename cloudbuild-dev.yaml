@@ -1,0 +1,61 @@
+# Cloud Build configuration for crawl4ai development deployment
+steps:
+  # Build the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/pulse-dev-project-462619/crawl4ai/crawl4:dev'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/pulse-dev-project-462619/crawl4ai/crawl4:$COMMIT_SHA'
+      - '--build-arg'
+      - 'USE_LOCAL=true'
+      - '--build-arg'
+      - 'INSTALL_TYPE=default'
+      - '--build-arg'
+      - 'ENABLE_GPU=false'
+      - '.'
+
+  # Push the image to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '--all-tags'
+      - 'us-central1-docker.pkg.dev/pulse-dev-project-462619/crawl4ai/crawl4'
+
+  # Deploy to Cloud Run
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'crawl4-dev'
+      - '--image'
+      - 'us-central1-docker.pkg.dev/pulse-dev-project-462619/crawl4ai/crawl4:$COMMIT_SHA'
+      - '--region'
+      - 'us-central1'
+      - '--project'
+      - 'pulse-dev-project-462619'
+      - '--allow-unauthenticated'
+      - '--platform'
+      - 'managed'
+      - '--memory'
+      - '2Gi'
+      - '--cpu'
+      - '1'
+      - '--min-instances'
+      - '0'
+      - '--max-instances'
+      - '5'
+      - '--port'
+      - '11234'
+      - '--set-env-vars'
+      - 'PYTHON_ENV=development,REDIS_HOST=localhost,REDIS_PORT=6379'
+      - '--timeout'
+      - '300'
+
+# Configure triggers for develop branch
+options:
+  logging: CLOUD_LOGGING_ONLY
+  substitution_option: ALLOW_LOOSE
+  
+timeout: 2400s  # 40 minutes for crawl4ai build (it's complex)
