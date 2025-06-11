@@ -282,13 +282,9 @@ async def handle_markdown_request(
 
     except Exception as e:
         logger.error(f"Markdown error: {str(e)}", exc_info=True)
-        if 'crawler' in locals() and crawler.ready: # Check if crawler was initialized and started
-            #  try:
-            #      await crawler.close()
-            #  except Exception as close_e:
-            #       logger.error(f"Error closing crawler during exception handling: {close_e}")
-            logger.error(f"Error closing crawler during exception handling: {str(e)}")
-
+       
+        # Note: Crawler lifecycle is managed by the browser pool system
+        
         # Measure memory even on error if possible
         end_mem_mb_error = _get_memory_mb()
         if start_mem_mb is not None and end_mem_mb_error is not None:
@@ -541,7 +537,7 @@ async def handle_crawl_request(
             #      await crawler.close()
             #  except Exception as close_e:
             #       logger.error(f"Error closing crawler during exception handling: {close_e}")
-            logger.error(f"Error closing crawler during exception handling: {close_e}")
+            logger.error(f"Error closing crawler during exception handling: {str(e)}")
 
         # Measure memory even on error if possible
         end_mem_mb_error = _get_memory_mb()

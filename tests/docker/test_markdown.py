@@ -15,7 +15,7 @@ BASE_URL = "http://127.0.0.1:11234"
 async def test_valid_list():
     async with httpx.AsyncClient() as client:
         response = await client.post(f"{BASE_URL}/md", json={
-            "urls": "",
+            "urls": "not-a-list",
             "f": FilterType.FIT,
             "q": None,
             "c": "0"
@@ -37,7 +37,6 @@ async def test_empty_array():
             "c": "0"
         })
         assert response.status_code == 422
-        print(response.json()["detail"])
         assert any(
             "List should have at least 1 item after validation, not 0" in detail['msg']
             for detail in response.json()["detail"]
@@ -152,7 +151,7 @@ async def test_stress():
 
 @pytest.mark.asyncio
 async def test_stress_multiple_urls():
-    async with httpx.AsyncClient(timeout=50000) as client:
+    async with httpx.AsyncClient(timeout=30.0) as client:
         maxUrls = 100
 
         urls = ["https://example.com"] * maxUrls
