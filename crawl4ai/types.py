@@ -23,7 +23,7 @@ SeedingConfig = Union['SeedingConfigType']
 
 # Content scraping types
 ContentScrapingStrategy = Union['ContentScrapingStrategyType']
-WebScrapingStrategy = Union['WebScrapingStrategyType']
+# WebScrapingStrategy = Union['WebScrapingStrategyType']
 LXMLWebScrapingStrategy = Union['LXMLWebScrapingStrategyType']
 
 # Proxy types
@@ -114,7 +114,7 @@ if TYPE_CHECKING:
     # Content scraping imports
     from .content_scraping_strategy import (
         ContentScrapingStrategy as ContentScrapingStrategyType,
-        WebScrapingStrategy as WebScrapingStrategyType,
+        # WebScrapingStrategy as WebScrapingStrategyType,
         LXMLWebScrapingStrategy as LXMLWebScrapingStrategyType,
     )
     

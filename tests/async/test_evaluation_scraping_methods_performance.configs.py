@@ -2,7 +2,6 @@ import json
 import time
 from bs4 import BeautifulSoup
 from crawl4ai.content_scraping_strategy import (
-    WebScrapingStrategy,
     LXMLWebScrapingStrategy,
 )
 from typing import Dict, List, Tuple
@@ -274,7 +273,7 @@ def get_test_scenarios():
     that will be passed into scrap() for testing various features.
     """
     TEST_SCENARIOS = {
-        # "default": {},
+        "default": {},
         # "exclude_domains": {
         #     "exclude_domains": {"images.example.com", "ads.example.com"}
         # },
@@ -609,19 +608,26 @@ class ScraperEquivalenceTester:
         print("\n=== Testing complicated HTML with multiple parameter scenarios ===")
 
         # Create the scrapers once (or you can re-create if needed)
-        original = WebScrapingStrategy()
+        # original = WebScrapingStrategy()
+        original = LXMLWebScrapingStrategy()
         lxml = LXMLWebScrapingStrategy()
+        
+        # Base URL for testing
+        url = "http://test.com"
+        url = "https://kidocode.com"
 
         for scenario_name, params in get_test_scenarios().items():
             print(f"\nScenario: {scenario_name}")
 
             start = time.time()
-            orig_result = original.scrap("http://test.com", complicated_html, **params)
+            orig_result = original.scrap(url, complicated_html, **params)
             orig_time = time.time() - start
+            orig_result = orig_result.model_dump()
 
             start = time.time()
-            lxml_result = lxml.scrap("http://test.com", complicated_html, **params)
+            lxml_result = lxml.scrap(url, complicated_html, **params)
             lxml_time = time.time() - start
+            lxml_result = lxml_result.model_dump()
 
             diffs = {}
             link_diff = self.deep_compare_links(
