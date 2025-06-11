@@ -279,7 +279,7 @@ def attach_mcp(
                 print("Application shutting down...")
 
     app.router.mount(
-        "{base}/http",
+        f"{base}/http",
         app=handle_streamable_http,
     )
 
