@@ -207,21 +207,35 @@ class BrowserProfiler:
                 import msvcrt
 
                 while True:
-                    if msvcrt.kbhit():
-                        key = msvcrt.getch().decode("utf-8")
-                        if key.lower() == "q":
-                            self.logger.info(
-                                "Closing browser and saving profile...",
-                                tag="PROFILE",
-                                base_color=LogColor.GREEN
-                            )
-                            user_done_event.set()
+                    try:
+                        if msvcrt.kbhit():
+                            raw = msvcrt.getch()
+                            try:
+                                key = raw.decode("utf-8")
+                            except UnicodeDecodeError:
+                                # Arrow/function keys come back as multi-byte sequences
+                                continue
+
+                            # Skip control/multi-byte keys that decoded but aren't printable
+                            if len(key) != 1 or not key.isprintable():
+                                continue
+
+                            if key.lower() == "q":
+                                self.logger.info(
+                                    "Closing browser and saving profile...",
+                                    tag="PROFILE",
+                                    base_color=LogColor.GREEN
+                                )
+                                user_done_event.set()
+                                return
+
+                        if await check_browser_process():
                             return
 
-                    if await check_browser_process():
-                        return
-
-                    await asyncio.sleep(0.1)
+                        await asyncio.sleep(0.1)
+                    except Exception as e:
+                        self.logger.error(f"Error in keyboard listener: {e}", tag="PROFILE")
+                        continue
 
             else:  # Unix-like
                 import termios
@@ -744,17 +758,31 @@ class BrowserProfiler:
                 import msvcrt
 
                 while True:
-                    if msvcrt.kbhit():
-                        key = msvcrt.getch().decode("utf-8")
-                        if key.lower() == "q":
-                            self.logger.info("Closing browser...", tag="CDP")
-                            user_done_event.set()
+                    try:
+                        if msvcrt.kbhit():
+                            raw = msvcrt.getch()
+                            try:
+                                key = raw.decode("utf-8")
+                            except UnicodeDecodeError:
+                                # Arrow/function keys come back as multi-byte sequences
+                                continue
+
+                            # Skip control/multi-byte keys that decoded but aren't printable
+                            if len(key) != 1 or not key.isprintable():
+                                continue
+
+                            if key.lower() == "q":
+                                self.logger.info("Closing browser...", tag="CDP")
+                                user_done_event.set()
+                                return
+
+                        if await check_browser_process():
                             return
 
-                    if await check_browser_process():
-                        return
-
-                    await asyncio.sleep(0.1)
+                        await asyncio.sleep(0.1)
+                    except Exception as e:
+                        self.logger.error(f"Error in keyboard listener: {e}", tag="CDP")
+                        continue
             else:
                 import termios
                 import tty
