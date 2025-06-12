@@ -1596,12 +1596,31 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     # then wait for the new page to load before continuing
                     result = None
                     try:
+                        # OLD VERSION:
+                        # result = await page.evaluate(
+                        #     f"""
+                        # (async () => {{
+                        #     try {{
+                        #         const script_result = {script};
+                        #         return {{ success: true, result: script_result }};
+                        #     }} catch (err) {{
+                        #         return {{ success: false, error: err.toString(), stack: err.stack }};
+                        #     }}
+                        # }})();
+                        # """
+                        # )
+                        
+                        # """ NEW VERSION:
+                        # When {script} contains statements (e.g., const link = …; link.click();), 
+                        # this forms invalid JavaScript, causing Playwright execution error: SyntaxError: Unexpected token 'const'.
+                        # """
                         result = await page.evaluate(
                             f"""
                         (async () => {{
                             try {{
-                                const script_result = {script};
-                                return {{ success: true, result: script_result }};
+                                return await (async () => {{
+                                    {script}
+                                }})();
                             }} catch (err) {{
                                 return {{ success: false, error: err.toString(), stack: err.stack }};
                             }}
