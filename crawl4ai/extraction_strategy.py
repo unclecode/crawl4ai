@@ -656,11 +656,11 @@ class LLMExtractionStrategy(ExtractionStrategy):
             self.total_usage.total_tokens += usage.total_tokens
 
             try:
-                response = response.choices[0].message.content
+                content = response.choices[0].message.content
                 blocks = None
 
                 if self.force_json_response:
-                    blocks = json.loads(response)
+                    blocks = json.loads(content)
                     if isinstance(blocks, dict):
                         # If it has only one key which calue is list then assign that to blocks, exampled: {"news": [..]}
                         if len(blocks) == 1 and isinstance(list(blocks.values())[0], list):
@@ -673,14 +673,14 @@ class LLMExtractionStrategy(ExtractionStrategy):
                         blocks = blocks
                 else: 
                     # blocks = extract_xml_data(["blocks"], response.choices[0].message.content)["blocks"]
-                    blocks = extract_xml_data(["blocks"], response)["blocks"]
+                    blocks = extract_xml_data(["blocks"], content)["blocks"]
                     blocks = json.loads(blocks)
 
                 for block in blocks:
                     block["error"] = False
             except Exception:
                 parsed, unparsed = split_and_parse_json_objects(
-                    response
+                    response.choices[0].message.content
                 )
                 blocks = parsed
                 if unparsed:
