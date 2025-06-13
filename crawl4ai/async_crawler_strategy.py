@@ -744,18 +744,49 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     )
                     redirected_url = page.url
                 except Error as e:
-                    raise RuntimeError(f"Failed on navigating ACS-GOTO:\n{str(e)}")
+                    # Allow navigation to be aborted when downloading files
+                    # This is expected behavior for downloads in some browser engines
+                    if 'net::ERR_ABORTED' in str(e) and self.browser_config.accept_downloads:
+                        self.logger.info(
+                            message=f"Navigation aborted, likely due to file download: {url}",
+                            tag="GOTO",
+                            params={"url": url},
+                        )
+                        response = None
+                    else:
+                        raise RuntimeError(f"Failed on navigating ACS-GOTO:\n{str(e)}")
 
                 await self.execute_hook(
                     "after_goto", page, context=context, url=url, response=response, config=config
                 )
 
+                # ──────────────────────────────────────────────────────────────
+                # Walk the redirect chain.  Playwright returns only the last
+                # hop, so we trace the `request.redirected_from` links until the
+                # first response that differs from the final one and surface its
+                # status-code.
+                # ──────────────────────────────────────────────────────────────
                 if response is None:
                     status_code = 200
                     response_headers = {}
                 else:
-                    status_code = response.status
-                    response_headers = response.headers
+                    first_resp = response
+                    req = response.request
+                    while req and req.redirected_from:
+                        prev_req = req.redirected_from
+                        prev_resp = await prev_req.response()
+                        if prev_resp:                       # keep earliest
+                            first_resp = prev_resp
+                        req = prev_req
+                
+                    status_code = first_resp.status
+                    response_headers = first_resp.headers
+                # if response is None:
+                #     status_code = 200
+                #     response_headers = {}
+                # else:
+                #     status_code = response.status
+                #     response_headers = response.headers
 
             else:
                 status_code = 200
@@ -940,8 +971,10 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
             if config.wait_for:
                 try:
+                    # Use wait_for_timeout if specified, otherwise fall back to page_timeout
+                    timeout = config.wait_for_timeout if config.wait_for_timeout is not None else config.page_timeout
                     await self.smart_wait(
-                        page, config.wait_for, timeout=config.page_timeout
+                        page, config.wait_for, timeout=timeout
                     )
                 except Exception as e:
                     raise RuntimeError(f"Wait condition failed: {str(e)}")
@@ -1066,7 +1099,13 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
         finally:
             # If no session_id is given we should close the page
-            if not config.session_id:
+            all_contexts = page.context.browser.contexts
+            total_pages = sum(len(context.pages) for context in all_contexts)                
+            if config.session_id:
+                pass
+            elif total_pages <= 1 and (self.browser_config.use_managed_browser or self.browser_config.headless):
+                pass
+            else:
                 # Detach listeners before closing to prevent potential errors during close
                 if config.capture_network_requests:
                     page.remove_listener("request", handle_request_capture)
@@ -1076,6 +1115,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     page.remove_listener("console", handle_console_capture)
                     page.remove_listener("pageerror", handle_pageerror_capture)
                 
+                # Close the page
                 await page.close()
 
     async def _handle_full_page_scan(self, page: Page, scroll_delay: float = 0.1):
@@ -1435,11 +1475,31 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             num_segments = (page_height // viewport_height) + 1
             for i in range(num_segments):
                 y_offset = i * viewport_height
+                # Special handling for the last segment
+                if i == num_segments - 1:
+                    last_part_height = page_height % viewport_height
+                    
+                    # If page_height is an exact multiple of viewport_height,
+                    # we don't need an extra segment
+                    if last_part_height == 0:
+                        # Skip last segment if page height is exact multiple of viewport
+                        break
+                    
+                    # Adjust viewport to exactly match the remaining content height
+                    await page.set_viewport_size({"width": page_width, "height": last_part_height})
+                
                 await page.evaluate(f"window.scrollTo(0, {y_offset})")
                 await asyncio.sleep(0.01)  # wait for render
-                seg_shot = await page.screenshot(full_page=False)
+                
+                # Capture the current segment
+                # Note: Using compression options (format, quality) would go here
+                seg_shot = await page.screenshot(full_page=False, type="jpeg", quality=85)
+                # seg_shot = await page.screenshot(full_page=False)
                 img = Image.open(BytesIO(seg_shot)).convert("RGB")
                 segments.append(img)
+
+            # Reset viewport to original size after capturing segments
+            await page.set_viewport_size({"width": page_width, "height": viewport_height})
 
             total_height = sum(img.height for img in segments)
             stitched = Image.new("RGB", (segments[0].width, total_height))

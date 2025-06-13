@@ -718,13 +718,18 @@ class WebScrapingStrategy(ContentScrapingStrategy):
 
                     # Check flag if we should remove external images
                     if kwargs.get("exclude_external_images", False):
-                        element.decompose()
-                        return False
-                        # src_url_base = src.split('/')[2]
-                        # url_base = url.split('/')[2]
-                        # if url_base not in src_url_base:
-                        #     element.decompose()
-                        #     return False
+                        # Handle relative URLs (which are always from the same domain)
+                        if not src.startswith('http') and not src.startswith('//'):
+                            return True  # Keep relative URLs
+                        
+                        # For absolute URLs, compare the base domains using the existing function
+                        src_base_domain = get_base_domain(src)
+                        url_base_domain = get_base_domain(url)
+                        
+                        # If the domains don't match and both are valid, the image is external
+                        if src_base_domain and url_base_domain and src_base_domain != url_base_domain:
+                            element.decompose()
+                            return False
 
                     # if kwargs.get('exclude_social_media_links', False):
                     #     if image_src_base_domain in exclude_social_media_domains:

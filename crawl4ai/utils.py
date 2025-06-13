@@ -6,6 +6,7 @@ import html
 import lxml
 import re
 import os
+import subprocess
 import platform
 from .prompts import PROMPT_EXTRACT_BLOCKS
 from array import array
@@ -41,6 +42,29 @@ from typing import Sequence
 from itertools import chain
 from collections import deque
 from typing import  Generator, Iterable
+
+# Monkey patch to fix wildcard handling in urllib.robotparser
+from urllib.robotparser import RuleLine
+import re
+
+original_applies_to = RuleLine.applies_to
+
+def patched_applies_to(self, filename):
+   # Handle wildcards in paths
+   if '*' in self.path or '%2A' in self.path or self.path in ("*", "%2A"):
+       pattern = self.path.replace('%2A', '*')
+       pattern = re.escape(pattern).replace('\\*', '.*')
+       pattern = '^' + pattern
+       if pattern.endswith('\\$'):
+           pattern = pattern[:-2] + '$'
+       try:
+           return bool(re.match(pattern, filename))
+       except re.error:
+           return original_applies_to(self, filename)
+   return original_applies_to(self, filename)
+
+RuleLine.applies_to = patched_applies_to
+# Monkey patch ends
 
 def chunk_documents(
     documents: Iterable[str],
@@ -135,13 +159,20 @@ def merge_chunks(
     word_token_ratio: float = 1.0,
     splitter: Callable = None
 ) -> List[str]:
-    """Merges documents into chunks of specified token size.
+    """
+    Merges a sequence of documents into chunks based on a target token count, with optional overlap.
+    
+    Each document is split into tokens using the provided splitter function (defaults to str.split). Tokens are distributed into chunks aiming for the specified target size, with optional overlapping tokens between consecutive chunks. Returns a list of non-empty merged chunks as strings.
     
     Args:
-        docs: Input documents
-        target_size: Desired token count per chunk
-        overlap: Number of tokens to overlap between chunks
-        word_token_ratio: Multiplier for word->token conversion
+        docs: Sequence of input document strings to be merged.
+        target_size: Target number of tokens per chunk.
+        overlap: Number of tokens to overlap between consecutive chunks.
+        word_token_ratio: Multiplier to estimate token count from word count.
+        splitter: Callable used to split each document into tokens.
+    
+    Returns:
+        List of merged document chunks as strings, each not exceeding the target token size.
     """
     # Pre-tokenize all docs and store token counts
     splitter = splitter or str.split
@@ -150,7 +181,7 @@ def merge_chunks(
     total_tokens = 0
     
     for doc in docs:
-        tokens = doc.split()
+        tokens = splitter(doc)
         count = int(len(tokens) * word_token_ratio)
         if count:  # Skip empty docs
             token_counts.append(count)
@@ -303,7 +334,7 @@ class RobotsParser:
                 robots_url = f"{scheme}://{domain}/robots.txt"
                 
                 async with aiohttp.ClientSession() as session:
-                    async with session.get(robots_url, timeout=2) as response:
+                    async with session.get(robots_url, timeout=2, ssl=False) as response:
                         if response.status == 200:
                             rules = await response.text()
                             self._cache_rules(domain, rules)
@@ -1109,6 +1140,23 @@ def get_content_of_website_optimized(
     css_selector: str = None,
     **kwargs,
 ) -> Dict[str, Any]:
+    """
+    Extracts and cleans content from website HTML, optimizing for useful media and contextual information.
+    
+    Parses the provided HTML to extract internal and external links, filters and scores images for usefulness, gathers contextual descriptions for media, removes unwanted or low-value elements, and converts the cleaned HTML to Markdown. Also extracts metadata and returns all structured content in a dictionary.
+    
+    Args:
+        url: The URL of the website being processed.
+        html: The raw HTML content to extract from.
+        word_count_threshold: Minimum word count for elements to be retained.
+        css_selector: Optional CSS selector to restrict extraction to specific elements.
+    
+    Returns:
+        A dictionary containing Markdown content, cleaned HTML, extraction success status, media and link lists, and metadata.
+    
+    Raises:
+        InvalidCSSSelectorError: If a provided CSS selector does not match any elements.
+    """
     if not html:
         return None
 
@@ -1151,6 +1199,20 @@ def get_content_of_website_optimized(
 
     def process_image(img, url, index, total_images):
         # Check if an image has valid display and inside undesired html elements
+        """
+        Processes an HTML image element to determine its relevance and extract metadata.
+        
+        Evaluates an image's visibility, context, and usefulness based on its attributes and parent elements. If the image passes validation and exceeds a usefulness score threshold, returns a dictionary with its source, alt text, contextual description, score, and type. Otherwise, returns None.
+        
+        Args:
+            img: The BeautifulSoup image tag to process.
+            url: The base URL of the page containing the image.
+            index: The index of the image in the list of images on the page.
+            total_images: The total number of images on the page.
+        
+        Returns:
+            A dictionary with image metadata if the image is considered useful, or None otherwise.
+        """
         def is_valid_image(img, parent, parent_classes):
             style = img.get("style", "")
             src = img.get("src", "")
@@ -1172,6 +1234,20 @@ def get_content_of_website_optimized(
         # Score an image for it's usefulness
         def score_image_for_usefulness(img, base_url, index, images_count):
             # Function to parse image height/width value and units
+            """
+            Scores an HTML image element for usefulness based on size, format, attributes, and position.
+            
+            The function evaluates an image's dimensions, file format, alt text, and its position among all images on the page to assign a usefulness score. Higher scores indicate images that are likely more relevant or informative for content extraction or summarization.
+            
+            Args:
+                img: The HTML image element to score.
+                base_url: The base URL used to resolve relative image sources.
+                index: The position of the image in the list of images on the page (zero-based).
+                images_count: The total number of images on the page.
+            
+            Returns:
+                An integer usefulness score for the image.
+            """
             def parse_dimension(dimension):
                 if dimension:
                     match = re.match(r"(\d+)(\D*)", dimension)
@@ -1186,6 +1262,16 @@ def get_content_of_website_optimized(
             # Fetch image file metadata to extract size and extension
             def fetch_image_file_size(img, base_url):
                 # If src is relative path construct full URL, if not it may be CDN URL
+                """
+                Fetches the file size of an image by sending a HEAD request to its URL.
+                
+                Args:
+                    img: A BeautifulSoup tag representing the image element.
+                    base_url: The base URL to resolve relative image sources.
+                
+                Returns:
+                    The value of the "Content-Length" header as a string if available, otherwise None.
+                """
                 img_url = urljoin(base_url, img.get("src"))
                 try:
                     response = requests.head(img_url)
@@ -1196,8 +1282,6 @@ def get_content_of_website_optimized(
                         return None
                 except InvalidSchema:
                     return None
-                finally:
-                    return
 
             image_height = img.get("height")
             height_value, height_unit = parse_dimension(image_height)
@@ -2822,5 +2906,73 @@ def preprocess_html_for_schema(html_content, text_threshold=100, attr_value_thre
     
     except Exception as e:
         # Fallback for parsing errors
-        return html_content[:max_size] if len(html_content) > max_size else html_content
+        return html_content[:max_size] if len(html_content) > max_size else html_content    
+
+def start_colab_display_server():
+    """
+    Start virtual display server in Google Colab.
+    Raises error if not running in Colab environment.
+    """
+    # Check if running in Google Colab
+    try:
+        import google.colab
+        from google.colab import output
+        from IPython.display import IFrame, display
+    except ImportError:
+        raise RuntimeError("This function must be run in Google Colab environment.")
     
+    import os, time, subprocess
+    
+    os.environ["DISPLAY"] = ":99"
+    
+    # Xvfb
+    xvfb = subprocess.Popen(["Xvfb", ":99", "-screen", "0", "1280x720x24"])
+    time.sleep(2)
+    
+    # minimal window manager
+    fluxbox = subprocess.Popen(["fluxbox"])
+    
+    # VNC → X
+    x11vnc = subprocess.Popen(["x11vnc",
+                              "-display", ":99",
+                              "-nopw", "-forever", "-shared",
+                              "-rfbport", "5900", "-quiet"])
+    
+    # websockify → VNC
+    novnc = subprocess.Popen(["/opt/novnc/utils/websockify/run",
+                              "6080", "localhost:5900",
+                              "--web", "/opt/novnc"])
+    
+    time.sleep(2)  # give ports a moment
+    
+    # Colab proxy url
+    url = output.eval_js("google.colab.kernel.proxyPort(6080)")
+    display(IFrame(f"{url}/vnc.html?autoconnect=true&resize=scale", width=1024, height=768))
+
+
+
+def setup_colab_environment():
+    """
+    Alternative setup using IPython magic commands
+    """
+    from IPython import get_ipython
+    ipython = get_ipython()
+    
+    print("🚀 Setting up Crawl4AI environment in Google Colab...")
+    
+    # Run the bash commands
+    ipython.run_cell_magic('bash', '', '''
+set -e
+
+echo "📦 Installing system dependencies..."
+apt-get update -y
+apt-get install -y xvfb x11vnc fluxbox websockify git
+
+echo "📥 Setting up virtual display..."
+git clone https://github.com/novnc/noVNC         /opt/novnc
+git clone https://github.com/novnc/websockify    /opt/novnc/utils/websockify
+
+pip install -q nest_asyncio google-colab
+echo "✅ Setup complete!"
+''')
+
