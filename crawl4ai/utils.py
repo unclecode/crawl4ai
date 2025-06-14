@@ -1638,7 +1638,7 @@ def perform_completion_with_backoff(
     Returns:
         dict: The API response or an error message after all retries.
     """
-    import os
+    # The 'os' module is already imported globally at the top of the file.
     from litellm import completion
     from litellm.exceptions import RateLimitError
 
