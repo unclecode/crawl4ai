@@ -1646,8 +1646,9 @@ def perform_completion_with_backoff(
     if base_url is None:
         base_url = os.environ.get("OPENAI_BASE_URL", None)
     if not provider:
-        provider = os.environ.get("OPENAI_MODEL", None)
-
+        provider = os.environ.get("OPENAI_MODEL")
+    if not provider:
+        raise ValueError("`provider` must be supplied or OPENAI_MODEL must be set")
     max_attempts = 3
     base_delay = 2  # Base delay in seconds, you can adjust this based on your needs
 
