@@ -19,6 +19,18 @@
 
 </div>
 
+<p align="center">
+    <!-- Keep these links. Translations will automatically update with the README. -->
+    <a href="https://www.readme-i18n.com/unclecode/crawl4ai?lang=de">Deutsch</a> | 
+    <a href="https://www.readme-i18n.com/unclecode/crawl4ai?lang=es">Español</a> | 
+    <a href="https://www.readme-i18n.com/unclecode/crawl4ai?lang=fr">français</a> | 
+    <a href="https://www.readme-i18n.com/unclecode/crawl4ai?lang=ja">日本語</a> | 
+    <a href="https://www.readme-i18n.com/unclecode/crawl4ai?lang=ko">한국어</a> | 
+    <a href="https://www.readme-i18n.com/unclecode/crawl4ai?lang=pt">Português</a> | 
+    <a href="https://www.readme-i18n.com/unclecode/crawl4ai?lang=ru">Русский</a> | 
+    <a href="https://www.readme-i18n.com/unclecode/crawl4ai?lang=zh">中文</a>
+</p>
+
 Crawl4AI is the #1 trending GitHub repository, actively maintained by a vibrant community. It delivers blazing-fast, AI-ready web crawling tailored for LLMs, AI agents, and data pipelines. Open source, flexible, and built for real-time performance, Crawl4AI empowers developers with unmatched speed, precision, and deployment ease.  
 
 [✨ Check out latest update v0.6.0](#-recent-updates)
