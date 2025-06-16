@@ -1068,7 +1068,26 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             )
 
         except Exception as e:
-            raise e
+            # Handle exceptions and return error responsen in case if stream is enabled
+            # raising the error will cause streaming to stop instead of continuing with upcoming pages during the crawl
+            if config.stream:
+                self.logger.error(
+                    message=f"Error during crawl: {str(e)}",
+                    tag="ERROR",
+                )
+                return AsyncCrawlResponse(
+                    html=str(e),
+                    response_headers=response_headers,
+                    status_code=500,
+                    network_requests=captured_requests if config.capture_network_requests else None,
+                    console_messages=captured_console if config.capture_console_messages else None,
+                )
+            else:
+                self.logger.error(
+                    message=f"Error during crawl: {str(e)}",
+                    tag="ERROR",
+                )
+                raise e
 
         finally:
             # If no session_id is given we should close the page
