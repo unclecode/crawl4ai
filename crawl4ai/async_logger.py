@@ -37,6 +37,7 @@ class LogColor(str, Enum):
     CYAN = "cyan"
     GREEN = "green"
     YELLOW = "yellow"
+    RED = "red"
     MAGENTA = "magenta"
     DIM_MAGENTA = "dim magenta"
 
