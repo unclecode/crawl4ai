@@ -180,42 +180,97 @@ class BrowserProfiler:
         
         # Run keyboard input loop in a separate task
         async def listen_for_quit_command():
-            import termios
-            import tty
-            import select
-            
+            import sys
+
             # First output the prompt
-            self.logger.info("Press 'q' when you've finished using the browser...", tag="PROFILE")
-            
-            # Save original terminal settings
-            fd = sys.stdin.fileno()
-            old_settings = termios.tcgetattr(fd)
-            
-            try:
-                # Switch to non-canonical mode (no line buffering)
-                tty.setcbreak(fd)
-                
+            self.logger.info(
+                "Press {segment} when you've finished using the browser...",
+                tag="PROFILE",
+                params={"segment": "'q'"}, colors={"segment": LogColor.YELLOW},
+                base_color=LogColor.CYAN
+            )
+
+            async def check_browser_process():
+                if (
+                    managed_browser.browser_process
+                    and managed_browser.browser_process.poll() is not None
+                ):
+                    self.logger.info(
+                        "Browser already closed. Ending input listener.", tag="PROFILE"
+                    )
+                    user_done_event.set()
+                    return True
+                return False
+
+            # Platform-specific handling
+            if sys.platform == "win32":
+                import msvcrt
+
                 while True:
-                    # Check if input is available (non-blocking)
-                    readable, _, _ = select.select([sys.stdin], [], [], 0.5)
-                    if readable:
-                        key = sys.stdin.read(1)
-                        if key.lower() == 'q':
-                            self.logger.info("Closing browser and saving profile...", tag="PROFILE", base_color=LogColor.GREEN)
-                            user_done_event.set()
+                    try:
+                        if msvcrt.kbhit():
+                            raw = msvcrt.getch()
+                            try:
+                                key = raw.decode("utf-8")
+                            except UnicodeDecodeError:
+                                # Arrow/function keys come back as multi-byte sequences
+                                continue
+
+                            # Skip control/multi-byte keys that decoded but aren't printable
+                            if len(key) != 1 or not key.isprintable():
+                                continue
+
+                            if key.lower() == "q":
+                                self.logger.info(
+                                    "Closing browser and saving profile...",
+                                    tag="PROFILE",
+                                    base_color=LogColor.GREEN
+                                )
+                                user_done_event.set()
+                                return
+
+                        if await check_browser_process():
                             return
-                    
-                    # Check if the browser process has already exited
-                    if managed_browser.browser_process and managed_browser.browser_process.poll() is not None:
-                        self.logger.info("Browser already closed. Ending input listener.", tag="PROFILE")
-                        user_done_event.set()
-                        return
-                        
-                    await asyncio.sleep(0.1)
-            
-            finally:
-                # Restore terminal settings 
-                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+
+                        await asyncio.sleep(0.1)
+                    except Exception as e:
+                        self.logger.error(f"Error in keyboard listener: {e}", tag="PROFILE")
+                        continue
+
+            else:  # Unix-like
+                import termios
+                import tty
+                import select
+
+                # Save original terminal settings
+                fd = sys.stdin.fileno()
+                old_settings = termios.tcgetattr(fd)
+
+                try:
+                    # Switch to non-canonical mode (no line buffering)
+                    tty.setcbreak(fd)
+
+                    while True:
+                        # Check if input is available (non-blocking)
+                        readable, _, _ = select.select([sys.stdin], [], [], 0.5)
+                        if readable:
+                            key = sys.stdin.read(1)
+                            if key.lower() == "q":
+                                self.logger.info(
+                                    "Closing browser and saving profile...",
+                                    tag="PROFILE",
+                                    base_color=LogColor.GREEN
+                                )
+                                user_done_event.set()
+                                return
+
+                        if await check_browser_process():
+                            return
+
+                        await asyncio.sleep(0.1)
+                finally:
+                    # Restore terminal settings
+                    termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
         
         try:
             from playwright.async_api import async_playwright
@@ -682,42 +737,76 @@ class BrowserProfiler:
         
         # Run keyboard input loop in a separate task
         async def listen_for_quit_command():
-            import termios
-            import tty
-            import select
-            
+            import sys
+
             # First output the prompt
-            self.logger.info("Press 'q' to stop the browser and exit...", tag="CDP")
-            
-            # Save original terminal settings
-            fd = sys.stdin.fileno()
-            old_settings = termios.tcgetattr(fd)
-            
-            try:
-                # Switch to non-canonical mode (no line buffering)
-                tty.setcbreak(fd)
-                
+            self.logger.info(
+                "Press {segment} to stop the browser and exit...",
+                tag="CDP",
+                params={"segment": "'q'"}, colors={"segment": LogColor.YELLOW},
+                base_color=LogColor.CYAN
+            )
+
+            async def check_browser_process():
+                if managed_browser.browser_process and managed_browser.browser_process.poll() is not None:
+                    self.logger.info("Browser already closed. Ending input listener.", tag="CDP")
+                    user_done_event.set()
+                    return True
+                return False
+
+            if sys.platform == "win32":
+                import msvcrt
+
                 while True:
-                    # Check if input is available (non-blocking)
-                    readable, _, _ = select.select([sys.stdin], [], [], 0.5)
-                    if readable:
-                        key = sys.stdin.read(1)
-                        if key.lower() == 'q':
-                            self.logger.info("Closing browser...", tag="CDP")
-                            user_done_event.set()
+                    try:
+                        if msvcrt.kbhit():
+                            raw = msvcrt.getch()
+                            try:
+                                key = raw.decode("utf-8")
+                            except UnicodeDecodeError:
+                                # Arrow/function keys come back as multi-byte sequences
+                                continue
+
+                            # Skip control/multi-byte keys that decoded but aren't printable
+                            if len(key) != 1 or not key.isprintable():
+                                continue
+
+                            if key.lower() == "q":
+                                self.logger.info("Closing browser...", tag="CDP")
+                                user_done_event.set()
+                                return
+
+                        if await check_browser_process():
                             return
-                    
-                    # Check if the browser process has already exited
-                    if managed_browser.browser_process and managed_browser.browser_process.poll() is not None:
-                        self.logger.info("Browser already closed. Ending input listener.", tag="CDP")
-                        user_done_event.set()
-                        return
-                        
-                    await asyncio.sleep(0.1)
-            
-            finally:
-                # Restore terminal settings 
-                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+
+                        await asyncio.sleep(0.1)
+                    except Exception as e:
+                        self.logger.error(f"Error in keyboard listener: {e}", tag="CDP")
+                        continue
+            else:
+                import termios
+                import tty
+                import select
+
+                fd = sys.stdin.fileno()
+                old_settings = termios.tcgetattr(fd)
+
+                try:
+                    tty.setcbreak(fd)
+                    while True:
+                        readable, _, _ = select.select([sys.stdin], [], [], 0.5)
+                        if readable:
+                            key = sys.stdin.read(1)
+                            if key.lower() == "q":
+                                self.logger.info("Closing browser...", tag="CDP")
+                                user_done_event.set()
+                                return
+
+                        if await check_browser_process():
+                            return
+                        await asyncio.sleep(0.1)
+                finally:
+                    termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
                 
         # Function to retrieve and display CDP JSON config
         async def get_cdp_json(port):
