@@ -11,6 +11,11 @@ on:
         required: true
         type: string
 
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
@@ -45,13 +50,10 @@ jobs:
         echo "source_name=$(basename $source_file)" >> $GITHUB_OUTPUT
     
     - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: softprops/action-gh-release@v1
       with:
         tag_name: ${{ github.ref_name || github.event.inputs.version }}
-        release_name: Release ${{ github.ref_name || github.event.inputs.version }}
+        name: Release ${{ github.ref_name || github.event.inputs.version }}
         draft: false
         prerelease: false
         body: |
@@ -67,23 +69,8 @@ jobs:
           wget https://github.com/atomicworkhq/crawl4ai/releases/download/${{ github.ref_name || github.event.inputs.version }}/${{ steps.get-files.outputs.wheel_name }}
           pip install ${{ steps.get-files.outputs.wheel_name }}
           ```
-    
-    - name: Upload Wheel
-      uses: actions/upload-release-asset@v1
+        files: |
+          ${{ steps.get-files.outputs.wheel_file }}
+          ${{ steps.get-files.outputs.source_file }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ${{ steps.get-files.outputs.wheel_file }}
-        asset_name: ${{ steps.get-files.outputs.wheel_name }}
-        asset_content_type: application/zip
-    
-    - name: Upload Source Distribution
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ${{ steps.get-files.outputs.source_file }}
-        asset_name: ${{ steps.get-files.outputs.source_name }}
-        asset_content_type: application/gzip
