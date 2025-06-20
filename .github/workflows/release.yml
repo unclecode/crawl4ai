@@ -1,0 +1,84 @@
+name: Build and Release Package
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v0.5.1)'
+        required: true
+        type: string
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install build dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build twine wheel setuptools
+    
+    - name: Build package
+      run: |
+        python -m build
+    
+    - name: Get built files
+      id: get-files
+      run: |
+        echo "wheel_file=$(ls dist/*.whl)" >> $GITHUB_OUTPUT
+        echo "source_file=$(ls dist/*.tar.gz)" >> $GITHUB_OUTPUT
+    
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref_name || github.event.inputs.version }}
+        release_name: Release ${{ github.ref_name || github.event.inputs.version }}
+        draft: false
+        prerelease: false
+        body: |
+          ## Installation
+          
+          Install this release using:
+          ```bash
+          pip install ${{ steps.get-files.outputs.wheel_file }}
+          ```
+          
+          Or install directly from this release:
+          ```bash
+          pip install https://github.com/atomicworkhq/crawl4ai/releases/download/${{ github.ref_name || github.event.inputs.version }}/$(basename ${{ steps.get-files.outputs.wheel_file }})
+          ```
+    
+    - name: Upload Wheel
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ${{ steps.get-files.outputs.wheel_file }}
+        asset_name: $(basename ${{ steps.get-files.outputs.wheel_file }})
+        asset_content_type: application/zip
+    
+    - name: Upload Source Distribution
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ${{ steps.get-files.outputs.source_file }}
+        asset_name: $(basename ${{ steps.get-files.outputs.source_file }})
+        asset_content_type: application/gzip

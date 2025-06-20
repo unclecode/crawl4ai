@@ -15,7 +15,7 @@ authors = [
 dependencies = [
     "aiosqlite~=0.20",
     "lxml~=5.3",
-    "litellm>=1.53.1",
+    "litellm>=1.53.1,<1.60.0",
     "numpy>=1.26.0,<3",
     "pillow~=10.4",
     "playwright>=1.49.0",
@@ -41,7 +41,7 @@ dependencies = [
     "click>=8.1.7",
     "pyperclip>=1.8.2",
     "faust-cchardet>=2.1.19",
-    "aiohttp>=3.11.11",
+    "aiohttp>=3.11.11,<4.0.0",
     "humanize>=4.10.0",
 ]
 classifiers = [
