@@ -37,8 +37,12 @@ jobs:
     - name: Get built files
       id: get-files
       run: |
-        echo "wheel_file=$(ls dist/*.whl)" >> $GITHUB_OUTPUT
-        echo "source_file=$(ls dist/*.tar.gz)" >> $GITHUB_OUTPUT
+        wheel_file=$(ls dist/*.whl)
+        source_file=$(ls dist/*.tar.gz)
+        echo "wheel_file=$wheel_file" >> $GITHUB_OUTPUT
+        echo "source_file=$source_file" >> $GITHUB_OUTPUT
+        echo "wheel_name=$(basename $wheel_file)" >> $GITHUB_OUTPUT
+        echo "source_name=$(basename $source_file)" >> $GITHUB_OUTPUT
     
     - name: Create Release
       id: create_release
@@ -53,14 +57,15 @@ jobs:
         body: |
           ## Installation
           
-          Install this release using:
+          Install directly from this release:
           ```bash
-          pip install ${{ steps.get-files.outputs.wheel_file }}
+          pip install https://github.com/atomicworkhq/crawl4ai/releases/download/${{ github.ref_name || github.event.inputs.version }}/${{ steps.get-files.outputs.wheel_name }}
           ```
           
-          Or install directly from this release:
+          Or download and install locally:
           ```bash
-          pip install https://github.com/atomicworkhq/crawl4ai/releases/download/${{ github.ref_name || github.event.inputs.version }}/$(basename ${{ steps.get-files.outputs.wheel_file }})
+          wget https://github.com/atomicworkhq/crawl4ai/releases/download/${{ github.ref_name || github.event.inputs.version }}/${{ steps.get-files.outputs.wheel_name }}
+          pip install ${{ steps.get-files.outputs.wheel_name }}
           ```
     
     - name: Upload Wheel
@@ -70,7 +75,7 @@ jobs:
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ${{ steps.get-files.outputs.wheel_file }}
-        asset_name: $(basename ${{ steps.get-files.outputs.wheel_file }})
+        asset_name: ${{ steps.get-files.outputs.wheel_name }}
         asset_content_type: application/zip
     
     - name: Upload Source Distribution
@@ -80,5 +85,5 @@ jobs:
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ${{ steps.get-files.outputs.source_file }}
-        asset_name: $(basename ${{ steps.get-files.outputs.source_file }})
+        asset_name: ${{ steps.get-files.outputs.source_name }}
         asset_content_type: application/gzip
