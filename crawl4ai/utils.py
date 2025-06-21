@@ -443,7 +443,7 @@ def create_box_message(
     # Define border and text colors for different types
     styles = {
         "warning": ("yellow", "bright_yellow", "⚠"),
-        "info": ("blue", "bright_blue", "ℹ"),
+        "info": ("blue", "bright_blue", "i"),
         "debug": ("lightblack", "bright_black", "⋯"),
         "success": ("green", "bright_green", "✓"),
         "error": ("red", "bright_red", "×"),
