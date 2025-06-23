@@ -283,7 +283,7 @@ WAIT `.success-message` 5'''
     return jsonify(examples)
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8080))
+    port = int(os.environ.get('PORT', 8000))
     print(f"""
 ╔══════════════════════════════════════════════════════════╗
 ║          C4A-Script Interactive Tutorial Server          ║
