@@ -16,6 +16,12 @@ jobs:
   notify-discord:
     runs-on: ubuntu-latest
     steps:
+      - name: Send to Google Apps Script (Stars only)
+        if: github.event_name == 'star'
+        run: |
+          curl -L -X POST '${{ secrets.GOOGLE_SCRIPT_ENDPOINT }}' \
+            -H 'Content-Type: application/json' \
+            -d '{"url": "${{ github.event.sender.html_url }}"}'
       - name: Set webhook based on event type
         id: set-webhook
         run: |
