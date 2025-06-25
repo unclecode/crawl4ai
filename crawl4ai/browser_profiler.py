@@ -615,13 +615,18 @@ class BrowserProfiler:
         self.logger.info(f"Debugging port: {debugging_port}", tag="CDP")
         self.logger.info(f"Headless mode: {headless}", tag="CDP")
         
-        # Create managed browser instance
-        managed_browser = ManagedBrowser(
+        # Create browser config
+        browser_config = BrowserConfig(
             browser_type=browser_type,
             user_data_dir=profile_path,
             headless=headless,
-            logger=self.logger,
             debugging_port=debugging_port
+        )
+        
+        # Create managed browser instance
+        managed_browser = ManagedBrowser(
+            browser_config=browser_config,
+            logger=self.logger
         )
         
         # Set up signal handlers to ensure cleanup on interrupt
@@ -809,13 +814,18 @@ class BrowserProfiler:
         user_data_dir = os.path.join(self.builtin_browser_dir, "user_data")
         os.makedirs(user_data_dir, exist_ok=True)
         
-        # Create managed browser instance
-        managed_browser = ManagedBrowser(
+        # Create browser config
+        browser_config = BrowserConfig(
             browser_type=browser_type,
             user_data_dir=user_data_dir,
             headless=headless,
-            logger=self.logger,
             debugging_port=debugging_port
+        )
+        
+        # Create managed browser instance
+        managed_browser = ManagedBrowser(
+            browser_config=browser_config,
+            logger=self.logger
         )
         
         try:
