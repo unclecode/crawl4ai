@@ -49,7 +49,7 @@ def parse_srcset(s: str) -> List[Dict]:
         if len(parts) >= 1:
             url = parts[0]
             width = (
-                parts[1].rstrip("w").split('.')[0]
+                parts[1].rstrip("w").split(".")[0]
                 if len(parts) > 1 and parts[1].endswith("w")
                 else None
             )
@@ -157,7 +157,7 @@ class WebScrapingStrategy(ContentScrapingStrategy):
                 for aud in raw_result.get("media", {}).get("audios", [])
                 if aud
             ],
-            tables=raw_result.get("media", {}).get("tables", [])
+            tables=raw_result.get("media", {}).get("tables", []),
         )
 
         # Convert links
@@ -208,141 +208,147 @@ class WebScrapingStrategy(ContentScrapingStrategy):
             bool: True if the table is a data table, False otherwise
         """
         score = 0
-        
+
         # Check for thead and tbody
-        has_thead = len(table.select('thead')) > 0
-        has_tbody = len(table.select('tbody')) > 0
+        has_thead = len(table.select("thead")) > 0
+        has_tbody = len(table.select("tbody")) > 0
         if has_thead:
             score += 2
         if has_tbody:
             score += 1
-            
+
         # Check for th elements
-        th_count = len(table.select('th'))
+        th_count = len(table.select("th"))
         if th_count > 0:
             score += 2
-            if has_thead or len(table.select('tr:first-child th')) > 0:
+            if has_thead or len(table.select("tr:first-child th")) > 0:
                 score += 1
-                
+
         # Check for nested tables
-        if len(table.select('table')) > 0:
+        if len(table.select("table")) > 0:
             score -= 3
-            
+
         # Role attribute check
-        role = table.get('role', '').lower()
-        if role in {'presentation', 'none'}:
+        role = table.get("role", "").lower()
+        if role in {"presentation", "none"}:
             score -= 3
-            
+
         # Column consistency
-        rows = table.select('tr')
+        rows = table.select("tr")
         if not rows:
             return False
-            
-        col_counts = [len(row.select('td, th')) for row in rows]
+
+        col_counts = [len(row.select("td, th")) for row in rows]
         avg_cols = sum(col_counts) / len(col_counts)
-        variance = sum((c - avg_cols)**2 for c in col_counts) / len(col_counts)
+        variance = sum((c - avg_cols) ** 2 for c in col_counts) / len(col_counts)
         if variance < 1:
             score += 2
-            
+
         # Caption and summary
-        if table.select('caption'):
+        if table.select("caption"):
             score += 2
-        if table.has_attr('summary') and table['summary']:
+        if table.has_attr("summary") and table["summary"]:
             score += 1
-            
+
         # Text density
-        total_text = sum(len(cell.get_text().strip()) for row in rows for cell in row.select('td, th'))
+        total_text = sum(
+            len(cell.get_text().strip())
+            for row in rows
+            for cell in row.select("td, th")
+        )
         total_tags = sum(1 for _ in table.descendants if isinstance(_, Tag))
         text_ratio = total_text / (total_tags + 1e-5)
         if text_ratio > 20:
             score += 3
         elif text_ratio > 10:
             score += 2
-            
+
         # Data attributes
-        data_attrs = sum(1 for attr in table.attrs if attr.startswith('data-'))
+        data_attrs = sum(1 for attr in table.attrs if attr.startswith("data-"))
         score += data_attrs * 0.5
-        
+
         # Size check
         if avg_cols >= 2 and len(rows) >= 2:
             score += 2
-            
-        threshold = kwargs.get('table_score_threshold', 7)
+
+        threshold = kwargs.get("table_score_threshold", 7)
         return score >= threshold
-    
+
     def extract_table_data(self, table: Tag) -> dict:
         """
         Extract structured data from a table element.
-        
+
         Args:
             table (Tag): BeautifulSoup Tag representing a table element
-            
+
         Returns:
             dict: Dictionary containing table data (headers, rows, caption, summary)
         """
-        caption_elem = table.select_one('caption')
+        caption_elem = table.select_one("caption")
         caption = caption_elem.get_text().strip() if caption_elem else ""
-        summary = table.get('summary', '').strip()
-        
+        summary = table.get("summary", "").strip()
+
         # Extract headers with colspan handling
         headers = []
-        thead_rows = table.select('thead tr')
+        thead_rows = table.select("thead tr")
         if thead_rows:
-            header_cells = thead_rows[0].select('th')
+            header_cells = thead_rows[0].select("th")
             for cell in header_cells:
                 text = cell.get_text().strip()
-                colspan = int(cell.get('colspan', 1))
+                colspan = int(cell.get("colspan", 1))
                 headers.extend([text] * colspan)
         else:
-            first_row = table.select('tr:first-child')
+            first_row = table.select("tr:first-child")
             if first_row:
-                for cell in first_row[0].select('th, td'):
+                for cell in first_row[0].select("th, td"):
                     text = cell.get_text().strip()
-                    colspan = int(cell.get('colspan', 1))
+                    colspan = int(cell.get("colspan", 1))
                     headers.extend([text] * colspan)
-        
+
         # Extract rows with colspan handling
         rows = []
-        all_rows = table.select('tr')
-        thead = table.select_one('thead')
+        all_rows = table.select("tr")
+        thead = table.select_one("thead")
         tbody_rows = []
 
         if thead:
-            thead_rows = thead.select('tr')
+            thead_rows = thead.select("tr")
             tbody_rows = [row for row in all_rows if row not in thead_rows]
         else:
-            if all_rows and all_rows[0].select('th'):
+            if all_rows and all_rows[0].select("th"):
                 tbody_rows = all_rows[1:]
             else:
                 tbody_rows = all_rows
-                
-        for row in tbody_rows:        
-        # for row in table.select('tr:not(:has(ancestor::thead))'):
+
+        for row in tbody_rows:
+            # for row in table.select('tr:not(:has(ancestor::thead))'):
             row_data = []
-            for cell in row.select('td'):
+            for cell in row.select("td"):
                 text = cell.get_text().strip()
-                colspan = int(cell.get('colspan', 1))
+                colspan = int(cell.get("colspan", 1))
                 row_data.extend([text] * colspan)
             if row_data:
                 rows.append(row_data)
-                
+
         # Align rows with headers
-        max_columns = len(headers) if headers else (max(len(row) for row in rows) if rows else 0)
+        max_columns = (
+            len(headers) if headers else (max(len(row) for row in rows) if rows else 0)
+        )
         aligned_rows = []
         for row in rows:
-            aligned = row[:max_columns] + [''] * (max_columns - len(row))
+            aligned = row[:max_columns] + [""] * (max_columns - len(row))
             aligned_rows.append(aligned)
-            
+
         if not headers:
             headers = [f"Column {i+1}" for i in range(max_columns)]
-            
+
         return {
             "headers": headers,
             "rows": aligned_rows,
             "caption": caption,
             "summary": summary,
         }
-    
+
     def flatten_nested_elements(self, node):
         """
         Flatten nested elements in a HTML tree.
@@ -784,9 +790,34 @@ class WebScrapingStrategy(ContentScrapingStrategy):
                     element.replace_with(element.get_text())
 
             try:
+                # Ensure keep_attrs is always a list before concatenation
+                # Sometimes keep_attrs might be a boolean (False), which causes errors when added to a list
+                keep_attrs = kwargs.get("keep_attrs", [])
+                if not isinstance(keep_attrs, list):
+                    # If keep_attrs is False, convert to empty list; if a single value, wrap it in a list
+                    keep_attrs = (
+                        []
+                        if keep_attrs is False
+                        else [keep_attrs] if keep_attrs else []
+                    )
+
+                # Similarly, ensure keep_data_attributes is a list to avoid TypeError on concatenation
+                keep_data_attrs = kwargs.get("keep_data_attributes", False)
+                if not isinstance(keep_data_attrs, list):
+                    keep_data_attrs = (
+                        [] if keep_data_attrs is False else [keep_data_attrs]
+                    )
+
+                # Call the method with safe lists, preventing TypeError bugs when bool values are passed
                 self.remove_unwanted_attributes(
-                    element, IMPORTANT_ATTRS + kwargs.get("keep_attrs", []) , kwargs.get("keep_data_attributes", False)
+                    element, IMPORTANT_ATTRS + keep_attrs, keep_data_attrs
                 )
+
+                # self.remove_unwanted_attributes(
+                #     element,
+                #     IMPORTANT_ATTRS + kwargs.get("keep_attrs", []),
+                #     kwargs.get("keep_data_attributes", False),
+                # )
             except Exception as e:
                 # print('Error removing unwanted attributes:', str(e))
                 self._log(
@@ -865,13 +896,15 @@ class WebScrapingStrategy(ContentScrapingStrategy):
         soup = BeautifulSoup(html, parser_type)
         body = soup.body
         if body is None:
-            raise Exception("'<body>' tag is not found in fetched html. Consider adding wait_for=\"css:body\" to wait for body tag to be loaded into DOM.")
+            raise Exception(
+                "'<body>' tag is not found in fetched html. Consider adding wait_for=\"css:body\" to wait for body tag to be loaded into DOM."
+            )
         base_domain = get_base_domain(url)
-        
+
         # Early removal of all images if exclude_all_images is set
         # This happens before any processing to minimize memory usage
         if kwargs.get("exclude_all_images", False):
-            for img in body.find_all('img'):
+            for img in body.find_all("img"):
                 img.decompose()
 
         try:
@@ -914,10 +947,12 @@ class WebScrapingStrategy(ContentScrapingStrategy):
                 for el in for_content_targeted_element:
                     content_element.append(copy.deepcopy(el))
             except Exception as e:
-                self._log("error", f"Error with target element detection: {str(e)}", "SCRAPE")
+                self._log(
+                    "error", f"Error with target element detection: {str(e)}", "SCRAPE"
+                )
                 return None
         else:
-            content_element = body     
+            content_element = body
 
         kwargs["exclude_social_media_domains"] = set(
             kwargs.get("exclude_social_media_domains", []) + SOCIAL_MEDIA_DOMAINS
@@ -957,11 +992,11 @@ class WebScrapingStrategy(ContentScrapingStrategy):
             if result is not None
             for img in result
         ]
-        
+
         # Process tables if not excluded
         excluded_tags = set(kwargs.get("excluded_tags", []) or [])
-        if 'table' not in excluded_tags:
-            tables = body.find_all('table')
+        if "table" not in excluded_tags:
+            tables = body.find_all("table")
             for table in tables:
                 if self.is_data_table(table, **kwargs):
                     table_data = self.extract_table_data(table)
@@ -1390,7 +1425,7 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
             return False
         col_counts = [len(row.xpath(".//td|.//th")) for row in rows]
         avg_cols = sum(col_counts) / len(col_counts)
-        variance = sum((c - avg_cols)**2 for c in col_counts) / len(col_counts)
+        variance = sum((c - avg_cols) ** 2 for c in col_counts) / len(col_counts)
         if variance < 1:
             score += 2
 
@@ -1401,7 +1436,11 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
             score += 1
 
         # Text density
-        total_text = sum(len(''.join(cell.itertext()).strip()) for row in rows for cell in row.xpath(".//td|.//th"))
+        total_text = sum(
+            len("".join(cell.itertext()).strip())
+            for row in rows
+            for cell in row.xpath(".//td|.//th")
+        )
         total_tags = sum(1 for _ in table.iterdescendants())
         text_ratio = total_text / (total_tags + 1e-5)
         if text_ratio > 20:
@@ -1410,7 +1449,7 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
             score += 2
 
         # Data attributes
-        data_attrs = sum(1 for attr in table.attrib if attr.startswith('data-'))
+        data_attrs = sum(1 for attr in table.attrib if attr.startswith("data-"))
         score += data_attrs * 0.5
 
         # Size check
@@ -1454,10 +1493,12 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
                 rows.append(row_data)
 
         # Align rows with headers
-        max_columns = len(headers) if headers else (max(len(row) for row in rows) if rows else 0)
+        max_columns = (
+            len(headers) if headers else (max(len(row) for row in rows) if rows else 0)
+        )
         aligned_rows = []
         for row in rows:
-            aligned = row[:max_columns] + [''] * (max_columns - len(row))
+            aligned = row[:max_columns] + [""] * (max_columns - len(row))
             aligned_rows.append(aligned)
 
         if not headers:
@@ -1490,11 +1531,11 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
             body = doc
 
             base_domain = get_base_domain(url)
-            
+
             # Early removal of all images if exclude_all_images is set
             # This is more efficient in lxml as we remove elements before any processing
             if kwargs.get("exclude_all_images", False):
-                for img in body.xpath('//img'):
+                for img in body.xpath("//img"):
                     if img.getparent() is not None:
                         img.getparent().remove(img)
 
@@ -1538,11 +1579,17 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
                 try:
                     for_content_targeted_element = []
                     for target_element in target_elements:
-                        for_content_targeted_element.extend(body.cssselect(target_element))
+                        for_content_targeted_element.extend(
+                            body.cssselect(target_element)
+                        )
                     content_element = lhtml.Element("div")
                     content_element.extend(copy.deepcopy(for_content_targeted_element))
                 except Exception as e:
-                    self._log("error", f"Error with target element detection: {str(e)}", "SCRAPE")
+                    self._log(
+                        "error",
+                        f"Error with target element detection: {str(e)}",
+                        "SCRAPE",
+                    )
                     return None
             else:
                 content_element = body
@@ -1583,7 +1630,7 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
                 **kwargs,
             )
 
-            if 'table' not in excluded_tags:
+            if "table" not in excluded_tags:
                 tables = body.xpath(".//table")
                 for table in tables:
                     if self.is_data_table(table, **kwargs):
@@ -1616,7 +1663,7 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
 
             # Generate output HTML
             cleaned_html = lhtml.tostring(
-                # body,   
+                # body,
                 content_element,
                 encoding="unicode",
                 pretty_print=True,
@@ -1662,12 +1709,7 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
             return {
                 "cleaned_html": cleaned_html,
                 "success": False,
-                "media": {
-                    "images": [],
-                    "videos": [],
-                    "audios": [],
-                    "tables": []
-                },
+                "media": {"images": [], "videos": [], "audios": [], "tables": []},
                 "links": {"internal": [], "external": []},
                 "metadata": {},
             }
