@@ -23,3 +23,4 @@ rich>=13.9.4
 cssselect>=1.2.0
 chardet>=5.2.0
 brotli>=1.1.0
+openai>=1.0.0
