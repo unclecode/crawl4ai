@@ -1638,10 +1638,17 @@ def perform_completion_with_backoff(
     Returns:
         dict: The API response or an error message after all retries.
     """
-
+    # The 'os' module is already imported globally at the top of the file.
     from litellm import completion
     from litellm.exceptions import RateLimitError
 
+    # Allow base_url and provider to be set via environment variables if not provided
+    if base_url is None:
+        base_url = os.environ.get("OPENAI_BASE_URL", None)
+    if not provider:
+        provider = os.environ.get("OPENAI_MODEL")
+    if not provider:
+        raise ValueError("`provider` must be supplied or OPENAI_MODEL must be set")
     max_attempts = 3
     base_delay = 2  # Base delay in seconds, you can adjust this based on your needs
 
@@ -1657,6 +1664,8 @@ def perform_completion_with_backoff(
             response = completion(
                 model=provider,
                 messages=[{"role": "user", "content": prompt_with_variables}],
+                api_key=api_token,
+                base_url=base_url,
                 **extra_args,
             )
             return response  # Return the successful response
@@ -2809,4 +2818,4 @@ def preprocess_html_for_schema(html_content, text_threshold=100, attr_value_thre
     except Exception as e:
         # Fallback for parsing errors
         return html_content[:max_size] if len(html_content) > max_size else html_content
-    
+

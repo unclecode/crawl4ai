@@ -44,7 +44,7 @@ import numpy as np
 import re
 from bs4 import BeautifulSoup
 from lxml import html, etree
-
+import os
 
 class ExtractionStrategy(ABC):
     """
