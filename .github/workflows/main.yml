@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Send to Google Apps Script (Stars only)
-        if: github.event_name == 'star'
+        if: github.event_name == 'watch'
         run: |
           curl -L -X POST '${{ secrets.GOOGLE_SCRIPT_ENDPOINT }}' \
             -H 'Content-Type: application/json' \
