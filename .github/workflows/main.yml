@@ -19,9 +19,9 @@ jobs:
       - name: Send to Google Apps Script (Stars only)
         if: github.event_name == 'watch'
         run: |
-          curl -L -X POST '${{ secrets.GOOGLE_SCRIPT_ENDPOINT }}' \
+          curl -fSs -X POST "${{ secrets.GOOGLE_SCRIPT_ENDPOINT }}" \
             -H 'Content-Type: application/json' \
-            -d '{"url": "${{ github.event.sender.html_url }}"}'
+            -d '{"url":"${{ github.event.sender.html_url }}"}'
       - name: Set webhook based on event type
         id: set-webhook
         run: |
