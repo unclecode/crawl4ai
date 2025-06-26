@@ -994,6 +994,32 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 except Error as e:
                     raise RuntimeError(f"Failed to extract HTML content: {str(e)}")
             else:
+                # Remove excluded tags before getting content
+                if config.excluded_tags:
+                    try:
+                        # Create a script to remove excluded tags
+                        remove_tags_script = """
+                        () => {
+                            const excludedTags = %s;
+                            for (const tag of excludedTags) {
+                                const elements = document.getElementsByTagName(tag);
+                                for (let i = elements.length - 1; i >= 0; i--) {
+                                    if (elements[i] && elements[i].parentNode) {
+                                        elements[i].parentNode.removeChild(elements[i]);
+                                    }
+                                }
+                            }
+                            return true;
+                        }
+                        """ % config.excluded_tags
+                        
+                        await page.evaluate(remove_tags_script)
+                    except Error as e:
+                        self.logger.warning(
+                            message="Failed to remove excluded tags: {error}",
+                            tag="HTML_PROCESSING",
+                            params={"error": str(e)},
+                        )
                 html = await page.content()
             
             # # Get final HTML content
