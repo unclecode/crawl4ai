@@ -1,0 +1,153 @@
+{
+    "actorSpecification": 1,
+    "name": "crawl4ai",
+    "title": "Crawl4AI",
+    "description": "🔥🕷️ Crawl4AI: Open-source LLM Friendly Web Crawler & scraper",
+    "version": "0.0",
+    "buildTag": "latest",
+    "input": {
+        "title": "Crawl4AI settings",
+        "description": "See https://docs.crawl4ai.com/ for explanation",
+        "type": "object",
+        "schemaVersion": 1,
+        "properties": {
+            "startUrls": {
+                "title": "Start URLs",
+                "type": "array",
+                "description": "URLs to start with",
+                "prefill": [
+                    {"url": "http://crawl4ai.com"}
+                ],
+                "editor": "requestListSources"
+            },
+            "maxCrawlDepth": {
+                "title": "Maximum crawl depth",
+                "type": "integer",
+                "description": "How many levels of links should the crawler follow. The Start URLs have a depth of 0, all links found there have a depth of 1, and so on.",
+                "minimum": 0,
+                "default": 2
+            },
+            "proxyConfiguration": {
+                "title": "Proxy configuration",
+                "type": "object",
+                "editor": "proxy",
+                "description": "Select proxies to be used by your crawler.",
+                "prefill": { "useApifyProxy": true }
+            },
+            "magicMode": {
+                "title": "Use magic mode",
+                "type": "boolean",
+                "default": true,
+                "description": "Masks browser automation signals, Simulates human-like behavior, Overrides navigator properties, Handles cookie consent popups, Manages browser fingerprinting, Randomizes timing patterns"
+            },
+            "saveScreenshots": {
+                "title": "Save screenshots",
+                "description": "Should the crawler save screenshots?",
+                "type": "boolean",
+                "default": false
+            },
+            "cssSelector": {
+                "title": "CSS selector",
+                "description": "Ensures only a part of the website is processed",
+                "type": "string",
+                "nullable": true,
+                "editor": "textfield"
+            },
+            "waitFor": {
+                "title": "Wait for",
+                "description": "CSS selector or JS function to wait for before processing a page",
+                "editor": "textarea",
+                "type": "string",
+                "nullable": true
+            },
+            "jsCode": {
+                "title": "Javascript code to execute on each page",
+                "type": "string",
+                "description": "Function executed for each request",
+                "nullable": true,
+                "editor": "javascript"
+            },
+            "extractionStrategy": {
+                "title": "Extraction strategy",
+                "description": "Specifies how data is extracted from each page",
+                "type": "string",
+                "enum": ["llm", "jsonCss", "cosine"],
+                "editor": "select",
+                "nullable": true
+            },
+            "llmProvider": {
+                "sectionCaption": "LLM extraction settings",
+                "title": "LLM provider",
+                "description": "Specifies the LLM used to extract data",
+                "type": "string",
+                "nullable": true,
+                "editor": "textfield"
+            },
+            "llmApiToken": {
+                "title": "API token",
+                "description": "Token used for authentication with the LLM provider",
+                "type": "string",
+                "editor": "textfield",
+                "isSecret": true,
+                "nullable": true
+            },
+            "llmInstruction": {
+                "title": "Instruction",
+                "description": "Instructions (prompt) for the LLM",
+                "editor": "textarea",
+                "type": "string",
+                "nullable": true
+            },
+            "jsonCssSchema": {
+                "sectionCaption": "JsonCSS extraction settings",
+                "title": "JsonCss schema",
+                "description": "Description of the data to be extracted",
+                "type": "string",
+                "editor": "textarea",
+                "nullable": true
+            },
+            "cosineSemanticFilter": {
+                "sectionCaption": "Cosine extraction settings",
+                "title": "Semantic filter",
+                "description": "Specifies the semantic filter",
+                "type": "string",
+                "nullable": true,
+                "editor": "textfield"
+            },
+            "cosineWordCountThreshold": {
+                "title": "Word count threshold",
+                "description": "Specifies the word count threshold",
+                "type": "integer",
+                "nullable": true
+            },
+            "cosineLinkageMethod": {
+                "title": "Linkage method",
+                "description": "Specifies the linkage method",
+                "type": "string",
+                "nullable": true,
+                "editor": "textfield"
+            },
+            "cosineTopK": {
+                "title": "Top K",
+                "description": "Specifies top K",
+                "type": "integer",
+                "nullable": true
+            },
+            "cosineModelName": {
+                "title": "Model name",
+                "description": "Specifies the model",
+                "type": "string",
+                "nullable": true,
+                "editor": "textfield"
+            },
+            "debugLog": {
+                "sectionCaption": "Developer settings",
+                "title": "Debug logging",
+                "description": "Print debug-level log messages",
+                "type": "boolean",
+                "default": false
+            }
+        },
+        "required": ["startUrls"]
+    }
+}
