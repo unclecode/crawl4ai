@@ -15,7 +15,7 @@ from .models import Links, Link
 from .utils import calculate_total_score
 
 
-class LinkExtractor:
+class LinkPreview:
     """
     Extracts head content from links using URLSeeder's parallel processing infrastructure.
     
@@ -29,7 +29,7 @@ class LinkExtractor:
     
     def __init__(self, logger: Optional[AsyncLogger] = None):
         """
-        Initialize the LinkExtractor.
+        Initialize the LinkPreview.
         
         Args:
             logger: Optional logger instance for recording events
@@ -78,12 +78,12 @@ class LinkExtractor:
         
         Args:
             links: Links object containing internal and external links
-            config: CrawlerRunConfig with link_extraction_config settings
+            config: CrawlerRunConfig with link_preview_config settings
             
         Returns:
             Links object with head_data attached to filtered Link objects
         """
-        link_config = config.link_extraction_config
+        link_config = config.link_preview_config
         
         # Ensure seeder is initialized
         await self.start()
@@ -331,7 +331,7 @@ class LinkExtractor:
                     intrinsic_score=updated_link.intrinsic_score,
                     contextual_score=updated_link.contextual_score,
                     score_links_enabled=getattr(config, 'score_links', False),
-                    query_provided=bool(config.link_extraction_config.query)
+                    query_provided=bool(config.link_preview_config.query)
                 )
                 
                 updated_internal.append(updated_link)
@@ -369,7 +369,7 @@ class LinkExtractor:
                     intrinsic_score=updated_link.intrinsic_score,
                     contextual_score=updated_link.contextual_score,
                     score_links_enabled=getattr(config, 'score_links', False),
-                    query_provided=bool(config.link_extraction_config.query)
+                    query_provided=bool(config.link_preview_config.query)
                 )
                 
                 updated_external.append(updated_link)

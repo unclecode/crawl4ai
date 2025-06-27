@@ -37,7 +37,7 @@ from .content_filter_strategy import (
 )
 from .models import CrawlResult, MarkdownGenerationResult, DisplayMode
 from .components.crawler_monitor import CrawlerMonitor
-from .link_extractor import LinkExtractor
+from .link_preview import LinkPreview
 from .async_dispatcher import (
     MemoryAdaptiveDispatcher,
     SemaphoreDispatcher,
@@ -142,7 +142,7 @@ __all__ = [
     "SemaphoreDispatcher",
     "RateLimiter",
     "CrawlerMonitor",
-    "LinkExtractor",
+    "LinkPreview",
     "DisplayMode",
     "MarkdownGenerationResult",
     "Crawl4aiDockerClient",

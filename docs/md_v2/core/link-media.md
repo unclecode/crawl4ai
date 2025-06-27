@@ -125,7 +125,7 @@ Here's a full example you can copy, paste, and run immediately:
 ```python
 import asyncio
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
-from crawl4ai.async_configs import LinkExtractionConfig
+from crawl4ai.async_configs import LinkPreviewConfig
 
 async def extract_link_heads_example():
     """
@@ -136,7 +136,7 @@ async def extract_link_heads_example():
     # Configure link head extraction
     config = CrawlerRunConfig(
         # Enable link head extraction with detailed configuration
-        link_extraction_config=LinkExtractionConfig(
+        link_preview_config=LinkPreviewConfig(
             include_internal=True,           # Extract from internal links
             include_external=False,          # Skip external links for this example
             max_links=10,                   # Limit to 10 links for demo
@@ -234,12 +234,12 @@ if __name__ == "__main__":
 
 ### 2.3 Configuration Deep Dive
 
-The `LinkExtractionConfig` class supports these options:
+The `LinkPreviewConfig` class supports these options:
 
 ```python
-from crawl4ai.async_configs import LinkExtractionConfig
+from crawl4ai.async_configs import LinkPreviewConfig
 
-link_extraction_config = LinkExtractionConfig(
+link_preview_config = LinkPreviewConfig(
     # BASIC SETTINGS
     verbose=True,                    # Show detailed logs (recommended for learning)
     
@@ -316,7 +316,7 @@ Find the most relevant documentation pages:
 ```python
 async def research_assistant():
     config = CrawlerRunConfig(
-        link_extraction_config=LinkExtractionConfig(
+        link_preview_config=LinkPreviewConfig(
             include_internal=True,
             include_external=True,
             include_patterns=["*/docs/*", "*/tutorial/*", "*/guide/*"],
@@ -348,7 +348,7 @@ Find all API endpoints and references:
 ```python
 async def api_discovery():
     config = CrawlerRunConfig(
-        link_extraction_config=LinkExtractionConfig(
+        link_preview_config=LinkPreviewConfig(
             include_internal=True,
             include_patterns=["*/api/*", "*/reference/*"],
             exclude_patterns=["*/deprecated/*"],
@@ -387,7 +387,7 @@ Analyze website structure and content quality:
 ```python
 async def quality_analysis():
     config = CrawlerRunConfig(
-        link_extraction_config=LinkExtractionConfig(
+        link_preview_config=LinkPreviewConfig(
             include_internal=True,
             max_links=200,
             concurrency=20,
@@ -434,7 +434,7 @@ async def quality_analysis():
 ```python
 # Check your configuration:
 config = CrawlerRunConfig(
-    link_extraction_config=LinkExtractionConfig(
+    link_preview_config=LinkPreviewConfig(
         verbose=True   # ← Enable to see what's happening
     )
 )
@@ -445,7 +445,7 @@ config = CrawlerRunConfig(
 # Make sure scoring is enabled:
 config = CrawlerRunConfig(
     score_links=True,  # ← Enable intrinsic scoring
-    link_extraction_config=LinkExtractionConfig(
+    link_preview_config=LinkPreviewConfig(
         query="your search terms"  # ← For contextual scoring
     )
 )
@@ -454,7 +454,7 @@ config = CrawlerRunConfig(
 **Process taking too long?**
 ```python
 # Optimize performance:
-link_extraction_config = LinkExtractionConfig(
+link_preview_config = LinkPreviewConfig(
     max_links=20,      # ← Reduce number
     concurrency=10,    # ← Increase parallelism
     timeout=3,         # ← Shorter timeout

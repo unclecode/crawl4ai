@@ -594,7 +594,7 @@ class BrowserConfig:
             return config
         return BrowserConfig.from_kwargs(config)
 
-class LinkExtractionConfig:
+class LinkPreviewConfig:
     """Configuration for link head extraction and scoring."""
     
     def __init__(
@@ -649,12 +649,12 @@ class LinkExtractionConfig:
             raise ValueError("At least one of include_internal or include_external must be True")
     
     @staticmethod
-    def from_dict(config_dict: Dict[str, Any]) -> "LinkExtractionConfig":
-        """Create LinkExtractionConfig from dictionary (for backward compatibility)."""
+    def from_dict(config_dict: Dict[str, Any]) -> "LinkPreviewConfig":
+        """Create LinkPreviewConfig from dictionary (for backward compatibility)."""
         if not config_dict:
             return None
         
-        return LinkExtractionConfig(
+        return LinkPreviewConfig(
             include_internal=config_dict.get("include_internal", True),
             include_external=config_dict.get("include_external", False),
             include_patterns=config_dict.get("include_patterns"),
@@ -682,11 +682,11 @@ class LinkExtractionConfig:
             "verbose": self.verbose
         }
     
-    def clone(self, **kwargs) -> "LinkExtractionConfig":
+    def clone(self, **kwargs) -> "LinkPreviewConfig":
         """Create a copy with updated values."""
         config_dict = self.to_dict()
         config_dict.update(kwargs)
-        return LinkExtractionConfig.from_dict(config_dict)
+        return LinkPreviewConfig.from_dict(config_dict)
 
 
 class HTTPCrawlerConfig:
@@ -925,7 +925,7 @@ class CrawlerRunConfig():
         exclude_internal_links (bool): If True, exclude internal links from the results.
                                        Default: False.
         score_links (bool): If True, calculate intrinsic quality scores for all links using URL structure,
-                           text quality, and contextual relevance metrics. Separate from link_extraction_config.
+                           text quality, and contextual relevance metrics. Separate from link_preview_config.
                            Default: False.
 
         # Debugging and Logging Parameters
@@ -1055,7 +1055,7 @@ class CrawlerRunConfig():
         # Deep Crawl Parameters
         deep_crawl_strategy: Optional[DeepCrawlStrategy] = None,
         # Link Extraction Parameters
-        link_extraction_config: Union[LinkExtractionConfig, Dict[str, Any]] = None,
+        link_preview_config: Union[LinkPreviewConfig, Dict[str, Any]] = None,
         # Experimental Parameters
         experimental: Dict[str, Any] = None,
     ):
@@ -1187,15 +1187,15 @@ class CrawlerRunConfig():
         self.deep_crawl_strategy = deep_crawl_strategy
         
         # Link Extraction Parameters
-        if link_extraction_config is None:
-            self.link_extraction_config = None
-        elif isinstance(link_extraction_config, LinkExtractionConfig):
-            self.link_extraction_config = link_extraction_config
-        elif isinstance(link_extraction_config, dict):
+        if link_preview_config is None:
+            self.link_preview_config = None
+        elif isinstance(link_preview_config, LinkPreviewConfig):
+            self.link_preview_config = link_preview_config
+        elif isinstance(link_preview_config, dict):
             # Convert dict to config object for backward compatibility
-            self.link_extraction_config = LinkExtractionConfig.from_dict(link_extraction_config)
+            self.link_preview_config = LinkPreviewConfig.from_dict(link_preview_config)
         else:
-            raise ValueError("link_extraction_config must be LinkExtractionConfig object or dict")
+            raise ValueError("link_preview_config must be LinkPreviewConfig object or dict")
         
         # Experimental Parameters
         self.experimental = experimental or {}
@@ -1371,7 +1371,7 @@ class CrawlerRunConfig():
             # Deep Crawl Parameters
             deep_crawl_strategy=kwargs.get("deep_crawl_strategy"),
             # Link Extraction Parameters
-            link_extraction_config=kwargs.get("link_extraction_config"),
+            link_preview_config=kwargs.get("link_preview_config"),
             url=kwargs.get("url"),
             # Experimental Parameters 
             experimental=kwargs.get("experimental"),
@@ -1467,7 +1467,7 @@ class CrawlerRunConfig():
             "user_agent_mode": self.user_agent_mode,
             "user_agent_generator_config": self.user_agent_generator_config,
             "deep_crawl_strategy": self.deep_crawl_strategy,
-            "link_extraction_config": self.link_extraction_config.to_dict() if self.link_extraction_config else None,
+            "link_preview_config": self.link_preview_config.to_dict() if self.link_preview_config else None,
             "url": self.url,
             "experimental": self.experimental,
         }

@@ -948,14 +948,14 @@ class WebScrapingStrategy(ContentScrapingStrategy):
         links["external"] = list(external_links_dict.values())
         
         # Extract head content for links if configured
-        link_extraction_config = kwargs.get("link_extraction_config")
-        if link_extraction_config is not None:
+        link_preview_config = kwargs.get("link_preview_config")
+        if link_preview_config is not None:
             try:
                 import asyncio
-                from .link_extractor import LinkExtractor
+                from .link_preview import LinkPreview
                 from .models import Links, Link
                 
-                verbose = link_extraction_config.verbose
+                verbose = link_preview_config.verbose
                 
                 if verbose:
                     self._log("info", "Starting link head extraction for {internal} internal and {external} external links",
@@ -966,17 +966,17 @@ class WebScrapingStrategy(ContentScrapingStrategy):
                 external_links = [Link(**link_data) for link_data in links["external"]]
                 links_obj = Links(internal=internal_links, external=external_links)
                 
-                # Create a config object for LinkExtractor  
+                # Create a config object for LinkPreview  
                 class TempCrawlerRunConfig:
                     def __init__(self, link_config, score_links):
-                        self.link_extraction_config = link_config
+                        self.link_preview_config = link_config
                         self.score_links = score_links
                 
-                config = TempCrawlerRunConfig(link_extraction_config, kwargs.get("score_links", False))
+                config = TempCrawlerRunConfig(link_preview_config, kwargs.get("score_links", False))
                 
                 # Extract head content (run async operation in sync context)
                 async def extract_links():
-                    async with LinkExtractor(self.logger) as extractor:
+                    async with LinkPreview(self.logger) as extractor:
                         return await extractor.extract_link_heads(links_obj, config)
                 
                 # Run the async operation
@@ -1740,21 +1740,21 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
                 with_tail=False,
             ).strip()
             
-            # Create links dictionary in the format expected by LinkExtractor
+            # Create links dictionary in the format expected by LinkPreview
             links = {
                 "internal": list(internal_links_dict.values()),
                 "external": list(external_links_dict.values()),
             }
             
             # Extract head content for links if configured
-            link_extraction_config = kwargs.get("link_extraction_config")
-            if link_extraction_config is not None:
+            link_preview_config = kwargs.get("link_preview_config")
+            if link_preview_config is not None:
                 try:
                     import asyncio
-                    from .link_extractor import LinkExtractor
+                    from .link_preview import LinkPreview
                     from .models import Links, Link
                     
-                    verbose = link_extraction_config.verbose
+                    verbose = link_preview_config.verbose
                     
                     if verbose:
                         self._log("info", "Starting link head extraction for {internal} internal and {external} external links",
@@ -1765,17 +1765,17 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
                     external_links = [Link(**link_data) for link_data in links["external"]]
                     links_obj = Links(internal=internal_links, external=external_links)
                     
-                    # Create a config object for LinkExtractor
+                    # Create a config object for LinkPreview
                     class TempCrawlerRunConfig:
                         def __init__(self, link_config, score_links):
-                            self.link_extraction_config = link_config
+                            self.link_preview_config = link_config
                             self.score_links = score_links
                     
-                    config = TempCrawlerRunConfig(link_extraction_config, kwargs.get("score_links", False))
+                    config = TempCrawlerRunConfig(link_preview_config, kwargs.get("score_links", False))
                     
                     # Extract head content (run async operation in sync context)
                     async def extract_links():
-                        async with LinkExtractor(self.logger) as extractor:
+                        async with LinkPreview(self.logger) as extractor:
                             return await extractor.extract_link_heads(links_obj, config)
                     
                     # Run the async operation

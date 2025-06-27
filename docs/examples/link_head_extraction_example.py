@@ -18,7 +18,7 @@ Usage:
 
 import asyncio
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
-from crawl4ai.async_configs import LinkExtractionConfig
+from crawl4ai.async_configs import LinkPreviewConfig
 
 
 async def basic_link_head_extraction():
@@ -30,7 +30,7 @@ async def basic_link_head_extraction():
     
     config = CrawlerRunConfig(
         # Enable link head extraction
-        link_extraction_config=LinkExtractionConfig(
+        link_preview_config=LinkPreviewConfig(
             include_internal=True,           # Process internal links
             include_external=False,          # Skip external links for this demo
             max_links=5,                    # Limit to 5 links
@@ -94,7 +94,7 @@ async def research_assistant_example():
     print("=" * 50)
     
     config = CrawlerRunConfig(
-        link_extraction_config=LinkExtractionConfig(
+        link_preview_config=LinkPreviewConfig(
             include_internal=True,
             include_external=True,
             include_patterns=["*/docs/*", "*/tutorial/*", "*/guide/*"],
@@ -149,7 +149,7 @@ async def api_discovery_example():
     print("=" * 50)
     
     config = CrawlerRunConfig(
-        link_extraction_config=LinkExtractionConfig(
+        link_preview_config=LinkPreviewConfig(
             include_internal=True,
             include_patterns=["*/api/*", "*/reference/*", "*/endpoint/*"],
             exclude_patterns=["*/deprecated/*", "*/v1/*"],  # Skip old versions
@@ -214,7 +214,7 @@ async def link_quality_analysis():
     print("=" * 50)
     
     config = CrawlerRunConfig(
-        link_extraction_config=LinkExtractionConfig(
+        link_preview_config=LinkPreviewConfig(
             include_internal=True,
             max_links=30,  # Analyze more links for better statistics
             concurrency=15,
@@ -281,7 +281,7 @@ async def pattern_filtering_example():
     filters = [
         {
             "name": "Documentation Only",
-            "config": LinkExtractionConfig(
+            "config": LinkPreviewConfig(
                 include_internal=True,
                 max_links=10,
                 concurrency=5,
@@ -292,7 +292,7 @@ async def pattern_filtering_example():
         },
         {
             "name": "API References Only", 
-            "config": LinkExtractionConfig(
+            "config": LinkPreviewConfig(
                 include_internal=True,
                 max_links=10,
                 concurrency=5,
@@ -303,7 +303,7 @@ async def pattern_filtering_example():
         },
         {
             "name": "Exclude Admin Areas",
-            "config": LinkExtractionConfig(
+            "config": LinkPreviewConfig(
                 include_internal=True,
                 max_links=10,
                 concurrency=5,
@@ -318,7 +318,7 @@ async def pattern_filtering_example():
             print(f"\n🔍 Testing: {filter_example['name']}")
             
             config = CrawlerRunConfig(
-                link_extraction_config=filter_example['config'],
+                link_preview_config=filter_example['config'],
                 score_links=True
             )
             
