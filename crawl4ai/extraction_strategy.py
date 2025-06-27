@@ -1224,7 +1224,6 @@ class JsonCssExtractionStrategy(JsonElementExtractionStrategy):
         return parsed_html.select(selector)
 
     def _get_elements(self, element, selector: str):
-        print(f"Applying selector: {selector} on element: {element}")
         if selector.startswith('+ '):
             # Remove '+ ' prefix and strip whitespace
             rest = selector[2:].strip()
@@ -1237,11 +1236,9 @@ class JsonCssExtractionStrategy(JsonElementExtractionStrategy):
                 sibling_selector = rest
                 rest_selector = None
             
-            print(f"Sibling Selector: {sibling_selector}, Rest Selector: {rest_selector}")
             
             # Find the next sibling matching the sibling_selector
             sibling = element.find_next_sibling(sibling_selector)
-            print(f"Sibling: {sibling}")
             
             if sibling and rest_selector:
                 # Apply the remaining selector to the sibling
