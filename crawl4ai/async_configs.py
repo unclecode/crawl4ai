@@ -17,7 +17,7 @@ from .extraction_strategy import ExtractionStrategy, LLMExtractionStrategy
 from .chunking_strategy import ChunkingStrategy, RegexChunking
 
 from .markdown_generation_strategy import MarkdownGenerationStrategy, DefaultMarkdownGenerator
-from .content_scraping_strategy import ContentScrapingStrategy, WebScrapingStrategy
+from .content_scraping_strategy import ContentScrapingStrategy, WebScrapingStrategy, LXMLWebScrapingStrategy
 from .deep_crawling import DeepCrawlStrategy
 
 from .cache_context import CacheMode
@@ -594,6 +594,101 @@ class BrowserConfig:
             return config
         return BrowserConfig.from_kwargs(config)
 
+class LinkExtractionConfig:
+    """Configuration for link head extraction and scoring."""
+    
+    def __init__(
+        self,
+        include_internal: bool = True,
+        include_external: bool = False,
+        include_patterns: Optional[List[str]] = None,
+        exclude_patterns: Optional[List[str]] = None,
+        concurrency: int = 10,
+        timeout: int = 5,
+        max_links: int = 100,
+        query: Optional[str] = None,
+        score_threshold: Optional[float] = None,
+        verbose: bool = False
+    ):
+        """
+        Initialize link extraction configuration.
+        
+        Args:
+            include_internal: Whether to include same-domain links
+            include_external: Whether to include different-domain links  
+            include_patterns: List of glob patterns to include (e.g., ["*/docs/*", "*/api/*"])
+            exclude_patterns: List of glob patterns to exclude (e.g., ["*/login*", "*/admin*"])
+            concurrency: Number of links to process simultaneously
+            timeout: Timeout in seconds for each link's head extraction
+            max_links: Maximum number of links to process (prevents overload)
+            query: Query string for BM25 contextual scoring (optional)
+            score_threshold: Minimum relevance score to include links (0.0-1.0, optional)
+            verbose: Show detailed progress during extraction
+        """
+        self.include_internal = include_internal
+        self.include_external = include_external
+        self.include_patterns = include_patterns
+        self.exclude_patterns = exclude_patterns
+        self.concurrency = concurrency
+        self.timeout = timeout
+        self.max_links = max_links
+        self.query = query
+        self.score_threshold = score_threshold
+        self.verbose = verbose
+        
+        # Validation
+        if concurrency <= 0:
+            raise ValueError("concurrency must be positive")
+        if timeout <= 0:
+            raise ValueError("timeout must be positive")
+        if max_links <= 0:
+            raise ValueError("max_links must be positive")
+        if score_threshold is not None and not (0.0 <= score_threshold <= 1.0):
+            raise ValueError("score_threshold must be between 0.0 and 1.0")
+        if not include_internal and not include_external:
+            raise ValueError("At least one of include_internal or include_external must be True")
+    
+    @staticmethod
+    def from_dict(config_dict: Dict[str, Any]) -> "LinkExtractionConfig":
+        """Create LinkExtractionConfig from dictionary (for backward compatibility)."""
+        if not config_dict:
+            return None
+        
+        return LinkExtractionConfig(
+            include_internal=config_dict.get("include_internal", True),
+            include_external=config_dict.get("include_external", False),
+            include_patterns=config_dict.get("include_patterns"),
+            exclude_patterns=config_dict.get("exclude_patterns"),
+            concurrency=config_dict.get("concurrency", 10),
+            timeout=config_dict.get("timeout", 5),
+            max_links=config_dict.get("max_links", 100),
+            query=config_dict.get("query"),
+            score_threshold=config_dict.get("score_threshold"),
+            verbose=config_dict.get("verbose", False)
+        )
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary format."""
+        return {
+            "include_internal": self.include_internal,
+            "include_external": self.include_external,
+            "include_patterns": self.include_patterns,
+            "exclude_patterns": self.exclude_patterns,
+            "concurrency": self.concurrency,
+            "timeout": self.timeout,
+            "max_links": self.max_links,
+            "query": self.query,
+            "score_threshold": self.score_threshold,
+            "verbose": self.verbose
+        }
+    
+    def clone(self, **kwargs) -> "LinkExtractionConfig":
+        """Create a copy with updated values."""
+        config_dict = self.to_dict()
+        config_dict.update(kwargs)
+        return LinkExtractionConfig.from_dict(config_dict)
+
+
 class HTTPCrawlerConfig:
     """HTTP-specific crawler configuration"""
 
@@ -829,6 +924,9 @@ class CrawlerRunConfig():
                                        Default: [].
         exclude_internal_links (bool): If True, exclude internal links from the results.
                                        Default: False.
+        score_links (bool): If True, calculate intrinsic quality scores for all links using URL structure,
+                           text quality, and contextual relevance metrics. Separate from link_extraction_config.
+                           Default: False.
 
         # Debugging and Logging Parameters
         verbose (bool): Enable verbose logging.
@@ -939,6 +1037,7 @@ class CrawlerRunConfig():
         exclude_social_media_links: bool = False,
         exclude_domains: list = None,
         exclude_internal_links: bool = False,
+        score_links: bool = False,
         # Debugging and Logging Parameters
         verbose: bool = True,
         log_console: bool = False,
@@ -955,6 +1054,8 @@ class CrawlerRunConfig():
         user_agent_generator_config: dict = {},
         # Deep Crawl Parameters
         deep_crawl_strategy: Optional[DeepCrawlStrategy] = None,
+        # Link Extraction Parameters
+        link_extraction_config: Union[LinkExtractionConfig, Dict[str, Any]] = None,
         # Experimental Parameters
         experimental: Dict[str, Any] = None,
     ):
@@ -976,7 +1077,7 @@ class CrawlerRunConfig():
         self.remove_forms = remove_forms
         self.prettiify = prettiify
         self.parser_type = parser_type
-        self.scraping_strategy = scraping_strategy or WebScrapingStrategy()
+        self.scraping_strategy = scraping_strategy or LXMLWebScrapingStrategy()
         self.proxy_config = proxy_config
         self.proxy_rotation_strategy = proxy_rotation_strategy
         
@@ -1042,6 +1143,7 @@ class CrawlerRunConfig():
         self.exclude_social_media_links = exclude_social_media_links
         self.exclude_domains = exclude_domains or []
         self.exclude_internal_links = exclude_internal_links
+        self.score_links = score_links
 
         # Debugging and Logging Parameters
         self.verbose = verbose
@@ -1083,6 +1185,17 @@ class CrawlerRunConfig():
 
         # Deep Crawl Parameters
         self.deep_crawl_strategy = deep_crawl_strategy
+        
+        # Link Extraction Parameters
+        if link_extraction_config is None:
+            self.link_extraction_config = None
+        elif isinstance(link_extraction_config, LinkExtractionConfig):
+            self.link_extraction_config = link_extraction_config
+        elif isinstance(link_extraction_config, dict):
+            # Convert dict to config object for backward compatibility
+            self.link_extraction_config = LinkExtractionConfig.from_dict(link_extraction_config)
+        else:
+            raise ValueError("link_extraction_config must be LinkExtractionConfig object or dict")
         
         # Experimental Parameters
         self.experimental = experimental or {}
@@ -1241,6 +1354,7 @@ class CrawlerRunConfig():
             exclude_social_media_links=kwargs.get("exclude_social_media_links", False),
             exclude_domains=kwargs.get("exclude_domains", []),
             exclude_internal_links=kwargs.get("exclude_internal_links", False),
+            score_links=kwargs.get("score_links", False),
             # Debugging and Logging Parameters
             verbose=kwargs.get("verbose", True),
             log_console=kwargs.get("log_console", False),
@@ -1256,6 +1370,8 @@ class CrawlerRunConfig():
             user_agent_generator_config=kwargs.get("user_agent_generator_config", {}),
             # Deep Crawl Parameters
             deep_crawl_strategy=kwargs.get("deep_crawl_strategy"),
+            # Link Extraction Parameters
+            link_extraction_config=kwargs.get("link_extraction_config"),
             url=kwargs.get("url"),
             # Experimental Parameters 
             experimental=kwargs.get("experimental"),
@@ -1339,6 +1455,7 @@ class CrawlerRunConfig():
             "exclude_social_media_links": self.exclude_social_media_links,
             "exclude_domains": self.exclude_domains,
             "exclude_internal_links": self.exclude_internal_links,
+            "score_links": self.score_links,
             "verbose": self.verbose,
             "log_console": self.log_console,
             "capture_network_requests": self.capture_network_requests,
@@ -1350,6 +1467,7 @@ class CrawlerRunConfig():
             "user_agent_mode": self.user_agent_mode,
             "user_agent_generator_config": self.user_agent_generator_config,
             "deep_crawl_strategy": self.deep_crawl_strategy,
+            "link_extraction_config": self.link_extraction_config.to_dict() if self.link_extraction_config else None,
             "url": self.url,
             "experimental": self.experimental,
         }

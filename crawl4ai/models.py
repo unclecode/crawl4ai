@@ -345,6 +345,12 @@ class Link(BaseModel):
     text: Optional[str] = ""
     title: Optional[str] = ""
     base_domain: Optional[str] = ""
+    head_data: Optional[Dict[str, Any]] = None  # Head metadata extracted from link target
+    head_extraction_status: Optional[str] = None  # "success", "failed", "skipped"
+    head_extraction_error: Optional[str] = None  # Error message if extraction failed
+    intrinsic_score: Optional[float] = None  # Quality score based on URL structure, text, and context
+    contextual_score: Optional[float] = None  # BM25 relevance score based on query and head content
+    total_score: Optional[float] = None  # Combined score from intrinsic and contextual scores
 
 
 class Media(BaseModel):
