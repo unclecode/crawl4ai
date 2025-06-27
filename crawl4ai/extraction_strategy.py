@@ -1224,9 +1224,37 @@ class JsonCssExtractionStrategy(JsonElementExtractionStrategy):
         return parsed_html.select(selector)
 
     def _get_elements(self, element, selector: str):
-        # Return all matching elements using select() instead of select_one()
-        # This ensures that we get all elements that match the selector, not just the first one
-        return element.select(selector)
+        print(f"Applying selector: {selector} on element: {element}")
+        if selector.startswith('+ '):
+            # Remove '+ ' prefix and strip whitespace
+            rest = selector[2:].strip()
+            # Split on the first space to separate sibling selector from the rest
+            space_index = rest.find(' ')
+            if space_index != -1:
+                sibling_selector = rest[:space_index]
+                rest_selector = rest[space_index+1:].strip()
+            else:
+                sibling_selector = rest
+                rest_selector = None
+            
+            print(f"Sibling Selector: {sibling_selector}, Rest Selector: {rest_selector}")
+            
+            # Find the next sibling matching the sibling_selector
+            sibling = element.find_next_sibling(sibling_selector)
+            print(f"Sibling: {sibling}")
+            
+            if sibling and rest_selector:
+                # Apply the remaining selector to the sibling
+                return sibling.select(rest_selector)
+            elif sibling:
+                # If no further selector, return the sibling itself
+                return [sibling]
+            else:
+                # No sibling found
+                return []
+        else:
+            # Default behavior for descendant selectors
+            return element.select(selector)
 
     def _get_element_text(self, element) -> str:
         return element.get_text(strip=True)
