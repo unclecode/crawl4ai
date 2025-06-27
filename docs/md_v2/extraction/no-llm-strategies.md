@@ -342,6 +342,119 @@ If all goes well, you get a **structured** JSON array with each "category," cont
 
 ---
 
+### Advanced Selectors: The Sibling Combinator (`+`)
+
+For websites where related data is not nested but appears in adjacent elements (like table rows), Crawl4AI now supports the **next-sibling combinator (`+`)**. This is especially useful for sites like Hacker News, where a post's title is in one `<tr>` and its metadata (score, author) is in the immediately following `<tr>`.
+
+The syntax is `+ sibling_selector [descendant_selector]`, where:
+- `+` signals a sibling lookup.
+- `sibling_selector` is the CSS selector for the next sibling element (e.g., `tr`, `div.details`).
+- `descendant_selector` (optional) is a standard CSS selector to find an element *within* that sibling.
+
+#### Example: Hacker News Style Extraction
+
+Consider this HTML structure where the score is in the row *after* the title row:
+
+```html
+<table>
+    <tbody>
+        <tr class='athing' id='1'>
+            <td class="title"><span class="titleline"><a href="...">My Awesome Project</a></span></td>
+        </tr>
+        <tr>
+            <td class="subtext">
+                <span class="score">100 points</span>
+            </td>
+        </tr>
+        <tr class='athing' id='2'>
+            <td class="title"><span class="titleline"><a href="...">Another Cool Thing</a></span></td>
+        </tr>
+        <tr>
+            <td class="subtext">
+                <span class="score">50 points</span>
+            </td>
+        </tr>
+    </tbody>
+</table>
+```
+
+Here’s how you can extract both the title and the score using the sibling selector:
+
+```python
+import json
+import asyncio
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
+from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+
+async def extract_sibling_data():
+    # 1. Sample HTML
+    dummy_html = """
+    <table>
+        <tbody>
+            <tr class='athing' id='1'>
+                <td class="title"><span class="titleline"><a href="...">My Awesome Project</a></span></td>
+            </tr>
+            <tr>
+                <td class="subtext">
+                    <span class="score">100 points</span>
+                </td>
+            </tr>
+            <tr class='athing' id='2'>
+                <td class="title"><span class="titleline"><a href="...">Another Cool Thing</a></span></td>
+            </tr>
+            <tr>
+                <td class="subtext">
+                    <span class="score">50 points</span>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    """
+
+    # 2. Define the schema with a sibling selector
+    schema = {
+        "name": "HackerNewsItems",
+        "baseSelector": "tr.athing",
+        "fields": [
+            {
+                "name": "title",
+                "selector": ".titleline a",  # Standard descendant selector
+                "type": "text"
+            },
+            {
+                "name": "points",
+                "selector": "+ tr .score",  # Sibling selector
+                "type": "text"
+            }
+        ]
+    }
+
+    # 3. Create and run the extraction
+    strategy = JsonCssExtractionStrategy(schema, verbose=True)
+    config = CrawlerRunConfig(extraction_strategy=strategy)
+    raw_url = f"raw://{dummy_html}"
+
+    async with AsyncWebCrawler(verbose=True) as crawler:
+        result = await crawler.arun(url=raw_url, config=config)
+
+        if not result.success:
+            print("Crawl failed:", result.error_message)
+            return
+
+        data = json.loads(result.extracted_content)
+        print(json.dumps(data, indent=2))
+
+asyncio.run(extract_sibling_data())
+```
+
+**How it works**:
+1. `baseSelector: "tr.athing"` identifies each main row as an item.
+2. For the `points` field, `selector: "+ tr .score"` does the following:
+    - From the `tr.athing` element, `+ tr` finds the immediately following `<tr>` sibling.
+    - ` .score` then finds the descendant element with the class `score` inside that sibling.
+
+This powerful feature allows you to scrape data from complex, non-nested layouts with ease and precision, further reducing the need for an LLM for structured extraction.
+
 ## 4. RegexExtractionStrategy - Fast Pattern-Based Extraction
 
 Crawl4AI now offers a powerful new zero-LLM extraction strategy: `RegexExtractionStrategy`. This strategy provides lightning-fast extraction of common data types like emails, phone numbers, URLs, dates, and more using pre-compiled regular expressions.
