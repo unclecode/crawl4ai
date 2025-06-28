@@ -285,8 +285,6 @@ async def run_memory_stress_test(
     # Create monitor with reference to test results
     monitor = StressTestMonitor(
         test_results=test_results,
-        display_mode=DisplayMode.DETAILED,
-        max_visible_rows=20,
         total_urls=url_count  # Pass total URLs count
     )
     
