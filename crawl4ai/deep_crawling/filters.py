@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Pattern, Set, Union
+from typing import List, Pattern, Set, Union, Callable, Awaitable
 from urllib.parse import urlparse
 from array import array
 import re
@@ -476,6 +476,83 @@ class DomainFilter(URLFilter):
         # No matches found
         self._update_stats(False)
         return False
+
+
+class CallbackURLFilter(URLFilter):
+    """
+    A flexible URL filter that uses a custom callback function to determine
+    whether a URL should be crawled.
+    
+    This filter allows users to implement any custom logic for URL filtering
+    by providing a callback function that takes a URL and returns a boolean.
+    
+    The callback can optionally be async (coroutine) or sync (regular function).
+    
+    Example usage:
+        # Simple path-based filter
+        def path_filter(url: str) -> bool:
+            parsed = urlparse(url)
+            return parsed.path.startswith('/docs/')
+        
+        filter = CallbackURLFilter(path_filter)
+        
+        # More complex filter with multiple conditions
+        async def complex_filter(url: str) -> bool:
+            parsed = urlparse(url)
+            # Check path prefix
+            if not parsed.path.startswith('/api/v2/'):
+                return False
+            # Check query parameters
+            if 'deprecated' in parsed.query:
+                return False
+            # Could even make HTTP requests here if needed
+            return True
+        
+        filter = CallbackURLFilter(complex_filter, name="APIv2Filter")
+    """
+    
+    __slots__ = ("_callback", "_is_async")
+    
+    def __init__(
+        self,
+        callback: Union[Callable[[str], bool], Callable[[str], Awaitable[bool]]],
+        name: str = None
+    ):
+        """
+        Initialize the callback filter.
+        
+        Args:
+            callback: A function that takes a URL string and returns bool.
+                     Can be either sync or async.
+            name: Optional name for the filter (for logging/debugging).
+        """
+        super().__init__(name=name or "CallbackFilter")
+        self._callback = callback
+        self._is_async = inspect.iscoroutinefunction(callback)
+    
+    async def apply(self, url: str) -> bool:
+        """
+        Apply the callback function to determine if URL should be crawled.
+        
+        Args:
+            url: The URL to evaluate
+            
+        Returns:
+            bool: True if the URL should be crawled, False otherwise
+        """
+        try:
+            if self._is_async:
+                result = await self._callback(url)
+            else:
+                result = self._callback(url)
+            
+            self._update_stats(result)
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"Callback filter error for URL {url}: {e}")
+            self._update_stats(False)
+            return False
 
 
 class ContentRelevanceFilter(URLFilter):
