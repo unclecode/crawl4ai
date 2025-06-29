@@ -963,8 +963,13 @@ class BrowserManager:
             context = self.default_context
             pages = context.pages
             page = next((p for p in pages if p.url == crawlerRunConfig.url), None)
-            if not page:
-                page = context.pages[0] # await context.new_page()
+        if not page:
+            # Prefer an existing, open page; otherwise create one.
+            if pages:
+                live_pages = [p for p in pages if not p.is_closed()]
+                page = live_pages[0] if live_pages else await context.new_page()
+            else:
+                page = await context.new_page()
         else:
             # Otherwise, check if we have an existing context for this config
             config_signature = self._make_config_signature(crawlerRunConfig)
