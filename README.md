@@ -299,7 +299,7 @@ task_id = response.json()["task_id"]
 result = requests.get(f"http://localhost:11235/task/{task_id}")
 ```
 
-For more examples, see our [Docker Examples](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/docker_example.py). For advanced configuration, environment variables, and usage examples, see our [Docker Deployment Guide](https://docs.crawl4ai.com/basic/docker-deployment/).
+For more examples, see our [Docker Examples](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/docker_example.py). For advanced configuration, environment variables, and usage examples, see our [Docker Deployment Guide](https://docs.crawl4ai.com/core/docker-deployment/).
 
 </details>
 
@@ -575,7 +575,7 @@ async def test_news_crawl():
 
 - **📱 Multi-stage Build System**: Optimized Dockerfile with platform-specific performance enhancements
 
-Read the full details in our [0.6.0 Release Notes](https://docs.crawl4ai.com/blog/releases/0.6.0.html) or check the [CHANGELOG](https://github.com/unclecode/crawl4ai/blob/main/CHANGELOG.md).
+Read the full details in our [0.6.0 Release Notes](https://docs.crawl4ai.com/blog/releases/0.6.0/) or check the [CHANGELOG](https://github.com/unclecode/crawl4ai/blob/main/CHANGELOG.md).
 
 ### Previous Version: 0.5.0 Major Release Highlights
 
@@ -590,7 +590,7 @@ Read the full details in our [0.6.0 Release Notes](https://docs.crawl4ai.com/blo
 -   **🤖 LLM Content Filter**: Intelligent markdown generation using LLMs
 -   **📄 PDF Processing**: Extract text, images, and metadata from PDF files
 
-Read the full details in our [0.5.0 Release Notes](https://docs.crawl4ai.com/blog/releases/0.5.0.html).
+Read the full details in our [0.5.0 Release Notes](https://docs.crawl4ai.com/blog/releases/0.5.0/).
 
 ## Version Numbering in Crawl4AI
 
