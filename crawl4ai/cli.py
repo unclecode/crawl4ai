@@ -53,10 +53,11 @@ def save_global_config(config: dict):
     with open(config_file, "w") as f:
         yaml.dump(config, f)
 
-def setup_llm_config() -> tuple[str, str]:
+def setup_llm_config() -> tuple[str, str, str]:
     config = get_global_config()
     provider = config.get("DEFAULT_LLM_PROVIDER")
     token = config.get("DEFAULT_LLM_PROVIDER_TOKEN")
+    base_url = config.get("DEFAULT_LLM_PROVIDER_BASE_URL")
     
     if not provider:
         click.echo("\nNo default LLM provider configured.")
@@ -69,6 +70,12 @@ def setup_llm_config() -> tuple[str, str]:
             token = click.prompt("Enter API token for " + provider, hide_input=True)
     else:
         token = "no-token"
+
+    if not base_url:
+        click.echo("\nIf you need to set a custom base URL for the provider, enter it below. Otherwise, leave it blank.")
+        click.echo("For example, for Ollama, you might set it to 'http://localhost:11434'")
+        base_url = click.prompt("Enter base URL for " + provider)
+        config["DEFAULT_LLM_PROVIDER_BASE_URL"] = base_url
     
     if not config.get("DEFAULT_LLM_PROVIDER") or not config.get("DEFAULT_LLM_PROVIDER_TOKEN"):
         config["DEFAULT_LLM_PROVIDER"] = provider
@@ -76,12 +83,13 @@ def setup_llm_config() -> tuple[str, str]:
         save_global_config(config)
         click.echo("\nConfiguration saved to ~/.crawl4ai/global.yml")
     
-    return provider, token
+    return provider, token, base_url
 
-async def stream_llm_response(url: str, markdown: str, query: str, provider: str, token: str):
+async def stream_llm_response(url: str, markdown: str, query: str, provider: str, token: str, base_url: Optional[str] = None):
     response = completion(
         model=provider,
         api_key=token,
+        base_url=base_url,
         messages=[
             {
                 "content": f"You are Crawl4ai assistant, answering user question based on the provided context which is crawled from {url}.",
@@ -1134,7 +1142,7 @@ Always return valid, properly formatted JSON."""
                     raise click.ClickException("LLM provider and API token are required for LLM extraction")
 
                 crawler_cfg.extraction_strategy = LLMExtractionStrategy(
-                    llm_config=LLMConfig(provider=extract_conf["provider"], api_token=extract_conf["api_token"]),
+                    llm_config=LLMConfig(provider=extract_conf["provider"], api_token=extract_conf["api_token"], base_url=extract_conf.get("base_url")),
                     instruction=extract_conf["instruction"],
                     schema=schema_data,
                     **extract_conf.get("params", {})
@@ -1171,9 +1179,9 @@ Always return valid, properly formatted JSON."""
 
         # Handle question
         if question:
-            provider, token = setup_llm_config()
+            provider, token, base_url = setup_llm_config()
             markdown = result.markdown.raw_markdown
-            anyio.run(stream_llm_response, url, markdown, question, provider, token)
+            anyio.run(stream_llm_response, url, markdown, question, provider, token, base_url)
             return
         
         # Handle output
