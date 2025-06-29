@@ -1,4 +1,5 @@
 import os
+from typing import Union
 from .config import (
     DEFAULT_PROVIDER,
     DEFAULT_PROVIDER_API_KEY,
@@ -594,6 +595,51 @@ class BrowserConfig:
             return config
         return BrowserConfig.from_kwargs(config)
 
+class VirtualScrollConfig:
+    """Configuration for virtual scroll handling.
+    
+    This config enables capturing content from pages with virtualized scrolling
+    (like Twitter, Instagram feeds) where DOM elements are recycled as user scrolls.
+    """
+    
+    def __init__(
+        self,
+        container_selector: str,
+        scroll_count: int = 10,
+        scroll_by: Union[str, int] = "container_height",
+        wait_after_scroll: float = 0.5,
+    ):
+        """
+        Initialize virtual scroll configuration.
+        
+        Args:
+            container_selector: CSS selector for the scrollable container
+            scroll_count: Maximum number of scrolls to perform
+            scroll_by: Amount to scroll - can be:
+                - "container_height": scroll by container's height
+                - "page_height": scroll by viewport height  
+                - int: fixed pixel amount
+            wait_after_scroll: Seconds to wait after each scroll for content to load
+        """
+        self.container_selector = container_selector
+        self.scroll_count = scroll_count
+        self.scroll_by = scroll_by
+        self.wait_after_scroll = wait_after_scroll
+    
+    def to_dict(self) -> dict:
+        """Convert to dictionary for serialization."""
+        return {
+            "container_selector": self.container_selector,
+            "scroll_count": self.scroll_count,
+            "scroll_by": self.scroll_by,
+            "wait_after_scroll": self.wait_after_scroll,
+        }
+    
+    @classmethod
+    def from_dict(cls, data: dict) -> "VirtualScrollConfig":
+        """Create instance from dictionary."""
+        return cls(**data)
+
 class LinkPreviewConfig:
     """Configuration for link head extraction and scoring."""
     
@@ -911,6 +957,12 @@ class CrawlerRunConfig():
         table_score_threshold (int): Minimum score threshold for processing a table.
                                      Default: 7.
 
+        # Virtual Scroll Parameters
+        virtual_scroll_config (VirtualScrollConfig or dict or None): Configuration for handling virtual scroll containers.
+                                                                     Used for capturing content from pages with virtualized 
+                                                                     scrolling (e.g., Twitter, Instagram feeds).
+                                                                     Default: None.
+
         # Link and Domain Handling Parameters
         exclude_social_media_domains (list of str): List of domains to exclude for social media links.
                                                     Default: SOCIAL_MEDIA_DOMAINS (from config).
@@ -1056,6 +1108,8 @@ class CrawlerRunConfig():
         deep_crawl_strategy: Optional[DeepCrawlStrategy] = None,
         # Link Extraction Parameters
         link_preview_config: Union[LinkPreviewConfig, Dict[str, Any]] = None,
+        # Virtual Scroll Parameters
+        virtual_scroll_config: Union[VirtualScrollConfig, Dict[str, Any]] = None,
         # Experimental Parameters
         experimental: Dict[str, Any] = None,
     ):
@@ -1196,6 +1250,17 @@ class CrawlerRunConfig():
             self.link_preview_config = LinkPreviewConfig.from_dict(link_preview_config)
         else:
             raise ValueError("link_preview_config must be LinkPreviewConfig object or dict")
+        
+        # Virtual Scroll Parameters
+        if virtual_scroll_config is None:
+            self.virtual_scroll_config = None
+        elif isinstance(virtual_scroll_config, VirtualScrollConfig):
+            self.virtual_scroll_config = virtual_scroll_config
+        elif isinstance(virtual_scroll_config, dict):
+            # Convert dict to config object for backward compatibility
+            self.virtual_scroll_config = VirtualScrollConfig.from_dict(virtual_scroll_config)
+        else:
+            raise ValueError("virtual_scroll_config must be VirtualScrollConfig object or dict")
         
         # Experimental Parameters
         self.experimental = experimental or {}

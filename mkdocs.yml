@@ -37,6 +37,7 @@ nav:
     - "Link & Media": "core/link-media.md"
   - Advanced:
     - "Overview": "advanced/advanced-features.md"
+    - "Virtual Scroll": "advanced/virtual-scroll.md"
     - "File Downloading": "advanced/file-downloading.md"
     - "Lazy Loading": "advanced/lazy-loading.md"
     - "Hooks & Auth": "advanced/hooks-auth.md"

@@ -898,6 +898,10 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             if config.scan_full_page:
                 await self._handle_full_page_scan(page, config.scroll_delay)
 
+            # Handle virtual scroll if configured
+            if config.virtual_scroll_config:
+                await self._handle_virtual_scroll(page, config.virtual_scroll_config)
+
             # Execute JavaScript if provided
             # if config.js_code:
             #     if isinstance(config.js_code, str):
@@ -1148,6 +1152,177 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         else:
             # await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
             await self.safe_scroll(page, 0, total_height)
+
+    async def _handle_virtual_scroll(self, page: Page, config: "VirtualScrollConfig"):
+        """
+        Handle virtual scroll containers (e.g., Twitter-like feeds) by capturing
+        content at different scroll positions and merging unique elements.
+        
+        Following the design:
+        1. Get container HTML
+        2. Scroll by container height
+        3. Wait and check if container HTML changed
+        4. Three cases:
+           - No change: continue scrolling
+           - New items added (appended): continue (items already in page)
+           - Items replaced: capture HTML chunk and add to list
+        5. After N scrolls, merge chunks if any were captured
+        
+        Args:
+            page: The Playwright page object
+            config: Virtual scroll configuration
+        """
+        try:
+            # Import VirtualScrollConfig to avoid circular import
+            from .async_configs import VirtualScrollConfig
+            
+            # Ensure config is a VirtualScrollConfig instance
+            if isinstance(config, dict):
+                config = VirtualScrollConfig.from_dict(config)
+            
+            self.logger.info(
+                message="Starting virtual scroll capture for container: {selector}",
+                tag="VSCROLL",
+                params={"selector": config.container_selector}
+            )
+            
+            # JavaScript function to handle virtual scroll capture
+            virtual_scroll_js = """
+            async (config) => {
+                const container = document.querySelector(config.container_selector);
+                if (!container) {
+                    throw new Error(`Container not found: ${config.container_selector}`);
+                }
+                
+                // List to store HTML chunks when content is replaced
+                const htmlChunks = [];
+                let previousHTML = container.innerHTML;
+                let scrollCount = 0;
+                
+                // Determine scroll amount
+                let scrollAmount;
+                if (typeof config.scroll_by === 'number') {
+                    scrollAmount = config.scroll_by;
+                } else if (config.scroll_by === 'page_height') {
+                    scrollAmount = window.innerHeight;
+                } else { // container_height
+                    scrollAmount = container.offsetHeight;
+                }
+                
+                // Perform scrolling
+                while (scrollCount < config.scroll_count) {
+                    // Scroll the container
+                    container.scrollTop += scrollAmount;
+                    
+                    // Wait for content to potentially load
+                    await new Promise(resolve => setTimeout(resolve, config.wait_after_scroll * 1000));
+                    
+                    // Get current HTML
+                    const currentHTML = container.innerHTML;
+                    
+                    // Determine what changed
+                    if (currentHTML === previousHTML) {
+                        // Case 0: No change - continue scrolling
+                        console.log(`Scroll ${scrollCount + 1}: No change in content`);
+                    } else if (currentHTML.startsWith(previousHTML)) {
+                        // Case 1: New items appended - content already in page
+                        console.log(`Scroll ${scrollCount + 1}: New items appended`);
+                    } else {
+                        // Case 2: Items replaced - capture the previous HTML
+                        console.log(`Scroll ${scrollCount + 1}: Content replaced, capturing chunk`);
+                        htmlChunks.push(previousHTML);
+                    }
+                    
+                    // Update previous HTML for next iteration
+                    previousHTML = currentHTML;
+                    scrollCount++;
+                    
+                    // Check if we've reached the end
+                    if (container.scrollTop + container.clientHeight >= container.scrollHeight - 10) {
+                        console.log(`Reached end of scrollable content at scroll ${scrollCount}`);
+                        // Capture final chunk if content was replaced
+                        if (htmlChunks.length > 0) {
+                            htmlChunks.push(currentHTML);
+                        }
+                        break;
+                    }
+                }
+                
+                // If we have chunks (case 2 occurred), merge them
+                if (htmlChunks.length > 0) {
+                    console.log(`Merging ${htmlChunks.length} HTML chunks`);
+                    
+                    // Parse all chunks to extract unique elements
+                    const tempDiv = document.createElement('div');
+                    const seenTexts = new Set();
+                    const uniqueElements = [];
+                    
+                    // Process each chunk
+                    for (const chunk of htmlChunks) {
+                        tempDiv.innerHTML = chunk;
+                        const elements = tempDiv.children;
+                        
+                        for (let i = 0; i < elements.length; i++) {
+                            const element = elements[i];
+                            // Normalize text for deduplication
+                            const normalizedText = element.innerText
+                                .toLowerCase()
+                                .replace(/[\\s\\W]/g, ''); // Remove spaces and symbols
+                            
+                            if (!seenTexts.has(normalizedText)) {
+                                seenTexts.add(normalizedText);
+                                uniqueElements.push(element.outerHTML);
+                            }
+                        }
+                    }
+                    
+                    // Replace container content with merged unique elements
+                    container.innerHTML = uniqueElements.join('\\n');
+                    console.log(`Merged ${uniqueElements.length} unique elements from ${htmlChunks.length} chunks`);
+                    
+                    return {
+                        success: true,
+                        chunksCount: htmlChunks.length,
+                        uniqueCount: uniqueElements.length,
+                        replaced: true
+                    };
+                } else {
+                    console.log('No content replacement detected, all content remains in page');
+                    return {
+                        success: true,
+                        chunksCount: 0,
+                        uniqueCount: 0,
+                        replaced: false
+                    };
+                }
+            }
+            """
+            
+            # Execute virtual scroll capture
+            result = await page.evaluate(virtual_scroll_js, config.to_dict())
+            
+            if result.get("replaced", False):
+                self.logger.success(
+                    message="Virtual scroll completed. Merged {unique} unique elements from {chunks} chunks",
+                    tag="VSCROLL",
+                    params={
+                        "unique": result.get("uniqueCount", 0),
+                        "chunks": result.get("chunksCount", 0)
+                    }
+                )
+            else:
+                self.logger.info(
+                    message="Virtual scroll completed. Content was appended, no merging needed",
+                    tag="VSCROLL"
+                )
+            
+        except Exception as e:
+            self.logger.error(
+                message="Virtual scroll capture failed: {error}",
+                tag="VSCROLL",
+                params={"error": str(e)}
+            )
+            # Continue with normal flow even if virtual scroll fails
 
     async def _handle_download(self, download):
         """

@@ -169,7 +169,46 @@ Use these for link-level content filtering (often to keep crawls “internal” 
 
 ---
 
-## 2.2 Helper Methods
+
+### H) **Virtual Scroll Configuration**
+
+| **Parameter**                | **Type / Default**           | **What It Does**                                                                                                                    |
+|------------------------------|------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
+| **`virtual_scroll_config`**  | `VirtualScrollConfig or dict` (None) | Configuration for handling virtualized scrolling on sites like Twitter/Instagram where content is replaced rather than appended. |
+
+When sites use virtual scrolling (content replaced as you scroll), use `VirtualScrollConfig`:
+
+```python
+from crawl4ai import VirtualScrollConfig
+
+virtual_config = VirtualScrollConfig(
+    container_selector="#timeline",    # CSS selector for scrollable container
+    scroll_count=30,                   # Number of times to scroll
+    scroll_by="container_height",      # How much to scroll: "container_height", "page_height", or pixels (e.g. 500)
+    wait_after_scroll=0.5             # Seconds to wait after each scroll for content to load
+)
+
+config = CrawlerRunConfig(
+    virtual_scroll_config=virtual_config
+)
+```
+
+**VirtualScrollConfig Parameters:**
+
+| **Parameter**          | **Type / Default**        | **What It Does**                                                                          |
+|------------------------|---------------------------|-------------------------------------------------------------------------------------------|
+| **`container_selector`** | `str` (required)        | CSS selector for the scrollable container (e.g., `"#feed"`, `".timeline"`)              |
+| **`scroll_count`**     | `int` (10)               | Maximum number of scrolls to perform                                                      |
+| **`scroll_by`**        | `str or int` ("container_height") | Scroll amount: `"container_height"`, `"page_height"`, or pixels (e.g., `500`)   |
+| **`wait_after_scroll`** | `float` (0.5)           | Time in seconds to wait after each scroll for new content to load                        |
+
+**When to use Virtual Scroll vs scan_full_page:**
+- Use `virtual_scroll_config` when content is **replaced** during scroll (Twitter, Instagram)
+- Use `scan_full_page` when content is **appended** during scroll (traditional infinite scroll)
+
+See [Virtual Scroll documentation](../../advanced/virtual-scroll.md) for detailed examples.
+
+---## 2.2 Helper Methods
 
 Both `BrowserConfig` and `CrawlerRunConfig` provide a `clone()` method to create modified copies:
 

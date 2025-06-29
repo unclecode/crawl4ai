@@ -5,6 +5,20 @@ All notable changes to Crawl4AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.x] - 2025-06-29
+
+### Added
+- **Virtual Scroll Support**: New `VirtualScrollConfig` for handling virtualized scrolling on modern websites
+  - Automatically detects and handles three scrolling scenarios:
+    - Content unchanged (continue scrolling)
+    - Content appended (traditional infinite scroll)
+    - Content replaced (true virtual scroll - Twitter/Instagram style)
+  - Captures ALL content from pages that replace DOM elements during scroll
+  - Intelligent deduplication based on normalized text content
+  - Configurable scroll amount, count, and wait times
+  - Seamless integration with existing extraction strategies
+  - Comprehensive examples including Twitter timeline, Instagram grid, and mixed content scenarios
+
 ## [Unreleased]
 
 ### Added

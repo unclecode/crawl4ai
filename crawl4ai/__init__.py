@@ -2,8 +2,8 @@
 import warnings
 
 from .async_webcrawler import AsyncWebCrawler, CacheMode
-# MODIFIED: Add SeedingConfig here
-from .async_configs import BrowserConfig, CrawlerRunConfig, HTTPCrawlerConfig, LLMConfig, ProxyConfig, GeolocationConfig, SeedingConfig
+# MODIFIED: Add SeedingConfig and VirtualScrollConfig here
+from .async_configs import BrowserConfig, CrawlerRunConfig, HTTPCrawlerConfig, LLMConfig, ProxyConfig, GeolocationConfig, SeedingConfig, VirtualScrollConfig
 
 from .content_scraping_strategy import (
     ContentScrapingStrategy,
@@ -92,8 +92,9 @@ __all__ = [
     "BrowserProfiler",
     "LLMConfig",
     "GeolocationConfig",
-    # NEW: Add SeedingConfig
+    # NEW: Add SeedingConfig and VirtualScrollConfig
     "SeedingConfig",
+    "VirtualScrollConfig",
     # NEW: Add AsyncUrlSeeder
     "AsyncUrlSeeder",
     "DeepCrawlStrategy",
