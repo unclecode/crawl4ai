@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+import time
 import aiosqlite
 import asyncio
 from typing import Optional, Dict
@@ -241,7 +242,8 @@ class AsyncDatabaseManager:
                     metadata TEXT DEFAULT "{}",
                     screenshot TEXT DEFAULT "",
                     response_headers TEXT DEFAULT "{}",
-                    downloaded_files TEXT DEFAULT "{}"  -- New column added
+                    downloaded_files TEXT DEFAULT "{}",
+                    timestamp REAL DEFAULT 0
                 )
             """
             )
@@ -262,6 +264,7 @@ class AsyncDatabaseManager:
                 "screenshot",
                 "response_headers",
                 "downloaded_files",
+                "timestamp",
             ]
 
             for column in new_columns:
@@ -274,6 +277,10 @@ class AsyncDatabaseManager:
         if new_column == "response_headers":
             await db.execute(
                 f'ALTER TABLE crawled_data ADD COLUMN {new_column} TEXT DEFAULT "{{}}"'
+            )
+        elif new_column == "timestamp":
+            await db.execute(
+                f'ALTER TABLE crawled_data ADD COLUMN {new_column} REAL DEFAULT 0'
             )
         else:
             await db.execute(
@@ -300,6 +307,9 @@ class AsyncDatabaseManager:
                 columns = [description[0] for description in cursor.description]
                 # Create dict from row data
                 row_dict = dict(zip(columns, row))
+                
+                # Extract timestamp if present (for our content change detection)
+                timestamp = row_dict.get("timestamp", 0)
 
                 # Load content from files using stored hashes
                 content_fields = {
@@ -365,7 +375,18 @@ class AsyncDatabaseManager:
                 valid_fields = CrawlResult.__annotations__.keys()
                 filtered_dict = {k: v for k, v in row_dict.items() if k in valid_fields}
                 filtered_dict["markdown"] = row_dict["markdown"]
-                return CrawlResult(**filtered_dict)
+                
+                # Create the CrawlResult object
+                result = CrawlResult(**filtered_dict)
+
+                # Store timestamp in metadata instead of as a direct attribute
+                if not hasattr(result, "metadata") or result.metadata is None:
+                    result.metadata = {}
+
+                # Add timestamp to metadata
+                result.metadata["_timestamp"] = timestamp
+
+            return result
 
         try:
             return await self.execute_with_retry(_get)
@@ -425,15 +446,18 @@ class AsyncDatabaseManager:
         for field, (content, content_type) in content_map.items():
             content_hashes[field] = await self._store_content(content, content_type)
 
+        # Add timestamp to the data being saved
+        current_timestamp = time.time()
+        
         async def _cache(db):
             await db.execute(
                 """
                 INSERT INTO crawled_data (
                     url, html, cleaned_html, markdown,
                     extracted_content, success, media, links, metadata,
-                    screenshot, response_headers, downloaded_files
+                    screenshot, response_headers, downloaded_files, timestamp
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(url) DO UPDATE SET
                     html = excluded.html,
                     cleaned_html = excluded.cleaned_html,
@@ -445,7 +469,8 @@ class AsyncDatabaseManager:
                     metadata = excluded.metadata,
                     screenshot = excluded.screenshot,
                     response_headers = excluded.response_headers,
-                    downloaded_files = excluded.downloaded_files
+                    downloaded_files = excluded.downloaded_files,
+                    timestamp = excluded.timestamp
             """,
                 (
                     result.url,
@@ -460,6 +485,7 @@ class AsyncDatabaseManager:
                     content_hashes["screenshot"],
                     json.dumps(result.response_headers or {}),
                     json.dumps(result.downloaded_files or []),
+                    current_timestamp,  # Store current timestamp
                 ),
             )
 
@@ -491,6 +517,23 @@ class AsyncDatabaseManager:
                 params={"error": str(e)},
             )
             return 0
+
+    async def adelete_data_point(self, url: str):
+        """Delete a specific URL from the database"""
+     
+        async def _delete(db):
+            await db.execute("DELETE FROM crawled_data WHERE url = ?", (url,))
+
+        try:
+            await self.execute_with_retry(_delete)
+        except Exception as e:
+            self.logger.error(
+                message="Error deleting data point: {error}",
+                tag="ERROR",
+                force_verbose=True,
+                params={"error": str(e)},
+            )
+            raise e
 
     async def aclear_db(self):
         """Clear all data from the database"""
