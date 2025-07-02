@@ -502,9 +502,12 @@ class AsyncWebCrawler:
             metadata = result.get("metadata", {})
         else:
             cleaned_html = sanitize_input_encode(result.cleaned_html)
-            media = result.media.model_dump()
-            tables = media.pop("tables", [])
-            links = result.links.model_dump()
+            # media = result.media.model_dump()
+            # tables = media.pop("tables", [])
+            # links = result.links.model_dump()
+            media = result.media.model_dump() if hasattr(result.media, 'model_dump') else result.media
+            tables = media.pop("tables", []) if isinstance(media, dict) else []
+            links = result.links.model_dump() if hasattr(result.links, 'model_dump') else result.links
             metadata = result.metadata
             
         fit_html = preprocess_html_for_schema(html_content=html, text_threshold= 500, max_size= 300_000)
