@@ -1263,7 +1263,7 @@ class LLMConfig:
         provider: str = DEFAULT_PROVIDER,
         api_token: Optional[str] = None,
         base_url: Optional[str] = None,
-        temprature: Optional[float] = None,
+        temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
         top_p: Optional[float] = None,
         frequency_penalty: Optional[float] = None,
@@ -1291,7 +1291,7 @@ class LLMConfig:
                 self.provider = DEFAULT_PROVIDER
                 self.api_token = os.getenv(DEFAULT_PROVIDER_API_KEY)
         self.base_url = base_url
-        self.temprature = temprature
+        self.temperature = temperature
         self.max_tokens = max_tokens
         self.top_p = top_p
         self.frequency_penalty = frequency_penalty
@@ -1305,7 +1305,7 @@ class LLMConfig:
             provider=kwargs.get("provider", DEFAULT_PROVIDER),
             api_token=kwargs.get("api_token"),
             base_url=kwargs.get("base_url"),
-            temprature=kwargs.get("temprature"),
+            temperature=kwargs.get("temperature"),
             max_tokens=kwargs.get("max_tokens"),
             top_p=kwargs.get("top_p"),
             frequency_penalty=kwargs.get("frequency_penalty"),
@@ -1319,7 +1319,7 @@ class LLMConfig:
             "provider": self.provider,
             "api_token": self.api_token,
             "base_url": self.base_url,
-            "temprature": self.temprature,
+            "temperature": self.temperature,
             "max_tokens": self.max_tokens,
             "top_p": self.top_p,
             "frequency_penalty": self.frequency_penalty,
@@ -4075,7 +4075,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
             api_token: The API token for the provider.
             base_url: The base URL for the API request.
             api_base: The base URL for the API request.
-            extra_args: Additional arguments for the API request, such as temprature, max_tokens, etc.
+            extra_args: Additional arguments for the API request, such as temperature, max_tokens, etc.
         """
         super().__init__( input_format=input_format, **kwargs)
         self.llm_config = llm_config
