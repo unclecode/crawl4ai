@@ -4,10 +4,13 @@ from pydantic import BaseModel, Field
 from utils import FilterType
 
 
-class CrawlRequest(BaseModel):
-    urls: List[str] = Field(min_length=1, max_length=100)
+class CrawlConfigs(BaseModel):
     browser_config: Optional[Dict] = Field(default_factory=dict)
     crawler_config: Optional[Dict] = Field(default_factory=dict)
+
+class CrawlRequest(BaseModel):
+    urls: List[str] = Field(min_length=1, max_length=100)
+    configs: Optional[CrawlConfigs] = None
 
 class MarkdownRequest(BaseModel):
     """Request body for the /md endpoint."""
