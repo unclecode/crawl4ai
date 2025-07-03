@@ -438,11 +438,8 @@ async def crawl(
     if not crawl_request.urls:
         raise HTTPException(400, "At least one URL required")
 
-    browser_config = {}
-    crawler_config = {}
-    if crawl_request.configs:
-        browser_config = crawl_request.configs.browser_config if crawl_request.configs.browser_config else {}
-        crawler_config = crawl_request.configs.crawler_config if crawl_request.configs.crawler_config else {}
+    browser_config = crawl_request.configs.browser_config if crawl_request.configs.browser_config else {}
+    crawler_config = crawl_request.configs.crawler_config if crawl_request.configs.crawler_config else {}
 
     res = await handle_crawl_request(
         urls=crawl_request.urls,
@@ -463,11 +460,8 @@ async def crawl_stream(
     if not crawl_request.urls:
         raise HTTPException(400, "At least one URL required")
 
-    browser_config = {}
-    crawler_config = {}
-    if crawl_request.configs:
-        browser_config = crawl_request.configs.browser_config if crawl_request.configs.browser_config else {}
-        crawler_config = crawl_request.configs.crawler_config if crawl_request.configs.crawler_config else {}
+    browser_config = crawl_request.configs.browser_config if crawl_request.configs.browser_config else {}
+    crawler_config = crawl_request.configs.crawler_config if crawl_request.configs.crawler_config else {}
 
     crawler, gen = await handle_stream_crawl_request(
         urls=crawl_request.urls,

@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 from utils import FilterType
 
 
+
 class CrawlConfigs(BaseModel):
     browser_config: Optional[Dict] = Field(default_factory=dict)
     crawler_config: Optional[Dict] = Field(default_factory=dict)
