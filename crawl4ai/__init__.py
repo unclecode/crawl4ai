@@ -69,6 +69,14 @@ from .deep_crawling import (
 )
 # NEW: Import AsyncUrlSeeder
 from .async_url_seeder import AsyncUrlSeeder
+# Adaptive Crawler
+from .adaptive_crawler import (
+    AdaptiveCrawler,
+    AdaptiveConfig,
+    CrawlState,
+    CrawlStrategy,
+    StatisticalStrategy
+)
 
 # C4A Script Language Support
 from .script import (
@@ -97,6 +105,12 @@ __all__ = [
     "VirtualScrollConfig",
     # NEW: Add AsyncUrlSeeder
     "AsyncUrlSeeder",
+    # Adaptive Crawler
+    "AdaptiveCrawler",
+    "AdaptiveConfig", 
+    "CrawlState",
+    "CrawlStrategy",
+    "StatisticalStrategy",
     "DeepCrawlStrategy",
     "BFSDeepCrawlStrategy",
     "BestFirstCrawlingStrategy",

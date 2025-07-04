@@ -32,7 +32,6 @@ import hashlib
 
 from urllib.robotparser import RobotFileParser
 import aiohttp
-from urllib.parse import urlparse, urlunparse
 from functools import lru_cache
 
 from packaging import version
@@ -42,6 +41,14 @@ from typing import Sequence
 from itertools import chain
 from collections import deque
 from typing import  Generator, Iterable
+
+import numpy as np
+
+from urllib.parse import (
+    urljoin, urlparse, urlunparse,
+    parse_qsl, urlencode, quote, unquote
+)
+
 
 def chunk_documents(
     documents: Iterable[str],
@@ -2071,6 +2078,92 @@ def normalize_url(href, base_url):
     return normalized
 
 
+def normalize_url(
+    href: str,
+    base_url: str,
+    *,
+    drop_query_tracking=True,
+    sort_query=True,
+    keep_fragment=False,
+    extra_drop_params=None
+):
+    """
+    Extended URL normalizer
+
+    Parameters
+    ----------
+    href : str
+        The raw link extracted from a page.
+    base_url : str
+        The page’s canonical URL (used to resolve relative links).
+    drop_query_tracking : bool (default True)
+        Remove common tracking query parameters.
+    sort_query : bool (default True)
+        Alphabetically sort query keys for deterministic output.
+    keep_fragment : bool (default False)
+        Preserve the hash fragment (#section) if you need in-page links.
+    extra_drop_params : Iterable[str] | None
+        Additional query keys to strip (case-insensitive).
+
+    Returns
+    -------
+    str | None
+        A clean, canonical URL or None if href is empty/None.
+    """
+    if not href:
+        return None
+
+    # Resolve relative paths first
+    full_url = urljoin(base_url, href.strip())
+
+    # Parse once, edit parts, then rebuild
+    parsed = urlparse(full_url)
+
+    # ── netloc ──
+    netloc = parsed.netloc.lower()
+
+    # ── path ──
+    # Strip duplicate slashes and trailing “/” (except root)
+    path = quote(unquote(parsed.path))
+    if path.endswith('/') and path != '/':
+        path = path.rstrip('/')
+
+    # ── query ──
+    query = parsed.query
+    if query:
+        # explode, mutate, then rebuild
+        params = [(k.lower(), v) for k, v in parse_qsl(query, keep_blank_values=True)]
+
+        if drop_query_tracking:
+            default_tracking = {
+                'utm_source', 'utm_medium', 'utm_campaign', 'utm_term',
+                'utm_content', 'gclid', 'fbclid', 'ref', 'ref_src'
+            }
+            if extra_drop_params:
+                default_tracking |= {p.lower() for p in extra_drop_params}
+            params = [(k, v) for k, v in params if k not in default_tracking]
+
+        if sort_query:
+            params.sort(key=lambda kv: kv[0])
+
+        query = urlencode(params, doseq=True) if params else ''
+
+    # ── fragment ──
+    fragment = parsed.fragment if keep_fragment else ''
+
+    # Re-assemble
+    normalized = urlunparse((
+        parsed.scheme,
+        netloc,
+        path,
+        parsed.params,
+        query,
+        fragment
+    ))
+
+    return normalized
+
+
 def normalize_url_for_deep_crawl(href, base_url):
     """Normalize URLs to ensure consistent format"""
     from urllib.parse import urljoin, urlparse, urlunparse, parse_qs, urlencode
@@ -3147,4 +3240,109 @@ def calculate_total_score(
     total = (intrinsic * 0.7) + (contextual_scaled * 0.3)
     
     return max(0.0, min(total, 10.0))
+
+
+# Embedding utilities
+async def get_text_embeddings(
+    texts: List[str], 
+    llm_config: Optional[Dict] = None,
+    model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
+    batch_size: int = 32
+) -> np.ndarray:
+    """
+    Compute embeddings for a list of texts using specified model.
+    
+    Args:
+        texts: List of texts to embed
+        llm_config: Optional LLM configuration for API-based embeddings
+        model_name: Model name (used when llm_config is None)
+        batch_size: Batch size for processing
+        
+    Returns:
+        numpy array of embeddings
+    """
+    import numpy as np
+    
+    if not texts:
+        return np.array([])
+    
+    # If LLMConfig provided, use litellm for embeddings
+    if llm_config is not None:
+        from litellm import aembedding
+        
+        # Get embedding model from config or use default
+        embedding_model = llm_config.get('provider', 'text-embedding-3-small')
+        api_base = llm_config.get('base_url', llm_config.get('api_base'))
+        
+        # Prepare kwargs
+        kwargs = {
+            'model': embedding_model,
+            'input': texts,
+            'api_key': llm_config.get('api_token', llm_config.get('api_key'))
+        }
+        
+        if api_base:
+            kwargs['api_base'] = api_base
+            
+        # Handle OpenAI-compatible endpoints
+        if api_base and 'openai/' not in embedding_model:
+            kwargs['model'] = f"openai/{embedding_model}"
+        
+        # Get embeddings
+        response = await aembedding(**kwargs)
+        
+        # Extract embeddings from response
+        embeddings = []
+        for item in response.data:
+            embeddings.append(item['embedding'])
+            
+        return np.array(embeddings)
+    
+    # Default: use sentence-transformers
+    else:
+        # Lazy load to avoid importing heavy libraries unless needed
+        from sentence_transformers import SentenceTransformer
+        
+        # Cache the model in function attribute to avoid reloading
+        if not hasattr(get_text_embeddings, '_models'):
+            get_text_embeddings._models = {}
+        
+        if model_name not in get_text_embeddings._models:
+            get_text_embeddings._models[model_name] = SentenceTransformer(model_name)
+        
+        encoder = get_text_embeddings._models[model_name]
+        
+        # Batch encode for efficiency
+        embeddings = encoder.encode(
+            texts,
+            batch_size=batch_size,
+            show_progress_bar=False,
+            convert_to_numpy=True
+        )
+        
+        return embeddings
+
+
+def get_text_embeddings_sync(
+    texts: List[str],
+    llm_config: Optional[Dict] = None,
+    model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
+    batch_size: int = 32
+) -> np.ndarray:
+    """Synchronous wrapper for get_text_embeddings"""
+    import numpy as np
+    return asyncio.run(get_text_embeddings(texts, llm_config, model_name, batch_size))
+
+
+def cosine_similarity(vec1: np.ndarray, vec2: np.ndarray) -> float:
+    """Calculate cosine similarity between two vectors"""
+    import numpy as np
+    dot_product = np.dot(vec1, vec2)
+    norm_product = np.linalg.norm(vec1) * np.linalg.norm(vec2)
+    return float(dot_product / norm_product) if norm_product != 0 else 0.0
+
+
+def cosine_distance(vec1: np.ndarray, vec2: np.ndarray) -> float:
+    """Calculate cosine distance (1 - similarity) between two vectors"""
+    return 1 - cosine_similarity(vec1, vec2)
 

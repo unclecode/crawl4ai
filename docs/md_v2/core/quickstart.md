@@ -272,7 +272,43 @@ if __name__ == "__main__":
 
 ---
 
-## 7. Multi-URL Concurrency (Preview)
+## 7. Adaptive Crawling (New!)
+
+Crawl4AI now includes intelligent adaptive crawling that automatically determines when sufficient information has been gathered. Here's a quick example:
+
+```python
+import asyncio
+from crawl4ai import AsyncWebCrawler, AdaptiveCrawler
+
+async def adaptive_example():
+    async with AsyncWebCrawler() as crawler:
+        adaptive = AdaptiveCrawler(crawler)
+        
+        # Start adaptive crawling
+        result = await adaptive.digest(
+            start_url="https://docs.python.org/3/",
+            query="async context managers"
+        )
+        
+        # View results
+        adaptive.print_stats()
+        print(f"Crawled {len(result.crawled_urls)} pages")
+        print(f"Achieved {adaptive.confidence:.0%} confidence")
+
+if __name__ == "__main__":
+    asyncio.run(adaptive_example())
+```
+
+**What's special about adaptive crawling?**
+- **Automatic stopping**: Stops when sufficient information is gathered
+- **Intelligent link selection**: Follows only relevant links
+- **Confidence scoring**: Know how complete your information is
+
+[Learn more about Adaptive Crawling →](adaptive-crawling.md)
+
+---
+
+## 8. Multi-URL Concurrency (Preview)
 
 If you need to crawl multiple URLs in **parallel**, you can use `arun_many()`. By default, Crawl4AI employs a **MemoryAdaptiveDispatcher**, automatically adjusting concurrency based on system resources. Here’s a quick glimpse:
 

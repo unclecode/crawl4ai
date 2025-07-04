@@ -48,6 +48,12 @@ Crawl4AI is the #1 trending GitHub repository, actively maintained by a vibrant 
 
 > **Note**: If you're looking for the old documentation, you can access it [here](https://old.docs.crawl4ai.com).
 
+## 🎯 New: Adaptive Web Crawling
+
+Crawl4AI now features intelligent adaptive crawling that knows when to stop! Using advanced information foraging algorithms, it determines when sufficient information has been gathered to answer your query.
+
+[Learn more about Adaptive Crawling →](core/adaptive-crawling.md)
+
 
 ## Quick Start
 
