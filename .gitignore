@@ -265,3 +265,5 @@ tests/**/benchmark_reports
 
 docs/**/data
 .codecat/
+!.devcontainer/setup.sh
+!.devcontainer/start-services.sh

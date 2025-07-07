@@ -1,0 +1,132 @@
+{
+  "name": "Crawl4AI Development Environment",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "devcontainer",
+  "workspaceFolder": "/workspace",
+  
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "installOhMyZsh": true,
+      "configureZshAsDefaultShell": true,
+      "username": "vscode",
+      "userUid": "1000",
+      "userGid": "1000"
+    },
+    "ghcr.io/devcontainers/features/git:1": {
+      "version": "latest",
+      "ppa": true
+    }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.black-formatter",
+        "charliermarsh.ruff",
+        "ms-python.debugpy",
+        "ms-azuretools.vscode-docker",
+        "tamasfe.even-better-toml",
+        "redhat.vscode-yaml",
+        "esbenp.prettier-vscode",
+        "GitHub.copilot",
+        "GitHub.copilot-chat",
+        "ms-vscode.makefile-tools",
+        "yzhang.markdown-all-in-one",
+        "DavidAnson.vscode-markdownlint",
+        "streetsidesoftware.code-spell-checker",
+        "bierner.markdown-mermaid",
+        "hediet.vscode-drawio",
+        "humao.rest-client",
+        "rangav.vscode-thunder-client",
+        "donjayamanne.githistory",
+        "eamodio.gitlens",
+        "mhutchie.git-graph",
+        "oderwat.indent-rainbow",
+        "christian-kohler.path-intellisense",
+        "PKief.material-icon-theme",
+        "aaron-bond.better-comments",
+        "SonarSource.sonarlint-vscode",
+        "ms-python.mypy-type-checker",
+        "ms-vscode.test-adapter-converter",
+        "littlefoxteam.vscode-python-test-adapter",
+        "modelcontextprotocol.ide-extension"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.linting.enabled": true,
+        "python.linting.pylintEnabled": false,
+        "python.formatting.provider": "black",
+        "python.formatting.blackPath": "/usr/local/bin/black",
+        "python.languageServer": "Pylance",
+        "python.analysis.typeCheckingMode": "basic",
+        "python.analysis.autoImportCompletions": true,
+        "python.analysis.autoSearchPaths": true,
+        "python.analysis.diagnosticMode": "workspace",
+        "python.terminal.activateEnvironment": false,
+        "[python]": {
+          "editor.formatOnSave": true,
+          "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit"
+          }
+        },
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": [
+          "source.organizeImports",
+          "source.fixAll"
+        ],
+        "files.exclude": {
+          "**/__pycache__": true,
+          "**/*.pyc": true,
+          ".pytest_cache": true,
+          ".mypy_cache": true,
+          ".ruff_cache": true,
+          "*.egg-info": true,
+          "build": true,
+          "dist": true
+        },
+        "terminal.integrated.defaultProfile.linux": "zsh",
+        "terminal.integrated.profiles.linux": {
+          "zsh": {
+            "path": "/bin/zsh"
+          }
+        },
+        "git.autofetch": true,
+        "git.confirmSync": false,
+        "workbench.iconTheme": "material-icon-theme",
+        "editor.rulers": [88],
+        "editor.wordWrap": "on",
+        "files.trimTrailingWhitespace": true,
+        "files.insertFinalNewline": true
+      }
+    }
+  },
+
+  "mounts": [
+    "source=${localWorkspaceFolder}/.env.dev,target=/workspace/.env.dev,type=bind,consistency=cached"
+  ],
+
+  "forwardPorts": [11235, 6379],
+  
+  "portsAttributes": {
+    "11235": {
+      "label": "Crawl4AI API Server",
+      "onAutoForward": "notify"
+    },
+    "6379": {
+      "label": "Redis",
+      "onAutoForward": "silent"
+    }
+  },
+
+  "postCreateCommand": "bash /workspace/.devcontainer/setup.sh",
+  
+  "postStartCommand": "bash /workspace/.devcontainer/start-services.sh",
+
+  "remoteUser": "vscode",
+  "containerUser": "vscode",
+  
+  "shutdownAction": "stopCompose"
+} 

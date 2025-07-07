@@ -1,0 +1,166 @@
+FROM python:3.12-slim-bookworm
+
+ARG USERNAME=vscode
+ARG USER_UID=1000
+ARG USER_GID=$USER_UID
+
+ENV PYTHONFAULTHANDLER=1 \
+    PYTHONHASHSEED=random \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_DEFAULT_TIMEOUT=100 \
+    DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    wget \
+    gnupg \
+    git \
+    cmake \
+    pkg-config \
+    python3-dev \
+    libjpeg-dev \
+    redis-tools \
+    supervisor \
+    sudo \
+    zsh \
+    vim \
+    nano \
+    htop \
+    jq \
+    unzip \
+    zip \
+    bash-completion \
+    man-db \
+    strace \
+    lsof \
+    procps \
+    ca-certificates \
+    openssh-client \
+    iproute2 \
+    dialog \
+    gnupg2 \
+    psmisc \
+    postgresql-client \
+    lsb-release \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libglib2.0-0 \
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libdbus-1-3 \
+    libxcb1 \
+    libxkbcommon0 \
+    libx11-6 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxext6 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libpango-1.0-0 \
+    libcairo2 \
+    libasound2 \
+    libatspi2.0-0 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd --gid $USER_GID $USERNAME \
+    && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME \
+    && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
+    && chmod 0440 /etc/sudoers.d/$USERNAME
+
+RUN pip install --upgrade pip setuptools wheel \
+    && pip install \
+    uv \
+    poetry \
+    black \
+    ruff \
+    mypy \
+    pytest \
+    pytest-cov \
+    pytest-asyncio \
+    pytest-xdist \
+    ipython \
+    ipdb \
+    rich \
+    httpx \
+    pydantic \
+    python-dotenv \
+    pre-commit \
+    commitizen \
+    python-semantic-release \
+    pylint \
+    bandit \
+    safety \
+    notebook \
+    jupyterlab \
+    mcp \
+    fastmcp
+
+RUN pip install playwright && playwright install --with-deps chromium
+
+USER $USERNAME
+
+RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended \
+    && echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc \
+    && echo 'alias ll="ls -la"' >> ~/.zshrc \
+    && echo 'alias gs="git status"' >> ~/.zshrc \
+    && echo 'alias gp="git pull"' >> ~/.zshrc \
+    && echo 'alias gc="git commit"' >> ~/.zshrc \
+    && echo 'alias gco="git checkout"' >> ~/.zshrc \
+    && echo 'alias dev="python -m crawl4ai.server"' >> ~/.zshrc \
+    && echo 'alias test="pytest -v"' >> ~/.zshrc \
+    && echo 'alias fmt="black . && ruff check . --fix"' >> ~/.zshrc \
+    && echo 'alias crawl="crawl4ai-doctor && python -m crawl4ai.server"' >> ~/.zshrc \
+    && echo 'alias redis-status="redis-cli ping"' >> ~/.zshrc
+
+RUN sed -i 's/ZSH_THEME="robbyrussell"/ZSH_THEME="agnoster"/g' ~/.zshrc
+
+RUN mkdir -p ~/.cache/ms-playwright \
+    && mkdir -p ~/.local/share/crawl4ai
+
+USER root
+
+# Install Docker CLI and Docker Compose plugin
+RUN mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" \
+    > /etc/apt/sources.list.d/docker.list \
+    && apt-get update \
+    && apt-get install -y docker-ce-cli docker-compose-plugin \
+    && apt-get autoremove -y \
+    && apt-get clean -y \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js
+RUN mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" > /etc/apt/sources.list.d/nodesource.list \
+    && apt-get update \
+    && apt-get install -y nodejs \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd -f docker \
+    && usermod -aG docker $USERNAME
+
+RUN npm install -g tldr
+
+RUN git config --global init.defaultBranch main \
+    && git config --global pull.rebase false
+
+WORKDIR /workspace
+
+USER $USERNAME
+
+ENV SHELL /bin/zsh 

@@ -1,0 +1,101 @@
+version: "3.8"
+
+services:
+  devcontainer:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        VARIANT: "3.12-slim-bookworm"
+        USERNAME: vscode
+        USER_UID: 1000
+        USER_GID: 1000
+    volumes:
+      - ../:/workspace:cached
+      - /var/run/docker.sock:/var/run/docker.sock
+      - vscode-extensions:/home/vscode/.vscode-server/extensions
+      - playwright-cache:/home/vscode/.cache/ms-playwright
+    command: sleep infinity
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - DEVELOPMENT=true
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - seccomp:unconfined
+    user: vscode
+    networks:
+      - crawl4ai-network
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    container_name: crawl4ai-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - crawl4ai-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  crawl4ai-api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        INSTALL_TYPE: all
+        ENABLE_GPU: false
+    container_name: crawl4ai-server
+    restart: unless-stopped
+    ports:
+      - "11235:11235"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - OPENAI_API_KEY=mock_openai_key
+      - ANTHROPIC_API_KEY=mock_anthropic_key
+      - GROQ_API_KEY=mock_groq_key
+      - TOGETHER_API_KEY=mock_together_key
+      - MISTRAL_API_KEY=mock_mistral_key
+      - GEMINI_API_TOKEN=mock_gemini_token
+      - DEEPSEEK_API_KEY=mock_deepseek_key
+      - DEVELOPMENT=true
+      - DEBUG=true
+      - TESTING=false
+      - HOST=0.0.0.0
+      - PORT=11235
+      - WORKERS=4
+      - LOG_LEVEL=debug
+    volumes:
+      - /dev/shm:/dev/shm
+      - ../deploy/docker:/app
+    networks:
+      - crawl4ai-network
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11235/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  redis-data:
+  vscode-extensions:
+  playwright-cache:
+
+networks:
+  crawl4ai-network:
+    driver: bridge
