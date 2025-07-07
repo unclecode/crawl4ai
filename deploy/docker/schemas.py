@@ -44,3 +44,6 @@ class JSEndpointRequest(BaseModel):
         ...,
         description="List of separated JavaScript snippets to execute"
     )
+
+class ScriptRequest(BaseModel):
+    script_name: str

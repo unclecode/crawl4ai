@@ -16,6 +16,7 @@ from fastapi import Request, Depends
 from fastapi.responses import FileResponse
 import base64
 import re
+import os
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
 from api import (
     handle_markdown_request, handle_llm_qa,
@@ -30,12 +31,13 @@ from schemas import (
     ScreenshotRequest,
     PDFRequest,
     JSEndpointRequest,
+    ScriptRequest,
 )
 
 from utils import (
     FilterType, load_config, setup_logging, verify_email_domain
 )
-import os
+import os, subprocess
 import sys
 import time
 import asyncio
@@ -478,6 +480,59 @@ async def crawl_stream(
             "X-Stream-Status": "active",
         },
     )
+
+@app.get("/scripts")
+async def get_scripts():
+    current_directory = '/app'  # Update this path as needed
+    script_folder = os.path.join(current_directory, 'scripts')
+    
+    if not os.path.exists(script_folder):
+        raise HTTPException(400, f"Directory {script_folder} does not exist.")
+    
+    return JSONResponse([file for file in os.listdir(script_folder) if os.path.isfile(os.path.join(script_folder, file))])
+
+@app.post("/scripts/run")
+@limiter.limit(config["rate_limiting"]["default_limit"])
+async def scripts_run(
+    request: Request,
+    body: ScriptRequest,
+    _td: Dict = Depends(token_dep),
+):
+    scripts_directory = '/app/scripts'  # Update this path as needed
+   
+    if not body or not body.script_name:
+        raise HTTPException(400, "You have to provide an script name")
+
+    if body.script_name.lower().endswith('.py'):
+        raise HTTPException(400, "Provide only the name, without the extension")
+
+    script_name = f'{body.script_name}.py'
+    script_path = os.path.join(scripts_directory, script_name)
+
+    if not os.path.isfile(script_path):
+        raise HTTPException(400, "No script found with that name. Check available in /scripts")
+
+    try:
+        result = await subprocess.run(['python', script_path], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        output = result.stdout.decode('utf-8')
+        error_output = result.stderr.decode('utf-8')
+        
+        if output or error_output:
+            response_data = {
+                "Output": f"{output}{error_output}",
+                "Status": "Script executed with output"
+            }
+            raise HTTPException(400, response_data) 
+
+        return JSONResponse(output)
+    except subprocess.CalledProcessError as e:
+        # Return the command execution error details
+        response_data = {
+            "Status": "Failed to execute the script",
+            "Details": str(e)
+        }
+        raise HTTPException(400, response_data)     
+   
 
 
 def chunk_code_functions(code_md: str) -> List[str]:

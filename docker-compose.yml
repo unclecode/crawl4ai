@@ -1,19 +1,6 @@
-version: '3.8'
-
-# Shared configuration for all environments
 x-base-config: &base-config
   ports:
     - "11235:11235"  # Gunicorn port
-  env_file:
-    - .llm.env       # API keys (create from .llm.env.example)
-  environment:
-    - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-    - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
-    - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-    - GROQ_API_KEY=${GROQ_API_KEY:-}
-    - TOGETHER_API_KEY=${TOGETHER_API_KEY:-}
-    - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
-    - GEMINI_API_TOKEN=${GEMINI_API_TOKEN:-}
   volumes:
     - /dev/shm:/dev/shm  # Chromium performance
   deploy:
@@ -29,14 +16,19 @@ x-base-config: &base-config
     timeout: 10s
     retries: 3
     start_period: 40s
-  user: "appuser"
 
 services:
   crawl4ai:
     # 1. Default: Pull multi-platform test image from Docker Hub
     # 2. Override with local image via: IMAGE=local-test docker compose up
     image: ${IMAGE:-unclecode/crawl4ai:${TAG:-latest}}
-    
+    container_name: crawl4ai-local
+    privileged: true
+    user: appuser
+    hostname: crawl4ai
+    networks: ["demo"]
+    volumes:
+      - ~/scripts:/app/scripts:rw
     # Local build config (used with --build)
     build:
       context: .
@@ -44,6 +36,14 @@ services:
       args:
         INSTALL_TYPE: ${INSTALL_TYPE:-default}
         ENABLE_GPU: ${ENABLE_GPU:-false}
-    
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 1G
     # Inherit shared config
     <<: *base-config
+
+networks:
+  demo:
+    external: true
