@@ -10,8 +10,8 @@ MODEL_REPO_BRANCH = "new-release-0.0.2"
 # Provider-model dictionary, ONLY used when the extraction strategy is LLMExtractionStrategy
 PROVIDER_MODELS = {
     "ollama/llama3": "no-token-needed",  # Any model from Ollama no need for API token
-    "groq/llama3-70b-8192": os.getenv("GROQ_API_KEY"),
-    "groq/llama3-8b-8192": os.getenv("GROQ_API_KEY"),
+    "groq/llama-3.3-70b-versatile": os.getenv("GROQ_API_KEY"),
+    "groq/meta-llama/llama-4-scout-17b-16e-instruct": os.getenv("GROQ_API_KEY"),
     "openai/gpt-4o-mini": os.getenv("OPENAI_API_KEY"),
     "openai/gpt-4o": os.getenv("OPENAI_API_KEY"),
     "openai/o1-mini": os.getenv("OPENAI_API_KEY"),

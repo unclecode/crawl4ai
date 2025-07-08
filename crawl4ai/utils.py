@@ -1752,19 +1752,14 @@ def extract_blocks(url, html, provider=DEFAULT_PROVIDER, api_token=None, base_ur
     return blocks
 
 
-def extract_blocks_batch(batch_data, provider="groq/llama3-70b-8192", api_token=None):
+def extract_blocks_batch(batch_data, provider="groq/llama-3.3-70b-versatile", api_token=None):
     """
-    Extract content blocks from a batch of website HTMLs.
-
-    How it works:
-    1. Prepares prompts for each URL and HTML pair.
-    2. Sends the prompts to the AI provider in a batch request.
-    3. Parses the responses to extract structured blocks or errors.
+    Process a batch of HTML sections with an AI model for structured information extraction.
 
     Args:
-        batch_data (List[Tuple[str, str]]): A list of (URL, HTML) pairs.
-        provider (str): The AI provider for content extraction. Defaults to "groq/llama3-70b-8192".
-        api_token (Optional[str]): The API token for authentication. Defaults to None.
+        batch_data (List[str]): A list of HTML sections to process.
+        provider (str): The AI provider for content extraction. Defaults to "groq/llama-3.3-70b-versatile".
+        api_token (str, optional): The API token for the provider. Defaults to None.
 
     Returns:
         List[dict]: A list of extracted content blocks from all batch items.

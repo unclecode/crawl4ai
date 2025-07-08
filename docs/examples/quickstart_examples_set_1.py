@@ -82,7 +82,7 @@ async def demo_llm_structured_extraction_no_schema():
     # Create a simple LLM extraction strategy (no schema required)
     extraction_strategy = LLMExtractionStrategy(
         llm_config=LLMConfig(
-            provider="groq/qwen-2.5-32b",
+            provider="groq/qwen-qwq-32b",
             api_token="env:GROQ_API_KEY",
         ),
         instruction="This is news.ycombinator.com, extract all news, and for each, I want title, source url, number of comments.",
@@ -147,7 +147,7 @@ async def demo_css_structured_extraction_no_schema():
         schema = JsonCssExtractionStrategy.generate_schema(
             html=sample_html,
             llm_config=LLMConfig(
-                provider="groq/qwen-2.5-32b",
+                provider="groq/qwen-qwq-32b",
                 api_token="env:GROQ_API_KEY",
             ),
             query="From https://thehackernews.com/, I have shared a sample of one news div with a title, date, and description. Please generate a schema for this news div.",
