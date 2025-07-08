@@ -858,14 +858,12 @@ class BrowserManager:
         if crawlerRunConfig:
             # Check if there is value for crawlerRunConfig.proxy_config set add that to context
             if crawlerRunConfig.proxy_config:
-                proxy_settings = {
-                    "server": crawlerRunConfig.proxy_config.server,
-                }
-                if crawlerRunConfig.proxy_config.username:
-                    proxy_settings.update({
-                        "username": crawlerRunConfig.proxy_config.username,
-                        "password": crawlerRunConfig.proxy_config.password,
-                    })
+                from playwright.async_api import ProxySettings
+                proxy_settings = ProxySettings(
+                    server=crawlerRunConfig.proxy_config.server,
+                    username=crawlerRunConfig.proxy_config.username,
+                    password=crawlerRunConfig.proxy_config.password,
+                )
                 context_settings["proxy"] = proxy_settings
 
         if self.config.text_mode:
