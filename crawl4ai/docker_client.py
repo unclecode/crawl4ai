@@ -73,6 +73,8 @@ class Crawl4aiDockerClient:
     def _prepare_request(self, urls: List[str], browser_config: Optional[BrowserConfig] = None, 
                        crawler_config: Optional[CrawlerRunConfig] = None) -> Dict[str, Any]:
         """Prepare request data from configs."""
+        if self._token:
+            self._http_client.headers["Authorization"] = f"Bearer {self._token}"
         return {
             "urls": urls,
             "browser_config": browser_config.dump() if browser_config else {},
@@ -103,8 +105,6 @@ class Crawl4aiDockerClient:
         crawler_config: Optional[CrawlerRunConfig] = None
     ) -> Union[CrawlResult, List[CrawlResult], AsyncGenerator[CrawlResult, None]]:
         """Execute a crawl operation."""
-        if not self._token:
-            raise Crawl4aiClientError("Authentication required. Call authenticate() first.")
         await self._check_server()
         
         data = self._prepare_request(urls, browser_config, crawler_config)
@@ -140,8 +140,6 @@ class Crawl4aiDockerClient:
 
     async def get_schema(self) -> Dict[str, Any]:
         """Retrieve configuration schemas."""
-        if not self._token:
-            raise Crawl4aiClientError("Authentication required. Call authenticate() first.")
         response = await self._request("GET", "/schema")
         return response.json()
 

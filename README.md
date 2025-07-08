@@ -291,12 +291,20 @@ import requests
 # Submit a crawl job
 response = requests.post(
     "http://localhost:11235/crawl",
-    json={"urls": "https://example.com", "priority": 10}
+    json={"urls": ["https://example.com"], "priority": 10}
 )
-task_id = response.json()["task_id"]
-
-# Continue polling until the task is complete (status="completed")
-result = requests.get(f"http://localhost:11235/task/{task_id}")
+if response.status_code == 200:
+    print("Crawl job submitted successfully.")
+    
+if "results" in response.json():
+    results = response.json()["results"]
+    print("Crawl job completed. Results:")
+    for result in results:
+        print(result)
+else:
+    task_id = response.json()["task_id"]
+    print(f"Crawl job submitted. Task ID:: {task_id}")
+    result = requests.get(f"http://localhost:11235/task/{task_id}")
 ```
 
 For more examples, see our [Docker Examples](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/docker_example.py). For advanced configuration, environment variables, and usage examples, see our [Docker Deployment Guide](https://docs.crawl4ai.com/basic/docker-deployment/).

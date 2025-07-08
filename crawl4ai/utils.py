@@ -50,6 +50,29 @@ from urllib.parse import (
 )
 
 
+# Monkey patch to fix wildcard handling in urllib.robotparser
+from urllib.robotparser import RuleLine
+import re
+
+original_applies_to = RuleLine.applies_to
+
+def patched_applies_to(self, filename):
+   # Handle wildcards in paths
+   if '*' in self.path or '%2A' in self.path or self.path in ("*", "%2A"):
+       pattern = self.path.replace('%2A', '*')
+       pattern = re.escape(pattern).replace('\\*', '.*')
+       pattern = '^' + pattern
+       if pattern.endswith('\\$'):
+           pattern = pattern[:-2] + '$'
+       try:
+           return bool(re.match(pattern, filename))
+       except re.error:
+           return original_applies_to(self, filename)
+   return original_applies_to(self, filename)
+
+RuleLine.applies_to = patched_applies_to
+# Monkey patch ends
+
 def chunk_documents(
     documents: Iterable[str],
     chunk_token_threshold: int,
@@ -318,7 +341,7 @@ class RobotsParser:
                 robots_url = f"{scheme}://{domain}/robots.txt"
                 
                 async with aiohttp.ClientSession() as session:
-                    async with session.get(robots_url, timeout=2) as response:
+                    async with session.get(robots_url, timeout=2, ssl=False) as response:
                         if response.status == 200:
                             rules = await response.text()
                             self._cache_rules(domain, rules)
@@ -1524,6 +1547,13 @@ def extract_metadata_using_lxml(html, doc=None):
         content = tag.get("content", "").strip()
         if property_name and content:
             metadata[property_name] = content
+   # Article metadata - using starts-with() for performance
+    article_tags = head.xpath('.//meta[starts-with(@property, "article:")]')
+    for tag in article_tags:
+        property_name = tag.get("property", "").strip()
+        content = tag.get("content", "").strip()
+        if property_name and content:
+            metadata[property_name] = content
 
     return metadata
 
@@ -1599,7 +1629,12 @@ def extract_metadata(html, soup=None):
         content = tag.get("content", "").strip()
         if property_name and content:
             metadata[property_name] = content
-
+        # getting the article Values
+    metadata.update({
+        tag['property'].strip():tag["content"].strip()
+        for tag in head.find_all("meta", attrs={"property": re.compile(r"^article:")})
+          if tag.has_attr('property') and tag.has_attr('content')
+    })
     return metadata
 
 
@@ -2068,14 +2103,16 @@ def normalize_url(href, base_url):
     parsed_base = urlparse(base_url)
     if not parsed_base.scheme or not parsed_base.netloc:
         raise ValueError(f"Invalid base URL format: {base_url}")
-
-    # Ensure base_url ends with a trailing slash if it's a directory path
-    if not base_url.endswith('/'):
-        base_url = base_url + '/'
+    
+    if  parsed_base.scheme.lower() not in ["http", "https"]:
+        # Handle special protocols
+        raise ValueError(f"Invalid base URL format: {base_url}")
+    cleaned_href = href.strip()
 
     # Use urljoin to handle all cases
-    normalized = urljoin(base_url, href.strip())
-    return normalized
+    return urljoin(base_url, cleaned_href)
+
+
 
 
 def normalize_url(

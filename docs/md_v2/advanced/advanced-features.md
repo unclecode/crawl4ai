@@ -66,29 +66,38 @@ Sometimes you need a visual record of a page or a PDF “printout.” Crawl4AI c
 ```python
 import os, asyncio
 from base64 import b64decode
-from crawl4ai import AsyncWebCrawler, CacheMode
+from crawl4ai import AsyncWebCrawler, CacheMode, CrawlerRunConfig
 
 async def main():
+    run_config = CrawlerRunConfig(
+        cache_mode=CacheMode.BYPASS,
+        screenshot=True,
+        pdf=True
+    )
+
     async with AsyncWebCrawler() as crawler:
         result = await crawler.arun(
             url="https://en.wikipedia.org/wiki/List_of_common_misconceptions",
-            cache_mode=CacheMode.BYPASS,
-            pdf=True,
-            screenshot=True
+            config=run_config
         )
-        
         if result.success:
-            # Save screenshot
+            print(f"Screenshot data present: {result.screenshot is not None}")
+            print(f"PDF data present: {result.pdf is not None}")
+
             if result.screenshot:
+                print(f"[OK] Screenshot captured, size: {len(result.screenshot)} bytes")
                 with open("wikipedia_screenshot.png", "wb") as f:
                     f.write(b64decode(result.screenshot))
-            
-            # Save PDF
+            else:
+                print("[WARN] Screenshot data is None.")
+
             if result.pdf:
+                print(f"[OK] PDF captured, size: {len(result.pdf)} bytes")
                 with open("wikipedia_page.pdf", "wb") as f:
                     f.write(result.pdf)
-            
-            print("[OK] PDF & screenshot captured.")
+            else:
+                print("[WARN] PDF data is None.")
+
         else:
             print("[ERROR]", result.error_message)
 
