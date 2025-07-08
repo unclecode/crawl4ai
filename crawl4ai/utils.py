@@ -1547,7 +1547,8 @@ def extract_metadata_using_lxml(html, doc=None):
         content = tag.get("content", "").strip()
         if property_name and content:
             metadata[property_name] = content
-   # Article metadata - using starts-with() for performance
+   
+   # Article metadata
     article_tags = head.xpath('.//meta[starts-with(@property, "article:")]')
     for tag in article_tags:
         property_name = tag.get("property", "").strip()
@@ -1629,12 +1630,15 @@ def extract_metadata(html, soup=None):
         content = tag.get("content", "").strip()
         if property_name and content:
             metadata[property_name] = content
-        # getting the article Values
-    metadata.update({
-        tag['property'].strip():tag["content"].strip()
-        for tag in head.find_all("meta", attrs={"property": re.compile(r"^article:")})
-          if tag.has_attr('property') and tag.has_attr('content')
-    })
+    
+    # Article metadata
+    article_tags = head.find_all("meta", attrs={"property": re.compile(r"^article:")})
+    for tag in article_tags:
+        property_name = tag.get("property", "").strip()
+        content = tag.get("content", "").strip()
+        if property_name and content:
+            metadata[property_name] = content
+    
     return metadata
 
 
