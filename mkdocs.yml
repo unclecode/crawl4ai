@@ -48,6 +48,7 @@ nav:
     - "Identity Based Crawling": "advanced/identity-based-crawling.md"
     - "SSL Certificate": "advanced/ssl-certificate.md"
     - "Network & Console Capture": "advanced/network-console-capture.md"
+    - "PDF Parsing": "advanced/pdf-parsing.md"
   - Extraction:
     - "LLM-Free Strategies": "extraction/no-llm-strategies.md"
     - "LLM Strategies": "extraction/llm-strategies.md"

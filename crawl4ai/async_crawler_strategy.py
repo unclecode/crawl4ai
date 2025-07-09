@@ -469,9 +469,15 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 console_messages=captured_console,
             )
 
-        elif url.startswith("raw:") or url.startswith("raw://"):
+        ##### 
+        # Since both "raw:" and "raw://" start with "raw:", the first condition is always true for both, so "raw://" will be sliced as "//...", which is incorrect.
+        # Fix: Check for "raw://" first, then "raw:"
+        # Also, the prefix "raw://" is actually 6 characters long, not 7, so it should be sliced accordingly: url[6:]
+        #####
+        elif url.startswith("raw://") or url.startswith("raw:"):
             # Process raw HTML content
-            raw_html = url[4:] if url[:4] == "raw:" else url[7:]
+            # raw_html = url[4:] if url[:4] == "raw:" else url[7:]
+            raw_html = url[6:] if url.startswith("raw://") else url[4:]
             html = raw_html
             if config.screenshot:
                 screenshot_data = await self._generate_screenshot_from_html(html)
@@ -930,7 +936,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
             # Handle full page scanning
             if config.scan_full_page:
-                await self._handle_full_page_scan(page, config.scroll_delay)
+                # await self._handle_full_page_scan(page, config.scroll_delay)
+                await self._handle_full_page_scan(page, config.scroll_delay, config.max_scroll_steps)
 
             # Handle virtual scroll if configured
             if config.virtual_scroll_config:
@@ -1122,7 +1129,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 # Close the page
                 await page.close()
 
-    async def _handle_full_page_scan(self, page: Page, scroll_delay: float = 0.1):
+    # async def _handle_full_page_scan(self, page: Page, scroll_delay: float = 0.1):
+    async def _handle_full_page_scan(self, page: Page, scroll_delay: float = 0.1, max_scroll_steps: Optional[int] = None):
         """
         Helper method to handle full page scanning.
 
@@ -1137,6 +1145,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         Args:
             page (Page): The Playwright page object
             scroll_delay (float): The delay between page scrolls
+            max_scroll_steps (Optional[int]): Maximum number of scroll steps to perform. If None, scrolls until end.
 
         """
         try:
@@ -1161,9 +1170,21 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             dimensions = await self.get_page_dimensions(page)
             total_height = dimensions["height"]
 
+            scroll_step_count = 0
             while current_position < total_height:
+                #### 
+                # NEW FEATURE: Check if we've reached the maximum allowed scroll steps
+                # This prevents infinite scrolling on very long pages or infinite scroll scenarios
+                # If max_scroll_steps is None, this check is skipped (unlimited scrolling - original behavior)
+                ####
+                if max_scroll_steps is not None and scroll_step_count >= max_scroll_steps:
+                    break
                 current_position = min(current_position + viewport_height, total_height)
                 await self.safe_scroll(page, 0, current_position, delay=scroll_delay)
+
+                # Increment the step counter for max_scroll_steps tracking
+                scroll_step_count += 1
+                
                 # await page.evaluate(f"window.scrollTo(0, {current_position})")
                 # await asyncio.sleep(scroll_delay)
 
@@ -1804,12 +1825,31 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     # then wait for the new page to load before continuing
                     result = None
                     try:
+                        # OLD VERSION:
+                        # result = await page.evaluate(
+                        #     f"""
+                        # (async () => {{
+                        #     try {{
+                        #         const script_result = {script};
+                        #         return {{ success: true, result: script_result }};
+                        #     }} catch (err) {{
+                        #         return {{ success: false, error: err.toString(), stack: err.stack }};
+                        #     }}
+                        # }})();
+                        # """
+                        # )
+                        
+                        # """ NEW VERSION:
+                        # When {script} contains statements (e.g., const link = …; link.click();), 
+                        # this forms invalid JavaScript, causing Playwright execution error: SyntaxError: Unexpected token 'const'.
+                        # """
                         result = await page.evaluate(
                             f"""
                         (async () => {{
                             try {{
-                                const script_result = {script};
-                                return {{ success: true, result: script_result }};
+                                return await (async () => {{
+                                    {script}
+                                }})();
                             }} catch (err) {{
                                 return {{ success: false, error: err.toString(), stack: err.stack }};
                             }}

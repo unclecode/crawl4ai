@@ -227,10 +227,21 @@ class URLPatternFilter(URLFilter):
         # Prefix check (/foo/*)
         if self._simple_prefixes:
             path = url.split("?")[0]
-            if any(path.startswith(p) for p in self._simple_prefixes):
-                result = True
-                self._update_stats(result)
-                return not result if self._reverse else result
+            # if any(path.startswith(p) for p in self._simple_prefixes):
+            #     result = True
+            #     self._update_stats(result)
+            #     return not result if self._reverse else result
+            ####
+            # Modified the prefix matching logic to ensure path boundary checking:
+            # - Check if the matched prefix is followed by a path separator (`/`), query parameter (`?`), fragment (`#`), or is at the end of the path
+            # - This ensures `/api/` only matches complete path segments, not substrings like `/apiv2/`
+            ####
+            for prefix in self._simple_prefixes:
+                if path.startswith(prefix):
+                    if len(path) == len(prefix) or path[len(prefix)] in ['/', '?', '#']:
+                        result = True
+                        self._update_stats(result)
+                        return not result if self._reverse else result
 
         # Complex patterns
         if self._path_patterns:
@@ -337,6 +348,15 @@ class ContentTypeFilter(URLFilter):
         "sqlite": "application/vnd.sqlite3",
         # Placeholder
         "unknown": "application/octet-stream",  # Fallback for unknown file types
+        # php
+        "php": "application/x-httpd-php",
+        "php3": "application/x-httpd-php",
+        "php4": "application/x-httpd-php",
+        "php5": "application/x-httpd-php",
+        "php7": "application/x-httpd-php",
+        "phtml": "application/x-httpd-php",
+        "phps": "application/x-httpd-php-source",
+
     }
 
     @staticmethod
