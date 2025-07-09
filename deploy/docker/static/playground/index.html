@@ -671,6 +671,16 @@
                         method: 'GET',
                         headers: { 'Accept': 'application/json' }
                     });
+                    responseData = await response.json();
+                    const time = Math.round(performance.now() - startTime);
+                    if (!response.ok) {
+                        updateStatus('error', time);
+                        throw new Error(responseData.error || 'Request failed');
+                    }
+                    updateStatus('success', time);
+                    document.querySelector('#response-content code').textContent = JSON.stringify(responseData, null, 2);
+                    document.querySelector('#response-content code').className = 'json hljs';
+                    forceHighlightElement(document.querySelector('#response-content code'));
                 } else if (endpoint === 'crawl_stream') {
                     // Stream processing
                     response = await fetch(api, {
