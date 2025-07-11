@@ -252,7 +252,7 @@ The `clone()` method:
 ### Key fields to note
 
 1. **`provider`**:  
-- Which LLM provoder to use. 
+- Which LLM provider to use. 
 - Possible values are `"ollama/llama3","groq/llama3-70b-8192","groq/llama3-8b-8192", "openai/gpt-4o-mini" ,"openai/gpt-4o","openai/o1-mini","openai/o1-preview","openai/o3-mini","openai/o3-mini-high","anthropic/claude-3-haiku-20240307","anthropic/claude-3-opus-20240229","anthropic/claude-3-sonnet-20240229","anthropic/claude-3-5-sonnet-20240620","gemini/gemini-pro","gemini/gemini-1.5-pro","gemini/gemini-2.0-flash","gemini/gemini-2.0-flash-exp","gemini/gemini-2.0-flash-lite-preview-02-05","deepseek/deepseek-chat"`<br/>*(default: `"openai/gpt-4o-mini"`)*
 
 2. **`api_token`**:  
@@ -273,7 +273,7 @@ In a typical scenario, you define **one** `BrowserConfig` for your crawler sessi
 
 ```python
 import asyncio
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, LLMConfig
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, LLMConfig, LLMContentFilter, DefaultMarkdownGenerator
 from crawl4ai import JsonCssExtractionStrategy
 
 async def main():
@@ -298,7 +298,7 @@ async def main():
     # 3) Example LLM content filtering
 
     gemini_config = LLMConfig(
-        provider="gemini/gemini-1.5-pro" 
+        provider="gemini/gemini-1.5-pro", 
         api_token = "env:GEMINI_API_TOKEN"
     )
 
@@ -322,8 +322,9 @@ async def main():
     )
 
     md_generator = DefaultMarkdownGenerator(
-    content_filter=filter,
-    options={"ignore_links": True}
+        content_filter=filter,
+        options={"ignore_links": True}
+    )
 
     # 4) Crawler run config: skip cache, use extraction
     run_conf = CrawlerRunConfig(

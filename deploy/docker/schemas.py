@@ -12,8 +12,7 @@ class CrawlRequest(BaseModel):
 class MarkdownRequest(BaseModel):
     """Request body for the /md endpoint."""
     url: str                    = Field(...,  description="Absolute http/https URL to fetch")
-    f:   FilterType             = Field(FilterType.FIT,
-                                        description="Content‑filter strategy: FIT, RAW, BM25, or LLM")
+    f:   FilterType             = Field(FilterType.FIT, description="Content‑filter strategy: fit, raw, bm25, or llm")
     q:   Optional[str] = Field(None,  description="Query string used by BM25/LLM filters")
     c:   Optional[str] = Field("0",   description="Cache‑bust / revision counter")
 
