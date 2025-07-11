@@ -445,6 +445,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             return await self._crawl_web(url, config)
 
         elif url.startswith("file://"):
+            # initialize empty lists for console messages
+            captured_console = []
+            
             # Process local file
             local_file_path = url[7:]  # Remove 'file://' prefix
             if not os.path.exists(local_file_path):
@@ -466,9 +469,15 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 console_messages=captured_console,
             )
 
-        elif url.startswith("raw:") or url.startswith("raw://"):
+        ##### 
+        # Since both "raw:" and "raw://" start with "raw:", the first condition is always true for both, so "raw://" will be sliced as "//...", which is incorrect.
+        # Fix: Check for "raw://" first, then "raw:"
+        # Also, the prefix "raw://" is actually 6 characters long, not 7, so it should be sliced accordingly: url[6:]
+        #####
+        elif url.startswith("raw://") or url.startswith("raw:"):
             # Process raw HTML content
-            raw_html = url[4:] if url[:4] == "raw:" else url[7:]
+            # raw_html = url[4:] if url[:4] == "raw:" else url[7:]
+            raw_html = url[6:] if url.startswith("raw://") else url[4:]
             html = raw_html
             if config.screenshot:
                 screenshot_data = await self._generate_screenshot_from_html(html)
@@ -741,18 +750,49 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     )
                     redirected_url = page.url
                 except Error as e:
-                    raise RuntimeError(f"Failed on navigating ACS-GOTO:\n{str(e)}")
+                    # Allow navigation to be aborted when downloading files
+                    # This is expected behavior for downloads in some browser engines
+                    if 'net::ERR_ABORTED' in str(e) and self.browser_config.accept_downloads:
+                        self.logger.info(
+                            message=f"Navigation aborted, likely due to file download: {url}",
+                            tag="GOTO",
+                            params={"url": url},
+                        )
+                        response = None
+                    else:
+                        raise RuntimeError(f"Failed on navigating ACS-GOTO:\n{str(e)}")
 
                 await self.execute_hook(
                     "after_goto", page, context=context, url=url, response=response, config=config
                 )
 
+                # ──────────────────────────────────────────────────────────────
+                # Walk the redirect chain.  Playwright returns only the last
+                # hop, so we trace the `request.redirected_from` links until the
+                # first response that differs from the final one and surface its
+                # status-code.
+                # ──────────────────────────────────────────────────────────────
                 if response is None:
                     status_code = 200
                     response_headers = {}
                 else:
-                    status_code = response.status
-                    response_headers = response.headers
+                    first_resp = response
+                    req = response.request
+                    while req and req.redirected_from:
+                        prev_req = req.redirected_from
+                        prev_resp = await prev_req.response()
+                        if prev_resp:                       # keep earliest
+                            first_resp = prev_resp
+                        req = prev_req
+                
+                    status_code = first_resp.status
+                    response_headers = first_resp.headers
+                # if response is None:
+                #     status_code = 200
+                #     response_headers = {}
+                # else:
+                #     status_code = response.status
+                #     response_headers = response.headers
 
             else:
                 status_code = 200
@@ -896,7 +936,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
             # Handle full page scanning
             if config.scan_full_page:
-                await self._handle_full_page_scan(page, config.scroll_delay)
+                # await self._handle_full_page_scan(page, config.scroll_delay)
+                await self._handle_full_page_scan(page, config.scroll_delay, config.max_scroll_steps)
 
             # Handle virtual scroll if configured
             if config.virtual_scroll_config:
@@ -1088,7 +1129,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 # Close the page
                 await page.close()
 
-    async def _handle_full_page_scan(self, page: Page, scroll_delay: float = 0.1):
+    # async def _handle_full_page_scan(self, page: Page, scroll_delay: float = 0.1):
+    async def _handle_full_page_scan(self, page: Page, scroll_delay: float = 0.1, max_scroll_steps: Optional[int] = None):
         """
         Helper method to handle full page scanning.
 
@@ -1103,6 +1145,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         Args:
             page (Page): The Playwright page object
             scroll_delay (float): The delay between page scrolls
+            max_scroll_steps (Optional[int]): Maximum number of scroll steps to perform. If None, scrolls until end.
 
         """
         try:
@@ -1127,9 +1170,21 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             dimensions = await self.get_page_dimensions(page)
             total_height = dimensions["height"]
 
+            scroll_step_count = 0
             while current_position < total_height:
+                #### 
+                # NEW FEATURE: Check if we've reached the maximum allowed scroll steps
+                # This prevents infinite scrolling on very long pages or infinite scroll scenarios
+                # If max_scroll_steps is None, this check is skipped (unlimited scrolling - original behavior)
+                ####
+                if max_scroll_steps is not None and scroll_step_count >= max_scroll_steps:
+                    break
                 current_position = min(current_position + viewport_height, total_height)
                 await self.safe_scroll(page, 0, current_position, delay=scroll_delay)
+
+                # Increment the step counter for max_scroll_steps tracking
+                scroll_step_count += 1
+                
                 # await page.evaluate(f"window.scrollTo(0, {current_position})")
                 # await asyncio.sleep(scroll_delay)
 
@@ -1616,11 +1671,31 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             num_segments = (page_height // viewport_height) + 1
             for i in range(num_segments):
                 y_offset = i * viewport_height
+                # Special handling for the last segment
+                if i == num_segments - 1:
+                    last_part_height = page_height % viewport_height
+                    
+                    # If page_height is an exact multiple of viewport_height,
+                    # we don't need an extra segment
+                    if last_part_height == 0:
+                        # Skip last segment if page height is exact multiple of viewport
+                        break
+                    
+                    # Adjust viewport to exactly match the remaining content height
+                    await page.set_viewport_size({"width": page_width, "height": last_part_height})
+                
                 await page.evaluate(f"window.scrollTo(0, {y_offset})")
                 await asyncio.sleep(0.01)  # wait for render
-                seg_shot = await page.screenshot(full_page=False)
+                
+                # Capture the current segment
+                # Note: Using compression options (format, quality) would go here
+                seg_shot = await page.screenshot(full_page=False, type="jpeg", quality=85)
+                # seg_shot = await page.screenshot(full_page=False)
                 img = Image.open(BytesIO(seg_shot)).convert("RGB")
                 segments.append(img)
+
+            # Reset viewport to original size after capturing segments
+            await page.set_viewport_size({"width": page_width, "height": viewport_height})
 
             total_height = sum(img.height for img in segments)
             stitched = Image.new("RGB", (segments[0].width, total_height))
@@ -1750,12 +1825,31 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     # then wait for the new page to load before continuing
                     result = None
                     try:
+                        # OLD VERSION:
+                        # result = await page.evaluate(
+                        #     f"""
+                        # (async () => {{
+                        #     try {{
+                        #         const script_result = {script};
+                        #         return {{ success: true, result: script_result }};
+                        #     }} catch (err) {{
+                        #         return {{ success: false, error: err.toString(), stack: err.stack }};
+                        #     }}
+                        # }})();
+                        # """
+                        # )
+                        
+                        # """ NEW VERSION:
+                        # When {script} contains statements (e.g., const link = …; link.click();), 
+                        # this forms invalid JavaScript, causing Playwright execution error: SyntaxError: Unexpected token 'const'.
+                        # """
                         result = await page.evaluate(
                             f"""
                         (async () => {{
                             try {{
-                                const script_result = {script};
-                                return {{ success: true, result: script_result }};
+                                return await (async () => {{
+                                    {script}
+                                }})();
                             }} catch (err) {{
                                 return {{ success: false, error: err.toString(), stack: err.stack }};
                             }}

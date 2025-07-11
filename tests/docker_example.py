@@ -105,7 +105,7 @@ def test_docker_deployment(version="basic"):
 def test_basic_crawl(tester: Crawl4AiTester):
     print("\n=== Testing Basic Crawl ===")
     request = {
-        "urls": "https://www.nbcnews.com/business",
+        "urls": ["https://www.nbcnews.com/business"],
         "priority": 10,
         "session_id": "test",
     }
@@ -119,7 +119,7 @@ def test_basic_crawl(tester: Crawl4AiTester):
 def test_basic_crawl_sync(tester: Crawl4AiTester):
     print("\n=== Testing Basic Crawl (Sync) ===")
     request = {
-        "urls": "https://www.nbcnews.com/business",
+        "urls": ["https://www.nbcnews.com/business"],
         "priority": 10,
         "session_id": "test",
     }
@@ -134,7 +134,7 @@ def test_basic_crawl_sync(tester: Crawl4AiTester):
 def test_js_execution(tester: Crawl4AiTester):
     print("\n=== Testing JS Execution ===")
     request = {
-        "urls": "https://www.nbcnews.com/business",
+        "urls": ["https://www.nbcnews.com/business"],
         "priority": 8,
         "js_code": [
             "const loadMoreButton = Array.from(document.querySelectorAll('button')).find(button => button.textContent.includes('Load More')); loadMoreButton && loadMoreButton.click();"
@@ -151,7 +151,7 @@ def test_js_execution(tester: Crawl4AiTester):
 def test_css_selector(tester: Crawl4AiTester):
     print("\n=== Testing CSS Selector ===")
     request = {
-        "urls": "https://www.nbcnews.com/business",
+        "urls": ["https://www.nbcnews.com/business"],
         "priority": 7,
         "css_selector": ".wide-tease-item__description",
         "crawler_params": {"headless": True},
@@ -188,7 +188,7 @@ def test_structured_extraction(tester: Crawl4AiTester):
     }
 
     request = {
-        "urls": "https://www.coinbase.com/explore",
+        "urls": ["https://www.coinbase.com/explore"],
         "priority": 9,
         "extraction_config": {"type": "json_css", "params": {"schema": schema}},
     }
@@ -223,7 +223,7 @@ def test_llm_extraction(tester: Crawl4AiTester):
     }
 
     request = {
-        "urls": "https://openai.com/api/pricing",
+        "urls": ["https://openai.com/api/pricing"],
         "priority": 8,
         "extraction_config": {
             "type": "llm",
@@ -270,7 +270,7 @@ def test_llm_with_ollama(tester: Crawl4AiTester):
     }
 
     request = {
-        "urls": "https://www.nbcnews.com/business",
+        "urls": ["https://www.nbcnews.com/business"],
         "priority": 8,
         "extraction_config": {
             "type": "llm",
@@ -297,7 +297,7 @@ def test_llm_with_ollama(tester: Crawl4AiTester):
 def test_cosine_extraction(tester: Crawl4AiTester):
     print("\n=== Testing Cosine Extraction ===")
     request = {
-        "urls": "https://www.nbcnews.com/business",
+        "urls": ["https://www.nbcnews.com/business"],
         "priority": 8,
         "extraction_config": {
             "type": "cosine",
@@ -323,7 +323,7 @@ def test_cosine_extraction(tester: Crawl4AiTester):
 def test_screenshot(tester: Crawl4AiTester):
     print("\n=== Testing Screenshot ===")
     request = {
-        "urls": "https://www.nbcnews.com/business",
+        "urls": ["https://www.nbcnews.com/business"],
         "priority": 5,
         "screenshot": True,
         "crawler_params": {"headless": True},

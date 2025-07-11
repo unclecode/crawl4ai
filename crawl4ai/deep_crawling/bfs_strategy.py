@@ -157,6 +157,11 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
         results: List[CrawlResult] = []
 
         while current_level and not self._cancel_event.is_set():
+            # Check if we've already reached max_pages before starting a new level
+            if self._pages_crawled >= self.max_pages:
+                self.logger.info(f"Max pages limit ({self.max_pages}) reached, stopping crawl")
+                break
+            
             next_level: List[Tuple[str, Optional[str]]] = []
             urls = [url for url, _ in current_level]
 
@@ -221,6 +226,10 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
                 # Count only successful crawls
                 if result.success:
                     self._pages_crawled += 1
+                    # Check if we've reached the limit during batch processing
+                    if self._pages_crawled >= self.max_pages:
+                        self.logger.info(f"Max pages limit ({self.max_pages}) reached during batch, stopping crawl")
+                        break  # Exit the generator
                 
                 results_count += 1
                 yield result
