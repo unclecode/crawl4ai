@@ -187,7 +187,7 @@ from crawl4ai import CrawlerRunConfig
 bm25_filter = BM25ContentFilter(
     user_query="machine learning",
     bm25_threshold=1.2,
-    use_stemming=True
+    language="english"
 )
 
 md_generator = DefaultMarkdownGenerator(
@@ -200,7 +200,8 @@ config = CrawlerRunConfig(markdown_generator=md_generator)
 
 - **`user_query`**: The term you want to focus on. BM25 tries to keep only content blocks relevant to that query.  
 - **`bm25_threshold`**: Raise it to keep fewer blocks; lower it to keep more.  
-- **`use_stemming`**: If `True`, variations of words match (e.g., “learn,” “learning,” “learnt”).
+- **`use_stemming`** *(default `True`)*: Whether to apply stemming to the query and content.
+- **`language (str)`**: Language for stemming (default: 'english').
 
 **No query provided?** BM25 tries to glean a context from page metadata, or you can simply treat it as a scorched-earth approach that discards text with low generic score. Realistically, you want to supply a query for best results.
 
@@ -233,7 +234,7 @@ prune_filter = PruningContentFilter(
 For intelligent content filtering and high-quality markdown generation, you can use the **LLMContentFilter**. This filter leverages LLMs to generate relevant markdown while preserving the original content's meaning and structure:
 
 ```python
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, LLMConfig
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, LLMConfig, DefaultMarkdownGenerator
 from crawl4ai.content_filter_strategy import LLMContentFilter
 
 async def main():
@@ -255,9 +256,12 @@ async def main():
         chunk_token_threshold=4096,  # Adjust based on your needs
         verbose=True
     )
-
+    md_generator = DefaultMarkdownGenerator(
+        content_filter=filter,
+        options={"ignore_links": True}
+    )
     config = CrawlerRunConfig(
-        content_filter=filter
+        markdown_generator=md_generator,
     )
 
     async with AsyncWebCrawler() as crawler:

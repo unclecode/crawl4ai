@@ -1,0 +1,8 @@
+GO https://myapp.com
+WAIT 2
+IF (EXISTS `.user-avatar`) THEN CLICK `.logout` ELSE CLICK `.login`
+WAIT `#auth-form` 5
+IF (EXISTS `#auth-form`) THEN TYPE "user@example.com"
+IF (EXISTS `#auth-form`) THEN PRESS Tab
+IF (EXISTS `#auth-form`) THEN TYPE "password123"
+IF (EXISTS `#auth-form`) THEN CLICK `button[type="submit"]`

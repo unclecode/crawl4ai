@@ -1010,7 +1010,7 @@ def cdp_cmd(user_data_dir: Optional[str], port: int, browser_type: str, headless
 @click.option("--crawler", "-c", type=str, callback=parse_key_values, help="Crawler parameters as key1=value1,key2=value2")
 @click.option("--output", "-o", type=click.Choice(["all", "json", "markdown", "md", "markdown-fit", "md-fit"]), default="all")
 @click.option("--output-file", "-O", type=click.Path(), help="Output file path (default: stdout)")
-@click.option("--bypass-cache", "-b", is_flag=True, default=True, help="Bypass cache when crawling")
+@click.option("--bypass-cache", "-bc", is_flag=True, default=True, help="Bypass cache when crawling")
 @click.option("--question", "-q", help="Ask a question about the crawled content")
 @click.option("--verbose", "-v", is_flag=True)
 @click.option("--profile", "-p", help="Use a specific browser profile (by name)")
@@ -1073,7 +1073,8 @@ def crawl_cmd(url: str, browser_config: str, crawler_config: str, filter_config:
                 crawler_cfg.markdown_generator = DefaultMarkdownGenerator(
                     content_filter = BM25ContentFilter(
                         user_query=filter_conf.get("query"),
-                        bm25_threshold=filter_conf.get("threshold", 1.0)
+                        bm25_threshold=filter_conf.get("threshold", 1.0),
+                        use_stemming=filter_conf.get("use_stemming", True),
                     )
                 )
             elif filter_conf["type"] == "pruning":

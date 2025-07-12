@@ -2,6 +2,22 @@
 
 Welcome to the Crawl4AI blog! Here you'll find detailed release notes, technical insights, and updates about the project. Whether you're looking for the latest improvements or want to dive deep into web crawling techniques, this is the place.
 
+## Featured Articles
+
+### [When to Stop Crawling: The Art of Knowing "Enough"](articles/adaptive-crawling-revolution.md)
+*January 29, 2025*
+
+Traditional crawlers are like tourists with unlimited time—they'll visit every street, every alley, every dead end. But what if your crawler could think like a researcher with a deadline? Discover how Adaptive Crawling revolutionizes web scraping by knowing when to stop. Learn about the three-layer intelligence system that evaluates coverage, consistency, and saturation to build focused knowledge bases instead of endless page collections.
+
+[Read the full article →](articles/adaptive-crawling-revolution.md)
+
+### [The LLM Context Protocol: Why Your AI Assistant Needs Memory, Reasoning, and Examples](articles/llm-context-revolution.md)
+*January 24, 2025*
+
+Ever wondered why your AI coding assistant struggles with your library despite comprehensive documentation? This article introduces the three-dimensional context protocol that transforms how AI understands code. Learn why memory, reasoning, and examples together create wisdom—not just information.
+
+[Read the full article →](articles/llm-context-revolution.md)
+
 ## Latest Release
 
 Here’s the blog index entry for **v0.6.0**, written to match the exact tone and structure of your previous entries:

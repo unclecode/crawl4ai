@@ -1,0 +1,82 @@
+# Complete E-commerce Workflow
+# Login, browse products, and interact with various elements
+
+# Define reusable procedures
+PROC handle_popups
+  IF (EXISTS `.cookie-banner`) THEN CLICK `.accept`
+  IF (EXISTS `.newsletter-popup`) THEN CLICK `.close`
+ENDPROC
+
+PROC login_user
+  CLICK `#login-btn`
+  WAIT `.login-form` 2
+  CLICK `#email`
+  TYPE "demo@example.com"
+  CLICK `#password`
+  TYPE "demo123"
+  CLICK `button[type="submit"]`
+  WAIT `.welcome-message` 5
+ENDPROC
+
+PROC browse_products
+  # Go to catalog
+  CLICK `#catalog-link`
+  WAIT `.product-grid` 3
+  
+  # Apply filters
+  CLICK `.collapsible`
+  WAIT 0.5
+  CLICK `input[type="checkbox"]`
+  
+  # Load some products
+  SCROLL DOWN 500
+  WAIT 1
+  SCROLL DOWN 500
+  WAIT 1
+ENDPROC
+
+# Main workflow
+GO http://127.0.0.1:8080/playground/
+WAIT `body` 2
+
+# Handle initial popups
+handle_popups
+
+# Login if not already
+IF (NOT EXISTS `.user-info`) THEN login_user
+
+# Browse products
+browse_products
+
+# Navigate to tabs demo
+CLICK `a[href="#tabs"]`
+WAIT `.tabs-container` 2
+
+# Interact with tabs
+CLICK `button[data-tab="reviews"]`
+WAIT 1
+
+# Load comments
+IF (EXISTS `.load-comments`) THEN CLICK `.load-comments`
+WAIT `.comments-section` 2
+
+# Check specifications
+CLICK `button[data-tab="specs"]`
+WAIT 1
+
+# Final navigation to data tables
+CLICK `a[href="#data"]`
+WAIT `.data-table` 2
+
+# Search in table
+CLICK `.search-input`
+TYPE "User"
+
+# Load more rows
+CLICK `.load-more-rows`
+WAIT 1
+
+# Export data
+CLICK `#export-btn`
+
+EVAL `console.log('✅ Workflow completed successfully!')`

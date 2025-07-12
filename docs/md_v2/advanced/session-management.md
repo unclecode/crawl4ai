@@ -45,7 +45,7 @@ Here's an example of crawling GitHub commits across multiple pages while preserv
 
 ```python
 from crawl4ai.async_configs import CrawlerRunConfig
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 from crawl4ai.cache_context import CacheMode
 
 async def crawl_dynamic_content():

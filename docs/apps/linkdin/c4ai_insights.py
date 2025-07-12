@@ -29,8 +29,9 @@ from typing import List, Dict, Any
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeElapsedColumn
-import logging
 
+
+# ───────────────────────────────────────────────────────────────────────────────
 
 BASE_DIR = pathlib.Path(__file__).resolve().parent
 
@@ -44,6 +45,8 @@ import pandas as pd
 import hashlib
 
 from litellm import completion   #Support any LLM Provider
+
+
 
 # ───────────────────────────────────────────────────────────────────────────────
 # Utils
@@ -66,14 +69,16 @@ BASE_DIR = pathlib.Path(__file__).resolve().parent
 # ───────────────────────────────────────────────────────────────────────────────
 def dev_defaults() -> SimpleNamespace:
     return SimpleNamespace(
-        in_dir="./debug_out",          
-        out_dir="./insights_debug",
+        in_dir="./samples",          
+        out_dir="./samples/insights",
         embed_model="all-MiniLM-L6-v2",
         top_k=10,
         llm_provider="openai/gpt-4.1", 
         llm_api_key=None,
         max_llm_tokens=8000,
         llm_temperature=1.0,
+        stub=False,  # Set to True to use a stub for org-chart inference
+        llm_base_url=None,  # e.g., "https://api.openai.com/v1" for OpenAI
         workers=4
     )
 
@@ -82,8 +87,9 @@ def dev_defaults() -> SimpleNamespace:
 # ───────────────────────────────────────────────────────────────────────────────
 def embed_descriptions(companies, model_name:str, opts) -> np.ndarray:
     from sentence_transformers import SentenceTransformer
-    
-    logging.debug(f"Using embedding model: {model_name}")
+
+    console = Console()
+    console.print(f"Using embedding model: [bold cyan]{model_name}[/]")
     cache_path = BASE_DIR / Path(opts.out_dir) / "embeds_cache.json"
     cache = {}
     if cache_path.exists():
@@ -122,7 +128,6 @@ def build_company_graph(companies, embeds:np.ndarray, top_k:int) -> Dict[str,Any
     from sklearn.metrics.pairwise import cosine_similarity
     sims = cosine_similarity(embeds)
     nodes, edges = [], []
-    idx_of = {c["handle"]: i for i,c in enumerate(companies)}
     for i,c in enumerate(companies):
         node = dict(
             id=c["handle"].strip("/"),
@@ -252,18 +257,18 @@ def render_html(out:Path, template_dir:Path):
 # ───────────────────────────────────────────────────────────────────────────────
 async def run(opts):
     # ── silence SDK noise ──────────────────────────────────────────────────────
-    for noisy in ("openai", "httpx", "httpcore"):
-        lg = logging.getLogger(noisy)
-        lg.setLevel(logging.WARNING)     # or ERROR if you want total silence
-        lg.propagate = False             # optional: stop them reaching root
+    # for noisy in ("openai", "httpx", "httpcore"):
+    #     lg = logging.getLogger(noisy)
+    #     lg.setLevel(logging.WARNING)     # or ERROR if you want total silence
+    #     lg.propagate = False             # optional: stop them reaching root
 
     # ────────────── logging bootstrap ──────────────
     console = Console()
-    logging.basicConfig(
-        level="INFO",
-        format="%(message)s",
-        handlers=[RichHandler(console=console, markup=True, rich_tracebacks=True)],
-    )
+    # logging.basicConfig(
+    #     level="INFO",
+    #     format="%(message)s",
+    #     handlers=[RichHandler(console=console, markup=True, rich_tracebacks=True)],
+    # )
 
     in_dir  = BASE_DIR / Path(opts.in_dir)
     out_dir = BASE_DIR / Path(opts.out_dir)
@@ -272,12 +277,12 @@ async def run(opts):
     companies = load_jsonl(in_dir/"companies.jsonl")
     people    = load_jsonl(in_dir/"people.jsonl")
 
-    logging.info(f"[bold cyan]Loaded[/] {len(companies)} companies, {len(people)} people")
+    console.print(f"[bold cyan]Loaded[/] {len(companies)} companies, {len(people)} people")
 
-    logging.info("[bold]⇢[/] Embedding company descriptions…")
+    console.print("[bold]⇢[/] Embedding company descriptions…")
     embeds = embed_descriptions(companies, opts.embed_model, opts)
     
-    logging.info("[bold]⇢[/] Building similarity graph")
+    console.print("[bold]⇢[/] Building similarity graph")
     company_graph = build_company_graph(companies, embeds, opts.top_k)
     dump_json(company_graph, out_dir/"company_graph.json")
 
@@ -286,19 +291,19 @@ async def run(opts):
     for comp in companies:
         handle = comp["handle"].strip("/").replace("/","_")
         out_file = out_dir/f"org_chart_{handle}.json"
-        if out_file.exists() and False:
-            logging.info(f"[green]✓[/] Skipping existing {comp['name']}")
+        if out_file.exists():
+            console.print(f"[green]✓[/] Skipping existing {comp['name']}")
             continue
         to_process.append(comp)
     
     
     if not to_process:
-        logging.info("[yellow]All companies already processed[/]")
+        console.print("[yellow]All companies already processed[/]")
     else:
         workers = getattr(opts, 'workers', 1)
         parallel = workers > 1
         
-        logging.info(f"[bold]⇢[/] Inferring org-charts via LLM {f'(parallel={workers} workers)' if parallel else ''}")
+        console.print(f"[bold]⇢[/] Inferring org-charts via LLM {f'(parallel={workers} workers)' if parallel else ''}")
         
         with Progress(
             SpinnerColumn(),
@@ -341,12 +346,11 @@ async def run(opts):
             # Run with concurrency control
             await asyncio.gather(*(bounded_process(task) for task in tasks))
 
-    logging.info("[bold]⇢[/] Flattening decision-makers CSV")
+    console.print("[bold]⇢[/] Flattening decision-makers CSV")
     export_decision_makers(out_dir, out_dir/"decision_makers.csv")
         
     render_html(out_dir, template_dir=BASE_DIR/"templates")
-    logging.success = lambda msg, **k: console.print(f"[bold green]✓[/] {msg}", **k)
-    logging.success(f"Stage-2 artefacts written to {out_dir}")
+    console.print(f"[bold green]✓[/] Stage-2 artefacts written to {out_dir}")
 
 # ───────────────────────────────────────────────────────────────────────────────
 # CLI
@@ -369,8 +373,8 @@ def build_arg_parser():
 
 def main():
     dbg = dev_defaults()
-    # opts = dbg if True else build_arg_parser().parse_args()
-    opts = build_arg_parser().parse_args()
+    opts = dbg if True else build_arg_parser().parse_args()
+    # opts = build_arg_parser().parse_args()
     asyncio.run(run(opts))
 
 if __name__ == "__main__":

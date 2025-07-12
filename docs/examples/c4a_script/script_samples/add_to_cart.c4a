@@ -1,0 +1,7 @@
+GO https://store.example.com/product/laptop
+WAIT `.product-details` 8
+CLICK `button.add-to-cart`
+WAIT `.cart-notification` 3
+CLICK `.cart-icon`
+WAIT `.checkout-btn` 5
+CLICK `.checkout-btn`

@@ -1,4 +1,5 @@
 site_name: Crawl4AI Documentation (v0.6.x)
+site_favicon: docs/md_v2/favicon.ico
 site_description:  🚀🤖 Crawl4AI, Open-source LLM-Friendly Web Crawler & Scraper
 site_url: https://docs.crawl4ai.com
 repo_url: https://github.com/unclecode/crawl4ai
@@ -10,6 +11,10 @@ nav:
   - "Ask AI": "core/ask-ai.md"
   - "Quick Start": "core/quickstart.md"
   - "Code Examples": "core/examples.md"
+  - Apps:
+    - "Demo Apps": "apps/index.md"
+    - "C4A-Script Editor": "apps/c4a-script/index.html"
+    - "LLM Context Builder": "apps/llmtxt/index.html"
   - Setup & Installation:
     - "Installation": "core/installation.md"
     - "Docker Deployment": "core/docker-deployment.md"
@@ -20,6 +25,7 @@ nav:
     - "Command Line Interface": "core/cli.md"
     - "Simple Crawling": "core/simple-crawling.md"
     - "Deep Crawling": "core/deep-crawling.md"
+    - "C4A-Script": "core/c4a-script.md"
     - "Crawler Result": "core/crawler-result.md"
     - "Browser, Crawler & LLM Config": "core/browser-crawler-config.md"
     - "Markdown Generation": "core/markdown-generation.md"
@@ -31,6 +37,7 @@ nav:
     - "Link & Media": "core/link-media.md"
   - Advanced:
     - "Overview": "advanced/advanced-features.md"
+    - "Virtual Scroll": "advanced/virtual-scroll.md"
     - "File Downloading": "advanced/file-downloading.md"
     - "Lazy Loading": "advanced/lazy-loading.md"
     - "Hooks & Auth": "advanced/hooks-auth.md"
@@ -41,6 +48,7 @@ nav:
     - "Identity Based Crawling": "advanced/identity-based-crawling.md"
     - "SSL Certificate": "advanced/ssl-certificate.md"
     - "Network & Console Capture": "advanced/network-console-capture.md"
+    - "PDF Parsing": "advanced/pdf-parsing.md"
   - Extraction:
     - "LLM-Free Strategies": "extraction/no-llm-strategies.md"
     - "LLM Strategies": "extraction/llm-strategies.md"
@@ -53,10 +61,13 @@ nav:
     - "Browser, Crawler & LLM Config": "api/parameters.md"
     - "CrawlResult": "api/crawl-result.md"
     - "Strategies": "api/strategies.md"
+    - "C4A-Script Reference": "api/c4a-script-reference.md"
 
 theme:
   name: 'terminal'
   palette: 'dark'
+  custom_dir: docs/md_v2/overrides
+  color_mode: 'dark'
   icon:
     repo: fontawesome/brands/github
 
@@ -82,8 +93,11 @@ extra_css:
   - assets/styles.css
   - assets/highlight.css
   - assets/dmvendor.css
+  - assets/feedback-overrides.css
 
 extra_javascript:
+  - https://www.googletagmanager.com/gtag/js?id=G-58W0K2ZQ25
+  - assets/gtag.js
   - assets/highlight.min.js
   - assets/highlight_init.js
   - https://buttons.github.io/buttons.js

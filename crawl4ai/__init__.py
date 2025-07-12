@@ -2,7 +2,8 @@
 import warnings
 
 from .async_webcrawler import AsyncWebCrawler, CacheMode
-from .async_configs import BrowserConfig, CrawlerRunConfig, HTTPCrawlerConfig, LLMConfig, ProxyConfig, GeolocationConfig
+# MODIFIED: Add SeedingConfig and VirtualScrollConfig here
+from .async_configs import BrowserConfig, CrawlerRunConfig, HTTPCrawlerConfig, LLMConfig, ProxyConfig, GeolocationConfig, SeedingConfig, VirtualScrollConfig
 
 from .content_scraping_strategy import (
     ContentScrapingStrategy,
@@ -36,6 +37,7 @@ from .content_filter_strategy import (
 )
 from .models import CrawlResult, MarkdownGenerationResult, DisplayMode
 from .components.crawler_monitor import CrawlerMonitor
+from .link_preview import LinkPreview
 from .async_dispatcher import (
     MemoryAdaptiveDispatcher,
     SemaphoreDispatcher,
@@ -65,6 +67,31 @@ from .deep_crawling import (
     DFSDeepCrawlStrategy,
     DeepCrawlDecorator,
 )
+# NEW: Import AsyncUrlSeeder
+from .async_url_seeder import AsyncUrlSeeder
+# Adaptive Crawler
+from .adaptive_crawler import (
+    AdaptiveCrawler,
+    AdaptiveConfig,
+    CrawlState,
+    CrawlStrategy,
+    StatisticalStrategy
+)
+
+# C4A Script Language Support
+from .script import (
+    compile as c4a_compile,
+    validate as c4a_validate,
+    compile_file as c4a_compile_file,
+    CompilationResult,
+    ValidationResult,
+    ErrorDetail
+)
+
+from .utils import (
+    start_colab_display_server,
+    setup_colab_environment
+)
 
 __all__ = [
     "AsyncLoggerBase",
@@ -73,6 +100,17 @@ __all__ = [
     "BrowserProfiler",
     "LLMConfig",
     "GeolocationConfig",
+    # NEW: Add SeedingConfig and VirtualScrollConfig
+    "SeedingConfig",
+    "VirtualScrollConfig",
+    # NEW: Add AsyncUrlSeeder
+    "AsyncUrlSeeder",
+    # Adaptive Crawler
+    "AdaptiveCrawler",
+    "AdaptiveConfig", 
+    "CrawlState",
+    "CrawlStrategy",
+    "StatisticalStrategy",
     "DeepCrawlStrategy",
     "BFSDeepCrawlStrategy",
     "BestFirstCrawlingStrategy",
@@ -119,12 +157,22 @@ __all__ = [
     "SemaphoreDispatcher",
     "RateLimiter",
     "CrawlerMonitor",
+    "LinkPreview",
     "DisplayMode",
     "MarkdownGenerationResult",
     "Crawl4aiDockerClient",
     "ProxyRotationStrategy",
     "RoundRobinProxyStrategy",
-    "ProxyConfig"
+    "ProxyConfig",
+    "start_colab_display_server",
+    "setup_colab_environment",
+    # C4A Script additions
+    "c4a_compile",
+    "c4a_validate", 
+    "c4a_compile_file",
+    "CompilationResult",
+    "ValidationResult",
+    "ErrorDetail",
 ]
 
 

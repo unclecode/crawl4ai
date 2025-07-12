@@ -541,7 +541,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
             api_token: The API token for the provider.
             base_url: The base URL for the API request.
             api_base: The base URL for the API request.
-            extra_args: Additional arguments for the API request, such as temprature, max_tokens, etc.
+            extra_args: Additional arguments for the API request, such as temperature, max_tokens, etc.
         """
         super().__init__( input_format=input_format, **kwargs)
         self.llm_config = llm_config
@@ -656,11 +656,11 @@ class LLMExtractionStrategy(ExtractionStrategy):
             self.total_usage.total_tokens += usage.total_tokens
 
             try:
-                response = response.choices[0].message.content
+                content = response.choices[0].message.content
                 blocks = None
 
                 if self.force_json_response:
-                    blocks = json.loads(response)
+                    blocks = json.loads(content)
                     if isinstance(blocks, dict):
                         # If it has only one key which calue is list then assign that to blocks, exampled: {"news": [..]}
                         if len(blocks) == 1 and isinstance(list(blocks.values())[0], list):
@@ -673,7 +673,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
                         blocks = blocks
                 else: 
                     # blocks = extract_xml_data(["blocks"], response.choices[0].message.content)["blocks"]
-                    blocks = extract_xml_data(["blocks"], response)["blocks"]
+                    blocks = extract_xml_data(["blocks"], content)["blocks"]
                     blocks = json.loads(blocks)
 
                 for block in blocks:
@@ -1168,7 +1168,11 @@ In this scenario, use your best judgment to generate the schema. You need to exa
         elif not query and not target_json_example:
             user_message["content"] += """IMPORTANT: Since we neither have a query nor an example, it is crucial to rely solely on the HTML content provided. Leverage your expertise to determine the schema based on the repetitive patterns observed in the content."""
         
-        user_message["content"] += """IMPORTANT: Ensure your schema remains reliable by avoiding selectors that appear to generate dynamically and are not dependable. You want a reliable schema, as it consistently returns the same data even after many page reloads.
+        user_message["content"] += """IMPORTANT: 
+        0/ Ensure your schema remains reliable by avoiding selectors that appear to generate dynamically and are not dependable. You want a reliable schema, as it consistently returns the same data even after many page reloads.
+        1/ DO NOT USE use base64 kind of classes, they are temporary and not reliable.
+        2/ Every selector must refer to only one unique element. You should ensure your selector points to a single element and is unique to the place that contains the information. You have to use available techniques based on CSS or XPATH requested schema to make sure your selector is unique and also not fragile, meaning if we reload the page now or in the future, the selector should remain reliable.
+        3/ Do not use Regex as much as possible.
 
         Analyze the HTML and generate a JSON schema that follows the specified format. Only output valid JSON schema, nothing else.
         """

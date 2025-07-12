@@ -138,7 +138,7 @@ If you run a JSON-based extraction strategy (CSS, XPath, LLM, etc.), the structu
 import asyncio
 import json
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 async def main():
     schema = {

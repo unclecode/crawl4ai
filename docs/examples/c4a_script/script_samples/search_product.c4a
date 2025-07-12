@@ -1,0 +1,7 @@
+GO https://shop.example.com
+WAIT `.search-bar` 10
+CLICK `.search-bar`
+TYPE "wireless headphones"
+PRESS Enter
+WAIT `.results` 5
+CLICK `.product-card:first-child`

@@ -6,7 +6,7 @@ Many websites now load images **lazily** as you scroll. If you need to ensure th
 2. **`scan_full_page`** – Force the crawler to scroll the entire page, triggering lazy loads.  
 3. **`scroll_delay`** – Add small delays between scroll steps.  
 
-**Note**: If the site requires multiple “Load More” triggers or complex interactions, see the [Page Interaction docs](../core/page-interaction.md).
+**Note**: If the site requires multiple “Load More” triggers or complex interactions, see the [Page Interaction docs](../core/page-interaction.md). For sites with virtual scrolling (Twitter/Instagram style), see the [Virtual Scroll docs](virtual-scroll.md).
 
 ### Example: Ensuring Lazy Images Appear
 

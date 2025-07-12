@@ -6,6 +6,7 @@ import html
 import lxml
 import re
 import os
+import subprocess
 import platform
 from .prompts import PROMPT_EXTRACT_BLOCKS
 from array import array
@@ -31,7 +32,6 @@ import hashlib
 
 from urllib.robotparser import RobotFileParser
 import aiohttp
-from urllib.parse import urlparse, urlunparse
 from functools import lru_cache
 
 from packaging import version
@@ -41,6 +41,37 @@ from typing import Sequence
 from itertools import chain
 from collections import deque
 from typing import  Generator, Iterable
+
+import numpy as np
+
+from urllib.parse import (
+    urljoin, urlparse, urlunparse,
+    parse_qsl, urlencode, quote, unquote
+)
+
+
+# Monkey patch to fix wildcard handling in urllib.robotparser
+from urllib.robotparser import RuleLine
+import re
+
+original_applies_to = RuleLine.applies_to
+
+def patched_applies_to(self, filename):
+   # Handle wildcards in paths
+   if '*' in self.path or '%2A' in self.path or self.path in ("*", "%2A"):
+       pattern = self.path.replace('%2A', '*')
+       pattern = re.escape(pattern).replace('\\*', '.*')
+       pattern = '^' + pattern
+       if pattern.endswith('\\$'):
+           pattern = pattern[:-2] + '$'
+       try:
+           return bool(re.match(pattern, filename))
+       except re.error:
+           return original_applies_to(self, filename)
+   return original_applies_to(self, filename)
+
+RuleLine.applies_to = patched_applies_to
+# Monkey patch ends
 
 def chunk_documents(
     documents: Iterable[str],
@@ -135,13 +166,20 @@ def merge_chunks(
     word_token_ratio: float = 1.0,
     splitter: Callable = None
 ) -> List[str]:
-    """Merges documents into chunks of specified token size.
+    """
+    Merges a sequence of documents into chunks based on a target token count, with optional overlap.
+    
+    Each document is split into tokens using the provided splitter function (defaults to str.split). Tokens are distributed into chunks aiming for the specified target size, with optional overlapping tokens between consecutive chunks. Returns a list of non-empty merged chunks as strings.
     
     Args:
-        docs: Input documents
-        target_size: Desired token count per chunk
-        overlap: Number of tokens to overlap between chunks
-        word_token_ratio: Multiplier for word->token conversion
+        docs: Sequence of input document strings to be merged.
+        target_size: Target number of tokens per chunk.
+        overlap: Number of tokens to overlap between consecutive chunks.
+        word_token_ratio: Multiplier to estimate token count from word count.
+        splitter: Callable used to split each document into tokens.
+    
+    Returns:
+        List of merged document chunks as strings, each not exceeding the target token size.
     """
     # Pre-tokenize all docs and store token counts
     splitter = splitter or str.split
@@ -150,7 +188,7 @@ def merge_chunks(
     total_tokens = 0
     
     for doc in docs:
-        tokens = doc.split()
+        tokens = splitter(doc)
         count = int(len(tokens) * word_token_ratio)
         if count:  # Skip empty docs
             token_counts.append(count)
@@ -303,7 +341,7 @@ class RobotsParser:
                 robots_url = f"{scheme}://{domain}/robots.txt"
                 
                 async with aiohttp.ClientSession() as session:
-                    async with session.get(robots_url, timeout=2) as response:
+                    async with session.get(robots_url, timeout=2, ssl=False) as response:
                         if response.status == 200:
                             rules = await response.text()
                             self._cache_rules(domain, rules)
@@ -1109,6 +1147,23 @@ def get_content_of_website_optimized(
     css_selector: str = None,
     **kwargs,
 ) -> Dict[str, Any]:
+    """
+    Extracts and cleans content from website HTML, optimizing for useful media and contextual information.
+    
+    Parses the provided HTML to extract internal and external links, filters and scores images for usefulness, gathers contextual descriptions for media, removes unwanted or low-value elements, and converts the cleaned HTML to Markdown. Also extracts metadata and returns all structured content in a dictionary.
+    
+    Args:
+        url: The URL of the website being processed.
+        html: The raw HTML content to extract from.
+        word_count_threshold: Minimum word count for elements to be retained.
+        css_selector: Optional CSS selector to restrict extraction to specific elements.
+    
+    Returns:
+        A dictionary containing Markdown content, cleaned HTML, extraction success status, media and link lists, and metadata.
+    
+    Raises:
+        InvalidCSSSelectorError: If a provided CSS selector does not match any elements.
+    """
     if not html:
         return None
 
@@ -1151,6 +1206,20 @@ def get_content_of_website_optimized(
 
     def process_image(img, url, index, total_images):
         # Check if an image has valid display and inside undesired html elements
+        """
+        Processes an HTML image element to determine its relevance and extract metadata.
+        
+        Evaluates an image's visibility, context, and usefulness based on its attributes and parent elements. If the image passes validation and exceeds a usefulness score threshold, returns a dictionary with its source, alt text, contextual description, score, and type. Otherwise, returns None.
+        
+        Args:
+            img: The BeautifulSoup image tag to process.
+            url: The base URL of the page containing the image.
+            index: The index of the image in the list of images on the page.
+            total_images: The total number of images on the page.
+        
+        Returns:
+            A dictionary with image metadata if the image is considered useful, or None otherwise.
+        """
         def is_valid_image(img, parent, parent_classes):
             style = img.get("style", "")
             src = img.get("src", "")
@@ -1172,6 +1241,20 @@ def get_content_of_website_optimized(
         # Score an image for it's usefulness
         def score_image_for_usefulness(img, base_url, index, images_count):
             # Function to parse image height/width value and units
+            """
+            Scores an HTML image element for usefulness based on size, format, attributes, and position.
+            
+            The function evaluates an image's dimensions, file format, alt text, and its position among all images on the page to assign a usefulness score. Higher scores indicate images that are likely more relevant or informative for content extraction or summarization.
+            
+            Args:
+                img: The HTML image element to score.
+                base_url: The base URL used to resolve relative image sources.
+                index: The position of the image in the list of images on the page (zero-based).
+                images_count: The total number of images on the page.
+            
+            Returns:
+                An integer usefulness score for the image.
+            """
             def parse_dimension(dimension):
                 if dimension:
                     match = re.match(r"(\d+)(\D*)", dimension)
@@ -1186,6 +1269,16 @@ def get_content_of_website_optimized(
             # Fetch image file metadata to extract size and extension
             def fetch_image_file_size(img, base_url):
                 # If src is relative path construct full URL, if not it may be CDN URL
+                """
+                Fetches the file size of an image by sending a HEAD request to its URL.
+                
+                Args:
+                    img: A BeautifulSoup tag representing the image element.
+                    base_url: The base URL to resolve relative image sources.
+                
+                Returns:
+                    The value of the "Content-Length" header as a string if available, otherwise None.
+                """
                 img_url = urljoin(base_url, img.get("src"))
                 try:
                     response = requests.head(img_url)
@@ -1196,8 +1289,6 @@ def get_content_of_website_optimized(
                         return None
                 except InvalidSchema:
                     return None
-                finally:
-                    return
 
             image_height = img.get("height")
             height_value, height_unit = parse_dimension(image_height)
@@ -1456,6 +1547,14 @@ def extract_metadata_using_lxml(html, doc=None):
         content = tag.get("content", "").strip()
         if property_name and content:
             metadata[property_name] = content
+   
+   # Article metadata
+    article_tags = head.xpath('.//meta[starts-with(@property, "article:")]')
+    for tag in article_tags:
+        property_name = tag.get("property", "").strip()
+        content = tag.get("content", "").strip()
+        if property_name and content:
+            metadata[property_name] = content
 
     return metadata
 
@@ -1531,7 +1630,15 @@ def extract_metadata(html, soup=None):
         content = tag.get("content", "").strip()
         if property_name and content:
             metadata[property_name] = content
-
+    
+    # Article metadata
+    article_tags = head.find_all("meta", attrs={"property": re.compile(r"^article:")})
+    for tag in article_tags:
+        property_name = tag.get("property", "").strip()
+        content = tag.get("content", "").strip()
+        if property_name and content:
+            metadata[property_name] = content
+    
     return metadata
 
 
@@ -2000,13 +2107,101 @@ def normalize_url(href, base_url):
     parsed_base = urlparse(base_url)
     if not parsed_base.scheme or not parsed_base.netloc:
         raise ValueError(f"Invalid base URL format: {base_url}")
-
-    # Ensure base_url ends with a trailing slash if it's a directory path
-    if not base_url.endswith('/'):
-        base_url = base_url + '/'
+    
+    if  parsed_base.scheme.lower() not in ["http", "https"]:
+        # Handle special protocols
+        raise ValueError(f"Invalid base URL format: {base_url}")
+    cleaned_href = href.strip()
 
     # Use urljoin to handle all cases
-    normalized = urljoin(base_url, href.strip())
+    return urljoin(base_url, cleaned_href)
+
+
+
+
+def normalize_url(
+    href: str,
+    base_url: str,
+    *,
+    drop_query_tracking=True,
+    sort_query=True,
+    keep_fragment=False,
+    extra_drop_params=None
+):
+    """
+    Extended URL normalizer
+
+    Parameters
+    ----------
+    href : str
+        The raw link extracted from a page.
+    base_url : str
+        The page’s canonical URL (used to resolve relative links).
+    drop_query_tracking : bool (default True)
+        Remove common tracking query parameters.
+    sort_query : bool (default True)
+        Alphabetically sort query keys for deterministic output.
+    keep_fragment : bool (default False)
+        Preserve the hash fragment (#section) if you need in-page links.
+    extra_drop_params : Iterable[str] | None
+        Additional query keys to strip (case-insensitive).
+
+    Returns
+    -------
+    str | None
+        A clean, canonical URL or None if href is empty/None.
+    """
+    if not href:
+        return None
+
+    # Resolve relative paths first
+    full_url = urljoin(base_url, href.strip())
+
+    # Parse once, edit parts, then rebuild
+    parsed = urlparse(full_url)
+
+    # ── netloc ──
+    netloc = parsed.netloc.lower()
+
+    # ── path ──
+    # Strip duplicate slashes and trailing “/” (except root)
+    path = quote(unquote(parsed.path))
+    if path.endswith('/') and path != '/':
+        path = path.rstrip('/')
+
+    # ── query ──
+    query = parsed.query
+    if query:
+        # explode, mutate, then rebuild
+        params = [(k.lower(), v) for k, v in parse_qsl(query, keep_blank_values=True)]
+
+        if drop_query_tracking:
+            default_tracking = {
+                'utm_source', 'utm_medium', 'utm_campaign', 'utm_term',
+                'utm_content', 'gclid', 'fbclid', 'ref', 'ref_src'
+            }
+            if extra_drop_params:
+                default_tracking |= {p.lower() for p in extra_drop_params}
+            params = [(k, v) for k, v in params if k not in default_tracking]
+
+        if sort_query:
+            params.sort(key=lambda kv: kv[0])
+
+        query = urlencode(params, doseq=True) if params else ''
+
+    # ── fragment ──
+    fragment = parsed.fragment if keep_fragment else ''
+
+    # Re-assemble
+    normalized = urlunparse((
+        parsed.scheme,
+        netloc,
+        path,
+        parsed.params,
+        query,
+        fragment
+    ))
+
     return normalized
 
 
@@ -2808,5 +3003,387 @@ def preprocess_html_for_schema(html_content, text_threshold=100, attr_value_thre
     
     except Exception as e:
         # Fallback for parsing errors
-        return html_content[:max_size] if len(html_content) > max_size else html_content
+        return html_content[:max_size] if len(html_content) > max_size else html_content    
+
+def start_colab_display_server():
+    """
+    Start virtual display server in Google Colab.
+    Raises error if not running in Colab environment.
+    """
+    # Check if running in Google Colab
+    try:
+        import google.colab
+        from google.colab import output
+        from IPython.display import IFrame, display
+    except ImportError:
+        raise RuntimeError("This function must be run in Google Colab environment.")
     
+    import os, time, subprocess
+    
+    os.environ["DISPLAY"] = ":99"
+    
+    # Xvfb
+    xvfb = subprocess.Popen(["Xvfb", ":99", "-screen", "0", "1280x720x24"])
+    time.sleep(2)
+    
+    # minimal window manager
+    fluxbox = subprocess.Popen(["fluxbox"])
+    
+    # VNC → X
+    x11vnc = subprocess.Popen(["x11vnc",
+                              "-display", ":99",
+                              "-nopw", "-forever", "-shared",
+                              "-rfbport", "5900", "-quiet"])
+    
+    # websockify → VNC
+    novnc = subprocess.Popen(["/opt/novnc/utils/websockify/run",
+                              "6080", "localhost:5900",
+                              "--web", "/opt/novnc"])
+    
+    time.sleep(2)  # give ports a moment
+    
+    # Colab proxy url
+    url = output.eval_js("google.colab.kernel.proxyPort(6080)")
+    display(IFrame(f"{url}/vnc.html?autoconnect=true&resize=scale", width=1024, height=768))
+
+
+
+def setup_colab_environment():
+    """
+    Alternative setup using IPython magic commands
+    """
+    from IPython import get_ipython
+    ipython = get_ipython()
+    
+    print("🚀 Setting up Crawl4AI environment in Google Colab...")
+    
+    # Run the bash commands
+    ipython.run_cell_magic('bash', '', '''
+set -e
+
+echo "📦 Installing system dependencies..."
+apt-get update -y
+apt-get install -y xvfb x11vnc fluxbox websockify git
+
+echo "📥 Setting up virtual display..."
+git clone https://github.com/novnc/noVNC         /opt/novnc
+git clone https://github.com/novnc/websockify    /opt/novnc/utils/websockify
+
+pip install -q nest_asyncio google-colab
+echo "✅ Setup complete!"
+''')
+
+
+# Link Quality Scoring Functions
+def extract_page_context(page_title: str, headlines_text: str, meta_description: str, base_url: str) -> dict:
+    """
+    Extract page context for link scoring - called ONCE per page for performance.
+    Parser-agnostic function that takes pre-extracted data.
+    
+    Args:
+        page_title: Title of the page
+        headlines_text: Combined text from h1, h2, h3 elements
+        meta_description: Meta description content
+        base_url: Base URL of the page
+        
+    Returns:
+        Dictionary containing page context data for fast link scoring
+    """
+    context = {
+        'terms': set(),
+        'headlines': headlines_text or '',
+        'meta_description': meta_description or '',
+        'domain': '',
+        'is_docs_site': False
+    }
+    
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse(base_url)
+        context['domain'] = parsed.netloc.lower()
+        
+        # Check if this is a documentation/reference site
+        context['is_docs_site'] = any(indicator in context['domain'] 
+                                    for indicator in ['docs.', 'api.', 'developer.', 'reference.'])
+        
+        # Create term set for fast intersection (performance optimization)
+        all_text = ((page_title or '') + ' ' + context['headlines'] + ' ' + context['meta_description']).lower()
+        # Simple tokenization - fast and sufficient for scoring
+        context['terms'] = set(word.strip('.,!?;:"()[]{}') 
+                             for word in all_text.split() 
+                             if len(word.strip('.,!?;:"()[]{}')) > 2)
+                             
+    except Exception:
+        # Fail gracefully - return empty context
+        pass
+    
+    return context
+
+
+def calculate_link_intrinsic_score(
+    link_text: str, 
+    url: str, 
+    title_attr: str, 
+    class_attr: str, 
+    rel_attr: str, 
+    page_context: dict
+) -> float:
+    """
+    Ultra-fast link quality scoring using only provided data (no DOM access needed).
+    Parser-agnostic function.
+    
+    Args:
+        link_text: Text content of the link
+        url: Link URL
+        title_attr: Title attribute of the link
+        class_attr: Class attribute of the link
+        rel_attr: Rel attribute of the link
+        page_context: Pre-computed page context from extract_page_context()
+        
+    Returns:
+        Quality score (0.0 - 10.0), higher is better
+    """
+    score = 0.0
+    
+    try:
+        # 1. ATTRIBUTE QUALITY (string analysis - very fast)
+        if title_attr and len(title_attr.strip()) > 3:
+            score += 1.0
+            
+        class_str = (class_attr or '').lower()
+        # Navigation/important classes boost score
+        if any(nav_class in class_str for nav_class in ['nav', 'menu', 'primary', 'main', 'important']):
+            score += 1.5
+        # Marketing/ad classes reduce score  
+        if any(bad_class in class_str for bad_class in ['ad', 'sponsor', 'track', 'promo', 'banner']):
+            score -= 1.0
+            
+        rel_str = (rel_attr or '').lower()
+        # Semantic rel values
+        if any(good_rel in rel_str for good_rel in ['canonical', 'next', 'prev', 'chapter']):
+            score += 1.0
+        if any(bad_rel in rel_str for bad_rel in ['nofollow', 'sponsored', 'ugc']):
+            score -= 0.5
+            
+        # 2. URL STRUCTURE QUALITY (string operations - very fast)
+        url_lower = url.lower()
+        
+        # High-value path patterns
+        if any(good_path in url_lower for good_path in ['/docs/', '/api/', '/guide/', '/tutorial/', '/reference/', '/manual/']):
+            score += 2.0
+        elif any(medium_path in url_lower for medium_path in ['/blog/', '/article/', '/post/', '/news/']):
+            score += 1.0
+            
+        # Penalize certain patterns
+        if any(bad_path in url_lower for bad_path in ['/admin/', '/login/', '/cart/', '/checkout/', '/track/', '/click/']):
+            score -= 1.5
+            
+        # URL depth (shallow URLs often more important)
+        url_depth = url.count('/') - 2  # Subtract protocol and domain
+        if url_depth <= 2:
+            score += 1.0
+        elif url_depth > 5:
+            score -= 0.5
+            
+        # HTTPS bonus
+        if url.startswith('https://'):
+            score += 0.5
+            
+        # 3. TEXT QUALITY (string analysis - very fast)
+        if link_text:
+            text_clean = link_text.strip()
+            if len(text_clean) > 3:
+                score += 1.0
+                
+            # Multi-word links are usually more descriptive
+            word_count = len(text_clean.split())
+            if word_count >= 2:
+                score += 0.5
+            if word_count >= 4:
+                score += 0.5
+                
+            # Avoid generic link text
+            generic_texts = ['click here', 'read more', 'more info', 'link', 'here']
+            if text_clean.lower() in generic_texts:
+                score -= 1.0
+                
+        # 4. CONTEXTUAL RELEVANCE (pre-computed page terms - very fast)
+        if page_context.get('terms') and link_text:
+            link_words = set(word.strip('.,!?;:"()[]{}').lower() 
+                           for word in link_text.split() 
+                           if len(word.strip('.,!?;:"()[]{}')) > 2)
+            
+            if link_words:
+                # Calculate word overlap ratio
+                overlap = len(link_words & page_context['terms'])
+                if overlap > 0:
+                    relevance_ratio = overlap / min(len(link_words), 10)  # Cap to avoid over-weighting
+                    score += relevance_ratio * 2.0  # Up to 2 points for relevance
+                    
+        # 5. DOMAIN CONTEXT BONUSES (very fast string checks)
+        if page_context.get('is_docs_site', False):
+            # Documentation sites: prioritize internal navigation
+            if link_text and any(doc_keyword in link_text.lower() 
+                               for doc_keyword in ['api', 'reference', 'guide', 'tutorial', 'example']):
+                score += 1.0
+                
+    except Exception:
+        # Fail gracefully - return minimal score
+        score = 0.5
+        
+    # Ensure score is within reasonable bounds
+    return max(0.0, min(score, 10.0))
+
+
+def calculate_total_score(
+    intrinsic_score: Optional[float] = None,
+    contextual_score: Optional[float] = None,
+    score_links_enabled: bool = False,
+    query_provided: bool = False
+) -> float:
+    """
+    Calculate combined total score from intrinsic and contextual scores with smart fallbacks.
+    
+    Args:
+        intrinsic_score: Quality score based on URL structure, text, and context (0-10)
+        contextual_score: BM25 relevance score based on query and head content (0-1 typically)
+        score_links_enabled: Whether link scoring is enabled
+        query_provided: Whether a query was provided for contextual scoring
+        
+    Returns:
+        Combined total score (0-10 scale)
+        
+    Scoring Logic:
+        - No scoring: return 5.0 (neutral score)
+        - Only intrinsic: return normalized intrinsic score
+        - Only contextual: return contextual score scaled to 10
+        - Both: weighted combination (70% intrinsic, 30% contextual scaled)
+    """
+    # Case 1: No scoring enabled at all
+    if not score_links_enabled:
+        return 5.0  # Neutral score - all links treated equally
+    
+    # Normalize scores to handle None values
+    intrinsic = intrinsic_score if intrinsic_score is not None else 0.0
+    contextual = contextual_score if contextual_score is not None else 0.0
+    
+    # Case 2: Only intrinsic scoring (no query provided or no head extraction)
+    if not query_provided or contextual_score is None:
+        # Use intrinsic score directly (already 0-10 scale)
+        return max(0.0, min(intrinsic, 10.0))
+    
+    # Case 3: Both intrinsic and contextual scores available
+    # Scale contextual score (typically 0-1) to 0-10 range
+    contextual_scaled = min(contextual * 10.0, 10.0)
+    
+    # Weighted combination: 70% intrinsic (structure/content quality) + 30% contextual (query relevance)
+    # This gives more weight to link quality while still considering relevance
+    total = (intrinsic * 0.7) + (contextual_scaled * 0.3)
+    
+    return max(0.0, min(total, 10.0))
+
+
+# Embedding utilities
+async def get_text_embeddings(
+    texts: List[str], 
+    llm_config: Optional[Dict] = None,
+    model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
+    batch_size: int = 32
+) -> np.ndarray:
+    """
+    Compute embeddings for a list of texts using specified model.
+    
+    Args:
+        texts: List of texts to embed
+        llm_config: Optional LLM configuration for API-based embeddings
+        model_name: Model name (used when llm_config is None)
+        batch_size: Batch size for processing
+        
+    Returns:
+        numpy array of embeddings
+    """
+    import numpy as np
+    
+    if not texts:
+        return np.array([])
+    
+    # If LLMConfig provided, use litellm for embeddings
+    if llm_config is not None:
+        from litellm import aembedding
+        
+        # Get embedding model from config or use default
+        embedding_model = llm_config.get('provider', 'text-embedding-3-small')
+        api_base = llm_config.get('base_url', llm_config.get('api_base'))
+        
+        # Prepare kwargs
+        kwargs = {
+            'model': embedding_model,
+            'input': texts,
+            'api_key': llm_config.get('api_token', llm_config.get('api_key'))
+        }
+        
+        if api_base:
+            kwargs['api_base'] = api_base
+            
+        # Handle OpenAI-compatible endpoints
+        if api_base and 'openai/' not in embedding_model:
+            kwargs['model'] = f"openai/{embedding_model}"
+        
+        # Get embeddings
+        response = await aembedding(**kwargs)
+        
+        # Extract embeddings from response
+        embeddings = []
+        for item in response.data:
+            embeddings.append(item['embedding'])
+            
+        return np.array(embeddings)
+    
+    # Default: use sentence-transformers
+    else:
+        # Lazy load to avoid importing heavy libraries unless needed
+        from sentence_transformers import SentenceTransformer
+        
+        # Cache the model in function attribute to avoid reloading
+        if not hasattr(get_text_embeddings, '_models'):
+            get_text_embeddings._models = {}
+        
+        if model_name not in get_text_embeddings._models:
+            get_text_embeddings._models[model_name] = SentenceTransformer(model_name)
+        
+        encoder = get_text_embeddings._models[model_name]
+        
+        # Batch encode for efficiency
+        embeddings = encoder.encode(
+            texts,
+            batch_size=batch_size,
+            show_progress_bar=False,
+            convert_to_numpy=True
+        )
+        
+        return embeddings
+
+
+def get_text_embeddings_sync(
+    texts: List[str],
+    llm_config: Optional[Dict] = None,
+    model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
+    batch_size: int = 32
+) -> np.ndarray:
+    """Synchronous wrapper for get_text_embeddings"""
+    import numpy as np
+    return asyncio.run(get_text_embeddings(texts, llm_config, model_name, batch_size))
+
+
+def cosine_similarity(vec1: np.ndarray, vec2: np.ndarray) -> float:
+    """Calculate cosine similarity between two vectors"""
+    import numpy as np
+    dot_product = np.dot(vec1, vec2)
+    norm_product = np.linalg.norm(vec1) * np.linalg.norm(vec2)
+    return float(dot_product / norm_product) if norm_product != 0 else 0.0
+
+
+def cosine_distance(vec1: np.ndarray, vec2: np.ndarray) -> float:
+    """Calculate cosine distance (1 - similarity) between two vectors"""
+    return 1 - cosine_similarity(vec1, vec2)
+

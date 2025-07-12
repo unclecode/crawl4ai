@@ -1,0 +1,238 @@
+/* Blockly Theme CSS for C4A-Script */
+
+/* Blockly workspace container */
+.blockly-workspace {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: var(--bg-primary);
+}
+
+/* Blockly button active state */
+#blockly-btn.active {
+    background: var(--primary-color);
+    color: var(--bg-primary);
+    border-color: var(--primary-color);
+}
+
+#blockly-btn.active:hover {
+    background: var(--primary-hover);
+    border-color: var(--primary-hover);
+}
+
+/* Override Blockly's default styles for dark theme */
+.blocklyToolboxDiv {
+    background-color: var(--bg-tertiary) !important;
+    border-right: 1px solid var(--border-color) !important;
+}
+
+.blocklyFlyout {
+    background-color: var(--bg-secondary) !important;
+}
+
+.blocklyFlyoutBackground {
+    fill: var(--bg-secondary) !important;
+}
+
+.blocklyMainBackground {
+    stroke: none !important;
+}
+
+.blocklyTreeRow {
+    color: var(--text-primary) !important;
+    font-family: 'Dank Mono', monospace !important;
+    padding: 4px 16px !important;
+    margin: 2px 0 !important;
+}
+
+.blocklyTreeRow:hover {
+    background-color: var(--bg-secondary) !important;
+}
+
+.blocklyTreeSelected {
+    background-color: var(--primary-dim) !important;
+}
+
+.blocklyTreeLabel {
+    cursor: pointer;
+}
+
+/* Blockly scrollbars */
+.blocklyScrollbarHorizontal,
+.blocklyScrollbarVertical {
+    background-color: transparent !important;
+}
+
+.blocklyScrollbarHandle {
+    fill: var(--border-color) !important;
+    opacity: 0.5 !important;
+}
+
+.blocklyScrollbarHandle:hover {
+    fill: var(--border-hover) !important;
+    opacity: 0.8 !important;
+}
+
+/* Blockly zoom controls */
+.blocklyZoom > image {
+    opacity: 0.6;
+}
+
+.blocklyZoom > image:hover {
+    opacity: 1;
+}
+
+/* Blockly trash can */
+.blocklyTrash {
+    opacity: 0.6;
+}
+
+.blocklyTrash:hover {
+    opacity: 1;
+}
+
+/* Blockly context menus */
+.blocklyContextMenu {
+    background-color: var(--bg-tertiary) !important;
+    border: 1px solid var(--border-color) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+
+.blocklyMenuItem {
+    color: var(--text-primary) !important;
+    font-family: 'Dank Mono', monospace !important;
+}
+
+.blocklyMenuItemDisabled {
+    color: var(--text-muted) !important;
+}
+
+.blocklyMenuItem:hover {
+    background-color: var(--bg-secondary) !important;
+}
+
+/* Blockly text inputs */
+.blocklyHtmlInput {
+    background-color: var(--bg-tertiary) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-color) !important;
+    font-family: 'Dank Mono', monospace !important;
+    font-size: 13px !important;
+    padding: 4px 8px !important;
+}
+
+.blocklyHtmlInput:focus {
+    border-color: var(--primary-color) !important;
+    outline: none !important;
+}
+
+/* Blockly dropdowns */
+.blocklyDropDownDiv {
+    background-color: var(--bg-tertiary) !important;
+    border: 1px solid var(--border-color) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+
+.blocklyDropDownContent {
+    color: var(--text-primary) !important;
+}
+
+.blocklyDropDownDiv .goog-menuitem {
+    color: var(--text-primary) !important;
+    font-family: 'Dank Mono', monospace !important;
+    padding: 4px 16px !important;
+}
+
+.blocklyDropDownDiv .goog-menuitem-highlight,
+.blocklyDropDownDiv .goog-menuitem-hover {
+    background-color: var(--bg-secondary) !important;
+}
+
+/* Custom block colors are defined in the block definitions */
+
+/* Block text styling */
+.blocklyText {
+    fill: #ffffff !important;
+    font-family: 'Dank Mono', monospace !important;
+    font-size: 13px !important;
+}
+
+.blocklyEditableText > .blocklyText {
+    fill: #ffffff !important;
+}
+
+.blocklyEditableText:hover > rect {
+    stroke: var(--primary-color) !important;
+    stroke-width: 2px !important;
+}
+
+/* Improve visibility of connection highlights */
+.blocklyHighlightedConnectionPath {
+    stroke: var(--primary-color) !important;
+    stroke-width: 4px !important;
+}
+
+.blocklyInsertionMarker > .blocklyPath {
+    fill-opacity: 0.3 !important;
+    stroke-opacity: 0.6 !important;
+}
+
+/* Workspace grid pattern */
+.blocklyWorkspace > .blocklyBlockCanvas > .blocklyGridCanvas {
+    opacity: 0.1;
+}
+
+/* Smooth transitions */
+.blocklyDraggable {
+    transition: transform 0.1s ease;
+}
+
+/* Field labels */
+.blocklyFieldLabel {
+    font-weight: normal !important;
+}
+
+/* Comment blocks styling */
+.blocklyCommentText {
+    font-style: italic !important;
+}
+
+/* Make comment blocks slightly transparent */
+g[data-category="Comments"] .blocklyPath {
+    fill-opacity: 0.8 !important;
+}
+
+/* Better visibility for disabled blocks */
+.blocklyDisabled > .blocklyPath {
+    fill-opacity: 0.3 !important;
+}
+
+.blocklyDisabled > .blocklyText {
+    fill-opacity: 0.5 !important;
+}
+
+/* Warning and error text */
+.blocklyWarningText,
+.blocklyErrorText {
+    font-family: 'Dank Mono', monospace !important;
+    font-size: 12px !important;
+}
+
+/* Workspace scrollbar improvement for dark theme */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--border-hover);
+}
