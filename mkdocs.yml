@@ -25,6 +25,8 @@ nav:
     - "Command Line Interface": "core/cli.md"
     - "Simple Crawling": "core/simple-crawling.md"
     - "Deep Crawling": "core/deep-crawling.md"
+    - "Adaptive Crawling": "core/adaptive-crawling.md"
+    - "URL Seeding": "core/url-seeding.md"
     - "C4A-Script": "core/c4a-script.md"
     - "Crawler Result": "core/crawler-result.md"
     - "Browser, Crawler & LLM Config": "core/browser-crawler-config.md"
@@ -37,6 +39,7 @@ nav:
     - "Link & Media": "core/link-media.md"
   - Advanced:
     - "Overview": "advanced/advanced-features.md"
+    - "Adaptive Strategies": "advanced/adaptive-strategies.md"
     - "Virtual Scroll": "advanced/virtual-scroll.md"
     - "File Downloading": "advanced/file-downloading.md"
     - "Lazy Loading": "advanced/lazy-loading.md"
