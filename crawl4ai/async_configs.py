@@ -1659,22 +1659,57 @@ class SeedingConfig:
     """
     def __init__(
         self,
-        source: str = "sitemap+cc",  # Options: "sitemap", "cc", "sitemap+cc"
-        pattern: Optional[str] = "*", # URL pattern to filter discovered URLs (e.g., "*example.com/blog/*")
-        live_check: bool = False,    # Whether to perform HEAD requests to verify URL liveness
-        extract_head: bool = False,  # Whether to fetch and parse <head> section for metadata
-        max_urls: int = -1, # Maximum number of URLs to discover (default: -1 for no limit)
-        concurrency: int = 1000,      # Maximum concurrent requests for live checks/head extraction
-        hits_per_sec: int = 5,      # Rate limit in requests per second
-        force: bool = False, # If True, bypasses the AsyncUrlSeeder's internal .jsonl cache
-        base_directory: Optional[str] = None, # Base directory for UrlSeeder's cache files (.jsonl)
-        llm_config: Optional[LLMConfig] = None, # Forward LLM config for future use (e.g., relevance scoring)
-        verbose: Optional[bool] = None, # Override crawler's general verbose setting
-        query: Optional[str] = None,  # Search query for relevance scoring
-        score_threshold: Optional[float] = None,  # Minimum relevance score to include URL (0.0-1.0)
-        scoring_method: str = "bm25",  # Scoring method: "bm25" (default), future: "semantic"
-        filter_nonsense_urls: bool = True,  # Filter out utility URLs like robots.txt, sitemap.xml, etc.
+        source: str = "sitemap+cc",
+        pattern: Optional[str] = "*",
+        live_check: bool = False,
+        extract_head: bool = False,
+        max_urls: int = -1,
+        concurrency: int = 1000,
+        hits_per_sec: int = 5,
+        force: bool = False,
+        base_directory: Optional[str] = None,
+        llm_config: Optional[LLMConfig] = None,
+        verbose: Optional[bool] = None,
+        query: Optional[str] = None,
+        score_threshold: Optional[float] = None,
+        scoring_method: str = "bm25",
+        filter_nonsense_urls: bool = True,
     ):
+        """
+        Initialize URL seeding configuration.
+        
+        Args:
+            source: Discovery source(s) to use. Options: "sitemap", "cc" (Common Crawl), 
+                   or "sitemap+cc" (both). Default: "sitemap+cc"
+            pattern: URL pattern to filter discovered URLs (e.g., "*example.com/blog/*"). 
+                    Supports glob-style wildcards. Default: "*" (all URLs)
+            live_check: Whether to perform HEAD requests to verify URL liveness. 
+                       Default: False
+            extract_head: Whether to fetch and parse <head> section for metadata extraction.
+                         Required for BM25 relevance scoring. Default: False
+            max_urls: Maximum number of URLs to discover. Use -1 for no limit. 
+                     Default: -1
+            concurrency: Maximum concurrent requests for live checks/head extraction. 
+                        Default: 1000
+            hits_per_sec: Rate limit in requests per second to avoid overwhelming servers. 
+                         Default: 5
+            force: If True, bypasses the AsyncUrlSeeder's internal .jsonl cache and 
+                  re-fetches URLs. Default: False
+            base_directory: Base directory for UrlSeeder's cache files (.jsonl). 
+                           If None, uses default ~/.crawl4ai/. Default: None
+            llm_config: LLM configuration for future features (e.g., semantic scoring). 
+                       Currently unused. Default: None
+            verbose: Override crawler's general verbose setting for seeding operations. 
+                    Default: None (inherits from crawler)
+            query: Search query for BM25 relevance scoring (e.g., "python tutorials"). 
+                  Requires extract_head=True. Default: None
+            score_threshold: Minimum relevance score (0.0-1.0) to include URL. 
+                           Only applies when query is provided. Default: None
+            scoring_method: Scoring algorithm to use. Currently only "bm25" is supported. 
+                          Future: "semantic". Default: "bm25"
+            filter_nonsense_urls: Filter out utility URLs like robots.txt, sitemap.xml, 
+                                 ads.txt, favicon.ico, etc. Default: True
+        """
         self.source = source
         self.pattern = pattern
         self.live_check = live_check

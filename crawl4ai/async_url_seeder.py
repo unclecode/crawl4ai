@@ -424,10 +424,21 @@ class AsyncUrlSeeder:
         self._log("info", "Finished URL seeding for {domain}. Total URLs: {count}",
                   params={"domain": domain, "count": len(results)}, tag="URL_SEED")
 
-        # Sort by relevance score if query was provided
+        # Apply BM25 scoring if query was provided
         if query and extract_head and scoring_method == "bm25":
-            results.sort(key=lambda x: x.get(
-                "relevance_score", 0.0), reverse=True)
+            # Apply collective BM25 scoring across all documents
+            results = await self._apply_bm25_scoring(results, config)
+            
+            # Filter by score threshold if specified
+            if score_threshold is not None:
+                original_count = len(results)
+                results = [r for r in results if r.get("relevance_score", 0) >= score_threshold]
+                if original_count > len(results):
+                    self._log("info", "Filtered {filtered} URLs below score threshold {threshold}",
+                              params={"filtered": original_count - len(results), "threshold": score_threshold}, tag="URL_SEED")
+            
+            # Sort by relevance score
+            results.sort(key=lambda x: x.get("relevance_score", 0.0), reverse=True)
             self._log("info", "Sorted {count} URLs by relevance score for query: '{query}'",
                       params={"count": len(results), "query": query}, tag="URL_SEED")
         elif query and not extract_head:
@@ -982,28 +993,6 @@ class AsyncUrlSeeder:
                 "head_data": head_data,
             }
 
-            # Apply BM25 scoring if query is provided and head data exists
-            if query and ok and scoring_method == "bm25" and head_data:
-                text_context = self._extract_text_context(head_data)
-                if text_context:
-                    # Calculate BM25 score for this single document
-                    # scores = self._calculate_bm25_score(query, [text_context])
-                    scores = await asyncio.to_thread(self._calculate_bm25_score, query, [text_context])
-                    relevance_score = scores[0] if scores else 0.0
-                    entry["relevance_score"] = float(relevance_score)
-                else:
-                    # No text context, use URL-based scoring as fallback
-                    relevance_score = self._calculate_url_relevance_score(
-                        query, entry["url"])
-                    entry["relevance_score"] = float(relevance_score)
-            elif query:
-                # Query provided but no head data - we reject this entry
-                self._log("debug", "No head data for {url}, using URL-based scoring",
-                          params={"url": url}, tag="URL_SEED")
-                return
-                # relevance_score = self._calculate_url_relevance_score(query, entry["url"])
-                # entry["relevance_score"] = float(relevance_score)
-
         elif live:
             self._log("debug", "Performing live check for {url}", params={
                       "url": url}, tag="URL_SEED")
@@ -1013,35 +1002,13 @@ class AsyncUrlSeeder:
                       params={"status": status.upper(), "url": url}, tag="URL_SEED")
             entry = {"url": url, "status": status, "head_data": {}}
 
-            # Apply URL-based scoring if query is provided
-            if query:
-                relevance_score = self._calculate_url_relevance_score(
-                    query, url)
-                entry["relevance_score"] = float(relevance_score)
-
         else:
             entry = {"url": url, "status": "unknown", "head_data": {}}
 
-            # Apply URL-based scoring if query is provided
-            if query:
-                relevance_score = self._calculate_url_relevance_score(
-                    query, url)
-                entry["relevance_score"] = float(relevance_score)
-
-        # Now decide whether to add the entry based on score threshold
-        if query and "relevance_score" in entry:
-            if score_threshold is None or entry["relevance_score"] >= score_threshold:
-                if live or extract:
-                    await self._cache_set(cache_kind, url, entry)
-                res_list.append(entry)
-            else:
-                self._log("debug", "URL {url} filtered out with score {score} < {threshold}",
-                          params={"url": url, "score": entry["relevance_score"], "threshold": score_threshold}, tag="URL_SEED")
-        else:
-            # No query or no scoring - add as usual
-            if live or extract:
-                await self._cache_set(cache_kind, url, entry)
-            res_list.append(entry)
+        # Add entry to results (scoring will be done later)
+        if live or extract:
+            await self._cache_set(cache_kind, url, entry)
+        res_list.append(entry)
 
     async def _head_ok(self, url: str, timeout: int) -> bool:
         try:
@@ -1436,8 +1403,19 @@ class AsyncUrlSeeder:
             scores = bm25.get_scores(query_tokens)
 
             # Normalize scores to 0-1 range
-            max_score = max(scores) if max(scores) > 0 else 1.0
-            normalized_scores = [score / max_score for score in scores]
+            # BM25 can return negative scores, so we need to handle the full range
+            if len(scores) == 0:
+                return []
+            
+            min_score = min(scores)
+            max_score = max(scores)
+            
+            # If all scores are the same, return 0.5 for all
+            if max_score == min_score:
+                return [0.5] * len(scores)
+            
+            # Normalize to 0-1 range using min-max normalization
+            normalized_scores = [(score - min_score) / (max_score - min_score) for score in scores]
 
             return normalized_scores
         except Exception as e:

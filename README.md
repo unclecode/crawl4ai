@@ -26,9 +26,9 @@
 
 Crawl4AI is the #1 trending GitHub repository, actively maintained by a vibrant community. It delivers blazing-fast, AI-ready web crawling tailored for LLMs, AI agents, and data pipelines. Open source, flexible, and built for real-time performance, Crawl4AI empowers developers with unmatched speed, precision, and deployment ease.  
 
-[✨ Check out latest update v0.6.0](#-recent-updates)
+[✨ Check out latest update v0.7.0](#-recent-updates)
 
-🎉 **Version 0.6.0 is now available!** This release candidate introduces World-aware Crawling with geolocation and locale settings, Table-to-DataFrame extraction, Browser pooling with pre-warming, Network and console traffic capture, MCP integration for AI tools, and a completely revamped Docker deployment! [Read the release notes →](https://docs.crawl4ai.com/blog)
+🎉 **Version 0.7.0 is now available!** The Adaptive Intelligence Update introduces groundbreaking features: Adaptive Crawling that learns website patterns, Virtual Scroll support for infinite pages, intelligent Link Preview with 3-layer scoring, Async URL Seeder for massive discovery, and significant performance improvements. [Read the release notes →](https://docs.crawl4ai.com/blog/release-v0.7.0)
 
 <details>
 <summary>🤓 <strong>My Personal Story</strong></summary>
@@ -274,8 +274,8 @@ The new Docker implementation includes:
 
 ```bash
 # Pull and run the latest release candidate
-docker pull unclecode/crawl4ai:0.6.0-rN # Use your favorite revision number
-docker run -d -p 11235:11235 --name crawl4ai --shm-size=1g unclecode/crawl4ai:0.6.0-rN # Use your favorite revision number
+docker pull unclecode/crawl4ai:0.7.0
+docker run -d -p 11235:11235 --name crawl4ai --shm-size=1g unclecode/crawl4ai:0.7.0
 
 # Visit the playground at http://localhost:11235/playground
 ```
@@ -518,7 +518,69 @@ async def test_news_crawl():
 
 ## ✨ Recent Updates
 
-### Version 0.6.0 Release Highlights
+### Version 0.7.0 Release Highlights - The Adaptive Intelligence Update
+
+- **🧠 Adaptive Crawling**: Your crawler now learns and adapts to website patterns automatically:
+  ```python
+  config = AdaptiveConfig(
+      confidence_threshold=0.7,
+      max_history=100,
+      learning_rate=0.2
+  )
+  
+  result = await crawler.arun(
+      "https://news.example.com",
+      config=CrawlerRunConfig(adaptive_config=config)
+  )
+  # Crawler learns patterns and improves extraction over time
+  ```
+
+- **🌊 Virtual Scroll Support**: Complete content extraction from infinite scroll pages:
+  ```python
+  scroll_config = VirtualScrollConfig(
+      container_selector="[data-testid='feed']",
+      scroll_count=20,
+      scroll_by="container_height",
+      wait_after_scroll=1.0
+  )
+  
+  result = await crawler.arun(url, config=CrawlerRunConfig(
+      virtual_scroll_config=scroll_config
+  ))
+  ```
+
+- **🔗 Intelligent Link Analysis**: 3-layer scoring system for smart link prioritization:
+  ```python
+  link_config = LinkPreviewConfig(
+      query="machine learning tutorials",
+      score_threshold=0.3,
+      concurrent_requests=10
+  )
+  
+  result = await crawler.arun(url, config=CrawlerRunConfig(
+      link_preview_config=link_config,
+      score_links=True
+  ))
+  # Links ranked by relevance and quality
+  ```
+
+- **🎣 Async URL Seeder**: Discover thousands of URLs in seconds:
+  ```python
+  seeder = AsyncUrlSeeder(SeedingConfig(
+      source="sitemap+cc",
+      pattern="*/blog/*",
+      query="python tutorials",
+      score_threshold=0.4
+  ))
+  
+  urls = await seeder.discover("https://example.com")
+  ```
+
+- **⚡ Performance Boost**: Up to 3x faster with optimized resource handling and memory efficiency
+
+Read the full details in our [0.7.0 Release Notes](https://docs.crawl4ai.com/blog/release-v0.7.0) or check the [CHANGELOG](https://github.com/unclecode/crawl4ai/blob/main/CHANGELOG.md).
+
+### Previous Version: 0.6.0 Release Highlights
 
 - **🌎 World-aware Crawling**: Set geolocation, language, and timezone for authentic locale-specific content:
   ```python
@@ -588,7 +650,6 @@ async def test_news_crawl():
 
 - **📱 Multi-stage Build System**: Optimized Dockerfile with platform-specific performance enhancements
 
-Read the full details in our [0.6.0 Release Notes](https://docs.crawl4ai.com/blog/releases/0.6.0.html) or check the [CHANGELOG](https://github.com/unclecode/crawl4ai/blob/main/CHANGELOG.md).
 
 ### Previous Version: 0.5.0 Major Release Highlights
 
