@@ -4,7 +4,7 @@ import asyncio
 from typing import List, Tuple, Dict
 from functools import partial
 from uuid import uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 
 import logging
 from typing import Optional, AsyncGenerator
@@ -542,7 +542,7 @@ async def handle_crawl_job(
     task_id = f"crawl_{uuid4().hex[:8]}"
     await redis.hset(f"task:{task_id}", mapping={
         "status": TaskStatus.PROCESSING,         # <-- keep enum values consistent
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
         "url": json.dumps(urls),                 # store list as JSON string
         "result": "",
         "error": "",
