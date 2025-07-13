@@ -52,7 +52,7 @@ Thank you to everyone who has supported this project, used it, and shared feedba
 6. **Thriving Community**: Actively maintained by a vibrant community and the #1 trending GitHub repository.
 
 ## 🚀 Quick Start 
-
+need to create the mcp server for the same
 1. Install Crawl4AI:
 ```bash
 # Install the package
