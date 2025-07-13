@@ -52,7 +52,7 @@ security:
 # Crawler Configuration
 crawler:
   base_config:
-    simulate_user: true
+    simulate_user: false
   memory_threshold_percent: 95.0
   rate_limiter:
     enabled: true
