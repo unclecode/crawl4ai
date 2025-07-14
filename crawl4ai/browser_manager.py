@@ -588,21 +588,26 @@ class BrowserManager:
     _playwright_instance = None
     
     @classmethod
-    async def get_playwright(cls):
-        from playwright.async_api import async_playwright
+    async def get_playwright(cls, use_undetected: bool = False):
+        if use_undetected:
+            from patchright.async_api import async_playwright
+        else:
+            from playwright.async_api import async_playwright
         cls._playwright_instance = await async_playwright().start()
         return cls._playwright_instance    
 
-    def __init__(self, browser_config: BrowserConfig, logger=None):
+    def __init__(self, browser_config: BrowserConfig, logger=None, use_undetected: bool = False):
         """
         Initialize the BrowserManager with a browser configuration.
 
         Args:
             browser_config (BrowserConfig): Configuration object containing all browser settings
             logger: Logger instance for recording events and errors
+            use_undetected (bool): Whether to use undetected browser (Patchright)
         """
         self.config: BrowserConfig = browser_config
         self.logger = logger
+        self.use_undetected = use_undetected
 
         # Browser state
         self.browser = None
@@ -645,7 +650,10 @@ class BrowserManager:
         if self.playwright is not None:
             await self.close()
             
-        from playwright.async_api import async_playwright
+        if self.use_undetected:
+            from patchright.async_api import async_playwright
+        else:
+            from playwright.async_api import async_playwright
 
         self.playwright = await async_playwright().start()
 
