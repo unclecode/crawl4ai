@@ -144,7 +144,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Mouse selection events (desktop)
-    document.addEventListener('mouseup', handleSelectionEvent);
+    document.addEventListener('mouseup', (event) => {
+    if (askAiButton) askAiButton.classList.remove('no-pointer');
+    handleSelectionEvent(event);
+    });
+
 
     // Touch selection events (mobile)
     document.addEventListener('touchend', handleSelectionEvent);
@@ -160,6 +164,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Hide button on various events
     document.addEventListener('mousedown', (event) => {
+        if (askAiButton) askAiButton.classList.add('no-pointer');
         // Hide if clicking anywhere EXCEPT the button itself
         if (askAiButton && event.target !== askAiButton) {
             hideButton();
