@@ -54,6 +54,27 @@ def _get_memory_mb():
         logger.warning(f"Could not get memory info: {e}")
         return None
 
+# --- Helper to sanitize JSON data ---
+def sanitize_json_data(data):
+    """
+    Recursively sanitize data to handle infinity and NaN values that are not JSON compliant.
+    """
+    import math
+    
+    if isinstance(data, dict):
+        return {k: sanitize_json_data(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [sanitize_json_data(item) for item in data]
+    elif isinstance(data, float):
+        if math.isinf(data):
+            return "Infinity" if data > 0 else "-Infinity"
+        elif math.isnan(data):
+            return "NaN"
+        else:
+            return data
+    else:
+        return data
+
 
 async def handle_llm_qa(
     url: str,
@@ -371,8 +392,10 @@ async def stream_results(crawler: AsyncWebCrawler, results_gen: AsyncGenerator) 
                 server_memory_mb = _get_memory_mb()
                 result_dict = result.model_dump()
                 result_dict['server_memory_mb'] = server_memory_mb
-                logger.info(f"Streaming result for {result_dict.get('url', 'unknown')}")
-                data = json.dumps(result_dict, default=datetime_handler) + "\n"
+                # Sanitize data to handle infinity values
+                sanitized_dict = sanitize_json_data(result_dict)
+                logger.info(f"Streaming result for {sanitized_dict.get('url', 'unknown')}")
+                data = json.dumps(sanitized_dict, default=datetime_handler) + "\n"
                 yield data.encode('utf-8')
             except Exception as e:
                 logger.error(f"Serialization error: {e}")
@@ -446,7 +469,7 @@ async def handle_crawl_request(
                               
         return {
             "success": True,
-            "results": [result.model_dump() for result in results],
+            "results": [sanitize_json_data(result.model_dump()) for result in results],
             "server_processing_time_s": end_time - start_time,
             "server_memory_delta_mb": mem_delta_mb,
             "server_peak_memory_mb": peak_mem_mb
