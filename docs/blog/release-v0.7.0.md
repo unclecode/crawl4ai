@@ -82,9 +82,7 @@ twitter_config = VirtualScrollConfig(
     container_selector="[data-testid='primaryColumn']",
     scroll_count=20,                    # Number of scrolls
     scroll_by="container_height",       # Smart scrolling by container size
-    wait_after_scroll=1.0,             # Let content load
-    capture_method="incremental",       # Capture new content on each scroll
-    deduplicate=True                   # Remove duplicate elements
+    wait_after_scroll=1.0              # Let content load
 )
 
 # For e-commerce product grids (Instagram style)
@@ -92,8 +90,7 @@ grid_config = VirtualScrollConfig(
     container_selector="main .product-grid",
     scroll_count=30,
     scroll_by=800,                     # Fixed pixel scrolling
-    wait_after_scroll=1.5,             # Images need time
-    stop_on_no_change=True            # Smart stopping
+    wait_after_scroll=1.5              # Images need time
 )
 
 # For news feeds with lazy loading
@@ -101,9 +98,7 @@ news_config = VirtualScrollConfig(
     container_selector=".article-feed",
     scroll_count=50,
     scroll_by="page_height",           # Viewport-based scrolling
-    wait_after_scroll=0.5,
-    wait_for_selector=".article-card",  # Wait for specific elements
-    timeout=30000                      # Max 30 seconds total
+    wait_after_scroll=0.5              # Wait for content to load
 )
 
 # Use it in your crawl
