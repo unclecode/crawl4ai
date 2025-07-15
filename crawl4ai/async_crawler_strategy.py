@@ -6,6 +6,7 @@ import time
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, Any, List, Union
 from typing import Optional, AsyncGenerator, Final
+from playwright_stealth import Stealth
 import os
 from playwright.async_api import Page, Error
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
@@ -531,6 +532,11 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
         # Get page for session
         page, context = await self.browser_manager.get_page(crawlerRunConfig=config)
+
+        # Apply stealth measures if enabled
+        if self.browser_config.stealth:
+            stealth = Stealth()
+            await stealth.apply_stealth_async(page)
 
         # await page.goto(URL)
 

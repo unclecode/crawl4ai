@@ -389,6 +389,7 @@ class BrowserConfig:
         self,
         browser_type: str = "chromium",
         headless: bool = True,
+        stealth: bool = True,
         browser_mode: str = "dedicated",
         use_managed_browser: bool = False,
         cdp_url: str = None,
@@ -426,6 +427,7 @@ class BrowserConfig:
     ):
         self.browser_type = browser_type
         self.headless = headless 
+        self.stealth = stealth
         self.browser_mode = browser_mode
         self.use_managed_browser = use_managed_browser
         self.cdp_url = cdp_url
