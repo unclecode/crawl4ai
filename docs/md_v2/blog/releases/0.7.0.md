@@ -30,44 +30,34 @@ The Adaptive Crawler maintains a persistent state for each domain, tracking:
 - Extraction confidence scores
 
 ```python
-from crawl4ai import AdaptiveCrawler, AdaptiveConfig, CrawlState
+from crawl4ai import AsyncWebCrawler, AdaptiveCrawler, AdaptiveConfig
 
-# Initialize with custom learning parameters
+# Initialize with custom adaptive parameters
 config = AdaptiveConfig(
-    confidence_threshold=0.7,    # Min confidence to use learned patterns
-    max_history=100,            # Remember last 100 crawls per domain
-    learning_rate=0.2,          # How quickly to adapt to changes
-    patterns_per_page=3,        # Patterns to learn per page type
-    extraction_strategy='css'   # 'css' or 'xpath'
+    confidence_threshold=0.7,    # Min confidence to stop crawling
+    max_depth=5,                # Maximum crawl depth
+    max_pages=20,               # Maximum number of pages to crawl
+    top_k_links=3,              # Number of top links to follow per page
+    strategy="statistical",     # 'statistical' or 'embedding'
+    coverage_weight=0.4,        # Weight for coverage in confidence calculation
+    consistency_weight=0.3,     # Weight for consistency in confidence calculation
+    saturation_weight=0.3       # Weight for saturation in confidence calculation
 )
 
-adaptive_crawler = AdaptiveCrawler(config)
-
-# First crawl - crawler learns the structure
+# Initialize adaptive crawler with web crawler
 async with AsyncWebCrawler() as crawler:
-    result = await crawler.arun(
-        "https://news.example.com/article/12345",
-        config=CrawlerRunConfig(
-            adaptive_config=config,
-            extraction_hints={  # Optional hints to speed up learning
-                "title": "article h1",
-                "content": "article .body-content"
-            }
-        )
+    adaptive_crawler = AdaptiveCrawler(crawler, config)
+    
+    # Crawl and learn patterns
+    state = await adaptive_crawler.digest(
+        start_url="https://news.example.com/article/12345",
+        query="latest news articles and content"
     )
     
-    # Crawler identifies and stores patterns
-    if result.success:
-        state = adaptive_crawler.get_state("news.example.com")
-        print(f"Learned {len(state.patterns)} patterns")
-        print(f"Confidence: {state.avg_confidence:.2%}")
-
-# Subsequent crawls - uses learned patterns
-result2 = await crawler.arun(
-    "https://news.example.com/article/67890",
-    config=CrawlerRunConfig(adaptive_config=config)
-)
-# Automatically extracts using learned patterns!
+    # Access results and confidence
+    print(f"Confidence Level: {adaptive_crawler.confidence:.0%}")
+    print(f"Pages Crawled: {len(state.crawled_urls)}")
+    print(f"Knowledge Base: {len(adaptive_crawler.state.knowledge_base)} documents")
 ```
 
 **Expected Real-World Impact:**
