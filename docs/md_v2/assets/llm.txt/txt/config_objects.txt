@@ -442,7 +442,7 @@ config = CrawlerRunConfig(
 
 # Hierarchical content selection
 config = CrawlerRunConfig(
-    css_selector=["#main-content", ".article-wrapper"],  # Top-level extraction
+    css_selector="#main-content, .article-wrapper",       # Top-level extraction
     target_elements=[                                     # Subset for processing
         ".article-title",
         ".article-body", 
