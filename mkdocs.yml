@@ -67,7 +67,7 @@ nav:
     - "C4A-Script Reference": "api/c4a-script-reference.md"
 
 theme:
-  name: 'terminal'
+  name: 'material'
   palette: 'dark'
   custom_dir: docs/md_v2/overrides
   color_mode: 'dark'

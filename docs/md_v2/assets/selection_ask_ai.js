@@ -145,13 +145,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Mouse selection events (desktop)
     document.addEventListener('mouseup', (event) => {
-    if (askAiButton) askAiButton.classList.remove('no-pointer');
-    handleSelectionEvent(event);
+        if (askAiButton) askAiButton.classList.remove('no-pointer');
+        handleSelectionEvent(event);
     });
 
 
     // Touch selection events (mobile)
-    document.addEventListener('touchend', handleSelectionEvent);
+    document.addEventListener('touchend', (event) => {
+        if (askAiButton) askAiButton.classList.remove('no-pointer');
+        handleSelectionEvent(event);
+    });
+
     document.addEventListener('selectionchange', () => {
         // This helps with mobile selection which can happen without mouseup/touchend
         setTimeout(() => {
@@ -172,6 +176,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     document.addEventListener('touchstart', (event) => {
+        if (askAiButton) askAiButton.classList.add('no-pointer');
         // Same for touch events, but only hide if not on the button
         if (askAiButton && event.target !== askAiButton) {
             hideButton();
