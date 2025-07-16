@@ -6,13 +6,26 @@ import time
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, Any, List, Union
 from typing import Optional, AsyncGenerator, Final
-from playwright_stealth import Stealth
 import os
 from playwright.async_api import Page, Error
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 import hashlib
+
+# Backward compatible stealth import
+try:
+    # Try new tf-playwright-stealth API (Stealth class)
+    from playwright_stealth import Stealth
+    STEALTH_NEW_API = True
+except ImportError:
+    try:
+        # Try old playwright-stealth API (stealth_async function)
+        from playwright_stealth import stealth_async
+        STEALTH_NEW_API = False
+    except ImportError:
+        # No stealth available
+        STEALTH_NEW_API = None
 import uuid
 from .js_snippet import load_js_script
 from .models import AsyncCrawlResponse
@@ -32,6 +45,107 @@ from types import MappingProxyType
 import contextlib
 from functools import partial
 
+
+# Add StealthConfig class for backward compatibility and new features
+class StealthConfig:
+    """
+    Configuration class for stealth settings that works with tf-playwright-stealth.
+    This maintains backward compatibility while supporting all tf-playwright-stealth features.
+    """
+    def __init__(
+        self,
+        # Common settings
+        enabled: bool = True,
+        
+        # Core tf-playwright-stealth parameters (matching the actual library)
+        chrome_app: bool = True,
+        chrome_csi: bool = True,
+        chrome_load_times: bool = True,
+        chrome_runtime: bool = False,  # Note: library default is False
+        hairline: bool = True,
+        iframe_content_window: bool = True,
+        media_codecs: bool = True,
+        navigator_hardware_concurrency: bool = True,
+        navigator_languages: bool = True,
+        navigator_permissions: bool = True,
+        navigator_platform: bool = True,
+        navigator_plugins: bool = True,
+        navigator_user_agent: bool = True,
+        navigator_vendor: bool = True,
+        navigator_webdriver: bool = True,
+        sec_ch_ua: bool = True,
+        webgl_vendor: bool = True,
+        
+        # Override parameters
+        navigator_languages_override: tuple = ("en-US", "en"),
+        navigator_platform_override: str = "Win32",
+        navigator_user_agent_override: str = None,
+        navigator_vendor_override: str = None,
+        sec_ch_ua_override: str = None,
+        webgl_renderer_override: str = None,
+        webgl_vendor_override: str = None,
+        
+        # Advanced parameters
+        init_scripts_only: bool = False,
+        script_logging: bool = False,
+        
+        # Legacy parameters for backward compatibility
+        webdriver: bool = None,  # This will be mapped to navigator_webdriver
+        user_agent_override: bool = None,  # This will be mapped to navigator_user_agent
+        window_outerdimensions: bool = None,  # This parameter doesn't exist in tf-playwright-stealth
+    ):
+        self.enabled = enabled
+        
+        # Handle legacy parameter mapping for backward compatibility
+        if webdriver is not None:
+            navigator_webdriver = webdriver
+        if user_agent_override is not None:
+            navigator_user_agent = user_agent_override
+        
+        # Store all stealth options for the Stealth class - filter out None values
+        self.stealth_options = {
+            k: v for k, v in {
+                'chrome_app': chrome_app,
+                'chrome_csi': chrome_csi,
+                'chrome_load_times': chrome_load_times,
+                'chrome_runtime': chrome_runtime,
+                'hairline': hairline,
+                'iframe_content_window': iframe_content_window,
+                'media_codecs': media_codecs,
+                'navigator_hardware_concurrency': navigator_hardware_concurrency,
+                'navigator_languages': navigator_languages,
+                'navigator_permissions': navigator_permissions,
+                'navigator_platform': navigator_platform,
+                'navigator_plugins': navigator_plugins,
+                'navigator_user_agent': navigator_user_agent,
+                'navigator_vendor': navigator_vendor,
+                'navigator_webdriver': navigator_webdriver,
+                'sec_ch_ua': sec_ch_ua,
+                'webgl_vendor': webgl_vendor,
+                'navigator_languages_override': navigator_languages_override,
+                'navigator_platform_override': navigator_platform_override,
+                'navigator_user_agent_override': navigator_user_agent_override,
+                'navigator_vendor_override': navigator_vendor_override,
+                'sec_ch_ua_override': sec_ch_ua_override,
+                'webgl_renderer_override': webgl_renderer_override,
+                'webgl_vendor_override': webgl_vendor_override,
+                'init_scripts_only': init_scripts_only,
+                'script_logging': script_logging,
+            }.items() if v is not None
+        }
+    
+    @classmethod
+    def from_dict(cls, config_dict: dict) -> 'StealthConfig':
+        """Create StealthConfig from dictionary for easy configuration"""
+        return cls(**config_dict)
+    
+    def to_dict(self) -> dict:
+        """Convert to dictionary for serialization"""
+        return {
+            'enabled': self.enabled,
+            **self.stealth_options
+        }
+
 class AsyncCrawlerStrategy(ABC):
     """
     Abstract base class for crawler strategies.
@@ -40,7 +154,7 @@ class AsyncCrawlerStrategy(ABC):
 
     @abstractmethod
     async def crawl(self, url: str, **kwargs) -> AsyncCrawlResponse:
-        pass  # 4 + 3
+        pass # 4 + 3
 
 class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
     """
@@ -220,6 +334,79 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             None
         """
         self.headers = headers
+
+    async def _apply_stealth(self, page: Page, stealth_config: Optional[StealthConfig] = None):
+        """
+        Apply stealth measures to the page with backward compatibility and enhanced configuration.
+        
+        This method automatically applies stealth measures and now supports configuration
+        through StealthConfig while maintaining backward compatibility.
+        
+        Currently supports:
+        - tf-playwright-stealth (Stealth class with extensive configuration)
+        - Old playwright-stealth v1.x (stealth_async function) - legacy support
+        
+        Args:
+            page (Page): The Playwright page object
+            stealth_config (Optional[StealthConfig]): Configuration for stealth settings
+        """
+        if STEALTH_NEW_API is None:
+            # No stealth library available - silently continue
+            if self.logger and hasattr(self.logger, 'debug'):
+                self.logger.debug(
+                    message="playwright-stealth not available, skipping stealth measures",
+                    tag="STEALTH"
+                )
+            return
+        
+        # Use default config if none provided
+        if stealth_config is None:
+            stealth_config = StealthConfig()
+        
+        # Skip if stealth is disabled
+        if not stealth_config.enabled:
+            if self.logger and hasattr(self.logger, 'debug'):
+                self.logger.debug(
+                    message="Stealth measures disabled in configuration",
+                    tag="STEALTH"
+                )
+            return
+        
+        try:
+            if STEALTH_NEW_API:
+                # Use tf-playwright-stealth API with configuration support
+                # Filter out any invalid parameters that might cause issues
+                valid_options = {}
+                for key, value in stealth_config.stealth_options.items():
+                    # Accept boolean parameters and specific string/tuple parameters
+                    if isinstance(value, (bool, str, tuple)):
+                        valid_options[key] = value
+                
+                stealth = Stealth(**valid_options)
+                await stealth.apply_stealth_async(page)
+                
+                config_info = f"with {len(valid_options)} options"
+            else:
+                # Use old API (v1.x) - configuration options are limited
+                await stealth_async(page)
+                config_info = "default (v1.x legacy)"
+                
+            # Only log if logger is available and in debug mode
+            if self.logger and hasattr(self.logger, 'debug'):
+                api_version = "tf-playwright-stealth" if STEALTH_NEW_API else "v1.x"
+                self.logger.debug(
+                    message="Applied stealth measures using {version} {config}",
+                    tag="STEALTH",
+                    params={"version": api_version, "config": config_info}
+                )
+        except Exception as e:
+            # Silently continue if stealth fails - don't break the crawling process
+            if self.logger:
+                self.logger.warning(
+                    message="Stealth measures failed, continuing without stealth: {error}",
+                    tag="STEALTH",
+                    params={"error": str(e)}
+                )
 
     async def smart_wait(self, page: Page, wait_for: str, timeout: float = 30000):
         """
@@ -533,10 +720,23 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         # Get page for session
         page, context = await self.browser_manager.get_page(crawlerRunConfig=config)
 
-        # Apply stealth measures if enabled
-        if self.browser_config.stealth:
-            stealth = Stealth()
-            await stealth.apply_stealth_async(page)
+        # Apply stealth measures automatically (backward compatible) with optional config
+        # Check multiple possible locations for stealth config for flexibility
+        stealth_config = None
+        if hasattr(config, 'stealth_config') and config.stealth_config:
+            stealth_config = config.stealth_config
+        elif hasattr(config, 'stealth') and config.stealth:
+            # Alternative attribute name for backward compatibility
+            stealth_config = config.stealth if isinstance(config.stealth, StealthConfig) else StealthConfig.from_dict(config.stealth)
+        elif config.magic:
+            # Enable more aggressive stealth in magic mode
+            stealth_config = StealthConfig(
+                navigator_webdriver=False,  # More aggressive stealth
+                webdriver=False,
+                chrome_app=False
+            )
+        
+        await self._apply_stealth(page, stealth_config)
 
         # await page.goto(URL)
 
@@ -939,7 +1139,6 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         tag="VIEWPORT",
                         params={"error": str(e)},
                     )
-
             # Handle full page scanning
             if config.scan_full_page:
                 # await self._handle_full_page_scan(page, config.scroll_delay)
@@ -1843,8 +2042,6 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         #     }}
                         # }})();
                         # """
-                        # )
-                        
                         # """ NEW VERSION:
                         # When {script} contains statements (e.g., const link = …; link.click();), 
                         # this forms invalid JavaScript, causing Playwright execution error: SyntaxError: Unexpected token 'const'.

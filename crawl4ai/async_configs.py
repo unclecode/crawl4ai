@@ -389,7 +389,6 @@ class BrowserConfig:
         self,
         browser_type: str = "chromium",
         headless: bool = True,
-        stealth: bool = True,
         browser_mode: str = "dedicated",
         use_managed_browser: bool = False,
         cdp_url: str = None,
@@ -427,7 +426,6 @@ class BrowserConfig:
     ):
         self.browser_type = browser_type
         self.headless = headless 
-        self.stealth = stealth
         self.browser_mode = browser_mode
         self.use_managed_browser = use_managed_browser
         self.cdp_url = cdp_url
@@ -502,7 +500,6 @@ class BrowserConfig:
         return BrowserConfig(
             browser_type=kwargs.get("browser_type", "chromium"),
             headless=kwargs.get("headless", True),
-            stealth=kwargs.get("stealth", True),
             browser_mode=kwargs.get("browser_mode", "dedicated"),
             use_managed_browser=kwargs.get("use_managed_browser", False),
             cdp_url=kwargs.get("cdp_url"),
@@ -539,7 +536,6 @@ class BrowserConfig:
         result = {
             "browser_type": self.browser_type,
             "headless": self.headless,
-            "stealth": self.stealth,
             "browser_mode": self.browser_mode,
             "use_managed_browser": self.use_managed_browser,
             "cdp_url": self.cdp_url,
