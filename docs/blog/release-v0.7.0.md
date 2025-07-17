@@ -174,23 +174,20 @@ internal_links = result.links.get("internal", [])
 scored_links = [l for l in internal_links if l.get("total_score")]
 scored_links.sort(key=lambda x: x.get("total_score", 0), reverse=True)
 
-# Create a scoring table
-table = Table(title="Link Scoring Results", box=box.ROUNDED)
-table.add_column("Link Text", style="cyan", width=40)
-table.add_column("Intrinsic Score", justify="center")
-table.add_column("Contextual Score", justify="center")
-table.add_column("Total Score", justify="center", style="bold green")
-
+# Print scoring results
+print("Link Scoring Results:")
+print("=" * 50)
 for link in scored_links[:5]:
     text = link.get('text', 'No text')[:40]
-    table.add_row(
-        text,
-        f"{link.get('intrinsic_score', 0):.1f}/10",
-        f"{link.get('contextual_score', 0):.2f}/1",
-        f"{link.get('total_score', 0):.3f}"
-    )
-
-console.print(table)
+    intrinsic = link.get('intrinsic_score', 0)
+    contextual = link.get('contextual_score', 0)
+    total = link.get('total_score', 0)
+    
+    print(f"Link: {text}")
+    print(f"  Intrinsic Score: {intrinsic:.1f}/10")
+    print(f"  Contextual Score: {contextual:.2f}/1") 
+    print(f"  Total Score: {total:.3f}")
+    print("-" * 30)
 ```
 
 **Scoring Components:**
