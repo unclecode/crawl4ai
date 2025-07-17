@@ -27,7 +27,10 @@ from crawl4ai import (
     PruningContentFilter,
     BrowserProfiler,
     DefaultMarkdownGenerator,
-    LLMConfig
+    LLMConfig,
+    BFSDeepCrawlStrategy,
+    DFSDeepCrawlStrategy,
+    BestFirstCrawlingStrategy,
 )
 from crawl4ai.config import USER_SETTINGS
 from litellm import completion
@@ -1014,9 +1017,11 @@ def cdp_cmd(user_data_dir: Optional[str], port: int, browser_type: str, headless
 @click.option("--question", "-q", help="Ask a question about the crawled content")
 @click.option("--verbose", "-v", is_flag=True)
 @click.option("--profile", "-p", help="Use a specific browser profile (by name)")
+@click.option("--deep-crawl", type=click.Choice(["bfs", "dfs", "best-first"]), help="Enable deep crawling with specified strategy (bfs, dfs, or best-first)")
+@click.option("--max-pages", type=int, default=10, help="Maximum number of pages to crawl in deep crawl mode")
 def crawl_cmd(url: str, browser_config: str, crawler_config: str, filter_config: str, 
            extraction_config: str, json_extract: str, schema: str, browser: Dict, crawler: Dict,
-           output: str, output_file: str, bypass_cache: bool, question: str, verbose: bool, profile: str):
+           output: str, output_file: str, bypass_cache: bool, question: str, verbose: bool, profile: str, deep_crawl: str, max_pages: int):
     """Crawl a website and extract content
     
     Simple Usage:
@@ -1156,6 +1161,27 @@ Always return valid, properly formatted JSON."""
 
         crawler_cfg.scraping_strategy = LXMLWebScrapingStrategy()    
 
+        # Handle deep crawling configuration
+        if deep_crawl:
+            if deep_crawl == "bfs":
+                crawler_cfg.deep_crawl_strategy = BFSDeepCrawlStrategy(
+                    max_depth=3,
+                    max_pages=max_pages
+                )
+            elif deep_crawl == "dfs":
+                crawler_cfg.deep_crawl_strategy = DFSDeepCrawlStrategy(
+                    max_depth=3,
+                    max_pages=max_pages
+                )
+            elif deep_crawl == "best-first":
+                crawler_cfg.deep_crawl_strategy = BestFirstCrawlingStrategy(
+                    max_depth=3,
+                    max_pages=max_pages
+                )
+            
+            if verbose:
+                console.print(f"[green]Deep crawling enabled:[/green] {deep_crawl} strategy, max {max_pages} pages")
+
         config = get_global_config()
         
         browser_cfg.verbose = config.get("VERBOSE", False)
@@ -1170,39 +1196,60 @@ Always return valid, properly formatted JSON."""
             verbose
         )
 
+        # Handle deep crawl results (list) vs single result
+        if isinstance(result, list):
+            if len(result) == 0:
+                click.echo("No results found during deep crawling")
+                return
+            # Use the first result for question answering and output
+            main_result = result[0]
+            all_results = result
+        else:
+            # Single result from regular crawling
+            main_result = result
+            all_results = [result]
+
         # Handle question
         if question:
             provider, token = setup_llm_config()
-            markdown = result.markdown.raw_markdown
+            markdown = main_result.markdown.raw_markdown
             anyio.run(stream_llm_response, url, markdown, question, provider, token)
             return
         
         # Handle output
         if not output_file:
             if output == "all":
-                click.echo(json.dumps(result.model_dump(), indent=2))
+                if isinstance(result, list):
+                    output_data = [r.model_dump() for r in all_results]
+                    click.echo(json.dumps(output_data, indent=2))
+                else:
+                    click.echo(json.dumps(main_result.model_dump(), indent=2))
             elif output == "json":
-                print(result.extracted_content)
-                extracted_items = json.loads(result.extracted_content)
+                print(main_result.extracted_content)
+                extracted_items = json.loads(main_result.extracted_content)
                 click.echo(json.dumps(extracted_items, indent=2))
                 
             elif output in ["markdown", "md"]:
-                click.echo(result.markdown.raw_markdown)
+                click.echo(main_result.markdown.raw_markdown)
             elif output in ["markdown-fit", "md-fit"]:
-                click.echo(result.markdown.fit_markdown)
+                click.echo(main_result.markdown.fit_markdown)
         else:
             if output == "all":
                 with open(output_file, "w") as f:
-                    f.write(json.dumps(result.model_dump(), indent=2))
+                    if isinstance(result, list):
+                        output_data = [r.model_dump() for r in all_results]
+                        f.write(json.dumps(output_data, indent=2))
+                    else:
+                        f.write(json.dumps(main_result.model_dump(), indent=2))
             elif output == "json":
                 with open(output_file, "w") as f:
-                    f.write(result.extracted_content)
+                    f.write(main_result.extracted_content)
             elif output in ["markdown", "md"]:
                 with open(output_file, "w") as f:
-                    f.write(result.markdown.raw_markdown)
+                    f.write(main_result.markdown.raw_markdown)
             elif output in ["markdown-fit", "md-fit"]:
                 with open(output_file, "w") as f:
-                    f.write(result.markdown.fit_markdown)
+                    f.write(main_result.markdown.fit_markdown)
             
     except Exception as e:
         raise click.ClickException(str(e))
@@ -1354,9 +1401,11 @@ def profiles_cmd():
 @click.option("--question", "-q", help="Ask a question about the crawled content")
 @click.option("--verbose", "-v", is_flag=True)
 @click.option("--profile", "-p", help="Use a specific browser profile (by name)")
+@click.option("--deep-crawl", type=click.Choice(["bfs", "dfs", "best-first"]), help="Enable deep crawling with specified strategy")
+@click.option("--max-pages", type=int, default=10, help="Maximum number of pages to crawl in deep crawl mode")
 def default(url: str, example: bool, browser_config: str, crawler_config: str, filter_config: str, 
         extraction_config: str, json_extract: str, schema: str, browser: Dict, crawler: Dict,
-        output: str, bypass_cache: bool, question: str, verbose: bool, profile: str):
+        output: str, bypass_cache: bool, question: str, verbose: bool, profile: str, deep_crawl: str, max_pages: int):
     """Crawl4AI CLI - Web content extraction tool
 
     Simple Usage:
@@ -1406,7 +1455,9 @@ def default(url: str, example: bool, browser_config: str, crawler_config: str, f
         bypass_cache=bypass_cache,
         question=question,
         verbose=verbose,
-        profile=profile
+        profile=profile,
+        deep_crawl=deep_crawl,
+        max_pages=max_pages
     )
 
 def main():
