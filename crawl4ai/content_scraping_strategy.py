@@ -1145,10 +1145,10 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
                         link_data["intrinsic_score"] = intrinsic_score
                     except Exception:
                         # Fail gracefully - assign default score
-                        link_data["intrinsic_score"] = float('inf')
+                        link_data["intrinsic_score"] = 0
                 else:
                     # No scoring enabled - assign infinity (all links equal priority)
-                    link_data["intrinsic_score"] = float('inf')
+                    link_data["intrinsic_score"] = 0
 
                 is_external = is_external_url(normalized_href, base_domain)
                 if is_external:

@@ -331,27 +331,6 @@ async def generate_pdf(
     return {"success": True, "pdf": base64.b64encode(pdf_data).decode()}
 
 
-def sanitize_json_data(data):
-    """
-    Recursively sanitize data to handle infinity and NaN values that are not JSON compliant.
-    """
-    import math
-    
-    if isinstance(data, dict):
-        return {k: sanitize_json_data(v) for k, v in data.items()}
-    elif isinstance(data, list):
-        return [sanitize_json_data(item) for item in data]
-    elif isinstance(data, float):
-        if math.isinf(data):
-            return "Infinity" if data > 0 else "-Infinity"
-        elif math.isnan(data):
-            return "NaN"
-        else:
-            return data
-    else:
-        return data
-
-
 @app.post("/execute_js")
 @limiter.limit(config["rate_limiting"]["default_limit"])
 @mcp_tool("execute_js")
@@ -410,9 +389,7 @@ async def execute_js(
         results = await crawler.arun(url=body.url, config=cfg)
     # Return JSON-serializable dict of the first CrawlResult
     data = results[0].model_dump()
-    # Sanitize data to handle infinity values
-    sanitized_data = sanitize_json_data(data)
-    return JSONResponse(sanitized_data)
+    return JSONResponse(data)
 
 
 @app.get("/llm/{url:path}")
