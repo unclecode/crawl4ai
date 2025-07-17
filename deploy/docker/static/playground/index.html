@@ -503,6 +503,25 @@
             } else {
                 // For /crawl endpoints, show the advanced config
                 advConfig.classList.remove('hidden');
+
+                // Update the stream configuration in CodeMirror
+                let currentConfig = cm.getValue();
+                if (endpoint === 'crawl_stream') {
+                    // Make sure that stream=True
+                    if (!currentConfig.includes('stream=')) {
+                        currentConfig = currentConfig.replace('CrawlerRunConfig(', 'CrawlerRunConfig(\n    stream=True,');
+                    } else {
+                        currentConfig = currentConfig.replace(/stream=False/, 'stream=True');
+                    }
+                } else {
+                    // Make sure that stream=False
+                    if (!currentConfig.includes('stream=')) {
+                        currentConfig = currentConfig.replace('CrawlerRunConfig(', 'CrawlerRunConfig(\n    stream=False,');
+                    } else {
+                        currentConfig = currentConfig.replace(/stream=True/, 'stream=False');
+                    }
+                }
+                cm.setValue(currentConfig);
             }
         });
 
