@@ -5,7 +5,7 @@ Test script for Link Extractor functionality
 
 from crawl4ai.models import Link
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
-from crawl4ai.async_configs import LinkPreviewConfig
+from crawl4ai import LinkPreviewConfig
 import asyncio
 import sys
 import os
@@ -237,7 +237,7 @@ def test_config_examples():
             print(f"     {key}: {value}")
 
         print("   Usage:")
-        print("     from crawl4ai.async_configs import LinkPreviewConfig")
+        print("     from crawl4ai import LinkPreviewConfig")
         print("     config = CrawlerRunConfig(")
         print("         link_preview_config=LinkPreviewConfig(")
         for key, value in config_dict.items():

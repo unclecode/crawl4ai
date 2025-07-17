@@ -10,9 +10,8 @@ Today I'm releasing Crawl4AI v0.7.0—the Adaptive Intelligence Update. This rel
 
 - **Adaptive Crawling**: Your crawler now learns and adapts to website patterns
 - **Virtual Scroll Support**: Complete content extraction from infinite scroll pages
-- **Link Preview with 3-Layer Scoring**: Intelligent link analysis and prioritization
+- **Link Preview with Intelligent Scoring**: Intelligent link analysis and prioritization
 - **Async URL Seeder**: Discover thousands of URLs in seconds with intelligent filtering
-- **PDF Parsing**: Extract data from PDF documents
 - **Performance Optimizations**: Significant speed and memory improvements
 
 ## 🧠 Adaptive Crawling: Intelligence Through Pattern Learning
@@ -30,44 +29,41 @@ The Adaptive Crawler maintains a persistent state for each domain, tracking:
 - Extraction confidence scores
 
 ```python
-from crawl4ai import AdaptiveCrawler, AdaptiveConfig, CrawlState
+from crawl4ai import AsyncWebCrawler, AdaptiveCrawler, AdaptiveConfig
+import asyncio
 
-# Initialize with custom learning parameters
-config = AdaptiveConfig(
-    confidence_threshold=0.7,    # Min confidence to use learned patterns
-    max_history=100,            # Remember last 100 crawls per domain
-    learning_rate=0.2,          # How quickly to adapt to changes
-    patterns_per_page=3,        # Patterns to learn per page type
-    extraction_strategy='css'   # 'css' or 'xpath'
-)
-
-adaptive_crawler = AdaptiveCrawler(config)
-
-# First crawl - crawler learns the structure
-async with AsyncWebCrawler() as crawler:
-    result = await crawler.arun(
-        "https://news.example.com/article/12345",
-        config=CrawlerRunConfig(
-            adaptive_config=config,
-            extraction_hints={  # Optional hints to speed up learning
-                "title": "article h1",
-                "content": "article .body-content"
-            }
-        )
+async def main():
+    
+    # Configure adaptive crawler
+    config = AdaptiveConfig(
+        strategy="statistical",  # or "embedding" for semantic understanding
+        max_pages=10,
+        confidence_threshold=0.7,  # Stop at 70% confidence
+        top_k_links=3,  # Follow top 3 links per page
+        min_gain_threshold=0.05  # Need 5% information gain to continue
     )
     
-    # Crawler identifies and stores patterns
-    if result.success:
-        state = adaptive_crawler.get_state("news.example.com")
-        print(f"Learned {len(state.patterns)} patterns")
-        print(f"Confidence: {state.avg_confidence:.2%}")
+    async with AsyncWebCrawler(verbose=False) as crawler:
+        adaptive = AdaptiveCrawler(crawler, config)
+        
+        print("Starting adaptive crawl about Python decorators...")
+        result = await adaptive.digest(
+            start_url="https://docs.python.org/3/glossary.html",
+            query="python decorators functions wrapping"
+        )
+        
+        print(f"\n✅ Crawling Complete!")
+        print(f"• Confidence Level: {adaptive.confidence:.0%}")
+        print(f"• Pages Crawled: {len(result.crawled_urls)}")
+        print(f"• Knowledge Base: {len(adaptive.state.knowledge_base)} documents")
+        
+        # Get most relevant content
+        relevant = adaptive.get_relevant_content(top_k=3)
+        print(f"\nMost Relevant Pages:")
+        for i, page in enumerate(relevant, 1):
+            print(f"{i}. {page['url']} (relevance: {page['score']:.2%})")
 
-# Subsequent crawls - uses learned patterns
-result2 = await crawler.arun(
-    "https://news.example.com/article/67890",
-    config=CrawlerRunConfig(adaptive_config=config)
-)
-# Automatically extracts using learned patterns!
+asyncio.run(main())
 ```
 
 **Expected Real-World Impact:**
@@ -92,9 +88,7 @@ twitter_config = VirtualScrollConfig(
     container_selector="[data-testid='primaryColumn']",
     scroll_count=20,                    # Number of scrolls
     scroll_by="container_height",       # Smart scrolling by container size
-    wait_after_scroll=1.0,             # Let content load
-    capture_method="incremental",       # Capture new content on each scroll
-    deduplicate=True                   # Remove duplicate elements
+    wait_after_scroll=1.0              # Let content load
 )
 
 # For e-commerce product grids (Instagram style)
@@ -102,8 +96,7 @@ grid_config = VirtualScrollConfig(
     container_selector="main .product-grid",
     scroll_count=30,
     scroll_by=800,                     # Fixed pixel scrolling
-    wait_after_scroll=1.5,             # Images need time
-    stop_on_no_change=True            # Smart stopping
+    wait_after_scroll=1.5              # Images need time
 )
 
 # For news feeds with lazy loading
@@ -111,9 +104,7 @@ news_config = VirtualScrollConfig(
     container_selector=".article-feed",
     scroll_count=50,
     scroll_by="page_height",           # Viewport-based scrolling
-    wait_after_scroll=0.5,
-    wait_for_selector=".article-card",  # Wait for specific elements
-    timeout=30000                      # Max 30 seconds total
+    wait_after_scroll=0.5              # Wait for content to load
 )
 
 # Use it in your crawl
@@ -157,68 +148,63 @@ async with AsyncWebCrawler() as crawler:
 
 **My Solution:** I implemented a three-layer scoring system that analyzes links like a human would—considering their position, context, and relevance to your goals.
 
-### The Three-Layer Scoring System
+### Intelligent Link Analysis and Scoring
 
 ```python
-from crawl4ai import LinkPreviewConfig
+import asyncio
+from crawl4ai import CrawlerRunConfig, CacheMode, AsyncWebCrawler
+from crawl4ai.adaptive_crawler import LinkPreviewConfig
 
-# Configure intelligent link analysis
-link_config = LinkPreviewConfig(
-    # What to analyze
-    include_internal=True,
-    include_external=True,
-    max_links=100,              # Analyze top 100 links
-    
-    # Relevance scoring
-    query="machine learning tutorials",  # Your interest
-    score_threshold=0.3,        # Minimum relevance score
-    
-    # Performance
-    concurrent_requests=10,     # Parallel processing
-    timeout_per_link=5000,      # 5s per link
-    
-    # Advanced scoring weights
-    scoring_weights={
-        "intrinsic": 0.3,       # Link quality indicators
-        "contextual": 0.5,      # Relevance to query
-        "popularity": 0.2       # Link prominence
-    }
-)
-
-# Use in your crawl
-result = await crawler.arun(
-    "https://tech-blog.example.com",
-    config=CrawlerRunConfig(
-        link_preview_config=link_config,
-        score_links=True
+async def main():
+    # Configure intelligent link analysis
+    link_config = LinkPreviewConfig(
+        include_internal=True,
+        include_external=False,
+        max_links=10,
+        concurrency=5,
+        query="python tutorial",  # For contextual scoring
+        score_threshold=0.3,
+        verbose=True
     )
-)
+    # Use in your crawl
+    async with AsyncWebCrawler() as crawler:
+        result = await crawler.arun(
+            "https://www.geeksforgeeks.org/",
+            config=CrawlerRunConfig(
+                link_preview_config=link_config,
+                score_links=True,  # Enable intrinsic scoring
+                cache_mode=CacheMode.BYPASS
+            )
+        )
 
-# Access scored and sorted links
-for link in result.links["internal"][:10]:  # Top 10 internal links
-    print(f"Score: {link['total_score']:.3f}")
-    print(f"  Intrinsic: {link['intrinsic_score']:.1f}/10")  # Position, attributes
-    print(f"  Contextual: {link['contextual_score']:.1f}/1")  # Relevance to query
-    print(f"  URL: {link['href']}")
-    print(f"  Title: {link['head_data']['title']}")
-    print(f"  Description: {link['head_data']['meta']['description'][:100]}...")
+        # Access scored and sorted links
+        if result.success and result.links:
+            for link in result.links.get("internal", []):
+                text = link.get('text', 'No text')[:40]
+                print(
+                    text,
+                    f"{link.get('intrinsic_score', 0):.1f}/10" if link.get('intrinsic_score') is not None else "0.0/10",
+                    f"{link.get('contextual_score', 0):.2f}/1" if link.get('contextual_score') is not None else "0.00/1",
+                    f"{link.get('total_score', 0):.3f}" if link.get('total_score') is not None else "0.000"
+                )
+
+asyncio.run(main())
 ```
 
 **Scoring Components:**
 
-1. **Intrinsic Score (0-10)**: Based on link quality indicators
+1. **Intrinsic Score**: Based on link quality indicators
    - Position on page (navigation, content, footer)
    - Link attributes (rel, title, class names)
    - Anchor text quality and length
    - URL structure and depth
 
-2. **Contextual Score (0-1)**: Relevance to your query
-   - Semantic similarity using embeddings
+2. **Contextual Score**: Relevance to your query using BM25 algorithm
    - Keyword matching in link text and title
    - Meta description analysis
    - Content preview scoring
 
-3. **Total Score**: Weighted combination for final ranking
+3. **Total Score**: Combined score for final ranking
 
 **Expected Real-World Impact:**
 - **Research Efficiency**: Find relevant papers 10x faster by following only high-score links
@@ -235,58 +221,34 @@ for link in result.links["internal"][:10]:  # Top 10 internal links
 ### Technical Architecture
 
 ```python
+import asyncio
 from crawl4ai import AsyncUrlSeeder, SeedingConfig
 
-# Basic discovery - find all product pages
-seeder_config = SeedingConfig(
-    # Discovery sources
-    source="sitemap+cc",        # Sitemap + Common Crawl
-    
-    # Filtering
-    pattern="*/product/*",      # URL pattern matching
-    ignore_patterns=["*/reviews/*", "*/questions/*"],
-    
-    # Validation
-    live_check=True,           # Verify URLs are alive
-    max_urls=5000,             # Stop at 5000 URLs
-    
-    # Performance  
-    concurrency=100,           # Parallel requests
-    hits_per_sec=10           # Rate limiting
-)
+async def main():
+    async with AsyncUrlSeeder() as seeder:
+        # Discover Python tutorial URLs
+        config = SeedingConfig(
+            source="sitemap",  # Use sitemap
+            pattern="*python*",  # URL pattern filter
+            extract_head=True,  # Get metadata
+            query="python tutorial",  # For relevance scoring
+            scoring_method="bm25",
+            score_threshold=0.2,
+            max_urls=10
+        )
+        
+        print("Discovering Python async tutorial URLs...")
+        urls = await seeder.urls("https://www.geeksforgeeks.org/", config)
+        
+        print(f"\n✅ Found {len(urls)} relevant URLs:")
+        for i, url_info in enumerate(urls[:5], 1):
+            print(f"\n{i}. {url_info['url']}")
+            if url_info.get('relevance_score'):
+                print(f"   Relevance: {url_info['relevance_score']:.3f}")
+            if url_info.get('head_data', {}).get('title'):
+                print(f"   Title: {url_info['head_data']['title'][:60]}...")
 
-seeder = AsyncUrlSeeder(seeder_config)
-urls = await seeder.discover("https://shop.example.com")
-
-# Advanced: Relevance-based discovery
-research_config = SeedingConfig(
-    source="crawl+sitemap",    # Deep crawl + sitemap
-    pattern="*/blog/*",        # Blog posts only
-    
-    # Content relevance
-    extract_head=True,         # Get meta tags
-    query="quantum computing tutorials",
-    scoring_method="bm25",     # Or "semantic" (coming soon)
-    score_threshold=0.4,       # High relevance only
-    
-    # Smart filtering
-    filter_nonsense_urls=True,  # Remove .xml, .txt, etc.
-    min_content_length=500,     # Skip thin content
-    
-    force=True                 # Bypass cache
-)
-
-# Discover with progress tracking
-discovered = []
-async for batch in seeder.discover_iter("https://physics-blog.com", research_config):
-    discovered.extend(batch)
-    print(f"Found {len(discovered)} relevant URLs so far...")
-
-# Results include scores and metadata
-for url_data in discovered[:5]:
-    print(f"URL: {url_data['url']}")
-    print(f"Score: {url_data['score']:.3f}")
-    print(f"Title: {url_data['title']}")
+asyncio.run(main())
 ```
 
 **Discovery Methods:**
@@ -309,35 +271,18 @@ This release includes significant performance improvements through optimized res
 ### What We Optimized
 
 ```python
-# Before v0.7.0 (slow)
+# Optimized crawling with v0.7.0 improvements
 results = []
 for url in urls:
-    result = await crawler.arun(url)
-    results.append(result)
-
-# After v0.7.0 (fast)
-# Automatic batching and connection pooling
-results = await crawler.arun_batch(
-    urls,
-    config=CrawlerRunConfig(
-        # New performance options
-        batch_size=10,              # Process 10 URLs concurrently
-        reuse_browser=True,         # Keep browser warm
-        eager_loading=False,        # Load only what's needed
-        streaming_extraction=True,  # Stream large extractions
-        
-        # Optimized defaults
-        wait_until="domcontentloaded",  # Faster than networkidle
-        exclude_external_resources=True, # Skip third-party assets
-        block_ads=True                  # Ad blocking built-in
+    result = await crawler.arun(
+        url,
+        config=CrawlerRunConfig(
+            # Performance optimizations
+            wait_until="domcontentloaded",  # Faster than networkidle
+            cache_mode=CacheMode.ENABLED    # Enable caching
+        )
     )
-)
-
-# Memory-efficient streaming for large crawls
-async for result in crawler.arun_stream(large_url_list):
-    # Process results as they complete
-    await process_result(result)
-    # Memory is freed after each iteration
+    results.append(result)
 ```
 
 **Performance Gains:**
@@ -347,24 +292,6 @@ async for result in crawler.arun_stream(large_url_list):
 - **Memory Usage**: 60% reduction with streaming processing
 - **Concurrent Crawls**: Handle 5x more parallel requests
 
-## 📄 PDF Support
-
-PDF extraction is now natively supported in Crawl4AI.
-
-```python
-# Extract data from PDF documents
-result = await crawler.arun(
-    "https://example.com/report.pdf",
-    config=CrawlerRunConfig(
-        pdf_extraction=True,
-        extraction_strategy=JsonCssExtractionStrategy({
-            # Works on converted PDF structure
-            "title": {"selector": "h1", "type": "text"},
-            "sections": {"selector": "h2", "type": "list"}
-        })
-    )
-)
-```
 
 ## 🔧 Important Changes
 
