@@ -3,7 +3,7 @@ C4A-Script Hello World - Error Example
 Shows how error handling works
 """
 
-from c4a_compile import compile
+from crawl4ai.script.c4a_compile import compile
 
 # Define a script with an error (missing THEN)
 script = """

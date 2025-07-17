@@ -5,11 +5,10 @@ from crawl4ai import (
     CrawlerRunConfig,
     DefaultMarkdownGenerator,
     PruningContentFilter,
-    CrawlResult
+    CrawlResult,
+    UndetectedAdapter
 )
-# Import the custom strategy and adapter from the _ud file
-from crawl4ai.async_crawler_strategy_ud import AsyncPlaywrightCrawlerStrategy
-from crawl4ai.browser_adapter import UndetectedAdapter
+from crawl4ai.async_crawler_strategy import AsyncPlaywrightCrawlerStrategy
 
 
 async def main():

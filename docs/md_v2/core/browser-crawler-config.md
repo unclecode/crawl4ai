@@ -29,6 +29,7 @@ class BrowserConfig:
         text_mode=False,
         light_mode=False,
         extra_args=None,
+        enable_stealth=False,
         # ... other advanced parameters omitted here
     ):
         ...
@@ -83,6 +84,11 @@ class BrowserConfig:
 10. **`extra_args`**:  
     - Additional flags for the underlying browser.  
     - E.g. `["--disable-extensions"]`.
+
+11. **`enable_stealth`**:  
+    - If `True`, enables stealth mode using playwright-stealth.  
+    - Modifies browser fingerprints to avoid basic bot detection.  
+    - Default is `False`. Recommended for sites with bot protection.
 
 ### Helper Methods
 

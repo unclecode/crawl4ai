@@ -14,23 +14,7 @@ import hashlib
 from .js_snippet import load_js_script
 from .config import DOWNLOAD_PAGE_TIMEOUT
 from .async_configs import BrowserConfig, CrawlerRunConfig
-from playwright_stealth import StealthConfig
 from .utils import get_chromium_path
-
-stealth_config = StealthConfig(
-    webdriver=True,
-    chrome_app=True,
-    chrome_csi=True,
-    chrome_load_times=True,
-    chrome_runtime=True,
-    navigator_languages=True,
-    navigator_plugins=True,
-    navigator_permissions=True,
-    webgl_vendor=True,
-    outerdimensions=True,
-    navigator_hardware_concurrency=True,
-    media_codecs=True,
-)
 
 BROWSER_DISABLE_OPTIONS = [
     "--disable-background-networking",
@@ -621,7 +605,11 @@ class BrowserManager:
 
         # Keep track of contexts by a "config signature," so each unique config reuses a single context
         self.contexts_by_config = {}
-        self._contexts_lock = asyncio.Lock() 
+        self._contexts_lock = asyncio.Lock()
+        
+        # Stealth-related attributes
+        self._stealth_instance = None
+        self._stealth_cm = None 
 
         # Initialize ManagedBrowser if needed
         if self.config.use_managed_browser:
@@ -655,7 +643,16 @@ class BrowserManager:
         else:
             from playwright.async_api import async_playwright
 
-        self.playwright = await async_playwright().start()
+        # Initialize playwright with or without stealth
+        if self.config.enable_stealth and not self.use_undetected:
+            # Import stealth only when needed
+            from playwright_stealth import Stealth
+            # Use the recommended stealth wrapper approach
+            self._stealth_instance = Stealth()
+            self._stealth_cm = self._stealth_instance.use_async(async_playwright())
+            self.playwright = await self._stealth_cm.__aenter__()
+        else:
+            self.playwright = await async_playwright().start()
 
         if self.config.cdp_url or self.config.use_managed_browser:
             self.config.use_managed_browser = True
@@ -1117,5 +1114,19 @@ class BrowserManager:
             self.managed_browser = None
 
         if self.playwright:
-            await self.playwright.stop()
+            # Handle stealth context manager cleanup if it exists
+            if hasattr(self, '_stealth_cm') and self._stealth_cm is not None:
+                try:
+                    await self._stealth_cm.__aexit__(None, None, None)
+                except Exception as e:
+                    if self.logger:
+                        self.logger.error(
+                            message="Error closing stealth context: {error}",
+                            tag="ERROR", 
+                            params={"error": str(e)}
+                        )
+                self._stealth_cm = None
+                self._stealth_instance = None
+            else:
+                await self.playwright.stop()
             self.playwright = None
