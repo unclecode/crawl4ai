@@ -274,7 +274,7 @@ The new Docker implementation includes:
 
 ```bash
 # Pull and run the latest release candidate
-docker pull unclecode/crawl4ai:0.7.0
+docker pull unclecode/crawl4ai:0.7.0-r1
 docker run -d -p 11235:11235 --name crawl4ai --shm-size=1g unclecode/crawl4ai:0.7.0
 
 # Visit the playground at http://localhost:11235/playground
