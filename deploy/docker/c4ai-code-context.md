@@ -9795,9 +9795,9 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
             # Score the URL if a scorer is provided
             score = self.url_scorer.score(base_url) if self.url_scorer else 0
             
-            # Skip URLs with scores below the threshold
-            if score < self.score_threshold:
-                self.logger.debug(f"URL {url} skipped: score {score} below threshold {self.score_threshold}")
+            # Skip URLs with scores above the threshold
+            if score > self.score_threshold:
+                self.logger.debug(f"URL {url} skipped: score {score} above threshold {self.score_threshold}")
                 self.stats.urls_skipped += 1
                 continue
             
@@ -11476,14 +11476,14 @@ async def max_pages_and_thresholds():
             
         # EXAMPLE 2: DFS WITH SCORE THRESHOLD
         print("\n📊 EXAMPLE 2: DFS STRATEGY WITH SCORE THRESHOLD")
-        print("  Only crawl pages with a relevance score above 0.5")
+        print("  Only crawl pages with a relevance score below 0.5 (lower is better)")
         
         dfs_config = CrawlerRunConfig(
             deep_crawl_strategy=DFSDeepCrawlStrategy(
                 max_depth=2,
                 include_external=False, 
                 url_scorer=keyword_scorer,
-                score_threshold=0.7,  # Only process URLs with scores above 0.5
+                score_threshold=0.5,  # Only process URLs with scores below 0.5
                 max_pages=10
             ),
             scraping_strategy=LXMLWebScrapingStrategy(),
