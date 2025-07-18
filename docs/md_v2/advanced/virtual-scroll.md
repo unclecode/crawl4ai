@@ -91,13 +91,12 @@ async def crawl_twitter_timeline():
         wait_after_scroll=1.0  # Twitter needs time to load
     )
     
+    browser_config = BrowserConfig(headless=True)  # Set to False to watch it work
     config = CrawlerRunConfig(
-        virtual_scroll_config=virtual_config,
-        # Optional: Set headless=False to watch it work
-        # browser_config=BrowserConfig(headless=False)
+        virtual_scroll_config=virtual_config
     )
     
-    async with AsyncWebCrawler() as crawler:
+    async with AsyncWebCrawler(config=browser_config) as crawler:
         result = await crawler.arun(
             url="https://twitter.com/search?q=AI",
             config=config
@@ -200,7 +199,7 @@ Use **scan_full_page** when:
 Virtual Scroll works seamlessly with extraction strategies:
 
 ```python
-from crawl4ai import LLMExtractionStrategy
+from crawl4ai import LLMExtractionStrategy, LLMConfig
 
 # Define extraction schema
 schema = {
@@ -222,7 +221,7 @@ config = CrawlerRunConfig(
         scroll_count=20
     ),
     extraction_strategy=LLMExtractionStrategy(
-        provider="openai/gpt-4o-mini",
+        llm_config=LLMConfig(provider="openai/gpt-4o-mini"),
         schema=schema
     )
 )

@@ -125,7 +125,7 @@ Here's a full example you can copy, paste, and run immediately:
 ```python
 import asyncio
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
-from crawl4ai.async_configs import LinkPreviewConfig
+from crawl4ai import LinkPreviewConfig
 
 async def extract_link_heads_example():
     """
@@ -237,7 +237,7 @@ if __name__ == "__main__":
 The `LinkPreviewConfig` class supports these options:
 
 ```python
-from crawl4ai.async_configs import LinkPreviewConfig
+from crawl4ai import LinkPreviewConfig
 
 link_preview_config = LinkPreviewConfig(
     # BASIC SETTINGS

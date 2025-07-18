@@ -3,7 +3,7 @@ import warnings
 
 from .async_webcrawler import AsyncWebCrawler, CacheMode
 # MODIFIED: Add SeedingConfig and VirtualScrollConfig here
-from .async_configs import BrowserConfig, CrawlerRunConfig, HTTPCrawlerConfig, LLMConfig, ProxyConfig, GeolocationConfig, SeedingConfig, VirtualScrollConfig
+from .async_configs import BrowserConfig, CrawlerRunConfig, HTTPCrawlerConfig, LLMConfig, ProxyConfig, GeolocationConfig, SeedingConfig, VirtualScrollConfig, LinkPreviewConfig
 
 from .content_scraping_strategy import (
     ContentScrapingStrategy,
@@ -173,6 +173,7 @@ __all__ = [
     "CompilationResult",
     "ValidationResult",
     "ErrorDetail",
+    "LinkPreviewConfig"
 ]
 
 
