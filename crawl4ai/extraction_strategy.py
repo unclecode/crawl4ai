@@ -955,18 +955,25 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
             selected = selected[0]
         else:
             selected = element
-
-        value = None
-        if field["type"] == "text":
-            value = self._get_element_text(selected)
-        elif field["type"] == "attribute":
-            value = self._get_element_attribute(selected, field["attribute"])
-        elif field["type"] == "html":
-            value = self._get_element_html(selected)
-        elif field["type"] == "regex":
-            text = self._get_element_text(selected)
-            match = re.search(field["pattern"], text)
-            value = match.group(1) if match else None
+        # process type (compatible string and list)
+        type_pipeline = field["type"]
+        if not isinstance(type_pipeline, list):
+            type_pipeline = [type_pipeline]
+        value = selected
+        for step in type_pipeline:
+            if step == "text":
+                value = self._get_element_text(value)
+            elif step == "attribute":
+                value = self._get_element_attribute(value, field["attribute"])
+            elif step == "html":
+                value = self._get_element_html(value)
+            elif step == "regex":
+                pattern = field.get("pattern")
+                if pattern and isinstance(value, str):
+                    match = re.search(pattern, value)
+                    value = match.group(field.get("group", 1)) if match else None
+            if value is None:
+                break
 
         if "transform" in field:
             value = self._apply_transform(value, field["transform"])
