@@ -824,7 +824,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             except Error:
                 visibility_info = await self.check_visibility(page)
 
-                if self.browser_config.config.verbose:
+                if self.browser_config.verbose:
                     self.logger.debug(
                         message="Body visibility info: {info}",
                         tag="DEBUG",
