@@ -18,7 +18,7 @@ Usage:
 
 import asyncio
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
-from crawl4ai.async_configs import LinkPreviewConfig
+from crawl4ai import LinkPreviewConfig
 
 
 async def basic_link_head_extraction():

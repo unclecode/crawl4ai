@@ -35,7 +35,7 @@ from crawl4ai import AsyncWebCrawler, AdaptiveCrawler
 
 async def main():
     async with AsyncWebCrawler() as crawler:
-        # Create an adaptive crawler
+        # Create an adaptive crawler (config is optional)
         adaptive = AdaptiveCrawler(crawler)
         
         # Start crawling with a query
@@ -59,13 +59,13 @@ async def main():
 from crawl4ai import AdaptiveConfig
 
 config = AdaptiveConfig(
-    confidence_threshold=0.7,    # Stop when 70% confident (default: 0.8)
-    max_pages=20,               # Maximum pages to crawl (default: 50)
-    top_k_links=3,              # Links to follow per page (default: 5)
+    confidence_threshold=0.8,    # Stop when 80% confident (default: 0.7)
+    max_pages=30,               # Maximum pages to crawl (default: 20)
+    top_k_links=5,              # Links to follow per page (default: 3)
     min_gain_threshold=0.05     # Minimum expected gain to continue (default: 0.1)
 )
 
-adaptive = AdaptiveCrawler(crawler, config=config)
+adaptive = AdaptiveCrawler(crawler, config)
 ```
 
 ## Crawling Strategies
@@ -198,8 +198,8 @@ if result.metrics.get('is_irrelevant', False):
 The confidence score (0-1) indicates how sufficient the gathered information is:
 - **0.0-0.3**: Insufficient information, needs more crawling
 - **0.3-0.6**: Partial information, may answer basic queries
-- **0.6-0.8**: Good coverage, can answer most queries
-- **0.8-1.0**: Excellent coverage, comprehensive information
+- **0.6-0.7**: Good coverage, can answer most queries
+- **0.7-1.0**: Excellent coverage, comprehensive information
 
 ### Statistics Display
 
@@ -257,9 +257,9 @@ new_adaptive.import_knowledge_base("knowledge_base.jsonl")
 - Avoid overly broad queries
 
 ### 2. Threshold Tuning
-- Start with default (0.8) for general use
-- Lower to 0.6-0.7 for exploratory crawling
-- Raise to 0.9+ for exhaustive coverage
+- Start with default (0.7) for general use
+- Lower to 0.5-0.6 for exploratory crawling
+- Raise to 0.8+ for exhaustive coverage
 
 ### 3. Performance Optimization
 - Use appropriate `max_pages` limits
