@@ -37,6 +37,12 @@ This page provides a comprehensive list of example scripts that demonstrate vari
 | Storage State | Tutorial on managing browser storage state for persistence. | [View Guide](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/storage_state_tutorial.md) |
 | Network Console Capture | Demonstrates how to capture and analyze network requests and console logs. | [View Code](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/network_console_capture_example.py) |
 
+## Caching & Performance
+
+| Example | Description | Link |
+|---------|-------------|------|
+| SMART Cache Mode | Demonstrates the intelligent SMART cache mode that validates cached content using HEAD requests, saving 70-95% bandwidth while ensuring fresh content. | [View Code](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/smart_cache.py) |
+
 ## Extraction Strategies
 
 | Example | Description | Link |

@@ -47,6 +47,7 @@ from .utils import (
     get_error_context,
     RobotsParser,
     preprocess_html_for_schema,
+    should_crawl_based_on_head,
 )
 
 
@@ -268,31 +269,56 @@ class AsyncWebCrawler:
                     cached_result = await async_db_manager.aget_cached_url(url)
 
                 if cached_result:
-                    html = sanitize_input_encode(cached_result.html)
-                    extracted_content = sanitize_input_encode(
-                        cached_result.extracted_content or ""
-                    )
-                    extracted_content = (
-                        None
-                        if not extracted_content or extracted_content == "[]"
-                        else extracted_content
-                    )
-                    # If screenshot is requested but its not in cache, then set cache_result to None
-                    screenshot_data = cached_result.screenshot
-                    pdf_data = cached_result.pdf
-                    # if config.screenshot and not screenshot or config.pdf and not pdf:
-                    if config.screenshot and not screenshot_data:
-                        cached_result = None
+                    # Check if SMART mode requires validation
+                    if cache_context.cache_mode == CacheMode.SMART:
+                        # Perform HEAD check to see if content has changed
+                        user_agent = self.crawler_strategy.user_agent if hasattr(self.crawler_strategy, 'user_agent') else "Mozilla/5.0"
+                        should_crawl, reason = await should_crawl_based_on_head(
+                            url=url,
+                            cached_headers=cached_result.response_headers or {},
+                            user_agent=user_agent,
+                            timeout=5
+                        )
+                        
+                        if should_crawl:
+                            self.logger.info(
+                                f"SMART cache: {reason} - Re-crawling {url}",
+                                tag="SMART"
+                            )
+                            cached_result = None  # Force re-crawl
+                        else:
+                            self.logger.info(
+                                f"SMART cache: {reason} - Using cache for {url}",
+                                tag="SMART"
+                            )
+                    
+                    # Process cached result if still valid
+                    if cached_result:
+                        html = sanitize_input_encode(cached_result.html)
+                        extracted_content = sanitize_input_encode(
+                            cached_result.extracted_content or ""
+                        )
+                        extracted_content = (
+                            None
+                            if not extracted_content or extracted_content == "[]"
+                            else extracted_content
+                        )
+                        # If screenshot is requested but its not in cache, then set cache_result to None
+                        screenshot_data = cached_result.screenshot
+                        pdf_data = cached_result.pdf
+                        # if config.screenshot and not screenshot or config.pdf and not pdf:
+                        if config.screenshot and not screenshot_data:
+                            cached_result = None
 
-                    if config.pdf and not pdf_data:
-                        cached_result = None
+                        if config.pdf and not pdf_data:
+                            cached_result = None
 
-                    self.logger.url_status(
-                        url=cache_context.display_url,
-                        success=bool(html),
-                        timing=time.perf_counter() - start_time,
-                        tag="FETCH",
-                    )
+                        self.logger.url_status(
+                            url=cache_context.display_url,
+                            success=bool(html),
+                            timing=time.perf_counter() - start_time,
+                            tag="FETCH",
+                        )
 
                 # Update proxy configuration from rotation strategy if available
                 if config and config.proxy_rotation_strategy:

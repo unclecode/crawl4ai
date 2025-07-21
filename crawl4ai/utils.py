@@ -3387,3 +3387,90 @@ def cosine_distance(vec1: np.ndarray, vec2: np.ndarray) -> float:
     """Calculate cosine distance (1 - similarity) between two vectors"""
     return 1 - cosine_similarity(vec1, vec2)
 
+
+async def should_crawl_based_on_head(
+    url: str, 
+    cached_headers: Dict[str, str], 
+    user_agent: str = "Mozilla/5.0",
+    timeout: int = 5
+) -> tuple[bool, str]:
+    """
+    Check if content has changed using HEAD request.
+    
+    Args:
+        url: The URL to check
+        cached_headers: The cached response headers from previous crawl
+        user_agent: User agent string to use for the HEAD request
+        timeout: Timeout in seconds for the HEAD request
+        
+    Returns:
+        Tuple of (should_crawl: bool, reason: str)
+        - should_crawl: True if content has changed and should be re-crawled, False otherwise
+        - reason: Explanation of the decision
+    """
+    import email.utils
+    
+    if not cached_headers:
+        return True, "No cached headers available, must crawl"
+    
+    headers = {
+        "Accept-Encoding": "identity",
+        "User-Agent": user_agent,
+        "Want-Content-Digest": "sha-256",  # Request RFC 9530 digest
+    }
+    
+    # Add conditional headers if available in cache
+    if cached_headers.get("etag"):
+        headers["If-None-Match"] = cached_headers["etag"]
+    if cached_headers.get("last-modified"):
+        headers["If-Modified-Since"] = cached_headers["last-modified"]
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.head(
+                url, 
+                headers=headers, 
+                timeout=aiohttp.ClientTimeout(total=timeout),
+                allow_redirects=True
+            ) as response:
+                # 304 Not Modified - content hasn't changed
+                if response.status == 304:
+                    return False, "304 Not Modified - Content unchanged"
+                
+                # Check other headers if no 304 response
+                new_headers = dict(response.headers)
+                
+                # Check Content-Digest (most reliable)
+                if new_headers.get("content-digest") and cached_headers.get("content-digest"):
+                    if new_headers["content-digest"] == cached_headers["content-digest"]:
+                        return False, "Content-Digest matches - Content unchanged"
+                
+                # Check strong ETag
+                if new_headers.get("etag") and cached_headers.get("etag"):
+                    # Strong ETags start with '"'
+                    if (new_headers["etag"].startswith('"') and 
+                        new_headers["etag"] == cached_headers["etag"]):
+                        return False, "Strong ETag matches - Content unchanged"
+                
+                # Check Last-Modified
+                if new_headers.get("last-modified") and cached_headers.get("last-modified"):
+                    try:
+                        new_lm = email.utils.parsedate_to_datetime(new_headers["last-modified"])
+                        cached_lm = email.utils.parsedate_to_datetime(cached_headers["last-modified"])
+                        if new_lm <= cached_lm:
+                            return False, "Last-Modified not newer - Content unchanged"
+                    except Exception:
+                        pass
+                
+                # Content-Length changed is a positive signal
+                if (new_headers.get("content-length") and cached_headers.get("content-length") and
+                    new_headers["content-length"] != cached_headers["content-length"]):
+                    return True, f"Content-Length changed ({cached_headers['content-length']} -> {new_headers['content-length']})"
+                
+                # Default: assume content has changed
+                return True, "No definitive cache headers matched - Assuming content changed"
+                
+    except Exception as e:
+        # On error, assume content has changed (safe default)
+        return True, f"HEAD request failed: {str(e)} - Assuming content changed"
+

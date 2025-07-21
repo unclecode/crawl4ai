@@ -11,6 +11,7 @@ class CacheMode(Enum):
     - READ_ONLY: Only read from cache, don't write
     - WRITE_ONLY: Only write to cache, don't read
     - BYPASS: Bypass cache for this operation
+    - SMART: Validate cache with HEAD request before using
     """
 
     ENABLED = "enabled"
@@ -18,6 +19,7 @@ class CacheMode(Enum):
     READ_ONLY = "read_only"
     WRITE_ONLY = "write_only"
     BYPASS = "bypass"
+    SMART = "smart"
 
 
 class CacheContext:
@@ -62,14 +64,14 @@ class CacheContext:
 
         How it works:
         1. If always_bypass is True or is_cacheable is False, return False.
-        2. If cache_mode is ENABLED or READ_ONLY, return True.
+        2. If cache_mode is ENABLED, READ_ONLY, or SMART, return True.
 
         Returns:
             bool: True if cache should be read, False otherwise.
         """
         if self.always_bypass or not self.is_cacheable:
             return False
-        return self.cache_mode in [CacheMode.ENABLED, CacheMode.READ_ONLY]
+        return self.cache_mode in [CacheMode.ENABLED, CacheMode.READ_ONLY, CacheMode.SMART]
 
     def should_write(self) -> bool:
         """
@@ -77,14 +79,14 @@ class CacheContext:
 
         How it works:
         1. If always_bypass is True or is_cacheable is False, return False.
-        2. If cache_mode is ENABLED or WRITE_ONLY, return True.
+        2. If cache_mode is ENABLED, WRITE_ONLY, or SMART, return True.
 
         Returns:
             bool: True if cache should be written, False otherwise.
         """
         if self.always_bypass or not self.is_cacheable:
             return False
-        return self.cache_mode in [CacheMode.ENABLED, CacheMode.WRITE_ONLY]
+        return self.cache_mode in [CacheMode.ENABLED, CacheMode.WRITE_ONLY, CacheMode.SMART]
 
     @property
     def display_url(self) -> str:
