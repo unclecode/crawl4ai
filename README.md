@@ -28,7 +28,7 @@ Crawl4AI is the #1 trending GitHub repository, actively maintained by a vibrant 
 
 [✨ Check out latest update v0.7.0](#-recent-updates)
 
-🎉 **Version 0.7.0 is now available!** The Adaptive Intelligence Update introduces groundbreaking features: Adaptive Crawling that learns website patterns, Virtual Scroll support for infinite pages, intelligent Link Preview with 3-layer scoring, Async URL Seeder for massive discovery, and significant performance improvements. [Read the release notes →](https://docs.crawl4ai.com/blog/release-v0.7.0)
+🎉 **Version 0.7.0 is now available!** The Adaptive Intelligence Update introduces groundbreaking features: Adaptive Crawling that learns website patterns, Virtual Scroll support for infinite pages, intelligent Link Preview with 3-layer scoring, Async URL Seeder for massive discovery, and significant performance improvements. [Read the release notes →](https://docs.crawl4ai.com/blog/releases/0.7.0/)
 
 <details>
 <summary>🤓 <strong>My Personal Story</strong></summary>
@@ -312,7 +312,7 @@ else:
     result = requests.get(f"http://localhost:11235/task/{task_id}")
 ```
 
-For more examples, see our [Docker Examples](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/docker_example.py). For advanced configuration, environment variables, and usage examples, see our [Docker Deployment Guide](https://docs.crawl4ai.com/basic/docker-deployment/).
+For more examples, see our [Docker Examples](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/docker_example.py). For advanced configuration, environment variables, and usage examples, see our [Docker Deployment Guide](https://docs.crawl4ai.com/core/docker-deployment/).
 
 </details>
 
@@ -581,7 +581,7 @@ async def test_news_crawl():
 
 - **⚡ Performance Boost**: Up to 3x faster with optimized resource handling and memory efficiency
 
-Read the full details in our [0.7.0 Release Notes](https://docs.crawl4ai.com/blog/release-v0.7.0) or check the [CHANGELOG](https://github.com/unclecode/crawl4ai/blob/main/CHANGELOG.md).
+Read the full details in our [0.7.0 Release Notes](https://docs.crawl4ai.com/blog/releases/0.7.0/) or check the [CHANGELOG](https://github.com/unclecode/crawl4ai/blob/main/CHANGELOG.md).
 
 ### Previous Version: 0.6.0 Release Highlights
 
@@ -667,7 +667,7 @@ Read the full details in our [0.7.0 Release Notes](https://docs.crawl4ai.com/blo
 -   **🤖 LLM Content Filter**: Intelligent markdown generation using LLMs
 -   **📄 PDF Processing**: Extract text, images, and metadata from PDF files
 
-Read the full details in our [0.5.0 Release Notes](https://docs.crawl4ai.com/blog/releases/0.5.0.html).
+Read the full details in our [0.5.0 Release Notes](https://docs.crawl4ai.com/blog/releases/0.5.0/).
 
 ## Version Numbering in Crawl4AI
 
