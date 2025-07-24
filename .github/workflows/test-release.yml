@@ -24,6 +24,10 @@ jobs:
           echo "VERSION=$TAG_VERSION" >> $GITHUB_OUTPUT
           echo "Testing with version: $TAG_VERSION"
       
+      - name: Install package dependencies
+        run: |
+          pip install -e .
+      
       - name: Check version consistency
         run: |
           TAG_VERSION=${{ steps.get_version.outputs.VERSION }}
