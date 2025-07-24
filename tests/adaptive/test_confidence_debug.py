@@ -13,7 +13,7 @@ import math
 sys.path.append(str(Path(__file__).parent.parent))
 
 from crawl4ai import AsyncWebCrawler
-from crawl4ai.adaptive_crawler import CrawlState, StatisticalStrategy
+from crawl4ai.adaptive_crawler import AdaptiveCrawlResult, StatisticalStrategy
 from crawl4ai.models import CrawlResult
 
 
@@ -37,7 +37,7 @@ class ConfidenceTestHarness:
         print("=" * 80)
         
         # Initialize state
-        state = CrawlState(query=self.query)
+        state = AdaptiveCrawlResult(query=self.query)
         
         # Create crawler
         async with AsyncWebCrawler() as crawler:
@@ -107,7 +107,7 @@ class ConfidenceTestHarness:
                 
                 state.metrics['prev_confidence'] = confidence
     
-    def _debug_coverage_calculation(self, state: CrawlState, query_terms: List[str]):
+    def _debug_coverage_calculation(self, state: AdaptiveCrawlResult, query_terms: List[str]):
         """Debug coverage calculation step by step"""
         coverage_score = 0.0
         max_possible_score = 0.0
@@ -136,7 +136,7 @@ class ConfidenceTestHarness:
         new_coverage = self._calculate_coverage_new(state, query_terms)
         print(f"    → New Coverage: {new_coverage:.3f}")
     
-    def _calculate_coverage_new(self, state: CrawlState, query_terms: List[str]) -> float:
+    def _calculate_coverage_new(self, state: AdaptiveCrawlResult, query_terms: List[str]) -> float:
         """New coverage calculation without IDF"""
         if not query_terms or state.total_documents == 0:
             return 0.0

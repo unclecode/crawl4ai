@@ -9,7 +9,7 @@ async def digest(
     start_url: str,
     query: str,
     resume_from: Optional[Union[str, Path]] = None
-) -> CrawlState
+) -> AdaptiveCrawlResult
 ```
 
 ## Parameters
@@ -31,7 +31,7 @@ async def digest(
 
 ## Return Value
 
-Returns a `CrawlState` object containing:
+Returns a `AdaptiveCrawlResult` object containing:
 
 - **crawled_urls** (`Set[str]`): All URLs that have been crawled
 - **knowledge_base** (`List[CrawlResult]`): Collection of crawled pages with content

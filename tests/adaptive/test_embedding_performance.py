@@ -15,7 +15,7 @@ import os
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from crawl4ai import AsyncWebCrawler, AdaptiveCrawler, AdaptiveConfig
-from crawl4ai.adaptive_crawler import EmbeddingStrategy, CrawlState
+from crawl4ai.adaptive_crawler import EmbeddingStrategy, AdaptiveCrawlResult
 from crawl4ai.models import CrawlResult
 
 
@@ -132,7 +132,7 @@ async def test_embedding_performance():
     strategy.config = config
     
     # Initialize state
-    state = CrawlState()
+    state = AdaptiveCrawlResult()
     state.query = "async await coroutines event loops tasks"
     
     # Start performance monitoring

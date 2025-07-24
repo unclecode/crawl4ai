@@ -9,7 +9,7 @@ import asyncio
 import re
 from typing import List, Dict, Set
 from crawl4ai import AsyncWebCrawler, AdaptiveCrawler, AdaptiveConfig
-from crawl4ai.adaptive_crawler import CrawlState, Link
+from crawl4ai.adaptive_crawler import AdaptiveCrawlResult, Link
 import math
 
 
@@ -45,7 +45,7 @@ class APIDocumentationStrategy:
             r'/legal/'
         ]
     
-    def score_link(self, link: Link, query: str, state: CrawlState) -> float:
+    def score_link(self, link: Link, query: str, state: AdaptiveCrawlResult) -> float:
         """Custom link scoring for API documentation"""
         score = 1.0
         url = link.href.lower()
@@ -77,7 +77,7 @@ class APIDocumentationStrategy:
         
         return score
     
-    def calculate_api_coverage(self, state: CrawlState, query: str) -> Dict[str, float]:
+    def calculate_api_coverage(self, state: AdaptiveCrawlResult, query: str) -> Dict[str, float]:
         """Calculate specialized coverage metrics for API documentation"""
         metrics = {
             'endpoint_coverage': 0.0,

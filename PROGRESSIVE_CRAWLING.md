@@ -216,7 +216,7 @@ Under certain assumptions about link preview accuracy:
 
 ### 8.1 Core Components
 
-1. **CrawlState**: Maintains crawl history and metrics
+1. **AdaptiveCrawlResult**: Maintains crawl history and metrics
 2. **AdaptiveConfig**: Configuration parameters
 3. **CrawlStrategy**: Pluggable strategy interface
 4. **AdaptiveCrawler**: Main orchestrator

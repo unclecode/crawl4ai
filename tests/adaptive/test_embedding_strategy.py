@@ -20,7 +20,7 @@ from crawl4ai import (
     AsyncWebCrawler,
     AdaptiveCrawler,
     AdaptiveConfig,
-    CrawlState
+    AdaptiveCrawlResult
 )
 
 console = Console()

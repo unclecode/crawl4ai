@@ -130,7 +130,7 @@ Factors:
 
 ```python
 class CustomLinkScorer:
-    def score(self, link: Link, query: str, state: CrawlState) -> float:
+    def score(self, link: Link, query: str, state: AdaptiveCrawlResult) -> float:
         # Prioritize specific URL patterns
         if "/api/reference/" in link.href:
             return 2.0  # Double the score
@@ -325,17 +325,17 @@ with open("crawl_analysis.json", "w") as f:
 from crawl4ai.adaptive_crawler import BaseStrategy
 
 class DomainSpecificStrategy(BaseStrategy):
-    def calculate_coverage(self, state: CrawlState) -> float:
+    def calculate_coverage(self, state: AdaptiveCrawlResult) -> float:
         # Custom coverage calculation
         # e.g., weight certain terms more heavily
         pass
     
-    def calculate_consistency(self, state: CrawlState) -> float:
+    def calculate_consistency(self, state: AdaptiveCrawlResult) -> float:
         # Custom consistency logic
         # e.g., domain-specific validation
         pass
     
-    def rank_links(self, links: List[Link], state: CrawlState) -> List[Link]:
+    def rank_links(self, links: List[Link], state: AdaptiveCrawlResult) -> List[Link]:
         # Custom link ranking
         # e.g., prioritize specific URL patterns
         pass
@@ -359,7 +359,7 @@ class HybridStrategy(BaseStrategy):
             URLPatternStrategy()
         ]
     
-    def calculate_confidence(self, state: CrawlState) -> float:
+    def calculate_confidence(self, state: AdaptiveCrawlResult) -> float:
         # Weighted combination of strategies
         scores = [s.calculate_confidence(state) for s in self.strategies]
         weights = [0.5, 0.3, 0.2]

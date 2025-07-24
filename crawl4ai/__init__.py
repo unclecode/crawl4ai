@@ -73,7 +73,7 @@ from .async_url_seeder import AsyncUrlSeeder
 from .adaptive_crawler import (
     AdaptiveCrawler,
     AdaptiveConfig,
-    CrawlState,
+    AdaptiveCrawlResult,
     CrawlStrategy,
     StatisticalStrategy
 )
@@ -108,7 +108,7 @@ __all__ = [
     # Adaptive Crawler
     "AdaptiveCrawler",
     "AdaptiveConfig", 
-    "CrawlState",
+    "AdaptiveCrawlResult",
     "CrawlStrategy",
     "StatisticalStrategy",
     "DeepCrawlStrategy",

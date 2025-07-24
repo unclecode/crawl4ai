@@ -27,7 +27,7 @@ async def digest(
     start_url: str,
     query: str,
     resume_from: Optional[Union[str, Path]] = None
-) -> CrawlState
+) -> AdaptiveCrawlResult
 ```
 
 #### Parameters
@@ -38,7 +38,7 @@ async def digest(
 
 #### Returns
 
-- **CrawlState**: The final crawl state containing all crawled URLs, knowledge base, and metrics
+- **AdaptiveCrawlResult**: The final crawl state containing all crawled URLs, knowledge base, and metrics
 
 #### Example
 
@@ -92,7 +92,7 @@ Access to the current crawl state.
 
 ```python
 @property
-def state(self) -> CrawlState
+def state(self) -> AdaptiveCrawlResult
 ```
 
 ## Methods
