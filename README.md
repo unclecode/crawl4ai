@@ -10,6 +10,7 @@
 [![PyPI version](https://badge.fury.io/py/crawl4ai.svg)](https://badge.fury.io/py/crawl4ai)
 [![Python Version](https://img.shields.io/pypi/pyversions/crawl4ai)](https://pypi.org/project/crawl4ai/)
 [![Downloads](https://static.pepy.tech/badge/crawl4ai/month)](https://pepy.tech/project/crawl4ai)
+[![Crawl4AI Actor](https://apify.com/actor-badge?actor=janbuchar/crawl4ai)](https://apify.com/janbuchar/crawl4ai?fpr=crawl4ai)
 
 <p align="center">
     <a href="https://x.com/crawl4ai">
@@ -284,6 +285,7 @@ For complete documentation, see our [Docker Deployment Guide](https://docs.crawl
 
 </details>
 
+
 ---
 
 ### Quick Test
@@ -316,6 +318,37 @@ For more examples, see our [Docker Examples](https://github.com/unclecode/crawl4
 
 </details>
 
+## Apify Actor Usage 
+
+<a href="https://apify.com/janbuchar/crawl4ai?fpr=crawl4ai"><img src="https://apify.com/ext/run-on-apify.png" alt="Run Crawl4AI Actor on Apify" width="176" height="39" /></a>
+
+You can run Crawl4AI in the cloud without installation using the [Crawl4AI Actor](https://apify.com/janbuchar/crawl4ai?fpr=crawl4ai) on [Apify](https://apify.com?fpr=crawl4ai) free of charge.
+
+``` bash
+$ echo '{"startUrls": [{ "url": "https://docs.crawl4ai.com/" }], "maxCrawlDepth": 1}' | apify call -so janbuchar/crawl4ai
+[{
+  "url": "https://docs.crawl4ai.com/",
+  "markdown": "https://api.apify.com/v2/key-value-stores/m1Sqnke1KWM0AI8co/records/content_4242424242.md",
+  "html": "https://api.apify.com/v2/key-value-stores/m1Sqnke1KWM0AI8co/records/content_4242424242.html",
+  "metadata": {
+    "title": "Home - Crawl4AI Documentation (v0.5.x)",
+    "description": "🚀🤖 Crawl4AI, Open-source LLM-Friendly Web Crawler & Scraper"
+  }
+},
+{
+  "url": "https://docs.crawl4ai.com/advanced/ssl-certificate/",
+  "markdown": "https://api.apify.com/v2/key-value-stores/m1Sqnke1KWM0AI8co/records/content_4242424242.md",
+  "html": "https://api.apify.com/v2/key-value-stores/m1Sqnke1KWM0AI8co/records/content_4242424242.html",
+  "metadata": {
+    "title": "SSL Certificate - Crawl4AI Documentation (v0.5.x)",
+    "description": "🚀🤖 Crawl4AI, Open-source LLM-Friendly Web Crawler & Scraper"
+  }
+},
+# ...
+]
+```
+
+---
 
 ## 🔬 Advanced Usage Examples 🔬
 
