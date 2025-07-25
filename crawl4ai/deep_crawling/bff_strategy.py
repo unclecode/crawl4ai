@@ -116,10 +116,6 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
                 
             valid_links.append(base_url)
             
-        # If we have more valid links than capacity, limit them
-        if len(valid_links) > remaining_capacity:
-            valid_links = valid_links[:remaining_capacity]
-            self.logger.info(f"Limiting to {remaining_capacity} URLs due to max_pages limit")
             
         # Record the new depths and add to next_links
         for url in valid_links:
