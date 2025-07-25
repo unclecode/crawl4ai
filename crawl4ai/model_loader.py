@@ -2,7 +2,6 @@ from functools import lru_cache
 from pathlib import Path
 import subprocess, os
 import shutil
-from .model_loader import *
 import argparse
 from crawl4ai.config import MODEL_REPO_BRANCH
 
