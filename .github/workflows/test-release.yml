@@ -87,7 +87,7 @@ jobs:
           tags: |
             unclecode/crawl4ai:test-${{ steps.get_version.outputs.VERSION }}
             unclecode/crawl4ai:test-latest
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
       
