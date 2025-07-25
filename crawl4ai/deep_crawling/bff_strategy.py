@@ -116,10 +116,6 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
                 
             valid_links.append(base_url)
             
-        # If we have more valid links than capacity, limit them
-        if len(valid_links) > remaining_capacity:
-            valid_links = valid_links[:remaining_capacity]
-            self.logger.info(f"Limiting to {remaining_capacity} URLs due to max_pages limit")
             
         # Record the new depths and add to next_links
         for url in valid_links:
@@ -187,7 +183,7 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
                 result.metadata = result.metadata or {}
                 result.metadata["depth"] = depth
                 result.metadata["parent_url"] = parent_url
-                result.metadata["score"] = score
+                result.metadata["score"] = -score #original score as metadata
                 
                 # Count only successful crawls toward max_pages limit
                 if result.success:
@@ -208,7 +204,7 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
                     for new_url, new_parent in new_links:
                         new_depth = depths.get(new_url, depth + 1)
                         new_score = self.url_scorer.score(new_url) if self.url_scorer else 0
-                        await queue.put((new_score, new_depth, new_url, new_parent))
+                        await queue.put((-new_score, new_depth, new_url, new_parent)) # negative of score so as to prioritize higher positive score from min heap
 
         # End of crawl.
 
