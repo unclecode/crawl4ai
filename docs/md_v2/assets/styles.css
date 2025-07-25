@@ -260,3 +260,7 @@ div.badges a > img {
 table td, table th {
     border: 1px solid var(--code-bg-color) !important;
 }
+
+.ask-ai-selection-button.no-pointer {
+  pointer-events: none !important;
+}
