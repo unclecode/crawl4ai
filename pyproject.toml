@@ -44,7 +44,6 @@ dependencies = [
     "brotli>=1.1.0",
     "humanize>=4.10.0",
     "lark>=1.2.2",
-    "sentence-transformers>=2.2.0",
     "alphashape>=1.3.1",
     "shapely>=2.0.0"
 ]
@@ -62,8 +61,8 @@ classifiers = [
 [project.optional-dependencies]
 pdf = ["PyPDF2"]  
 torch = ["torch", "nltk", "scikit-learn"]
-transformer = ["transformers", "tokenizers"]
-cosine = ["torch", "transformers", "nltk"]
+transformer = ["transformers", "tokenizers", "sentence-transformers"]
+cosine = ["torch", "transformers", "nltk", "sentence-transformers"]
 sync = ["selenium"]
 all = [
     "PyPDF2",
@@ -72,8 +71,8 @@ all = [
     "scikit-learn",
     "transformers",
     "tokenizers",
-    "selenium",
-    "PyPDF2"  
+    "sentence-transformers",
+    "selenium"
 ]
 
 [project.scripts]

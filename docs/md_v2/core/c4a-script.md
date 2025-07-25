@@ -52,11 +52,9 @@ That's it! In just a few lines, you've automated a complete search workflow.
 
 Want to learn by doing? We've got you covered:
 
-**🚀 [Live Demo](https://docs.crawl4ai.com/c4a-script/demo)** - Try C4A-Script in your browser right now!
+**🚀 [Live Demo](https://docs.crawl4ai.com/apps/c4a-script/)** - Try C4A-Script in your browser right now!
 
-**📁 [Tutorial Examples](/examples/c4a_script/)** - Complete examples with source code
-
-**🛠️ [Local Tutorial](/examples/c4a_script/tutorial/)** - Run the interactive tutorial on your machine
+**📁 [Tutorial Examples](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/c4a_script/)** - Complete examples with source code
 
 ### Running the Tutorial Locally
 

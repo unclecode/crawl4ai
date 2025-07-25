@@ -3342,7 +3342,13 @@ async def get_text_embeddings(
     # Default: use sentence-transformers
     else:
         # Lazy load to avoid importing heavy libraries unless needed
-        from sentence_transformers import SentenceTransformer
+        try:
+            from sentence_transformers import SentenceTransformer
+        except ImportError:
+            raise ImportError(
+                "sentence-transformers is required for local embeddings. "
+                "Install it with: pip install 'crawl4ai[transformer]' or pip install sentence-transformers"
+            )
         
         # Cache the model in function attribute to avoid reloading
         if not hasattr(get_text_embeddings, '_models'):
