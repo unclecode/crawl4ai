@@ -187,7 +187,7 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
                 result.metadata = result.metadata or {}
                 result.metadata["depth"] = depth
                 result.metadata["parent_url"] = parent_url
-                result.metadata["score"] = score
+                result.metadata["score"] = -score #original score as metadata
                 
                 # Count only successful crawls toward max_pages limit
                 if result.success:
@@ -208,7 +208,7 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
                     for new_url, new_parent in new_links:
                         new_depth = depths.get(new_url, depth + 1)
                         new_score = self.url_scorer.score(new_url) if self.url_scorer else 0
-                        await queue.put((new_score, new_depth, new_url, new_parent))
+                        await queue.put((-new_score, new_depth, new_url, new_parent)) # negative of score so as to prioritize higher positive score from min heap
 
         # End of crawl.
 
