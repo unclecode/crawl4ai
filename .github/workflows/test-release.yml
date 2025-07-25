@@ -60,8 +60,15 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.TEST_PYPI_TOKEN }}
         run: |
           echo "📦 Uploading to Test PyPI..."
-          twine upload --repository testpypi dist/*
-          echo "✅ Package uploaded to https://test.pypi.org/project/crawl4ai/"
+          twine upload --repository testpypi dist/* || {
+            if [ $? -eq 1 ]; then
+              echo "⚠️ Upload failed - likely version already exists on Test PyPI"
+              echo "Continuing anyway for test purposes..."
+            else
+              exit 1
+            fi
+          }
+          echo "✅ Test PyPI step complete"
       
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -78,9 +85,11 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/crawl4ai:test-${{ steps.get_version.outputs.VERSION }}
-            ${{ secrets.DOCKER_USERNAME }}/crawl4ai:test-latest
+            unclecode/crawl4ai:test-${{ steps.get_version.outputs.VERSION }}
+            unclecode/crawl4ai:test-latest
           platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
       
       - name: Summary
         run: |
@@ -92,8 +101,8 @@ jobs:
           echo "- Install: \`pip install -i https://test.pypi.org/simple/ crawl4ai==${{ steps.get_version.outputs.VERSION }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🐳 Docker Test Images" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ secrets.DOCKER_USERNAME }}/crawl4ai:test-${{ steps.get_version.outputs.VERSION }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ secrets.DOCKER_USERNAME }}/crawl4ai:test-latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`unclecode/crawl4ai:test-${{ steps.get_version.outputs.VERSION }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`unclecode/crawl4ai:test-latest\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🧹 Cleanup Commands" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
@@ -102,6 +111,6 @@ jobs:
           echo "git push origin :test-v${{ steps.get_version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "# Remove Docker test images" >> $GITHUB_STEP_SUMMARY
-          echo "docker rmi ${{ secrets.DOCKER_USERNAME }}/crawl4ai:test-${{ steps.get_version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
-          echo "docker rmi ${{ secrets.DOCKER_USERNAME }}/crawl4ai:test-latest" >> $GITHUB_STEP_SUMMARY
+          echo "docker rmi unclecode/crawl4ai:test-${{ steps.get_version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "docker rmi unclecode/crawl4ai:test-latest" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

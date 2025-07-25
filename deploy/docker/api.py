@@ -5,6 +5,7 @@ from typing import List, Tuple, Dict
 from functools import partial
 from uuid import uuid4
 from datetime import datetime
+from base64 import b64encode
 
 import logging
 from typing import Optional, AsyncGenerator
@@ -371,6 +372,9 @@ async def stream_results(crawler: AsyncWebCrawler, results_gen: AsyncGenerator) 
                 server_memory_mb = _get_memory_mb()
                 result_dict = result.model_dump()
                 result_dict['server_memory_mb'] = server_memory_mb
+                # If PDF exists, encode it to base64
+                if result_dict.get('pdf') is not None:
+                    result_dict['pdf'] = b64encode(result_dict['pdf']).decode('utf-8')
                 logger.info(f"Streaming result for {result_dict.get('url', 'unknown')}")
                 data = json.dumps(result_dict, default=datetime_handler) + "\n"
                 yield data.encode('utf-8')
@@ -443,10 +447,19 @@ async def handle_crawl_request(
             mem_delta_mb = end_mem_mb - start_mem_mb # <--- Calculate delta
             peak_mem_mb = max(peak_mem_mb if peak_mem_mb else 0, end_mem_mb) # <--- Get peak memory
         logger.info(f"Memory usage: Start: {start_mem_mb} MB, End: {end_mem_mb} MB, Delta: {mem_delta_mb} MB, Peak: {peak_mem_mb} MB")
-                              
+
+        # Process results to handle PDF bytes
+        processed_results = []
+        for result in results:
+            result_dict = result.model_dump()
+            # If PDF exists, encode it to base64
+            if result_dict.get('pdf') is not None:
+                result_dict['pdf'] = b64encode(result_dict['pdf']).decode('utf-8')
+            processed_results.append(result_dict)
+            
         return {
             "success": True,
-            "results": [result.model_dump() for result in results],
+            "results": processed_results,
             "server_processing_time_s": end_time - start_time,
             "server_memory_delta_mb": mem_delta_mb,
             "server_peak_memory_mb": peak_mem_mb
