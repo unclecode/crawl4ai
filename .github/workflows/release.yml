@@ -88,10 +88,10 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/crawl4ai:${{ steps.get_version.outputs.VERSION }}
-            ${{ secrets.DOCKER_USERNAME }}/crawl4ai:${{ steps.versions.outputs.MINOR }}
-            ${{ secrets.DOCKER_USERNAME }}/crawl4ai:${{ steps.versions.outputs.MAJOR }}
-            ${{ secrets.DOCKER_USERNAME }}/crawl4ai:latest
+            unclecode/crawl4ai:${{ steps.get_version.outputs.VERSION }}
+            unclecode/crawl4ai:${{ steps.versions.outputs.MINOR }}
+            unclecode/crawl4ai:${{ steps.versions.outputs.MAJOR }}
+            unclecode/crawl4ai:latest
           platforms: linux/amd64,linux/arm64
       
       - name: Create GitHub Release
@@ -113,8 +113,8 @@ jobs:
             
             **Docker:**
             ```bash
-            docker pull ${{ secrets.DOCKER_USERNAME }}/crawl4ai:${{ steps.get_version.outputs.VERSION }}
-            docker pull ${{ secrets.DOCKER_USERNAME }}/crawl4ai:latest
+            docker pull unclecode/crawl4ai:${{ steps.get_version.outputs.VERSION }}
+            docker pull unclecode/crawl4ai:latest
             ```
             
             ### 📝 What's Changed
@@ -132,10 +132,10 @@ jobs:
           echo "- Install: \`pip install crawl4ai==${{ steps.get_version.outputs.VERSION }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🐳 Docker Images" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ secrets.DOCKER_USERNAME }}/crawl4ai:${{ steps.get_version.outputs.VERSION }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ secrets.DOCKER_USERNAME }}/crawl4ai:${{ steps.versions.outputs.MINOR }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ secrets.DOCKER_USERNAME }}/crawl4ai:${{ steps.versions.outputs.MAJOR }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ secrets.DOCKER_USERNAME }}/crawl4ai:latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`unclecode/crawl4ai:${{ steps.get_version.outputs.VERSION }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`unclecode/crawl4ai:${{ steps.versions.outputs.MINOR }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`unclecode/crawl4ai:${{ steps.versions.outputs.MAJOR }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`unclecode/crawl4ai:latest\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📋 GitHub Release" >> $GITHUB_STEP_SUMMARY
           echo "https://github.com/${{ github.repository }}/releases/tag/v${{ steps.get_version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY

@@ -85,8 +85,8 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/crawl4ai:test-${{ steps.get_version.outputs.VERSION }}
-            ${{ secrets.DOCKER_USERNAME }}/crawl4ai:test-latest
+            unclecode/crawl4ai:test-${{ steps.get_version.outputs.VERSION }}
+            unclecode/crawl4ai:test-latest
           platforms: linux/amd64
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -101,8 +101,8 @@ jobs:
           echo "- Install: \`pip install -i https://test.pypi.org/simple/ crawl4ai==${{ steps.get_version.outputs.VERSION }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🐳 Docker Test Images" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ secrets.DOCKER_USERNAME }}/crawl4ai:test-${{ steps.get_version.outputs.VERSION }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ secrets.DOCKER_USERNAME }}/crawl4ai:test-latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`unclecode/crawl4ai:test-${{ steps.get_version.outputs.VERSION }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`unclecode/crawl4ai:test-latest\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🧹 Cleanup Commands" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
@@ -111,6 +111,6 @@ jobs:
           echo "git push origin :test-v${{ steps.get_version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "# Remove Docker test images" >> $GITHUB_STEP_SUMMARY
-          echo "docker rmi ${{ secrets.DOCKER_USERNAME }}/crawl4ai:test-${{ steps.get_version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
-          echo "docker rmi ${{ secrets.DOCKER_USERNAME }}/crawl4ai:test-latest" >> $GITHUB_STEP_SUMMARY
+          echo "docker rmi unclecode/crawl4ai:test-${{ steps.get_version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "docker rmi unclecode/crawl4ai:test-latest" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
