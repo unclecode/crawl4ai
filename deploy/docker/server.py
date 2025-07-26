@@ -33,7 +33,11 @@ from schemas import (
 )
 
 from utils import (
-    FilterType, load_config, setup_logging, verify_email_domain
+    FilterType,
+    load_config,
+    setup_logging,
+    verify_email_domain,
+    get_base_url,
 )
 import os
 import sys
@@ -48,7 +52,11 @@ from fastapi import (
 )
 from rank_bm25 import BM25Okapi
 from fastapi.responses import (
-    StreamingResponse, RedirectResponse, PlainTextResponse, JSONResponse
+    StreamingResponse,
+    RedirectResponse,
+    PlainTextResponse,
+    JSONResponse,
+    HTMLResponse,
 )
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -129,10 +137,30 @@ app.mount(
     name="play",
 )
 
+# Serve noVNC static files if available
+VNC_DIR = pathlib.Path("/opt/novnc")
+if VNC_DIR.exists():
+    app.mount("/novnc", StaticFiles(directory=VNC_DIR, html=True), name="novnc")
+
 
 @app.get("/")
 async def root():
     return RedirectResponse("/playground")
+
+
+@app.get("/vnc")
+async def vnc_page(request: Request):
+    """Return a simple page embedding the noVNC client."""
+    url = f"{get_base_url(request)}/novnc/vnc.html?autoconnect=true&resize=scale"
+    html = f"<iframe src='{url}' width='1024' height='768' style='border:none'></iframe>"
+    return HTMLResponse(f"<html><body>{html}</body></html>")
+
+
+@app.get("/vnc/url")
+async def vnc_url(request: Request):
+    """Return the direct URL to the noVNC client."""
+    url = f"{get_base_url(request)}/novnc/vnc.html?autoconnect=true&resize=scale"
+    return {"url": url}
 
 # ─────────────────── infra / middleware  ─────────────────────
 redis = aioredis.from_url(config["redis"].get("uri", "redis://localhost"))
