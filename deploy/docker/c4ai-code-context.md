@@ -3553,7 +3553,7 @@ from .utils import *  # noqa: F403
 from .utils import (
     sanitize_html,
     escape_json_string,
-    perform_completion_with_backoff,
+    aperform_completion_with_backoff,
     extract_xml_data,
     split_and_parse_json_objects,
     sanitize_input_encode,
@@ -4162,7 +4162,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
             )
 
         try:
-            response = perform_completion_with_backoff(
+            response = await aperform_completion_with_backoff(
                 self.llm_config.provider,
                 prompt_with_variables,
                 self.llm_config.api_token,
@@ -4646,7 +4646,7 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
             dict: Generated schema following the JsonElementExtractionStrategy format
         """
         from .prompts import JSON_SCHEMA_BUILDER
-        from .utils import perform_completion_with_backoff
+        from .utils import aperform_completion_with_backoff
         for name, message in JsonElementExtractionStrategy._GENERATE_SCHEMA_UNWANTED_PROPS.items():
             if locals()[name] is not None:
                 raise AttributeError(f"Setting '{name}' is deprecated. {message}")
@@ -4709,7 +4709,7 @@ In this scenario, use your best judgment to generate the schema. You need to exa
 
         try:
             # Call LLM with backoff handling
-            response = perform_completion_with_backoff(
+            response = await aperform_completion_with_backoff(
                 provider=llm_config.provider,
                 prompt_with_variables="\n\n".join([system_message["content"], user_message["content"]]),
                 json_response = True,                
@@ -5597,7 +5597,7 @@ from bs4 import NavigableString, Comment
 
 from .utils import (
     clean_tokens,
-    perform_completion_with_backoff,
+    aperform_completion_with_backoff,
     escape_json_string,
     sanitize_html,
     get_home_folder,
@@ -6556,7 +6556,7 @@ class LLMContentFilter(RelevantContentFilter):
                             tag="CHUNK",
                             params={"chunk_num": i + 1},
                         )
-                    return perform_completion_with_backoff(
+                    return await aperform_completion_with_backoff(
                         provider,
                         prompt,
                         api_token,
