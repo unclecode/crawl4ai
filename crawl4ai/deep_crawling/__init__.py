@@ -11,7 +11,8 @@ from .filters import (
     URLPatternFilter,
     FilterStats,
     ContentRelevanceFilter,
-    SEOFilter
+    SEOFilter,
+    CallbackURLFilter
 )
 from .scorers import (
     KeywordRelevanceScorer,
@@ -37,6 +38,7 @@ __all__ = [
     "FilterStats",
     "ContentRelevanceFilter",
     "SEOFilter",
+    "CallbackURLFilter",
     "KeywordRelevanceScorer",
     "URLScorer",
     "CompositeScorer",
