@@ -8,6 +8,8 @@ from crawl4ai import (
     CrawlResult
 )
 
+from crawl4ai.prompts import GENERATE_SCRIPT_PROMPT
+
 
 async def main():
     browser_config = BrowserConfig(
