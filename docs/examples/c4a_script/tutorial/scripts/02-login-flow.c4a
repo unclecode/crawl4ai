@@ -1,0 +1,27 @@
+# Complete Login Flow
+# Demonstrates form interaction and authentication
+
+# Click login button
+CLICK `#login-btn`
+
+# Wait for login modal
+WAIT `.login-form` 3
+
+# Fill in credentials
+CLICK `#email`
+TYPE "demo@example.com"
+
+CLICK `#password`
+TYPE "demo123"
+
+# Check remember me
+IF (EXISTS `#remember-me`) THEN CLICK `#remember-me`
+
+# Submit form
+CLICK `button[type="submit"]`
+
+# Wait for success
+WAIT `.welcome-message` 5
+
+# Verify login succeeded
+IF (EXISTS `.user-info`) THEN EVAL `console.log('✅ Login successful!')`

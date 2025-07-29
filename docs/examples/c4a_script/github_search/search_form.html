@@ -1,0 +1,336 @@
+<form id="search_form" class="search_repos" data-turbo="false" action="/search" accept-charset="UTF-8" method="get">
+  
+<div class="pagehead codesearch-head color-border-muted">
+  <div class="container-lg p-responsive d-flex flex-column flex-md-row">
+    <h1 class="flex-shrink-0" id="search-title">Advanced search</h1>
+    <div class="search-form-fluid flex-auto d-flex flex-column flex-md-row pt-2 pt-md-0" id="adv_code_search">
+      <div class="flex-auto pr-md-2">
+        <label class="form-control search-page-label js-advanced-search-label">
+          <input aria-labelledby="search-title" class="form-control input-block search-page-input js-advanced-search-input js-advanced-search-prefix" data-search-prefix="" type="text" value="">
+          <p class="completed-query js-advanced-query top-0 right-0 left-0"><span></span> </p>
+        </label>
+        <input class="js-search-query" type="hidden" name="q" value="">
+        <input class="js-type-value" type="hidden" name="type" value="Repositories">
+        <input type="hidden" name="ref" value="advsearch">
+      </div>
+      <div class="d-flex d-md-block flex-shrink-0 pt-2 pt-md-0">
+          <button type="submit" data-view-component="true" class="btn flex-auto">    Search
+</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="container-lg p-responsive advanced-search-form">
+  <fieldset class="pb-3 mb-4 border-bottom color-border-muted min-width-0">
+    <h3>Advanced options</h3>
+    <dl class="form-group flattened d-flex d-md-block flex-column">
+      <dt><label for="search_from">From these owners</label></dt>
+      <dd><input id="search_from" type="text" class="form-control js-advanced-search-prefix" placeholder="github, atom, electron, octokit" data-search-prefix="user:"></dd>
+    </dl>
+    <dl class="form-group flattened d-flex d-md-block flex-column">
+      <dt><label for="search_repos">In these repositories</label></dt>
+      <dd><input id="search_repos" type="text" class="form-control js-advanced-search-prefix" value="" placeholder="twbs/bootstrap, rails/rails" data-search-prefix="repo:"></dd>
+    </dl>
+    <dl class="form-group flattened d-flex d-md-block flex-column">
+      <dt><label for="search_date">Created on the dates</label></dt>
+      <dd><input id="search_date" type="text" class="form-control js-advanced-search-prefix" value="" placeholder=">YYYY-MM-DD, YYYY-MM-DD" data-search-prefix="created:"></dd>
+    </dl>
+    <dl class="form-group flattened d-flex d-md-block flex-column">
+      <dt><label for="search_language">Written in this language</label></dt>
+      <dd>
+        <select id="search_language" name="l" class="form-select js-advanced-search-prefix" data-search-prefix="language:">
+          <option value="">Any language</option>
+          <optgroup label="Popular">
+            <option value="C">C</option>
+<option value="C#">C#</option>
+<option value="C++">C++</option>
+<option value="CoffeeScript">CoffeeScript</option>
+<option value="CSS">CSS</option>
+<option value="Dart">Dart</option>
+<option value="DM">DM</option>
+<option value="Elixir">Elixir</option>
+<option value="Go">Go</option>
+<option value="Groovy">Groovy</option>
+<option value="HTML">HTML</option>
+<option value="Java">Java</option>
+<option value="JavaScript">JavaScript</option>
+<option value="Kotlin">Kotlin</option>
+<option value="Objective-C">Objective-C</option>
+<option value="Perl">Perl</option>
+<option value="PHP">PHP</option>
+<option value="PowerShell">PowerShell</option>
+<option value="Python">Python</option>
+<option value="Ruby">Ruby</option>
+<option value="Rust">Rust</option>
+<option value="Scala">Scala</option>
+<option value="Shell">Shell</option>
+<option value="Swift">Swift</option>
+<option value="TypeScript">TypeScript</option>
+          </optgroup>
+          <optgroup label="Everything else">
+            <option value="1C Enterprise">1C Enterprise</option>
+<option value="2-Dimensional Array">2-Dimensional Array</option>
+<option value="4D">4D</option>
+<option value="ABAP">ABAP</option>
+<option value="ABAP CDS">ABAP CDS</option>
+<option value="ABNF">ABNF</option>
+<option value="ActionScript">ActionScript</option>
+<option value="Ada">Ada</option>
+<option value="Adblock Filter List">Adblock Filter List</option>
+<option value="Adobe Font Metrics">Adobe Font Metrics</option>
+<option value="Agda">Agda</option>
+<option value="AGS Script">AGS Script</option>
+<option value="AIDL">AIDL</option>
+<option value="Aiken">Aiken</option>
+          </optgroup>
+        </select>
+      </dd>
+    </dl>
+  </fieldset>
+  <fieldset class="pb-3 mb-4 border-bottom color-border-muted min-width-0">
+    <h3>Repositories options</h3>
+    <dl class="form-group flattened d-flex d-md-block flex-column">
+      <dt><label for="search_stars">With this many stars</label></dt>
+      <dd><input id="search_stars" type="text" class="form-control js-advanced-search-prefix" placeholder="0..100, 200, >1000" data-search-prefix="stars:" data-search-type="Repositories"></dd>
+    </dl>
+    <dl class="form-group flattened d-flex d-md-block flex-column">
+      <dt><label for="search_forks">With this many forks</label></dt>
+      <dd><input id="search_forks" type="text" class="form-control js-advanced-search-prefix" placeholder="50..100, 200, <5" data-search-prefix="forks:" data-search-type="Repositories"></dd>
+    </dl>
+    <dl class="form-group flattened d-flex d-md-block flex-column">
+      <dt><label for="search_size">Of this size</label></dt>
+      <dd><input id="search_size" type="text" class="form-control js-advanced-search-prefix" placeholder="Repository size in KB" data-search-prefix="size:" data-search-type="Repositories"></dd>
+    </dl>
+    <dl class="form-group flattened d-flex d-md-block flex-column">
+      <dt><label for="search_push">Pushed to</label></dt>
+      <dd><input id="search_push" type="text" class="form-control js-advanced-search-prefix" value="" placeholder="<YYYY-MM-DD" data-search-prefix="pushed:" data-search-type="Repositories"></dd>
+    </dl>
+    <dl class="form-group flattened d-flex d-md-block flex-column">
+      <dt><label for="search_license">With this license</label></dt>
+      <dd>
+          <select id="search_license" class="form-select js-advanced-search-prefix" data-search-prefix="license:" data-search-type="Repositories">
+          <option value="">Any license</option>
+          <optgroup label="Licenses">
+            <option value="0bsd">BSD Zero Clause License</option>
+<option value="afl-3.0">Academic Free License v3.0</option>
+<option value="agpl-3.0">GNU Affero General Public License v3.0</option>
+<option value="apache-2.0">Apache License 2.0</option>
+<option value="artistic-2.0">Artistic License 2.0</option>
+<option value="blueoak-1.0.0">Blue Oak Model License 1.0.0</option>
+<option value="bsd-2-clause">BSD 2-Clause "Simplified" License</option>
+<option value="bsd-2-clause-patent">BSD-2-Clause Plus Patent License</option>
+<option value="bsd-3-clause">BSD 3-Clause "New" or "Revised" License</option>
+<option value="bsd-3-clause-clear">BSD 3-Clause Clear License</option>
+<option value="bsd-4-clause">BSD 4-Clause "Original" or "Old" License</option>
+<option value="bsl-1.0">Boost Software License 1.0</option>
+<option value="cc-by-4.0">Creative Commons Attribution 4.0 International</option>
+<option value="cc-by-sa-4.0">Creative Commons Attribution Share Alike 4.0 International</option>
+<option value="cc0-1.0">Creative Commons Zero v1.0 Universal</option>
+<option value="cecill-2.1">CeCILL Free Software License Agreement v2.1</option>
+<option value="cern-ohl-p-2.0">CERN Open Hardware Licence Version 2 - Permissive</option>
+<option value="cern-ohl-s-2.0">CERN Open Hardware Licence Version 2 - Strongly Reciprocal</option>
+<option value="cern-ohl-w-2.0">CERN Open Hardware Licence Version 2 - Weakly Reciprocal</option>
+<option value="ecl-2.0">Educational Community License v2.0</option>
+<option value="epl-1.0">Eclipse Public License 1.0</option>
+<option value="epl-2.0">Eclipse Public License 2.0</option>
+<option value="eupl-1.1">European Union Public License 1.1</option>
+<option value="eupl-1.2">European Union Public License 1.2</option>
+<option value="gfdl-1.3">GNU Free Documentation License v1.3</option>
+<option value="gpl-2.0">GNU General Public License v2.0</option>
+<option value="gpl-3.0">GNU General Public License v3.0</option>
+<option value="isc">ISC License</option>
+<option value="lgpl-2.1">GNU Lesser General Public License v2.1</option>
+<option value="lgpl-3.0">GNU Lesser General Public License v3.0</option>
+<option value="lppl-1.3c">LaTeX Project Public License v1.3c</option>
+<option value="mit">MIT License</option>
+<option value="mit-0">MIT No Attribution</option>
+<option value="mpl-2.0">Mozilla Public License 2.0</option>
+<option value="ms-pl">Microsoft Public License</option>
+<option value="ms-rl">Microsoft Reciprocal License</option>
+<option value="mulanpsl-2.0">Mulan Permissive Software License, Version 2</option>
+<option value="ncsa">University of Illinois/NCSA Open Source License</option>
+<option value="odbl-1.0">Open Data Commons Open Database License v1.0</option>
+<option value="ofl-1.1">SIL Open Font License 1.1</option>
+<option value="osl-3.0">Open Software License 3.0</option>
+<option value="postgresql">PostgreSQL License</option>
+<option value="unlicense">The Unlicense</option>
+<option value="upl-1.0">Universal Permissive License v1.0</option>
+<option value="vim">Vim License</option>
+<option value="wtfpl">Do What The F*ck You Want To Public License</option>
+<option value="zlib">zlib License</option>
+          </optgroup>
+          <optgroup label="License families">
+            <option value="cc">Creative Commons</option>
+<option value="gpl">GNU General Public License</option>
+<option value="lgpl">GNU Lesser General Public License</option>
+          </optgroup>
+        </select>
+      </dd>
+    </dl>
+    <label>
+      Return repositories <select class="form-select js-advanced-search-prefix" data-search-prefix="fork:" data-search-type="Repositories">
+      <option value="">not</option>
+      <option value="true">and</option>
+      <option value="only">only</option>
+      </select> including forks.
+    </label>
+  </fieldset>
+  <fieldset class="pb-3 mb-4 border-bottom color-border-muted min-width-0">
+    <h3>Code options</h3>
+    <dl class="form-group flattened d-flex d-md-block flex-column">
+      <dt><label for="search_extension">With this extension</label></dt>
+      <dd>
+        <input id="search_extension" type="text" class="form-control js-advanced-search-prefix" value="" placeholder="rb, py, jpg" data-search-type="Code" data-search-prefix="path:" data-glob-pattern="*.$0" data-regex-pattern="/.$0$/" data-use-or="true">
+      </dd>
+    </dl>
+    <dl class="form-group flattened d-flex d-md-block flex-column">
+      <dt><label for="search_path">In this path</label></dt>
+      <dd><input id="search_path" type="text" class="form-control js-advanced-search-prefix" value="" placeholder="/foo/bar/baz/qux" data-search-prefix="path:" data-search-type="Code" data-use-or=""></dd>
+    </dl>
+    <dl class="form-group flattened d-flex d-md-block flex-column">
+      <dt><label for="search_filename">With this file name</label></dt>
+      <dd>
+        <input id="search_filename" type="text" class="form-control js-advanced-search-prefix" placeholder="app.rb, footer.erb" data-search-type="code:" data-search-prefix="path:" data-glob-pattern="**/$0" data-regex-pattern="/(^|/)$0$/" data-use-or="true">
+      </dd>
+    </dl>
+    <label>
+      Return code <select class="form-select js-advanced-search-prefix" data-search-prefix="fork:" data-search-type="Code">
+      <option value="">not</option>
+      <option value="true">and</option>
+      <option value="only">only</option>
+      </select> including forks.
+    </label>
+  </fieldset>
+  <fieldset class="pb-3 mb-4 border-bottom color-border-muted min-width-0">
+    <h3>Issues options</h3>
+    <dl class="form-group flattened d-flex d-md-block flex-column">
+      <dt><label for="search_state">In the state</label></dt>
+      <dd><select id="search_state" class="form-select js-advanced-search-prefix" data-search-prefix="state:" data-search-type="Issues">
+      <option value="">open/closed</option>
+      <option value="open">open</option>
+      <option value="closed">closed</option>
+      </select></dd>
+    </dl>
+    <dl class="form-group flattened d-flex d-md-block flex-column">
+      <dt><label for="search_state_reason">With the reason</label></dt>
+      <dd><select id="search_state_reason" class="form-select js-advanced-search-prefix" data-search-prefix="reason:" data-search-type="Issues">
+      <option value="">any reason</option>
+      <option value="completed">completed</option>
+      <option value="not planned">not planned</option>
+      <option value="reopened">reopened</option>
+      </select></dd>
+    </dl>
+    <dl class="form-group flattened d-flex d-md-block flex-column">
+      <dt><label for="search_comments">With this many comments</label></dt>
+      <dd><input id="search_comments" type="text" class="form-control js-advanced-search-prefix" value="" placeholder="0..100, >442" data-search-prefix="comments:" data-search-type="Issues"></dd>
+    </dl>
+    <dl class="form-group flattened d-flex d-md-block flex-column">
+      <dt><label for="search_labels">With the labels</label></dt>
+      <dd><input id="search_labels" type="text" class="form-control js-advanced-search-prefix" value="" placeholder="bug, ie6" data-search-prefix="label:" data-search-type="Issues"></dd>
+    </dl>
+    <dl class="form-group flattened d-flex d-md-block flex-column">
+      <dt><label for="search_author">Opened by the author</label></dt>
+      <dd><input id="search_author" type="text" class="form-control js-advanced-search-prefix" value="" placeholder="hubot, octocat" data-search-prefix="author:" data-search-type="Issues"></dd>
+    </dl>
+    <dl class="form-group flattened d-flex d-md-block flex-column">
+      <dt><label for="search_mention">Mentioning the users</label></dt>
+      <dd><input id="search_mention" type="text" class="form-control js-advanced-search-prefix" value="" placeholder="tpope, mattt" data-search-prefix="mentions:" data-search-type="Issues"></dd>
+    </dl>
+    <dl class="form-group flattened d-flex d-md-block flex-column">
+      <dt><label for="search_assignment">Assigned to the users</label></dt>
+      <dd><input id="search_assignment" type="text" class="form-control js-advanced-search-prefix" value="" placeholder="twp, jim" data-search-prefix="assignee:" data-search-type="Issues"></dd>
+    </dl>
+    <dl class="form-group flattened d-flex d-md-block flex-column">
+      <dt><label for="search_updated_date">Updated before the date</label></dt>
+      <dd><input id="search_updated_date" type="text" class="form-control js-advanced-search-prefix" value="" placeholder="<YYYY-MM-DD" data-search-prefix="updated:" data-search-type="Issues"></dd>
+    </dl>
+  </fieldset>
+  <fieldset class="pb-3 mb-4 border-bottom color-border-muted min-width-0">
+    <h3>Users options</h3>
+    <dl class="form-group flattened d-flex d-md-block flex-column">
+      <dt><label for="search_full_name">With this full name</label></dt>
+      <dd><input id="search_full_name" type="text" class="form-control js-advanced-search-prefix" placeholder="Grace Hopper" data-search-prefix="fullname:" data-search-type="Users"></dd>
+    </dl>
+    <dl class="form-group flattened d-flex d-md-block flex-column">
+      <dt><label for="search_location">From this location</label></dt>
+      <dd><input id="search_location" type="text" class="form-control js-advanced-search-prefix" placeholder="San Francisco, CA" data-search-prefix="location:" data-search-type="Users"></dd>
+    </dl>
+    <dl class="form-group flattened d-flex d-md-block flex-column">
+      <dt><label for="search_followers">With this many followers</label></dt>
+      <dd><input id="search_followers" type="text" class="form-control js-advanced-search-prefix" placeholder="20..50, >200, <2" data-search-prefix="followers:" data-search-type="Users"></dd>
+    </dl>
+    <dl class="form-group flattened d-flex d-md-block flex-column">
+      <dt><label for="search_public_repos">With this many public repositories</label></dt>
+      <dd><input id="search_public_repos" type="text" class="form-control js-advanced-search-prefix" placeholder="0, <42, >5" data-search-prefix="repos:" data-search-type="Users"></dd>
+    </dl>
+    <dl class="form-group flattened d-flex d-md-block flex-column">
+      <dt><label for="search_user_language">Working in this language</label></dt>
+      <dd>
+        <select id="search_user_language" name="l" class="form-select js-advanced-search-prefix" data-search-prefix="language:">
+          <option value="">Any language</option>
+          <optgroup label="Popular">
+            <option value="C">C</option>
+<option value="C#">C#</option>
+<option value="C++">C++</option>
+<option value="CoffeeScript">CoffeeScript</option>
+<option value="CSS">CSS</option>
+<option value="Dart">Dart</option>
+<option value="DM">DM</option>
+<option value="Elixir">Elixir</option>
+<option value="Go">Go</option>
+<option value="Groovy">Groovy</option>
+<option value="HTML">HTML</option>
+<option value="Java">Java</option>
+<option value="JavaScript">JavaScript</option>
+<option value="Kotlin">Kotlin</option>
+<option value="Objective-C">Objective-C</option>
+<option value="Perl">Perl</option>
+<option value="PHP">PHP</option>
+<option value="PowerShell">PowerShell</option>
+<option value="Python">Python</option>
+<option value="Ruby">Ruby</option>
+<option value="Rust">Rust</option>
+<option value="Scala">Scala</option>
+<option value="Shell">Shell</option>
+<option value="Swift">Swift</option>
+<option value="TypeScript">TypeScript</option>
+          </optgroup>
+          <optgroup label="Everything else">
+            <option value="1C Enterprise">1C Enterprise</option>
+<option value="2-Dimensional Array">2-Dimensional Array</option>
+<option value="4D">4D</option>
+<option value="ABAP">ABAP</option>
+<option value="ABAP CDS">ABAP CDS</option>
+<option value="ABNF">ABNF</option>
+<option value="ActionScript">ActionScript</option>
+<option value="Ada">Ada</option>
+
+<option value="Yul">Yul</option>
+<option value="ZAP">ZAP</option>
+<option value="Zeek">Zeek</option>
+<option value="ZenScript">ZenScript</option>
+<option value="Zephir">Zephir</option>
+<option value="Zig">Zig</option>
+<option value="ZIL">ZIL</option>
+<option value="Zimpl">Zimpl</option>
+<option value="Zmodel">Zmodel</option>
+          </optgroup>
+        </select>
+      </dd>
+    </dl>
+  </fieldset>
+  <fieldset class="pb-3 mb-4 border-bottom color-border-muted min-width-0">
+    <h3>Wiki options</h3>
+    <dl class="form-group flattened d-flex d-md-block flex-column">
+      <dt><label for="search_wiki_updated_date">Updated before the date</label></dt>
+      <dd><input id="search_wiki_updated_date" type="text" class="form-control js-advanced-search-prefix" placeholder="<YYYY-MM-DD" data-search-prefix="updated:" data-search-type="Wiki"></dd>
+    </dl>
+  </fieldset>
+  <div class="form-group flattened">
+    <div class="d-flex d-md-block">  <button type="submit" data-view-component="true" class="btn flex-auto">    Search
+</button></div>
+  </div>
+</div>
+
+</form>

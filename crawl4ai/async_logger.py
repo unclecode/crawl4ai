@@ -29,7 +29,7 @@ class LogLevel(Enum):
 class LogColor(str, Enum):
     """Enum for log colors."""
 
-    DEBUG = "lightblack"
+    DEBUG = "bright_black"
     INFO = "cyan"
     SUCCESS = "green"
     WARNING = "yellow"
@@ -39,6 +39,7 @@ class LogColor(str, Enum):
     YELLOW = "yellow"
     MAGENTA = "magenta"
     DIM_MAGENTA = "dim magenta"
+    RED = "red"
 
     def __str__(self):
         """Automatically convert rich color to string."""

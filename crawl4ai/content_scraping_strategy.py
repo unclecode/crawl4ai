@@ -23,6 +23,8 @@ from .utils import (
     is_external_url,
     get_base_domain,
     extract_metadata_using_lxml,
+    extract_page_context,
+    calculate_link_intrinsic_score,
 )
 from lxml import etree
 from lxml import html as lhtml
@@ -718,13 +720,18 @@ class WebScrapingStrategy(ContentScrapingStrategy):
 
                     # Check flag if we should remove external images
                     if kwargs.get("exclude_external_images", False):
-                        element.decompose()
-                        return False
-                        # src_url_base = src.split('/')[2]
-                        # url_base = url.split('/')[2]
-                        # if url_base not in src_url_base:
-                        #     element.decompose()
-                        #     return False
+                        # Handle relative URLs (which are always from the same domain)
+                        if not src.startswith('http') and not src.startswith('//'):
+                            return True  # Keep relative URLs
+                        
+                        # For absolute URLs, compare the base domains using the existing function
+                        src_base_domain = get_base_domain(src)
+                        url_base_domain = get_base_domain(url)
+                        
+                        # If the domains don't match and both are valid, the image is external
+                        if src_base_domain and url_base_domain and src_base_domain != url_base_domain:
+                            element.decompose()
+                            return False
 
                     # if kwargs.get('exclude_social_media_links', False):
                     #     if image_src_base_domain in exclude_social_media_domains:
@@ -944,6 +951,72 @@ class WebScrapingStrategy(ContentScrapingStrategy):
         # Update the links dictionary with unique links
         links["internal"] = list(internal_links_dict.values())
         links["external"] = list(external_links_dict.values())
+        
+        # Extract head content for links if configured
+        link_preview_config = kwargs.get("link_preview_config")
+        if link_preview_config is not None:
+            try:
+                import asyncio
+                from .link_preview import LinkPreview
+                from .models import Links, Link
+                
+                verbose = link_preview_config.verbose
+                
+                if verbose:
+                    self._log("info", "Starting link head extraction for {internal} internal and {external} external links",
+                              params={"internal": len(links["internal"]), "external": len(links["external"])}, tag="LINK_EXTRACT")
+                
+                # Convert dict links to Link objects
+                internal_links = [Link(**link_data) for link_data in links["internal"]]
+                external_links = [Link(**link_data) for link_data in links["external"]]
+                links_obj = Links(internal=internal_links, external=external_links)
+                
+                # Create a config object for LinkPreview  
+                class TempCrawlerRunConfig:
+                    def __init__(self, link_config, score_links):
+                        self.link_preview_config = link_config
+                        self.score_links = score_links
+                
+                config = TempCrawlerRunConfig(link_preview_config, kwargs.get("score_links", False))
+                
+                # Extract head content (run async operation in sync context)
+                async def extract_links():
+                    async with LinkPreview(self.logger) as extractor:
+                        return await extractor.extract_link_heads(links_obj, config)
+                
+                # Run the async operation
+                try:
+                    # Check if we're already in an async context
+                    loop = asyncio.get_running_loop()
+                    # If we're in an async context, we need to run in a thread
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(asyncio.run, extract_links())
+                        updated_links = future.result()
+                except RuntimeError:
+                    # No running loop, we can use asyncio.run directly
+                    updated_links = asyncio.run(extract_links())
+                
+                # Convert back to dict format
+                links["internal"] = [link.dict() for link in updated_links.internal]
+                links["external"] = [link.dict() for link in updated_links.external]
+                
+                if verbose:
+                    successful_internal = len([l for l in updated_links.internal if l.head_extraction_status == "valid"])
+                    successful_external = len([l for l in updated_links.external if l.head_extraction_status == "valid"])
+                    self._log("info", "Link head extraction completed: {internal_success}/{internal_total} internal, {external_success}/{external_total} external",
+                              params={
+                                  "internal_success": successful_internal,
+                                  "internal_total": len(updated_links.internal),
+                                  "external_success": successful_external,
+                                  "external_total": len(updated_links.external)
+                              }, tag="LINK_EXTRACT")
+                else:
+                    self._log("info", "Link head extraction completed successfully", tag="LINK_EXTRACT")
+                
+            except Exception as e:
+                self._log("error", f"Link head extraction failed: {str(e)}", tag="LINK_EXTRACT")
+                # Continue with original links if extraction fails
 
         # # Process images using ThreadPoolExecutor
         imgs = body.find_all("img")
@@ -1037,6 +1110,7 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
         media: Dict[str, List],
         internal_links_dict: Dict[str, Any],
         external_links_dict: Dict[str, Any],
+        page_context: dict = None,
         **kwargs,
     ) -> bool:
         base_domain = kwargs.get("base_domain", get_base_domain(url))
@@ -1056,6 +1130,25 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
                     "title": link.get("title", "").strip(),
                     "base_domain": base_domain,
                 }
+                
+                # Add intrinsic scoring if enabled
+                if kwargs.get("score_links", False) and page_context is not None:
+                    try:
+                        intrinsic_score = calculate_link_intrinsic_score(
+                            link_text=link_data["text"],
+                            url=normalized_href,
+                            title_attr=link_data["title"],
+                            class_attr=link.get("class", ""),
+                            rel_attr=link.get("rel", ""),
+                            page_context=page_context
+                        )
+                        link_data["intrinsic_score"] = intrinsic_score
+                    except Exception:
+                        # Fail gracefully - assign default score
+                        link_data["intrinsic_score"] = 0
+                else:
+                    # No scoring enabled - assign infinity (all links equal priority)
+                    link_data["intrinsic_score"] = 0
 
                 is_external = is_external_url(normalized_href, base_domain)
                 if is_external:
@@ -1491,6 +1584,33 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
 
             base_domain = get_base_domain(url)
             
+            # Extract page context for link scoring (if enabled) - do this BEFORE any removals
+            page_context = None
+            if kwargs.get("score_links", False):
+                try:
+                    # Extract title
+                    title_elements = doc.xpath('//title')
+                    page_title = title_elements[0].text_content() if title_elements else ""
+                    
+                    # Extract headlines
+                    headlines = []
+                    for tag in ['h1', 'h2', 'h3']:
+                        elements = doc.xpath(f'//{tag}')
+                        for el in elements:
+                            text = el.text_content().strip()
+                            if text:
+                                headlines.append(text)
+                    headlines_text = ' '.join(headlines)
+                    
+                    # Extract meta description
+                    meta_desc_elements = doc.xpath('//meta[@name="description"]/@content')
+                    meta_description = meta_desc_elements[0] if meta_desc_elements else ""
+                    
+                    # Create page context
+                    page_context = extract_page_context(page_title, headlines_text, meta_description, url)
+                except Exception:
+                    page_context = {}  # Fail gracefully
+            
             # Early removal of all images if exclude_all_images is set
             # This is more efficient in lxml as we remove elements before any processing
             if kwargs.get("exclude_all_images", False):
@@ -1579,6 +1699,7 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
                 media,
                 internal_links_dict,
                 external_links_dict,
+                page_context=page_context,
                 base_domain=base_domain,
                 **kwargs,
             )
@@ -1623,14 +1744,84 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
                 method="html",
                 with_tail=False,
             ).strip()
+            
+            # Create links dictionary in the format expected by LinkPreview
+            links = {
+                "internal": list(internal_links_dict.values()),
+                "external": list(external_links_dict.values()),
+            }
+            
+            # Extract head content for links if configured
+            link_preview_config = kwargs.get("link_preview_config")
+            if link_preview_config is not None:
+                try:
+                    import asyncio
+                    from .link_preview import LinkPreview
+                    from .models import Links, Link
+                    
+                    verbose = link_preview_config.verbose
+                    
+                    if verbose:
+                        self._log("info", "Starting link head extraction for {internal} internal and {external} external links",
+                                  params={"internal": len(links["internal"]), "external": len(links["external"])}, tag="LINK_EXTRACT")
+                    
+                    # Convert dict links to Link objects
+                    internal_links = [Link(**link_data) for link_data in links["internal"]]
+                    external_links = [Link(**link_data) for link_data in links["external"]]
+                    links_obj = Links(internal=internal_links, external=external_links)
+                    
+                    # Create a config object for LinkPreview
+                    class TempCrawlerRunConfig:
+                        def __init__(self, link_config, score_links):
+                            self.link_preview_config = link_config
+                            self.score_links = score_links
+                    
+                    config = TempCrawlerRunConfig(link_preview_config, kwargs.get("score_links", False))
+                    
+                    # Extract head content (run async operation in sync context)
+                    async def extract_links():
+                        async with LinkPreview(self.logger) as extractor:
+                            return await extractor.extract_link_heads(links_obj, config)
+                    
+                    # Run the async operation
+                    try:
+                        # Check if we're already in an async context
+                        loop = asyncio.get_running_loop()
+                        # If we're in an async context, we need to run in a thread
+                        import concurrent.futures
+                        with concurrent.futures.ThreadPoolExecutor() as executor:
+                            future = executor.submit(asyncio.run, extract_links())
+                            updated_links = future.result()
+                    except RuntimeError:
+                        # No running loop, we can use asyncio.run directly
+                        updated_links = asyncio.run(extract_links())
+                    
+                    # Convert back to dict format
+                    links["internal"] = [link.dict() for link in updated_links.internal]
+                    links["external"] = [link.dict() for link in updated_links.external]
+                    
+                    if verbose:
+                        successful_internal = len([l for l in updated_links.internal if l.head_extraction_status == "valid"])
+                        successful_external = len([l for l in updated_links.external if l.head_extraction_status == "valid"])
+                        self._log("info", "Link head extraction completed: {internal_success}/{internal_total} internal, {external_success}/{external_total} external",
+                                  params={
+                                      "internal_success": successful_internal,
+                                      "internal_total": len(updated_links.internal),
+                                      "external_success": successful_external,
+                                      "external_total": len(updated_links.external)
+                                  }, tag="LINK_EXTRACT")
+                    else:
+                        self._log("info", "Link head extraction completed successfully", tag="LINK_EXTRACT")
+                        
+                except Exception as e:
+                    self._log("error", f"Error during link head extraction: {str(e)}", tag="LINK_EXTRACT")
+                    # Continue with original links if head extraction fails
+            
             return {
                 "cleaned_html": cleaned_html,
                 "success": success,
                 "media": media,
-                "links": {
-                    "internal": list(internal_links_dict.values()),
-                    "external": list(external_links_dict.values()),
-                },
+                "links": links,
                 "metadata": meta,
             }
 

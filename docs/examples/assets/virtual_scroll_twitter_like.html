@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Twitter-like Virtual Scroll</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f2f5;
+        }
+        
+        h1 {
+            color: #1da1f2;
+            text-align: center;
+        }
+        
+        #timeline {
+            max-width: 600px;
+            margin: 0 auto;
+            height: 600px;
+            overflow-y: auto;
+            background: white;
+            border: 1px solid #e1e8ed;
+            border-radius: 10px;
+        }
+        
+        .tweet {
+            padding: 15px;
+            border-bottom: 1px solid #e1e8ed;
+            min-height: 80px;
+        }
+        
+        .tweet:hover {
+            background-color: #f7f9fa;
+        }
+        
+        .author {
+            font-weight: bold;
+            color: #14171a;
+            margin-bottom: 5px;
+        }
+        
+        .content {
+            color: #14171a;
+            line-height: 1.5;
+        }
+        
+        .stats {
+            color: #657786;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Virtual Scroll Demo - Twitter Style</h1>
+    <p style="text-align: center; color: #666;">This simulates Twitter's timeline where content is replaced as you scroll</p>
+    <div id="timeline"></div>
+    
+    <script>
+        // Simulate Twitter-like virtual scrolling where DOM elements are replaced
+        const timeline = document.getElementById('timeline');
+        const totalTweets = 500;
+        const tweetsPerPage = 10;
+        let currentIndex = 0;
+        
+        // Generate fake tweet data
+        const allTweets = [];
+        for (let i = 0; i < totalTweets; i++) {
+            allTweets.push({
+                id: i,
+                author: `User_${i + 1}`,
+                content: `This is tweet #${i + 1} of ${totalTweets}. Virtual scrolling replaces DOM elements to maintain performance. Unique content ID: ${i}`,
+                likes: Math.floor(Math.random() * 1000),
+                retweets: Math.floor(Math.random() * 500)
+            });
+        }
+        
+        // Render tweets - REPLACES content
+        function renderTweets(startIndex) {
+            const tweets = [];
+            const endIndex = Math.min(startIndex + tweetsPerPage, totalTweets);
+            
+            for (let i = startIndex; i < endIndex; i++) {
+                const tweet = allTweets[i];
+                tweets.push(`
+                    <div class="tweet" data-tweet-id="${tweet.id}">
+                        <div class="author">@${tweet.author}</div>
+                        <div class="content">${tweet.content}</div>
+                        <div class="stats">❤️ ${tweet.likes} | 🔁 ${tweet.retweets}</div>
+                    </div>
+                `);
+            }
+            
+            // REPLACE entire content (virtual scroll behavior)
+            timeline.innerHTML = tweets.join('');
+            currentIndex = startIndex;
+        }
+        
+        // Initial render
+        renderTweets(0);
+        
+        // Handle scroll
+        timeline.addEventListener('scroll', () => {
+            const scrollTop = timeline.scrollTop;
+            const scrollHeight = timeline.scrollHeight;
+            const clientHeight = timeline.clientHeight;
+            
+            // When near bottom, load next page
+            if (scrollTop + clientHeight >= scrollHeight - 100) {
+                const nextIndex = currentIndex + tweetsPerPage;
+                if (nextIndex < totalTweets) {
+                    renderTweets(nextIndex);
+                    // Small scroll adjustment for continuous scrolling
+                    timeline.scrollTop = 50;
+                }
+            }
+        });
+    </script>
+</body>
+</html>

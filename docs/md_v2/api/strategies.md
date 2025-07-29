@@ -169,7 +169,7 @@ OverlappingWindowChunking(
 
 ```python
 from pydantic import BaseModel
-from crawl4ai.extraction_strategy import LLMExtractionStrategy
+from crawl4ai import LLMExtractionStrategy
 from crawl4ai import LLMConfig
 
 # Define schema
@@ -247,7 +247,7 @@ async with AsyncWebCrawler() as crawler:
 ### CSS Extraction
 
 ```python
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 # Define schema
 schema = {

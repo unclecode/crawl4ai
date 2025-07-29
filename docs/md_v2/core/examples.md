@@ -28,6 +28,11 @@ This page provides a comprehensive list of example scripts that demonstrate vari
 | Example | Description | Link |
 |---------|-------------|------|
 | Deep Crawling | An extensive tutorial on deep crawling capabilities, demonstrating BFS and BestFirst strategies, stream vs. non-stream execution, filters, scorers, and advanced configurations. | [View Code](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/deepcrawl_example.py) |
+<<<<<<< HEAD
+| Virtual Scroll | Comprehensive examples for handling virtualized scrolling on sites like Twitter, Instagram. Demonstrates different scrolling scenarios with local test server. | [View Code](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/virtual_scroll_example.py) |
+=======
+| Adaptive Crawling | Demonstrates intelligent crawling that automatically determines when sufficient information has been gathered. | [View Code](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/adaptive_crawling/) |
+>>>>>>> feature/progressive-crawling
 | Dispatcher | Shows how to use the crawl dispatcher for advanced workload management. | [View Code](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/dispatcher_example.py) |
 | Storage State | Tutorial on managing browser storage state for persistence. | [View Guide](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/storage_state_tutorial.md) |
 | Network Console Capture | Demonstrates how to capture and analyze network requests and console logs. | [View Code](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/network_console_capture_example.py) |

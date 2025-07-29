@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <header>
+      <img src="icons/icon-48.png" class="logo" alt="Crawl4AI">
+      <div class="header-content">
+        <h1>Crawl4AI Assistant</h1>
+        <div class="header-stats">
+          <a href="https://github.com/unclecode/crawl4ai" target="_blank" class="github-stars">
+            <svg class="github-icon" viewBox="0 0 16 16" width="16" height="16">
+              <path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
+            </svg>
+            <span id="stars-count">Loading...</span>
+          </a>
+        </div>
+      </div>
+    </header>
+    
+    <div class="mode-selector">
+      <button id="schema-mode" class="mode-button schema">
+        <div class="icon">🎯</div>
+        <div class="mode-info">
+          <h3>Click2Crawl</h3>
+          <p>Click elements to build extraction schemas</p>
+        </div>
+      </button>
+      
+      <button id="script-mode" class="mode-button script">
+        <div class="icon">🔴</div>
+        <div class="mode-info">
+          <h3>Script Builder <span style="color: #ff3c74; font-size: 10px;">(Alpha)</span></h3>
+          <p>Record actions to build automation scripts</p>
+        </div>
+      </button>
+      
+      <button id="c2c-mode" class="mode-button c2c">
+        <div class="icon">📝</div>
+        <div class="mode-info">
+          <h3>Markdown Extraction</h3>
+          <p>Select elements and convert to clean markdown</p>
+        </div>
+      </button>
+    </div>
+    
+    <div id="active-session" class="active-session hidden">
+      <div class="session-header">
+        <span class="status-dot"></span>
+        <span class="session-title">Schema Capture Active</span>
+      </div>
+      <div class="session-stats">
+        <div class="stat">
+          <span class="stat-label">Container:</span>
+          <span id="container-status" class="stat-value">Not selected</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Fields:</span>
+          <span id="fields-count" class="stat-value">0</span>
+        </div>
+      </div>
+      <div class="session-actions">
+        <button id="generate-code" class="action-button primary" disabled>
+          <span>Generate Code</span>
+        </button>
+        <button id="stop-capture" class="action-button secondary">
+          <span>Stop Capture</span>
+        </button>
+      </div>
+    </div>
+    
+    <div class="instructions" style="display: none;">
+      <h4>How to use:</h4>
+      <ol>
+        <li>Click "Click2Crawl" to start</li>
+        <li>Click on a container element (e.g., product card)</li>
+        <li>Click individual fields inside and name them</li>
+        <li>Generate Python code when done</li>
+      </ol>
+    </div>
+    
+    <footer>
+      <div class="social-links">
+        <a href="https://docs.crawl4ai.com" target="_blank" class="social-link">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+          </svg>
+          <span>Docs</span>
+        </a>
+        <a href="https://twitter.com/unclecode" target="_blank" class="social-link">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path fill="currentColor" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+          </svg>
+          <span>@unclecode</span>
+        </a>
+        <a href="https://discord.gg/jP8KfhDhyN" target="_blank" class="social-link">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path fill="currentColor" d="M19.27 5.33C17.94 4.71 16.5 4.26 15 4a.09.09 0 00-.07.03c-.18.33-.39.76-.53 1.09a16.09 16.09 0 00-4.8 0c-.14-.34-.35-.76-.54-1.09-.01-.02-.04-.03-.07-.03-1.5.26-2.93.71-4.27 1.33-.01 0-.02.01-.03.02-2.72 4.07-3.47 8.03-3.1 11.95 0 .02.01.04.03.05 1.8 1.32 3.53 2.12 5.24 2.65.03.01.06 0 .07-.02.4-.55.76-1.13 1.07-1.74.02-.04 0-.08-.04-.09-.57-.22-1.11-.48-1.64-.78-.04-.02-.04-.08-.01-.11.11-.08.22-.17.33-.25.02-.02.05-.02.07-.01 3.44 1.57 7.15 1.57 10.55 0 .02-.01.05-.01.07.01.11.09.22.17.33.26.04.03.04.09-.01.11-.52.31-1.07.56-1.64.78-.04.01-.05.06-.04.09.32.61.68 1.19 1.07 1.74.03.01.06.02.09.01 1.72-.53 3.45-1.33 5.25-2.65.02-.01.03-.03.03-.05.44-4.53-.73-8.46-3.1-11.95-.01-.01-.02-.02-.04-.02zM8.52 14.91c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12 0 1.17-.84 2.12-1.89 2.12zm6.97 0c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12 0 1.17-.83 2.12-1.89 2.12z"/>
+          </svg>
+          <span>Discord</span>
+        </a>
+      </div>
+    </footer>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>

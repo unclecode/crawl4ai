@@ -6,7 +6,7 @@ from crawl4ai.chunking_strategy import (
     FixedLengthWordChunking,
     SlidingWindowChunking,
 )
-from crawl4ai.extraction_strategy import (
+from crawl4ai import (
     CosineStrategy,
     LLMExtractionStrategy,
     TopicExtractionStrategy,
