@@ -8898,9 +8898,7 @@ async def memory_adaptive(urls, browser_config, run_config):
         dispatcher = MemoryAdaptiveDispatcher(
             memory_threshold_percent=70.0,
             max_session_permit=10,
-            monitor=CrawlerMonitor(
-                max_visible_rows=15, display_mode=DisplayMode.DETAILED
-            ),
+            monitor=CrawlerMonitor(),
         )
         results = await crawler.arun_many(
             urls, config=run_config, dispatcher=dispatcher
@@ -8919,9 +8917,7 @@ async def memory_adaptive_with_rate_limit(urls, browser_config, run_config):
             rate_limiter=RateLimiter(
                 base_delay=(1.0, 2.0), max_delay=30.0, max_retries=2
             ),
-            monitor=CrawlerMonitor(
-                max_visible_rows=15, display_mode=DisplayMode.DETAILED
-            ),
+            monitor=CrawlerMonitor(),
         )
         results = await crawler.arun_many(
             urls, config=run_config, dispatcher=dispatcher
@@ -8936,9 +8932,7 @@ async def semaphore(urls, browser_config, run_config):
     async with AsyncWebCrawler(config=browser_config) as crawler:
         dispatcher = SemaphoreDispatcher(
             semaphore_count=5,
-            monitor=CrawlerMonitor(
-                max_visible_rows=15, display_mode=DisplayMode.DETAILED
-            ),
+            monitor=CrawlerMonitor(),
         )
         results = await crawler.arun_many(
             urls, config=run_config, dispatcher=dispatcher
@@ -8956,9 +8950,7 @@ async def semaphore_with_rate_limit(urls, browser_config, run_config):
             rate_limiter=RateLimiter(
                 base_delay=(1.0, 2.0), max_delay=30.0, max_retries=2
             ),
-            monitor=CrawlerMonitor(
-                max_visible_rows=15, display_mode=DisplayMode.DETAILED
-            ),
+            monitor=CrawlerMonitor(),
         )
         results = await crawler.arun_many(
             urls, config=run_config, dispatcher=dispatcher
