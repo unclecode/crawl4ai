@@ -17,6 +17,7 @@
   - [Screenshot Endpoint](#screenshot-endpoint)
   - [PDF Export Endpoint](#pdf-export-endpoint)
   - [JavaScript Execution Endpoint](#javascript-execution-endpoint)
+  - [Browser VNC Endpoint](#browser-vnc-endpoint)
   - [Library Context Endpoint](#library-context-endpoint)
 - [MCP (Model Context Protocol) Support](#mcp-model-context-protocol-support)
   - [What is MCP?](#what-is-mcp)
@@ -378,6 +379,20 @@ Executes JavaScript snippets on the specified URL and returns the full crawl res
 ```
 
 - `scripts`: List of JavaScript snippets to execute sequentially
+
+### Browser VNC Endpoint
+
+```
+GET /vnc
+```
+
+Opens a browser-based VNC session for interacting with the container's desktop environment. Use `/vnc/url` to retrieve only the iframe URL.
+
+```
+GET /vnc/url
+```
+
+Returns a JSON object containing the URL of the embedded noVNC client.
 
 ---
 
