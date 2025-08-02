@@ -252,6 +252,20 @@ class CrawlResult(BaseModel):
         serialized despite being stored in a private attribute. If the serialization
         requirements change, this is where you would update the logic.
         """
+        # Exclude deprecated properties that raise AttributeError
+        exclude_properties = {'markdown_v2', 'fit_markdown', 'fit_html'}
+        
+        # Get the kwargs and update exclude set
+        if 'exclude' in kwargs:
+            if isinstance(kwargs['exclude'], set):
+                kwargs['exclude'].update(exclude_properties)
+            elif isinstance(kwargs['exclude'], list):
+                kwargs['exclude'] = set(kwargs['exclude']) | exclude_properties
+            else:
+                kwargs['exclude'] = exclude_properties
+        else:
+            kwargs['exclude'] = exclude_properties
+            
         result = super().model_dump(*args, **kwargs)
         if self._markdown is not None:
             result["markdown"] = self._markdown.model_dump() 
