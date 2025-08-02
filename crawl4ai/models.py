@@ -262,7 +262,11 @@ class CrawlResult(BaseModel):
             elif isinstance(kwargs['exclude'], list):
                 kwargs['exclude'] = set(kwargs['exclude']) | exclude_properties
             else:
-                kwargs['exclude'] = exclude_properties
+                # For unknown types, try to combine if possible, otherwise use deprecated properties
+                try:
+                    kwargs['exclude'] = set(kwargs['exclude']) | exclude_properties
+                except (TypeError, ValueError):
+                    kwargs['exclude'] = exclude_properties
         else:
             kwargs['exclude'] = exclude_properties
             
