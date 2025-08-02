@@ -209,7 +209,13 @@ class CrawlerRunConfig:
     - The maximum number of concurrent crawl sessions.  
     - Helps prevent overwhelming the system.
 
-14. **`display_mode`**:  
+14. **`url_matcher`** & **`match_mode`**:  
+    - Enable URL-specific configurations when used with `arun_many()`.
+    - Set `url_matcher` to patterns (glob, function, or list) to match specific URLs.
+    - Use `match_mode` (OR/AND) to control how multiple patterns combine.
+    - See [URL-Specific Configurations](../api/arun_many.md#url-specific-configurations) for examples.
+
+15. **`display_mode`**:  
     - The display mode for progress information (`DETAILED`, `BRIEF`, etc.).  
     - Affects how much information is printed during the crawl.
 

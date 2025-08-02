@@ -1,4 +1,4 @@
-from typing import Dict, Optional, List, Tuple
+from typing import Dict, Optional, List, Tuple, Union
 from .async_configs import CrawlerRunConfig
 from .models import (
     CrawlResult,
@@ -96,11 +96,37 @@ class BaseDispatcher(ABC):
         self.rate_limiter = rate_limiter
         self.monitor = monitor
 
+    def select_config(self, url: str, configs: Union[CrawlerRunConfig, List[CrawlerRunConfig]]) -> CrawlerRunConfig:
+        """Select the appropriate config for a given URL.
+        
+        Args:
+            url: The URL to match against
+            configs: Single config or list of configs to choose from
+            
+        Returns:
+            The matching config, or the first config if no match, or a default config if empty list
+        """
+        # Single config - return as is
+        if isinstance(configs, CrawlerRunConfig):
+            return configs
+        
+        # Empty list - return default config
+        if not configs:
+            return CrawlerRunConfig()
+        
+        # Find first matching config
+        for config in configs:
+            if config.is_match(url):
+                return config
+        
+        # No match found - return first config as fallback
+        return configs[0]
+
     @abstractmethod
     async def crawl_url(
         self,
         url: str,
-        config: CrawlerRunConfig,
+        config: Union[CrawlerRunConfig, List[CrawlerRunConfig]],
         task_id: str,
         monitor: Optional[CrawlerMonitor] = None,
     ) -> CrawlerTaskResult:
@@ -111,7 +137,7 @@ class BaseDispatcher(ABC):
         self,
         urls: List[str],
         crawler: AsyncWebCrawler,  # noqa: F821
-        config: CrawlerRunConfig,
+        config: Union[CrawlerRunConfig, List[CrawlerRunConfig]],
         monitor: Optional[CrawlerMonitor] = None,
     ) -> List[CrawlerTaskResult]:
         pass
@@ -200,13 +226,16 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
     async def crawl_url(
         self,
         url: str,
-        config: CrawlerRunConfig,
+        config: Union[CrawlerRunConfig, List[CrawlerRunConfig]],
         task_id: str,
         retry_count: int = 0,
     ) -> CrawlerTaskResult:
         start_time = time.time()
         error_message = ""
         memory_usage = peak_memory = 0.0
+        
+        # Select appropriate config for this URL
+        selected_config = self.select_config(url, config)
         
         # Get starting memory for accurate measurement
         process = psutil.Process()
@@ -257,8 +286,8 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
                     retry_count=retry_count + 1
                 )
             
-            # Execute the crawl
-            result = await self.crawler.arun(url, config=config, session_id=task_id)
+            # Execute the crawl with selected config
+            result = await self.crawler.arun(url, config=selected_config, session_id=task_id)
             
             # Measure memory usage
             end_memory = process.memory_info().rss / (1024 * 1024)
@@ -316,7 +345,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
         self,
         urls: List[str],
         crawler: AsyncWebCrawler,
-        config: CrawlerRunConfig,
+        config: Union[CrawlerRunConfig, List[CrawlerRunConfig]],
     ) -> List[CrawlerTaskResult]:
         self.crawler = crawler
         
@@ -470,7 +499,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
         self,
         urls: List[str],
         crawler: AsyncWebCrawler,
-        config: CrawlerRunConfig,
+        config: Union[CrawlerRunConfig, List[CrawlerRunConfig]],
     ) -> AsyncGenerator[CrawlerTaskResult, None]:
         self.crawler = crawler
         
@@ -572,13 +601,16 @@ class SemaphoreDispatcher(BaseDispatcher):
     async def crawl_url(
         self,
         url: str,
-        config: CrawlerRunConfig,
+        config: Union[CrawlerRunConfig, List[CrawlerRunConfig]],
         task_id: str,
         semaphore: asyncio.Semaphore = None,
     ) -> CrawlerTaskResult:
         start_time = time.time()
         error_message = ""
         memory_usage = peak_memory = 0.0
+
+        # Select appropriate config for this URL
+        selected_config = self.select_config(url, config)
 
         try:
             if self.monitor:
@@ -592,7 +624,7 @@ class SemaphoreDispatcher(BaseDispatcher):
             async with semaphore:
                 process = psutil.Process()
                 start_memory = process.memory_info().rss / (1024 * 1024)
-                result = await self.crawler.arun(url, config=config, session_id=task_id)
+                result = await self.crawler.arun(url, config=selected_config, session_id=task_id)
                 end_memory = process.memory_info().rss / (1024 * 1024)
 
                 memory_usage = peak_memory = end_memory - start_memory
@@ -654,7 +686,7 @@ class SemaphoreDispatcher(BaseDispatcher):
         self,
         crawler: AsyncWebCrawler,  # noqa: F821
         urls: List[str],
-        config: CrawlerRunConfig,
+        config: Union[CrawlerRunConfig, List[CrawlerRunConfig]],
     ) -> List[CrawlerTaskResult]:
         self.crawler = crawler
         if self.monitor:
