@@ -188,7 +188,6 @@ async def demo_part2_practical_crawling():
                 lambda url: 'api' in url or 'httpbin.org' in url  # Function for API endpoints
             ],
             match_mode=MatchMode.OR,
-            extraction_strategy=JsonCssExtractionStrategy({"data": "body"})
         ),
         
         # Config 5: Complex matcher - Secure documentation sites
@@ -200,11 +199,11 @@ async def demo_part2_practical_crawling():
                 lambda url: not url.endswith(('.pdf', '.json'))  # Not PDF or JSON
             ],
             match_mode=MatchMode.AND,
-            wait_for="css:.content, css:article"  # Wait for content to load
+            # wait_for="css:.content, css:article"  # Wait for content to load
         ),
         
         # Default config for everything else
-        CrawlerRunConfig()  # No url_matcher means it never matches (except as fallback)
+        # CrawlerRunConfig()  # No url_matcher means it matches everything (use it as fallback)
     ]
     
     # URLs to crawl - each will use a different config
@@ -214,7 +213,7 @@ async def demo_part2_practical_crawling():
         "https://github.com/microsoft/playwright",  # → JS config
         "https://httpbin.org/json",  # → Mixed matcher config (API)
         "https://docs.python.org/3/reference/",  # → Complex matcher config
-        "https://example.com/",  # → Default config
+        "https://www.w3schools.com/",  # → Default config, if you uncomment the default config line above, if not you will see `Error: No matching configuration`
     ]
     
     print("URLs to crawl:")

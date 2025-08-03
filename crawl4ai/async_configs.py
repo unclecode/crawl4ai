@@ -1343,10 +1343,10 @@ class CrawlerRunConfig():
             url: The URL to check against this config's matcher
             
         Returns:
-            bool: True if this config should be used for the URL
+            bool: True if this config should be used for the URL or if no matcher is set.
         """
         if self.url_matcher is None:
-            return False
+            return True
             
         if callable(self.url_matcher):
             # Single function matcher

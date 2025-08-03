@@ -22,6 +22,8 @@ from urllib.parse import urlparse
 import random
 from abc import ABC, abstractmethod
 
+from .memory_utils import get_true_memory_usage_percent
+
 
 class RateLimiter:
     def __init__(
@@ -96,7 +98,7 @@ class BaseDispatcher(ABC):
         self.rate_limiter = rate_limiter
         self.monitor = monitor
 
-    def select_config(self, url: str, configs: Union[CrawlerRunConfig, List[CrawlerRunConfig]]) -> CrawlerRunConfig:
+    def select_config(self, url: str, configs: Union[CrawlerRunConfig, List[CrawlerRunConfig]]) -> Optional[CrawlerRunConfig]:
         """Select the appropriate config for a given URL.
         
         Args:
@@ -104,23 +106,23 @@ class BaseDispatcher(ABC):
             configs: Single config or list of configs to choose from
             
         Returns:
-            The matching config, or the first config if no match, or a default config if empty list
+            The matching config, or None if no match found
         """
         # Single config - return as is
         if isinstance(configs, CrawlerRunConfig):
             return configs
         
-        # Empty list - return default config
+        # Empty list - return None
         if not configs:
-            return CrawlerRunConfig()
+            return None
         
         # Find first matching config
         for config in configs:
             if config.is_match(url):
                 return config
         
-        # No match found - return first config as fallback
-        return configs[0]
+        # No match found - return None to indicate URL should be skipped
+        return None
 
     @abstractmethod
     async def crawl_url(
@@ -173,7 +175,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
     async def _memory_monitor_task(self):
         """Background task to continuously monitor memory usage and update state"""
         while True:
-            self.current_memory_percent = psutil.virtual_memory().percent
+            self.current_memory_percent = get_true_memory_usage_percent()
 
             # Enter memory pressure mode if we cross the threshold
             if self.current_memory_percent >= self.memory_threshold_percent:
@@ -236,6 +238,34 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
         
         # Select appropriate config for this URL
         selected_config = self.select_config(url, config)
+        
+        # If no config matches, return failed result
+        if selected_config is None:
+            error_message = f"No matching configuration found for URL: {url}"
+            if self.monitor:
+                self.monitor.update_task(
+                    task_id, 
+                    status=CrawlStatus.FAILED,
+                    error_message=error_message
+                )
+            
+            return CrawlerTaskResult(
+                task_id=task_id,
+                url=url,
+                result=CrawlResult(
+                    url=url, 
+                    html="", 
+                    metadata={"status": "no_config_match"}, 
+                    success=False, 
+                    error_message=error_message
+                ),
+                memory_usage=0,
+                peak_memory=0,
+                start_time=start_time,
+                end_time=time.time(),
+                error_message=error_message,
+                retry_count=retry_count
+            )
         
         # Get starting memory for accurate measurement
         process = psutil.Process()
@@ -611,6 +641,33 @@ class SemaphoreDispatcher(BaseDispatcher):
 
         # Select appropriate config for this URL
         selected_config = self.select_config(url, config)
+        
+        # If no config matches, return failed result
+        if selected_config is None:
+            error_message = f"No matching configuration found for URL: {url}"
+            if self.monitor:
+                self.monitor.update_task(
+                    task_id, 
+                    status=CrawlStatus.FAILED,
+                    error_message=error_message
+                )
+            
+            return CrawlerTaskResult(
+                task_id=task_id,
+                url=url,
+                result=CrawlResult(
+                    url=url, 
+                    html="", 
+                    metadata={"status": "no_config_match"}, 
+                    success=False, 
+                    error_message=error_message
+                ),
+                memory_usage=0,
+                peak_memory=0,
+                start_time=start_time,
+                end_time=time.time(),
+                error_message=error_message
+            )
 
         try:
             if self.monitor:

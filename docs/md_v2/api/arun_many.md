@@ -131,7 +131,7 @@ github_config = CrawlerRunConfig(
 # API endpoints - JSON extraction
 api_config = CrawlerRunConfig(
     url_matcher=lambda url: 'api' in url or url.endswith('.json'),
-    extraction_strategy=JsonCssExtractionStrategy({"data": "body"})
+    # Custome settings for JSON extraction
 )
 
 # Default fallback config
@@ -160,6 +160,7 @@ results = await crawler.arun_many(
 - Each URL is processed by the same or separate sessions, depending on the dispatcher’s strategy.
 - `dispatch_result` in each `CrawlResult` (if using concurrency) can hold memory and timing info.  
 - If you need to handle authentication or session IDs, pass them in each individual task or within your run config.
+- **Important**: Always include a default config (without `url_matcher`) as the last item if you want to handle all URLs. Otherwise, unmatched URLs will fail.
 
 ### Return Value
 

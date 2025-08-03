@@ -55,13 +55,13 @@ async def test_multi_config():
     
     # Test URLs - using real URLs that exist
     test_urls = [
-        # "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",  # Real PDF
-        # "https://www.bbc.com/news/articles/c5y3e3glnldo",  # News article
-        # "https://blog.python.org/",  # Blog URL  
-        # "https://api.github.com/users/github",  # GitHub API (returns JSON)
-        # "https://httpbin.org/json",  # API endpoint that returns JSON
-        # "https://www.python.org/",  # Generic HTTPS page
-        # "http://info.cern.ch/",  # HTTP (not HTTPS) page
+        "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",  # Real PDF
+        "https://www.bbc.com/news/articles/c5y3e3glnldo",  # News article
+        "https://blog.python.org/",  # Blog URL  
+        "https://api.github.com/users/github",  # GitHub API (returns JSON)
+        "https://httpbin.org/json",  # API endpoint that returns JSON
+        "https://www.python.org/",  # Generic HTTPS page
+        "http://info.cern.ch/",  # HTTP (not HTTPS) page
         "https://example.com/",  # → Default config
     ]
     

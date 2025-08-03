@@ -447,11 +447,11 @@ async def crawl_mixed_content():
         # API endpoints - JSON extraction
         CrawlerRunConfig(
             url_matcher=lambda url: 'api' in url or url.endswith('.json'),
-            extraction_strategy=JsonCssExtractionStrategy({"data": "body"})
+            # Custome settings for JSON extraction
         ),
         
         # Default config for everything else
-        CrawlerRunConfig()  # No url_matcher = fallback
+        CrawlerRunConfig()  # No url_matcher means it matches ALL URLs (fallback)
     ]
     
     # Mixed URLs
@@ -474,6 +474,8 @@ async def crawl_mixed_content():
 ```
 
 ### 6.2 Advanced Pattern Matching
+
+**Important**: A `CrawlerRunConfig` without `url_matcher` (or with `url_matcher=None`) matches ALL URLs. This makes it perfect as a default/fallback configuration.
 
 The `url_matcher` parameter supports three types of patterns:
 
@@ -560,11 +562,17 @@ async def crawl_news_site():
 ### 6.4 Best Practices
 
 1. **Order Matters**: Configs are evaluated in order - put specific patterns before general ones
-2. **Always Include a Default**: Last config should have no `url_matcher` as a fallback
+2. **Default Config Behavior**: 
+   - A config without `url_matcher` matches ALL URLs
+   - Always include a default config as the last item if you want to handle all URLs
+   - Without a default config, unmatched URLs will fail with "No matching configuration found"
 3. **Test Your Patterns**: Use the config's `is_match()` method to test patterns:
    ```python
-   config = CrawlerRunConfig(url_matcher="*/api/*")
-   print(config.is_match("https://example.com/api/users"))  # True
+   config = CrawlerRunConfig(url_matcher="*.pdf")
+   print(config.is_match("https://example.com/doc.pdf"))  # True
+   
+   default_config = CrawlerRunConfig()  # No url_matcher
+   print(default_config.is_match("https://any-url.com"))  # True - matches everything!
    ```
 4. **Optimize for Performance**: 
    - Disable JS for static content
