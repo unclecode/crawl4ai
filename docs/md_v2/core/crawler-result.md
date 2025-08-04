@@ -19,13 +19,15 @@ class MarkdownGenerationResult(BaseModel):
 class CrawlResult(BaseModel):
     url: str
     html: str
+    fit_html: Optional[str] = None
     success: bool
     cleaned_html: Optional[str] = None
     media: Dict[str, List[Dict]] = {}
     links: Dict[str, List[Dict]] = {}
     downloaded_files: Optional[List[str]] = None
+    js_execution_result: Optional[Dict[str, Any]] = None
     screenshot: Optional[str] = None
-    pdf : Optional[bytes] = None
+    pdf: Optional[bytes] = None
     mhtml: Optional[str] = None
     markdown: Optional[Union[str, MarkdownGenerationResult]] = None
     extracted_content: Optional[str] = None
@@ -35,6 +37,12 @@ class CrawlResult(BaseModel):
     response_headers: Optional[dict] = None
     status_code: Optional[int] = None
     ssl_certificate: Optional[SSLCertificate] = None
+    dispatch_result: Optional[DispatchResult] = None
+    redirected_url: Optional[str] = None
+    network_requests: Optional[List[Dict[str, Any]]] = None
+    console_messages: Optional[List[Dict[str, Any]]] = None
+    tables: List[Dict] = Field(default_factory=list)
+
     class Config:
         arbitrary_types_allowed = True
 ```
@@ -45,11 +53,13 @@ class CrawlResult(BaseModel):
 |-------------------------------------------|-----------------------------------------------------------------------------------------------------|
 | **url (`str`)**                           | The final or actual URL crawled (in case of redirects).                                             |
 | **html (`str`)**                          | Original, unmodified page HTML. Good for debugging or custom processing.                            |
+| **fit_html (`Optional[str]`)**            | Preprocessed HTML optimized for extraction and content filtering.                                    |
 | **success (`bool`)**                      | `True` if the crawl completed without major errors, else `False`.                                   |
 | **cleaned_html (`Optional[str]`)**        | Sanitized HTML with scripts/styles removed; can exclude tags if configured via `excluded_tags` etc. |
 | **media (`Dict[str, List[Dict]]`)**       | Extracted media info (images, audio, etc.), each with attributes like `src`, `alt`, `score`, etc.   |
 | **links (`Dict[str, List[Dict]]`)**       | Extracted link data, split by `internal` and `external`. Each link usually has `href`, `text`, etc. |
 | **downloaded_files (`Optional[List[str]]`)** | If `accept_downloads=True` in `BrowserConfig`, this lists the filepaths of saved downloads.         |
+| **js_execution_result (`Optional[Dict[str, Any]]`)** | Results from JavaScript execution during crawling. |
 | **screenshot (`Optional[str]`)**          | Screenshot of the page (base64-encoded) if `screenshot=True`.                                       |
 | **pdf (`Optional[bytes]`)**               | PDF of the page if `pdf=True`.                                                                      |
 | **mhtml (`Optional[str]`)**               | MHTML snapshot of the page if `capture_mhtml=True`. Contains the full page with all resources.      |
@@ -61,6 +71,11 @@ class CrawlResult(BaseModel):
 | **response_headers (`Optional[dict]`)**   | HTTP response headers, if captured.                                                                 |
 | **status_code (`Optional[int]`)**         | HTTP status code (e.g., 200 for OK).                                                                |
 | **ssl_certificate (`Optional[SSLCertificate]`)** | SSL certificate info if `fetch_ssl_certificate=True`.                                               |
+| **dispatch_result (`Optional[DispatchResult]`)** | Additional concurrency and resource usage information when crawling URLs in parallel.               |
+| **redirected_url (`Optional[str]`)**      | The URL after any redirects (different from `url` which is the final URL).                          |
+| **network_requests (`Optional[List[Dict[str, Any]]]`)** | List of network requests, responses, and failures captured during the crawl if `capture_network_requests=True`. |
+| **console_messages (`Optional[List[Dict[str, Any]]]`)** | List of browser console messages captured during the crawl if `capture_console_messages=True`.       |
+| **tables (`List[Dict]`)**                 | Table data extracted from HTML tables with structure `[{headers, rows, caption, summary}]`.           |
 
 ---
 
