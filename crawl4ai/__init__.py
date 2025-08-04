@@ -7,8 +7,8 @@ from .async_configs import BrowserConfig, CrawlerRunConfig, HTTPCrawlerConfig, L
 
 from .content_scraping_strategy import (
     ContentScrapingStrategy,
-    WebScrapingStrategy,
     LXMLWebScrapingStrategy,
+    WebScrapingStrategy,  # Backward compatibility alias
 )
 from .async_logger import (
     AsyncLoggerBase,

@@ -18,7 +18,7 @@ from .extraction_strategy import ExtractionStrategy, LLMExtractionStrategy
 from .chunking_strategy import ChunkingStrategy, RegexChunking
 
 from .markdown_generation_strategy import MarkdownGenerationStrategy, DefaultMarkdownGenerator
-from .content_scraping_strategy import ContentScrapingStrategy, WebScrapingStrategy, LXMLWebScrapingStrategy
+from .content_scraping_strategy import ContentScrapingStrategy, LXMLWebScrapingStrategy
 from .deep_crawling import DeepCrawlStrategy
 
 from .cache_context import CacheMode
@@ -869,7 +869,7 @@ class CrawlerRunConfig():
         parser_type (str): Type of parser to use for HTML parsing.
                            Default: "lxml".
         scraping_strategy (ContentScrapingStrategy): Scraping strategy to use.
-                           Default: WebScrapingStrategy.
+                           Default: LXMLWebScrapingStrategy.
         proxy_config (ProxyConfig or dict or None): Detailed proxy configuration, e.g. {"server": "...", "username": "..."}.
                                      If None, no additional proxy config. Default: None.
 

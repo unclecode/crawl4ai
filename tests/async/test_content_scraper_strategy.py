@@ -12,11 +12,8 @@ parent_dir = os.path.dirname(
 sys.path.append(parent_dir)
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
-from crawl4ai.content_scraping_strategy import WebScrapingStrategy
-from crawl4ai.content_scraping_strategy import (
-    WebScrapingStrategy as WebScrapingStrategyCurrent,
-)
-# from crawl4ai.content_scrapping_strategy_current import WebScrapingStrategy as WebScrapingStrategyCurrent
+from crawl4ai.content_scraping_strategy import LXMLWebScrapingStrategy
+# This test compares the same strategy with itself now since WebScrapingStrategy is deprecated
 
 
 @dataclass
@@ -32,8 +29,8 @@ class TestResult:
 
 class StrategyTester:
     def __init__(self):
-        self.new_scraper = WebScrapingStrategy()
-        self.current_scraper = WebScrapingStrategyCurrent()
+        self.new_scraper = LXMLWebScrapingStrategy()
+        self.current_scraper = LXMLWebScrapingStrategy()  # Same strategy now
         with open(__location__ + "/sample_wikipedia.html", "r", encoding="utf-8") as f:
             self.WIKI_HTML = f.read()
         self.results = {"new": [], "current": []}

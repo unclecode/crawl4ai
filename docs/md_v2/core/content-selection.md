@@ -350,15 +350,22 @@ if __name__ == "__main__":
 
 ## 6. Scraping Modes
 
-Crawl4AI provides two different scraping strategies for HTML content processing: `WebScrapingStrategy` (BeautifulSoup-based, default) and `LXMLWebScrapingStrategy` (LXML-based). The LXML strategy offers significantly better performance, especially for large HTML documents.
+Crawl4AI uses `LXMLWebScrapingStrategy` (LXML-based) as the default scraping strategy for HTML content processing. This strategy offers excellent performance, especially for large HTML documents.
+
+**Note:** For backward compatibility, `WebScrapingStrategy` is still available as an alias for `LXMLWebScrapingStrategy`.
 
 ```python
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, LXMLWebScrapingStrategy
 
 async def main():
-    config = CrawlerRunConfig(
-        scraping_strategy=LXMLWebScrapingStrategy()  # Faster alternative to default BeautifulSoup
+    # Default configuration already uses LXMLWebScrapingStrategy
+    config = CrawlerRunConfig()
+    
+    # Or explicitly specify it if desired
+    config_explicit = CrawlerRunConfig(
+        scraping_strategy=LXMLWebScrapingStrategy()
     )
+    
     async with AsyncWebCrawler() as crawler:
         result = await crawler.arun(
             url="https://example.com", 
@@ -417,21 +424,20 @@ class CustomScrapingStrategy(ContentScrapingStrategy):
 
 ### Performance Considerations
 
-The LXML strategy can be up to 10-20x faster than BeautifulSoup strategy, particularly when processing large HTML documents. However, please note:
+The LXML strategy provides excellent performance, particularly when processing large HTML documents, offering up to 10-20x faster processing compared to BeautifulSoup-based approaches.
 
-1. LXML strategy is currently experimental
-2. In some edge cases, the parsing results might differ slightly from BeautifulSoup
-3. If you encounter any inconsistencies between LXML and BeautifulSoup results, please [raise an issue](https://github.com/codeium/crawl4ai/issues) with a reproducible example
+Benefits of LXML strategy:
+- Fast processing of large HTML documents (especially >100KB)
+- Efficient memory usage
+- Good handling of well-formed HTML
+- Robust table detection and extraction
 
-Choose LXML strategy when:
-- Processing large HTML documents (recommended for >100KB)
-- Performance is critical
-- Working with well-formed HTML
+### Backward Compatibility
 
-Stick to BeautifulSoup strategy (default) when:
-- Maximum compatibility is needed
-- Working with malformed HTML
-- Exact parsing behavior is critical
+For users upgrading from earlier versions:
+- `WebScrapingStrategy` is now an alias for `LXMLWebScrapingStrategy`
+- Existing code using `WebScrapingStrategy` will continue to work without modification
+- No changes are required to your existing code
 
 ---
 
