@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Flexible LLM Provider Configuration** (Docker): 
+  - Support for `LLM_PROVIDER` environment variable to override default provider
+  - Per-request provider override via optional `provider` parameter in API endpoints
+  - Automatic provider validation with clear error messages
+  - Updated Docker documentation and examples
+
 ### Changed
 - **WebScrapingStrategy Refactoring**: Simplified content scraping architecture
   - `WebScrapingStrategy` is now an alias for `LXMLWebScrapingStrategy` for backward compatibility

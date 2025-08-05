@@ -40,7 +40,9 @@ from utils import (
     get_base_url,
     is_task_id,
     should_cleanup_task,
-    decode_redis_hash
+    decode_redis_hash,
+    get_llm_api_key,
+    validate_llm_provider
 )
 
 import psutil, time
@@ -89,10 +91,12 @@ async def handle_llm_qa(
 
     Answer:"""
 
+        # api_token=os.environ.get(config["llm"].get("api_key_env", ""))
+
         response = perform_completion_with_backoff(
             provider=config["llm"]["provider"],
             prompt_with_variables=prompt,
-            api_token=os.environ.get(config["llm"].get("api_key_env", ""))
+            api_token=get_llm_api_key(config)
         )
 
         return response.choices[0].message.content
@@ -110,19 +114,23 @@ async def process_llm_extraction(
     url: str,
     instruction: str,
     schema: Optional[str] = None,
-    cache: str = "0"
+    cache: str = "0",
+    provider: Optional[str] = None
 ) -> None:
     """Process LLM extraction in background."""
     try:
-        # If config['llm'] has api_key then ignore the api_key_env
-        api_key = ""
-        if "api_key" in config["llm"]:
-            api_key = config["llm"]["api_key"]
-        else:
-            api_key = os.environ.get(config["llm"].get("api_key_env", None), "")
+        # Validate provider
+        is_valid, error_msg = validate_llm_provider(config, provider)
+        if not is_valid:
+            await redis.hset(f"task:{task_id}", mapping={
+                "status": TaskStatus.FAILED,
+                "error": error_msg
+            })
+            return
+        api_key = get_llm_api_key(config, provider)
         llm_strategy = LLMExtractionStrategy(
             llm_config=LLMConfig(
-                provider=config["llm"]["provider"],
+                provider=provider or config["llm"]["provider"],
                 api_token=api_key
             ),
             instruction=instruction,
@@ -169,10 +177,19 @@ async def handle_markdown_request(
     filter_type: FilterType,
     query: Optional[str] = None,
     cache: str = "0",
-    config: Optional[dict] = None
+    config: Optional[dict] = None,
+    provider: Optional[str] = None
 ) -> str:
     """Handle markdown generation requests."""
     try:
+        # Validate provider if using LLM filter
+        if filter_type == FilterType.LLM:
+            is_valid, error_msg = validate_llm_provider(config, provider)
+            if not is_valid:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=error_msg
+                )
         decoded_url = unquote(url)
         if not decoded_url.startswith(('http://', 'https://')):
             decoded_url = 'https://' + decoded_url
@@ -185,8 +202,8 @@ async def handle_markdown_request(
                 FilterType.BM25: BM25ContentFilter(user_query=query or ""),
                 FilterType.LLM: LLMContentFilter(
                     llm_config=LLMConfig(
-                        provider=config["llm"]["provider"],
-                        api_token=os.environ.get(config["llm"].get("api_key_env", None), ""),
+                        provider=provider or config["llm"]["provider"],
+                        api_token=get_llm_api_key(config, provider),
                     ),
                     instruction=query or "Extract main content"
                 )
@@ -230,7 +247,8 @@ async def handle_llm_request(
     query: Optional[str] = None,
     schema: Optional[str] = None,
     cache: str = "0",
-    config: Optional[dict] = None
+    config: Optional[dict] = None,
+    provider: Optional[str] = None
 ) -> JSONResponse:
     """Handle LLM extraction requests."""
     base_url = get_base_url(request)
@@ -260,7 +278,8 @@ async def handle_llm_request(
             schema,
             cache,
             base_url,
-            config
+            config,
+            provider
         )
 
     except Exception as e:
@@ -304,7 +323,8 @@ async def create_new_task(
     schema: Optional[str],
     cache: str,
     base_url: str,
-    config: dict
+    config: dict,
+    provider: Optional[str] = None
 ) -> JSONResponse:
     """Create and initialize a new task."""
     decoded_url = unquote(input_path)
@@ -328,7 +348,8 @@ async def create_new_task(
         decoded_url,
         query,
         schema,
-        cache
+        cache,
+        provider
     )
 
     return JSONResponse({

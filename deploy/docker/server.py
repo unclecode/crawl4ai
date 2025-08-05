@@ -241,7 +241,7 @@ async def get_markdown(
         raise HTTPException(
             400, "URL must be absolute and start with http/https")
     markdown = await handle_markdown_request(
-        body.url, body.f, body.q, body.c, config
+        body.url, body.f, body.q, body.c, config, body.provider
     )
     return JSONResponse({
         "url": body.url,

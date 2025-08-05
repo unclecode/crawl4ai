@@ -1,6 +1,7 @@
 import dns.resolver
 import logging
 import yaml
+import os
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
@@ -19,10 +20,24 @@ class FilterType(str, Enum):
     LLM = "llm"
 
 def load_config() -> Dict:
-    """Load and return application configuration."""
+    """Load and return application configuration with environment variable overrides."""
     config_path = Path(__file__).parent / "config.yml"
     with open(config_path, "r") as config_file:
-        return yaml.safe_load(config_file)
+        config = yaml.safe_load(config_file)
+    
+    # Override LLM provider from environment if set
+    llm_provider = os.environ.get("LLM_PROVIDER")
+    if llm_provider:
+        config["llm"]["provider"] = llm_provider
+        logging.info(f"LLM provider overridden from environment: {llm_provider}")
+    
+    # Also support direct API key from environment if the provider-specific key isn't set
+    llm_api_key = os.environ.get("LLM_API_KEY")
+    if llm_api_key and "api_key" not in config["llm"]:
+        config["llm"]["api_key"] = llm_api_key
+        logging.info("LLM API key loaded from LLM_API_KEY environment variable")
+    
+    return config
 
 def setup_logging(config: Dict) -> None:
     """Configure application logging."""
@@ -54,6 +69,52 @@ def decode_redis_hash(hash_data: Dict[bytes, bytes]) -> Dict[str, str]:
     """Decode Redis hash data from bytes to strings."""
     return {k.decode('utf-8'): v.decode('utf-8') for k, v in hash_data.items()}
 
+
+
+def get_llm_api_key(config: Dict, provider: Optional[str] = None) -> str:
+    """Get the appropriate API key based on the LLM provider.
+    
+    Args:
+        config: The application configuration dictionary
+        provider: Optional provider override (e.g., "openai/gpt-4")
+    
+    Returns:
+        The API key for the provider, or empty string if not found
+    """
+        
+    # Use provided provider or fall back to config
+    if not provider:
+        provider = config["llm"]["provider"]
+    
+    # Check if direct API key is configured
+    if "api_key" in config["llm"]:
+        return config["llm"]["api_key"]
+    
+    # Fall back to the configured api_key_env if no match
+    return os.environ.get(config["llm"].get("api_key_env", ""), "")
+
+
+def validate_llm_provider(config: Dict, provider: Optional[str] = None) -> tuple[bool, str]:
+    """Validate that the LLM provider has an associated API key.
+    
+    Args:
+        config: The application configuration dictionary
+        provider: Optional provider override (e.g., "openai/gpt-4")
+    
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    # Use provided provider or fall back to config
+    if not provider:
+        provider = config["llm"]["provider"]
+    
+    # Get the API key for this provider
+    api_key = get_llm_api_key(config, provider)
+    
+    if not api_key:
+        return False, f"No API key found for provider '{provider}'. Please set the appropriate environment variable."
+    
+    return True, ""
 
 
 def verify_email_domain(email: str) -> bool:
