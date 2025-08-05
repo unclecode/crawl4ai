@@ -187,7 +187,7 @@ Here:
 
 ---
 
-## 5. More Fields: Links, Media, and More
+## 5. More Fields: Links, Media, Tables and More
 
 ### 5.1 `links`
 
@@ -207,7 +207,69 @@ for img in images:
     print("Image URL:", img["src"], "Alt:", img.get("alt"))
 ```
 
-### 5.3 `screenshot`, `pdf`, and `mhtml`
+### 5.3 `tables`
+
+The `tables` field contains structured data extracted from HTML tables found on the crawled page. Tables are analyzed based on various criteria to determine if they are actual data tables (as opposed to layout tables), including:
+
+- Presence of thead and tbody sections
+- Use of th elements for headers
+- Column consistency
+- Text density
+- And other factors
+
+Tables that score above the threshold (default: 7) are extracted and stored in result.tables.
+
+### Accessing Table data:
+```python
+async with AsyncWebCrawler() as crawler:
+    result = await crawler.arun(
+        url="https://example.com/",
+        config=CrawlerRunConfig(
+            table_score_threshold=7  # Minimum score for table detection
+        )
+    )
+    
+    if result.success and result.tables:
+        print(f"Found {len(result.tables)} tables")
+        
+        for i, table in enumerate(result.tables):
+            print(f"\nTable {i+1}:")
+            print(f"Caption: {table.get('caption', 'No caption')}")
+            print(f"Headers: {table['headers']}")
+            print(f"Rows: {len(table['rows'])}")
+            
+            # Print first few rows as example
+            for j, row in enumerate(table['rows'][:3]):
+                print(f"  Row {j+1}: {row}")
+```
+
+### Configuring Table Extraction:
+
+You can adjust the sensitivity of the table detection algorithm with:
+
+```python
+config = CrawlerRunConfig(
+    table_score_threshold=5  # Lower value = more tables detected (default: 7)
+)
+```
+
+Each extracted table contains: 
+
+- `headers`: Column header names 
+- `rows`: List of rows, each containing cell values
+- `caption`: Table caption text (if available) 
+- `summary`: Table summary attribute (if specified)
+
+### Table Extraction Tips
+
+- Not all HTML tables are extracted - only those detected as "data tables" vs. layout tables.
+- Tables with inconsistent cell counts, nested tables, or those used purely for layout may be skipped.
+- If you're missing tables, try adjusting the `table_score_threshold` to a lower value (default is 7).
+
+The table detection algorithm scores tables based on features like consistent columns, presence of headers, text density, and more. Tables scoring above the threshold are considered data tables worth extracting.
+
+
+### 5.4 `screenshot`, `pdf`, and `mhtml`
 
 If you set `screenshot=True`, `pdf=True`, or `capture_mhtml=True` in **`CrawlerRunConfig`**, then:
 
@@ -228,7 +290,7 @@ if result.mhtml:
 
 The MHTML (MIME HTML) format is particularly useful as it captures the entire web page including all of its resources (CSS, images, scripts, etc.) in a single file, making it perfect for archiving or offline viewing.
 
-### 5.4 `ssl_certificate`
+### 5.5 `ssl_certificate`
 
 If `fetch_ssl_certificate=True`, `result.ssl_certificate` holds details about the site’s SSL cert, such as issuer, validity dates, etc.
 

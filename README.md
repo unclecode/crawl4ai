@@ -618,16 +618,16 @@ Read the full details in our [0.7.0 Release Notes](https://docs.crawl4ai.com/blo
         # Process results
         raw_df = pd.DataFrame()
         for result in results:
-            if result.success and result.media["tables"]:
+            if result.success and result.tables:
                 raw_df = pd.DataFrame(
-                    result.media["tables"][0]["rows"],
-                    columns=result.media["tables"][0]["headers"],
+                    result.tables[0]["rows"],
+                    columns=result.tables[0]["headers"],
                 )
                 break
         print(raw_df.head())
 
     finally:
-        await crawler.stop()
+        await crawler.close()
   ```
 
 - **🚀 Browser Pooling**: Pages launch hot with pre-warmed browser instances for lower latency and memory usage
