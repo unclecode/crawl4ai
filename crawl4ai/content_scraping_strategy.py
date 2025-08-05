@@ -1668,6 +1668,11 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
                 content_element = body
 
             # Remove script and style tags
+            for tag in ["style", "link", "meta", "noscript"]:
+                for element in body.xpath(f".//{tag}"):
+                    if element.getparent() is not None:
+                        element.getparent().remove(element)
+                        
             # Handle script separately
             for element in body.xpath(f".//script"):
                 parent = element.getparent()
@@ -1687,10 +1692,6 @@ class LXMLWebScrapingStrategy(WebScrapingStrategy):
                                 parent.text = tail
                     parent.remove(element)  # Delete the element
 
-            for tag in ["style", "link", "meta", "noscript"]:
-                for element in body.xpath(f".//{tag}"):
-                    if element.getparent() is not None:
-                        element.getparent().remove(element)
 
             # Handle social media and domain exclusions
             kwargs["exclude_domains"] = set(kwargs.get("exclude_domains", []))
