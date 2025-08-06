@@ -27,6 +27,7 @@ from .async_crawler_strategy import (
     AsyncCrawlerStrategy,
     AsyncPlaywrightCrawlerStrategy,
     AsyncCrawlResponse,
+    HTTPStatusError,
 )
 from .cache_context import CacheMode, CacheContext
 from .markdown_generation_strategy import (
@@ -407,7 +408,12 @@ class AsyncWebCrawler:
                         config, "session_id", None)
                     cached_result.redirected_url = cached_result.redirected_url or url
                     return CrawlResultContainer(cached_result)
-
+            except HTTPStatusError as e:
+                return CrawlResultContainer(
+                    CrawlResult(
+                        url=url, html="", success=False, error_message=str(e), status_code=e.status_code,
+                    )
+                )
             except Exception as e:
                 error_context = get_error_context(sys.exc_info())
 

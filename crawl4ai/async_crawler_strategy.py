@@ -2398,6 +2398,9 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
                     await self.hooks['after_request'](result)
                     return result
 
+            except HTTPStatusError:
+                raise
+
             except aiohttp.ServerTimeoutError as e:
                 await self.hooks['on_error'](e)
                 raise ConnectionTimeoutError(f"Request timed out: {str(e)}")
