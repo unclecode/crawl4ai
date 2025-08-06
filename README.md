@@ -347,7 +347,7 @@ async def main():
     
     async with AsyncWebCrawler(config=browser_config) as crawler:
         result = await crawler.arun(
-            url="https://docs.micronaut.io/4.7.6/guide/",
+            url="https://docs.micronaut.io/4.9.9/guide/",
             config=run_config
         )
         print(len(result.markdown.raw_markdown))
@@ -399,7 +399,7 @@ async def main():
             "type": "attribute",
             "attribute": "src"
         }
-    }
+    ]
 }
 
     extraction_strategy = JsonCssExtractionStrategy(schema, verbose=True)
