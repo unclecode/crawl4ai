@@ -88,6 +88,13 @@ from .script import (
     ErrorDetail
 )
 
+# Browser Adapters
+from .browser_adapter import (
+    BrowserAdapter,
+    PlaywrightAdapter,
+    UndetectedAdapter
+)
+
 from .utils import (
     start_colab_display_server,
     setup_colab_environment
@@ -174,6 +181,10 @@ __all__ = [
     "CompilationResult",
     "ValidationResult",
     "ErrorDetail",
+    # Browser Adapters
+    "BrowserAdapter",
+    "PlaywrightAdapter", 
+    "UndetectedAdapter",
     "LinkPreviewConfig"
 ]
 

@@ -390,6 +390,8 @@ class BrowserConfig:
         light_mode (bool): Disables certain background features for performance gains. Default: False.
         extra_args (list): Additional command-line arguments passed to the browser.
                            Default: [].
+        enable_stealth (bool): If True, applies playwright-stealth to bypass basic bot detection.
+                              Cannot be used with use_undetected browser mode. Default: False.
     """
 
     def __init__(
@@ -430,6 +432,7 @@ class BrowserConfig:
         extra_args: list = None,
         debugging_port: int = 9222,
         host: str = "localhost",
+        enable_stealth: bool = False,
     ):
         self.browser_type = browser_type
         self.headless = headless 
@@ -470,6 +473,7 @@ class BrowserConfig:
         self.verbose = verbose
         self.debugging_port = debugging_port
         self.host = host
+        self.enable_stealth = enable_stealth
 
         fa_user_agenr_generator = ValidUAGenerator()
         if self.user_agent_mode == "random":
@@ -501,6 +505,13 @@ class BrowserConfig:
         # If persistent context is requested, ensure managed browser is enabled
         if self.use_persistent_context:
             self.use_managed_browser = True
+            
+        # Validate stealth configuration
+        if self.enable_stealth and self.use_managed_browser and self.browser_mode == "builtin":
+            raise ValueError(
+                "enable_stealth cannot be used with browser_mode='builtin'. "
+                "Stealth mode requires a dedicated browser instance."
+            )
 
     @staticmethod
     def from_kwargs(kwargs: dict) -> "BrowserConfig":
@@ -537,6 +548,7 @@ class BrowserConfig:
             extra_args=kwargs.get("extra_args", []),
             debugging_port=kwargs.get("debugging_port", 9222),
             host=kwargs.get("host", "localhost"),
+            enable_stealth=kwargs.get("enable_stealth", False),
         )
 
     def to_dict(self):
@@ -571,6 +583,7 @@ class BrowserConfig:
             "verbose": self.verbose,
             "debugging_port": self.debugging_port,
             "host": self.host,
+            "enable_stealth": self.enable_stealth,
         }
 
                 

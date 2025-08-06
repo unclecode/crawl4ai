@@ -573,21 +573,26 @@ class BrowserManager:
     _playwright_instance = None
     
     @classmethod
-    async def get_playwright(cls):
-        from playwright.async_api import async_playwright
+    async def get_playwright(cls, use_undetected: bool = False):
+        if use_undetected:
+            from patchright.async_api import async_playwright
+        else:
+            from playwright.async_api import async_playwright
         cls._playwright_instance = await async_playwright().start()
         return cls._playwright_instance    
 
-    def __init__(self, browser_config: BrowserConfig, logger=None):
+    def __init__(self, browser_config: BrowserConfig, logger=None, use_undetected: bool = False):
         """
         Initialize the BrowserManager with a browser configuration.
 
         Args:
             browser_config (BrowserConfig): Configuration object containing all browser settings
             logger: Logger instance for recording events and errors
+            use_undetected (bool): Whether to use undetected browser (Patchright)
         """
         self.config: BrowserConfig = browser_config
         self.logger = logger
+        self.use_undetected = use_undetected
 
         # Browser state
         self.browser = None
@@ -601,7 +606,11 @@ class BrowserManager:
 
         # Keep track of contexts by a "config signature," so each unique config reuses a single context
         self.contexts_by_config = {}
-        self._contexts_lock = asyncio.Lock() 
+        self._contexts_lock = asyncio.Lock()
+        
+        # Stealth-related attributes
+        self._stealth_instance = None
+        self._stealth_cm = None 
 
         # Initialize ManagedBrowser if needed
         if self.config.use_managed_browser:
@@ -630,9 +639,21 @@ class BrowserManager:
         if self.playwright is not None:
             await self.close()
             
-        from playwright.async_api import async_playwright
+        if self.use_undetected:
+            from patchright.async_api import async_playwright
+        else:
+            from playwright.async_api import async_playwright
 
-        self.playwright = await async_playwright().start()
+        # Initialize playwright with or without stealth
+        if self.config.enable_stealth and not self.use_undetected:
+            # Import stealth only when needed
+            from playwright_stealth import Stealth
+            # Use the recommended stealth wrapper approach
+            self._stealth_instance = Stealth()
+            self._stealth_cm = self._stealth_instance.use_async(async_playwright())
+            self.playwright = await self._stealth_cm.__aenter__()
+        else:
+            self.playwright = await async_playwright().start()
 
         if self.config.cdp_url or self.config.use_managed_browser:
             self.config.use_managed_browser = True
@@ -1094,5 +1115,19 @@ class BrowserManager:
             self.managed_browser = None
 
         if self.playwright:
-            await self.playwright.stop()
+            # Handle stealth context manager cleanup if it exists
+            if hasattr(self, '_stealth_cm') and self._stealth_cm is not None:
+                try:
+                    await self._stealth_cm.__aexit__(None, None, None)
+                except Exception as e:
+                    if self.logger:
+                        self.logger.error(
+                            message="Error closing stealth context: {error}",
+                            tag="ERROR", 
+                            params={"error": str(e)}
+                        )
+                self._stealth_cm = None
+                self._stealth_instance = None
+            else:
+                await self.playwright.stop()
             self.playwright = None

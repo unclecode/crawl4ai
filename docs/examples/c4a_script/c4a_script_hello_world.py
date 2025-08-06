@@ -3,7 +3,7 @@ C4A-Script Hello World
 A concise example showing how to use the C4A-Script compiler
 """
 
-from c4a_compile import compile
+from crawl4ai.script.c4a_compile import compile
 
 # Define your C4A-Script
 script = """

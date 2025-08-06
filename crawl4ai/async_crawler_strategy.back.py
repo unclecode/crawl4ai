@@ -21,7 +21,6 @@ from .async_logger import AsyncLogger
 from .ssl_certificate import SSLCertificate
 from .user_agent_generator import ValidUAGenerator
 from .browser_manager import BrowserManager
-from .browser_adapter import BrowserAdapter, PlaywrightAdapter, UndetectedAdapter
 
 import aiofiles
 import aiohttp
@@ -72,7 +71,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
     """
 
     def __init__(
-        self, browser_config: BrowserConfig = None, logger: AsyncLogger = None, browser_adapter: BrowserAdapter = None, **kwargs
+        self, browser_config: BrowserConfig = None, logger: AsyncLogger = None, **kwargs
     ):
         """
         Initialize the AsyncPlaywrightCrawlerStrategy with a browser configuration.
@@ -81,16 +80,11 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             browser_config (BrowserConfig): Configuration object containing browser settings.
                                           If None, will be created from kwargs for backwards compatibility.
             logger: Logger instance for recording events and errors.
-            browser_adapter (BrowserAdapter): Browser adapter for handling browser-specific operations.
-                                           If None, defaults to PlaywrightAdapter.
             **kwargs: Additional arguments for backwards compatibility and extending functionality.
         """
         # Initialize browser config, either from provided object or kwargs
         self.browser_config = browser_config or BrowserConfig.from_kwargs(kwargs)
         self.logger = logger
-        
-        # Initialize browser adapter
-        self.adapter = browser_adapter or PlaywrightAdapter()
 
         # Initialize session management
         self._downloaded_files = []
@@ -110,9 +104,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
         # Initialize browser manager with config
         self.browser_manager = BrowserManager(
-            browser_config=self.browser_config, 
-            logger=self.logger,
-            use_undetected=isinstance(self.adapter, UndetectedAdapter)
+            browser_config=self.browser_config, logger=self.logger
         )
 
     async def __aenter__(self):
@@ -330,7 +322,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         """
 
         try:
-            result = await self.adapter.evaluate(page, wrapper_js)
+            result = await page.evaluate(wrapper_js)
             return result
         except Exception as e:
             if "Error evaluating condition" in str(e):
@@ -375,7 +367,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
                     # Replace the iframe with a div containing the extracted content
                     _iframe = iframe_content.replace("`", "\\`")
-                    await self.adapter.evaluate(page,
+                    await page.evaluate(
                         f"""
                         () => {{
                             const iframe = document.getElementById('iframe-{i}');
@@ -636,16 +628,91 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             page.on("requestfailed", handle_request_failed_capture)
 
         # Console Message Capturing
-        handle_console = None
-        handle_error = None
         if config.capture_console_messages:
-            # Set up console capture using adapter
-            handle_console = await self.adapter.setup_console_capture(page, captured_console)
-            handle_error = await self.adapter.setup_error_capture(page, captured_console)
+            def handle_console_capture(msg):
+                try:
+                    message_type = "unknown"
+                    try:
+                        message_type = msg.type
+                    except:
+                        pass
+                        
+                    message_text = "unknown"
+                    try:
+                        message_text = msg.text
+                    except:
+                        pass
+                        
+                    # Basic console message with minimal content
+                    entry = {
+                        "type": message_type,
+                        "text": message_text,
+                        "timestamp": time.time()
+                    }
+                    
+                    captured_console.append(entry)
+                    
+                except Exception as e:
+                    if self.logger:
+                        self.logger.warning(f"Error capturing console message: {e}", tag="CAPTURE")
+                    # Still add something to the list even on error
+                    captured_console.append({
+                        "type": "console_capture_error", 
+                        "error": str(e), 
+                        "timestamp": time.time()
+                    })
+
+            def handle_pageerror_capture(err):
+                try:
+                    error_message = "Unknown error"
+                    try:
+                        error_message = err.message
+                    except:
+                        pass
+                        
+                    error_stack = ""
+                    try:
+                        error_stack = err.stack
+                    except:
+                        pass
+                        
+                    captured_console.append({
+                        "type": "error",
+                        "text": error_message,
+                        "stack": error_stack,
+                        "timestamp": time.time()
+                    })
+                except Exception as e:
+                    if self.logger:
+                        self.logger.warning(f"Error capturing page error: {e}", tag="CAPTURE")
+                    captured_console.append({
+                        "type": "pageerror_capture_error", 
+                        "error": str(e), 
+                        "timestamp": time.time()
+                    })
+
+            # Add event listeners directly
+            page.on("console", handle_console_capture)
+            page.on("pageerror", handle_pageerror_capture)
 
         # Set up console logging if requested
-        # Note: For undetected browsers, console logging won't work directly
-        # but captured messages can still be logged after retrieval
+        if config.log_console:
+            def log_consol(
+                msg, console_log_type="debug"
+            ):  # Corrected the parameter syntax
+                if console_log_type == "error":
+                    self.logger.error(
+                        message=f"Console error: {msg}",  # Use f-string for variable interpolation
+                        tag="CONSOLE"
+                    )
+                elif console_log_type == "debug":
+                    self.logger.debug(
+                        message=f"Console: {msg}",  # Use f-string for variable interpolation
+                        tag="CONSOLE"
+                    )
+
+            page.on("console", log_consol)
+            page.on("pageerror", lambda e: log_consol(e, "error"))
 
         try:
             # Get SSL certificate information if requested and URL is HTTPS
@@ -757,7 +824,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             except Error:
                 visibility_info = await self.check_visibility(page)
 
-                if self.browser_config.verbose:
+                if self.browser_config.config.verbose:
                     self.logger.debug(
                         message="Body visibility info: {info}",
                         tag="DEBUG",
@@ -931,7 +998,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         await page.wait_for_load_state("domcontentloaded", timeout=5)
                     except PlaywrightTimeoutError:
                         pass
-                    await self.adapter.evaluate(page, update_image_dimensions_js)
+                    await page.evaluate(update_image_dimensions_js)
                 except Exception as e:
                     self.logger.error(
                         message="Error updating image dimensions: {error}",
@@ -960,7 +1027,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     
                     for selector in selectors:
                         try:
-                            content = await self.adapter.evaluate(page,
+                            content = await page.evaluate(
                                 f"""Array.from(document.querySelectorAll("{selector}"))
                                     .map(el => el.outerHTML)
                                     .join('')"""
@@ -1018,11 +1085,6 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 await asyncio.sleep(delay)
                 return await page.content()
 
-            # For undetected browsers, retrieve console messages before returning
-            if config.capture_console_messages and hasattr(self.adapter, 'retrieve_console_messages'):
-                final_messages = await self.adapter.retrieve_console_messages(page)
-                captured_console.extend(final_messages)
-
             # Return complete response
             return AsyncCrawlResponse(
                 html=html,
@@ -1061,13 +1123,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     page.remove_listener("response", handle_response_capture)
                     page.remove_listener("requestfailed", handle_request_failed_capture)
                 if config.capture_console_messages:
-                    # Retrieve any final console messages for undetected browsers
-                    if hasattr(self.adapter, 'retrieve_console_messages'):
-                        final_messages = await self.adapter.retrieve_console_messages(page)
-                        captured_console.extend(final_messages)
-                    
-                    # Clean up console capture
-                    await self.adapter.cleanup_console_capture(page, handle_console, handle_error)
+                    page.remove_listener("console", handle_console_capture)
+                    page.remove_listener("pageerror", handle_pageerror_capture)
                 
                 # Close the page
                 await page.close()
@@ -1297,7 +1354,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             """
             
             # Execute virtual scroll capture
-            result = await self.adapter.evaluate(page, virtual_scroll_js, config.to_dict())
+            result = await page.evaluate(virtual_scroll_js, config.to_dict())
             
             if result.get("replaced", False):
                 self.logger.success(
@@ -1381,7 +1438,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         remove_overlays_js = load_js_script("remove_overlay_elements")
 
         try:
-            await self.adapter.evaluate(page,
+            await page.evaluate(
                 f"""
                 (() => {{
                     try {{
@@ -1786,7 +1843,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         # When {script} contains statements (e.g., const link = …; link.click();), 
                         # this forms invalid JavaScript, causing Playwright execution error: SyntaxError: Unexpected token 'const'.
                         # """
-                        result = await self.adapter.evaluate(page,
+                        result = await page.evaluate(
                             f"""
                         (async () => {{
                             try {{
@@ -1908,7 +1965,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             for script in scripts:
                 try:
                     # Execute the script and wait for network idle
-                    result = await self.adapter.evaluate(page,
+                    result = await page.evaluate(
                         f"""
                         (() => {{
                             return new Promise((resolve) => {{
@@ -1992,7 +2049,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         Returns:
             Boolean indicating visibility
         """
-        return await self.adapter.evaluate(page,
+        return await page.evaluate(
             """
             () => {
                 const element = document.body;
@@ -2033,7 +2090,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             Dict containing scroll status and position information
         """
         try:
-            result = await self.adapter.evaluate(page,
+            result = await page.evaluate(
                 f"""() => {{
                     try {{
                         const startX = window.scrollX;
@@ -2090,7 +2147,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         Returns:
             Dict containing width and height of the page
         """
-        return await self.adapter.evaluate(page,
+        return await page.evaluate(
             """
             () => {
                 const {scrollWidth, scrollHeight} = document.documentElement;
@@ -2110,7 +2167,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             bool: True if page needs scrolling
         """
         try:
-            need_scroll = await self.adapter.evaluate(page,
+            need_scroll = await page.evaluate(
                 """
             () => {
                 const scrollHeight = document.documentElement.scrollHeight;
@@ -2129,3 +2186,265 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             return True  # Default to scrolling if check fails
 
 
+####################################################################################################
+# HTTP Crawler Strategy
+####################################################################################################
+
+class HTTPCrawlerError(Exception):
+    """Base error class for HTTP crawler specific exceptions"""
+    pass
+
+
+class ConnectionTimeoutError(HTTPCrawlerError):
+    """Raised when connection timeout occurs"""
+    pass
+
+
+class HTTPStatusError(HTTPCrawlerError):
+    """Raised for unexpected status codes"""
+    def __init__(self, status_code: int, message: str):
+        self.status_code = status_code
+        super().__init__(f"HTTP {status_code}: {message}")
+
+
+class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
+    """
+    Fast, lightweight HTTP-only crawler strategy optimized for memory efficiency.
+    """
+    
+    __slots__ = ('logger', 'max_connections', 'dns_cache_ttl', 'chunk_size', '_session', 'hooks', 'browser_config')
+
+    DEFAULT_TIMEOUT: Final[int] = 30
+    DEFAULT_CHUNK_SIZE: Final[int] = 64 * 1024  
+    DEFAULT_MAX_CONNECTIONS: Final[int] = min(32, (os.cpu_count() or 1) * 4)
+    DEFAULT_DNS_CACHE_TTL: Final[int] = 300
+    VALID_SCHEMES: Final = frozenset({'http', 'https', 'file', 'raw'})
+
+    _BASE_HEADERS: Final = MappingProxyType({
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    })
+    
+    def __init__(
+        self, 
+        browser_config: Optional[HTTPCrawlerConfig] = None,
+        logger: Optional[AsyncLogger] = None,
+        max_connections: int = DEFAULT_MAX_CONNECTIONS,
+        dns_cache_ttl: int = DEFAULT_DNS_CACHE_TTL,
+        chunk_size: int = DEFAULT_CHUNK_SIZE
+    ):
+        """Initialize the HTTP crawler with config"""
+        self.browser_config = browser_config or HTTPCrawlerConfig()
+        self.logger = logger
+        self.max_connections = max_connections
+        self.dns_cache_ttl = dns_cache_ttl
+        self.chunk_size = chunk_size
+        self._session: Optional[aiohttp.ClientSession] = None
+        
+        self.hooks = {
+            k: partial(self._execute_hook, k) 
+            for k in ('before_request', 'after_request', 'on_error')
+        }
+
+        # Set default hooks
+        self.set_hook('before_request', lambda *args, **kwargs: None)
+        self.set_hook('after_request', lambda *args, **kwargs: None)
+        self.set_hook('on_error', lambda *args, **kwargs: None)
+                      
+
+    async def __aenter__(self) -> AsyncHTTPCrawlerStrategy:
+        await self.start()
+        return self
+        
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        await self.close()
+
+    @contextlib.asynccontextmanager
+    async def _session_context(self):
+        try:
+            if not self._session:
+                await self.start()
+            yield self._session
+        finally:
+            pass
+
+    def set_hook(self, hook_type: str, hook_func: Callable) -> None:
+        if hook_type in self.hooks:
+            self.hooks[hook_type] = partial(self._execute_hook, hook_type, hook_func)
+        else:
+            raise ValueError(f"Invalid hook type: {hook_type}")
+
+    async def _execute_hook(
+        self, 
+        hook_type: str, 
+        hook_func: Callable,
+        *args: Any, 
+        **kwargs: Any
+    ) -> Any:
+        if asyncio.iscoroutinefunction(hook_func):
+            return await hook_func(*args, **kwargs)
+        return hook_func(*args, **kwargs)
+
+    async def start(self) -> None:
+        if not self._session:
+            connector = aiohttp.TCPConnector(
+                limit=self.max_connections,
+                ttl_dns_cache=self.dns_cache_ttl,
+                use_dns_cache=True,
+                force_close=False
+            )
+            self._session = aiohttp.ClientSession(
+                headers=dict(self._BASE_HEADERS),
+                connector=connector,
+                timeout=ClientTimeout(total=self.DEFAULT_TIMEOUT)
+            )
+
+    async def close(self) -> None:
+        if self._session and not self._session.closed:
+            try:
+                await asyncio.wait_for(self._session.close(), timeout=5.0)
+            except asyncio.TimeoutError:
+                if self.logger:
+                    self.logger.warning(
+                        message="Session cleanup timed out",
+                        tag="CLEANUP"
+                    )
+            finally:
+                self._session = None
+
+    async def _stream_file(self, path: str) -> AsyncGenerator[memoryview, None]:
+        async with aiofiles.open(path, mode='rb') as f:
+            while chunk := await f.read(self.chunk_size):
+                yield memoryview(chunk)
+
+    async def _handle_file(self, path: str) -> AsyncCrawlResponse:
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"Local file not found: {path}")
+            
+        chunks = []
+        async for chunk in self._stream_file(path):
+            chunks.append(chunk.tobytes().decode('utf-8', errors='replace'))
+            
+        return AsyncCrawlResponse(
+            html=''.join(chunks),
+            response_headers={},
+            status_code=200
+        )
+
+    async def _handle_raw(self, content: str) -> AsyncCrawlResponse:
+        return AsyncCrawlResponse(
+            html=content,
+            response_headers={},
+            status_code=200
+        )
+
+
+    async def _handle_http(
+        self, 
+        url: str, 
+        config: CrawlerRunConfig
+    ) -> AsyncCrawlResponse:
+        async with self._session_context() as session:
+            timeout = ClientTimeout(
+                total=config.page_timeout or self.DEFAULT_TIMEOUT,
+                connect=10,
+                sock_read=30
+            )
+            
+            headers = dict(self._BASE_HEADERS)
+            if self.browser_config.headers:
+                headers.update(self.browser_config.headers)
+
+            request_kwargs = {
+                'timeout': timeout,
+                'allow_redirects': self.browser_config.follow_redirects,
+                'ssl': self.browser_config.verify_ssl,
+                'headers': headers
+            }
+
+            if self.browser_config.method == "POST":
+                if self.browser_config.data:
+                    request_kwargs['data'] = self.browser_config.data
+                if self.browser_config.json:
+                    request_kwargs['json'] = self.browser_config.json
+
+            await self.hooks['before_request'](url, request_kwargs)
+
+            try:
+                async with session.request(self.browser_config.method, url, **request_kwargs) as response:
+                    content = memoryview(await response.read())
+                    
+                    if not (200 <= response.status < 300):
+                        raise HTTPStatusError(
+                            response.status,
+                            f"Unexpected status code for {url}"
+                        )
+                    
+                    encoding = response.charset
+                    if not encoding:
+                        encoding = chardet.detect(content.tobytes())['encoding'] or 'utf-8'                    
+                    
+                    result = AsyncCrawlResponse(
+                        html=content.tobytes().decode(encoding, errors='replace'),
+                        response_headers=dict(response.headers),
+                        status_code=response.status,
+                        redirected_url=str(response.url)
+                    )
+                    
+                    await self.hooks['after_request'](result)
+                    return result
+
+            except aiohttp.ServerTimeoutError as e:
+                await self.hooks['on_error'](e)
+                raise ConnectionTimeoutError(f"Request timed out: {str(e)}")
+                
+            except aiohttp.ClientConnectorError as e:
+                await self.hooks['on_error'](e)
+                raise ConnectionError(f"Connection failed: {str(e)}")
+                
+            except aiohttp.ClientError as e:
+                await self.hooks['on_error'](e)
+                raise HTTPCrawlerError(f"HTTP client error: {str(e)}")
+            
+            except asyncio.exceptions.TimeoutError as e:
+                await self.hooks['on_error'](e)
+                raise ConnectionTimeoutError(f"Request timed out: {str(e)}")
+            
+            except Exception as e:
+                await self.hooks['on_error'](e)
+                raise HTTPCrawlerError(f"HTTP request failed: {str(e)}")
+
+    async def crawl(
+        self, 
+        url: str, 
+        config: Optional[CrawlerRunConfig] = None, 
+        **kwargs
+    ) -> AsyncCrawlResponse:
+        config = config or CrawlerRunConfig.from_kwargs(kwargs)
+        
+        parsed = urlparse(url)
+        scheme = parsed.scheme.rstrip('/')
+        
+        if scheme not in self.VALID_SCHEMES:
+            raise ValueError(f"Unsupported URL scheme: {scheme}")
+            
+        try:
+            if scheme == 'file':
+                return await self._handle_file(parsed.path)
+            elif scheme == 'raw':
+                return await self._handle_raw(parsed.path)
+            else:  # http or https
+                return await self._handle_http(url, config)
+                
+        except Exception as e:
+            if self.logger:
+                self.logger.error(
+                    message="Crawl failed: {error}",
+                    tag="CRAWL",
+                    params={"error": str(e), "url": url}
+                )
+            raise
