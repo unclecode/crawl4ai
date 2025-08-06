@@ -221,26 +221,34 @@ Tables that score above the threshold (default: 7) are extracted and stored in r
 
 ### Accessing Table data:
 ```python
-async with AsyncWebCrawler() as crawler:
-    result = await crawler.arun(
-        url="https://example.com/",
-        config=CrawlerRunConfig(
-            table_score_threshold=7  # Minimum score for table detection
+import asyncio
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
+
+async def main():
+    async with AsyncWebCrawler() as crawler:
+        result = await crawler.arun(
+            url="https://www.w3schools.com/html/html_tables.asp",
+            config=CrawlerRunConfig(
+                table_score_threshold=7  # Minimum score for table detection
+            )
         )
-    )
-    
-    if result.success and result.tables:
-        print(f"Found {len(result.tables)} tables")
-        
-        for i, table in enumerate(result.tables):
-            print(f"\nTable {i+1}:")
-            print(f"Caption: {table.get('caption', 'No caption')}")
-            print(f"Headers: {table['headers']}")
-            print(f"Rows: {len(table['rows'])}")
-            
-            # Print first few rows as example
-            for j, row in enumerate(table['rows'][:3]):
-                print(f"  Row {j+1}: {row}")
+
+        if result.success and result.tables:
+            print(f"Found {len(result.tables)} tables")
+
+            for i, table in enumerate(result.tables):
+                print(f"\nTable {i+1}:")
+                print(f"Caption: {table.get('caption', 'No caption')}")
+                print(f"Headers: {table['headers']}")
+                print(f"Rows: {len(table['rows'])}")
+
+                # Print first few rows as example
+                for j, row in enumerate(table['rows'][:3]):
+                    print(f"  Row {j+1}: {row}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
 ```
 
 ### Configuring Table Extraction:
