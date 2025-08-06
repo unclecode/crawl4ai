@@ -26,9 +26,9 @@
 
 Crawl4AI is the #1 trending GitHub repository, actively maintained by a vibrant community. It delivers blazing-fast, AI-ready web crawling tailored for LLMs, AI agents, and data pipelines. Open source, flexible, and built for real-time performance, Crawl4AI empowers developers with unmatched speed, precision, and deployment ease.  
 
-[✨ Check out latest update v0.7.0](#-recent-updates)
+[✨ Check out latest update v0.7.3](#-recent-updates)
 
-🎉 **Version 0.7.0 is now available!** The Adaptive Intelligence Update introduces groundbreaking features: Adaptive Crawling that learns website patterns, Virtual Scroll support for infinite pages, intelligent Link Preview with 3-layer scoring, Async URL Seeder for massive discovery, and significant performance improvements. [Read the release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.0.md)
+🎉 **Version 0.7.3 is now available!** The Multi-Config Intelligence Update brings URL-specific configurations for mixed content crawling, flexible Docker LLM providers, critical bug fixes, and improved documentation. Configure different strategies for docs, blogs, and APIs in a single crawl! [Read the release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/md_v2/blog/releases/0.7.3.md)
 
 <details>
 <summary>🤓 <strong>My Personal Story</strong></summary>
@@ -273,9 +273,9 @@ The new Docker implementation includes:
 ### Getting Started
 
 ```bash
-# Pull and run the latest release candidate
-docker pull unclecode/crawl4ai:0.7.0
-docker run -d -p 11235:11235 --name crawl4ai --shm-size=1g unclecode/crawl4ai:0.7.0
+# Pull and run the latest release
+docker pull unclecode/crawl4ai:0.7.3
+docker run -d -p 11235:11235 --name crawl4ai --shm-size=1g unclecode/crawl4ai:0.7.3
 
 # Visit the playground at http://localhost:11235/playground
 ```
@@ -518,7 +518,40 @@ async def test_news_crawl():
 
 ## ✨ Recent Updates
 
-### Version 0.7.0 Release Highlights - The Adaptive Intelligence Update
+### Version 0.7.3 Release Highlights - The Multi-Config Intelligence Update
+
+- **🎨 Multi-URL Configurations**: Different crawling strategies for different URL patterns in a single batch:
+  ```python
+  configs = [
+      # Documentation sites - aggressive caching
+      CrawlerRunConfig(
+          url_matcher=["*docs*", "*documentation*"],
+          cache_mode="write"
+      ),
+      # News sites - fresh content, scroll for lazy loading
+      CrawlerRunConfig(
+          url_matcher=lambda url: 'blog' in url or 'news' in url,
+          cache_mode="bypass",
+          js_code="window.scrollTo(0, document.body.scrollHeight/2);"
+      ),
+      # Default fallback
+      CrawlerRunConfig()
+  ]
+  
+  results = await crawler.arun_many(urls, config=configs)
+  ```
+
+- **🐳 Flexible Docker LLM Providers**: Configure LLM providers via environment variables:
+  ```bash
+  # Using .llm.env file (recommended)
+  docker run -d --env-file .llm.env -p 11235:11235 unclecode/crawl4ai:latest
+  ```
+
+- **🔧 Bug Fixes & Improvements**: Critical stability fixes for production deployments
+
+Read the full details in our [0.7.3 Release Notes](https://github.com/unclecode/crawl4ai/blob/main/docs/md_v2/blog/releases/0.7.3.md).
+
+### Previous Version: 0.7.0 Release Highlights - The Adaptive Intelligence Update
 
 - **🧠 Adaptive Crawling**: Your crawler now learns and adapts to website patterns automatically:
   ```python
