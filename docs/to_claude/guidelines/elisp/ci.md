@@ -1,0 +1,650 @@
+<!-- ---
+!-- Timestamp: 2025-05-28 07:23:29
+!-- Author: ywatanabe
+!-- File: /home/ywatanabe/.dotfiles/.claude/to_claude/guidelines/elisp/ci.md
+!-- --- -->
+
+# Elisp-CI Framework: Universal CI/CD Guidelines for Emacs Lisp Projects
+
+## Overview
+
+The Elisp-CI framework provides standardized, zero-configuration CI/CD infrastructure for Emacs Lisp projects. Developed during the ETM project, it addresses the unique challenges of testing across multiple Emacs versions while establishing modern development practices for the Elisp ecosystem.
+
+**Location:** `.claude/to_claude/bin/elisp/elisp-ci/elisp-ci`  
+**Status:** Production-ready, validated on real projects  
+**Compatibility:** Emacs 27.1 through snapshot  
+
+## Core Philosophy
+
+### 🎯 **Zero Configuration**
+- Works out-of-box with standard Elisp project structures
+- Intelligent defaults for common patterns
+- Minimal setup required for immediate productivity
+
+### 🔄 **Cross-Version Reliability** 
+- Native ERT integration eliminates external framework dependencies
+- Comprehensive load path management
+- Reproducible testing environments via Docker
+
+### 🌍 **Ecosystem Standardization**
+- Consistent CI/CD patterns across all Elisp projects
+- Shared best practices and quality gates
+- Community-driven infrastructure
+
+## Quick Start Guide
+
+### 1. Installation
+
+```bash
+# Add to PATH (recommended)
+export PATH="$HOME/.claude/to_claude/bin/elisp-ci:$PATH"
+
+# Or create system-wide symlink
+sudo ln -s ~/.claude/to_claude/bin/elisp-ci/elisp-ci /usr/local/bin/elisp-ci
+
+# Verify installation
+elisp-ci --version
+```
+
+### 2. Project Initialization
+
+```bash
+cd your-elisp-project/
+elisp-ci init
+```
+
+**Creates:**
+- `.elisp-ci.yml` - Configuration file
+- `tests/` directory with sample test
+- `Makefile` with common targets  
+- `.github/workflows/elisp-ci.yml` - GitHub Actions workflow
+
+### 3. Basic Usage
+
+```bash
+# Test current Emacs version
+elisp-ci test
+
+# Test all supported versions  
+elisp-ci test --all-versions
+
+# Analyze project structure
+elisp-ci analyze
+
+# Validate configuration
+elisp-ci validate
+```
+
+## Project Structure Requirements
+
+### 📁 **Standard Layout (Recommended)**
+
+```
+your-package/
+├── package-name.el           # Main entry point
+├── src/                      # Source files (optional)
+│   ├── package-core.el
+│   └── package-utils.el
+├── tests/                    # Test files
+│   ├── test-package-name.el
+│   └── test-package-core.el
+├── .elisp-ci.yml            # Configuration
+├── Makefile                  # Build automation
+└── .github/workflows/       # CI/CD
+    └── elisp-ci.yml
+```
+
+### 🔧 **Modular Layout (ETM Style)**
+
+```
+package-name/
+├── package-name.el           # Entry point
+├── module-a/                 # Functional modules
+│   ├── module-a.el
+│   ├── module-a-core.el
+│   └── module-a-utils.el
+├── module-b/
+│   ├── module-b.el
+│   └── module-b-helpers.el
+├── tests/                    # Mirror source structure
+│   ├── test-package-name.el
+│   ├── module-a/
+│   │   ├── test-module-a.el
+│   │   └── test-module-a-core.el
+│   └── module-b/
+│       └── test-module-b.el
+└── .elisp-ci.yml
+```
+
+## Configuration Guide
+
+### 📋 **Basic Configuration (.elisp-ci.yml)**
+
+```yaml
+project:
+  name: "my-package"
+  entry: "my-package.el"
+  description: "Brief package description"
+  
+emacs_versions:
+  - "27.1"
+  - "28.2" 
+  - "29.1"
+  - "29.4"
+  - "snapshot"
+
+dependencies:
+  # External packages required for testing
+  - "dash"
+  - "s"
+  - "f"
+
+test:
+  framework: "ert"
+  directory: "tests/"
+  pattern: "test-*.el"
+  timeout: 120
+  exclude_patterns:
+    - "*-manual.el"
+    - "*-integration.el"
+  
+coverage:
+  enabled: true
+  threshold: 80
+  exclude_files:
+    - "tests/*"
+    - "examples/*"
+
+github_actions:
+  enabled: true
+  continue_on_error_for_snapshot: true
+  upload_coverage: true
+  
+docker:
+  enabled: true
+  base_image: "ubuntu:22.04"
+```
+
+### 🔧 **Advanced Configuration**
+
+```yaml
+# For complex projects with custom requirements
+test:
+  framework: "ert"
+  pre_hooks:
+    - "package-lint-batch-and-exit *.el"
+    - "checkdoc-file *.el"
+  post_hooks:
+    - "cask exec ecukes"
+  
+  custom_load_paths:
+    - "./lib"
+    - "./vendor"
+    
+  environment_variables:
+    SOME_CONFIG: "test-value"
+    DEBUG_MODE: "true"
+
+coverage:
+  enabled: true
+  threshold: 85
+  format: "lcov"
+  upload_to: "codecov"
+  
+performance:
+  benchmark_enabled: true
+  baseline_version: "29.1"
+  performance_threshold: 0.2  # 20% regression threshold
+```
+
+## Testing Best Practices
+
+### ✅ **ERT Test Structure**
+
+```elisp
+;;; tests/test-my-package.el
+;;; Test file for my-package
+;;; Generated by elisp-ci
+
+(require 'ert)
+(require 'my-package)
+
+;; Loadability test (required)
+(ert-deftest test-my-package-loadable ()
+  "Test that package loads correctly."
+  (should (featurep 'my-package)))
+
+;; Function tests
+(ert-deftest test-my-function-basic ()
+  "Test my-function with basic input."
+  (should (equal (my-function "input") "expected-output")))
+
+(ert-deftest test-my-function-edge-cases ()
+  "Test my-function with edge cases."
+  (should-error (my-function nil))
+  (should (equal (my-function "") "")))
+
+;; Integration tests
+(ert-deftest test-my-package-integration ()
+  "Test package integration scenarios."
+  (let ((temp-buffer (generate-new-buffer "*test*")))
+    (unwind-protect
+        (with-current-buffer temp-buffer
+          ;; Test integration scenario
+          (should (my-package-setup))
+          (should (my-package-feature-works)))
+      (kill-buffer temp-buffer))))
+
+(provide 'test-my-package)
+```
+
+### 🎯 **Test Quality Guidelines**
+
+1. **Comprehensive Coverage**
+   - Test loadability for every module
+   - Cover main functions and edge cases
+   - Include integration scenarios
+
+2. **Test Independence**
+   - Each test should be self-contained
+   - No shared state between tests
+   - Clean up resources in `unwind-protect`
+
+3. **Descriptive Names**
+   - Use clear, descriptive test names
+   - Follow pattern: `test-module-function-scenario`
+   - Include docstrings explaining test purpose
+
+4. **Error Handling**
+   - Test both success and error cases
+   - Use `should-error` for expected failures
+   - Verify error messages when appropriate
+
+## CI/CD Integration
+
+### 🚀 **GitHub Actions (Automatic)**
+
+Elisp-CI generates optimized workflows:
+
+```yaml
+# Auto-generated .github/workflows/elisp-ci.yml
+name: Elisp CI
+
+on:
+  push:
+    paths-ignore: ['**.md', 'docs/**']
+  pull_request:
+    paths-ignore: ['**.md', 'docs/**']
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.emacs_version == 'snapshot' }}
+    
+    strategy:
+      matrix:
+        emacs_version: ["27.1", "28.2", "29.1", "29.4", "snapshot"]
+    
+    steps:
+      - uses: actions/checkout@v4
+      - uses: purcell/setup-emacs@master
+        with:
+          version: ${{ matrix.emacs_version }}
+      - name: Run Tests
+        run: elisp-ci test --version ${{ matrix.emacs_version }}
+```
+
+### 🐳 **Docker Integration**
+
+```bash
+# Build test environment
+elisp-ci docker-build
+
+# Test in containers
+elisp-ci docker-test --all-versions
+
+# Custom Docker configuration
+docker:
+  enabled: true
+  registry: "ghcr.io/your-org"
+  cache_layers: true
+  custom_packages:
+    - "git"
+    - "curl"
+```
+
+### 📊 **Local Development Workflow**
+
+```bash
+# Development cycle
+elisp-ci test --watch           # Continuous testing
+elisp-ci test --coverage        # Coverage analysis
+elisp-ci analyze                # Dependency check
+elisp-ci validate               # Configuration validation
+
+# Pre-commit workflow
+make test                       # Quick local test
+make test-all                   # Full version matrix
+make lint                       # Code quality checks
+```
+
+## Advanced Features
+
+### 🔍 **Dependency Analysis**
+
+```bash
+elisp-ci analyze
+
+# Output example:
+# [INFO] Analyzing project: my-package
+# [INFO] Found 15 Elisp files
+# [INFO] Found 8 test files
+# [INFO] External dependencies:
+#   - dash
+#   - s
+#   - async
+# [INFO] Suggestions:
+#   - Add missing dependencies to .elisp-ci.yml
+#   - Consider package-lint for style checking
+```
+
+### 📈 **Performance Benchmarking**
+
+```bash
+elisp-ci benchmark
+
+# Results across Emacs versions:
+# Emacs 27.1: 1.45s (100%)
+# Emacs 28.2: 1.32s (91.0%)  
+# Emacs 29.1: 1.28s (88.3%)
+# Emacs 29.4: 1.21s (83.4%)
+# Snapshot:   1.18s (81.4%)
+```
+
+### 📋 **Coverage Reporting**
+
+```yaml
+# .elisp-ci.yml
+coverage:
+  enabled: true
+  threshold: 85
+  format: "lcov"
+  upload_to: "codecov"
+  exclude_files:
+    - "tests/*"
+    - "examples/*"
+```
+
+## Migration Guide
+
+### 🔄 **From Existing CI**
+
+1. **Backup Current Setup**
+   ```bash
+   cp -r .github/workflows .github/workflows.backup
+   ```
+
+2. **Initialize Elisp-CI**
+   ```bash
+   elisp-ci init
+   ```
+
+3. **Compare and Merge**
+   - Review generated vs existing workflows
+   - Merge custom configurations
+   - Test incrementally
+
+### 📦 **Package.el Projects**
+
+```yaml
+# .elisp-ci.yml for package.el projects
+project:
+  name: "my-package"
+  entry: "my-package.el"
+
+dependencies:
+  - "package-lint"
+
+test:
+  pre_hooks:
+    - "package-lint-batch-and-exit my-package.el"
+  framework: "ert"
+```
+
+### 🏗️ **Large/Complex Projects**
+
+```yaml
+# Configuration for complex projects
+test:
+  timeout: 300
+  parallel: true
+  custom_load_paths:
+    - "./lib"
+    - "./modules/*"
+  
+  test_suites:
+    unit:
+      pattern: "test-*.el"
+      exclude: "*-integration.el"
+    integration:
+      pattern: "*-integration.el"
+      timeout: 600
+```
+
+## Troubleshooting Guide
+
+### 🚨 **Common Issues**
+
+**1. Tests Not Found**
+```bash
+# Check configuration
+elisp-ci validate
+
+# Verify test structure
+find tests -name "test-*.el"
+
+# Adjust pattern if needed
+test:
+  pattern: "*-test.el"  # Alternative pattern
+```
+
+**2. Dependency Loading Issues**
+```bash
+# Analyze dependencies
+elisp-ci analyze
+
+# Add missing dependencies
+dependencies:
+  - "missing-package"
+
+# Check load paths
+test:
+  custom_load_paths:
+    - "./vendor"
+```
+
+**3. Version-Specific Failures**
+```bash
+# Test specific version locally
+elisp-ci test --version 27.1
+
+# Allow snapshot failures
+github_actions:
+  continue_on_error_for_snapshot: true
+```
+
+**4. Docker Issues**
+```bash
+# Rebuild Docker images
+elisp-ci docker-build
+
+# Clear cache
+docker system prune -a
+
+# Check Docker configuration
+docker:
+  enabled: true
+  base_image: "ubuntu:20.04"  # Try different base
+```
+
+### 🔧 **Performance Optimization**
+
+```yaml
+# Optimize CI performance
+github_actions:
+  cache_dependencies: true
+  parallel_jobs: 4
+  
+docker:
+  cache_layers: true
+  multi_stage_build: true
+
+test:
+  parallel: true
+  timeout: 60  # Reduce if tests are fast
+```
+
+## Best Practices Summary
+
+### ✅ **DO**
+
+1. **Use Standard Structure**
+   - Follow conventional directory layout
+   - Use descriptive file and function names
+   - Mirror test structure to source structure
+
+2. **Write Quality Tests**
+   - Test loadability for all modules
+   - Cover edge cases and error conditions
+   - Use clear, descriptive test names
+
+3. **Configure Appropriately**
+   - Specify all external dependencies
+   - Set reasonable timeouts
+   - Enable coverage reporting
+
+4. **Maintain Documentation**
+   - Keep README updated with elisp-ci usage
+   - Document any custom configuration
+   - Include badge showing CI status
+
+### ❌ **DON'T**
+
+1. **Don't Override Defaults Unnecessarily**
+   - Trust elisp-ci's intelligent defaults
+   - Only customize when needed
+   - Keep configuration minimal
+
+2. **Don't Skip Testing**
+   - Test all supported Emacs versions
+   - Don't ignore test failures
+   - Maintain good test coverage
+
+3. **Don't Ignore Dependencies**
+   - Declare all external dependencies
+   - Avoid assuming packages are available
+   - Test in clean environments
+
+## Integration Examples
+
+### 🎯 **Real-World Success: ETM Project**
+
+The Emacs Tab Manager serves as the reference implementation:
+
+```bash
+# ETM's elisp-ci usage
+cd emacs-tab-manager/
+elisp-ci analyze
+# → Found 59 Elisp files, 25 test files
+# → 100% CI success across all Emacs versions
+
+elisp-ci test --all-versions
+# → ✅ All tests pass on 27.1, 28.2, 29.1, 29.4, snapshot
+```
+
+**Results:**
+- **Before Elisp-CI**: 0% CI success rate
+- **After Elisp-CI**: 100% CI success rate
+- **Impact**: Production-ready CI/CD in hours, not days
+
+### 📊 **Community Adoption Template**
+
+```bash
+# Standard adoption workflow
+git clone your-elisp-project
+cd your-elisp-project
+elisp-ci init
+git add .elisp-ci.yml Makefile .github/workflows/
+git commit -m "Add elisp-ci framework"
+git push
+# → Automatic CI/CD now active
+```
+
+## Future Enhancements
+
+### 🔮 **Planned Features**
+
+1. **Enhanced IDE Integration**
+   - VS Code extension
+   - Emacs interactive mode
+   - Real-time test feedback
+
+2. **Advanced Analytics**
+   - Performance trending
+   - Coverage visualization
+   - Dependency analysis
+
+3. **Community Features**
+   - Shared configuration templates
+   - Package quality metrics
+   - Best practice recommendations
+
+## Support and Community
+
+### 📚 **Resources**
+
+- **Documentation**: `elisp-ci --help` and README.md
+- **Examples**: ETM project as reference implementation
+- **Issues**: Report via GitHub for host projects
+
+### 🤝 **Contributing**
+
+The elisp-ci framework is designed to serve the entire Emacs community:
+
+```bash
+# Contribute improvements
+cd ~/.claude/to_claude/bin/elisp-ci/
+# ... make enhancements ...
+# Submit via host project channels
+```
+
+### 🌟 **Adoption Benefits**
+
+**For Maintainers:**
+- Reduced CI/CD setup time
+- Standardized quality gates
+- Cross-version compatibility assurance
+
+**For Contributors:**
+- Familiar development workflows
+- Clear test feedback
+- Consistent project structures
+
+**For Users:**
+- Higher quality packages
+- Better compatibility information
+- More reliable software
+
+---
+
+## Your Understanding Check
+
+Did you understand the Elisp-CI framework guidelines? If yes, please confirm:
+
+`CLAUDE UNDERSTOOD: /home/ywatanabe/.claude/to_claude/guidelines/IMPORTANT-guidelines-programming-Elisp-CI-Framework-Rules.md`
+
+---
+
+**Elisp-CI Framework** - Bringing modern CI/CD practices to the Emacs Lisp ecosystem, one project at a time! 🚀
+
+<!-- EOF -->

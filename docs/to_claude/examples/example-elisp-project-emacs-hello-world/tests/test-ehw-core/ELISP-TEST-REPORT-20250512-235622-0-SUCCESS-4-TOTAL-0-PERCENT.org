@@ -1,0 +1,25 @@
+#+TITLE: Elisp Test Report
+#+AUTHOR: ywatanabe
+#+DATE: 2025-05-12 23:56:24 Created by https://github.com/ywatanabe1989/emacs-test
+
+* Test Results Summary
+
+- Passed: 0
+- Failed: 1
+- Skipped: 3
+- Timeout (= 10 s): 0
+- Duplicates: 0
+- Total: 4
+- Total Time: 0.29 seconds
+- Success Rate: 0.0%
+
+* Failed Tests (1)
+** test-ehw-core.el (1 tests)
+- [[file:test-ehw-core.el::test-ehw-core-goodbye-is-function][test-ehw-core-goodbye-is-function]]
+  + Error details:
+    (file-missing "Cannot open load file" "No such file or directory" "ehw-core")
+* Not Found Tests (3)
+** test-ehw-core.el (3 tests)
+- [[file:test-ehw-core.el::test-ehw-core-greet-is-function][test-ehw-core-greet-is-function]]
+- [[file:test-ehw-core.el::test-ehw-core-greet-is-interactive][test-ehw-core-greet-is-interactive]]
+- [[file:test-ehw-core.el::test-ehw-core-insert-greeting-is-function][test-ehw-core-insert-greeting-is-function]]

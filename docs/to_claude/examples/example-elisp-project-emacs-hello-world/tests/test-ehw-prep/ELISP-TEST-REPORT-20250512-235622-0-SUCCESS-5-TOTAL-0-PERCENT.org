@@ -1,0 +1,26 @@
+#+TITLE: Elisp Test Report
+#+AUTHOR: ywatanabe
+#+DATE: 2025-05-12 23:56:24 Created by https://github.com/ywatanabe1989/emacs-test
+
+* Test Results Summary
+
+- Passed: 0
+- Failed: 1
+- Skipped: 4
+- Timeout (= 10 s): 0
+- Duplicates: 0
+- Total: 5
+- Total Time: 0.29 seconds
+- Success Rate: 0.0%
+
+* Failed Tests (1)
+** test-ehw-prep.el (1 tests)
+- [[file:test-ehw-prep.el::test-ehw-prep-install-dependencies-is-function][test-ehw-prep-install-dependencies-is-function]]
+  + Error details:
+    (file-missing "Cannot open load file" "No such file or directory" "ehw-prep")
+* Not Found Tests (4)
+** test-ehw-prep.el (4 tests)
+- [[file:test-ehw-prep.el::test-ehw-prep-variables-loadable][test-ehw-prep-variables-loadable]]
+- [[file:test-ehw-prep.el::test-ehw-prep-add-path-loadable][test-ehw-prep-add-path-loadable]]
+- [[file:test-ehw-prep.el::test-ehw-prep-install-deps-loadable][test-ehw-prep-install-deps-loadable]]
+- [[file:test-ehw-prep.el::test-ehw-prep-setup-is-function][test-ehw-prep-setup-is-function]]

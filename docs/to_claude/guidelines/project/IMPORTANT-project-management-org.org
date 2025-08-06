@@ -1,0 +1,161 @@
+# Timestamp: "2025-05-30 05:03:49 (ywatanabe)"
+# File: /ssh:ywatanabe@sp:/home/ywatanabe/.dotfiles/.claude/to_claude/guidelines/project/IMPORTANT-project-management-org.org
+
+#+TITLE: Project Management Rules
+#+AUTHOR: ywatanabe
+#+DATE: 2025-05-20 05:43:47
+
+Project management is conducted under =./project_management= directory.
+
+* Core Files and Locations
+- Original plan: =./project_management/USER_PLAN.md= (DO NOT EDIT)
+- Updated plans: =./project_management/CLAUDE_PLAN.org= (Use this as a persistent memory)
+- Progress tracking (Org): =./project_management/progress-<title>.org=
+- Progress tracking (Mermaid) : =./project_management/progress-<title>.mmd=
+- Memory across sessions: =./project_management/next_steps.md=
+
+* Progress Format
+#+BEGIN_SRC org
+#+TITLE: Project Title
+
+* Goal 1: Description
+** TODO Milestone 1
+*** DONE Task 1
+**** `./path/to/file/which/justify/the/completion/example.py`
+**** `./path/to/file/which/justify/the/completion/example.jpg`
+**** `./path/to/file/which/justify/the/completion/example.csv`
+*** TODO Task 2
+
+* Goal 2: Description  
+** DONE Milestone 2
+*** DONE Task 3
+*** DONE Task 4
+#+END_SRC
+
+* Visual Progress Management using Mermaid Diagram
+- =./project_management/progress-<title>.mmd=
+  - Mermaid diagram definition file reflecting =./project_management/progress-<title>.org=
+  - Use tags as well
+  - Use TD layout
+  - Understand the hierarchy and summarize into core elements
+  - Summarize up to most-important 7 elements
+- =./project_management/progress-<title>.svg=
+  - SVG file created from the mermaid file
+- =./project_management/progress-<title>.gif=
+  - GIF image created from the SVG file
+
+** Rendering Tool
+Use =.claude/bin/render_mermaid.sh /path/to/mermaid/file.mmd=
+
+** Example
+#+BEGIN_SRC mermaid
+graph TD
+    subgraph Legend
+        Z1[Todo]:::todo
+        Z2[In Progress]:::inProgress
+        Z3[Done]:::done
+        Z4[Directory]:::directory
+    end
+    
+    subgraph Project Structure
+    subgraph PD[Project Description]
+        PJNAME[Project Name]:::done
+        PJGOALS[Goals]:::done
+    end
+    
+    subgraph PDIR[Project Directory]
+        Root["\/workspace\/projects\/000-sample-project"]:::directory
+        Config[config/]:::directory
+        Data[data/]:::directory
+        Scripts[scripts/]:::directory
+        Results[results/]:::directory
+        Resources[resources/]:::directory
+        Env[.env/]:::directory
+        Git[.git/]:::directory
+        Requirements[requirements.txt/]:::directory
+        Log[Log.txt/]:::directory
+        PM[project_management.mmd]:::directory
+    end
+    end
+    
+    subgraph Execution Flow
+    subgraph Step
+        D[Compile Context]:::done
+        E[Generate Elisp]:::inProgress
+        F[Execute Elisp]:::todo
+        G{Success?}:::todo
+    end
+    
+    subgraph "Logging, Version Control, and State Update"
+        H[Log Success]:::todo
+        I[Log Error]:::todo
+        J{Milestone?}:::todo
+        K[Git Commit]:::todo
+        L[Log Only]:::todo
+        M{Goal Met?}:::todo
+        N[Update Project_States]:::todo
+    end
+    end
+    
+    subgraph PMFLOW[Project Management Flow]
+        MS1[Milestone 1]:::done
+        MS2[Milestone 2]:::inProgress
+        
+    subgraph Tasks M1
+        T1[task1]:::done
+        T2[task2]:::done
+    end
+    
+    subgraph Tasks M2
+        T3[task1]:::done
+        T4[task2]:::todo
+    end
+    end
+    
+    Start[Start]:::starttag --> PD
+    PD --> PDIR
+    PM --> PMFLOW
+    PMFLOW --> PM
+    PDIR --> D
+    D --> E --> F --> G
+    G -- Yes --> H
+    G -- No --> I
+    H --> J
+    J -- Yes --> K
+    J -- No --> L
+    K --> M
+    I --> L
+    L --> M
+    M -- No --> N
+    N --> Root
+    M -- Yes --> End[End]:::endtag
+    PJGOALS --> PMFLOW
+    MS1 --> T1
+    MS1 --> T2
+    MS2 --> T3
+    MS2 --> T4
+    
+    classDef starttag fill:#cce5ff,stroke:#333,stroke-width:2px;
+    classDef done fill:#9f9,stroke:#333,stroke-width:2px;
+    classDef inProgress fill:#ff9,stroke:#333,stroke-width:2px;
+    classDef todo fill:#fff,stroke:#333,stroke-width:2px;
+    classDef directory fill:#efe,stroke:#333,stroke-width:1px;
+    classDef endtag fill:#fcc,stroke:#333,stroke-width:2px;
+    class Root,Config,Data,Scripts,Results,Resources directory;
+#+END_SRC
+
+* Your Understanding Check
+Did you understand the guideline? If yes, please say:
+=CLAUDE UNDERSTOOD: <THIS FILE PATH HERE>=
+
+# EOF
+
+# EOF
+
+# EOF
+
+# EOF
+
+# EOF
+
+# EOF

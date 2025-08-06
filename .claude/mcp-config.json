@@ -1,0 +1,46 @@
+{
+    "mcpServers": {
+        "filesystem": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-filesystem",
+                "/home/ywatanabe/",
+                "/"
+            ]
+        },
+        "puppeteer": {
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-puppeteer"]
+        },
+        "brave-search": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-brave-search"
+            ],
+            "env": {
+                "BRAVE_API_KEY": "$BRAVE_API_KEY"
+            }
+        },
+        "zotero": {
+            "command": "mcp-zotero",
+            "env": {
+                "ZOTERO_API_KEY": "$ZOTERO_API_KEY",
+                "ZOTERO_USER_ID": "$ZOTERO_USER_ID"
+            },
+            "description": "https://github.com/kaliaboi/mcp-zotero"
+        },
+        "sequential-thinking": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-sequential-thinking"
+            ]
+        },
+        "crawl4ai": {
+            "type": "sse",
+            "url": "http://localhost:11235/mcp/sse"
+        }
+    }
+}

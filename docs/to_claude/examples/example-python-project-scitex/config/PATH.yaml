@@ -1,0 +1,30 @@
+# Timestamp: "2025-02-15 02:01:15 (ywatanabe)"
+# File: /home/ywatanabe/proj/example-scitex-project/config/PATH.yaml
+
+PATH:
+  MNIST:
+    RAW:
+      "./data/mnist/raw/"
+    LOADER:
+      TRAIN:
+        "./data/mnist/train_loader.pkl"
+      TEST:
+        "./data/mnist/test_loader.pkl"
+    FLATTENED:
+      TRAIN:
+        "./data/mnist/train_flattened.npy"
+      TEST:
+        "./data/mnist/test_flattened.npy"
+    LABELS:      
+      TRAIN:
+        "./data/mnist/train_labels.npy"
+      TEST:
+        "./data/mnist/test_labels.npy"
+    FIGURES:
+      "./data/mnist/figures/"
+    MODELS:
+      "./data/mnist/models/"
+    MODEL_SVM:
+      f"{CONFIG.PATH.MNIST.MODELS}/mnist_svm.pkl"
+
+# EOF

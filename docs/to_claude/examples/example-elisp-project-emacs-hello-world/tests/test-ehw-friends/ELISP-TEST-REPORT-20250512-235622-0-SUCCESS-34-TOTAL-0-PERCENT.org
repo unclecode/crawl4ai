@@ -1,0 +1,66 @@
+#+TITLE: Elisp Test Report
+#+AUTHOR: ywatanabe
+#+DATE: 2025-05-12 23:56:24 Created by https://github.com/ywatanabe1989/emacs-test
+
+* Test Results Summary
+
+- Passed: 0
+- Failed: 4
+- Skipped: 30
+- Timeout (= 10 s): 0
+- Duplicates: 0
+- Total: 34
+- Total Time: 0.29 seconds
+- Success Rate: 0.0%
+
+* Failed Tests (4)
+** test-ehw-friends-data.el (1 tests)
+- [[file:test-ehw-friends-data.el::test-ehw-friends-data-save-creates-directory][test-ehw-friends-data-save-creates-directory]]
+  + Error details:
+    (file-missing "Cannot open load file" "No such file or directory" "ehw-friends-data")
+** test-ehw-friends-greet.el (1 tests)
+- [[file:test-ehw-friends-greet.el::test-ehw-friends-greet-all-no-friends][test-ehw-friends-greet-all-no-friends]]
+  + Error details:
+    (file-missing "Cannot open load file" "No such file or directory" "ehw-friends-data")
+** test-ehw-friends-manage.el (1 tests)
+- [[file:test-ehw-friends-manage.el::test-ehw-friends-manage-list-empty][test-ehw-friends-manage-list-empty]]
+  + Error details:
+    (file-missing "Cannot open load file" "No such file or directory" "ehw-friends-data")
+** test-ehw-friends.el (1 tests)
+- [[file:test-ehw-friends.el::test-ehw-friends-loadable][test-ehw-friends-loadable]]
+  + Error details:
+    (file-missing "Cannot open load file" "No such file or directory" "test-ehw-friends-data")
+* Not Found Tests (30)
+** test-ehw-friends-data.el (14 tests)
+- [[file:test-ehw-friends-data.el::test-ehw-friends-data-loadable][test-ehw-friends-data-loadable]]
+- [[file:test-ehw-friends-data.el::test-ehw-friends-data-custom-vars-exist][test-ehw-friends-data-custom-vars-exist]]
+- [[file:test-ehw-friends-data.el::test-ehw-friends-data-list-exists][test-ehw-friends-data-list-exists]]
+- [[file:test-ehw-friends-data.el::test-ehw-friends-data-get-nonexistent][test-ehw-friends-data-get-nonexistent]]
+- [[file:test-ehw-friends-data.el::test-ehw-friends-data-set-new-friend][test-ehw-friends-data-set-new-friend]]
+- [[file:test-ehw-friends-data.el::test-ehw-friends-data-set-existing-friend][test-ehw-friends-data-set-existing-friend]]
+- [[file:test-ehw-friends-data.el::test-ehw-friends-data-remove-friend][test-ehw-friends-data-remove-friend]]
+- [[file:test-ehw-friends-data.el::test-ehw-friends-data-get-greeting-custom][test-ehw-friends-data-get-greeting-custom]]
+- [[file:test-ehw-friends-data.el::test-ehw-friends-data-get-greeting-default][test-ehw-friends-data-get-greeting-default]]
+- [[file:test-ehw-friends-data.el::test-ehw-friends-data-get-greeting-nonexistent][test-ehw-friends-data-get-greeting-nonexistent]]
+- [[file:test-ehw-friends-data.el::test-ehw-friends-data-save-function-exists][test-ehw-friends-data-save-function-exists]]
+- [[file:test-ehw-friends-data.el::test-ehw-friends-data-load-function-exists][test-ehw-friends-data-load-function-exists]]
+- [[file:test-ehw-friends-data.el::test-ehw-friends-data-save-and-load][test-ehw-friends-data-save-and-load]]
+- [[file:test-ehw-friends-data.el::test-ehw-friends-data-load-nonexistent][test-ehw-friends-data-load-nonexistent]]
+** test-ehw-friends-greet.el (8 tests)
+- [[file:test-ehw-friends-greet.el::test-ehw-friends-greet-loadable][test-ehw-friends-greet-loadable]]
+- [[file:test-ehw-friends-greet.el::test-ehw-friends-greet-function-exists][test-ehw-friends-greet-function-exists]]
+- [[file:test-ehw-friends-greet.el::test-ehw-friends-greet-all-function-exists][test-ehw-friends-greet-all-function-exists]]
+- [[file:test-ehw-friends-greet.el::test-ehw-friends-greet-is-interactive][test-ehw-friends-greet-is-interactive]]
+- [[file:test-ehw-friends-greet.el::test-ehw-friends-greet-all-is-interactive][test-ehw-friends-greet-all-is-interactive]]
+- [[file:test-ehw-friends-greet.el::test-ehw-friends-greet-existing-friend][test-ehw-friends-greet-existing-friend]]
+- [[file:test-ehw-friends-greet.el::test-ehw-friends-greet-nonexistent-friend][test-ehw-friends-greet-nonexistent-friend]]
+- [[file:test-ehw-friends-greet.el::test-ehw-friends-greet-all-with-friends][test-ehw-friends-greet-all-with-friends]]
+** test-ehw-friends-manage.el (8 tests)
+- [[file:test-ehw-friends-manage.el::test-ehw-friends-manage-loadable][test-ehw-friends-manage-loadable]]
+- [[file:test-ehw-friends-manage.el::test-ehw-friends-manage-add-function-exists][test-ehw-friends-manage-add-function-exists]]
+- [[file:test-ehw-friends-manage.el::test-ehw-friends-manage-remove-function-exists][test-ehw-friends-manage-remove-function-exists]]
+- [[file:test-ehw-friends-manage.el::test-ehw-friends-manage-list-function-exists][test-ehw-friends-manage-list-function-exists]]
+- [[file:test-ehw-friends-manage.el::test-ehw-friends-manage-add-functionality][test-ehw-friends-manage-add-functionality]]
+- [[file:test-ehw-friends-manage.el::test-ehw-friends-manage-remove-functionality][test-ehw-friends-manage-remove-functionality]]
+- [[file:test-ehw-friends-manage.el::test-ehw-friends-manage-list-returns-string][test-ehw-friends-manage-list-returns-string]]
+- [[file:test-ehw-friends-manage.el::test-ehw-friends-manage-list-includes-friends][test-ehw-friends-manage-list-includes-friends]]

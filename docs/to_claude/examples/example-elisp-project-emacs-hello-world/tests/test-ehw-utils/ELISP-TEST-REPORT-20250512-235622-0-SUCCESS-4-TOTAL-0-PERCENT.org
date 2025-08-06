@@ -1,0 +1,25 @@
+#+TITLE: Elisp Test Report
+#+AUTHOR: ywatanabe
+#+DATE: 2025-05-12 23:56:24 Created by https://github.com/ywatanabe1989/emacs-test
+
+* Test Results Summary
+
+- Passed: 0
+- Failed: 1
+- Skipped: 3
+- Timeout (= 10 s): 0
+- Duplicates: 0
+- Total: 4
+- Total Time: 0.29 seconds
+- Success Rate: 0.0%
+
+* Failed Tests (1)
+** test-ehw-utils.el (1 tests)
+- [[file:test-ehw-utils.el::test-ehw-utils-trim][test-ehw-utils-trim]]
+  + Error details:
+    (file-missing "Cannot open load file" "No such file or directory" "ehw-utils")
+* Not Found Tests (3)
+** test-ehw-utils.el (3 tests)
+- [[file:test-ehw-utils.el::test-ehw-utils-format][test-ehw-utils-format]]
+- [[file:test-ehw-utils.el::test-ehw-utils-count-words][test-ehw-utils-count-words]]
+- [[file:test-ehw-utils.el::test-ehw-utils-count-words-empty][test-ehw-utils-count-words-empty]]

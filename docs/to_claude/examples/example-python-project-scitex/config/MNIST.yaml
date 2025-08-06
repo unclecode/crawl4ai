@@ -1,0 +1,24 @@
+# Timestamp: "2025-02-14 20:16:51 (ywatanabe)"
+# File: /home/ywatanabe/proj/example-scitex-project/config/MNIST.yaml
+
+MNIST:
+  BATCH_SIZE:
+    TRAIN:
+      64
+    TEST:
+      1024
+  N_EPOCHS:
+    10
+  RANDOM_STATE:
+    42
+  UMAP_RANDOM_STATE:
+    42
+  NORMALIZE:
+    MEAN:
+      (0.1307,)
+    STD:
+      (0.3081,)
+  LABELS:
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+# EOF
