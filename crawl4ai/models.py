@@ -152,6 +152,7 @@ class CrawlResult(BaseModel):
     network_requests: Optional[List[Dict[str, Any]]] = None
     console_messages: Optional[List[Dict[str, Any]]] = None
     tables: List[Dict] = Field(default_factory=list)  # NEW – [{headers,rows,caption,summary}]
+    exception: Optional[Exception] = None
 
     class Config:
         arbitrary_types_allowed = True

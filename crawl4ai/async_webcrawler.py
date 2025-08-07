@@ -432,7 +432,7 @@ class AsyncWebCrawler:
 
                 return CrawlResultContainer(
                     CrawlResult(
-                        url=url, html="", success=False, error_message=error_message
+                        url=url, html="", success=False, error_message=error_message, exception=e
                     )
                 )
 
