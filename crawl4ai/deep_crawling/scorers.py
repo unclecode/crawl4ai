@@ -10,16 +10,16 @@ import ctypes
 import platform
 PLATFORM = platform.system()
 
-# Pre-computed scores for common year differences
-_SCORE_LOOKUP = [1.0, 0.5, 0.3333333333333333, 0.25]
+# Pre-computed scores for path distance differences
+_SCORE_LOOKUP = [0.0, 0.5, 0.6666666666666667, 0.75]
 
 # Pre-computed scores for common year differences
 _FRESHNESS_SCORES = [
-   1.0,    # Current year
-   0.9,    # Last year
-   0.8,    # 2 years ago
-   0.7,    # 3 years ago
-   0.6,    # 4 years ago
+   0.0,    # Current year
+   0.1,    # Last year
+   0.2,    # 2 years ago
+   0.3,    # 3 years ago
+   0.4,    # 4 years ago
    0.5,    # 5 years ago
 ]
 
@@ -181,11 +181,11 @@ class KeywordRelevanceScorer(URLScorer):
         
         # Fast return paths
         if not matches:
-            return 0.0
-        if matches == len(self._keywords):
             return 1.0
+        if matches == len(self._keywords):
+            return 0.0
             
-        return matches / len(self._keywords)
+        return 1.0 - (matches / len(self._keywords))
 
 class PathDepthScorer(URLScorer):
     __slots__ = ('_weight', '_stats', '_optimal_depth')  # Remove _url_cache
@@ -241,8 +241,8 @@ class PathDepthScorer(URLScorer):
         
         if distance < 4:
             return _SCORE_LOOKUP[distance]
-            
-        return 1.0 / (1.0 + distance)                                             
+
+        return 1.0 - 1.0 / (1.0 + distance)                                            
 
 class ContentTypeScorer(URLScorer):
     __slots__ = ('_weight', '_exact_types', '_regex_types')
@@ -313,21 +313,21 @@ class ContentTypeScorer(URLScorer):
             url: URL to score
             
         Returns:
-            Score between 0.0 and 1.0 * weight
+            Score between 0.0 and 1.0 * weight (lower is better)
         """
         # Fast path: direct extension lookup
         ext = self._quick_extension(url)
         if ext:
             score = self._exact_types.get(ext, None)
             if score is not None:
-                return score
+                return 1.0 - score
                 
         # Slow path: regex patterns
         for pattern, score in self._regex_types:
             if pattern.search(url):
-                return score
+                return 1.0 - score
 
-        return 0.0
+        return 1.0
 
 class FreshnessScorer(URLScorer):
     __slots__ = ('_weight', '_date_pattern', '_current_year')
@@ -390,14 +390,14 @@ class FreshnessScorer(URLScorer):
     def _calculate_score(self, url: str) -> float:
         """Calculate freshness score based on URL date.
         
-        More recent years score higher. Uses pre-computed scoring
+        More recent years score higher (lower numeric score). Uses pre-computed scoring
         table for common year differences.
         
         Args:
             url: URL to score
             
         Returns:
-            Score between 0.0 and 1.0 * weight
+            Score between 0.0 and 1.0 * weight (lower is better)
         """
         year = self._extract_year(url)
         if year is None:
@@ -409,7 +409,7 @@ class FreshnessScorer(URLScorer):
             return _FRESHNESS_SCORES[year_diff]
             
         # Fallback calculation for older content
-        return max(0.1, 1.0 - year_diff * 0.1)
+        return min(0.9, year_diff * 0.1)
 
 class DomainAuthorityScorer(URLScorer):
     __slots__ = ('_weight', '_domain_weights', '_default_weight', '_top_domains')
@@ -506,14 +506,14 @@ class DomainAuthorityScorer(URLScorer):
             url: URL to score
             
         Returns:
-            Authority score between 0.0 and 1.0 * weight
+            Authority score between 0.0 and 1.0 * weight (lower is better)
         """
         domain = self._extract_domain(url)
         
         # Fast path: check top domains first
         score = self._top_domains.get(domain)
         if score is not None:
-            return score
+            return 1.0 - score
             
         # Regular path: check all domains
-        return self._domain_weights.get(domain, self._default_weight)
+        return 1.0 - self._domain_weights.get(domain, self._default_weight)

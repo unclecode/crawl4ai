@@ -28,7 +28,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
         filter_chain: FilterChain = FilterChain(),
         url_scorer: Optional[URLScorer] = None,        
         include_external: bool = False,
-        score_threshold: float = -infinity,
+        score_threshold: float = infinity,
         max_pages: int = infinity,
         logger: Optional[logging.Logger] = None,
     ):
@@ -112,9 +112,9 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
             # Score the URL if a scorer is provided
             score = self.url_scorer.score(base_url) if self.url_scorer else 0
             
-            # Skip URLs with scores below the threshold
-            if score < self.score_threshold:
-                self.logger.debug(f"URL {url} skipped: score {score} below threshold {self.score_threshold}")
+            # Skip URLs with scores above the threshold
+            if score > self.score_threshold:
+                self.logger.debug(f"URL {url} skipped: score {score} above threshold {self.score_threshold}")
                 self.stats.urls_skipped += 1
                 continue
 
