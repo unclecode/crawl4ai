@@ -121,7 +121,8 @@ Crawl4AI is the #1 trending open-source web crawler on GitHub. Your support keep
 - **🌱 Believer ($5/mo)** — Join the movement for data democratization  
 - **🚀 Builder ($50/mo)** — Priority support & early access to features  
 - **💼 Growing Team ($500/mo)** — Bi-weekly syncs & optimization help  
-- **🏢 Data Infrastructure Partner ($2000/mo)** — Full partnership with dedicated support
+- **🏢 Data Infrastructure Partner ($2000/mo)** — Full partnership with dedicated support  
+  *Custom arrangements available - see [SPONSORS.md](SPONSORS.md) for details & contact*
 
 **Why sponsor?**  
 No rate-limited APIs. No lock-in. Build and own your data pipeline with direct guidance from the creator of Crawl4AI.
