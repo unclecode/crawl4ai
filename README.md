@@ -54,7 +54,7 @@ I made it open source for **availability**, anyone can use it without a gate. No
 
 
 ## 🚀 Quick Start 
-need to create the mcp server for the same
+
 1. Install Crawl4AI:
 ```bash
 # Install the package
