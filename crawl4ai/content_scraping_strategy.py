@@ -242,6 +242,16 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
         exclude_domains = set(kwargs.get("exclude_domains", []))
 
         # Process links
+        try:
+            base_element = element.xpath("//head/base[@href]")
+            if base_element:
+                base_href = base_element[0].get("href", "").strip()
+                if base_href:
+                    url = base_href
+        except Exception as e:
+            self._log("error", f"Error extracting base URL: {str(e)}", "SCRAPE")
+            pass
+
         for link in element.xpath(".//a[@href]"):
             href = link.get("href", "").strip()
             if not href:
