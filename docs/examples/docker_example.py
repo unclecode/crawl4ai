@@ -8,26 +8,20 @@ from typing import Dict, Any
 
 
 class Crawl4AiTester:
-    def __init__(self, base_url: str = "http://localhost:11235", api_token: str = None):
+    def __init__(self, base_url: str = "http://localhost:11235"):
         self.base_url = base_url
-        self.api_token = (
-            api_token or os.getenv("CRAWL4AI_API_TOKEN") or "test_api_code"
-        )  # Check environment variable as fallback
-        self.headers = (
-            {"Authorization": f"Bearer {self.api_token}"} if self.api_token else {}
-        )
 
     def submit_and_wait(
         self, request_data: Dict[str, Any], timeout: int = 300
     ) -> Dict[str, Any]:
-        # Submit crawl job
+        # Submit crawl job using async endpoint
         response = requests.post(
-            f"{self.base_url}/crawl", json=request_data, headers=self.headers
+            f"{self.base_url}/crawl/job", json=request_data
         )
-        if response.status_code == 403:
-            raise Exception("API token is invalid or missing")
-        task_id = response.json()["task_id"]
-        print(f"Task ID: {task_id}")
+        response.raise_for_status()
+        job_response = response.json()
+        task_id = job_response["task_id"]
+        print(f"Submitted job with task_id: {task_id}")
 
         # Poll for result
         start_time = time.time()
@@ -38,8 +32,9 @@ class Crawl4AiTester:
                 )
 
             result = requests.get(
-                f"{self.base_url}/task/{task_id}", headers=self.headers
+                f"{self.base_url}/crawl/job/{task_id}"
             )
+            result.raise_for_status()
             status = result.json()
 
             if status["status"] == "failed":
@@ -52,10 +47,10 @@ class Crawl4AiTester:
             time.sleep(2)
 
     def submit_sync(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
+        # Use synchronous crawl endpoint
         response = requests.post(
-            f"{self.base_url}/crawl_sync",
+            f"{self.base_url}/crawl",
             json=request_data,
-            headers=self.headers,
             timeout=60,
         )
         if response.status_code == 408:
@@ -63,20 +58,9 @@ class Crawl4AiTester:
         response.raise_for_status()
         return response.json()
 
-    def crawl_direct(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Directly crawl without using task queue"""
-        response = requests.post(
-            f"{self.base_url}/crawl_direct", json=request_data, headers=self.headers
-        )
-        response.raise_for_status()
-        return response.json()
-
-
 def test_docker_deployment(version="basic"):
     tester = Crawl4AiTester(
         base_url="http://localhost:11235",
-        # base_url="https://api.crawl4ai.com" # just for example
-        # api_token="test" # just for example
     )
     print(f"Testing Crawl4AI Docker {version} version")
 
@@ -95,11 +79,8 @@ def test_docker_deployment(version="basic"):
             time.sleep(5)
 
     # Test cases based on version
-    test_basic_crawl_direct(tester)
-    test_basic_crawl(tester)
     test_basic_crawl(tester)
     test_basic_crawl_sync(tester)
-
     if version in ["full", "transformer"]:
         test_cosine_extraction(tester)
 
@@ -112,115 +93,129 @@ def test_docker_deployment(version="basic"):
 
 
 def test_basic_crawl(tester: Crawl4AiTester):
-    print("\n=== Testing Basic Crawl ===")
+    print("\n=== Testing Basic Crawl (Async) ===")
     request = {
-        "urls": "https://www.nbcnews.com/business",
-        "priority": 10,
-        "session_id": "test",
+        "urls": ["https://www.nbcnews.com/business"],
+        "browser_config": {},
+        "crawler_config": {}
     }
 
     result = tester.submit_and_wait(request)
-    print(f"Basic crawl result length: {len(result['result']['markdown'])}")
+    print(f"Basic crawl result count: {len(result['result']['results'])}")
     assert result["result"]["success"]
-    assert len(result["result"]["markdown"]) > 0
+    assert len(result["result"]["results"]) > 0
+    assert len(result["result"]["results"][0]["markdown"]) > 0
 
 
 def test_basic_crawl_sync(tester: Crawl4AiTester):
     print("\n=== Testing Basic Crawl (Sync) ===")
     request = {
-        "urls": "https://www.nbcnews.com/business",
-        "priority": 10,
-        "session_id": "test",
+        "urls": ["https://www.nbcnews.com/business"],
+        "browser_config": {},
+        "crawler_config": {}
     }
 
     result = tester.submit_sync(request)
-    print(f"Basic crawl result length: {len(result['result']['markdown'])}")
-    assert result["status"] == "completed"
-    assert result["result"]["success"]
-    assert len(result["result"]["markdown"]) > 0
-
-
-def test_basic_crawl_direct(tester: Crawl4AiTester):
-    print("\n=== Testing Basic Crawl (Direct) ===")
-    request = {
-        "urls": "https://www.nbcnews.com/business",
-        "priority": 10,
-        # "session_id": "test"
-        "cache_mode": "bypass",  # or "enabled", "disabled", "read_only", "write_only"
-    }
-
-    result = tester.crawl_direct(request)
-    print(f"Basic crawl result length: {len(result['result']['markdown'])}")
-    assert result["result"]["success"]
-    assert len(result["result"]["markdown"]) > 0
+    print(f"Basic crawl result count: {len(result['results'])}")
+    assert result["success"]
+    assert len(result["results"]) > 0
+    assert len(result["results"][0]["markdown"]) > 0
 
 
 def test_js_execution(tester: Crawl4AiTester):
     print("\n=== Testing JS Execution ===")
     request = {
-        "urls": "https://www.nbcnews.com/business",
-        "priority": 8,
-        "js_code": [
-            "const loadMoreButton = Array.from(document.querySelectorAll('button')).find(button => button.textContent.includes('Load More')); loadMoreButton && loadMoreButton.click();"
-        ],
-        "wait_for": "article.tease-card:nth-child(10)",
-        "crawler_params": {"headless": True},
+        "urls": ["https://www.nbcnews.com/business"],
+        "browser_config": {"headless": True},
+        "crawler_config": {
+            "js_code": [
+                "const loadMoreButton = Array.from(document.querySelectorAll('button')).find(button => button.textContent.includes('Load More')); if(loadMoreButton) loadMoreButton.click();"
+            ],
+            "wait_for": "wide-tease-item__wrapper df flex-column flex-row-m flex-nowrap-m enable-new-sports-feed-mobile-design(10)"
+        }
     }
 
     result = tester.submit_and_wait(request)
-    print(f"JS execution result length: {len(result['result']['markdown'])}")
+    print(f"JS execution result count: {len(result['result']['results'])}")
     assert result["result"]["success"]
 
 
 def test_css_selector(tester: Crawl4AiTester):
     print("\n=== Testing CSS Selector ===")
     request = {
-        "urls": "https://www.nbcnews.com/business",
-        "priority": 7,
-        "css_selector": ".wide-tease-item__description",
-        "crawler_params": {"headless": True},
-        "extra": {"word_count_threshold": 10},
+        "urls": ["https://www.nbcnews.com/business"],
+        "browser_config": {"headless": True},
+        "crawler_config": {
+            "css_selector": ".wide-tease-item__description",
+            "word_count_threshold": 10
+        }
     }
 
     result = tester.submit_and_wait(request)
-    print(f"CSS selector result length: {len(result['result']['markdown'])}")
+    print(f"CSS selector result count: {len(result['result']['results'])}")
     assert result["result"]["success"]
 
 
 def test_structured_extraction(tester: Crawl4AiTester):
     print("\n=== Testing Structured Extraction ===")
     schema = {
-        "name": "Coinbase Crypto Prices",
-        "baseSelector": ".cds-tableRow-t45thuk",
+        "name": "Cryptocurrency Prices",
+        "baseSelector": "table[data-testid=\"prices-table\"] tbody tr",
         "fields": [
             {
-                "name": "crypto",
-                "selector": "td:nth-child(1) h2",
-                "type": "text",
+                "name": "asset_name",
+                "selector": "td:nth-child(2) p.cds-headline-h4steop",
+                "type": "text"
             },
             {
-                "name": "symbol",
-                "selector": "td:nth-child(1) p",
-                "type": "text",
+                "name": "asset_symbol",
+                "selector": "td:nth-child(2) p.cds-label2-l1sm09ec",
+                "type": "text"
+            },
+            {
+                "name": "asset_image_url",
+                "selector": "td:nth-child(2) img[alt=\"Asset Symbol\"]",
+                "type": "attribute",
+                "attribute": "src"
+            },
+            {
+                "name": "asset_url",
+                "selector": "td:nth-child(2) a[aria-label^=\"Asset page for\"]",
+                "type": "attribute",
+                "attribute": "href"
             },
             {
                 "name": "price",
-                "selector": "td:nth-child(2)",
-                "type": "text",
+                "selector": "td:nth-child(3) div.cds-typographyResets-t6muwls.cds-body-bwup3gq",
+                "type": "text"
             },
-        ],
+            {
+                "name": "change",
+                "selector": "td:nth-child(7) p.cds-body-bwup3gq",
+                "type": "text"
+            }
+        ]
     }
 
     request = {
-        "urls": "https://www.coinbase.com/explore",
-        "priority": 9,
-        "extraction_config": {"type": "json_css", "params": {"schema": schema}},
+        "urls": ["https://www.coinbase.com/explore"],
+        "browser_config": {},
+        "crawler_config": {
+            "type": "CrawlerRunConfig",
+            "params": {
+                "extraction_strategy": {
+                    "type": "JsonCssExtractionStrategy",
+                    "params": {"schema": schema}
+                }
+            }
+        }
     }
 
     result = tester.submit_and_wait(request)
-    extracted = json.loads(result["result"]["extracted_content"])
+    extracted = json.loads(result["result"]["results"][0]["extracted_content"])
     print(f"Extracted {len(extracted)} items")
-    print("Sample item:", json.dumps(extracted[0], indent=2))
+    if extracted:
+        print("Sample item:", json.dumps(extracted[0], indent=2))
     assert result["result"]["success"]
     assert len(extracted) > 0
 
@@ -230,43 +225,54 @@ def test_llm_extraction(tester: Crawl4AiTester):
     schema = {
         "type": "object",
         "properties": {
-            "model_name": {
+            "asset_name": {
                 "type": "string",
-                "description": "Name of the OpenAI model.",
+                "description": "Name of the asset.",
             },
-            "input_fee": {
+            "price": {
                 "type": "string",
-                "description": "Fee for input token for the OpenAI model.",
+                "description": "Price of the asset.",
             },
-            "output_fee": {
+            "change": {
                 "type": "string",
-                "description": "Fee for output token for the OpenAI model.",
+                "description": "Change in price of the asset.",
             },
         },
-        "required": ["model_name", "input_fee", "output_fee"],
+        "required": ["asset_name", "price", "change"],
     }
 
     request = {
-        "urls": "https://openai.com/api/pricing",
-        "priority": 8,
-        "extraction_config": {
-            "type": "llm",
+        "urls": ["https://www.coinbase.com/en-in/explore"],
+        "browser_config": {},
+        "crawler_config": {
+            "type": "CrawlerRunConfig",
             "params": {
-                "provider": "openai/gpt-4o-mini",
-                "api_token": os.getenv("OPENAI_API_KEY"),
-                "schema": schema,
-                "extraction_type": "schema",
-                "instruction": """From the crawled content, extract all mentioned model names along with their fees for input and output tokens.""",
-            },
-        },
-        "crawler_params": {"word_count_threshold": 1},
+                "extraction_strategy": {
+                    "type": "LLMExtractionStrategy",
+                    "params": {
+                        "llm_config": {
+                            "type": "LLMConfig",
+                            "params": {
+                                "provider": "gemini/gemini-2.0-flash-exp",
+                                "api_token": os.getenv("GEMINI_API_KEY")
+                            }
+                        },
+                        "schema": schema,
+                        "extraction_type": "schema",
+                        "instruction": "From the crawled content, extract asset names along with their prices and change in price.",
+                    }
+                },
+                "word_count_threshold": 1
+            }
+        }
     }
 
     try:
         result = tester.submit_and_wait(request)
-        extracted = json.loads(result["result"]["extracted_content"])
-        print(f"Extracted {len(extracted)} model pricing entries")
-        print("Sample entry:", json.dumps(extracted[0], indent=2))
+        extracted = json.loads(result["result"]["results"][0]["extracted_content"])
+        print(f"Extracted {len(extracted)} asset pricing entries")
+        if extracted:
+            print("Sample entry:", json.dumps(extracted[0], indent=2))
         assert result["result"]["success"]
     except Exception as e:
         print(f"LLM extraction test failed (might be due to missing API key): {str(e)}")
@@ -274,6 +280,16 @@ def test_llm_extraction(tester: Crawl4AiTester):
 
 def test_llm_with_ollama(tester: Crawl4AiTester):
     print("\n=== Testing LLM with Ollama ===")
+    
+    # Check if Ollama is accessible first
+    try:
+        ollama_response = requests.get("http://localhost:11434/api/tags", timeout=5)
+        ollama_response.raise_for_status()
+        print("Ollama is accessible")
+    except:
+        print("Ollama is not accessible, skipping test")
+        return
+    
     schema = {
         "type": "object",
         "properties": {
@@ -294,24 +310,33 @@ def test_llm_with_ollama(tester: Crawl4AiTester):
     }
 
     request = {
-        "urls": "https://www.nbcnews.com/business",
-        "priority": 8,
-        "extraction_config": {
-            "type": "llm",
+        "urls": ["https://www.nbcnews.com/business"],
+        "browser_config": {"verbose": True},
+        "crawler_config": {
+            "type": "CrawlerRunConfig",
             "params": {
-                "provider": "ollama/llama2",
-                "schema": schema,
-                "extraction_type": "schema",
-                "instruction": "Extract the main article information including title, summary, and main topics.",
-            },
-        },
-        "extra": {"word_count_threshold": 1},
-        "crawler_params": {"verbose": True},
+                "extraction_strategy": {
+                    "type": "LLMExtractionStrategy",
+                    "params": {
+                        "llm_config": {
+                            "type": "LLMConfig",
+                            "params": {
+                                "provider": "ollama/llama3.2:latest",
+                            }
+                        },
+                        "schema": schema,
+                        "extraction_type": "schema",
+                        "instruction": "Extract the main article information including title, summary, and main topics.",
+                    }
+                },
+                "word_count_threshold": 1
+            }
+        }
     }
 
     try:
         result = tester.submit_and_wait(request)
-        extracted = json.loads(result["result"]["extracted_content"])
+        extracted = json.loads(result["result"]["results"][0]["extracted_content"])
         print("Extracted content:", json.dumps(extracted, indent=2))
         assert result["result"]["success"]
     except Exception as e:
@@ -321,24 +346,30 @@ def test_llm_with_ollama(tester: Crawl4AiTester):
 def test_cosine_extraction(tester: Crawl4AiTester):
     print("\n=== Testing Cosine Extraction ===")
     request = {
-        "urls": "https://www.nbcnews.com/business",
-        "priority": 8,
-        "extraction_config": {
-            "type": "cosine",
+        "urls": ["https://www.nbcnews.com/business"],
+        "browser_config": {},
+        "crawler_config": {
+            "type": "CrawlerRunConfig",
             "params": {
-                "semantic_filter": "business finance economy",
-                "word_count_threshold": 10,
-                "max_dist": 0.2,
-                "top_k": 3,
-            },
-        },
+                "extraction_strategy": {
+                    "type": "CosineStrategy",
+                    "params": {
+                        "semantic_filter": "business finance economy",
+                        "word_count_threshold": 10,
+                        "max_dist": 0.2,
+                        "top_k": 3,
+                    }
+                }
+            }
+        }
     }
 
     try:
         result = tester.submit_and_wait(request)
-        extracted = json.loads(result["result"]["extracted_content"])
+        extracted = json.loads(result["result"]["results"][0]["extracted_content"])
         print(f"Extracted {len(extracted)} text clusters")
-        print("First cluster tags:", extracted[0]["tags"])
+        if extracted:
+            print("First cluster tags:", extracted[0]["tags"])
         assert result["result"]["success"]
     except Exception as e:
         print(f"Cosine extraction test failed: {str(e)}")
@@ -347,20 +378,25 @@ def test_cosine_extraction(tester: Crawl4AiTester):
 def test_screenshot(tester: Crawl4AiTester):
     print("\n=== Testing Screenshot ===")
     request = {
-        "urls": "https://www.nbcnews.com/business",
-        "priority": 5,
-        "screenshot": True,
-        "crawler_params": {"headless": True},
+        "urls": ["https://www.nbcnews.com/business"],
+        "browser_config": {"headless": True},
+        "crawler_config": {
+            "type": "CrawlerRunConfig",
+            "params": {
+                "screenshot": True
+            }
+        }
     }
 
     result = tester.submit_and_wait(request)
-    print("Screenshot captured:", bool(result["result"]["screenshot"]))
+    screenshot_data = result["result"]["results"][0]["screenshot"]
+    print("Screenshot captured:", bool(screenshot_data))
 
-    if result["result"]["screenshot"]:
+    if screenshot_data:
         # Save screenshot
-        screenshot_data = base64.b64decode(result["result"]["screenshot"])
+        screenshot_bytes = base64.b64decode(screenshot_data)
         with open("test_screenshot.jpg", "wb") as f:
-            f.write(screenshot_data)
+            f.write(screenshot_bytes)
         print("Screenshot saved as test_screenshot.jpg")
 
     assert result["result"]["success"]
@@ -368,5 +404,4 @@ def test_screenshot(tester: Crawl4AiTester):
 
 if __name__ == "__main__":
     version = sys.argv[1] if len(sys.argv) > 1 else "basic"
-    # version = "full"
     test_docker_deployment(version)
