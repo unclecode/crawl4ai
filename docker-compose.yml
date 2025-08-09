@@ -14,6 +14,7 @@ x-base-config: &base-config
     - TOGETHER_API_KEY=${TOGETHER_API_KEY:-}
     - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
     - GEMINI_API_TOKEN=${GEMINI_API_TOKEN:-}
+    - LLM_PROVIDER=${LLM_PROVIDER:-}  # Optional: Override default provider (e.g., "anthropic/claude-3-opus")
   volumes:
     - /dev/shm:/dev/shm  # Chromium performance
   deploy:

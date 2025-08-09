@@ -520,7 +520,8 @@ This approach is handy when you still want external links but need to block cert
 
 ### 4.1 Accessing `result.media`
 
-By default, Crawl4AI collects images, audio, video URLs, and data tables it finds on the page. These are stored in `result.media`, a dictionary keyed by media type (e.g., `images`, `videos`, `audio`, `tables`).
+By default, Crawl4AI collects images, audio and video URLs it finds on the page. These are stored in `result.media`, a dictionary keyed by media type (e.g., `images`, `videos`, `audio`).
+**Note: Tables have been moved from `result.media["tables"]` to the new `result.tables` format for better organization and direct access.**
 
 **Basic Example**:
 
@@ -534,14 +535,6 @@ if result.success:
         print(f"           Alt text: {img.get('alt', '')}")
         print(f"           Score: {img.get('score')}")
         print(f"           Description: {img.get('desc', '')}\n")
-    
-    # Get tables
-    tables = result.media.get("tables", [])
-    print(f"Found {len(tables)} data tables in total.")
-    for i, table in enumerate(tables):
-        print(f"[Table {i}] Caption: {table.get('caption', 'No caption')}")
-        print(f"           Columns: {len(table.get('headers', []))}")
-        print(f"           Rows: {len(table.get('rows', []))}")
 ```
 
 **Structure Example**:
@@ -568,19 +561,6 @@ result.media = {
   "audio": [
     # Similar structure but with audio-specific fields
   ],
-  "tables": [
-    {
-      "headers": ["Name", "Age", "Location"],
-      "rows": [
-        ["John Doe", "34", "New York"],
-        ["Jane Smith", "28", "San Francisco"],
-        ["Alex Johnson", "42", "Chicago"]
-      ],
-      "caption": "Employee Directory",
-      "summary": "Directory of company employees"
-    },
-    # More tables if present
-  ]
 }
 ```
 
@@ -608,53 +588,7 @@ crawler_cfg = CrawlerRunConfig(
 
 This setting attempts to discard images from outside the primary domain, keeping only those from the site you’re crawling.
 
-### 3.3 Working with Tables
-
-Crawl4AI can detect and extract structured data from HTML tables. Tables are analyzed based on various criteria to determine if they are actual data tables (as opposed to layout tables), including:
-
-- Presence of thead and tbody sections
-- Use of th elements for headers
-- Column consistency
-- Text density
-- And other factors
-
-Tables that score above the threshold (default: 7) are extracted and stored in `result.media.tables`.
-
-**Accessing Table Data**:
-
-```python
-if result.success:
-    tables = result.media.get("tables", [])
-    print(f"Found {len(tables)} data tables on the page")
-    
-    if tables:
-        # Access the first table
-        first_table = tables[0]
-        print(f"Table caption: {first_table.get('caption', 'No caption')}")
-        print(f"Headers: {first_table.get('headers', [])}")
-        
-        # Print the first 3 rows
-        for i, row in enumerate(first_table.get('rows', [])[:3]):
-            print(f"Row {i+1}: {row}")
-```
-
-**Configuring Table Extraction**:
-
-You can adjust the sensitivity of the table detection algorithm with:
-
-```python
-crawler_cfg = CrawlerRunConfig(
-    table_score_threshold=5  # Lower value = more tables detected (default: 7)
-)
-```
-
-Each extracted table contains:
-- `headers`: Column header names
-- `rows`: List of rows, each containing cell values
-- `caption`: Table caption text (if available)
-- `summary`: Table summary attribute (if specified)
-
-### 3.4 Additional Media Config
+### 4.3 Additional Media Config
 
 - **`screenshot`**: Set to `True` if you want a full-page screenshot stored as `base64` in `result.screenshot`.  
 - **`pdf`**: Set to `True` if you want a PDF version of the page in `result.pdf`.  
@@ -695,7 +629,7 @@ The MHTML format is particularly useful because:
 
 ---
 
-## 4. Putting It All Together: Link & Media Filtering
+## 5. Putting It All Together: Link & Media Filtering
 
 Here’s a combined example demonstrating how to filter out external links, skip certain domains, and exclude external images:
 
@@ -743,7 +677,7 @@ if __name__ == "__main__":
 
 ---
 
-## 5. Common Pitfalls & Tips
+## 6. Common Pitfalls & Tips
 
 1. **Conflicting Flags**:  
    - `exclude_external_links=True` but then also specifying `exclude_social_media_links=True` is typically fine, but understand that the first setting already discards *all* external links. The second becomes somewhat redundant.  
@@ -762,10 +696,3 @@ if __name__ == "__main__":
 ---
 
 **That’s it for Link & Media Analysis!** You’re now equipped to filter out unwanted sites and zero in on the images and videos that matter for your project.
-### Table Extraction Tips
-
-- Not all HTML tables are extracted - only those detected as "data tables" vs. layout tables.
-- Tables with inconsistent cell counts, nested tables, or those used purely for layout may be skipped.
-- If you're missing tables, try adjusting the `table_score_threshold` to a lower value (default is 7).
-
-The table detection algorithm scores tables based on features like consistent columns, presence of headers, text density, and more. Tables scoring above the threshold are considered data tables worth extracting.

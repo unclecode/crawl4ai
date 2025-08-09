@@ -36,6 +36,7 @@ class LlmJobPayload(BaseModel):
     q:      str
     schema: Optional[str] = None
     cache:  bool = False
+    provider: Optional[str] = None
 
 
 class CrawlJobPayload(BaseModel):
@@ -61,6 +62,7 @@ async def llm_job_enqueue(
         schema=payload.schema,
         cache=payload.cache,
         config=_config,
+        provider=payload.provider,
     )
 
 

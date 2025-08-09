@@ -208,6 +208,71 @@ config = CrawlerRunConfig(
 
 See [Virtual Scroll documentation](../../advanced/virtual-scroll.md) for detailed examples.
 
+---
+
+### I) **URL Matching Configuration**
+
+| **Parameter**          | **Type / Default**           | **What It Does**                                                                                                                    |
+|------------------------|------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
+| **`url_matcher`**      | `UrlMatcher` (None)          | Pattern(s) to match URLs against. Can be: string (glob), function, or list of mixed types. **None means match ALL URLs**         |
+| **`match_mode`**       | `MatchMode` (MatchMode.OR)   | How to combine multiple matchers in a list: `MatchMode.OR` (any match) or `MatchMode.AND` (all must match)                       |
+
+The `url_matcher` parameter enables URL-specific configurations when used with `arun_many()`:
+
+```python
+from crawl4ai import CrawlerRunConfig, MatchMode
+from crawl4ai.processors.pdf import PDFContentScrapingStrategy
+from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+
+# Simple string pattern (glob-style)
+pdf_config = CrawlerRunConfig(
+    url_matcher="*.pdf",
+    scraping_strategy=PDFContentScrapingStrategy()
+)
+
+# Multiple patterns with OR logic (default)
+blog_config = CrawlerRunConfig(
+    url_matcher=["*/blog/*", "*/article/*", "*/news/*"],
+    match_mode=MatchMode.OR  # Any pattern matches
+)
+
+# Function matcher
+api_config = CrawlerRunConfig(
+    url_matcher=lambda url: 'api' in url or url.endswith('.json'),
+    # Other settings like extraction_strategy
+)
+
+# Mixed: String + Function with AND logic
+complex_config = CrawlerRunConfig(
+    url_matcher=[
+        lambda url: url.startswith('https://'),  # Must be HTTPS
+        "*.org/*",                               # Must be .org domain
+        lambda url: 'docs' in url                # Must contain 'docs'
+    ],
+    match_mode=MatchMode.AND  # ALL conditions must match
+)
+
+# Combined patterns and functions with AND logic
+secure_docs = CrawlerRunConfig(
+    url_matcher=["https://*", lambda url: '.doc' in url],
+    match_mode=MatchMode.AND  # Must be HTTPS AND contain .doc
+)
+
+# Default config - matches ALL URLs
+default_config = CrawlerRunConfig()  # No url_matcher = matches everything
+```
+
+**UrlMatcher Types:**
+- **None (default)**: When `url_matcher` is None or not set, the config matches ALL URLs
+- **String patterns**: Glob-style patterns like `"*.pdf"`, `"*/api/*"`, `"https://*.example.com/*"`
+- **Functions**: `lambda url: bool` - Custom logic for complex matching
+- **Lists**: Mix strings and functions, combined with `MatchMode.OR` or `MatchMode.AND`
+
+**Important Behavior:**
+- When passing a list of configs to `arun_many()`, URLs are matched against each config's `url_matcher` in order. First match wins!
+- If no config matches a URL and there's no default config (one without `url_matcher`), the URL will fail with "No matching configuration found"
+- Always include a default config as the last item if you want to handle all URLs
+
 ---## 2.2 Helper Methods
 
 Both `BrowserConfig` and `CrawlerRunConfig` provide a `clone()` method to create modified copies:

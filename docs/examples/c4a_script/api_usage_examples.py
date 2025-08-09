@@ -3,8 +3,8 @@ C4A-Script API Usage Examples
 Shows how to use the new Result-based API in various scenarios
 """
 
-from c4a_compile import compile, validate, compile_file
-from c4a_result import CompilationResult, ValidationResult
+from crawl4ai.script.c4a_compile import compile, validate, compile_file
+from crawl4ai.script.c4a_result import CompilationResult, ValidationResult
 import json
 
 
