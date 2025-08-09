@@ -2,6 +2,14 @@
 
 Thank you to everyone supporting Crawl4AI! Your sponsorship helps keep this project open-source and actively maintained.
 
+## 👑 Founding Sponsors
+*The first 50 sponsors who believed in our vision - permanently recognized*
+
+<!-- Founding sponsors will be listed here with special recognition -->
+🎉 **Become a Founding Sponsor!** Only [X/50] spots remaining! [Join now →](https://github.com/sponsors/unclecode)
+
+---
+
 ## 🏢 Data Infrastructure Partners ($2000/month)
 *These organizations are building their data sovereignty with Crawl4AI at the core*
 
