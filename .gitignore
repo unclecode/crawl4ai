@@ -268,6 +268,8 @@ tests/**/benchmark_reports
 
 docs/**/data
 .codecat/
+.claude/
+docs/to_claude/
 
 docs/apps/linkdin/debug*/
 docs/apps/linkdin/samples/insights/*

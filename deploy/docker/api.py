@@ -1,5 +1,6 @@
 import os
 import json
+import math
 import asyncio
 from typing import List, Tuple, Dict
 from functools import partial
@@ -469,10 +470,21 @@ async def handle_crawl_request(
             peak_mem_mb = max(peak_mem_mb if peak_mem_mb else 0, end_mem_mb) # <--- Get peak memory
         logger.info(f"Memory usage: Start: {start_mem_mb} MB, End: {end_mem_mb} MB, Delta: {mem_delta_mb} MB, Peak: {peak_mem_mb} MB")
 
-        # Process results to handle PDF bytes
+        # Process results to handle PDF bytes with safe serialization
+        def safe_serialize(data):
+            def clean_value(v):
+                if isinstance(v, float) and (math.isinf(v) or math.isnan(v)):
+                    return None
+                elif isinstance(v, dict):
+                    return {k: clean_value(val) for k, val in v.items()}
+                elif isinstance(v, (list, tuple)):
+                    return [clean_value(val) for val in v]
+                return v
+            return clean_value(data)
+        
         processed_results = []
         for result in results:
-            result_dict = result.model_dump()
+            result_dict = safe_serialize(result.model_dump())
             # If PDF exists, encode it to base64
             if result_dict.get('pdf') is not None:
                 result_dict['pdf'] = b64encode(result_dict['pdf']).decode('utf-8')
