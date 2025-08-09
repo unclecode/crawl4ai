@@ -154,6 +154,29 @@ cp deploy/docker/.llm.env.example .llm.env
 # Now edit .llm.env and add your API keys
 ```
 
+**Flexible LLM Provider Configuration:**
+
+The Docker setup now supports flexible LLM provider configuration through three methods:
+
+1. **Environment Variable** (Highest Priority): Set `LLM_PROVIDER` to override the default
+   ```bash
+   export LLM_PROVIDER="anthropic/claude-3-opus"
+   # Or in your .llm.env file:
+   # LLM_PROVIDER=anthropic/claude-3-opus
+   ```
+
+2. **API Request Parameter**: Specify provider per request
+   ```json
+   {
+     "url": "https://example.com",
+     "provider": "groq/mixtral-8x7b"
+   }
+   ```
+
+3. **Config File Default**: Falls back to `config.yml` (default: `openai/gpt-4o-mini`)
+
+The system automatically selects the appropriate API key based on the provider.
+
 #### 3. Build and Run with Compose
 
 The `docker-compose.yml` file in the project root provides a simplified approach that automatically handles architecture detection using buildx.
@@ -668,7 +691,7 @@ app:
 
 # Default LLM Configuration
 llm:
-  provider: "openai/gpt-4o-mini"
+  provider: "openai/gpt-4o-mini"  # Can be overridden by LLM_PROVIDER env var
   api_key_env: "OPENAI_API_KEY"
   # api_key: sk-...  # If you pass the API key directly then api_key_env will be ignored
 

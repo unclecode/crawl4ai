@@ -404,7 +404,182 @@ for result in results:
         print(f"Duration: {dr.end_time - dr.start_time}")
 ```
 
-## 6. Summary
+## 6. URL-Specific Configurations
+
+When crawling diverse content types, you often need different configurations for different URLs. For example:
+- PDFs need specialized extraction
+- Blog pages benefit from content filtering
+- Dynamic sites need JavaScript execution
+- API endpoints need JSON parsing
+
+### 6.1 Basic URL Pattern Matching
+
+```python
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, MatchMode
+from crawl4ai.processors.pdf import PDFContentScrapingStrategy
+from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai.content_filter_strategy import PruningContentFilter
+from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
+
+async def crawl_mixed_content():
+    # Configure different strategies for different content
+    configs = [
+        # PDF files - specialized extraction
+        CrawlerRunConfig(
+            url_matcher="*.pdf",
+            scraping_strategy=PDFContentScrapingStrategy()
+        ),
+        
+        # Blog/article pages - content filtering
+        CrawlerRunConfig(
+            url_matcher=["*/blog/*", "*/article/*"],
+            markdown_generator=DefaultMarkdownGenerator(
+                content_filter=PruningContentFilter(threshold=0.48)
+            )
+        ),
+        
+        # Dynamic pages - JavaScript execution
+        CrawlerRunConfig(
+            url_matcher=lambda url: 'github.com' in url,
+            js_code="window.scrollTo(0, 500);"
+        ),
+        
+        # API endpoints - JSON extraction
+        CrawlerRunConfig(
+            url_matcher=lambda url: 'api' in url or url.endswith('.json'),
+            # Custome settings for JSON extraction
+        ),
+        
+        # Default config for everything else
+        CrawlerRunConfig()  # No url_matcher means it matches ALL URLs (fallback)
+    ]
+    
+    # Mixed URLs
+    urls = [
+        "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+        "https://blog.python.org/",
+        "https://github.com/microsoft/playwright",
+        "https://httpbin.org/json",
+        "https://example.com/"
+    ]
+    
+    async with AsyncWebCrawler() as crawler:
+        results = await crawler.arun_many(
+            urls=urls,
+            config=configs  # Pass list of configs
+        )
+        
+        for result in results:
+            print(f"{result.url}: {len(result.markdown)} chars")
+```
+
+### 6.2 Advanced Pattern Matching
+
+**Important**: A `CrawlerRunConfig` without `url_matcher` (or with `url_matcher=None`) matches ALL URLs. This makes it perfect as a default/fallback configuration.
+
+The `url_matcher` parameter supports three types of patterns:
+
+#### Glob Patterns (Strings)
+```python
+# Simple patterns
+"*.pdf"                    # Any PDF file
+"*/api/*"                  # Any URL with /api/ in path
+"https://*.example.com/*"  # Subdomain matching
+"*://example.com/blog/*"   # Any protocol
+```
+
+#### Custom Functions
+```python
+# Complex logic with lambdas
+lambda url: url.startswith('https://') and 'secure' in url
+lambda url: len(url) > 50 and url.count('/') > 5
+lambda url: any(domain in url for domain in ['api.', 'data.', 'feed.'])
+```
+
+#### Mixed Lists with AND/OR Logic
+```python
+# Combine multiple conditions
+CrawlerRunConfig(
+    url_matcher=[
+        "https://*",                        # Must be HTTPS
+        lambda url: 'internal' in url,      # Must contain 'internal'
+        lambda url: not url.endswith('.pdf') # Must not be PDF
+    ],
+    match_mode=MatchMode.AND  # ALL conditions must match
+)
+```
+
+### 6.3 Practical Example: News Site Crawler
+
+```python
+async def crawl_news_site():
+    dispatcher = MemoryAdaptiveDispatcher(
+        memory_threshold_percent=70.0,
+        rate_limiter=RateLimiter(base_delay=(1.0, 2.0))
+    )
+    
+    configs = [
+        # Homepage - light extraction
+        CrawlerRunConfig(
+            url_matcher=lambda url: url.rstrip('/') == 'https://news.ycombinator.com',
+            css_selector="nav, .headline",
+            extraction_strategy=None
+        ),
+        
+        # Article pages - full extraction
+        CrawlerRunConfig(
+            url_matcher="*/article/*",
+            extraction_strategy=CosineStrategy(
+                semantic_filter="article content",
+                word_count_threshold=100
+            ),
+            screenshot=True,
+            excluded_tags=["nav", "aside", "footer"]
+        ),
+        
+        # Author pages - metadata focus
+        CrawlerRunConfig(
+            url_matcher="*/author/*",
+            extraction_strategy=JsonCssExtractionStrategy({
+                "name": "h1.author-name",
+                "bio": ".author-bio",
+                "articles": "article.post-card h2"
+            })
+        ),
+        
+        # Everything else
+        CrawlerRunConfig()
+    ]
+    
+    async with AsyncWebCrawler() as crawler:
+        results = await crawler.arun_many(
+            urls=news_urls,
+            config=configs,
+            dispatcher=dispatcher
+        )
+```
+
+### 6.4 Best Practices
+
+1. **Order Matters**: Configs are evaluated in order - put specific patterns before general ones
+2. **Default Config Behavior**: 
+   - A config without `url_matcher` matches ALL URLs
+   - Always include a default config as the last item if you want to handle all URLs
+   - Without a default config, unmatched URLs will fail with "No matching configuration found"
+3. **Test Your Patterns**: Use the config's `is_match()` method to test patterns:
+   ```python
+   config = CrawlerRunConfig(url_matcher="*.pdf")
+   print(config.is_match("https://example.com/doc.pdf"))  # True
+   
+   default_config = CrawlerRunConfig()  # No url_matcher
+   print(default_config.is_match("https://any-url.com"))  # True - matches everything!
+   ```
+4. **Optimize for Performance**: 
+   - Disable JS for static content
+   - Skip screenshots for data APIs
+   - Use appropriate extraction strategies
+
+## 7. Summary
 
 1. **Two Dispatcher Types**:
 

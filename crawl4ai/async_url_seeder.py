@@ -829,7 +829,7 @@ class AsyncUrlSeeder:
 
     async def _iter_sitemap(self, url: str):
         try:
-            r = await self.client.get(url, timeout=15)
+            r = await self.client.get(url, timeout=15, follow_redirects=True)
             r.raise_for_status()
         except httpx.HTTPStatusError as e:
             self._log("warning", "Failed to fetch sitemap {url}: HTTP {status_code}",

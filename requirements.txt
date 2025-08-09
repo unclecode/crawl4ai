@@ -1,30 +1,32 @@
 # Note: These requirements are also specified in pyproject.toml
 # This file is kept for development environment setup and compatibility
+aiofiles>=24.1.0
+aiohttp>=3.11.11
 aiosqlite~=0.20
+anyio>=4.0.0
 lxml~=5.3
 litellm>=1.53.1
 numpy>=1.26.0,<3
 pillow>=10.4
 playwright>=1.49.0
+patchright>=1.49.0
 python-dotenv~=1.0
 requests~=2.26
 beautifulsoup4~=4.12
 tf-playwright-stealth>=1.1.0
 xxhash~=3.4
 rank-bm25~=0.2
-aiofiles>=24.1.0
 colorama~=0.4
 snowballstemmer~=2.2
 pydantic>=2.10
 pyOpenSSL>=24.3.0
 psutil>=6.1.1
+PyYAML>=6.0
 nltk>=3.9.1
 rich>=13.9.4
-cssselect>=1.2.0
 chardet>=5.2.0
 brotli>=1.1.0
 httpx[http2]>=0.27.2
-sentence-transformers>=2.2.0
 alphashape>=1.3.1
 shapely>=2.0.0
 

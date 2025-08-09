@@ -3,12 +3,12 @@ import warnings
 
 from .async_webcrawler import AsyncWebCrawler, CacheMode
 # MODIFIED: Add SeedingConfig and VirtualScrollConfig here
-from .async_configs import BrowserConfig, CrawlerRunConfig, HTTPCrawlerConfig, LLMConfig, ProxyConfig, GeolocationConfig, SeedingConfig, VirtualScrollConfig, LinkPreviewConfig
+from .async_configs import BrowserConfig, CrawlerRunConfig, HTTPCrawlerConfig, LLMConfig, ProxyConfig, GeolocationConfig, SeedingConfig, VirtualScrollConfig, LinkPreviewConfig, MatchMode
 
 from .content_scraping_strategy import (
     ContentScrapingStrategy,
-    WebScrapingStrategy,
     LXMLWebScrapingStrategy,
+    WebScrapingStrategy,  # Backward compatibility alias
 )
 from .async_logger import (
     AsyncLoggerBase,
@@ -88,6 +88,13 @@ from .script import (
     ErrorDetail
 )
 
+# Browser Adapters
+from .browser_adapter import (
+    BrowserAdapter,
+    PlaywrightAdapter,
+    UndetectedAdapter
+)
+
 from .utils import (
     start_colab_display_server,
     setup_colab_environment
@@ -132,6 +139,7 @@ __all__ = [
     "CrawlResult",
     "CrawlerHub",
     "CacheMode",
+    "MatchMode",
     "ContentScrapingStrategy",
     "WebScrapingStrategy",
     "LXMLWebScrapingStrategy",
@@ -173,6 +181,10 @@ __all__ = [
     "CompilationResult",
     "ValidationResult",
     "ErrorDetail",
+    # Browser Adapters
+    "BrowserAdapter",
+    "PlaywrightAdapter", 
+    "UndetectedAdapter",
     "LinkPreviewConfig"
 ]
 

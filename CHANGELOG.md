@@ -22,6 +22,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Flexible LLM Provider Configuration** (Docker): 
+  - Support for `LLM_PROVIDER` environment variable to override default provider
+  - Per-request provider override via optional `provider` parameter in API endpoints
+  - Automatic provider validation with clear error messages
+  - Updated Docker documentation and examples
+
+### Changed
+- **WebScrapingStrategy Refactoring**: Simplified content scraping architecture
+  - `WebScrapingStrategy` is now an alias for `LXMLWebScrapingStrategy` for backward compatibility
+  - Removed redundant BeautifulSoup-based implementation (~1000 lines of code)
+  - `LXMLWebScrapingStrategy` now inherits directly from `ContentScrapingStrategy`
+  - All existing code using `WebScrapingStrategy` continues to work without modification
+  - Default scraping strategy remains `LXMLWebScrapingStrategy` for optimal performance
+
+### Added
 - **AsyncUrlSeeder**: High-performance URL discovery system for intelligent crawling at scale
   - Discover URLs from sitemaps and Common Crawl index
   - Extract and analyze page metadata without full crawling
