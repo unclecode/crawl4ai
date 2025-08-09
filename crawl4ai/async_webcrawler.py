@@ -2,10 +2,12 @@ from .__version__ import __version__ as crawl4ai_version
 import os
 import sys
 import time
+import ssl
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 import json
 import asyncio
+import aiohttp
 
 # from contextlib import nullcontext, asynccontextmanager
 from contextlib import asynccontextmanager
@@ -200,6 +202,119 @@ class AsyncWebCrawler:
     async def nullcontext(self):
         """异步空上下文管理器"""
         yield
+
+    async def health_check(self, url: str, timeout: float = 10.0, verify_ssl: bool = False) -> Dict[str, Any]:
+        """
+        Perform quick accessibility check on URL using HEAD request.
+        
+        This method provides a lightweight way to verify if a URL is accessible
+        before running a full crawl operation. It's useful for:
+        - Pre-crawl validation of URLs
+        - Filtering dead URLs from batch operations  
+        - Network troubleshooting
+        - Resource optimization
+        
+        Args:
+            url (str): URL to check for accessibility
+            timeout (float): Request timeout in seconds (default: 10.0)
+            verify_ssl (bool): Whether to verify SSL certificates (default: False for broader compatibility)
+            
+        Returns:
+            Dict[str, Any]: Health check result containing:
+                - accessible (bool): True if URL is reachable with 2xx/3xx status
+                - status_code (int|None): HTTP status code, None if network error
+                - response_time_ms (float): Time taken for the request in milliseconds
+                - content_type (str): Content-Type header value
+                - final_url (str): Final URL after redirects
+                - redirected (bool): True if URL was redirected
+                - error (str, optional): Error message if not accessible
+                - error_type (str, optional): Type of error that occurred
+                
+        Example:
+            ```python
+            async with AsyncWebCrawler() as crawler:
+                health = await crawler.health_check("https://example.com")
+                if health["accessible"]:
+                    result = await crawler.arun(url)
+                else:
+                    print(f"URL not accessible: {health.get('error')}")
+            ```
+        """
+        start_time = time.time()
+        
+        try:
+            # Use similar headers to the main crawler for consistency
+            headers = {
+                'User-Agent': getattr(self.browser_config, 'user_agent', None) or 
+                             'Mozilla/5.0 (compatible; Crawl4AI-HealthCheck/1.0)',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Accept-Encoding': 'gzip, deflate',
+                'Connection': 'close'
+            }
+            
+            # Create connector with SSL verification setting
+            ssl_context = ssl.create_default_context() if verify_ssl else False
+            connector = aiohttp.TCPConnector(limit=1, ssl=ssl_context)
+            timeout_config = aiohttp.ClientTimeout(total=timeout)
+            
+            async with aiohttp.ClientSession(
+                timeout=timeout_config,
+                headers=headers,
+                connector=connector
+            ) as session:
+                async with session.head(url, allow_redirects=True) as response:
+                    response_time = (time.time() - start_time) * 1000
+                    
+                    # Consider 2xx and 3xx as accessible
+                    accessible = 200 <= response.status < 400
+                    
+                    return {
+                        "accessible": accessible,
+                        "status_code": response.status,
+                        "response_time_ms": round(response_time, 2),
+                        "content_type": response.headers.get('content-type', ''),
+                        "final_url": str(response.url),
+                        "redirected": str(response.url) != url,
+                        "server": response.headers.get('server', ''),
+                        "content_length": response.headers.get('content-length', '')
+                    }
+                    
+        except asyncio.TimeoutError:
+            response_time = (time.time() - start_time) * 1000
+            return {
+                "accessible": False,
+                "status_code": None,
+                "response_time_ms": round(response_time, 2),
+                "error": f"Request timed out after {timeout} seconds",
+                "error_type": "TimeoutError",
+                "final_url": url,
+                "redirected": False
+            }
+            
+        except aiohttp.ClientError as e:
+            response_time = (time.time() - start_time) * 1000
+            return {
+                "accessible": False,
+                "status_code": None,
+                "response_time_ms": round(response_time, 2),
+                "error": str(e),
+                "error_type": type(e).__name__,
+                "final_url": url,
+                "redirected": False
+            }
+            
+        except Exception as e:
+            response_time = (time.time() - start_time) * 1000
+            return {
+                "accessible": False,
+                "status_code": None,
+                "response_time_ms": round(response_time, 2),
+                "error": str(e),
+                "error_type": type(e).__name__,
+                "final_url": url,
+                "redirected": False
+            }
 
     async def arun(
         self,
