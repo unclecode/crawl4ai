@@ -58,7 +58,7 @@ Crawl4AI is the #1 trending open-source web crawler. We're building the future o
 
 Building data extraction at scale? Need dedicated support or infrastructure? Let's talk about a custom partnership.
 
-📧 Contact: [hello@crawl4ai.com](mailto:hello@crawl4ai.com)
+📧 Contact: [hello@crawl4ai.com](mailto:hello@crawl4ai.com) | 📅 [Schedule a call](https://calendar.app.google/rEpvi2UBgUQjWHfJ9)
 
 ---
 
