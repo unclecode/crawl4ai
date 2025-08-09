@@ -10,11 +10,13 @@ import sys
 import uuid
 import shutil
 
+from crawl4ai import BrowserProfiler
+from crawl4ai.browser_manager import BrowserManager
+
 # Add the project root to Python path if running directly
 if __name__ == "__main__":
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
-from crawl4ai.browser import BrowserManager, BrowserProfileManager
 from crawl4ai.async_configs import BrowserConfig, CrawlerRunConfig
 from crawl4ai.async_logger import AsyncLogger
 
@@ -25,7 +27,7 @@ async def test_profile_creation():
     """Test creating and managing browser profiles."""
     logger.info("Testing profile creation and management", tag="TEST")
     
-    profile_manager = BrowserProfileManager(logger=logger)
+    profile_manager = BrowserProfiler(logger=logger)
     
     try:
         # List existing profiles
@@ -83,7 +85,7 @@ async def test_profile_with_browser():
     """Test using a profile with a browser."""
     logger.info("Testing using a profile with a browser", tag="TEST")
     
-    profile_manager = BrowserProfileManager(logger=logger)
+    profile_manager = BrowserProfiler(logger=logger)
     test_profile_name = f"test-browser-profile-{uuid.uuid4().hex[:8]}"
     profile_path = None
     
@@ -101,6 +103,8 @@ async def test_profile_with_browser():
         # Now use this profile with a browser
         browser_config = BrowserConfig(
             user_data_dir=profile_path,
+            use_managed_browser=True,
+            use_persistent_context=True,
             headless=True
         )
         
