@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/unclecode-crawl4ai-badge.png)](https://mseep.ai/app/unclecode-crawl4ai)
+
 # 🚀🤖 Crawl4AI: Open-source LLM Friendly Web Crawler & Scraper.
 
 <div align="center">
