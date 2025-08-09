@@ -828,6 +828,31 @@ For questions, suggestions, or feedback, feel free to reach out:
 
 Happy Crawling! 🕸️🚀
 
+## 💖 Support Crawl4AI
+
+Crawl4AI is the #1 trending open-source web crawler, built by the community, for the community. Your support helps us maintain and improve this tool for everyone.
+
+<div align="center">
+
+[![GitHub Sponsors](https://img.shields.io/badge/Sponsor%20on-GitHub-pink?style=for-the-badge&logo=github-sponsors)](https://github.com/sponsors/unclecode)
+
+</div>
+
+### 🤝 Sponsorship Tiers
+
+- **🌱 Believer ($5/mo)**: Join the movement for data democratization
+- **🚀 Builder ($50/mo)**: Get priority support and early feature access  
+- **💼 Growing Team ($500/mo)**: Bi-weekly syncs and optimization help
+- **🏢 Data Infrastructure Partner ($2000/mo)**: Full partnership with dedicated support
+
+[Become a Sponsor →](https://github.com/sponsors/unclecode)
+
+### 🏆 Our Sponsors
+
+Thank you to all our sponsors who make this project possible!
+
+<!-- Sponsors will be automatically added here -->
+
 ## 🗾 Mission
 
 Our mission is to unlock the value of personal and enterprise data by transforming digital footprints into structured, tradeable assets. Crawl4AI empowers individuals and organizations with open-source tools to extract and structure data, fostering a shared data economy.  
