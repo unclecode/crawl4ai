@@ -47,7 +47,9 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
         self.url_scorer = url_scorer
         self.include_external = include_external
         self.max_pages = max_pages
-        self.logger = logger or logging.getLogger(__name__)
+        self.logger = logger if isinstance(
+            logger, (logging.Logger)
+        ) else logging.getLogger(__name__)
         self.stats = TraversalStats(start_time=datetime.now())
         self._cancel_event = asyncio.Event()
         self._pages_crawled = 0
