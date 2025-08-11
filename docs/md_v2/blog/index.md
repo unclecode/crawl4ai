@@ -20,23 +20,29 @@ Ever wondered why your AI coding assistant struggles with your library despite c
 
 ## Latest Release
 
-### [Crawl4AI v0.7.0 – The Adaptive Intelligence Update](releases/0.7.0.md)
-*January 28, 2025*
+### [Crawl4AI v0.7.3 – The Multi-Config Intelligence Update](releases/0.7.3.md)
+*August 6, 2025*
 
-Crawl4AI v0.7.0 introduces groundbreaking intelligence features that transform how crawlers understand and adapt to websites. This release brings Adaptive Crawling that learns website patterns, Virtual Scroll support for infinite pages, intelligent Link Preview with 3-layer scoring, and the powerful Async URL Seeder for massive URL discovery.
+Crawl4AI v0.7.3 brings smarter URL-specific configurations, flexible Docker deployments, and critical stability improvements. Configure different crawling strategies for different URL patterns in a single batch—perfect for mixed content sites with docs, blogs, and APIs.
 
 Key highlights:
-- **Adaptive Crawling**: Crawlers that learn and adapt to website structures automatically
-- **Virtual Scroll Support**: Complete content extraction from modern infinite scroll pages  
-- **Link Preview**: 3-layer scoring system for intelligent link prioritization
-- **Async URL Seeder**: Discover thousands of URLs in seconds with smart filtering
-- **Performance Boost**: Up to 3x faster with optimized resource handling
+- **Multi-URL Configurations**: Different strategies for different URL patterns in one crawl
+- **Flexible Docker LLM Providers**: Configure providers via environment variables  
+- **Bug Fixes**: Critical stability improvements for production deployments
+- **Documentation Updates**: Clearer examples and improved API documentation
 
-[Read full release notes →](releases/0.7.0.md)
+[Read full release notes →](releases/0.7.3.md)
 
 ---
 
 ## Previous Releases
+
+### [Crawl4AI v0.7.0 – The Adaptive Intelligence Update](releases/0.7.0.md)
+*January 28, 2025*
+
+Introduced groundbreaking intelligence features including Adaptive Crawling, Virtual Scroll support, intelligent Link Preview, and the Async URL Seeder for massive URL discovery.
+
+[Read release notes →](releases/0.7.0.md)
 
 ### [Crawl4AI v0.6.0 – World-Aware Crawling, Pre-Warmed Browsers, and the MCP API](releases/0.6.0.md)
 *December 23, 2024*

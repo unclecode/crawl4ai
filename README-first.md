@@ -25,33 +25,32 @@
   </p>
 </div>
 
-Crawl4AI turns the web into clean, LLM ready Markdown for RAG, agents, and data pipelines. Fast, controllable, battle tested by a 50k+ star community.
+Crawl4AI is the #1 trending GitHub repository, actively maintained by a vibrant community. It delivers blazing-fast, AI-ready web crawling tailored for LLMs, AI agents, and data pipelines. Open source, flexible, and built for real-time performance, Crawl4AI empowers developers with unmatched speed, precision, and deployment ease.  
 
 [✨ Check out latest update v0.7.0](#-recent-updates)
 
-✨ New in v0.7.0, Adaptive Crawling, Virtual Scroll, Link Preview scoring, Async URL Seeder, big performance gains. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.0.md)
+🎉 **Version 0.7.0 is now available!** The Adaptive Intelligence Update introduces groundbreaking features: Adaptive Crawling that learns website patterns, Virtual Scroll support for infinite pages, intelligent Link Preview with 3-layer scoring, Async URL Seeder for massive discovery, and significant performance improvements. [Read the release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.0.md)
 
 <details>
-  <summary>🤓 <strong>My Personal Story</strong></summary>
+<summary>🤓 <strong>My Personal Story</strong></summary>
 
-I grew up on an Amstrad, thanks to my dad, and never stopped building. In grad school I specialized in NLP and built crawlers for research. That’s where I learned how much extraction matters.
+My journey with computers started in childhood when my dad, a computer scientist, introduced me to an Amstrad computer. Those early days sparked a fascination with technology, leading me to pursue computer science and specialize in NLP during my postgraduate studies. It was during this time that I first delved into web crawling, building tools to help researchers organize papers and extract information from publications a challenging yet rewarding experience that honed my skills in data extraction.
 
-In 2023, I needed web-to-Markdown. The “open source” option wanted an account, API token, and $16, and still under-delivered. I went turbo anger mode, built Crawl4AI in days, and it went viral. Now it’s the most-starred crawler on GitHub.
+Fast forward to 2023, I was working on a tool for a project and needed a crawler to convert a webpage into markdown. While exploring solutions, I found one that claimed to be open-source but required creating an account and generating an API token. Worse, it turned out to be a SaaS model charging $16, and its quality didn’t meet my standards. Frustrated, I realized this was a deeper problem. That frustration turned into turbo anger mode, and I decided to build my own solution. In just a few days, I created Crawl4AI. To my surprise, it went viral, earning thousands of GitHub stars and resonating with a global community.
 
-I made it open source for **availability**, anyone can use it without a gate. Now I’m building the platform for **affordability**, anyone can run serious crawls without breaking the bank. If that resonates, join in, send feedback, or just crawl something amazing.
+I made Crawl4AI open-source for two reasons. First, it’s my way of giving back to the open-source community that has supported me throughout my career. Second, I believe data should be accessible to everyone, not locked behind paywalls or monopolized by a few. Open access to data lays the foundation for the democratization of AI, a vision where individuals can train their own models and take ownership of their information. This library is the first step in a larger journey to create the best open-source data extraction and generation tool the world has ever seen, built collaboratively by a passionate community.
+
+Thank you to everyone who has supported this project, used it, and shared feedback. Your encouragement motivates me to dream even bigger. Join us, file issues, submit PRs, or spread the word. Together, we can build a tool that truly empowers people to access their own data and reshape the future of AI.
 </details>
 
+## 🧐 Why Crawl4AI?
 
-<details>
-  <summary>Why developers pick Crawl4AI</summary>
-
-- **LLM ready output**, smart Markdown with headings, tables, code, citation hints
-- **Fast in practice**, async browser pool, caching, minimal hops
-- **Full control**, sessions, proxies, cookies, user scripts, hooks
-- **Adaptive intelligence**, learns site patterns, explores only what matters
-- **Deploy anywhere**, zero keys, CLI and Docker, cloud friendly
-</details>
-
+1. **Built for LLMs**: Creates smart, concise Markdown optimized for RAG and fine-tuning applications.  
+2. **Lightning Fast**: Delivers results faster with real-time, cost-efficient performance.  
+3. **Flexible Browser Control**: Offers session management, proxies, and custom hooks for seamless data access.  
+4. **Heuristic Intelligence**: Uses advanced algorithms for efficient extraction, reducing reliance on costly models.  
+5. **Open Source & Deployable**: Fully open-source with no API keys—ready for Docker and cloud integration.  
+6. **Thriving Community**: Actively maintained by a vibrant community and the #1 trending GitHub repository.
 
 ## 🚀 Quick Start 
 
@@ -102,33 +101,6 @@ crwl https://docs.crawl4ai.com --deep-crawl bfs --max-pages 10
 # Use LLM extraction with a specific question
 crwl https://www.example.com/products -q "Extract all product prices"
 ```
-
-## 💖 Support Crawl4AI
-
-> 🎉 **Sponsorship Program Now Open!** After powering 51K+ developers and 1 year of growth, Crawl4AI is launching dedicated support for **startups** and **enterprises**. Be among the first 50 **Founding Sponsors** for permanent recognition in our Hall of Fame.
-
-Crawl4AI is the #1 trending open-source web crawler on GitHub. Your support keeps it independent, innovative, and free for the community — while giving you direct access to premium benefits.
-
-<div align="">
-  
-[![Become a Sponsor](https://img.shields.io/badge/Become%20a%20Sponsor-pink?style=for-the-badge&logo=github-sponsors&logoColor=white)](https://github.com/sponsors/unclecode)  
-[![Current Sponsors](https://img.shields.io/github/sponsors/unclecode?style=for-the-badge&logo=github&label=Current%20Sponsors&color=green)](https://github.com/sponsors/unclecode)
-
-</div>
-
-### 🤝 Sponsorship Tiers
-
-- **🌱 Believer ($5/mo)** — Join the movement for data democratization  
-- **🚀 Builder ($50/mo)** — Priority support & early access to features  
-- **💼 Growing Team ($500/mo)** — Bi-weekly syncs & optimization help  
-- **🏢 Data Infrastructure Partner ($2000/mo)** — Full partnership with dedicated support  
-  *Custom arrangements available - see [SPONSORS.md](SPONSORS.md) for details & contact*
-
-**Why sponsor?**  
-No rate-limited APIs. No lock-in. Build and own your data pipeline with direct guidance from the creator of Crawl4AI.
-
-[See All Tiers & Benefits →](https://github.com/sponsors/unclecode)
-
 
 ## ✨ Features 
 
@@ -309,6 +281,12 @@ docker run -d -p 11235:11235 --name crawl4ai --shm-size=1g unclecode/crawl4ai:0.
 # Visit the playground at http://localhost:11235/playground
 ```
 
+For complete documentation, see our [Docker Deployment Guide](https://docs.crawl4ai.com/core/docker-deployment/).
+
+</details>
+
+---
+
 ### Quick Test
 
 Run a quick test (works for both Docker options):
@@ -339,7 +317,6 @@ For more examples, see our [Docker Examples](https://github.com/unclecode/crawl4
 
 </details>
 
----
 
 ## 🔬 Advanced Usage Examples 🔬
 
@@ -611,8 +588,7 @@ Read the full details in our [0.7.0 Release Notes](https://docs.crawl4ai.com/blo
 
 Crawl4AI follows standard Python version numbering conventions (PEP 440) to help users understand the stability and features of each release.
 
-<details>
-<summary>📈 <strong>Version Numbers Explained</strong></summary>
+### Version Numbers Explained
 
 Our version numbers follow this pattern: `MAJOR.MINOR.PATCH` (e.g., 0.4.3)
 
@@ -649,8 +625,6 @@ We use pre-releases to:
 
 For production environments, we recommend using the stable version. For testing new features, you can opt-in to pre-releases using the `--pre` flag.
 
-</details>
-
 ## 📖 Documentation & Roadmap 
 
 > 🚨 **Documentation Update Alert**: We're undertaking a major documentation overhaul next week to reflect recent updates and improvements. Stay tuned for a more comprehensive and up-to-date guide!
@@ -663,16 +637,16 @@ To check our development plans and upcoming features, visit our [Roadmap](https:
 <summary>📈 <strong>Development TODOs</strong></summary>
 
 - [x] 0. Graph Crawler: Smart website traversal using graph search algorithms for comprehensive nested page extraction
-- [x] 1. Question-Based Crawler: Natural language driven web discovery and content extraction
-- [x] 2. Knowledge-Optimal Crawler: Smart crawling that maximizes knowledge while minimizing data extraction
-- [x] 3. Agentic Crawler: Autonomous system for complex multi-step crawling operations
-- [x] 4. Automated Schema Generator: Convert natural language to extraction schemas
-- [x] 5. Domain-Specific Scrapers: Pre-configured extractors for common platforms (academic, e-commerce)
-- [x] 6. Web Embedding Index: Semantic search infrastructure for crawled content
-- [x] 7. Interactive Playground: Web UI for testing, comparing strategies with AI assistance
-- [x] 8. Performance Monitor: Real-time insights into crawler operations
+- [ ] 1. Question-Based Crawler: Natural language driven web discovery and content extraction
+- [ ] 2. Knowledge-Optimal Crawler: Smart crawling that maximizes knowledge while minimizing data extraction
+- [ ] 3. Agentic Crawler: Autonomous system for complex multi-step crawling operations
+- [ ] 4. Automated Schema Generator: Convert natural language to extraction schemas
+- [ ] 5. Domain-Specific Scrapers: Pre-configured extractors for common platforms (academic, e-commerce)
+- [ ] 6. Web Embedding Index: Semantic search infrastructure for crawled content
+- [ ] 7. Interactive Playground: Web UI for testing, comparing strategies with AI assistance
+- [ ] 8. Performance Monitor: Real-time insights into crawler operations
 - [ ] 9. Cloud Integration: One-click deployment solutions across cloud providers
-- [x] 10. Sponsorship Program: Structured support system with tiered benefits
+- [ ] 10. Sponsorship Program: Structured support system with tiered benefits
 - [ ] 11. Educational Content: "How to Crawl" video series and interactive tutorials
 
 </details>
@@ -692,8 +666,7 @@ This project is licensed under the Apache License 2.0, attribution is recommende
 ### Attribution Requirements
 When using Crawl4AI, you must include one of the following attribution methods:
 
-<details>
-<summary>📈 <strong>1. Badge Attribution (Recommended)</strong></summary>
+#### 1. Badge Attribution (Recommended)
 Add one of these badges to your README, documentation, or website:
 
 | Theme | Badge |
@@ -732,15 +705,11 @@ HTML code for adding the badges:
 </a>
 ```
 
-</details>
-
-<details>
-<summary>📖 <strong>2. Text Attribution</strong></summary>
+#### 2. Text Attribution
 Add this line to your documentation:
 ```
 This project uses Crawl4AI (https://github.com/unclecode/crawl4ai) for web data extraction.
 ```
-</details>
 
 ## 📚 Citation
 
@@ -773,6 +742,42 @@ For questions, suggestions, or feedback, feel free to reach out:
 - Website: [crawl4ai.com](https://crawl4ai.com)
 
 Happy Crawling! 🕸️🚀
+
+## 💖 Support Crawl4AI
+
+> 🎉 **Sponsorship Program Just Launched!** Be among the first 50 **Founding Sponsors** and get permanent recognition in our Hall of Fame!
+
+Crawl4AI is the #1 trending open-source web crawler with 51K+ stars. Your support ensures we stay independent, innovative, and free forever.
+
+<div align="center">
+
+[![Become a Sponsor](https://img.shields.io/badge/Become%20a%20Sponsor-pink?style=for-the-badge&logo=github-sponsors&logoColor=white)](https://github.com/sponsors/unclecode)
+[![Current Sponsors](https://img.shields.io/github/sponsors/unclecode?style=for-the-badge&logo=github&label=Current%20Sponsors&color=green)](https://github.com/sponsors/unclecode)
+
+</div>
+
+### 🤝 Sponsorship Tiers
+
+- **🌱 Believer ($5/mo)**: Join the movement for data democratization
+- **🚀 Builder ($50/mo)**: Get priority support and early feature access  
+- **💼 Growing Team ($500/mo)**: Bi-weekly syncs and optimization help
+- **🏢 Data Infrastructure Partner ($2000/mo)**: Full partnership with dedicated support
+
+**Why sponsor?** Every tier includes real benefits. No more rate-limited APIs. Own your data pipeline. Build data sovereignty together.
+
+[View All Tiers & Benefits →](https://github.com/sponsors/unclecode)
+
+### 🏆 Our Sponsors
+
+#### 👑 Founding Sponsors (First 50)
+*Be part of history - [Become a Founding Sponsor](https://github.com/sponsors/unclecode)*
+
+<!-- Founding sponsors will be permanently recognized here -->
+
+#### Current Sponsors
+Thank you to all our sponsors who make this project possible!
+
+<!-- Sponsors will be automatically added here -->
 
 ## 🗾 Mission
 
