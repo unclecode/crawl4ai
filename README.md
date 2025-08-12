@@ -74,7 +74,7 @@ For the simplest experience, use the new interactive wizard to create your crawl
 
 **Step 1: Create a configuration file**
 
-Run the `init` command to launch the wizard. It will ask you a few simple questions about what you want to crawl and extract.
+Run the `init` command to launch the wizard. It will ask you a few simple questions about what you want to crawl and extract. For more detailed control, you can enable 'Advanced Mode' at the start of the wizard.
 ```bash
 crwl init
 ```

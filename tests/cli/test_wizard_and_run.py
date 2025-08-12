@@ -10,13 +10,14 @@ from crawl4ai.cli import cli
 def runner():
     return CliRunner()
 
-def test_init_command_creates_config(runner, tmp_path):
+def test_init_command_creates_config_simple_mode(runner, tmp_path):
     """
     Test that `crwl init` creates a config file with the expected content
-    based on simulated user input.
+    based on simulated user input for simple mode.
     """
     with runner.isolated_filesystem(temp_dir=tmp_path) as td:
         # Simulate user input for the wizard
+        # 0. Advanced mode: no
         # 1. URL
         # 2. Crawl Type: Deep Crawl
         # 3. Strategy: bfs
@@ -27,6 +28,7 @@ def test_init_command_creates_config(runner, tmp_path):
         # 8. Output Filename: my_output.md
         # 9. Config Filename: my_crawl.yml
         input_text = (
+            "n\n"
             "https://example.com\n"
             "Deep Crawl (follow links)\n"
             "bfs\n"
@@ -56,6 +58,44 @@ def test_init_command_creates_config(runner, tmp_path):
         assert config['output']['file'] == 'my_output.md'
 
 
+def test_init_command_creates_config_advanced_mode(runner, tmp_path):
+    """
+    Test that `crwl init` creates a config file with advanced settings.
+    """
+    with runner.isolated_filesystem(temp_dir=tmp_path) as td:
+        input_text = (
+            "y\n"  # Advanced mode
+            "https://advanced.com\n"  # URL
+            "Single Page\n"  # Crawl type
+            "n\n"  # Headless: no
+            "y\n"  # Custom viewport: yes
+            "1920\n"  # width
+            "1080\n"  # height
+            "y\n"  # Proxy: yes
+            "http://proxy.com\n"  # Proxy URL
+            "y\n"  # Delay: yes
+            "3\n"  # Delay seconds
+            "Clean Markdown Content\n"  # Extraction
+            "n\n"  # Save to file: no
+            "advanced_config.yml\n"  # Config filename
+        )
+
+        result = runner.invoke(cli, ['init'], input=input_text)
+
+        assert result.exit_code == 0
+        config_path = Path(td) / "advanced_config.yml"
+        assert config_path.exists()
+
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+
+        assert config['url'] == 'https://advanced.com'
+        assert config['browser']['headless'] is False
+        assert config['browser']['viewport_width'] == 1920
+        assert config['browser']['proxy'] == 'http://proxy.com'
+        assert config['crawler']['delay_before_return_html'] == 3
+
+
 @patch('crawl4ai.cli.anyio.run')
 def test_run_command_parses_config_and_runs_crawler(mock_anyio_run, runner, tmp_path):
     """
@@ -66,6 +106,15 @@ def test_run_command_parses_config_and_runs_crawler(mock_anyio_run, runner, tmp_
         # Create a sample config file
         config_data = {
             'url': 'https://test.dev',
+            'browser': {
+                'headless': False,
+                'viewport_width': 1024,
+            },
+            'browser': {
+                'headless': False,
+                'viewport_width': 1024,
+                'proxy': 'http://foo.bar'
+            },
             'deep_crawl': {
                 'strategy': 'dfs',
                 'max_pages': 15,
@@ -107,6 +156,11 @@ def test_run_command_parses_config_and_runs_crawler(mock_anyio_run, runner, tmp_
         assert args[1] == 'https://test.dev'
 
         # args[2] is the BrowserConfig
+        browser_config = args[2]
+        assert browser_config.headless is False
+        assert browser_config.viewport_width == 1024
+        assert browser_config.proxy == 'http://foo.bar'
+
         # args[3] is the CrawlerRunConfig
         crawler_config = args[3]
         assert crawler_config.deep_crawl_strategy is not None

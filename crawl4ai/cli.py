@@ -646,11 +646,15 @@ def run_cmd(config_file: str, verbose: bool):
         if not url:
             raise click.ClickException("Configuration file must contain a 'url'.")
 
-        # Create default browser config for now
-        browser_cfg = BrowserConfig(verbose=verbose)
+        # Create browser config
+        browser_params = config.get("browser", {})
+        browser_params['verbose'] = verbose
+        browser_cfg = BrowserConfig(**browser_params)
 
         # Create crawler config from the unified config file
-        crawler_cfg = CrawlerRunConfig(verbose=verbose)
+        crawler_params = config.get("crawler", {})
+        crawler_params['verbose'] = verbose
+        crawler_cfg = CrawlerRunConfig(**crawler_params)
 
         # Deep Crawl configuration
         if "deep_crawl" in config:

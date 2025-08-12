@@ -15,6 +15,10 @@ def generate_config():
     config = {}
 
     try:
+        # 0. Choose Mode
+        advanced_mode = Confirm.ask("\n[bold]Enable Advanced Mode for more options?[/bold]", default=False)
+        config['advanced_mode'] = advanced_mode
+
         # 1. Get URL
         config['url'] = Prompt.ask("\n[bold]1. Enter the starting URL to crawl[/bold]")
 
@@ -42,6 +46,23 @@ def generate_config():
                 "   Enter the maximum crawl depth (how many links deep to follow)",
                 default=2
             )
+
+        if advanced_mode:
+            config['browser'] = {}
+            console.print("\n[bold]Advanced: Browser Settings[/bold]")
+            config['browser']['headless'] = Confirm.ask("   Run in headless mode (no browser window)?", default=True)
+            if Confirm.ask("   Set a custom viewport size?", default=False):
+                config['browser']['viewport_width'] = IntPrompt.ask("      Enter viewport width", default=1280)
+                config['browser']['viewport_height'] = IntPrompt.ask("      Enter viewport height", default=720)
+
+            if Confirm.ask("   Use a proxy server?", default=False):
+                config['browser']['proxy'] = Prompt.ask("      Enter proxy server URL (e.g., http://user:pass@host:port)")
+
+            console.print("\n[bold]Advanced: Crawler Settings[/bold]")
+            config['crawler'] = {}
+            if Confirm.ask("   Add a delay before extracting content (e.g., for animations)?", default=False):
+                config['crawler']['delay_before_return_html'] = IntPrompt.ask("      Enter delay in seconds", default=2)
+
 
         # 3. Choose Extraction Mode
         console.print("\n[bold]3. Choose what to extract:[/bold]")
