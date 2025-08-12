@@ -53,15 +53,12 @@ I made it open source for **availability**, anyone can use it without a gate. No
 </details>
 
 
-## 🚀 Quick Start 
+## 🚀 Quick Start
 
-1. Install Crawl4AI:
+First, install Crawl4AI and set up the necessary browser components:
 ```bash
 # Install the package
 pip install -U crawl4ai
-
-# For pre release versions
-pip install crawl4ai --pre
 
 # Run post-installation setup
 crawl4ai-setup
@@ -69,13 +66,34 @@ crawl4ai-setup
 # Verify your installation
 crawl4ai-doctor
 ```
+*If you run into browser issues, try `python -m playwright install --with-deps chromium`.*
 
-If you encounter any browser-related issues, you can install them manually:
+## ✨ Easy Start with the Interactive Wizard
+
+For the simplest experience, use the new interactive wizard to create your crawl configuration.
+
+**Step 1: Create a configuration file**
+
+Run the `init` command to launch the wizard. It will ask you a few simple questions about what you want to crawl and extract.
 ```bash
-python -m playwright install --with-deps chromium
+crwl init
 ```
+This will create a `config.yml` file with all your settings.
 
-2. Run a simple web crawl with Python:
+**Step 2: Run the crawl**
+
+Use the `run` command with your newly created configuration file.
+```bash
+crwl run config.yml
+```
+That's it! The crawler will execute the steps you defined and save the output.
+
+## Other Ways to Run Crawl4AI
+
+<details>
+<summary>🐍 Using Python</summary>
+
+You can run a web crawl directly from your Python code:
 ```python
 import asyncio
 from crawl4ai import *
@@ -90,8 +108,13 @@ async def main():
 if __name__ == "__main__":
     asyncio.run(main())
 ```
+</details>
 
-3. Or use the new command-line interface:
+<details>
+<summary>⌨️ Using the Command-Line (Advanced)</summary>
+
+The CLI provides fine-grained control for advanced users.
+
 ```bash
 # Basic crawl with markdown output
 crwl https://www.nbcnews.com/business -o markdown
@@ -102,6 +125,7 @@ crwl https://docs.crawl4ai.com --deep-crawl bfs --max-pages 10
 # Use LLM extraction with a specific question
 crwl https://www.example.com/products -q "Extract all product prices"
 ```
+</details>
 
 ## 💖 Support Crawl4AI
 

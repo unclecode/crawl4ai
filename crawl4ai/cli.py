@@ -33,6 +33,7 @@ from crawl4ai import (
     BestFirstCrawlingStrategy,
 )
 from crawl4ai.config import USER_SETTINGS
+from crawl4ai.wizard import generate_config
 from litellm import completion
 from pathlib import Path
 
@@ -623,6 +624,96 @@ async def manage_profiles():
 def cli():
     """Crawl4AI CLI - Web content extraction and browser profile management tool"""
     pass
+
+
+@cli.command("init")
+def init_cmd():
+    """Launch an interactive wizard to create a crawl configuration file."""
+    generate_config()
+
+
+@cli.command("run")
+@click.argument("config_file", type=click.Path(exists=True))
+@click.option("--verbose", "-v", is_flag=True)
+def run_cmd(config_file: str, verbose: bool):
+    """Run a crawl using a configuration file."""
+    try:
+        config = load_config_file(config_file)
+        if not config:
+            raise click.ClickException(f"Configuration file '{config_file}' is empty or invalid.")
+
+        url = config.get("url")
+        if not url:
+            raise click.ClickException("Configuration file must contain a 'url'.")
+
+        # Create default browser config for now
+        browser_cfg = BrowserConfig(verbose=verbose)
+
+        # Create crawler config from the unified config file
+        crawler_cfg = CrawlerRunConfig(verbose=verbose)
+
+        # Deep Crawl configuration
+        if "deep_crawl" in config:
+            strategy_map = {
+                "bfs": BFSDeepCrawlStrategy,
+                "dfs": DFSDeepCrawlStrategy,
+            }
+            strategy_class = strategy_map.get(config["deep_crawl"]["strategy"])
+            if strategy_class:
+                crawler_cfg.deep_crawl_strategy = strategy_class(
+                    max_pages=config["deep_crawl"].get("max_pages", 10),
+                    max_depth=config["deep_crawl"].get("max_depth", 2),
+                )
+
+        # Extraction configuration
+        if "extraction" in config:
+            if config["extraction"]["type"] == "llm":
+                llm_conf = config.get("llm", {})
+                provider = llm_conf.get("provider")
+                api_key = llm_conf.get("api_key")
+
+                # If not in config, try to get from global config
+                if not provider or not api_key:
+                    global_conf = get_global_config()
+                    provider = provider or global_conf.get("DEFAULT_LLM_PROVIDER")
+                    api_key = api_key or global_conf.get("DEFAULT_LLM_PROVIDER_TOKEN")
+
+                if not provider:
+                     raise click.ClickException(
+                        "LLM provider not found in config.yml or global settings. "
+                        "Run 'crwl init' to configure it, or 'crwl config set DEFAULT_LLM_PROVIDER <provider>'."
+                    )
+
+                crawler_cfg.extraction_strategy = LLMExtractionStrategy(
+                    llm_config=LLMConfig(provider=provider, api_token=api_key),
+                    instruction=config["extraction"]["instruction"],
+                    force_json_response=True,
+                    verbose=verbose,
+                )
+
+        # Run the crawler
+        result = anyio.run(run_crawler, url, browser_cfg, crawler_cfg, verbose)
+
+        # Handle output
+        output_conf = config.get("output", {})
+        output_file = output_conf.get("file")
+
+        output_content = ""
+        if "extraction" in config:
+            # Pretty print JSON
+            output_content = json.dumps(json.loads(result.extracted_content), indent=2)
+        else:
+            output_content = result.markdown.raw_markdown
+
+        if output_file:
+            with open(output_file, "w") as f:
+                f.write(output_content)
+            console.print(f"[green]✅ Output saved to {output_file}[/green]")
+        else:
+            console.print(output_content)
+
+    except Exception as e:
+        raise click.ClickException(str(e))
 
 
 @cli.group("browser")
@@ -1414,8 +1505,10 @@ def default(url: str, example: bool, browser_config: str, crawler_config: str, f
     Run with --example to see detailed usage examples.
     
     Other commands:
+        crwl init       - Create a new crawl configuration using an interactive wizard
+        crwl run        - Run a crawl using a configuration file
         crwl profiles   - Manage browser profiles for identity-based crawling
-        crwl crawl      - Crawl a website with advanced options
+        crwl crawl      - Crawl a website with advanced options (legacy)
         crwl cdp        - Launch browser with CDP debugging enabled
         crwl browser    - Manage builtin browser (start, stop, status, restart)
         crwl config     - Manage global configuration settings
