@@ -1,4 +1,4 @@
-from crawl4ai.deep_crawling.filters import ContentRelevanceFilter, URLPatternFilter, DomainFilter, ContentTypeFilter, SEOFilter
+from crawl4ai.deep_crawling.filters import ContentRelevanceFilter, URLPatternFilter, DomainFilter, ContentTypeFilter, SEOFilter, CallbackURLFilter
 async def test_pattern_filter():
     # Test cases as list of tuples instead of dict for multiple patterns
     test_cases = [
@@ -277,3 +277,8 @@ if __name__ == "__main__":
     asyncio.run(test_content_type_filter())
     asyncio.run(test_content_relevance_filter())
     asyncio.run(test_seo_filter())
+    
+    # Import and run callback filter tests
+    from test_callback_url_filter import test_callback_filter, test_callback_filter_error_handling
+    asyncio.run(test_callback_filter())
+    asyncio.run(test_callback_filter_error_handling())
