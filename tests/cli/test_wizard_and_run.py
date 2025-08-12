@@ -10,91 +10,47 @@ from crawl4ai.cli import cli
 def runner():
     return CliRunner()
 
-def test_init_command_creates_config_simple_mode(runner, tmp_path):
-    """
-    Test that `crwl init` creates a config file with the expected content
-    based on simulated user input for simple mode.
-    """
+def test_scrape_article_preset(runner, tmp_path):
     with runner.isolated_filesystem(temp_dir=tmp_path) as td:
-        # Simulate user input for the wizard
-        # 0. Advanced mode: no
-        # 1. URL
-        # 2. Crawl Type: Deep Crawl
-        # 3. Strategy: bfs
-        # 4. Max Pages: 5
-        # 5. Max Depth: 1
-        # 6. Extraction: Clean Markdown
-        # 7. Output: Save to file
-        # 8. Output Filename: my_output.md
-        # 9. Config Filename: my_crawl.yml
         input_text = (
-            "n\n"
-            "https://example.com\n"
-            "Deep Crawl (follow links)\n"
-            "bfs\n"
-            "5\n"
-            "1\n"
-            "Clean Markdown Content\n"
-            "y\n"
-            "my_output.md\n"
-            "my_crawl.yml\n"
+            "Scrape a single article (get clean markdown)\n"
+            "http://article.com\n"
+            "my_article.md\n"
+            "article_config.yml\n"
         )
-
         result = runner.invoke(cli, ['init'], input=input_text)
-
         assert result.exit_code == 0
-        assert "Configuration saved to `my_crawl.yml`!" in result.output
-
-        config_path = Path(td) / "my_crawl.yml"
+        config_path = Path(td) / "article_config.yml"
         assert config_path.exists()
-
         with open(config_path, 'r') as f:
             config = yaml.safe_load(f)
-
-        assert config['url'] == 'https://example.com'
-        assert config['deep_crawl']['strategy'] == 'bfs'
-        assert config['deep_crawl']['max_pages'] == 5
+        assert config['url'] == 'http://article.com'
+        assert config['output']['file'] == 'my_article.md'
+        assert 'deep_crawl' not in config
         assert 'extraction' not in config
-        assert config['output']['file'] == 'my_output.md'
 
-
-def test_init_command_creates_config_advanced_mode(runner, tmp_path):
-    """
-    Test that `crwl init` creates a config file with advanced settings.
-    """
+def test_crawl_website_preset(runner, tmp_path):
     with runner.isolated_filesystem(temp_dir=tmp_path) as td:
         input_text = (
-            "y\n"  # Advanced mode
-            "https://advanced.com\n"  # URL
-            "Single Page\n"  # Crawl type
-            "n\n"  # Headless: no
-            "y\n"  # Custom viewport: yes
-            "1920\n"  # width
-            "1080\n"  # height
-            "y\n"  # Proxy: yes
-            "http://proxy.com\n"  # Proxy URL
-            "y\n"  # Delay: yes
-            "3\n"  # Delay seconds
-            "Clean Markdown Content\n"  # Extraction
-            "n\n"  # Save to file: no
-            "advanced_config.yml\n"  # Config filename
+            "Crawl an entire website (deep crawl)\n"
+            "http://website.com\n"
+            "dfs\n"
+            "20\n"
+            "5\n"
+            "website.md\n"
+            "website_config.yml\n"
         )
-
         result = runner.invoke(cli, ['init'], input=input_text)
-
         assert result.exit_code == 0
-        config_path = Path(td) / "advanced_config.yml"
+        config_path = Path(td) / "website_config.yml"
         assert config_path.exists()
-
         with open(config_path, 'r') as f:
             config = yaml.safe_load(f)
-
-        assert config['url'] == 'https://advanced.com'
-        assert config['browser']['headless'] is False
-        assert config['browser']['viewport_width'] == 1920
-        assert config['browser']['proxy'] == 'http://proxy.com'
-        assert config['crawler']['delay_before_return_html'] == 3
-
+        assert config['url'] == 'http://website.com'
+        assert config['deep_crawl']['strategy'] == 'dfs'
+        assert config['deep_crawl']['max_pages'] == 20
+        assert config['deep_crawl']['max_depth'] == 5
+        assert config['output']['file'] == 'website.md'
 
 @patch('crawl4ai.cli.anyio.run')
 def test_run_command_parses_config_and_runs_crawler(mock_anyio_run, runner, tmp_path):
