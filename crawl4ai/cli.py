@@ -31,6 +31,7 @@ from crawl4ai import (
     BFSDeepCrawlStrategy,
     DFSDeepCrawlStrategy,
     BestFirstCrawlingStrategy,
+    LLMConfig,
 )
 from crawl4ai.config import USER_SETTINGS
 from crawl4ai.crawlers.sis_scraper import run_sis_scraper
@@ -57,35 +58,36 @@ def save_global_config(config: dict):
     with open(config_file, "w") as f:
         yaml.dump(config, f)
 
-def setup_llm_config() -> tuple[str, str]:
-    config = get_global_config()
-    provider = config.get("DEFAULT_LLM_PROVIDER")
-    token = config.get("DEFAULT_LLM_PROVIDER_TOKEN")
-    
-    if not provider:
-        click.echo("\nNo default LLM provider configured.")
-        click.echo("Provider format: 'company/model' (e.g., 'openai/gpt-4o', 'anthropic/claude-3-sonnet')")
-        click.echo("See available providers at: https://docs.litellm.ai/docs/providers")
-        provider = click.prompt("Enter provider")
-        
-    if not provider.startswith("ollama/"):
-        if not token:
-            token = click.prompt("Enter API token for " + provider, hide_input=True)
-    else:
-        token = "no-token"
-    
-    if not config.get("DEFAULT_LLM_PROVIDER") or not config.get("DEFAULT_LLM_PROVIDER_TOKEN"):
-        config["DEFAULT_LLM_PROVIDER"] = provider
-        config["DEFAULT_LLM_PROVIDER_TOKEN"] = token
-        save_global_config(config)
-        click.echo("\nConfiguration saved to ~/.crawl4ai/global.yml")
-    
-    return provider, token
+def setup_llm_config() -> LLMConfig:
+    """
+    Ensures a valid LLMConfig can be created, prompting the user if necessary.
+    Configuration is primarily loaded from .env variables.
+    """
+    # First, try to create a config from defaults (which reads .env)
+    llm_config = LLMConfig()
 
-async def stream_llm_response(url: str, markdown: str, query: str, provider: str, token: str):
+    # Check if the config is usable (has a token, unless it's a provider like Ollama)
+    is_ollama = llm_config.provider and llm_config.provider.startswith("ollama/")
+    if not llm_config.api_token and not is_ollama:
+        click.echo("\nLLM configuration is incomplete.")
+        click.echo("Please set CRAWL4AI_LLM_PROVIDER and CRAWL4AI_LLM_API_KEY in a .env file.")
+        click.echo("For custom APIs, also set CRAWL4AI_LLM_BASE_URL.")
+        click.echo("\nAlternatively, enter the details now for the current session:")
+        
+        provider = click.prompt("Enter provider (e.g., 'openai/gpt-4o')", default=llm_config.provider)
+        base_url = click.prompt("Enter API base URL (optional, for custom APIs)", default=llm_config.base_url or "")
+        api_token = click.prompt(f"Enter API token for {provider}", hide_input=True)
+
+        # Create a new config with the provided details
+        llm_config = LLMConfig(provider=provider, api_token=api_token, base_url=base_url if base_url else None)
+
+    return llm_config
+
+async def stream_llm_response(url: str, markdown: str, query: str, llm_config: LLMConfig):
     response = completion(
-        model=provider,
-        api_key=token,
+        model=llm_config.provider,
+        api_key=llm_config.api_token,
+        base_url=llm_config.base_url,
         messages=[
             {
                 "content": f"You are Crawl4ai assistant, answering user question based on the provided context which is crawled from {url}.",
@@ -1093,8 +1095,8 @@ def crawl_cmd(url: str, browser_config: str, crawler_config: str, filter_config:
         
         # Handle json-extract option (takes precedence over extraction-config)
         if json_extract is not None:
-            # Get LLM provider and token
-            provider, token = setup_llm_config()
+            # Get a valid LLMConfig, prompting user if necessary
+            llm_config = setup_llm_config()
             
             # Default sophisticated instruction for structured data extraction
             default_instruction = """Analyze the web page content and extract structured data as JSON. 
@@ -1111,7 +1113,7 @@ Always return valid, properly formatted JSON."""
             
             # Create LLM extraction strategy
             crawler_cfg.extraction_strategy = LLMExtractionStrategy(
-                llm_config=LLMConfig(provider=provider, api_token=token),
+                llm_config=llm_config,
                 instruction=instruction,
                 schema=load_schema_file(schema),  # Will be None if no schema is provided
                 extraction_type="schema", #if schema else "block",
@@ -1212,9 +1214,9 @@ Always return valid, properly formatted JSON."""
 
         # Handle question
         if question:
-            provider, token = setup_llm_config()
+            llm_config = setup_llm_config()
             markdown = main_result.markdown.raw_markdown
-            anyio.run(stream_llm_response, url, markdown, question, provider, token)
+            anyio.run(stream_llm_response, url, markdown, question, llm_config)
             return
         
         # Handle output

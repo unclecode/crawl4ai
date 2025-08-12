@@ -3,10 +3,10 @@ from typing import Union
 from .config import (
     DEFAULT_PROVIDER,
     DEFAULT_PROVIDER_API_KEY,
+    DEFAULT_PROVIDER_BASE_URL,
+    PROVIDER_API_KEYS,
     MIN_WORD_THRESHOLD,
     IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
-    PROVIDER_MODELS,
-    PROVIDER_MODELS_PREFIXES,
     SCREENSHOT_HEIGHT_TRESHOLD,
     PAGE_TIMEOUT,
     IMAGE_SCORE_THRESHOLD,
@@ -1649,7 +1649,7 @@ class CrawlerRunConfig():
 class LLMConfig:
     def __init__(
         self,
-        provider: str = DEFAULT_PROVIDER,
+        provider: Optional[str] = None,
         api_token: Optional[str] = None,
         base_url: Optional[str] = None,
         temperature: Optional[float] = None,
@@ -1658,28 +1658,33 @@ class LLMConfig:
         frequency_penalty: Optional[float] = None,
         presence_penalty: Optional[float] = None,
         stop: Optional[List[str]] = None,
-        n: Optional[int] = None,    
+        n: Optional[int] = None,
     ):
-        """Configuaration class for LLM provider and API token."""
-        self.provider = provider
-        if api_token and not api_token.startswith("env:"):
-            self.api_token = api_token
-        elif api_token and api_token.startswith("env:"):
-            self.api_token = os.getenv(api_token[4:])
-        else:
-            # Check if given provider starts with any of key in PROVIDER_MODELS_PREFIXES
-            # If not, check if it is in PROVIDER_MODELS
-            prefixes = PROVIDER_MODELS_PREFIXES.keys()
-            if any(provider.startswith(prefix) for prefix in prefixes):
-                selected_prefix = next(
-                    (prefix for prefix in prefixes if provider.startswith(prefix)),
-                    None,
-                )
-                self.api_token = PROVIDER_MODELS_PREFIXES.get(selected_prefix)                    
+        """Configuration class for LLM provider, API token, and other parameters."""
+
+        # Determine provider, base_url, and api_token with clear precedence:
+        # 1. Explicit arguments passed to constructor.
+        # 2. .env variables (CRAWL4AI_LLM_PROVIDER, etc.).
+        # 3. Legacy provider-specific keys (OPENAI_API_KEY, etc.) for token.
+
+        self.provider = provider if provider is not None else DEFAULT_PROVIDER
+        self.base_url = base_url if base_url is not None else DEFAULT_PROVIDER_BASE_URL
+
+        # Determine API token
+        if api_token:
+            # Prioritize explicitly passed api_token
+            if api_token.startswith("env:"):
+                self.api_token = os.getenv(api_token[4:])
             else:
-                self.provider = DEFAULT_PROVIDER
-                self.api_token = os.getenv(DEFAULT_PROVIDER_API_KEY)
-        self.base_url = base_url
+                self.api_token = api_token
+        elif DEFAULT_PROVIDER_API_KEY:
+            # Fallback to the generic CRAWL4AI_LLM_API_KEY from .env
+            self.api_token = DEFAULT_PROVIDER_API_KEY
+        else:
+            # Fallback to legacy provider-specific keys (e.g., OPENAI_API_KEY)
+            provider_prefix = self.provider.split('/')[0] if self.provider else ''
+            self.api_token = PROVIDER_API_KEYS.get(provider_prefix)
+
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.top_p = top_p

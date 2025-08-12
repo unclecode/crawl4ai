@@ -459,36 +459,51 @@ if __name__ == "__main__":
 <details>
 <summary>📚 <strong>Extracting Structured Data with LLMs</strong></summary>
 
+Crawl4AI simplifies LLM integration by automatically loading your provider details from a `.env` file in your project's root directory.
+
+First, create a `.env` file and add your configuration. You can use a major provider or any OpenAI-compatible custom API.
+
+**Example `.env` file for OpenAI:**
+```
+CRAWL4AI_LLM_PROVIDER="openai/gpt-4o"
+CRAWL4AI_LLM_API_KEY="sk-..."
+```
+
+**Example `.env` file for a custom/third-party API:**
+```
+CRAWL4AI_LLM_PROVIDER="my-custom-model"
+CRAWL4AI_LLM_API_KEY="your-secret-key"
+CRAWL4AI_LLM_BASE_URL="http://localhost:1234/v1"
+```
+
+Once your `.env` file is set up, you can run extraction with a very clean configuration:
+
 ```python
-import os
 import asyncio
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, LLMConfig
-from crawl4ai import LLMExtractionStrategy
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode, LLMConfig, LLMExtractionStrategy
 from pydantic import BaseModel, Field
 
+# Define your data structure
 class OpenAIModelFee(BaseModel):
     model_name: str = Field(..., description="Name of the OpenAI model.")
     input_fee: str = Field(..., description="Fee for input token for the OpenAI model.")
     output_fee: str = Field(..., description="Fee for output token for the OpenAI model.")
 
 async def main():
-    browser_config = BrowserConfig(verbose=True)
+    # LLMConfig() will automatically load settings from your .env file
+    llm_config = LLMConfig()
+
     run_config = CrawlerRunConfig(
         word_count_threshold=1,
         extraction_strategy=LLMExtractionStrategy(
-            # Here you can use any provider that Litellm library supports, for instance: ollama/qwen2
-            # provider="ollama/qwen2", api_token="no-token", 
-            llm_config = LLMConfig(provider="openai/gpt-4o", api_token=os.getenv('OPENAI_API_KEY')), 
+            llm_config=llm_config,
             schema=OpenAIModelFee.schema(),
-            extraction_type="schema",
-            instruction="""From the crawled content, extract all mentioned model names along with their fees for input and output tokens. 
-            Do not miss any models in the entire content. One extracted model JSON format should look like this: 
-            {"model_name": "GPT-4", "input_fee": "US$10.00 / 1M tokens", "output_fee": "US$30.00 / 1M tokens"}."""
+            instruction="Extract all model names and their input/output token fees."
         ),            
         cache_mode=CacheMode.BYPASS,
     )
     
-    async with AsyncWebCrawler(config=browser_config) as crawler:
+    async with AsyncWebCrawler() as crawler:
         result = await crawler.arun(
             url='https://openai.com/api/pricing/',
             config=run_config
@@ -498,6 +513,9 @@ async def main():
 if __name__ == "__main__":
     asyncio.run(main())
 ```
+
+You can still override the `.env` settings by passing arguments directly to `LLMConfig`, for example:
+`LLMConfig(provider="openai/gpt-4o-mini", api_token="...")`
 
 </details>
 
