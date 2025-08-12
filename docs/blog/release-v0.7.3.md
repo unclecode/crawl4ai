@@ -8,10 +8,14 @@ Today I'm releasing Crawl4AI v0.7.3—the Multi-Config Intelligence Update. This
 
 ## 🎯 What's New at a Glance
 
-- **Multi-URL Configurations**: Different crawling strategies for different URL patterns in a single batch
-- **Flexible Docker LLM Providers**: Configure LLM providers via environment variables
-- **Bug Fixes**: Resolved several critical issues for better stability
-- **Documentation Updates**: Clearer examples and improved API documentation
+- **🕵️ Undetected Browser Support**: Stealth mode for bypassing bot detection systems
+- **🎨 Multi-URL Configurations**: Different crawling strategies for different URL patterns in a single batch
+- **🐳 Flexible Docker LLM Providers**: Configure LLM providers via environment variables
+- **🧠 Memory Monitoring**: Enhanced memory usage tracking and optimization tools
+- **📊 Enhanced Table Extraction**: Improved table access and DataFrame conversion
+- **💰 GitHub Sponsors**: 4-tier sponsorship system with custom arrangements
+- **🔧 Bug Fixes**: Resolved several critical issues for better stability
+- **📚 Documentation Updates**: Clearer examples and improved API documentation
 
 ## 🎨 Multi-URL Configurations: One Size Doesn't Fit All
 
@@ -77,6 +81,182 @@ async with AsyncWebCrawler() as crawler:
 - **Multi-Domain Crawling**: Different strategies per domain without separate runs
 - **Reduced Complexity**: No more if/else forests in your extraction code
 - **Better Performance**: Each URL gets exactly the processing it needs
+
+## 🕵️ Undetected Browser Support: Stealth Mode Activated
+
+**The Problem:** Modern websites employ sophisticated bot detection systems. Cloudflare, Akamai, and custom solutions block automated crawlers, limiting access to valuable content.
+
+**My Solution:** I implemented undetected browser support with a flexible adapter pattern. Now Crawl4AI can bypass most bot detection systems using stealth techniques.
+
+### Technical Implementation
+
+```python
+from crawl4ai import AsyncWebCrawler, BrowserConfig
+
+# Enable undetected mode for stealth crawling
+browser_config = BrowserConfig(
+    browser_type="undetected",  # Use undetected Chrome
+    headless=True,              # Can run headless with stealth
+    extra_args=[
+        "--disable-blink-features=AutomationControlled",
+        "--disable-web-security",
+        "--disable-features=VizDisplayCompositor"
+    ]
+)
+
+async with AsyncWebCrawler(config=browser_config) as crawler:
+    # This will bypass most bot detection systems
+    result = await crawler.arun("https://protected-site.com")
+    
+    if result.success:
+        print("✅ Successfully bypassed bot detection!")
+        print(f"Content length: {len(result.markdown)}")
+```
+
+**Advanced Anti-Bot Strategies:**
+
+```python
+# Combine multiple stealth techniques
+from crawl4ai import CrawlerRunConfig
+
+config = CrawlerRunConfig(
+    # Random user agents and headers
+    headers={
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "DNT": "1"
+    },
+    
+    # Human-like behavior simulation
+    js_code="""
+        // Random mouse movements
+        const simulateHuman = () => {
+            const event = new MouseEvent('mousemove', {
+                clientX: Math.random() * window.innerWidth,
+                clientY: Math.random() * window.innerHeight
+            });
+            document.dispatchEvent(event);
+        };
+        setInterval(simulateHuman, 100 + Math.random() * 200);
+        
+        // Random scrolling
+        const randomScroll = () => {
+            const scrollY = Math.random() * (document.body.scrollHeight - window.innerHeight);
+            window.scrollTo(0, scrollY);
+        };
+        setTimeout(randomScroll, 500 + Math.random() * 1000);
+    """,
+    
+    # Delay to appear more human
+    delay_before_return_html=2.0
+)
+
+result = await crawler.arun("https://bot-protected-site.com", config=config)
+```
+
+**Expected Real-World Impact:**
+- **Enterprise Scraping**: Access previously blocked corporate sites and databases
+- **Market Research**: Gather data from competitor sites with protection
+- **Price Monitoring**: Track e-commerce sites that block automated access
+- **Content Aggregation**: Collect news and social media despite anti-bot measures
+- **Compliance Testing**: Verify your own site's bot protection effectiveness
+
+## 🧠 Memory Monitoring & Optimization
+
+**The Problem:** Long-running crawl sessions consuming excessive memory, especially when processing large batches or heavy JavaScript sites.
+
+**My Solution:** Built comprehensive memory monitoring and optimization utilities that track usage patterns and provide actionable insights.
+
+### Memory Tracking Implementation
+
+```python
+from crawl4ai.memory_utils import MemoryMonitor, get_memory_info
+
+# Monitor memory during crawling
+monitor = MemoryMonitor()
+
+async with AsyncWebCrawler() as crawler:
+    # Start monitoring
+    monitor.start_monitoring()
+    
+    # Perform memory-intensive operations
+    results = await crawler.arun_many([
+        "https://heavy-js-site.com",
+        "https://large-images-site.com", 
+        "https://dynamic-content-site.com"
+    ])
+    
+    # Get detailed memory report
+    memory_report = monitor.get_report()
+    print(f"Peak memory usage: {memory_report['peak_mb']:.1f} MB")
+    print(f"Memory efficiency: {memory_report['efficiency']:.1f}%")
+    
+    # Automatic cleanup suggestions
+    if memory_report['peak_mb'] > 1000:  # > 1GB
+        print("💡 Consider batch size optimization")
+        print("💡 Enable aggressive garbage collection")
+```
+
+**Expected Real-World Impact:**
+- **Production Stability**: Prevent memory-related crashes in long-running services
+- **Cost Optimization**: Right-size server resources based on actual usage
+- **Performance Tuning**: Identify memory bottlenecks and optimization opportunities
+- **Scalability Planning**: Understand memory patterns for horizontal scaling
+
+## 📊 Enhanced Table Extraction
+
+**The Problem:** Table data was accessed through the generic `result.media` interface, making DataFrame conversion cumbersome and unclear.
+
+**My Solution:** Dedicated `result.tables` interface with direct DataFrame conversion and improved detection algorithms.
+
+### New Table Access Pattern
+
+```python
+# Old way (deprecated)
+# tables_data = result.media.get('tables', [])
+
+# New way (v0.7.3+)
+result = await crawler.arun("https://site-with-tables.com")
+
+# Direct table access
+if result.tables:
+    print(f"Found {len(result.tables)} tables")
+    
+    # Convert to pandas DataFrame instantly
+    import pandas as pd
+    
+    for i, table in enumerate(result.tables):
+        df = pd.DataFrame(table['data'])
+        print(f"Table {i}: {df.shape[0]} rows × {df.shape[1]} columns")
+        print(df.head())
+        
+        # Table metadata
+        print(f"Source: {table.get('source_xpath', 'Unknown')}")
+        print(f"Headers: {table.get('headers', [])}")
+```
+
+**Expected Real-World Impact:**
+- **Data Analysis**: Faster transition from web data to analysis-ready DataFrames
+- **ETL Pipelines**: Cleaner integration with data processing workflows
+- **Reporting**: Simplified table extraction for automated reporting systems
+
+## 💰 Community Support: GitHub Sponsors
+
+I've launched GitHub Sponsors to ensure Crawl4AI's continued development and support our growing community.
+
+**Sponsorship Tiers:**
+- **🌱 Supporter ($5/month)**: Community support + early feature previews
+- **🚀 Professional ($25/month)**: Priority support + beta access
+- **🏢 Business ($100/month)**: Direct consultation + custom integrations
+- **🏛️ Enterprise ($500/month)**: Dedicated support + feature development
+
+**Why Sponsor?**
+- Ensure continuous development and maintenance
+- Get priority support and feature requests
+- Access to premium documentation and examples
+- Direct line to the development team
+
+[**Become a Sponsor →**](https://github.com/sponsors/unclecode)
 
 ## 🐳 Docker: Flexible LLM Provider Configuration
 

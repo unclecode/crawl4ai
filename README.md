@@ -27,9 +27,9 @@
 
 Crawl4AI turns the web into clean, LLM ready Markdown for RAG, agents, and data pipelines. Fast, controllable, battle tested by a 50k+ star community.
 
-[✨ Check out latest update v0.7.0](#-recent-updates)
+[✨ Check out latest update v0.7.3](#-recent-updates)
 
-✨ New in v0.7.0, Adaptive Crawling, Virtual Scroll, Link Preview scoring, Async URL Seeder, big performance gains. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.0.md)
+✨ New in v0.7.3: Undetected Browser Support, Multi-URL Configurations, Memory Monitoring, Enhanced Table Extraction, GitHub Sponsors. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.3.md)
 
 <details>
   <summary>🤓 <strong>My Personal Story</strong></summary>
@@ -542,7 +542,89 @@ async def test_news_crawl():
 
 ## ✨ Recent Updates
 
-### Version 0.7.0 Release Highlights - The Adaptive Intelligence Update
+<details>
+<summary><strong>Version 0.7.3 Release Highlights - The Multi-Config Intelligence Update</strong></summary>
+
+- **🕵️ Undetected Browser Support**: Bypass sophisticated bot detection systems:
+  ```python
+  from crawl4ai import AsyncWebCrawler, BrowserConfig
+  
+  browser_config = BrowserConfig(
+      browser_type="undetected",  # Use undetected Chrome
+      headless=True,              # Can run headless with stealth
+      extra_args=[
+          "--disable-blink-features=AutomationControlled",
+          "--disable-web-security"
+      ]
+  )
+  
+  async with AsyncWebCrawler(config=browser_config) as crawler:
+      result = await crawler.arun("https://protected-site.com")
+  # Successfully bypass Cloudflare, Akamai, and custom bot detection
+  ```
+
+- **🎨 Multi-URL Configuration**: Different strategies for different URL patterns in one batch:
+  ```python
+  from crawl4ai import CrawlerRunConfig, MatchMode
+  
+  configs = [
+      # Documentation sites - aggressive caching
+      CrawlerRunConfig(
+          url_matcher=["*docs*", "*documentation*"],
+          cache_mode="write",
+          markdown_generator_options={"include_links": True}
+      ),
+      
+      # News/blog sites - fresh content
+      CrawlerRunConfig(
+          url_matcher=lambda url: 'blog' in url or 'news' in url,
+          cache_mode="bypass"
+      ),
+      
+      # Fallback for everything else
+      CrawlerRunConfig()
+  ]
+  
+  results = await crawler.arun_many(urls, config=configs)
+  # Each URL gets the perfect configuration automatically
+  ```
+
+- **🧠 Memory Monitoring**: Track and optimize memory usage during crawling:
+  ```python
+  from crawl4ai.memory_utils import MemoryMonitor
+  
+  monitor = MemoryMonitor()
+  monitor.start_monitoring()
+  
+  results = await crawler.arun_many(large_url_list)
+  
+  report = monitor.get_report()
+  print(f"Peak memory: {report['peak_mb']:.1f} MB")
+  print(f"Efficiency: {report['efficiency']:.1f}%")
+  # Get optimization recommendations
+  ```
+
+- **📊 Enhanced Table Extraction**: Direct DataFrame conversion from web tables:
+  ```python
+  result = await crawler.arun("https://site-with-tables.com")
+  
+  # New way - direct table access
+  if result.tables:
+      import pandas as pd
+      for table in result.tables:
+          df = pd.DataFrame(table['data'])
+          print(f"Table: {df.shape[0]} rows × {df.shape[1]} columns")
+  ```
+
+- **💰 GitHub Sponsors**: 4-tier sponsorship system for project sustainability
+- **🐳 Docker LLM Flexibility**: Configure providers via environment variables
+
+[Full v0.7.3 Release Notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.3.md)
+
+</details>
+
+<details>
+<summary><strong>Version 0.7.0 Release Highlights - The Adaptive Intelligence Update</strong></summary>
 
 - **🧠 Adaptive Crawling**: Your crawler now learns and adapts to website patterns automatically:
   ```python
@@ -606,6 +688,8 @@ async def test_news_crawl():
 - **⚡ Performance Boost**: Up to 3x faster with optimized resource handling and memory efficiency
 
 Read the full details in our [0.7.0 Release Notes](https://docs.crawl4ai.com/blog/release-v0.7.0) or check the [CHANGELOG](https://github.com/unclecode/crawl4ai/blob/main/CHANGELOG.md).
+
+</details>
 
 ## Version Numbering in Crawl4AI
 
