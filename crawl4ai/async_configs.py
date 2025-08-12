@@ -448,6 +448,10 @@ class BrowserConfig:
             self.chrome_channel = ""
         self.proxy = proxy
         self.proxy_config = proxy_config
+        if isinstance(self.proxy_config, dict):
+            self.proxy_config = ProxyConfig.from_dict(self.proxy_config)
+        if isinstance(self.proxy_config, str):
+            self.proxy_config = ProxyConfig.from_string(self.proxy_config)
 
 
         self.viewport_width = viewport_width
@@ -1159,6 +1163,11 @@ class CrawlerRunConfig():
         self.parser_type = parser_type
         self.scraping_strategy = scraping_strategy or LXMLWebScrapingStrategy()
         self.proxy_config = proxy_config
+        if isinstance(proxy_config, dict):
+            self.proxy_config = ProxyConfig.from_dict(proxy_config)
+        if isinstance(proxy_config, str):
+            self.proxy_config = ProxyConfig.from_string(proxy_config)
+
         self.proxy_rotation_strategy = proxy_rotation_strategy
         
         # Browser Location and Identity Parameters
