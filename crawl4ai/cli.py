@@ -33,6 +33,7 @@ from crawl4ai import (
     BestFirstCrawlingStrategy,
 )
 from crawl4ai.config import USER_SETTINGS
+from crawl4ai.crawlers.sis_scraper import run_sis_scraper
 from litellm import completion
 from pathlib import Path
 
@@ -1384,6 +1385,21 @@ def profiles_cmd():
     """
     # Run interactive profile manager
     anyio.run(manage_profiles)
+
+
+@cli.command("sis-scraper")
+@click.option("--keyword", "-k", required=True, help="Keyword to search for in thread titles.")
+def sis_scraper_cmd(keyword: str):
+    """
+    Scrapes novels from sis001 forum based on a keyword.
+    """
+    try:
+        console.print(f"[cyan]Starting SIS001 scraper for keyword: '{keyword}'[/cyan]")
+        anyio.run(run_sis_scraper, keyword)
+        console.print(f"[green]Scraping finished for keyword: '{keyword}'[/green]")
+    except Exception as e:
+        raise click.ClickException(f"Scraping failed: {str(e)}")
+
 
 @cli.command(name="")
 @click.argument("url", required=False)
