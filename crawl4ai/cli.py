@@ -695,6 +695,11 @@ def run_cmd(config_file: str, verbose: bool):
                     verbose=verbose,
                 )
 
+            elif config["extraction"]["type"] == "json-css":
+                crawler_cfg.extraction_strategy = JsonCssExtractionStrategy(
+                    schema=config["extraction"]["schema"]
+                )
+
         # Run the crawler
         result = anyio.run(run_crawler, url, browser_cfg, crawler_cfg, verbose)
 

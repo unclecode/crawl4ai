@@ -109,10 +109,6 @@ def test_run_command_parses_config_and_runs_crawler(mock_anyio_run, runner, tmp_
             'browser': {
                 'headless': False,
                 'viewport_width': 1024,
-            },
-            'browser': {
-                'headless': False,
-                'viewport_width': 1024,
                 'proxy': 'http://foo.bar'
             },
             'deep_crawl': {
@@ -167,3 +163,47 @@ def test_run_command_parses_config_and_runs_crawler(mock_anyio_run, runner, tmp_
         assert crawler_config.deep_crawl_strategy.max_pages == 15
         assert crawler_config.deep_crawl_strategy.max_depth == 3
         assert crawler_config.deep_crawl_strategy.__class__.__name__ == 'DFSDeepCrawlStrategy'
+
+
+@patch('crawl4ai.cli.anyio.run')
+def test_run_command_with_css_extraction(mock_anyio_run, runner, tmp_path):
+    """
+    Test that the run command correctly uses JsonCssExtractionStrategy
+    when specified in the config.
+    """
+    with runner.isolated_filesystem(temp_dir=tmp_path) as td:
+        css_schema = {
+            'baseSelector': '.item',
+            'fields': [
+                {'name': 'title', 'selector': 'h2', 'type': 'text'},
+                {'name': 'link', 'selector': 'a', 'type': 'attribute', 'attribute': 'href'},
+            ]
+        }
+        config_data = {
+            'url': 'https://css-test.dev',
+            'extraction': {
+                'type': 'json-css',
+                'schema': css_schema,
+            }
+        }
+        config_path = Path(td) / "css_config.yml"
+        with open(config_path, 'w') as f:
+            yaml.dump(config_data, f)
+
+        # Mock the result of the crawl
+        class MockCrawlResult:
+            extracted_content = '[]' # Mock empty json array
+        mock_anyio_run.return_value = MockCrawlResult()
+
+        result = runner.invoke(cli, ['run', str(config_path)])
+
+        assert result.exit_code == 0
+
+        # Check that the crawler was called with the correct strategy
+        mock_anyio_run.assert_called_once()
+        args, kwargs = mock_anyio_run.call_args
+
+        crawler_config = args[3]
+        strategy = crawler_config.extraction_strategy
+        assert strategy.__class__.__name__ == 'JsonCssExtractionStrategy'
+        assert strategy.schema == css_schema

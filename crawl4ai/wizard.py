@@ -68,16 +68,15 @@ def generate_config():
         console.print("\n[bold]3. Choose what to extract:[/bold]")
         extraction_mode = Prompt.ask(
             "   ",
-            choices=["Clean Markdown Content", "Structured Data (JSON)"],
+            choices=["Clean Markdown Content", "Structured Data (JSON) using LLM", "Structured Data (JSON) using CSS Selectors"],
             default="Clean Markdown Content"
         )
 
-        if extraction_mode == "Structured Data (JSON)":
+        if extraction_mode == "Structured Data (JSON) using LLM":
             config['extraction'] = {}
-            console.print("\n   [bold]Configuring Structured Data Extraction:[/bold]")
-            config['extraction']['type'] = "llm"  # For now, only support LLM extraction in wizard
+            console.print("\n   [bold]Configuring LLM Data Extraction:[/bold]")
+            config['extraction']['type'] = "llm"
 
-            console.print("   You'll use an LLM to extract the data. See docs for CSS/XPath.")
             config['extraction']['instruction'] = Prompt.ask(
                 "   Enter the instruction for the LLM (e.g., 'Extract all product names and prices')"
             )
@@ -88,6 +87,34 @@ def generate_config():
                 config['llm']['api_key'] = Prompt.ask("   Enter your API key", password=True)
             else:
                  console.print("   [yellow]Skipping LLM config. The crawler will use the global default.[/yellow]")
+
+        elif extraction_mode == "Structured Data (JSON) using CSS Selectors":
+            config['extraction'] = {
+                'type': 'json-css',
+                'schema': {
+                    'fields': []
+                }
+            }
+            console.print("\n   [bold]Configuring CSS Selector Data Extraction:[/bold]")
+            console.print("   You will now define a schema to extract structured data.")
+
+            base_selector = Prompt.ask("   [bold]Step 1: Base Selector[/bold]\n   Enter the CSS selector for the repeating element that contains all the fields (e.g., 'div.product-item')")
+            config['extraction']['schema']['baseSelector'] = base_selector
+
+            console.print("\n   [bold]Step 2: Define Fields to Extract[/bold]")
+            while True:
+                field = {}
+                console.print(f"\n   --- Defining Field #{len(config['extraction']['schema']['fields']) + 1} ---")
+                field['name'] = Prompt.ask("   Field Name (e.g., 'product_title')")
+                field['selector'] = Prompt.ask(f"   CSS Selector for '{field['name']}' (relative to the base selector)")
+                field['type'] = Prompt.ask("   Extraction Type", choices=["text", "attribute"], default="text")
+                if field['type'] == 'attribute':
+                    field['attribute'] = Prompt.ask("   Which attribute to extract (e.g., 'href', 'src')")
+
+                config['extraction']['schema']['fields'].append(field)
+
+                if not Confirm.ask("\n   Add another field?", default=True):
+                    break
 
 
         # 4. Output Configuration
