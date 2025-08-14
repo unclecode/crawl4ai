@@ -20,6 +20,7 @@ from .chunking_strategy import ChunkingStrategy, RegexChunking
 from .markdown_generation_strategy import MarkdownGenerationStrategy, DefaultMarkdownGenerator
 from .content_scraping_strategy import ContentScrapingStrategy, LXMLWebScrapingStrategy
 from .deep_crawling import DeepCrawlStrategy
+from .table_extraction import TableExtractionStrategy, DefaultTableExtraction
 
 from .cache_context import CacheMode
 from .proxy_strategy import ProxyRotationStrategy
@@ -982,6 +983,8 @@ class CrawlerRunConfig():
                                          Default: False.
         table_score_threshold (int): Minimum score threshold for processing a table.
                                      Default: 7.
+        table_extraction (TableExtractionStrategy): Strategy to use for table extraction.
+                                     Default: DefaultTableExtraction with table_score_threshold.
 
         # Virtual Scroll Parameters
         virtual_scroll_config (VirtualScrollConfig or dict or None): Configuration for handling virtual scroll containers.
@@ -1108,6 +1111,7 @@ class CrawlerRunConfig():
         image_description_min_word_threshold: int = IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
         image_score_threshold: int = IMAGE_SCORE_THRESHOLD,
         table_score_threshold: int = 7,
+        table_extraction: TableExtractionStrategy = None,
         exclude_external_images: bool = False,
         exclude_all_images: bool = False,
         # Link and Domain Handling Parameters
@@ -1224,6 +1228,12 @@ class CrawlerRunConfig():
         self.exclude_external_images = exclude_external_images
         self.exclude_all_images = exclude_all_images
         self.table_score_threshold = table_score_threshold
+        
+        # Table extraction strategy (default to DefaultTableExtraction if not specified)
+        if table_extraction is None:
+            self.table_extraction = DefaultTableExtraction(table_score_threshold=table_score_threshold)
+        else:
+            self.table_extraction = table_extraction
 
         # Link and Domain Handling Parameters
         self.exclude_social_media_domains = (
@@ -1495,6 +1505,7 @@ class CrawlerRunConfig():
                 "image_score_threshold", IMAGE_SCORE_THRESHOLD
             ),
             table_score_threshold=kwargs.get("table_score_threshold", 7),
+            table_extraction=kwargs.get("table_extraction", None),
             exclude_all_images=kwargs.get("exclude_all_images", False),
             exclude_external_images=kwargs.get("exclude_external_images", False),
             # Link and Domain Handling Parameters
@@ -1603,6 +1614,7 @@ class CrawlerRunConfig():
             "image_description_min_word_threshold": self.image_description_min_word_threshold,
             "image_score_threshold": self.image_score_threshold,
             "table_score_threshold": self.table_score_threshold,
+            "table_extraction": self.table_extraction,
             "exclude_all_images": self.exclude_all_images,
             "exclude_external_images": self.exclude_external_images,
             "exclude_social_media_domains": self.exclude_social_media_domains,

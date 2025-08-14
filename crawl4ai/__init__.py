@@ -29,6 +29,12 @@ from .extraction_strategy import (
 )
 from .chunking_strategy import ChunkingStrategy, RegexChunking
 from .markdown_generation_strategy import DefaultMarkdownGenerator
+from .table_extraction import (
+    TableExtractionStrategy,
+    DefaultTableExtraction,
+    NoTableExtraction,
+    LLMTableExtraction,
+)
 from .content_filter_strategy import (
     PruningContentFilter,
     BM25ContentFilter,
@@ -156,6 +162,9 @@ __all__ = [
     "ChunkingStrategy",
     "RegexChunking",
     "DefaultMarkdownGenerator",
+    "TableExtractionStrategy",
+    "DefaultTableExtraction",
+    "NoTableExtraction",
     "RelevantContentFilter",
     "PruningContentFilter",
     "BM25ContentFilter",
