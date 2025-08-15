@@ -387,6 +387,7 @@ async def stream_results(crawler: AsyncWebCrawler, results_gen: AsyncGenerator) 
     """Stream results with heartbeats and completion markers."""
     import orjson
     from datetime import datetime
+    import inspect
     
     def orjson_default(obj):
         # Handle datetime (if not already handled by orjson)
@@ -399,23 +400,43 @@ async def stream_results(crawler: AsyncWebCrawler, results_gen: AsyncGenerator) 
         return str(obj)
 
     try:
-        async for result in results_gen:
-            try:
-                server_memory_mb = _get_memory_mb()
-                # Use ORJSON serialization to handle property objects properly
-                result_json = result.model_dump_json()
-                result_dict = orjson.loads(result_json)
-                result_dict['server_memory_mb'] = server_memory_mb
-                # If PDF exists, encode it to base64
-                if result_dict.get('pdf') is not None:
-                    result_dict['pdf'] = b64encode(result_dict['pdf']).decode('utf-8')
-                logger.info(f"Streaming result for {result_dict.get('url', 'unknown')}")
-                data = orjson.dumps(result_dict, default=orjson_default).decode('utf-8') + "\n"
-                yield data.encode('utf-8')
-            except Exception as e:
-                logger.error(f"Serialization error: {e}")
-                error_response = {"error": str(e), "url": getattr(result, 'url', 'unknown')}
-                yield (orjson.dumps(error_response).decode('utf-8') + "\n").encode('utf-8')
+        logger.info(f"Starting streaming with results_gen type: {type(results_gen)}")
+        logger.info(f"Is results_gen async generator: {inspect.isasyncgen(results_gen)}")
+        
+        # Check if results_gen is actually an async generator vs another type
+        if inspect.isasyncgen(results_gen):
+            logger.info("Processing as async generator")
+            async for result in results_gen:
+                try:
+                    logger.info(f"Processing streaming result of type: {type(result)}")
+                    
+                    # Check if this result is actually a CrawlResult
+                    if hasattr(result, 'model_dump_json'):
+                        server_memory_mb = _get_memory_mb()
+                        result_json = result.model_dump_json()
+                        result_dict = orjson.loads(result_json)
+                        result_dict['server_memory_mb'] = server_memory_mb
+                        
+                        if result_dict.get('pdf') is not None:
+                            result_dict['pdf'] = b64encode(result_dict['pdf']).decode('utf-8')
+                        
+                        logger.info(f"Streaming result for {result_dict.get('url', 'unknown')}")
+                        data = orjson.dumps(result_dict, default=orjson_default).decode('utf-8') + "\n"
+                        yield data.encode('utf-8')
+                    else:
+                        logger.error(f"Result doesn't have model_dump_json method: {type(result)}")
+                        error_response = {"error": f"Invalid result type: {type(result)}", "url": "unknown"}
+                        yield (orjson.dumps(error_response).decode('utf-8') + "\n").encode('utf-8')
+                        
+                except Exception as e:
+                    logger.error(f"Serialization error: {e}")
+                    logger.error(f"Result type was: {type(result)}")
+                    error_response = {"error": str(e), "url": getattr(result, 'url', 'unknown')}
+                    yield (orjson.dumps(error_response).decode('utf-8') + "\n").encode('utf-8')
+        else:
+            logger.error(f"results_gen is not an async generator: {type(results_gen)}")
+            error_response = {"error": f"Invalid results_gen type: {type(results_gen)}"}
+            yield (orjson.dumps(error_response).decode('utf-8') + "\n").encode('utf-8')
 
         yield orjson.dumps({"status": "completed"}).decode('utf-8').encode('utf-8')
         
@@ -574,10 +595,28 @@ async def handle_stream_crawl_request(
             
             async def single_result_generator():
                 # Handle CrawlResultContainer - extract the actual results
-                if hasattr(single_result_container, '__iter__'):
-                    # It's a CrawlResultContainer with multiple results (e.g., from deep crawl)
-                    for result in single_result_container:
+                if hasattr(single_result_container, '_results'):
+                    # It's a CrawlResultContainer - iterate over the internal results
+                    for result in single_result_container._results:
+                        # Check if the result is an async generator (from deep crawl)
+                        if hasattr(result, '__aiter__'):
+                            async for sub_result in result:
+                                yield sub_result
+                        else:
+                            yield result
+                elif hasattr(single_result_container, '__aiter__'):
+                    # It's an async generator (from streaming deep crawl)
+                    async for result in single_result_container:
                         yield result
+                elif hasattr(single_result_container, '__iter__') and not hasattr(single_result_container, 'url'):
+                    # It's iterable but not a CrawlResult itself
+                    for result in single_result_container:
+                        # Check if each result is an async generator
+                        if hasattr(result, '__aiter__'):
+                            async for sub_result in result:
+                                yield sub_result
+                        else:
+                            yield result
                 else:
                     # It's a single CrawlResult
                     yield single_result_container
