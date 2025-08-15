@@ -17,7 +17,6 @@ __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file
 
 
 import asyncio
-import json
 from crawl4ai import (
     AsyncWebCrawler,
     CrawlerRunConfig,
@@ -38,13 +37,19 @@ async def basic_llm_extraction():
         provider="openai/gpt-4.1-mini",
         api_token="env:OPENAI_API_KEY",  # Uses environment variable
         temperature=0.1,  # Low temperature for consistency
-        max_tokens=2000
+        max_tokens=32000
     )
     
     # Create LLM table extraction strategy
     table_strategy = LLMTableExtraction(
         llm_config=llm_config,
-        verbose=True
+        verbose=True,
+        # css_selector="div.mw-content-ltr",
+        max_tries=2,
+        enable_chunking=True,
+        chunk_token_threshold=5000,  # Lower threshold to force chunking
+        min_rows_per_chunk=10,
+        max_parallel_chunks=3
     )
     
     # Configure crawler with the strategy
@@ -56,7 +61,7 @@ async def basic_llm_extraction():
     async with AsyncWebCrawler() as crawler:
         # Extract tables from a Wikipedia page
         result = await crawler.arun(
-            url="https://en.wikipedia.org/wiki/List_of_countries_by_GDP_(nominal)",
+            url="https://en.wikipedia.org/wiki/List_of_chemical_elements",
             config=config
         )
         
@@ -264,70 +269,14 @@ async def compare_strategies():
                 print(f"    Row {i+1}: {row}")
             print(f"  Metadata: {table.get('metadata', {})}")
 
-
-# Example 4: Using Local Models (Ollama)
-async def local_model_extraction():
-    """Extract tables using local Ollama models for privacy/cost."""
-    print("\n=== Example 4: Local Model Extraction with Ollama ===")
-    
-    # Configure for local Ollama
-    llm_config = LLMConfig(
-        provider="ollama/llama3.3",
-        api_token=None,  # Not needed for Ollama
-        base_url="http://localhost:11434",
-        temperature=0.1
-    )
-    
-    table_strategy = LLMTableExtraction(
-        llm_config=llm_config,
-        verbose=True
-    )
-    
-    config = CrawlerRunConfig(
-        cache_mode=CacheMode.BYPASS,
-        table_extraction=table_strategy
-    )
-    
-    # Simple test HTML
-    test_html = """
-    <table>
-        <thead>
-            <tr><th>Product</th><th>Price</th><th>Stock</th></tr>
-        </thead>
-        <tbody>
-            <tr><td>Apple</td><td>$1.50</td><td>100</td></tr>
-            <tr><td>Banana</td><td>$0.50</td><td>200</td></tr>
-            <tr><td>Orange</td><td>$2.00</td><td>50</td></tr>
-        </tbody>
-    </table>
-    """
-    
-    async with AsyncWebCrawler() as crawler:
-        result = await crawler.arun(
-            url=f"raw:{test_html}",
-            config=config
-        )
-        
-        if result.success and result.tables:
-            table = result.tables[0]
-            print(f"✓ Extracted with local model:")
-            
-            # Create DataFrame
-            df = pd.DataFrame(table['rows'], columns=table['headers'])
-            print(df.to_string())
-        else:
-            print("✗ Make sure Ollama is running locally with llama3.3 model")
-
-
-# Example 5: Batch Processing Multiple Pages
+# Example 4: Batch Processing Multiple Pages
 async def batch_extraction():
     """Extract tables from multiple pages efficiently."""
-    print("\n=== Example 5: Batch Table Extraction ===")
+    print("\n=== Example 4: Batch Table Extraction ===")
     
     urls = [
-        "https://en.wikipedia.org/wiki/List_of_countries_by_population_(United_Nations)",
-        "https://en.wikipedia.org/wiki/List_of_countries_by_GDP_(nominal)",
-        "https://en.wikipedia.org/wiki/List_of_countries_by_Human_Development_Index"
+        "https://www.worldometers.info/geography/alphabetical-list-of-countries/",
+        # "https://en.wikipedia.org/wiki/List_of_chemical_elements",
     ]
     
     llm_config = LLMConfig(
@@ -339,8 +288,12 @@ async def batch_extraction():
     
     table_strategy = LLMTableExtraction(
         llm_config=llm_config,
-        css_selector="table.wikitable",  # Wikipedia data tables
-        verbose=False
+        css_selector="div.datatable-container",  # Wikipedia data tables
+        verbose=False,
+        enable_chunking=True,
+        chunk_token_threshold=5000,  # Lower threshold to force chunking
+        min_rows_per_chunk=10,
+        max_parallel_chunks=3
     )
     
     config = CrawlerRunConfig(
@@ -390,9 +343,6 @@ async def main():
     
     # # Compare strategies
     # await compare_strategies()
-    
-    # # Local model (requires Ollama)
-    # # await local_model_extraction()
     
     # # Batch processing
     # await batch_extraction()

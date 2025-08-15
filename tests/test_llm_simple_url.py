@@ -23,90 +23,15 @@ async def test_controlled_html():
     print("LLM TABLE EXTRACTION TEST")
     print("=" * 60)
     
-    # Create test HTML with complex tables
-    test_html = """
-    <!DOCTYPE html>
-    <html>
-    <head><title>Test Tables</title></head>
-    <body>
-        <h1>Sales Data</h1>
-        
-        <table border="1">
-            <caption>Q1 2024 Sales Report</caption>
-            <thead>
-                <tr>
-                    <th rowspan="2">Product</th>
-                    <th colspan="3">January</th>
-                    <th colspan="3">February</th>
-                </tr>
-                <tr>
-                    <th>Week 1</th>
-                    <th>Week 2</th>
-                    <th>Week 3</th>
-                    <th>Week 1</th>
-                    <th>Week 2</th>
-                    <th>Week 3</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>Widget A</td>
-                    <td>100</td>
-                    <td>120</td>
-                    <td>110</td>
-                    <td>130</td>
-                    <td>140</td>
-                    <td>150</td>
-                </tr>
-                <tr>
-                    <td>Widget B</td>
-                    <td>200</td>
-                    <td>180</td>
-                    <td>190</td>
-                    <td>210</td>
-                    <td>220</td>
-                    <td>230</td>
-                </tr>
-                <tr>
-                    <td colspan="7">Note: All values in thousands USD</td>
-                </tr>
-            </tbody>
-        </table>
-        
-        <br>
-        
-        <table>
-            <tr>
-                <th>Country</th>
-                <th>Population</th>
-                <th>GDP</th>
-            </tr>
-            <tr>
-                <td>USA</td>
-                <td>331M</td>
-                <td>$21T</td>
-            </tr>
-            <tr>
-                <td>China</td>
-                <td>1.4B</td>
-                <td>$14T</td>
-            </tr>
-        </table>
-    </body>
-    </html>
-    """
-    
-    # url = "https://www.w3schools.com/html/html_tables.asp"
     url = "https://en.wikipedia.org/wiki/List_of_chemical_elements"
     # url = "https://en.wikipedia.org/wiki/List_of_prime_ministers_of_India"
     
     # Configure LLM
     llm_config = LLMConfig(
-        provider="openai/gpt-4.1-mini",
-        # provider="groq/llama-3.3-70b-versatile",
-        api_token=os.getenv("OPENAI_API_KEY"),
-        # api_token=os.getenv("GROQ_API_KEY"),
-        # api_token="os.getenv("GROQ_API_KEY")",
+        # provider="openai/gpt-4.1-mini",
+        # api_token=os.getenv("OPENAI_API_KEY"),
+        provider="groq/llama-3.3-70b-versatile",
+        api_token="GROQ_API_TOKEN",
         temperature=0.1,
         max_tokens=32000
     )
