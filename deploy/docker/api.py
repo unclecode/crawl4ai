@@ -1,5 +1,6 @@
 import os
 import json
+import orjson
 import asyncio
 from typing import List, Tuple, Dict
 from functools import partial
@@ -384,27 +385,39 @@ def create_task_response(task: dict, task_id: str, base_url: str) -> dict:
 
 async def stream_results(crawler: AsyncWebCrawler, results_gen: AsyncGenerator) -> AsyncGenerator[bytes, None]:
     """Stream results with heartbeats and completion markers."""
-    import json
-    from utils import datetime_handler
+    import orjson
+    from datetime import datetime
+    
+    def orjson_default(obj):
+        # Handle datetime (if not already handled by orjson)
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        # Handle property objects (convert to string or something else)
+        if isinstance(obj, property):
+            return str(obj)
+        # Last resort: convert to string
+        return str(obj)
 
     try:
         async for result in results_gen:
             try:
                 server_memory_mb = _get_memory_mb()
-                result_dict = result.model_dump()
+                # Use ORJSON serialization to handle property objects properly
+                result_json = result.model_dump_json()
+                result_dict = orjson.loads(result_json)
                 result_dict['server_memory_mb'] = server_memory_mb
                 # If PDF exists, encode it to base64
                 if result_dict.get('pdf') is not None:
                     result_dict['pdf'] = b64encode(result_dict['pdf']).decode('utf-8')
                 logger.info(f"Streaming result for {result_dict.get('url', 'unknown')}")
-                data = json.dumps(result_dict, default=datetime_handler) + "\n"
+                data = orjson.dumps(result_dict, default=orjson_default).decode('utf-8') + "\n"
                 yield data.encode('utf-8')
             except Exception as e:
                 logger.error(f"Serialization error: {e}")
                 error_response = {"error": str(e), "url": getattr(result, 'url', 'unknown')}
-                yield (json.dumps(error_response) + "\n").encode('utf-8')
+                yield (orjson.dumps(error_response).decode('utf-8') + "\n").encode('utf-8')
 
-        yield json.dumps({"status": "completed"}).encode('utf-8')
+        yield orjson.dumps({"status": "completed"}).decode('utf-8').encode('utf-8')
         
     except asyncio.CancelledError:
         logger.warning("Client disconnected during streaming")
@@ -472,7 +485,9 @@ async def handle_crawl_request(
         # Process results to handle PDF bytes
         processed_results = []
         for result in results:
-            result_dict = result.model_dump()
+            # Use ORJSON serialization to handle property objects properly
+            result_json = result.model_dump_json()
+            result_dict = orjson.loads(result_json)
             # If PDF exists, encode it to base64
             if result_dict.get('pdf') is not None:
                 result_dict['pdf'] = b64encode(result_dict['pdf']).decode('utf-8')
@@ -522,8 +537,19 @@ async def handle_stream_crawl_request(
         browser_config.verbose = False
         crawler_config = CrawlerRunConfig.load(crawler_config)
         crawler_config.scraping_strategy = LXMLWebScrapingStrategy()
-        crawler_config.stream = True
+        # Don't force stream=True here - let the deep crawl strategy control its own streaming behavior
 
+        # Apply global base config (this was missing!)
+        base_config = config["crawler"]["base_config"]
+        for key, value in base_config.items():
+            if hasattr(crawler_config, key):
+                print(f"[DEBUG] Applying base_config: {key} = {value}")
+                setattr(crawler_config, key, value)
+
+        print(f"[DEBUG] Deep crawl strategy: {type(crawler_config.deep_crawl_strategy).__name__ if crawler_config.deep_crawl_strategy else 'None'}")
+        print(f"[DEBUG] Stream mode: {crawler_config.stream}")
+        print(f"[DEBUG] Simulate user: {getattr(crawler_config, 'simulate_user', 'Not set')}")
+        
         dispatcher = MemoryAdaptiveDispatcher(
             memory_threshold_percent=config["crawler"]["memory_threshold_percent"],
             rate_limiter=RateLimiter(
@@ -537,11 +563,40 @@ async def handle_stream_crawl_request(
         # crawler = AsyncWebCrawler(config=browser_config)
         # await crawler.start()
 
-        results_gen = await crawler.arun_many(
-            urls=urls,
-            config=crawler_config,
-            dispatcher=dispatcher
-        )
+        # Use correct method based on URL count (same as regular endpoint)
+        if len(urls) == 1:
+            # For single URL, use arun to get CrawlResult, then wrap in async generator
+            single_result_container = await crawler.arun(
+                url=urls[0],
+                config=crawler_config,
+                dispatcher=dispatcher
+            )
+            
+            async def single_result_generator():
+                # Handle CrawlResultContainer - extract the actual results
+                if hasattr(single_result_container, '__iter__'):
+                    # It's a CrawlResultContainer with multiple results (e.g., from deep crawl)
+                    for result in single_result_container:
+                        yield result
+                else:
+                    # It's a single CrawlResult
+                    yield single_result_container
+                    
+            results_gen = single_result_generator()
+        else:
+            # For multiple URLs, use arun_many
+            results_gen = await crawler.arun_many(
+                urls=urls,
+                config=crawler_config,
+                dispatcher=dispatcher
+            )
+            
+            # If results_gen is a list (e.g., from deep crawl), convert to async generator
+            if isinstance(results_gen, list):
+                async def convert_list_to_generator():
+                    for result in results_gen:
+                        yield result
+                results_gen = convert_list_to_generator()
 
         return crawler, results_gen
 

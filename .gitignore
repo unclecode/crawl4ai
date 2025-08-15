@@ -1,6 +1,11 @@
 # Scripts folder (private tools)
 .scripts/
 
+# Local development CLI (private)
+local_dev.py
+dev
+DEV_CLI_README.md
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -271,3 +276,6 @@ docs/**/data
 
 docs/apps/linkdin/debug*/
 docs/apps/linkdin/samples/insights/*
+
+# Production checklist (local, not for version control)
+PRODUCTION_CHECKLIST.md
