@@ -38,7 +38,14 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
         self.include_external = include_external
         self.score_threshold = score_threshold
         self.max_pages = max_pages
-        self.logger = logger or logging.getLogger(__name__)
+        # Type check for logger
+        if isinstance(logger, dict):
+            logging.getLogger(__name__).warning(
+                "BFSDeepCrawlStrategy received a dict as logger; falling back to default logger."
+            )
+            self.logger = logging.getLogger(__name__)
+        else:
+            self.logger = logger or logging.getLogger(__name__)
         self.stats = TraversalStats(start_time=datetime.now())
         self._cancel_event = asyncio.Event()
         self._pages_crawled = 0

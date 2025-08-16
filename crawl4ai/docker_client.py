@@ -30,7 +30,7 @@ class Crawl4aiDockerClient:
     def __init__(
         self,
         base_url: str = "http://localhost:8000",
-        timeout: float = 30.0,
+        timeout: float = 600.0,  # Increased to 10 minutes for crawling operations
         verify_ssl: bool = True,
         verbose: bool = True,
         log_file: Optional[str] = None
@@ -113,21 +113,12 @@ class Crawl4aiDockerClient:
         self.logger.info(f"Crawling {len(urls)} URLs {'(streaming)' if is_streaming else ''}", tag="CRAWL")
         
         if is_streaming:
-            async def stream_results() -> AsyncGenerator[CrawlResult, None]:
-                async with self._http_client.stream("POST", f"{self.base_url}/crawl/stream", json=data) as response:
-                    response.raise_for_status()
-                    async for line in response.aiter_lines():
-                        if line.strip():
-                            result = json.loads(line)
-                            if "error" in result:
-                                self.logger.error_status(url=result.get("url", "unknown"), error=result["error"])
-                                continue
-                            self.logger.url_status(url=result.get("url", "unknown"), success=True, timing=result.get("timing", 0.0))
-                            if result.get("status") == "completed":
-                                continue
-                            else:
-                                yield CrawlResult(**result)
-            return stream_results()
+            # For streaming, we need to return the async generator properly
+            # The caller should be able to do: async for result in await client.crawl(...)
+            async def streaming_wrapper():
+                async for result in self._stream_crawl_results(data):
+                    yield result
+            return streaming_wrapper()
         
         response = await self._request("POST", "/crawl", json=data)
         result_data = response.json()
@@ -137,6 +128,35 @@ class Crawl4aiDockerClient:
         results = [CrawlResult(**r) for r in result_data.get("results", [])]
         self.logger.success(f"Crawl completed with {len(results)} results", tag="CRAWL")
         return results[0] if len(results) == 1 else results
+
+    async def _stream_crawl_results(self, data: Dict[str, Any]) -> AsyncGenerator[CrawlResult, None]:
+        """Internal method to handle streaming crawl results."""
+        async with self._http_client.stream("POST", f"{self.base_url}/crawl/stream", json=data) as response:
+            response.raise_for_status()
+            async for line in response.aiter_lines():
+                if line.strip():
+                    try:
+                        result = json.loads(line)
+                        if "error" in result:
+                            self.logger.error_status(url=result.get("url", "unknown"), error=result["error"])
+                            continue
+                        
+                        # Check if this is a crawl result (has required fields)
+                        if "url" in result and "success" in result:
+                            self.logger.url_status(url=result.get("url", "unknown"), success=result.get("success", False), timing=result.get("timing", 0.0))
+                            
+                            # Create CrawlResult object properly
+                            crawl_result = CrawlResult(**result)
+                            yield crawl_result
+                        # Skip status-only messages
+                        elif result.get("status") == "completed":
+                            continue
+                    except json.JSONDecodeError as e:
+                        self.logger.error(f"Failed to parse streaming response: {e}", tag="STREAM")
+                        continue
+                    except Exception as e:
+                        self.logger.error(f"Error processing streaming result: {e}", tag="STREAM")
+                        continue
 
     async def get_schema(self) -> Dict[str, Any]:
         """Retrieve configuration schemas."""
