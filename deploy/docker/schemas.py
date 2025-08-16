@@ -9,6 +9,50 @@ class CrawlRequest(BaseModel):
     browser_config: Optional[Dict] = Field(default_factory=dict)
     crawler_config: Optional[Dict] = Field(default_factory=dict)
 
+
+class HookConfig(BaseModel):
+    """Configuration for user-provided hooks"""
+    code: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Map of hook points to Python code strings"
+    )
+    timeout: int = Field(
+        default=30,
+        ge=1,
+        le=120,
+        description="Timeout in seconds for each hook execution"
+    )
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "code": {
+                    "on_page_context_created": """
+async def hook(page, context, **kwargs):
+    # Block images to speed up crawling
+    await context.route("**/*.{png,jpg,jpeg,gif}", lambda route: route.abort())
+    return page
+""",
+                    "before_retrieve_html": """
+async def hook(page, context, **kwargs):
+    # Scroll to load lazy content
+    await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+    await page.wait_for_timeout(2000)
+    return page
+"""
+                },
+                "timeout": 30
+            }
+        }
+
+
+class CrawlRequestWithHooks(CrawlRequest):
+    """Extended crawl request with hooks support"""
+    hooks: Optional[HookConfig] = Field(
+        default=None,
+        description="Optional user-provided hook functions"
+    )
+
 class MarkdownRequest(BaseModel):
     """Request body for the /md endpoint."""
     url: str                    = Field(...,  description="Absolute http/https URL to fetch")
