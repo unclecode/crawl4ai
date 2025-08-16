@@ -102,16 +102,16 @@ async def smart_blog_crawler():
     
     # Step 2: Configure discovery - let's find all blog posts
     config = SeedingConfig(
-        source="sitemap",           # Use the website's sitemap
-        pattern="*/blog/*.html",    # Only blog posts
+        source="sitemap+cc",      # Use the website's sitemap+cc
+        pattern="*/courses/*",    # Only courses related posts
         extract_head=True,          # Get page metadata
         max_urls=100               # Limit for this example
     )
     
     # Step 3: Discover URLs from the Python blog
-    print("🔍 Discovering blog posts...")
+    print("🔍 Discovering course posts...")
     urls = await seeder.urls("realpython.com", config)
-    print(f"✅ Found {len(urls)} blog posts")
+    print(f"✅ Found {len(urls)} course posts")
     
     # Step 4: Filter for Python tutorials (using metadata!)
     tutorials = [
@@ -134,7 +134,8 @@ async def smart_blog_crawler():
     async with AsyncWebCrawler() as crawler:
         config = CrawlerRunConfig(
             only_text=True,
-            word_count_threshold=300  # Only substantial articles
+            word_count_threshold=300,  # Only substantial articles
+            stream=True
         )
         
         # Extract URLs and crawl them
@@ -155,7 +156,7 @@ asyncio.run(smart_blog_crawler())
 
 **What just happened?**
 
-1. We discovered all blog URLs from the sitemap
+1. We discovered all blog URLs from the sitemap+cc
 2. We filtered using metadata (no crawling needed!)
 3. We crawled only the relevant tutorials
 4. We saved tons of time and bandwidth
@@ -282,8 +283,8 @@ config = SeedingConfig(
     live_check=True,  # Verify each URL is accessible
     concurrency=20    # Check 20 URLs in parallel
 )
-
-urls = await seeder.urls("example.com", config)
+async with AsyncUrlSeeder() as seeder:
+    urls = await seeder.urls("example.com", config)
 
 # Now you can filter by status
 live_urls = [u for u in urls if u["status"] == "valid"]
@@ -311,8 +312,8 @@ This is where URL seeding gets really powerful. Instead of crawling entire pages
 config = SeedingConfig(
     extract_head=True  # Extract metadata from <head> section
 )
-
-urls = await seeder.urls("example.com", config)
+async with AsyncUrlSeeder() as seeder:
+    urls = await seeder.urls("example.com", config)
 
 # Now each URL has rich metadata
 for url in urls[:3]:
@@ -387,8 +388,8 @@ config = SeedingConfig(
     scoring_method="bm25",
     score_threshold=0.3
 )
-
-urls = await seeder.urls("example.com", config)
+async with AsyncUrlSeeder() as seeder:
+    urls = await seeder.urls("example.com", config)
 
 # URLs are scored based on:
 # 1. Domain parts matching (e.g., 'python' in python.example.com)
@@ -429,8 +430,8 @@ config = SeedingConfig(
     extract_head=True,
     live_check=True
 )
-
-urls = await seeder.urls("blog.example.com", config)
+async with AsyncUrlSeeder() as seeder:
+    urls = await seeder.urls("blog.example.com", config)
 
 # Analyze the results
 for url in urls[:5]:
@@ -488,8 +489,8 @@ config = SeedingConfig(
     scoring_method="bm25",       # Use BM25 algorithm
     score_threshold=0.3          # Minimum relevance score
 )
-
-urls = await seeder.urls("realpython.com", config)
+async with AsyncUrlSeeder() as seeder:
+    urls = await seeder.urls("realpython.com", config)
 
 # Results are automatically sorted by relevance!
 for url in urls[:5]:
@@ -511,8 +512,8 @@ config = SeedingConfig(
     score_threshold=0.5,
     max_urls=20
 )
-
-urls = await seeder.urls("docs.example.com", config)
+async with AsyncUrlSeeder() as seeder:
+    urls = await seeder.urls("docs.example.com", config)
 
 # The highest scoring URLs will be API docs!
 ```
@@ -529,8 +530,8 @@ config = SeedingConfig(
     score_threshold=0.4,
     pattern="*/product/*"  # Combine with pattern matching
 )
-
-urls = await seeder.urls("shop.example.com", config)
+async with AsyncUrlSeeder() as seeder:
+    urls = await seeder.urls("shop.example.com", config)
 
 # Filter further by price (from metadata)
 affordable = [
@@ -550,8 +551,8 @@ config = SeedingConfig(
     scoring_method="bm25",
     score_threshold=0.35
 )
-
-urls = await seeder.urls("technews.com", config)
+async with AsyncUrlSeeder() as seeder:
+    urls = await seeder.urls("technews.com", config)
 
 # Filter by date
 from datetime import datetime, timedelta
@@ -591,8 +592,8 @@ for query in queries:
         score_threshold=0.4,
         max_urls=10  # Top 10 per topic
     )
-    
-    urls = await seeder.urls("learning-platform.com", config)
+    async with AsyncUrlSeeder() as seeder:
+        urls = await seeder.urls("learning-platform.com", config)
     all_tutorials.extend(urls)
 
 # Remove duplicates while preserving order
@@ -625,7 +626,8 @@ config = SeedingConfig(
 )
 
 # Returns a dictionary: {domain: [urls]}
-results = await seeder.many_urls(domains, config)
+async with AsyncUrlSeeder() as seeder:
+    results = await seeder.many_urls(domains, config)
 
 # Process results
 for domain, urls in results.items():
@@ -654,8 +656,8 @@ config = SeedingConfig(
     pattern="*/blog/*",
     max_urls=100
 )
-
-results = await seeder.many_urls(competitors, config)
+async with AsyncUrlSeeder() as seeder:
+    results = await seeder.many_urls(competitors, config)
 
 # Analyze content types
 for domain, urls in results.items():
@@ -690,8 +692,8 @@ config = SeedingConfig(
     score_threshold=0.3,
     max_urls=20  # Per site
 )
-
-results = await seeder.many_urls(educational_sites, config)
+async with AsyncUrlSeeder() as seeder:
+    results = await seeder.many_urls(educational_sites, config)
 
 # Find the best beginner tutorials
 all_tutorials = []
@@ -731,8 +733,8 @@ config = SeedingConfig(
     score_threshold=0.5,  # High threshold for relevance
     max_urls=10
 )
-
-results = await seeder.many_urls(news_sites, config)
+async with AsyncUrlSeeder() as seeder:
+    results = await seeder.many_urls(news_sites, config)
 
 # Collect all mentions
 mentions = []
