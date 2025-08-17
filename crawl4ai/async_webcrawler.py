@@ -203,7 +203,7 @@ class AsyncWebCrawler:
         """异步空上下文管理器"""
         yield
 
-    async def health_check(self, url: str, timeout: float = 10.0, verify_ssl: bool = False) -> Dict[str, Any]:
+    async def health_check(self, url: str, timeout: float = 10.0, verify_ssl: bool = True) -> Dict[str, Any]:
         """
         Perform quick accessibility check on URL using HEAD request.
         
@@ -217,7 +217,7 @@ class AsyncWebCrawler:
         Args:
             url (str): URL to check for accessibility
             timeout (float): Request timeout in seconds (default: 10.0)
-            verify_ssl (bool): Whether to verify SSL certificates (default: False for broader compatibility)
+            verify_ssl (bool): Whether to verify SSL certificates (default: True for security)
             
         Returns:
             Dict[str, Any]: Health check result containing:
@@ -227,6 +227,8 @@ class AsyncWebCrawler:
                 - content_type (str): Content-Type header value
                 - final_url (str): Final URL after redirects
                 - redirected (bool): True if URL was redirected
+                - server (str): Server header value
+                - content_length (str): Content-Length header value
                 - error (str, optional): Error message if not accessible
                 - error_type (str, optional): Type of error that occurred
                 
@@ -254,7 +256,12 @@ class AsyncWebCrawler:
             }
             
             # Create connector with SSL verification setting
-            ssl_context = ssl.create_default_context() if verify_ssl else False
+            if verify_ssl:
+                ssl_context = ssl.create_default_context()
+            else:
+                ssl_context = ssl.create_default_context()
+                ssl_context.check_hostname = False
+                ssl_context.verify_mode = ssl.CERT_NONE
             connector = aiohttp.TCPConnector(limit=1, ssl=ssl_context)
             timeout_config = aiohttp.ClientTimeout(total=timeout)
             

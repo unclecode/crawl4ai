@@ -32,7 +32,7 @@ async def main():
         result = await crawler.health_check(
             "https://httpbin.org/status/200",
             timeout=5.0,
-            verify_ssl=False
+            verify_ssl=False  # Disable SSL verification if needed
         )
 ```
 

@@ -106,11 +106,12 @@ async def batch_url_validation():
                 })
                 print(f"  ✅ {url} - {health['status_code']} ({health['response_time_ms']}ms)")
             else:
+                error_msg = health.get("error", f"HTTP {health['status_code']}")
                 failed_urls.append({
                     "url": url,
-                    "error": health.get("error", f"HTTP {health['status_code']}")
+                    "error": error_msg
                 })
-                print(f"  ❌ {url} - {health.get('error', f'HTTP {health['status_code']}')}")
+                print(f"  ❌ {url} - {error_msg}")
         
         print(f"\nSummary:")
         print(f"  Accessible URLs: {len(accessible_urls)}")

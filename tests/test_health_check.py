@@ -10,7 +10,8 @@ class TestHealthCheck:
     async def test_health_check_accessible_url(self):
         """Test health check with an accessible URL"""
         async with AsyncWebCrawler() as crawler:
-            result = await crawler.health_check("https://httpbin.org/get")
+            # Use verify_ssl=False for better test environment compatibility
+            result = await crawler.health_check("https://httpbin.org/get", verify_ssl=False)
             
             assert isinstance(result, dict)
             assert "accessible" in result
