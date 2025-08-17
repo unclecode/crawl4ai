@@ -387,8 +387,22 @@ async def execute_js(
     cfg = CrawlerRunConfig(js_code=body.scripts)
     async with AsyncWebCrawler(config=BrowserConfig()) as crawler:
         results = await crawler.arun(url=body.url, config=cfg)
-    # Return JSON-serializable dict of the first CrawlResult
-    data = results[0].model_dump()
+    # Return JSON-serializable dict of the first CrawlResult with safe serialization
+    import json
+    import math
+    
+    def safe_serialize(data):
+        def clean_value(v):
+            if isinstance(v, float) and (math.isinf(v) or math.isnan(v)):
+                return None
+            elif isinstance(v, dict):
+                return {k: clean_value(val) for k, val in v.items()}
+            elif isinstance(v, (list, tuple)):
+                return [clean_value(val) for val in v]
+            return v
+        return clean_value(data)
+    
+    data = safe_serialize(results[0].model_dump())
     return JSONResponse(data)
 
 
