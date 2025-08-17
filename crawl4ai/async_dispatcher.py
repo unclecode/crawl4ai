@@ -22,7 +22,7 @@ from urllib.parse import urlparse
 import random
 from abc import ABC, abstractmethod
 
-from .memory_utils import get_true_memory_usage_percent
+from .utils import get_true_memory_usage_percent
 
 
 class RateLimiter:

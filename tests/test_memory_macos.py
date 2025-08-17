@@ -4,7 +4,7 @@
 import psutil
 import platform
 import time
-from crawl4ai.memory_utils import get_true_memory_usage_percent, get_memory_stats, get_true_available_memory_gb
+from crawl4ai.utils import get_true_memory_usage_percent, get_memory_stats, get_true_available_memory_gb
 
 
 def test_memory_calculation():
