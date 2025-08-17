@@ -65,7 +65,7 @@ async def handle_llm_qa(
 ) -> str:
     """Process QA using LLM with crawled content as context."""
     try:
-        if not url.startswith(('http://', 'https://')):
+        if not url.startswith(('http://', 'https://')) and not url.startswith(("raw:", "raw://")):
             url = 'https://' + url
         # Extract base URL by finding last '?q=' occurrence
         last_q_index = url.rfind('?q=')
@@ -191,7 +191,7 @@ async def handle_markdown_request(
                     detail=error_msg
                 )
         decoded_url = unquote(url)
-        if not decoded_url.startswith(('http://', 'https://')):
+        if not decoded_url.startswith(('http://', 'https://')) and not decoded_url.startswith(("raw:", "raw://")):
             decoded_url = 'https://' + decoded_url
 
         if filter_type == FilterType.RAW:
@@ -328,7 +328,7 @@ async def create_new_task(
 ) -> JSONResponse:
     """Create and initialize a new task."""
     decoded_url = unquote(input_path)
-    if not decoded_url.startswith(('http://', 'https://')):
+    if not decoded_url.startswith(('http://', 'https://')) and not decoded_url.startswith(("raw:", "raw://")):
         decoded_url = 'https://' + decoded_url
 
     from datetime import datetime
@@ -428,7 +428,7 @@ async def handle_crawl_request(
     peak_mem_mb = start_mem_mb
     
     try:
-        urls = [('https://' + url) if not url.startswith(('http://', 'https://')) else url for url in urls]
+        urls = [('https://' + url) if not url.startswith(('http://', 'https://')) and not url.startswith(("raw:", "raw://")) else url for url in urls]
         browser_config = BrowserConfig.load(browser_config)
         crawler_config = CrawlerRunConfig.load(crawler_config)
 

@@ -608,6 +608,11 @@ class BrowserManager:
         self.contexts_by_config = {}
         self._contexts_lock = asyncio.Lock()
         
+        # Serialize context.new_page() across concurrent tasks to avoid races
+        # when using a shared persistent context (context.pages may be empty
+        # for all racers). Prevents 'Target page/context closed' errors.
+        self._page_lock = asyncio.Lock()
+        
         # Stealth-related attributes
         self._stealth_instance = None
         self._stealth_cm = None 
@@ -1027,13 +1032,26 @@ class BrowserManager:
                 context = await self.create_browser_context(crawlerRunConfig)
                 ctx = self.default_context        # default context, one window only
                 ctx = await clone_runtime_state(context, ctx, crawlerRunConfig, self.config)
-                page = await ctx.new_page()
+                # Avoid concurrent new_page on shared persistent context
+                # See GH-1198: context.pages can be empty under races
+                async with self._page_lock:
+                    page = await ctx.new_page()
             else:
                 context = self.default_context
                 pages = context.pages
                 page = next((p for p in pages if p.url == crawlerRunConfig.url), None)
                 if not page:
-                    page = context.pages[0] # await context.new_page()
+                    if pages:
+                        page = pages[0]
+                    else:
+                        # Double-check under lock to avoid TOCTOU and ensure only
+                        # one task calls new_page when pages=[] concurrently
+                        async with self._page_lock:
+                            pages = context.pages
+                            if pages:
+                                page = pages[0]
+                            else:
+                                page = await context.new_page()
         else:
             # Otherwise, check if we have an existing context for this config
             config_signature = self._make_config_signature(crawlerRunConfig)

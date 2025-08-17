@@ -168,7 +168,7 @@ class SimpleApiTester:
         print("\n=== CORE APIs ===")
         
         test_url = "https://example.com"
-        
+        test_raw_html_url = "raw://<html><body><h1>Hello, World!</h1></body></html>"
         # Test markdown endpoint
         md_payload = {
             "url": test_url,
@@ -180,6 +180,17 @@ class SimpleApiTester:
         # print(result['data'].get('markdown', ''))
         self.print_result(result)
         
+        # Test markdown endpoint with raw HTML
+        raw_md_payload = {
+            "url": test_raw_html_url,
+            "f": "fit",
+            "q": "test query",
+            "c": "0"
+        }
+        result = self.test_post_endpoint("/md", raw_md_payload)
+        self.print_result(result)
+        
+
         # Test HTML endpoint
         html_payload = {"url": test_url}
         result = self.test_post_endpoint("/html", html_payload)
@@ -215,6 +226,15 @@ class SimpleApiTester:
         result = self.test_post_endpoint("/crawl", crawl_payload)
         self.print_result(result)
         
+        # Test crawl endpoint with raw HTML
+        crawl_payload = {
+            "urls": [test_raw_html_url],
+            "browser_config": {},
+            "crawler_config": {}
+        }
+        result = self.test_post_endpoint("/crawl", crawl_payload)
+        self.print_result(result)
+
         # Test config dump
         config_payload = {"code": "CrawlerRunConfig()"}
         result = self.test_post_endpoint("/config/dump", config_payload)

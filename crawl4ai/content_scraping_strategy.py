@@ -242,6 +242,16 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
         exclude_domains = set(kwargs.get("exclude_domains", []))
 
         # Process links
+        try:
+            base_element = element.xpath("//head/base[@href]")
+            if base_element:
+                base_href = base_element[0].get("href", "").strip()
+                if base_href:
+                    url = base_href
+        except Exception as e:
+            self._log("error", f"Error extracting base URL: {str(e)}", "SCRAPE")
+            pass
+
         for link in element.xpath(".//a[@href]"):
             href = link.get("href", "").strip()
             if not href:
@@ -576,117 +586,6 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
 
         return root
 
-    def is_data_table(self, table: etree.Element, **kwargs) -> bool:
-        score = 0
-        # Check for thead and tbody
-        has_thead = len(table.xpath(".//thead")) > 0
-        has_tbody = len(table.xpath(".//tbody")) > 0
-        if has_thead:
-            score += 2
-        if has_tbody:
-            score += 1
-
-        # Check for th elements
-        th_count = len(table.xpath(".//th"))
-        if th_count > 0:
-            score += 2
-            if has_thead or table.xpath(".//tr[1]/th"):
-                score += 1
-
-        # Check for nested tables
-        if len(table.xpath(".//table")) > 0:
-            score -= 3
-
-        # Role attribute check
-        role = table.get("role", "").lower()
-        if role in {"presentation", "none"}:
-            score -= 3
-
-        # Column consistency
-        rows = table.xpath(".//tr")
-        if not rows:
-            return False
-        col_counts = [len(row.xpath(".//td|.//th")) for row in rows]
-        avg_cols = sum(col_counts) / len(col_counts)
-        variance = sum((c - avg_cols)**2 for c in col_counts) / len(col_counts)
-        if variance < 1:
-            score += 2
-
-        # Caption and summary
-        if table.xpath(".//caption"):
-            score += 2
-        if table.get("summary"):
-            score += 1
-
-        # Text density
-        total_text = sum(len(''.join(cell.itertext()).strip()) for row in rows for cell in row.xpath(".//td|.//th"))
-        total_tags = sum(1 for _ in table.iterdescendants())
-        text_ratio = total_text / (total_tags + 1e-5)
-        if text_ratio > 20:
-            score += 3
-        elif text_ratio > 10:
-            score += 2
-
-        # Data attributes
-        data_attrs = sum(1 for attr in table.attrib if attr.startswith('data-'))
-        score += data_attrs * 0.5
-
-        # Size check
-        if avg_cols >= 2 and len(rows) >= 2:
-            score += 2
-
-        threshold = kwargs.get("table_score_threshold", 7)
-        return score >= threshold
-
-    def extract_table_data(self, table: etree.Element) -> dict:
-        caption = table.xpath(".//caption/text()")
-        caption = caption[0].strip() if caption else ""
-        summary = table.get("summary", "").strip()
-
-        # Extract headers with colspan handling
-        headers = []
-        thead_rows = table.xpath(".//thead/tr")
-        if thead_rows:
-            header_cells = thead_rows[0].xpath(".//th")
-            for cell in header_cells:
-                text = cell.text_content().strip()
-                colspan = int(cell.get("colspan", 1))
-                headers.extend([text] * colspan)
-        else:
-            first_row = table.xpath(".//tr[1]")
-            if first_row:
-                for cell in first_row[0].xpath(".//th|.//td"):
-                    text = cell.text_content().strip()
-                    colspan = int(cell.get("colspan", 1))
-                    headers.extend([text] * colspan)
-
-        # Extract rows with colspan handling
-        rows = []
-        for row in table.xpath(".//tr[not(ancestor::thead)]"):
-            row_data = []
-            for cell in row.xpath(".//td"):
-                text = cell.text_content().strip()
-                colspan = int(cell.get("colspan", 1))
-                row_data.extend([text] * colspan)
-            if row_data:
-                rows.append(row_data)
-
-        # Align rows with headers
-        max_columns = len(headers) if headers else (max(len(row) for row in rows) if rows else 0)
-        aligned_rows = []
-        for row in rows:
-            aligned = row[:max_columns] + [''] * (max_columns - len(row))
-            aligned_rows.append(aligned)
-
-        if not headers:
-            headers = [f"Column {i+1}" for i in range(max_columns)]
-
-        return {
-            "headers": headers,
-            "rows": aligned_rows,
-            "caption": caption,
-            "summary": summary,
-        }
 
     def _scrap(
         self,
@@ -829,12 +728,16 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                 **kwargs,
             )
 
+            # Extract tables using the table extraction strategy if provided
             if 'table' not in excluded_tags:
-                tables = body.xpath(".//table")
-                for table in tables:
-                    if self.is_data_table(table, **kwargs):
-                        table_data = self.extract_table_data(table)
-                        media["tables"].append(table_data)
+                table_extraction = kwargs.get('table_extraction')
+                if table_extraction:
+                    # Pass logger to the strategy if it doesn't have one
+                    if not table_extraction.logger:
+                        table_extraction.logger = self.logger
+                    # Extract tables using the strategy
+                    extracted_tables = table_extraction.extract_tables(body, **kwargs)
+                    media["tables"].extend(extracted_tables)
 
             # Handle only_text option
             if kwargs.get("only_text", False):

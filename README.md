@@ -27,9 +27,11 @@
 
 Crawl4AI turns the web into clean, LLM ready Markdown for RAG, agents, and data pipelines. Fast, controllable, battle tested by a 50k+ star community.
 
-[✨ Check out latest update v0.7.3](#-recent-updates)
+[✨ Check out latest update v0.7.4](#-recent-updates)
 
-✨ New in v0.7.3: Undetected Browser Support, Multi-URL Configurations, Memory Monitoring, Enhanced Table Extraction, GitHub Sponsors. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.3.md)
+✨ New in v0.7.4: Revolutionary LLM Table Extraction with intelligent chunking, enhanced concurrency fixes, memory management refactor, and critical stability improvements. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.4.md)
+
+✨ Recent v0.7.3: Undetected Browser Support, Multi-URL Configurations, Memory Monitoring, Enhanced Table Extraction, GitHub Sponsors. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.3.md)
 
 <details>
   <summary>🤓 <strong>My Personal Story</strong></summary>
@@ -541,6 +543,40 @@ async def test_news_crawl():
 </details>
 
 ## ✨ Recent Updates
+
+<details>
+<summary><strong>Version 0.7.4 Release Highlights - The Intelligent Table Extraction & Performance Update</strong></summary>
+
+- **🚀 LLMTableExtraction**: Revolutionary table extraction with intelligent chunking for massive tables:
+  ```python
+  from crawl4ai import LLMTableExtraction, LLMConfig
+  
+  # Configure intelligent table extraction
+  table_strategy = LLMTableExtraction(
+      llm_config=LLMConfig(provider="openai/gpt-4.1-mini"),
+      enable_chunking=True,           # Handle massive tables
+      chunk_token_threshold=5000,     # Smart chunking threshold
+      overlap_threshold=100,          # Maintain context between chunks
+      extraction_type="structured"    # Get structured data output
+  )
+  
+  config = CrawlerRunConfig(table_extraction_strategy=table_strategy)
+  result = await crawler.arun("https://complex-tables-site.com", config=config)
+  
+  # Tables are automatically chunked, processed, and merged
+  for table in result.tables:
+      print(f"Extracted table: {len(table['data'])} rows")
+  ```
+
+- **⚡ Dispatcher Bug Fix**: Fixed sequential processing bottleneck in arun_many for fast-completing tasks
+- **🧹 Memory Management Refactor**: Consolidated memory utilities into main utils module for cleaner architecture
+- **🔧 Browser Manager Fixes**: Resolved race conditions in concurrent page creation with thread-safe locking
+- **🔗 Advanced URL Processing**: Better handling of raw:// URLs and base tag link resolution
+- **🛡️ Enhanced Proxy Support**: Flexible proxy configuration supporting both dict and string formats
+
+[Full v0.7.4 Release Notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.4.md)
+
+</details>
 
 <details>
 <summary><strong>Version 0.7.3 Release Highlights - The Multi-Config Intelligence Update</strong></summary>
