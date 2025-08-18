@@ -144,6 +144,42 @@ class TestCrawlEndpoints:
         # We don't specify a markdown generator in this test, so don't make assumptions about markdown field
         # It might be null, missing, or populated depending on the server's default behavior
 
+    async def test_crawl_with_stream_redirects(self, async_client: httpx.AsyncClient):
+        """Test that when requesting /crawl, parameters with stream=True will be automatically redirected to /crawl/stream."""
+        payload = {
+            "urls": [SIMPLE_HTML_URL],
+            "browser_config": {
+                "type": "BrowserConfig",
+                "params": {
+                    "headless": True,
+                }
+            },
+            "crawler_config": {
+                "type": "CrawlerRunConfig", 
+                "params": {
+                    "stream": True,  # Set stream to True to trigger redirection
+                    "screenshot": False,
+                    "cache_mode": CacheMode.BYPASS.value
+                }
+            }
+        }
+        
+        # Send a request to the /crawl endpoint
+        response = await async_client.post("/crawl", json=payload, follow_redirects=True)
+        
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "application/x-ndjson"
+        assert response.headers.get("x-stream-status") == "active"
+        
+        results = await process_streaming_response(response)
+        
+        assert len(results) == 1
+        result = results[0]
+        await assert_crawl_result_structure(result)
+        assert result["success"] is True
+        assert result["url"] == SIMPLE_HTML_URL
+        assert "<h1>Herman Melville - Moby-Dick</h1>" in result["html"]
+        
     async def test_simple_crawl_single_url_streaming(self, async_client: httpx.AsyncClient):
         """Test /crawl/stream with a single URL and simple config values."""
         payload = {
