@@ -1,20 +1,17 @@
 from __future__ import annotations
 
-import asyncio
 import base64
-import random
 import time
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, Any, List, Union
 from typing import Optional, AsyncGenerator, Final
 import os
 
-from bs4 import BeautifulSoup
 from playwright.async_api import Page, Error
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
-import hashlib
+
 import uuid
 from .js_snippet import load_js_script
 from .models import AsyncCrawlResponse
