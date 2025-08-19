@@ -21,7 +21,7 @@ class FilterType(str, Enum):
 def load_config() -> Dict:
     """Load and return application configuration."""
     config_path = Path(__file__).parent / "config.yml"
-    with open(config_path, "r") as config_file:
+    with open(config_path, "r", encoding="utf-8") as config_file:
         return yaml.safe_load(config_file)
 
 def setup_logging(config: Dict) -> None:

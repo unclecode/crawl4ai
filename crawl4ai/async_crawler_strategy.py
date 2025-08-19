@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import random
 import time
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, Any, List, Union
 from typing import Optional, AsyncGenerator, Final
 import os
+
+from bs4 import BeautifulSoup
 from playwright.async_api import Page, Error
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from io import BytesIO
@@ -30,6 +33,12 @@ from urllib.parse import urlparse
 from types import MappingProxyType
 import contextlib
 from functools import partial
+import asyncio
+import hashlib
+import random
+from typing import Optional
+from bs4 import BeautifulSoup
+from playwright.async_api import Page
 
 class AsyncCrawlerStrategy(ABC):
     """
@@ -937,7 +946,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             # Handle full page scanning
             if config.scan_full_page:
                 # await self._handle_full_page_scan(page, config.scroll_delay)
-                await self._handle_full_page_scan(page, config.scroll_delay, config.max_scroll_steps)
+                await self._handle_full_page_scan_v2(page, config.scroll_delay, config.max_scroll_steps)
 
             # Handle virtual scroll if configured
             if config.virtual_scroll_config:
@@ -1207,6 +1216,216 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         else:
             # await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
             await self.safe_scroll(page, 0, total_height)
+
+
+    async def _handle_full_page_scan_v2(
+            self,
+            page: Page,
+            scroll_delay: float = 0.4,
+            max_scroll_steps: Optional[int] = None
+    ):
+        """
+        Enhanced full-page scan handler.
+
+        How it works:
+        1. Detect the main content container (body or a content-like element).
+        2. Determine whether the page is static (content fully loaded) or dynamic (content loads while scrolling).
+        3. For static pages: directly scroll to the bottom, extract full HTML, and replace DOM.
+        4. For dynamic pages: perform incremental scrolling, deduplicate nodes by hash, and handle unclosed tables.
+        5. Reconstruct the page DOM with merged nodes to get a clean, complete snapshot.
+
+        Difference from v1:
+        - v1: Sequential scrolling until the bottom, only concerned with vertical position.
+        - v2: Adds static/dynamic detection, node deduplication, table merge handling, and DOM reconstruction.
+        - v2 produces a more reliable snapshot for infinite scroll pages or sites with dynamic loading.
+
+        Args:
+            page (Page): The Playwright page object
+            scroll_delay (float): Delay between scroll steps
+            max_scroll_steps (Optional[int]): Limit for scroll steps; defaults to 100 if not provided
+        """
+        try:
+            # Initialize viewport
+            viewport_size = page.viewport_size or {
+                "width": self.browser_config.viewport_width,
+                "height": self.browser_config.viewport_height
+            }
+            viewport_height = viewport_size.get("height", self.browser_config.viewport_height)
+
+            # Control parameters
+            scroll_count = 0
+            stall_count = 0
+            seen_hashes = set()
+            collected_nodes = []
+            vertical_positions = [19 / 20, 3 / 4, 1 / 2]
+            current_position_index = 0
+            max_stall_count = len(vertical_positions)
+            max_scroll = max_scroll_steps if max_scroll_steps is not None else 100
+
+            # Static/dynamic detection flags
+            previous_container_html = None
+            is_dynamic = True
+            dynamic_check_done = False
+            static_break = False
+
+            # Identify content container
+            container_selector = await page.evaluate("""
+                () => {
+                    let container = null;
+                    const commonContainers = [
+                        document.querySelector('.content'),
+                        document.querySelector('.main-content'),
+                        document.querySelector('.article-content'),
+                        document.querySelector('.page-content'),
+                        document.querySelector('.post-content')
+                    ];
+                    container = commonContainers.find(el => el && el.scrollHeight > window.innerHeight);
+                    if (!container) {
+                        const centerElements = document.elementsFromPoint(window.innerWidth/2, window.innerHeight/2);
+                        container = centerElements.find(el => 
+                            el.scrollHeight > window.innerHeight * 1.5 &&
+                            el.offsetWidth > window.innerWidth * 0.6
+                        );
+                    }
+                    if (!container) container = document.body;
+                    return container.id ? `#${container.id}` :
+                           container.className ? `.${Array.from(container.classList).filter(cls => cls).join('.')}` : 'body';
+                }
+            """)
+
+            self.logger.info("Content container detected: {selector}", tag="PAGE_SCAN",
+                             params={"selector": container_selector})
+
+            # Main scrolling loop
+            while stall_count < max_stall_count and not static_break and scroll_count < max_scroll:
+                scroll_count += 1
+                current_vertical_ratio = vertical_positions[current_position_index]
+
+                # Simulate mouse move
+                visible_mid_x = viewport_size["width"] * current_vertical_ratio
+                random_x = visible_mid_x * (1 + random.uniform(-0.015, 0.015))
+                await page.mouse.move(random_x, viewport_height / 2 * (1 + random.uniform(-0.015, 0.015)))
+                await asyncio.sleep(random.uniform(0.1, 0.3))
+
+                # Extract container children outerHTML
+                node_list = await page.evaluate("""
+                    (containerSelector) => {
+                        const container = document.querySelector(containerSelector) || document.body;
+                        return Array.from(container.children).map(el => el.outerHTML);
+                    }
+                """, container_selector)
+
+                new_nodes = []
+                buffered_table = getattr(self, "_buffered_table", "")  # temporary buffer for unclosed tables
+
+                for node in node_list:
+                    # Handle buffered table
+                    if buffered_table:
+                        buffered_table += node
+                        if "</table>" in node:
+                            table_html = buffered_table
+                            buffered_table = ""
+                            node_hash = hashlib.md5(table_html.encode()).hexdigest()
+                            if node_hash not in seen_hashes:
+                                seen_hashes.add(node_hash)
+                                new_nodes.append(table_html)
+                        continue
+
+                    # Start buffering new unclosed table
+                    if node.strip().startswith("<table") and "</table>" not in node:
+                        buffered_table = node
+                        continue
+
+                    # Deduplicate by hash
+                    node_hash = hashlib.md5(node.encode()).hexdigest()
+                    if node_hash not in seen_hashes:
+                        seen_hashes.add(node_hash)
+                        new_nodes.append(node)
+
+                self._buffered_table = buffered_table  # save buffer for next round
+
+                if new_nodes:
+                    collected_nodes.extend(new_nodes)
+                    self.logger.info(
+                        "Scroll {count}: +{new_count} nodes (total {total})",
+                        tag="PAGE_SCAN",
+                        params={"count": scroll_count, "new_count": len(new_nodes), "total": len(collected_nodes)}
+                    )
+                else:
+                    self.logger.info(
+                        "Scroll {count}: no new nodes",
+                        tag="PAGE_SCAN",
+                        params={"count": scroll_count}
+                    )
+
+                # Pre-scroll hash
+                pre_scroll_html = await page.content()
+                pre_scroll_hash = hashlib.md5(pre_scroll_html.encode()).hexdigest()
+
+                # Perform scroll
+                await page.mouse.wheel(0, viewport_height * 0.9)
+                current_scroll_y = await page.evaluate("window.scrollY")
+
+                # Static page detection
+                current_container_html = await page.evaluate("""
+                    (containerSelector) => {
+                        const container = document.querySelector(containerSelector) || document.body;
+                        return container.innerHTML;
+                    }
+                """, container_selector)
+
+                if scroll_count == 1:
+                    previous_container_html = current_container_html
+                elif scroll_count == 2 and not dynamic_check_done:
+                    if current_container_html == previous_container_html:
+                        is_dynamic = False
+                        self.logger.info("Static page detected (first two scrolls identical)", tag="PAGE_SCAN")
+                        await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                        await asyncio.sleep(0.5)
+                        # static_html = await page.content()
+                        # await page.evaluate("(html) => { document.body.innerHTML = html; }", static_html)
+                        static_break = True
+                        break
+                    else:
+                        self.logger.info("Dynamic page detected (content changed)", tag="PAGE_SCAN")
+                    dynamic_check_done = True
+
+                # Post-scroll content change detection
+                post_scroll_html = await page.content()
+                post_scroll_hash = hashlib.md5(post_scroll_html.encode()).hexdigest()
+                if post_scroll_hash != pre_scroll_hash:
+                    stall_count = 0
+                else:
+                    stall_count += 1
+                    current_position_index = (current_position_index + 1) % len(vertical_positions)
+
+                await asyncio.sleep(random.uniform(0.9*scroll_delay, 1.1*scroll_delay) if is_dynamic else 0.05)
+
+            # Dynamic page final merge
+            if is_dynamic and not static_break:
+                soup = BeautifulSoup(await page.content(), "lxml")
+                all_containers = soup.select(container_selector)
+                content_container = all_containers[0] if all_containers else soup.find("body")
+
+                if content_container:
+                    for child in list(content_container.children):
+                        child.decompose()
+
+                    merged_html = BeautifulSoup("".join(collected_nodes), "lxml")
+                    for el in list(merged_html.contents):
+                        content_container.append(el.extract())
+
+                # Clean unwanted tags
+                for tag in soup.find_all(["script", "style", "noscript", "meta", "link"]):
+                    tag.decompose()
+
+                final_html = str(soup)
+                await page.evaluate("(html) => { document.body.innerHTML = html; }", final_html)
+                self.logger.info("Dynamic page processing complete, DOM replaced with merged HTML", tag="PAGE_SCAN")
+
+        except Exception as e:
+            self.logger.error("Full page scan failed: {error}", tag="PAGE_SCAN", params={"error": str(e)})
+
 
     async def _handle_virtual_scroll(self, page: Page, config: "VirtualScrollConfig"):
         """
