@@ -425,7 +425,7 @@ async def main():
             "type": "attribute",
             "attribute": "src"
         }
-    }
+    ]
 }
 
     extraction_strategy = JsonCssExtractionStrategy(schema, verbose=True)
