@@ -34,7 +34,6 @@ from types import MappingProxyType
 import contextlib
 from functools import partial
 
-
 class AsyncCrawlerStrategy(ABC):
     """
     Abstract base class for crawler strategies.
@@ -44,7 +43,6 @@ class AsyncCrawlerStrategy(ABC):
     @abstractmethod
     async def crawl(self, url: str, **kwargs) -> AsyncCrawlResponse:
         pass  # 4 + 3
-
 
 class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
     """
@@ -76,7 +74,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
     """
 
     def __init__(
-            self, browser_config: BrowserConfig = None, logger: AsyncLogger = None, **kwargs
+        self, browser_config: BrowserConfig = None, logger: AsyncLogger = None, **kwargs
     ):
         """
         Initialize the AsyncPlaywrightCrawlerStrategy with a browser configuration.
@@ -290,7 +288,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                             )
 
     async def csp_compliant_wait(
-            self, page: Page, user_wait_function: str, timeout: float = 30000
+        self, page: Page, user_wait_function: str, timeout: float = 30000
     ):
         """
         Wait for a condition in a CSP-compliant way.
@@ -424,7 +422,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         return session_id
 
     async def crawl(
-            self, url: str, config: CrawlerRunConfig, **kwargs
+        self, url: str, config: CrawlerRunConfig, **kwargs
     ) -> AsyncCrawlResponse:
         """
         Crawls a given URL or processes raw HTML/local file content based on the URL prefix.
@@ -499,7 +497,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             )
 
     async def _crawl_web(
-            self, url: str, config: CrawlerRunConfig
+        self, url: str, config: CrawlerRunConfig
     ) -> AsyncCrawlResponse:
         """
         Internal method to crawl web URLs with the specified configuration.
@@ -560,11 +558,11 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         # Be cautious with large post data
                         post_data = request.post_data_buffer
                         if post_data:
-                            # Attempt to decode, fallback to base64 or size indication
-                            try:
-                                post_data_str = post_data.decode('utf-8', errors='replace')
-                            except UnicodeDecodeError:
-                                post_data_str = f"[Binary data: {len(post_data)} bytes]"
+                             # Attempt to decode, fallback to base64 or size indication
+                             try:
+                                 post_data_str = post_data.decode('utf-8', errors='replace')
+                             except UnicodeDecodeError:
+                                 post_data_str = f"[Binary data: {len(post_data)} bytes]"
                     except Exception:
                         post_data_str = "[Error retrieving post data]"
 
@@ -572,7 +570,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         "event_type": "request",
                         "url": request.url,
                         "method": request.method,
-                        "headers": dict(request.headers),  # Convert Header dict
+                        "headers": dict(request.headers), # Convert Header dict
                         "post_data": post_data_str,
                         "resource_type": request.resource_type,
                         "is_navigation_request": request.is_navigation_request(),
@@ -581,9 +579,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 except Exception as e:
                     if self.logger:
                         self.logger.warning(f"Error capturing request details for {request.url}: {e}", tag="CAPTURE")
-                    captured_requests.append(
-                        {"event_type": "request_capture_error", "url": request.url, "error": str(e),
-                         "timestamp": time.time()})
+                    captured_requests.append({"event_type": "request_capture_error", "url": request.url, "error": str(e), "timestamp": time.time()})
 
             async def handle_response_capture(response):
                 try:
@@ -600,11 +596,11 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         "url": response.url,
                         "status": response.status,
                         "status_text": response.status_text,
-                        "headers": dict(response.headers),  # Convert Header dict
+                        "headers": dict(response.headers), # Convert Header dict
                         "from_service_worker": response.from_service_worker,
-                        "request_timing": response.request.timing,  # Detailed timing info
+                        "request_timing": response.request.timing, # Detailed timing info
                         "timestamp": time.time(),
-                        "body": {
+                        "body" : {
                             # "raw": body,
                             # "json": json_body,
                             "text": text_body
@@ -613,12 +609,10 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 except Exception as e:
                     if self.logger:
                         self.logger.warning(f"Error capturing response details for {response.url}: {e}", tag="CAPTURE")
-                    captured_requests.append(
-                        {"event_type": "response_capture_error", "url": response.url, "error": str(e),
-                         "timestamp": time.time()})
+                    captured_requests.append({"event_type": "response_capture_error", "url": response.url, "error": str(e), "timestamp": time.time()})
 
             async def handle_request_failed_capture(request):
-                try:
+                 try:
                     captured_requests.append({
                         "event_type": "request_failed",
                         "url": request.url,
@@ -627,13 +621,10 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         "failure_text": str(request.failure) if request.failure else "Unknown failure",
                         "timestamp": time.time()
                     })
-                except Exception as e:
+                 except Exception as e:
                     if self.logger:
-                        self.logger.warning(f"Error capturing request failed details for {request.url}: {e}",
-                                            tag="CAPTURE")
-                    captured_requests.append(
-                        {"event_type": "request_failed_capture_error", "url": request.url, "error": str(e),
-                         "timestamp": time.time()})
+                        self.logger.warning(f"Error capturing request failed details for {request.url}: {e}", tag="CAPTURE")
+                    captured_requests.append({"event_type": "request_failed_capture_error", "url": request.url, "error": str(e), "timestamp": time.time()})
 
             page.on("request", handle_request_capture)
             page.on("response", handle_response_capture)
@@ -710,7 +701,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         # Set up console logging if requested
         if config.log_console:
             def log_consol(
-                    msg, console_log_type="debug"
+                msg, console_log_type="debug"
             ):  # Corrected the parameter syntax
                 if console_log_type == "error":
                     self.logger.error(
@@ -793,7 +784,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     while req and req.redirected_from:
                         prev_req = req.redirected_from
                         prev_resp = await prev_req.response()
-                        if prev_resp:  # keep earliest
+                        if prev_resp:                       # keep earliest
                             first_resp = prev_resp
                         req = prev_req
 
@@ -890,7 +881,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
             # Handle content loading and viewport adjustment
             if not self.browser_config.text_mode and (
-                    config.wait_for_images or config.adjust_viewport_to_content
+                config.wait_for_images or config.adjust_viewport_to_content
             ):
                 await page.wait_for_load_state("domcontentloaded")
                 await asyncio.sleep(0.1)
@@ -977,8 +968,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     )
 
                 await self.execute_hook("on_execution_started", page, context=context, config=config)
-                await self.execute_hook("on_execution_ended", page, context=context, config=config,
-                                        result=execution_result)
+                await self.execute_hook("on_execution_ended", page, context=context, config=config, result=execution_result)
 
             # Handle user simulation
             if config.simulate_user or config.magic:
@@ -990,7 +980,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             # Handle wait_for condition
             # Todo: Decide how to handle this
             if not config.wait_for and config.css_selector and False:
-                # if not config.wait_for and config.css_selector:
+            # if not config.wait_for and config.css_selector:
                 config.wait_for = f"css:{config.css_selector}"
 
             if config.wait_for:
@@ -1143,8 +1133,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 await page.close()
 
     # async def _handle_full_page_scan(self, page: Page, scroll_delay: float = 0.1):
-    async def _handle_full_page_scan(self, page: Page, scroll_delay: float = 0.1,
-                                     max_scroll_steps: Optional[int] = None):
+    async def _handle_full_page_scan(self, page: Page, scroll_delay: float = 0.1, max_scroll_steps: Optional[int] = None):
         """
         Helper method to handle full page scanning.
 
@@ -1221,6 +1210,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         else:
             # await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
             await self.safe_scroll(page, 0, total_height)
+
 
     async def _handle_full_page_scan_v2(
             self,
@@ -1403,7 +1393,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     stall_count += 1
                     current_position_index = (current_position_index + 1) % len(vertical_positions)
 
-                await asyncio.sleep(random.uniform(0.9 * scroll_delay, 1.1 * scroll_delay) if is_dynamic else 0.05)
+                await asyncio.sleep(random.uniform(0.9*scroll_delay, 1.1*scroll_delay) if is_dynamic else 0.05)
 
             # Dynamic page final merge
             if is_dynamic and not static_break:
@@ -1429,6 +1419,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
         except Exception as e:
             self.logger.error("Full page scan failed: {error}", tag="PAGE_SCAN", params={"error": str(e)})
+
 
     async def _handle_virtual_scroll(self, page: Page, config: "VirtualScrollConfig"):
         """
@@ -1762,7 +1753,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             return None
 
     async def _capture_console_messages(
-            self, page: Page, file_path: str
+        self, page: Page, file_path: str
     ) -> List[Dict[str, Union[str, float]]]:
         """
         Captures console messages from the page.
@@ -2011,7 +2002,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             )
 
     async def robust_execute_user_script(
-            self, page: Page, js_code: Union[str, List[str]]
+        self, page: Page, js_code: Union[str, List[str]]
     ) -> Dict[str, Any]:
         """
         Executes user-provided JavaScript code with proper error handling and context,
@@ -2161,7 +2152,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             return {"success": False, "error": str(e)}
 
     async def execute_user_script(
-            self, page: Page, js_code: Union[str, List[str]]
+        self, page: Page, js_code: Union[str, List[str]]
     ) -> Dict[str, Any]:
         """
         Executes user-provided JavaScript code with proper error handling and context.
@@ -2227,6 +2218,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     # Wait for network idle after script execution
                     t1 = time.time()
                     await page.wait_for_load_state("domcontentloaded", timeout=5000)
+
 
                     t1 = time.time()
                     await page.wait_for_load_state("networkidle", timeout=5000)
@@ -2423,7 +2415,6 @@ class ConnectionTimeoutError(HTTPCrawlerError):
 
 class HTTPStatusError(HTTPCrawlerError):
     """Raised for unexpected status codes"""
-
     def __init__(self, status_code: int, message: str):
         self.status_code = status_code
         super().__init__(f"HTTP {status_code}: {message}")
@@ -2452,12 +2443,12 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
     })
 
     def __init__(
-            self,
-            browser_config: Optional[HTTPCrawlerConfig] = None,
-            logger: Optional[AsyncLogger] = None,
-            max_connections: int = DEFAULT_MAX_CONNECTIONS,
-            dns_cache_ttl: int = DEFAULT_DNS_CACHE_TTL,
-            chunk_size: int = DEFAULT_CHUNK_SIZE
+        self,
+        browser_config: Optional[HTTPCrawlerConfig] = None,
+        logger: Optional[AsyncLogger] = None,
+        max_connections: int = DEFAULT_MAX_CONNECTIONS,
+        dns_cache_ttl: int = DEFAULT_DNS_CACHE_TTL,
+        chunk_size: int = DEFAULT_CHUNK_SIZE
     ):
         """Initialize the HTTP crawler with config"""
         self.browser_config = browser_config or HTTPCrawlerConfig()
@@ -2476,6 +2467,7 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
         self.set_hook('before_request', lambda *args, **kwargs: None)
         self.set_hook('after_request', lambda *args, **kwargs: None)
         self.set_hook('on_error', lambda *args, **kwargs: None)
+
 
     async def __aenter__(self) -> AsyncHTTPCrawlerStrategy:
         await self.start()
@@ -2500,11 +2492,11 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
             raise ValueError(f"Invalid hook type: {hook_type}")
 
     async def _execute_hook(
-            self,
-            hook_type: str,
-            hook_func: Callable,
-            *args: Any,
-            **kwargs: Any
+        self,
+        hook_type: str,
+        hook_func: Callable,
+        *args: Any,
+        **kwargs: Any
     ) -> Any:
         if asyncio.iscoroutinefunction(hook_func):
             return await hook_func(*args, **kwargs)
@@ -2563,10 +2555,11 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
             status_code=200
         )
 
+
     async def _handle_http(
-            self,
-            url: str,
-            config: CrawlerRunConfig
+        self,
+        url: str,
+        config: CrawlerRunConfig
     ) -> AsyncCrawlResponse:
         async with self._session_context() as session:
             timeout = ClientTimeout(
@@ -2639,10 +2632,10 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
                 raise HTTPCrawlerError(f"HTTP request failed: {str(e)}")
 
     async def crawl(
-            self,
-            url: str,
-            config: Optional[CrawlerRunConfig] = None,
-            **kwargs
+        self,
+        url: str,
+        config: Optional[CrawlerRunConfig] = None,
+        **kwargs
     ) -> AsyncCrawlResponse:
         config = config or CrawlerRunConfig.from_kwargs(kwargs)
 
