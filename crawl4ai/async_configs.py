@@ -402,6 +402,7 @@ class BrowserConfig:
         browser_mode: str = "dedicated",
         use_managed_browser: bool = False,
         cdp_url: str = None,
+        cdp_headers: dict = None,
         use_persistent_context: bool = False,
         user_data_dir: str = None,
         chrome_channel: str = "chromium",
@@ -440,6 +441,7 @@ class BrowserConfig:
         self.browser_mode = browser_mode
         self.use_managed_browser = use_managed_browser
         self.cdp_url = cdp_url
+        self.cdp_headers = cdp_headers if cdp_headers is not None else {}
         self.use_persistent_context = use_persistent_context
         self.user_data_dir = user_data_dir
         self.chrome_channel = chrome_channel or self.browser_type or "chromium"
@@ -526,6 +528,7 @@ class BrowserConfig:
             browser_mode=kwargs.get("browser_mode", "dedicated"),
             use_managed_browser=kwargs.get("use_managed_browser", False),
             cdp_url=kwargs.get("cdp_url"),
+            cdp_headers=kwargs.get("cdp_headers"),
             use_persistent_context=kwargs.get("use_persistent_context", False),
             user_data_dir=kwargs.get("user_data_dir"),
             chrome_channel=kwargs.get("chrome_channel", "chromium"),
@@ -563,6 +566,7 @@ class BrowserConfig:
             "browser_mode": self.browser_mode,
             "use_managed_browser": self.use_managed_browser,
             "cdp_url": self.cdp_url,
+            "cdp_headers": self.cdp_headers,
             "use_persistent_context": self.use_persistent_context,
             "user_data_dir": self.user_data_dir,
             "chrome_channel": self.chrome_channel,
