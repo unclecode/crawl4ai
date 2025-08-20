@@ -35,6 +35,7 @@ nav:
     - "Page Interaction": "core/page-interaction.md"
     - "Content Selection": "core/content-selection.md"
     - "Cache Modes": "core/cache-modes.md"
+    - "Telemetry": "core/telemetry.md"
     - "Local Files & Raw HTML": "core/local-files.md"
     - "Link & Media": "core/link-media.md"
   - Advanced:
