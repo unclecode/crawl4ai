@@ -49,6 +49,9 @@ from .utils import (
     preprocess_html_for_schema,
 )
 
+# Import telemetry
+from .telemetry import capture_exception, telemetry_decorator, async_telemetry_decorator
+
 
 class AsyncWebCrawler:
     """
@@ -201,6 +204,7 @@ class AsyncWebCrawler:
         """异步空上下文管理器"""
         yield
 
+    @async_telemetry_decorator
     async def arun(
         self,
         url: str,
@@ -430,6 +434,7 @@ class AsyncWebCrawler:
                     )
                 )
 
+    @async_telemetry_decorator
     async def aprocess_html(
         self,
         url: str,

@@ -1385,6 +1385,97 @@ def profiles_cmd():
     # Run interactive profile manager
     anyio.run(manage_profiles)
 
+@cli.group("telemetry")
+def telemetry_cmd():
+    """Manage telemetry settings for Crawl4AI
+    
+    Telemetry helps improve Crawl4AI by sending anonymous crash reports.
+    No personal data or crawled content is ever collected.
+    """
+    pass
+
+@telemetry_cmd.command("enable")
+@click.option("--email", "-e", help="Optional email for follow-up on critical issues")
+@click.option("--always/--once", default=True, help="Always send errors (default) or just once")
+def telemetry_enable_cmd(email: Optional[str], always: bool):
+    """Enable telemetry to help improve Crawl4AI
+    
+    Examples:
+        crwl telemetry enable                    # Enable telemetry
+        crwl telemetry enable --email me@ex.com  # Enable with email
+        crwl telemetry enable --once             # Send only next error
+    """
+    from crawl4ai.telemetry import enable
+    
+    try:
+        enable(email=email, always=always, once=not always)
+        console.print("[green]✅ Telemetry enabled successfully[/green]")
+        
+        if email:
+            console.print(f"   Email: {email}")
+        console.print(f"   Mode: {'Always send errors' if always else 'Send next error only'}")
+        
+    except Exception as e:
+        console.print(f"[red]❌ Failed to enable telemetry: {e}[/red]")
+        sys.exit(1)
+
+@telemetry_cmd.command("disable")
+def telemetry_disable_cmd():
+    """Disable telemetry
+    
+    Stop sending anonymous crash reports to help improve Crawl4AI.
+    """
+    from crawl4ai.telemetry import disable
+    
+    try:
+        disable()
+        console.print("[green]✅ Telemetry disabled successfully[/green]")
+    except Exception as e:
+        console.print(f"[red]❌ Failed to disable telemetry: {e}[/red]")
+        sys.exit(1)
+
+@telemetry_cmd.command("status")
+def telemetry_status_cmd():
+    """Show current telemetry status
+    
+    Display whether telemetry is enabled and current settings.
+    """
+    from crawl4ai.telemetry import status
+    
+    try:
+        info = status()
+        
+        # Create status table
+        table = Table(title="Telemetry Status", show_header=False)
+        table.add_column("Setting", style="cyan")
+        table.add_column("Value")
+        
+        # Status emoji
+        status_icon = "✅" if info['enabled'] else "❌"
+        
+        table.add_row("Status", f"{status_icon} {'Enabled' if info['enabled'] else 'Disabled'}")
+        table.add_row("Consent", info['consent'].replace('_', ' ').title())
+        
+        if info['email']:
+            table.add_row("Email", info['email'])
+        
+        table.add_row("Environment", info['environment'])
+        table.add_row("Provider", info['provider'])
+        
+        if info['errors_sent'] > 0:
+            table.add_row("Errors Sent", str(info['errors_sent']))
+        
+        console.print(table)
+        
+        # Add helpful messages
+        if not info['enabled']:
+            console.print("\n[yellow]ℹ️  Telemetry is disabled. Enable it to help improve Crawl4AI:[/yellow]")
+            console.print("   [dim]crwl telemetry enable[/dim]")
+        
+    except Exception as e:
+        console.print(f"[red]❌ Failed to get telemetry status: {e}[/red]")
+        sys.exit(1)
+
 @cli.command(name="")
 @click.argument("url", required=False)
 @click.option("--example", is_flag=True, help="Show usage examples")

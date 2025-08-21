@@ -64,6 +64,7 @@ torch = ["torch", "nltk", "scikit-learn"]
 transformer = ["transformers", "tokenizers", "sentence-transformers"]
 cosine = ["torch", "transformers", "nltk", "sentence-transformers"]
 sync = ["selenium"]
+telemetry = ["sentry-sdk>=2.0.0", "ipywidgets>=8.0.0"]
 all = [
     "PyPDF2",
     "torch",
@@ -72,7 +73,9 @@ all = [
     "transformers",
     "tokenizers",
     "sentence-transformers",
-    "selenium"
+    "selenium",
+    "sentry-sdk>=2.0.0",
+    "ipywidgets>=8.0.0"
 ]
 
 [project.scripts]
