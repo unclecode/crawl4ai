@@ -71,7 +71,7 @@ def decode_redis_hash(hash_data: Dict[bytes, bytes]) -> Dict[str, str]:
 
 
 
-def get_llm_api_key(config: Dict, provider: Optional[str] = None) -> str:
+def get_llm_api_key(config: Dict, provider: Optional[str] = None) -> Optional[str]:
     """Get the appropriate API key based on the LLM provider.
     
     Args:
@@ -79,19 +79,14 @@ def get_llm_api_key(config: Dict, provider: Optional[str] = None) -> str:
         provider: Optional provider override (e.g., "openai/gpt-4")
     
     Returns:
-        The API key for the provider, or empty string if not found
+        The API key if directly configured, otherwise None to let litellm handle it
     """
-        
-    # Use provided provider or fall back to config
-    if not provider:
-        provider = config["llm"]["provider"]
-    
-    # Check if direct API key is configured
+    # Check if direct API key is configured (for backward compatibility)
     if "api_key" in config["llm"]:
         return config["llm"]["api_key"]
     
-    # Fall back to the configured api_key_env if no match
-    return os.environ.get(config["llm"].get("api_key_env", ""), "")
+    # Return None - litellm will automatically find the right environment variable
+    return None
 
 
 def validate_llm_provider(config: Dict, provider: Optional[str] = None) -> tuple[bool, str]:
@@ -104,16 +99,12 @@ def validate_llm_provider(config: Dict, provider: Optional[str] = None) -> tuple
     Returns:
         Tuple of (is_valid, error_message)
     """
-    # Use provided provider or fall back to config
-    if not provider:
-        provider = config["llm"]["provider"]
+    # If a direct API key is configured, validation passes
+    if "api_key" in config["llm"]:
+        return True, ""
     
-    # Get the API key for this provider
-    api_key = get_llm_api_key(config, provider)
-    
-    if not api_key:
-        return False, f"No API key found for provider '{provider}'. Please set the appropriate environment variable."
-    
+    # Otherwise, trust that litellm will find the appropriate environment variable
+    # We can't easily validate this without reimplementing litellm's logic
     return True, ""
 
 
