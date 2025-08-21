@@ -96,7 +96,7 @@ async def handle_llm_qa(
         response = perform_completion_with_backoff(
             provider=config["llm"]["provider"],
             prompt_with_variables=prompt,
-            api_token=get_llm_api_key(config)
+            api_token=get_llm_api_key(config)  # Returns None to let litellm handle it
         )
 
         return response.choices[0].message.content
@@ -127,7 +127,7 @@ async def process_llm_extraction(
                 "error": error_msg
             })
             return
-        api_key = get_llm_api_key(config, provider)
+        api_key = get_llm_api_key(config, provider)  # Returns None to let litellm handle it
         llm_strategy = LLMExtractionStrategy(
             llm_config=LLMConfig(
                 provider=provider or config["llm"]["provider"],
@@ -203,7 +203,7 @@ async def handle_markdown_request(
                 FilterType.LLM: LLMContentFilter(
                     llm_config=LLMConfig(
                         provider=provider or config["llm"]["provider"],
-                        api_token=get_llm_api_key(config, provider),
+                        api_token=get_llm_api_key(config, provider),  # Returns None to let litellm handle it
                     ),
                     instruction=query or "Extract main content"
                 )
