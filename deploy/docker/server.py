@@ -7,13 +7,16 @@ Crawl4AI FastAPI entry‑point
 """
 
 # ── stdlib & 3rd‑party imports ───────────────────────────────
+from datetime import datetime
+
+import orjson
 from crawler_pool import get_crawler, close_all, janitor
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
 from auth import create_access_token, get_token_dependency, TokenRequest
 from pydantic import BaseModel
 from typing import Optional, List, Dict
 from fastapi import Request, Depends
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, ORJSONResponse
 import base64
 import re
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
@@ -32,6 +35,8 @@ from schemas import (
     JSEndpointRequest,
 )
 
+# Use the proper serialization functions from async_configs
+from crawl4ai.async_configs import to_serializable_dict
 from utils import (
     FilterType, load_config, setup_logging, verify_email_domain
 )
@@ -112,11 +117,26 @@ async def lifespan(_: FastAPI):
     app.state.janitor.cancel()
     await close_all()
 
+def orjson_default(obj):
+    # Handle datetime (if not already handled by orjson)
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+
+    # Handle property objects (convert to string or something else)
+    if isinstance(obj, property):
+        return str(obj)
+
+    # Last resort: convert to string
+    return str(obj)
+
+def orjson_dumps(v, *, default):
+    return orjson.dumps(v, default=orjson_default).decode()
 # ───────────────────── FastAPI instance ──────────────────────
 app = FastAPI(
     title=config["app"]["title"],
     version=config["app"]["version"],
     lifespan=lifespan,
+    default_response_class=ORJSONResponse
 )
 
 # ── static playground ──────────────────────────────────────
@@ -435,15 +455,20 @@ async def crawl(
     """
     Crawl a list of URLs and return the results as JSON.
     """
-    if not crawl_request.urls:
-        raise HTTPException(400, "At least one URL required")
-    res = await handle_crawl_request(
-        urls=crawl_request.urls,
-        browser_config=crawl_request.browser_config,
-        crawler_config=crawl_request.crawler_config,
-        config=config,
-    )
-    return JSONResponse(res)
+    try:
+        if not crawl_request.urls:
+            raise HTTPException(400, "At least one URL required")
+        res = await handle_crawl_request(
+            urls=crawl_request.urls,
+            browser_config=crawl_request.browser_config,
+            crawler_config=crawl_request.crawler_config,
+            config=config,
+        )
+        # handle_crawl_request returns a dictionary, so we can pass it directly to ORJSONResponse
+        return ORJSONResponse(res)
+    except Exception as e:
+        print(f"Error occurred: {e}")
+        return ORJSONResponse({"error": str(e)}, status_code=500)
 
 
 @app.post("/crawl/stream")

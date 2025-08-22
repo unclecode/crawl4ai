@@ -1,4 +1,36 @@
-from pydantic import BaseModel, HttpUrl, PrivateAttr, Field
+
+"""
+Crawl4AI Models Module
+
+This module contains Pydantic models used throughout the Crawl4AI library.
+
+Key Features:
+- ORJSONModel: Base model with ORJSON serialization support
+- DeprecatedPropertiesMixin: Global system for handling deprecated properties
+- CrawlResult: Main result model with backward compatibility support
+
+Deprecated Properties System:
+The DeprecatedPropertiesMixin provides a global way to handle deprecated properties
+across all models. Instead of manually excluding deprecated properties in each
+model_dump() call, you can simply override the get_deprecated_properties() method:
+
+Example:
+    class MyModel(ORJSONModel):
+        name: str
+        old_field: Optional[str] = None
+        
+        def get_deprecated_properties(self) -> set[str]:
+            return {'old_field', 'another_deprecated_field'}
+        
+        @property
+        def old_field(self):
+            raise AttributeError("old_field is deprecated, use name instead")
+
+The system automatically excludes these properties from serialization, preventing
+property objects from appearing in JSON output.
+"""
+
+from pydantic import BaseModel, ConfigDict,HttpUrl, PrivateAttr, Field
 from typing import List, Dict, Optional, Callable, Awaitable, Union, Any
 from typing import AsyncGenerator
 from typing import Generic, TypeVar
@@ -8,7 +40,7 @@ from .ssl_certificate import SSLCertificate
 from datetime import datetime
 from datetime import timedelta
 
-
+import orjson
 ###############################
 # Dispatcher Models
 ###############################
@@ -91,7 +123,122 @@ class TokenUsage:
     completion_tokens_details: Optional[dict] = None
     prompt_tokens_details: Optional[dict] = None
 
-class UrlModel(BaseModel):
+
+def orjson_default(obj):
+    # Handle datetime (if not already handled by orjson)
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+
+    # Handle property objects (convert to string or something else)
+    if isinstance(obj, property):
+        return str(obj)
+
+    # Last resort: convert to string
+    return str(obj)
+
+
+class DeprecatedPropertiesMixin:
+    """
+    Mixin to handle deprecated properties in Pydantic models.
+    
+    Classes that inherit from this mixin can define deprecated properties
+    that will be automatically excluded from serialization.
+    
+    Usage:
+    1. Override the get_deprecated_properties() method to return a set of deprecated property names
+    2. The model_dump method will automatically exclude these properties
+    
+    Example:
+        class MyModel(ORJSONModel):
+            def get_deprecated_properties(self) -> set[str]:
+                return {'old_field', 'legacy_property'}
+            
+            name: str
+            old_field: Optional[str] = None  # Field definition
+            
+            @property
+            def old_field(self):  # Property that overrides the field
+                raise AttributeError("old_field is deprecated, use name instead")
+    """
+    
+    def get_deprecated_properties(self) -> set[str]:
+        """
+        Get deprecated property names for this model.
+        Override this method in subclasses to define deprecated properties.
+        
+        Returns:
+            set[str]: Set of deprecated property names
+        """
+        return set()
+    
+    @classmethod
+    def get_all_deprecated_properties(cls) -> set[str]:
+        """
+        Get all deprecated properties from this class and all parent classes.
+        
+        Returns:
+            set[str]: Set of all deprecated property names
+        """
+        deprecated_props = set()
+        # Create an instance to call the instance method
+        try:
+            # Try to create a dummy instance to get deprecated properties
+            dummy_instance = cls.__new__(cls)
+            deprecated_props.update(dummy_instance.get_deprecated_properties())
+        except Exception:
+            # If we can't create an instance, check for class-level definitions
+            pass
+            
+        # Also check parent classes
+        for klass in cls.__mro__:
+            if hasattr(klass, 'get_deprecated_properties') and klass != DeprecatedPropertiesMixin:
+                try:
+                    dummy_instance = klass.__new__(klass)
+                    deprecated_props.update(dummy_instance.get_deprecated_properties())
+                except Exception:
+                    pass
+        return deprecated_props
+    
+    def model_dump(self, *args, **kwargs):
+        """
+        Override model_dump to automatically exclude deprecated properties.
+        
+        This method:
+        1. Gets the existing exclude set from kwargs
+        2. Adds all deprecated properties defined in get_deprecated_properties()
+        3. Calls the parent model_dump with the updated exclude set
+        """
+        # Get the default exclude set, or create empty set if None
+        exclude = kwargs.get('exclude', set())
+        if exclude is None:
+            exclude = set()
+        elif not isinstance(exclude, set):
+            exclude = set(exclude) if exclude else set()
+        
+        # Add deprecated properties for this instance
+        exclude.update(self.get_deprecated_properties())
+        kwargs['exclude'] = exclude
+        
+        return super().model_dump(*args, **kwargs)
+
+
+class ORJSONModel(DeprecatedPropertiesMixin, BaseModel):
+    model_config = ConfigDict(
+        ser_json_timedelta="iso8601",  # Optional: format timedelta
+        ser_json_bytes="utf8",         # Optional: bytes → UTF-8 string
+    )
+    
+    def model_dump_json(self, **kwargs) -> bytes:
+        """Custom JSON serialization using orjson"""
+        return orjson.dumps(self.model_dump(**kwargs), default=orjson_default)
+    
+    @classmethod
+    def model_validate_json(cls, json_data: Union[str, bytes], **kwargs):
+        """Custom JSON deserialization using orjson"""
+        if isinstance(json_data, str):
+            json_data = json_data.encode()
+        return cls.model_validate(orjson.loads(json_data), **kwargs)
+class UrlModel(ORJSONModel):
     url: HttpUrl
     forced: bool = False
 
@@ -108,7 +255,7 @@ class TraversalStats:
     total_depth_reached: int = 0
     current_depth: int = 0
 
-class DispatchResult(BaseModel):
+class DispatchResult(ORJSONModel):
     task_id: str
     memory_usage: float
     peak_memory: float
@@ -116,7 +263,7 @@ class DispatchResult(BaseModel):
     end_time: Union[datetime, float]
     error_message: str = ""
 
-class MarkdownGenerationResult(BaseModel):
+class MarkdownGenerationResult(ORJSONModel):
     raw_markdown: str
     markdown_with_citations: str
     references_markdown: str
@@ -126,7 +273,7 @@ class MarkdownGenerationResult(BaseModel):
     def __str__(self):
         return self.raw_markdown
     
-class CrawlResult(BaseModel):
+class CrawlResult(ORJSONModel):
     url: str
     html: str
     fit_html: Optional[str] = None
@@ -155,6 +302,10 @@ class CrawlResult(BaseModel):
 
     class Config:
         arbitrary_types_allowed = True
+
+    def get_deprecated_properties(self) -> set[str]:
+        """Define deprecated properties that should be excluded from serialization."""
+        return {'fit_html', 'fit_markdown', 'markdown_v2'}
 
 # NOTE: The StringCompatibleMarkdown class, custom __init__ method, property getters/setters,
 # and model_dump override all exist to support a smooth transition from markdown as a string
@@ -245,14 +396,16 @@ class CrawlResult(BaseModel):
         1. PrivateAttr fields are excluded from serialization by default
         2. We need to maintain backward compatibility by including the 'markdown' field
            in the serialized output
-        3. We're transitioning from 'markdown_v2' to enhancing 'markdown' to hold
-           the same type of data
+        3. Uses the DeprecatedPropertiesMixin to automatically exclude deprecated properties
         
         Future developers: This method ensures that the markdown content is properly
-        serialized despite being stored in a private attribute. If the serialization
-        requirements change, this is where you would update the logic.
+        serialized despite being stored in a private attribute. The deprecated properties
+        are automatically handled by the mixin.
         """
+        # Use the parent class method which handles deprecated properties automatically
         result = super().model_dump(*args, **kwargs)
+        
+        # Add the markdown content if it exists
         if self._markdown is not None:
             result["markdown"] = self._markdown.model_dump() 
         return result
@@ -307,7 +460,7 @@ RunManyReturn = Union[
 # 1. Replace the private attribute and property with a standard field
 # 2. Update any serialization logic that might depend on the current behavior
 
-class AsyncCrawlResponse(BaseModel):
+class AsyncCrawlResponse(ORJSONModel):
     html: str
     response_headers: Dict[str, str]
     js_execution_result: Optional[Dict[str, Any]] = None
@@ -328,7 +481,7 @@ class AsyncCrawlResponse(BaseModel):
 ###############################
 # Scraping Models
 ###############################
-class MediaItem(BaseModel):
+class MediaItem(ORJSONModel):
     src: Optional[str] = ""
     data: Optional[str] = ""
     alt: Optional[str] = ""
@@ -340,7 +493,7 @@ class MediaItem(BaseModel):
     width: Optional[int] = None
 
 
-class Link(BaseModel):
+class Link(ORJSONModel):
     href: Optional[str] = ""
     text: Optional[str] = ""
     title: Optional[str] = ""
@@ -353,7 +506,7 @@ class Link(BaseModel):
     total_score: Optional[float] = None  # Combined score from intrinsic and contextual scores
 
 
-class Media(BaseModel):
+class Media(ORJSONModel):
     images: List[MediaItem] = []
     videos: List[
         MediaItem
@@ -364,12 +517,12 @@ class Media(BaseModel):
     tables: List[Dict] = []  # Table data extracted from HTML tables
 
 
-class Links(BaseModel):
+class Links(ORJSONModel):
     internal: List[Link] = []
     external: List[Link] = []
 
 
-class ScrapingResult(BaseModel):
+class ScrapingResult(ORJSONModel):
     cleaned_html: str
     success: bool
     media: Media = Media()
