@@ -2184,8 +2184,10 @@ def normalize_url(
     netloc = parsed.netloc.lower()
 
     # ── path ──
-    # Strip duplicate slashes and trailing “/” (except root)
-    path = quote(unquote(parsed.path))
+    # Strip duplicate slashes and trailing "/" (except root)
+    # IMPORTANT: Don't use quote(unquote()) as it mangles + signs in URLs
+    # The path from urlparse is already properly encoded
+    path = parsed.path
     if path.endswith('/') and path != '/':
         path = path.rstrip('/')
 
