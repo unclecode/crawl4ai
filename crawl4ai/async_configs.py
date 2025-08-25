@@ -97,13 +97,16 @@ def to_serializable_dict(obj: Any, ignore_default_value : bool = False) -> Dict:
                 if value != param.default and not ignore_default_value:
                     current_values[name] = to_serializable_dict(value)
         
-        if hasattr(obj, '__slots__'):
-            for slot in obj.__slots__:
-                if slot.startswith('_'):  # Handle private slots
-                    attr_name = slot[1:]  # Remove leading '_'
-                    value = getattr(obj, slot, None)
-                    if value is not None:
-                        current_values[attr_name] = to_serializable_dict(value)
+        # Don't serialize private __slots__ - they're internal implementation details
+        # not constructor parameters. This was causing URLPatternFilter to fail
+        # because _simple_suffixes was being serialized as 'simple_suffixes'
+        # if hasattr(obj, '__slots__'):
+        #     for slot in obj.__slots__:
+        #         if slot.startswith('_'):  # Handle private slots
+        #             attr_name = slot[1:]  # Remove leading '_'
+        #             value = getattr(obj, slot, None)
+        #             if value is not None:
+        #                 current_values[attr_name] = to_serializable_dict(value)
 
             
         

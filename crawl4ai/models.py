@@ -253,6 +253,16 @@ class CrawlResult(BaseModel):
         requirements change, this is where you would update the logic.
         """
         result = super().model_dump(*args, **kwargs)
+        
+        # Remove any property descriptors that might have been included
+        # These deprecated properties should not be in the serialized output
+        for key in ['fit_html', 'fit_markdown', 'markdown_v2']:
+            if key in result and isinstance(result[key], property):
+                # del result[key]
+                # Nasrin: I decided to convert it to string instead of removing it.
+                result[key] = str(result[key])
+        
+        # Add the markdown field properly
         if self._markdown is not None:
             result["markdown"] = self._markdown.model_dump() 
         return result
