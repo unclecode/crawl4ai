@@ -126,30 +126,6 @@ Factors:
 - URL depth (fewer slashes = higher authority)
 - Clean URL structure
 
-### Custom Link Scoring
-
-```python
-class CustomLinkScorer:
-    def score(self, link: Link, query: str, state: CrawlState) -> float:
-        # Prioritize specific URL patterns
-        if "/api/reference/" in link.href:
-            return 2.0  # Double the score
-        
-        # Deprioritize certain sections
-        if "/archive/" in link.href:
-            return 0.1  # Reduce score by 90%
-        
-        # Default scoring
-        return 1.0
-
-# Use with adaptive crawler
-adaptive = AdaptiveCrawler(
-    crawler,
-    config=config,
-    link_scorer=CustomLinkScorer()
-)
-```
-
 ## Domain-Specific Configurations
 
 ### Technical Documentation
@@ -230,8 +206,12 @@ config = AdaptiveConfig(
 
 # Periodically clean state
 if len(state.knowledge_base) > 1000:
-    # Keep only most relevant
-    state.knowledge_base = get_top_relevant(state.knowledge_base, 500)
+    # Keep only the top 500 most relevant docs
+    top_content = adaptive.get_relevant_content(top_k=500)
+    keep_indices = {d["index"] for d in top_content}
+    state.knowledge_base = [
+        doc for i, doc in enumerate(state.knowledge_base) if i in keep_indices
+    ]
 ```
 
 ### Parallel Processing
@@ -250,18 +230,6 @@ tasks = [
     for url in start_urls
 ]
 results = await asyncio.gather(*tasks)
-```
-
-### Caching Strategy
-
-```python
-# Enable caching for repeated crawls
-async with AsyncWebCrawler(
-    config=BrowserConfig(
-        cache_mode=CacheMode.ENABLED
-    )
-) as crawler:
-    adaptive = AdaptiveCrawler(crawler, config)
 ```
 
 ## Debugging & Analysis
@@ -322,9 +290,9 @@ with open("crawl_analysis.json", "w") as f:
 ### Implementing a Custom Strategy
 
 ```python
-from crawl4ai.adaptive_crawler import BaseStrategy
+from crawl4ai.adaptive_crawler import CrawlStrategy
 
-class DomainSpecificStrategy(BaseStrategy):
+class DomainSpecificStrategy(CrawlStrategy):
     def calculate_coverage(self, state: CrawlState) -> float:
         # Custom coverage calculation
         # e.g., weight certain terms more heavily
@@ -351,7 +319,7 @@ adaptive = AdaptiveCrawler(
 ### Combining Strategies
 
 ```python
-class HybridStrategy(BaseStrategy):
+class HybridStrategy(CrawlStrategy):
     def __init__(self):
         self.strategies = [
             TechnicalDocStrategy(),
