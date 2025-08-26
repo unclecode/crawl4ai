@@ -16,6 +16,8 @@ class MarkdownRequest(BaseModel):
     q:   Optional[str] = Field(None,  description="Query string used by BM25/LLM filters")
     c:   Optional[str] = Field("0",   description="Cache‑bust / revision counter")
     provider: Optional[str] = Field(None, description="LLM provider override (e.g., 'anthropic/claude-3-opus')")
+    temperature: Optional[float] = Field(None, description="LLM temperature override (0.0-2.0)")
+    base_url: Optional[str] = Field(None, description="LLM API base URL override")
 
 
 class RawCode(BaseModel):

@@ -42,7 +42,9 @@ from utils import (
     should_cleanup_task,
     decode_redis_hash,
     get_llm_api_key,
-    validate_llm_provider
+    validate_llm_provider,
+    get_llm_temperature,
+    get_llm_base_url
 )
 
 import psutil, time
@@ -96,7 +98,9 @@ async def handle_llm_qa(
         response = perform_completion_with_backoff(
             provider=config["llm"]["provider"],
             prompt_with_variables=prompt,
-            api_token=get_llm_api_key(config)  # Returns None to let litellm handle it
+            api_token=get_llm_api_key(config),  # Returns None to let litellm handle it
+            temperature=get_llm_temperature(config),
+            base_url=get_llm_base_url(config)
         )
 
         return response.choices[0].message.content
@@ -115,7 +119,9 @@ async def process_llm_extraction(
     instruction: str,
     schema: Optional[str] = None,
     cache: str = "0",
-    provider: Optional[str] = None
+    provider: Optional[str] = None,
+    temperature: Optional[float] = None,
+    base_url: Optional[str] = None
 ) -> None:
     """Process LLM extraction in background."""
     try:
@@ -131,7 +137,9 @@ async def process_llm_extraction(
         llm_strategy = LLMExtractionStrategy(
             llm_config=LLMConfig(
                 provider=provider or config["llm"]["provider"],
-                api_token=api_key
+                api_token=api_key,
+                temperature=temperature or get_llm_temperature(config, provider),
+                base_url=base_url or get_llm_base_url(config, provider)
             ),
             instruction=instruction,
             schema=json.loads(schema) if schema else None,
@@ -178,7 +186,9 @@ async def handle_markdown_request(
     query: Optional[str] = None,
     cache: str = "0",
     config: Optional[dict] = None,
-    provider: Optional[str] = None
+    provider: Optional[str] = None,
+    temperature: Optional[float] = None,
+    base_url: Optional[str] = None
 ) -> str:
     """Handle markdown generation requests."""
     try:
@@ -204,6 +214,8 @@ async def handle_markdown_request(
                     llm_config=LLMConfig(
                         provider=provider or config["llm"]["provider"],
                         api_token=get_llm_api_key(config, provider),  # Returns None to let litellm handle it
+                        temperature=temperature or get_llm_temperature(config, provider),
+                        base_url=base_url or get_llm_base_url(config, provider)
                     ),
                     instruction=query or "Extract main content"
                 )
@@ -248,7 +260,9 @@ async def handle_llm_request(
     schema: Optional[str] = None,
     cache: str = "0",
     config: Optional[dict] = None,
-    provider: Optional[str] = None
+    provider: Optional[str] = None,
+    temperature: Optional[float] = None,
+    api_base_url: Optional[str] = None
 ) -> JSONResponse:
     """Handle LLM extraction requests."""
     base_url = get_base_url(request)
@@ -279,7 +293,9 @@ async def handle_llm_request(
             cache,
             base_url,
             config,
-            provider
+            provider,
+            temperature,
+            api_base_url
         )
 
     except Exception as e:
@@ -324,7 +340,9 @@ async def create_new_task(
     cache: str,
     base_url: str,
     config: dict,
-    provider: Optional[str] = None
+    provider: Optional[str] = None,
+    temperature: Optional[float] = None,
+    api_base_url: Optional[str] = None
 ) -> JSONResponse:
     """Create and initialize a new task."""
     decoded_url = unquote(input_path)
@@ -349,7 +367,9 @@ async def create_new_task(
         query,
         schema,
         cache,
-        provider
+        provider,
+        temperature,
+        api_base_url
     )
 
     return JSONResponse({
