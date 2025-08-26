@@ -37,6 +37,8 @@ class LlmJobPayload(BaseModel):
     schema: Optional[str] = None
     cache:  bool = False
     provider: Optional[str] = None
+    temperature: Optional[float] = None
+    base_url: Optional[str] = None
 
 
 class CrawlJobPayload(BaseModel):
@@ -63,6 +65,8 @@ async def llm_job_enqueue(
         cache=payload.cache,
         config=_config,
         provider=payload.provider,
+        temperature=payload.temperature,
+        api_base_url=payload.base_url,
     )
 
 
@@ -72,7 +76,7 @@ async def llm_job_status(
     task_id: str,
     _td: Dict = Depends(lambda: _token_dep())
 ):
-    return await handle_task_status(_redis, task_id)
+    return await handle_task_status(_redis, task_id, base_url=str(request.base_url))
 
 
 # ---------- CRAWL job -------------------------------------------------------

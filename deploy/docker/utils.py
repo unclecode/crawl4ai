@@ -108,6 +108,69 @@ def validate_llm_provider(config: Dict, provider: Optional[str] = None) -> tuple
     return True, ""
 
 
+def get_llm_temperature(config: Dict, provider: Optional[str] = None) -> Optional[float]:
+    """Get temperature setting based on the LLM provider.
+    
+    Priority order:
+    1. Provider-specific environment variable (e.g., OPENAI_TEMPERATURE)
+    2. Global LLM_TEMPERATURE environment variable
+    3. None (to use litellm/provider defaults)
+    
+    Args:
+        config: The application configuration dictionary
+        provider: Optional provider override (e.g., "openai/gpt-4")
+    
+    Returns:
+        The temperature setting if configured, otherwise None
+    """
+    # Check provider-specific temperature first
+    if provider:
+        provider_name = provider.split('/')[0].upper()
+        provider_temp = os.environ.get(f"{provider_name}_TEMPERATURE")
+        if provider_temp:
+            try:
+                return float(provider_temp)
+            except ValueError:
+                logging.warning(f"Invalid temperature value for {provider_name}: {provider_temp}")
+    
+    # Check global LLM_TEMPERATURE
+    global_temp = os.environ.get("LLM_TEMPERATURE")
+    if global_temp:
+        try:
+            return float(global_temp)
+        except ValueError:
+            logging.warning(f"Invalid global temperature value: {global_temp}")
+    
+    # Return None to use litellm/provider defaults
+    return None
+
+
+def get_llm_base_url(config: Dict, provider: Optional[str] = None) -> Optional[str]:
+    """Get base URL setting based on the LLM provider.
+    
+    Priority order:
+    1. Provider-specific environment variable (e.g., OPENAI_BASE_URL)
+    2. Global LLM_BASE_URL environment variable
+    3. None (to use default endpoints)
+    
+    Args:
+        config: The application configuration dictionary
+        provider: Optional provider override (e.g., "openai/gpt-4")
+    
+    Returns:
+        The base URL if configured, otherwise None
+    """
+    # Check provider-specific base URL first
+    if provider:
+        provider_name = provider.split('/')[0].upper()
+        provider_url = os.environ.get(f"{provider_name}_BASE_URL")
+        if provider_url:
+            return provider_url
+    
+    # Check global LLM_BASE_URL
+    return os.environ.get("LLM_BASE_URL")
+
+
 def verify_email_domain(email: str) -> bool:
     try:
         domain = email.split('@')[1]

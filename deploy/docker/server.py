@@ -241,7 +241,8 @@ async def get_markdown(
         raise HTTPException(
             400, "Invalid URL format. Must start with http://, https://, or for raw HTML (raw:, raw://)")
     markdown = await handle_markdown_request(
-        body.url, body.f, body.q, body.c, config, body.provider
+        body.url, body.f, body.q, body.c, config, body.provider,
+        body.temperature, body.base_url
     )
     return JSONResponse({
         "url": body.url,
