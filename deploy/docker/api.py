@@ -413,6 +413,9 @@ async def stream_results(crawler: AsyncWebCrawler, results_gen: AsyncGenerator) 
                 server_memory_mb = _get_memory_mb()
                 result_dict = result.model_dump()
                 result_dict['server_memory_mb'] = server_memory_mb
+                # Ensure fit_html is JSON-serializable
+                if "fit_html" in result_dict and not (result_dict["fit_html"] is None or isinstance(result_dict["fit_html"], str)):
+                    result_dict["fit_html"] = None
                 # If PDF exists, encode it to base64
                 if result_dict.get('pdf') is not None:
                     result_dict['pdf'] = b64encode(result_dict['pdf']).decode('utf-8')
@@ -493,6 +496,9 @@ async def handle_crawl_request(
         processed_results = []
         for result in results:
             result_dict = result.model_dump()
+            # if fit_html is not a string, set it to None to avoid serialization errors
+            if "fit_html" in result_dict and not (result_dict["fit_html"] is None or isinstance(result_dict["fit_html"], str)):
+                result_dict["fit_html"] = None
             # If PDF exists, encode it to base64
             if result_dict.get('pdf') is not None:
                 result_dict['pdf'] = b64encode(result_dict['pdf']).decode('utf-8')
