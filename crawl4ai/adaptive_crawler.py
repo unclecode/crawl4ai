@@ -609,10 +609,18 @@ class EmbeddingStrategy(CrawlStrategy):
     async def _get_embeddings(self, texts: List[str]) -> Any:
         """Get embeddings using configured method"""
         from .utils import get_text_embeddings
-        embedding_llm_config = {
-            'provider': 'openai/text-embedding-3-small',
-            'api_token': os.getenv('OPENAI_API_KEY')
-        }
+        if  os.getenv('LLM_PROVIDER') and os.getenv('LLM_API_KEY') is not None:
+            embedding_llm_config = {
+                'provider':  os.getenv('LLM_PROVIDER'),
+                'api_token': os.getenv('LLM_API_KEY')
+            }
+        else:
+            embedding_llm_config = {
+                'provider':  "sentence-transformers/all-MiniLM-L6-v2",
+                'api_token': None,
+            }
+
+
         return await get_text_embeddings(
             texts, 
             embedding_llm_config,
@@ -677,10 +685,6 @@ class EmbeddingStrategy(CrawlStrategy):
         Include different phrasings, related concepts, and specific aspects.
         
         Return as a JSON array of strings."""
-        
-        # Use the LLM for query generation
-        provider = self.llm_config.get('provider', 'openai/gpt-4o-mini') if self.llm_config else 'openai/gpt-4o-mini'
-        api_token = self.llm_config.get('api_token') if self.llm_config else None
         
         # response = perform_completion_with_backoff(
         #     provider=provider,
@@ -843,10 +847,17 @@ class EmbeddingStrategy(CrawlStrategy):
         
         # Batch embed only uncached links
         if texts_to_embed:
-            embedding_llm_config = {
-                'provider': 'openai/text-embedding-3-small',
-                'api_token': os.getenv('OPENAI_API_KEY')
-            }
+            if  os.getenv('LLM_PROVIDER') and os.getenv('LLM_API_KEY') is not None:
+                   embedding_llm_config = {
+                       'provider':  os.getenv('LLM_PROVIDER'),
+                       'api_token': os.getenv('LLM_API_KEY')
+                }
+            else:
+               embedding_llm_config = {
+                    'provider':  "sentence-transformers/all-MiniLM-L6-v2",
+                    'api_token': None,
+               }
+
             new_embeddings = await get_text_embeddings(texts_to_embed, embedding_llm_config, self.embedding_model)
 
             # Cache the new embeddings
@@ -1184,10 +1195,17 @@ class EmbeddingStrategy(CrawlStrategy):
             return
             
         # Get embeddings for new texts
-        embedding_llm_config = {
-            'provider': 'openai/text-embedding-3-small',
-            'api_token': os.getenv('OPENAI_API_KEY')
-        }        
+        if  os.getenv('LLM_PROVIDER') and os.getenv('LLM_API_KEY') is not None:
+            embedding_llm_config = {
+                'provider':  os.getenv('LLM_PROVIDER'),
+                'api_token': os.getenv('LLM_API_KEY')
+            }
+        else:
+            embedding_llm_config = {
+                'provider':  "sentence-transformers/all-MiniLM-L6-v2",
+                'api_token': None,
+            }
+
         new_embeddings = await get_text_embeddings(new_texts, embedding_llm_config, self.embedding_model)
 
         # Deduplicate embeddings before adding to KB
