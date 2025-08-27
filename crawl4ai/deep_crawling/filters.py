@@ -120,6 +120,9 @@ class URLPatternFilter(URLFilter):
     """Pattern filter balancing speed and completeness"""
 
     __slots__ = (
+        "patterns",  # Store original patterns for serialization
+        "use_glob",  # Store original use_glob for serialization  
+        "reverse",   # Store original reverse for serialization
         "_simple_suffixes",
         "_simple_prefixes",
         "_domain_patterns",
@@ -142,6 +145,11 @@ class URLPatternFilter(URLFilter):
         reverse: bool = False,
     ):
         super().__init__()
+        # Store original constructor params for serialization
+        self.patterns = patterns
+        self.use_glob = use_glob
+        self.reverse = reverse
+        
         self._reverse = reverse
         patterns = [patterns] if isinstance(patterns, (str, Pattern)) else patterns
 
