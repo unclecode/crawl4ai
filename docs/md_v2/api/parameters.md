@@ -23,7 +23,7 @@ browser_cfg = BrowserConfig(
 | **`headless`**        | `bool` (default: `True`)               | Headless means no visible UI. `False` is handy for debugging.                                                                         |
 | **`viewport_width`**  | `int` (default: `1080`)                | Initial page width (in px). Useful for testing responsive layouts.                                                                    |
 | **`viewport_height`** | `int` (default: `600`)                 | Initial page height (in px).                                                                                                          |
-| **`proxy`**           | `str` (default: `None`)                | Single-proxy URL if you want all traffic to go through it, e.g. `"http://user:pass@proxy:8080"`.                                      |
+| **`proxy`**           | `str` (deprecated)                      | Deprecated. Use `proxy_config` instead. If set, it will be auto-converted internally. |
 | **`proxy_config`**    | `dict` (default: `None`)               | For advanced or multi-proxy needs, specify details like `{"server": "...", "username": "...", ...}`.                                  |
 | **`use_persistent_context`** | `bool` (default: `False`)       | If `True`, uses a **persistent** browser context (keep cookies, sessions across runs). Also sets `use_managed_browser=True`.          |
 | **`user_data_dir`**   | `str or None` (default: `None`)        | Directory to store user data (profiles, cookies). Must be set if you want permanent sessions.                                         |
