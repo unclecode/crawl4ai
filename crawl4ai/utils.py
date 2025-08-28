@@ -2146,7 +2146,9 @@ def normalize_url(
     drop_query_tracking=True,
     sort_query=True,
     keep_fragment=False,
-    extra_drop_params=None
+    extra_drop_params=None,
+    preserve_https=False,
+    original_scheme=None
 ):
     """
     Extended URL normalizer
@@ -2176,6 +2178,17 @@ def normalize_url(
 
     # Resolve relative paths first
     full_url = urljoin(base_url, href.strip())
+    
+    # Preserve HTTPS if requested and original scheme was HTTPS
+    if preserve_https and original_scheme == 'https':
+        parsed_full = urlparse(full_url)
+        parsed_base = urlparse(base_url)
+        # Only preserve HTTPS for same-domain links (not protocol-relative URLs)
+        # Protocol-relative URLs (//example.com) should follow the base URL's scheme
+        if (parsed_full.scheme == 'http' and 
+            parsed_full.netloc == parsed_base.netloc and
+            not href.strip().startswith('//')):
+            full_url = full_url.replace('http://', 'https://', 1)
 
     # Parse once, edit parts, then rebuild
     parsed = urlparse(full_url)
@@ -2225,7 +2238,7 @@ def normalize_url(
     return normalized
 
 
-def normalize_url_for_deep_crawl(href, base_url):
+def normalize_url_for_deep_crawl(href, base_url, preserve_https=False, original_scheme=None):
     """Normalize URLs to ensure consistent format"""
     from urllib.parse import urljoin, urlparse, urlunparse, parse_qs, urlencode
 
@@ -2235,6 +2248,17 @@ def normalize_url_for_deep_crawl(href, base_url):
 
     # Use urljoin to handle relative URLs
     full_url = urljoin(base_url, href.strip())
+    
+    # Preserve HTTPS if requested and original scheme was HTTPS
+    if preserve_https and original_scheme == 'https':
+        parsed_full = urlparse(full_url)
+        parsed_base = urlparse(base_url)
+        # Only preserve HTTPS for same-domain links (not protocol-relative URLs)
+        # Protocol-relative URLs (//example.com) should follow the base URL's scheme
+        if (parsed_full.scheme == 'http' and 
+            parsed_full.netloc == parsed_base.netloc and
+            not href.strip().startswith('//')):
+            full_url = full_url.replace('http://', 'https://', 1)
     
     # Parse the URL for normalization
     parsed = urlparse(full_url)
@@ -2273,7 +2297,7 @@ def normalize_url_for_deep_crawl(href, base_url):
     return normalized
 
 @lru_cache(maxsize=10000)
-def efficient_normalize_url_for_deep_crawl(href, base_url):
+def efficient_normalize_url_for_deep_crawl(href, base_url, preserve_https=False, original_scheme=None):
     """Efficient URL normalization with proper parsing"""
     from urllib.parse import urljoin
     
@@ -2282,6 +2306,17 @@ def efficient_normalize_url_for_deep_crawl(href, base_url):
     
     # Resolve relative URLs
     full_url = urljoin(base_url, href.strip())
+    
+    # Preserve HTTPS if requested and original scheme was HTTPS
+    if preserve_https and original_scheme == 'https':
+        parsed_full = urlparse(full_url)
+        parsed_base = urlparse(base_url)
+        # Only preserve HTTPS for same-domain links (not protocol-relative URLs)
+        # Protocol-relative URLs (//example.com) should follow the base URL's scheme
+        if (parsed_full.scheme == 'http' and 
+            parsed_full.netloc == parsed_base.netloc and
+            not href.strip().startswith('//')):
+            full_url = full_url.replace('http://', 'https://', 1)
     
     # Use proper URL parsing
     parsed = urlparse(full_url)

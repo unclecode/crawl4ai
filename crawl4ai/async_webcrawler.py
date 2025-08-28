@@ -354,6 +354,7 @@ class AsyncWebCrawler:
                     ###############################################################
                     # Process the HTML content, Call CrawlerStrategy.process_html #
                     ###############################################################
+                    from urllib.parse import urlparse
                     crawl_result: CrawlResult = await self.aprocess_html(
                         url=url,
                         html=html,
@@ -364,6 +365,7 @@ class AsyncWebCrawler:
                         verbose=config.verbose,
                         is_raw_html=True if url.startswith("raw:") else False,
                         redirected_url=async_response.redirected_url,
+                        original_scheme=urlparse(url).scheme,
                         **kwargs,
                     )
 

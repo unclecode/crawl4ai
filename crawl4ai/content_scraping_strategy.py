@@ -258,7 +258,11 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                 continue
 
             try:
-                normalized_href = normalize_url(href, url)
+                normalized_href = normalize_url(
+                    href, url,
+                    preserve_https=kwargs.get('preserve_https_for_internal_links', False),
+                    original_scheme=kwargs.get('original_scheme')
+                )
                 link_data = {
                     "href": normalized_href,
                     "text": link.text_content().strip(),
