@@ -615,7 +615,7 @@ class AsyncWebCrawler:
                 else config.chunking_strategy
             )
             sections = chunking.chunk(content)
-            extracted_content = config.extraction_strategy.run(url, sections)
+            extracted_content = config.extraction_strategy.run(_url, sections)
             extracted_content = json.dumps(
                 extracted_content, indent=4, default=str, ensure_ascii=False
             )
