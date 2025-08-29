@@ -24,6 +24,7 @@ psutil>=6.1.1
 PyYAML>=6.0
 nltk>=3.9.1
 rich>=13.9.4
+cssselect>=1.2.0
 chardet>=5.2.0
 brotli>=1.1.0
 httpx[http2]>=0.27.2
