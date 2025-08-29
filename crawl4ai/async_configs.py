@@ -813,12 +813,6 @@ class HTTPCrawlerConfig:
         return HTTPCrawlerConfig.from_kwargs(config)
 
 class CrawlerRunConfig():
-    _UNWANTED_PROPS = {
-        'disable_cache' : 'Instead, use cache_mode=CacheMode.DISABLED',
-        'bypass_cache' : 'Instead, use cache_mode=CacheMode.BYPASS',
-        'no_cache_read' : 'Instead, use cache_mode=CacheMode.WRITE_ONLY',
-        'no_cache_write' : 'Instead, use cache_mode=CacheMode.READ_ONLY',
-    }
 
     """
     Configuration class for controlling how the crawler runs each crawl operation.
@@ -1023,6 +1017,12 @@ class CrawlerRunConfig():
 
         url: str = None  # This is not a compulsory parameter
     """
+    _UNWANTED_PROPS = {
+        'disable_cache' : 'Instead, use cache_mode=CacheMode.DISABLED',
+        'bypass_cache' : 'Instead, use cache_mode=CacheMode.BYPASS',
+        'no_cache_read' : 'Instead, use cache_mode=CacheMode.WRITE_ONLY',
+        'no_cache_write' : 'Instead, use cache_mode=CacheMode.READ_ONLY',
+    }
 
     def __init__(
         self,
