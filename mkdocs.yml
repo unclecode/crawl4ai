@@ -45,6 +45,7 @@ nav:
     - "Lazy Loading": "advanced/lazy-loading.md"
     - "Hooks & Auth": "advanced/hooks-auth.md"
     - "Proxy & Security": "advanced/proxy-security.md"
+    - "Undetected Browser": "advanced/undetected-browser.md"
     - "Session Management": "advanced/session-management.md"
     - "Multi-URL Crawling": "advanced/multi-url-crawling.md"
     - "Crawl Dispatcher": "advanced/crawl-dispatcher.md"

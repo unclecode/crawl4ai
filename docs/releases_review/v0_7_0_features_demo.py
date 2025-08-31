@@ -13,14 +13,13 @@ from crawl4ai import (
     BrowserConfig,
     CacheMode,
     # New imports for v0.7.0
-    LinkPreviewConfig,
     VirtualScrollConfig,
+    LinkPreviewConfig,
     AdaptiveCrawler,
     AdaptiveConfig,
     AsyncUrlSeeder,
     SeedingConfig,
     c4a_compile,
-    CompilationResult
 )
 
 
@@ -170,16 +169,16 @@ async def demo_url_seeder():
         # Discover Python tutorial URLs
         config = SeedingConfig(
             source="sitemap",  # Use sitemap
-            pattern="*tutorial*",  # URL pattern filter
+            pattern="*python*",  # URL pattern filter
             extract_head=True,  # Get metadata
-            query="python async programming",  # For relevance scoring
+            query="python tutorial",  # For relevance scoring
             scoring_method="bm25",
             score_threshold=0.2,
             max_urls=10
         )
         
         print("Discovering Python async tutorial URLs...")
-        urls = await seeder.urls("docs.python.org", config)
+        urls = await seeder.urls("https://www.geeksforgeeks.org/", config)
         
         print(f"\n✅ Found {len(urls)} relevant URLs:")
         for i, url_info in enumerate(urls[:5], 1):
@@ -245,39 +244,6 @@ IF (EXISTS `.price-filter`) THEN CLICK `input[data-max-price="100"]`
         print(f"❌ Compilation error: {result.first_error.message}")
 
 
-async def demo_pdf_support():
-    """
-    Demo 6: PDF Parsing Support
-    
-    Shows how to extract content from PDF files.
-    Note: Requires 'pip install crawl4ai[pdf]'
-    """
-    print("\n" + "="*60)
-    print("📄 DEMO 6: PDF Parsing Support")
-    print("="*60)
-    
-    try:
-        # Check if PDF support is installed
-        import PyPDF2
-        
-        # Example: Process a PDF URL
-        config = CrawlerRunConfig(
-            cache_mode=CacheMode.BYPASS,
-            pdf=True,  # Enable PDF generation
-            extract_text_from_pdf=True  # Extract text content
-        )
-        
-        print("PDF parsing is available!")
-        print("You can now crawl PDF URLs and extract their content.")
-        print("\nExample usage:")
-        print('  result = await crawler.arun("https://example.com/document.pdf")')
-        print('  pdf_text = result.extracted_content  # Contains extracted text')
-        
-    except ImportError:
-        print("⚠️  PDF support not installed.")
-        print("Install with: pip install crawl4ai[pdf]")
-
-
 async def main():
     """Run all demos"""
     print("\n🚀 Crawl4AI v0.7.0 Feature Demonstrations")
@@ -289,7 +255,6 @@ async def main():
         ("Virtual Scroll", demo_virtual_scroll),
         ("URL Seeder", demo_url_seeder),
         ("C4A Script", demo_c4a_script),
-        ("PDF Support", demo_pdf_support)
     ]
     
     for name, demo_func in demos:
@@ -309,7 +274,6 @@ async def main():
     print("• Virtual Scroll: Capture all content from modern web pages")
     print("• URL Seeder: Pre-discover and filter URLs efficiently")
     print("• C4A Script: Simple language for complex automations")
-    print("• PDF Support: Extract content from PDF documents")
 
 
 if __name__ == "__main__":

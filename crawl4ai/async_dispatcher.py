@@ -1,4 +1,4 @@
-from typing import Dict, Optional, List, Tuple
+from typing import Dict, Optional, List, Tuple, Union
 from .async_configs import CrawlerRunConfig
 from .models import (
     CrawlResult,
@@ -21,6 +21,8 @@ import uuid
 from urllib.parse import urlparse
 import random
 from abc import ABC, abstractmethod
+
+from .utils import get_true_memory_usage_percent
 
 
 class RateLimiter:
@@ -96,11 +98,37 @@ class BaseDispatcher(ABC):
         self.rate_limiter = rate_limiter
         self.monitor = monitor
 
+    def select_config(self, url: str, configs: Union[CrawlerRunConfig, List[CrawlerRunConfig]]) -> Optional[CrawlerRunConfig]:
+        """Select the appropriate config for a given URL.
+        
+        Args:
+            url: The URL to match against
+            configs: Single config or list of configs to choose from
+            
+        Returns:
+            The matching config, or None if no match found
+        """
+        # Single config - return as is
+        if isinstance(configs, CrawlerRunConfig):
+            return configs
+        
+        # Empty list - return None
+        if not configs:
+            return None
+        
+        # Find first matching config
+        for config in configs:
+            if config.is_match(url):
+                return config
+        
+        # No match found - return None to indicate URL should be skipped
+        return None
+
     @abstractmethod
     async def crawl_url(
         self,
         url: str,
-        config: CrawlerRunConfig,
+        config: Union[CrawlerRunConfig, List[CrawlerRunConfig]],
         task_id: str,
         monitor: Optional[CrawlerMonitor] = None,
     ) -> CrawlerTaskResult:
@@ -111,7 +139,7 @@ class BaseDispatcher(ABC):
         self,
         urls: List[str],
         crawler: AsyncWebCrawler,  # noqa: F821
-        config: CrawlerRunConfig,
+        config: Union[CrawlerRunConfig, List[CrawlerRunConfig]],
         monitor: Optional[CrawlerMonitor] = None,
     ) -> List[CrawlerTaskResult]:
         pass
@@ -147,7 +175,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
     async def _memory_monitor_task(self):
         """Background task to continuously monitor memory usage and update state"""
         while True:
-            self.current_memory_percent = psutil.virtual_memory().percent
+            self.current_memory_percent = get_true_memory_usage_percent()
 
             # Enter memory pressure mode if we cross the threshold
             if self.current_memory_percent >= self.memory_threshold_percent:
@@ -200,13 +228,44 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
     async def crawl_url(
         self,
         url: str,
-        config: CrawlerRunConfig,
+        config: Union[CrawlerRunConfig, List[CrawlerRunConfig]],
         task_id: str,
         retry_count: int = 0,
     ) -> CrawlerTaskResult:
         start_time = time.time()
         error_message = ""
         memory_usage = peak_memory = 0.0
+        
+        # Select appropriate config for this URL
+        selected_config = self.select_config(url, config)
+        
+        # If no config matches, return failed result
+        if selected_config is None:
+            error_message = f"No matching configuration found for URL: {url}"
+            if self.monitor:
+                self.monitor.update_task(
+                    task_id, 
+                    status=CrawlStatus.FAILED,
+                    error_message=error_message
+                )
+            
+            return CrawlerTaskResult(
+                task_id=task_id,
+                url=url,
+                result=CrawlResult(
+                    url=url, 
+                    html="", 
+                    metadata={"status": "no_config_match"}, 
+                    success=False, 
+                    error_message=error_message
+                ),
+                memory_usage=0,
+                peak_memory=0,
+                start_time=start_time,
+                end_time=time.time(),
+                error_message=error_message,
+                retry_count=retry_count
+            )
         
         # Get starting memory for accurate measurement
         process = psutil.Process()
@@ -257,8 +316,8 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
                     retry_count=retry_count + 1
                 )
             
-            # Execute the crawl
-            result = await self.crawler.arun(url, config=config, session_id=task_id)
+            # Execute the crawl with selected config
+            result = await self.crawler.arun(url, config=selected_config, session_id=task_id)
             
             # Measure memory usage
             end_memory = process.memory_info().rss / (1024 * 1024)
@@ -316,7 +375,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
         self,
         urls: List[str],
         crawler: AsyncWebCrawler,
-        config: CrawlerRunConfig,
+        config: Union[CrawlerRunConfig, List[CrawlerRunConfig]],
     ) -> List[CrawlerTaskResult]:
         self.crawler = crawler
         
@@ -348,32 +407,34 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
                             t.cancel()
                         raise exc
 
-                # If memory pressure is low, start new tasks
-                if not self.memory_pressure_mode and len(active_tasks) < self.max_session_permit:
-                    try:
-                        # Try to get a task with timeout to avoid blocking indefinitely
-                        priority, (url, task_id, retry_count, enqueue_time) = await asyncio.wait_for(
-                            self.task_queue.get(), timeout=0.1
-                        )
-                        
-                        # Create and start the task
-                        task = asyncio.create_task(
-                            self.crawl_url(url, config, task_id, retry_count)
-                        )
-                        active_tasks.append(task)
-                        
-                        # Update waiting time in monitor
-                        if self.monitor:
-                            wait_time = time.time() - enqueue_time
-                            self.monitor.update_task(
-                                task_id, 
-                                wait_time=wait_time,
-                                status=CrawlStatus.IN_PROGRESS
-                            )
+                # If memory pressure is low, greedily fill all available slots
+                if not self.memory_pressure_mode:
+                    slots = self.max_session_permit - len(active_tasks)
+                    while slots > 0:
+                        try:
+                            # Use get_nowait() to immediately get tasks without blocking
+                            priority, (url, task_id, retry_count, enqueue_time) = self.task_queue.get_nowait()
                             
-                    except asyncio.TimeoutError:
-                        # No tasks in queue, that's fine
-                        pass
+                            # Create and start the task
+                            task = asyncio.create_task(
+                                self.crawl_url(url, config, task_id, retry_count)
+                            )
+                            active_tasks.append(task)
+                            
+                            # Update waiting time in monitor
+                            if self.monitor:
+                                wait_time = time.time() - enqueue_time
+                                self.monitor.update_task(
+                                    task_id, 
+                                    wait_time=wait_time,
+                                    status=CrawlStatus.IN_PROGRESS
+                                )
+                            
+                            slots -= 1
+                            
+                        except asyncio.QueueEmpty:
+                            # No more tasks in queue, exit the loop
+                            break
                         
                 # Wait for completion even if queue is starved
                 if active_tasks:
@@ -470,7 +531,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
         self,
         urls: List[str],
         crawler: AsyncWebCrawler,
-        config: CrawlerRunConfig,
+        config: Union[CrawlerRunConfig, List[CrawlerRunConfig]],
     ) -> AsyncGenerator[CrawlerTaskResult, None]:
         self.crawler = crawler
         
@@ -500,32 +561,34 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
                         for t in active_tasks:
                             t.cancel()
                         raise exc
-                # If memory pressure is low, start new tasks
-                if not self.memory_pressure_mode and len(active_tasks) < self.max_session_permit:
-                    try:
-                        # Try to get a task with timeout
-                        priority, (url, task_id, retry_count, enqueue_time) = await asyncio.wait_for(
-                            self.task_queue.get(), timeout=0.1
-                        )
-                        
-                        # Create and start the task
-                        task = asyncio.create_task(
-                            self.crawl_url(url, config, task_id, retry_count)
-                        )
-                        active_tasks.append(task)
-                        
-                        # Update waiting time in monitor
-                        if self.monitor:
-                            wait_time = time.time() - enqueue_time
-                            self.monitor.update_task(
-                                task_id, 
-                                wait_time=wait_time,
-                                status=CrawlStatus.IN_PROGRESS
-                            )
+                # If memory pressure is low, greedily fill all available slots
+                if not self.memory_pressure_mode:
+                    slots = self.max_session_permit - len(active_tasks)
+                    while slots > 0:
+                        try:
+                            # Use get_nowait() to immediately get tasks without blocking
+                            priority, (url, task_id, retry_count, enqueue_time) = self.task_queue.get_nowait()
                             
-                    except asyncio.TimeoutError:
-                        # No tasks in queue, that's fine
-                        pass
+                            # Create and start the task
+                            task = asyncio.create_task(
+                                self.crawl_url(url, config, task_id, retry_count)
+                            )
+                            active_tasks.append(task)
+                            
+                            # Update waiting time in monitor
+                            if self.monitor:
+                                wait_time = time.time() - enqueue_time
+                                self.monitor.update_task(
+                                    task_id, 
+                                    wait_time=wait_time,
+                                    status=CrawlStatus.IN_PROGRESS
+                                )
+                            
+                            slots -= 1
+                            
+                        except asyncio.QueueEmpty:
+                            # No more tasks in queue, exit the loop
+                            break
                         
                 # Process completed tasks and yield results
                 if active_tasks:
@@ -572,13 +635,43 @@ class SemaphoreDispatcher(BaseDispatcher):
     async def crawl_url(
         self,
         url: str,
-        config: CrawlerRunConfig,
+        config: Union[CrawlerRunConfig, List[CrawlerRunConfig]],
         task_id: str,
         semaphore: asyncio.Semaphore = None,
     ) -> CrawlerTaskResult:
         start_time = time.time()
         error_message = ""
         memory_usage = peak_memory = 0.0
+
+        # Select appropriate config for this URL
+        selected_config = self.select_config(url, config)
+        
+        # If no config matches, return failed result
+        if selected_config is None:
+            error_message = f"No matching configuration found for URL: {url}"
+            if self.monitor:
+                self.monitor.update_task(
+                    task_id, 
+                    status=CrawlStatus.FAILED,
+                    error_message=error_message
+                )
+            
+            return CrawlerTaskResult(
+                task_id=task_id,
+                url=url,
+                result=CrawlResult(
+                    url=url, 
+                    html="", 
+                    metadata={"status": "no_config_match"}, 
+                    success=False, 
+                    error_message=error_message
+                ),
+                memory_usage=0,
+                peak_memory=0,
+                start_time=start_time,
+                end_time=time.time(),
+                error_message=error_message
+            )
 
         try:
             if self.monitor:
@@ -592,7 +685,7 @@ class SemaphoreDispatcher(BaseDispatcher):
             async with semaphore:
                 process = psutil.Process()
                 start_memory = process.memory_info().rss / (1024 * 1024)
-                result = await self.crawler.arun(url, config=config, session_id=task_id)
+                result = await self.crawler.arun(url, config=selected_config, session_id=task_id)
                 end_memory = process.memory_info().rss / (1024 * 1024)
 
                 memory_usage = peak_memory = end_memory - start_memory
@@ -654,7 +747,7 @@ class SemaphoreDispatcher(BaseDispatcher):
         self,
         crawler: AsyncWebCrawler,  # noqa: F821
         urls: List[str],
-        config: CrawlerRunConfig,
+        config: Union[CrawlerRunConfig, List[CrawlerRunConfig]],
     ) -> List[CrawlerTaskResult]:
         self.crawler = crawler
         if self.monitor:

@@ -5,6 +5,7 @@ from typing import List, Tuple, Dict
 from functools import partial
 from uuid import uuid4
 from datetime import datetime
+from base64 import b64encode
 
 import logging
 from typing import Optional, AsyncGenerator
@@ -39,7 +40,9 @@ from utils import (
     get_base_url,
     is_task_id,
     should_cleanup_task,
-    decode_redis_hash
+    decode_redis_hash,
+    get_llm_api_key,
+    validate_llm_provider
 )
 
 import psutil, time
@@ -62,7 +65,7 @@ async def handle_llm_qa(
 ) -> str:
     """Process QA using LLM with crawled content as context."""
     try:
-        if not url.startswith(('http://', 'https://')):
+        if not url.startswith(('http://', 'https://')) and not url.startswith(("raw:", "raw://")):
             url = 'https://' + url
         # Extract base URL by finding last '?q=' occurrence
         last_q_index = url.rfind('?q=')
@@ -88,10 +91,12 @@ async def handle_llm_qa(
 
     Answer:"""
 
+        # api_token=os.environ.get(config["llm"].get("api_key_env", ""))
+
         response = perform_completion_with_backoff(
             provider=config["llm"]["provider"],
             prompt_with_variables=prompt,
-            api_token=os.environ.get(config["llm"].get("api_key_env", ""))
+            api_token=get_llm_api_key(config)
         )
 
         return response.choices[0].message.content
@@ -109,19 +114,23 @@ async def process_llm_extraction(
     url: str,
     instruction: str,
     schema: Optional[str] = None,
-    cache: str = "0"
+    cache: str = "0",
+    provider: Optional[str] = None
 ) -> None:
     """Process LLM extraction in background."""
     try:
-        # If config['llm'] has api_key then ignore the api_key_env
-        api_key = ""
-        if "api_key" in config["llm"]:
-            api_key = config["llm"]["api_key"]
-        else:
-            api_key = os.environ.get(config["llm"].get("api_key_env", None), "")
+        # Validate provider
+        is_valid, error_msg = validate_llm_provider(config, provider)
+        if not is_valid:
+            await redis.hset(f"task:{task_id}", mapping={
+                "status": TaskStatus.FAILED,
+                "error": error_msg
+            })
+            return
+        api_key = get_llm_api_key(config, provider)
         llm_strategy = LLMExtractionStrategy(
             llm_config=LLMConfig(
-                provider=config["llm"]["provider"],
+                provider=provider or config["llm"]["provider"],
                 api_token=api_key
             ),
             instruction=instruction,
@@ -168,12 +177,21 @@ async def handle_markdown_request(
     filter_type: FilterType,
     query: Optional[str] = None,
     cache: str = "0",
-    config: Optional[dict] = None
+    config: Optional[dict] = None,
+    provider: Optional[str] = None
 ) -> str:
     """Handle markdown generation requests."""
     try:
+        # Validate provider if using LLM filter
+        if filter_type == FilterType.LLM:
+            is_valid, error_msg = validate_llm_provider(config, provider)
+            if not is_valid:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=error_msg
+                )
         decoded_url = unquote(url)
-        if not decoded_url.startswith(('http://', 'https://')):
+        if not decoded_url.startswith(('http://', 'https://')) and not decoded_url.startswith(("raw:", "raw://")):
             decoded_url = 'https://' + decoded_url
 
         if filter_type == FilterType.RAW:
@@ -184,8 +202,8 @@ async def handle_markdown_request(
                 FilterType.BM25: BM25ContentFilter(user_query=query or ""),
                 FilterType.LLM: LLMContentFilter(
                     llm_config=LLMConfig(
-                        provider=config["llm"]["provider"],
-                        api_token=os.environ.get(config["llm"].get("api_key_env", None), ""),
+                        provider=provider or config["llm"]["provider"],
+                        api_token=get_llm_api_key(config, provider),
                     ),
                     instruction=query or "Extract main content"
                 )
@@ -229,7 +247,8 @@ async def handle_llm_request(
     query: Optional[str] = None,
     schema: Optional[str] = None,
     cache: str = "0",
-    config: Optional[dict] = None
+    config: Optional[dict] = None,
+    provider: Optional[str] = None
 ) -> JSONResponse:
     """Handle LLM extraction requests."""
     base_url = get_base_url(request)
@@ -259,7 +278,8 @@ async def handle_llm_request(
             schema,
             cache,
             base_url,
-            config
+            config,
+            provider
         )
 
     except Exception as e:
@@ -303,11 +323,12 @@ async def create_new_task(
     schema: Optional[str],
     cache: str,
     base_url: str,
-    config: dict
+    config: dict,
+    provider: Optional[str] = None
 ) -> JSONResponse:
     """Create and initialize a new task."""
     decoded_url = unquote(input_path)
-    if not decoded_url.startswith(('http://', 'https://')):
+    if not decoded_url.startswith(('http://', 'https://')) and not decoded_url.startswith(("raw:", "raw://")):
         decoded_url = 'https://' + decoded_url
 
     from datetime import datetime
@@ -327,7 +348,8 @@ async def create_new_task(
         decoded_url,
         query,
         schema,
-        cache
+        cache,
+        provider
     )
 
     return JSONResponse({
@@ -371,6 +393,9 @@ async def stream_results(crawler: AsyncWebCrawler, results_gen: AsyncGenerator) 
                 server_memory_mb = _get_memory_mb()
                 result_dict = result.model_dump()
                 result_dict['server_memory_mb'] = server_memory_mb
+                # If PDF exists, encode it to base64
+                if result_dict.get('pdf') is not None:
+                    result_dict['pdf'] = b64encode(result_dict['pdf']).decode('utf-8')
                 logger.info(f"Streaming result for {result_dict.get('url', 'unknown')}")
                 data = json.dumps(result_dict, default=datetime_handler) + "\n"
                 yield data.encode('utf-8')
@@ -403,7 +428,7 @@ async def handle_crawl_request(
     peak_mem_mb = start_mem_mb
     
     try:
-        urls = [('https://' + url) if not url.startswith(('http://', 'https://')) else url for url in urls]
+        urls = [('https://' + url) if not url.startswith(('http://', 'https://')) and not url.startswith(("raw:", "raw://")) else url for url in urls]
         browser_config = BrowserConfig.load(browser_config)
         crawler_config = CrawlerRunConfig.load(crawler_config)
 
@@ -443,10 +468,19 @@ async def handle_crawl_request(
             mem_delta_mb = end_mem_mb - start_mem_mb # <--- Calculate delta
             peak_mem_mb = max(peak_mem_mb if peak_mem_mb else 0, end_mem_mb) # <--- Get peak memory
         logger.info(f"Memory usage: Start: {start_mem_mb} MB, End: {end_mem_mb} MB, Delta: {mem_delta_mb} MB, Peak: {peak_mem_mb} MB")
-                              
+
+        # Process results to handle PDF bytes
+        processed_results = []
+        for result in results:
+            result_dict = result.model_dump()
+            # If PDF exists, encode it to base64
+            if result_dict.get('pdf') is not None:
+                result_dict['pdf'] = b64encode(result_dict['pdf']).decode('utf-8')
+            processed_results.append(result_dict)
+            
         return {
             "success": True,
-            "results": [result.model_dump() for result in results],
+            "results": processed_results,
             "server_processing_time_s": end_time - start_time,
             "server_memory_delta_mb": mem_delta_mb,
             "server_peak_memory_mb": peak_mem_mb

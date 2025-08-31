@@ -119,6 +119,32 @@ def install_playwright():
         logger.warning(
             f"Please run '{sys.executable} -m playwright install --with-deps' manually after the installation."
         )
+    
+    # Install Patchright browsers for undetected browser support
+    logger.info("Installing Patchright browsers for undetected mode...", tag="INIT")
+    try:
+        subprocess.check_call(
+            [
+                sys.executable,
+                "-m",
+                "patchright",
+                "install",
+                "--with-deps",
+                "--force",
+                "chromium",
+            ]
+        )
+        logger.success(
+            "Patchright installation completed successfully.", tag="COMPLETE"
+        )
+    except subprocess.CalledProcessError:
+        logger.warning(
+            f"Please run '{sys.executable} -m patchright install --with-deps' manually after the installation."
+        )
+    except Exception:
+        logger.warning(
+            f"Please run '{sys.executable} -m patchright install --with-deps' manually after the installation."
+        )
 
 
 def run_migration():

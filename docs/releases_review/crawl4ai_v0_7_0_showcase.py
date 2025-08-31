@@ -28,7 +28,7 @@ from rich import box
 
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, AdaptiveCrawler, AdaptiveConfig, BrowserConfig, CacheMode
 from crawl4ai import AsyncUrlSeeder, SeedingConfig
-from crawl4ai.async_configs import LinkPreviewConfig, VirtualScrollConfig
+from crawl4ai import LinkPreviewConfig, VirtualScrollConfig
 from crawl4ai import c4a_compile, CompilationResult
 
 # Initialize Rich console for beautiful output

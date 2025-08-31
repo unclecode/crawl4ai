@@ -137,7 +137,7 @@ async def smart_blog_crawler():
             word_count_threshold=300  # Only substantial articles
         )
         
-        # Extract URLs and stream results as they come
+        # Extract URLs and crawl them
         tutorial_urls = [t["url"] for t in tutorials[:10]]
         results = await crawler.arun_many(tutorial_urls, config=config)
         
@@ -231,7 +231,7 @@ Common Crawl is a massive public dataset that regularly crawls the entire web. I
 
 ```python
 # Use both sources
-config = SeedingConfig(source="cc+sitemap")
+config = SeedingConfig(source="sitemap+cc")
 urls = await seeder.urls("example.com", config)
 ```
 
@@ -241,13 +241,13 @@ The `SeedingConfig` object is your control panel. Here's everything you can conf
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `source` | str | "cc" | URL source: "cc" (Common Crawl), "sitemap", or "cc+sitemap" |
+| `source` | str | "sitemap+cc" | URL source: "cc" (Common Crawl), "sitemap", or "sitemap+cc" |
 | `pattern` | str | "*" | URL pattern filter (e.g., "*/blog/*", "*.html") |
 | `extract_head` | bool | False | Extract metadata from page `<head>` |
 | `live_check` | bool | False | Verify URLs are accessible |
 | `max_urls` | int | -1 | Maximum URLs to return (-1 = unlimited) |
 | `concurrency` | int | 10 | Parallel workers for fetching |
-| `hits_per_sec` | int | None | Rate limit for requests |
+| `hits_per_sec` | int | 5 | Rate limit for requests |
 | `force` | bool | False | Bypass cache, fetch fresh data |
 | `verbose` | bool | False | Show detailed progress |
 | `query` | str | None | Search query for BM25 scoring |
@@ -522,7 +522,7 @@ urls = await seeder.urls("docs.example.com", config)
 ```python
 # Find specific products
 config = SeedingConfig(
-    source="cc+sitemap",  # Use both sources
+    source="sitemap+cc",  # Use both sources
     extract_head=True,
     query="wireless headphones noise canceling",
     scoring_method="bm25",
@@ -782,7 +782,7 @@ class ResearchAssistant:
         
         # Step 1: Discover relevant URLs
         config = SeedingConfig(
-            source="cc+sitemap",     # Maximum coverage
+            source="sitemap+cc",     # Maximum coverage
             extract_head=True,       # Get metadata
             query=topic,             # Research topic
             scoring_method="bm25",   # Smart scoring
@@ -832,7 +832,8 @@ class ResearchAssistant:
             # Extract URLs and crawl all articles
             article_urls = [article['url'] for article in top_articles]
             results = []
-            async for result in await crawler.arun_many(article_urls, config=config):
+            crawl_results = await crawler.arun_many(article_urls, config=config)
+            async for result in crawl_results:
                 if result.success:
                     results.append({
                         'url': result.url,
@@ -933,10 +934,10 @@ config = SeedingConfig(concurrency=10, hits_per_sec=5)
 # When crawling many URLs
 async with AsyncWebCrawler() as crawler:
     # Assuming urls is a list of URL strings
-    results = await crawler.arun_many(urls, config=config)
+    crawl_results = await crawler.arun_many(urls, config=config)
     
     # Process as they arrive
-    async for result in results:
+    async for result in crawl_results:
         process_immediately(result)  # Don't wait for all
 ```
 
@@ -1020,7 +1021,7 @@ config = SeedingConfig(
 
 # E-commerce product discovery
 config = SeedingConfig(
-    source="cc+sitemap",
+    source="sitemap+cc",
     pattern="*/product/*",
     extract_head=True,
     live_check=True

@@ -7,7 +7,7 @@
 ```python
 async def arun_many(
     urls: Union[List[str], List[Any]],
-    config: Optional[CrawlerRunConfig] = None,
+    config: Optional[Union[CrawlerRunConfig, List[CrawlerRunConfig]]] = None,
     dispatcher: Optional[BaseDispatcher] = None,
     ...
 ) -> Union[List[CrawlResult], AsyncGenerator[CrawlResult, None]]:
@@ -15,7 +15,9 @@ async def arun_many(
     Crawl multiple URLs concurrently or in batches.
 
     :param urls: A list of URLs (or tasks) to crawl.
-    :param config: (Optional) A default `CrawlerRunConfig` applying to each crawl.
+    :param config: (Optional) Either:
+        - A single `CrawlerRunConfig` applying to all URLs
+        - A list of `CrawlerRunConfig` objects with url_matcher patterns
     :param dispatcher: (Optional) A concurrency controller (e.g. MemoryAdaptiveDispatcher).
     ...
     :return: Either a list of `CrawlResult` objects, or an async generator if streaming is enabled.
@@ -95,10 +97,70 @@ results = await crawler.arun_many(
 )
 ```
 
+### URL-Specific Configurations
+
+Instead of using one config for all URLs, provide a list of configs with `url_matcher` patterns:
+
+```python
+from crawl4ai import CrawlerRunConfig, MatchMode
+from crawl4ai.processors.pdf import PDFContentScrapingStrategy
+from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai.content_filter_strategy import PruningContentFilter
+from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
+
+# PDF files - specialized extraction
+pdf_config = CrawlerRunConfig(
+    url_matcher="*.pdf",
+    scraping_strategy=PDFContentScrapingStrategy()
+)
+
+# Blog/article pages - content filtering
+blog_config = CrawlerRunConfig(
+    url_matcher=["*/blog/*", "*/article/*", "*python.org*"],
+    markdown_generator=DefaultMarkdownGenerator(
+        content_filter=PruningContentFilter(threshold=0.48)
+    )
+)
+
+# Dynamic pages - JavaScript execution
+github_config = CrawlerRunConfig(
+    url_matcher=lambda url: 'github.com' in url,
+    js_code="window.scrollTo(0, 500);"
+)
+
+# API endpoints - JSON extraction
+api_config = CrawlerRunConfig(
+    url_matcher=lambda url: 'api' in url or url.endswith('.json'),
+    # Custome settings for JSON extraction
+)
+
+# Default fallback config
+default_config = CrawlerRunConfig()  # No url_matcher means it never matches except as fallback
+
+# Pass the list of configs - first match wins!
+results = await crawler.arun_many(
+    urls=[
+        "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",  # → pdf_config
+        "https://blog.python.org/",  # → blog_config
+        "https://github.com/microsoft/playwright",  # → github_config
+        "https://httpbin.org/json",  # → api_config
+        "https://example.com/"  # → default_config
+    ],
+    config=[pdf_config, blog_config, github_config, api_config, default_config]
+)
+```
+
+**URL Matching Features**:
+- **String patterns**: `"*.pdf"`, `"*/blog/*"`, `"*python.org*"`
+- **Function matchers**: `lambda url: 'api' in url`
+- **Mixed patterns**: Combine strings and functions with `MatchMode.OR` or `MatchMode.AND`
+- **First match wins**: Configs are evaluated in order
+
 **Key Points**:
 - Each URL is processed by the same or separate sessions, depending on the dispatcher’s strategy.
 - `dispatch_result` in each `CrawlResult` (if using concurrency) can hold memory and timing info.  
 - If you need to handle authentication or session IDs, pass them in each individual task or within your run config.
+- **Important**: Always include a default config (without `url_matcher`) as the last item if you want to handle all URLs. Otherwise, unmatched URLs will fail.
 
 ### Return Value
 

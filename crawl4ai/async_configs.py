@@ -18,16 +18,24 @@ from .extraction_strategy import ExtractionStrategy, LLMExtractionStrategy
 from .chunking_strategy import ChunkingStrategy, RegexChunking
 
 from .markdown_generation_strategy import MarkdownGenerationStrategy, DefaultMarkdownGenerator
-from .content_scraping_strategy import ContentScrapingStrategy, WebScrapingStrategy, LXMLWebScrapingStrategy
+from .content_scraping_strategy import ContentScrapingStrategy, LXMLWebScrapingStrategy
 from .deep_crawling import DeepCrawlStrategy
+from .table_extraction import TableExtractionStrategy, DefaultTableExtraction
 
 from .cache_context import CacheMode
 from .proxy_strategy import ProxyRotationStrategy
 
-from typing import Union, List
+from typing import Union, List, Callable
 import inspect
 from typing import Any, Dict, Optional
 from enum import Enum
+
+# Type alias for URL matching
+UrlMatcher = Union[str, Callable[[str], bool], List[Union[str, Callable[[str], bool]]]]
+
+class MatchMode(Enum):
+    OR = "or"
+    AND = "and"
 
 # from .proxy_strategy import ProxyConfig
 
@@ -383,6 +391,8 @@ class BrowserConfig:
         light_mode (bool): Disables certain background features for performance gains. Default: False.
         extra_args (list): Additional command-line arguments passed to the browser.
                            Default: [].
+        enable_stealth (bool): If True, applies playwright-stealth to bypass basic bot detection.
+                              Cannot be used with use_undetected browser mode. Default: False.
     """
 
     def __init__(
@@ -423,6 +433,7 @@ class BrowserConfig:
         extra_args: list = None,
         debugging_port: int = 9222,
         host: str = "localhost",
+        enable_stealth: bool = False,
     ):
         self.browser_type = browser_type
         self.headless = headless 
@@ -438,6 +449,10 @@ class BrowserConfig:
             self.chrome_channel = ""
         self.proxy = proxy
         self.proxy_config = proxy_config
+        if isinstance(self.proxy_config, dict):
+            self.proxy_config = ProxyConfig.from_dict(self.proxy_config)
+        if isinstance(self.proxy_config, str):
+            self.proxy_config = ProxyConfig.from_string(self.proxy_config)
 
 
         self.viewport_width = viewport_width
@@ -463,6 +478,7 @@ class BrowserConfig:
         self.verbose = verbose
         self.debugging_port = debugging_port
         self.host = host
+        self.enable_stealth = enable_stealth
 
         fa_user_agenr_generator = ValidUAGenerator()
         if self.user_agent_mode == "random":
@@ -494,6 +510,13 @@ class BrowserConfig:
         # If persistent context is requested, ensure managed browser is enabled
         if self.use_persistent_context:
             self.use_managed_browser = True
+            
+        # Validate stealth configuration
+        if self.enable_stealth and self.use_managed_browser and self.browser_mode == "builtin":
+            raise ValueError(
+                "enable_stealth cannot be used with browser_mode='builtin'. "
+                "Stealth mode requires a dedicated browser instance."
+            )
 
     @staticmethod
     def from_kwargs(kwargs: dict) -> "BrowserConfig":
@@ -530,6 +553,7 @@ class BrowserConfig:
             extra_args=kwargs.get("extra_args", []),
             debugging_port=kwargs.get("debugging_port", 9222),
             host=kwargs.get("host", "localhost"),
+            enable_stealth=kwargs.get("enable_stealth", False),
         )
 
     def to_dict(self):
@@ -564,6 +588,7 @@ class BrowserConfig:
             "verbose": self.verbose,
             "debugging_port": self.debugging_port,
             "host": self.host,
+            "enable_stealth": self.enable_stealth,
         }
 
                 
@@ -862,7 +887,7 @@ class CrawlerRunConfig():
         parser_type (str): Type of parser to use for HTML parsing.
                            Default: "lxml".
         scraping_strategy (ContentScrapingStrategy): Scraping strategy to use.
-                           Default: WebScrapingStrategy.
+                           Default: LXMLWebScrapingStrategy.
         proxy_config (ProxyConfig or dict or None): Detailed proxy configuration, e.g. {"server": "...", "username": "..."}.
                                      If None, no additional proxy config. Default: None.
 
@@ -958,6 +983,8 @@ class CrawlerRunConfig():
                                          Default: False.
         table_score_threshold (int): Minimum score threshold for processing a table.
                                      Default: 7.
+        table_extraction (TableExtractionStrategy): Strategy to use for table extraction.
+                                     Default: DefaultTableExtraction with table_score_threshold.
 
         # Virtual Scroll Parameters
         virtual_scroll_config (VirtualScrollConfig or dict or None): Configuration for handling virtual scroll containers.
@@ -1084,6 +1111,7 @@ class CrawlerRunConfig():
         image_description_min_word_threshold: int = IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
         image_score_threshold: int = IMAGE_SCORE_THRESHOLD,
         table_score_threshold: int = 7,
+        table_extraction: TableExtractionStrategy = None,
         exclude_external_images: bool = False,
         exclude_all_images: bool = False,
         # Link and Domain Handling Parameters
@@ -1113,6 +1141,9 @@ class CrawlerRunConfig():
         link_preview_config: Union[LinkPreviewConfig, Dict[str, Any]] = None,
         # Virtual Scroll Parameters
         virtual_scroll_config: Union[VirtualScrollConfig, Dict[str, Any]] = None,
+        # URL Matching Parameters
+        url_matcher: Optional[UrlMatcher] = None,
+        match_mode: MatchMode = MatchMode.OR,
         # Experimental Parameters
         experimental: Dict[str, Any] = None,
     ):
@@ -1136,6 +1167,11 @@ class CrawlerRunConfig():
         self.parser_type = parser_type
         self.scraping_strategy = scraping_strategy or LXMLWebScrapingStrategy()
         self.proxy_config = proxy_config
+        if isinstance(proxy_config, dict):
+            self.proxy_config = ProxyConfig.from_dict(proxy_config)
+        if isinstance(proxy_config, str):
+            self.proxy_config = ProxyConfig.from_string(proxy_config)
+
         self.proxy_rotation_strategy = proxy_rotation_strategy
         
         # Browser Location and Identity Parameters
@@ -1192,6 +1228,12 @@ class CrawlerRunConfig():
         self.exclude_external_images = exclude_external_images
         self.exclude_all_images = exclude_all_images
         self.table_score_threshold = table_score_threshold
+        
+        # Table extraction strategy (default to DefaultTableExtraction if not specified)
+        if table_extraction is None:
+            self.table_extraction = DefaultTableExtraction(table_score_threshold=table_score_threshold)
+        else:
+            self.table_extraction = table_extraction
 
         # Link and Domain Handling Parameters
         self.exclude_social_media_domains = (
@@ -1266,6 +1308,10 @@ class CrawlerRunConfig():
         else:
             raise ValueError("virtual_scroll_config must be VirtualScrollConfig object or dict")
         
+        # URL Matching Parameters
+        self.url_matcher = url_matcher
+        self.match_mode = match_mode
+        
         # Experimental Parameters
         self.experimental = experimental or {}
         
@@ -1321,6 +1367,51 @@ class CrawlerRunConfig():
             if "compilation error" not in str(e).lower():
                 raise ValueError(f"Failed to compile C4A script: {str(e)}")
             raise
+    
+    def is_match(self, url: str) -> bool:
+        """Check if this config matches the given URL.
+        
+        Args:
+            url: The URL to check against this config's matcher
+            
+        Returns:
+            bool: True if this config should be used for the URL or if no matcher is set.
+        """
+        if self.url_matcher is None:
+            return True
+            
+        if callable(self.url_matcher):
+            # Single function matcher
+            return self.url_matcher(url)
+        
+        elif isinstance(self.url_matcher, str):
+            # Single pattern string
+            from fnmatch import fnmatch
+            return fnmatch(url, self.url_matcher)
+        
+        elif isinstance(self.url_matcher, list):
+            # List of mixed matchers
+            if not self.url_matcher:  # Empty list
+                return False
+                
+            results = []
+            for matcher in self.url_matcher:
+                if callable(matcher):
+                    results.append(matcher(url))
+                elif isinstance(matcher, str):
+                    from fnmatch import fnmatch
+                    results.append(fnmatch(url, matcher))
+                else:
+                    # Skip invalid matchers
+                    continue
+            
+            # Apply match mode logic
+            if self.match_mode == MatchMode.OR:
+                return any(results) if results else False
+            else:  # AND mode
+                return all(results) if results else False
+        
+        return False
 
 
     def __getattr__(self, name):
@@ -1414,6 +1505,7 @@ class CrawlerRunConfig():
                 "image_score_threshold", IMAGE_SCORE_THRESHOLD
             ),
             table_score_threshold=kwargs.get("table_score_threshold", 7),
+            table_extraction=kwargs.get("table_extraction", None),
             exclude_all_images=kwargs.get("exclude_all_images", False),
             exclude_external_images=kwargs.get("exclude_external_images", False),
             # Link and Domain Handling Parameters
@@ -1443,6 +1535,9 @@ class CrawlerRunConfig():
             # Link Extraction Parameters
             link_preview_config=kwargs.get("link_preview_config"),
             url=kwargs.get("url"),
+            # URL Matching Parameters
+            url_matcher=kwargs.get("url_matcher"),
+            match_mode=kwargs.get("match_mode", MatchMode.OR),
             # Experimental Parameters 
             experimental=kwargs.get("experimental"),
         )
@@ -1519,6 +1614,7 @@ class CrawlerRunConfig():
             "image_description_min_word_threshold": self.image_description_min_word_threshold,
             "image_score_threshold": self.image_score_threshold,
             "table_score_threshold": self.table_score_threshold,
+            "table_extraction": self.table_extraction,
             "exclude_all_images": self.exclude_all_images,
             "exclude_external_images": self.exclude_external_images,
             "exclude_social_media_domains": self.exclude_social_media_domains,
@@ -1540,6 +1636,8 @@ class CrawlerRunConfig():
             "deep_crawl_strategy": self.deep_crawl_strategy,
             "link_preview_config": self.link_preview_config.to_dict() if self.link_preview_config else None,
             "url": self.url,
+            "url_matcher": self.url_matcher,
+            "match_mode": self.match_mode,
             "experimental": self.experimental,
         }
 

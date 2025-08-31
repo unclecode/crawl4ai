@@ -237,11 +237,11 @@ async def get_markdown(
     body: MarkdownRequest,
     _td: Dict = Depends(token_dep),
 ):
-    if not body.url.startswith(("http://", "https://")):
+    if not body.url.startswith(("http://", "https://")) and not body.url.startswith(("raw:", "raw://")):
         raise HTTPException(
-            400, "URL must be absolute and start with http/https")
+            400, "Invalid URL format. Must start with http://, https://, or for raw HTML (raw:, raw://)")
     markdown = await handle_markdown_request(
-        body.url, body.f, body.q, body.c, config
+        body.url, body.f, body.q, body.c, config, body.provider
     )
     return JSONResponse({
         "url": body.url,
@@ -401,7 +401,7 @@ async def llm_endpoint(
 ):
     if not q:
         raise HTTPException(400, "Query parameter 'q' is required")
-    if not url.startswith(("http://", "https://")):
+    if not url.startswith(("http://", "https://")) and not url.startswith(("raw:", "raw://")):
         url = "https://" + url
     answer = await handle_llm_qa(url, q, config)
     return JSONResponse({"answer": answer})

@@ -21,6 +21,7 @@ from .async_logger import AsyncLogger
 from .ssl_certificate import SSLCertificate
 from .user_agent_generator import ValidUAGenerator
 from .browser_manager import BrowserManager
+from .browser_adapter import BrowserAdapter, PlaywrightAdapter, UndetectedAdapter
 
 import aiofiles
 import aiohttp
@@ -71,7 +72,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
     """
 
     def __init__(
-        self, browser_config: BrowserConfig = None, logger: AsyncLogger = None, **kwargs
+        self, browser_config: BrowserConfig = None, logger: AsyncLogger = None, browser_adapter: BrowserAdapter = None, **kwargs
     ):
         """
         Initialize the AsyncPlaywrightCrawlerStrategy with a browser configuration.
@@ -80,11 +81,16 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             browser_config (BrowserConfig): Configuration object containing browser settings.
                                           If None, will be created from kwargs for backwards compatibility.
             logger: Logger instance for recording events and errors.
+            browser_adapter (BrowserAdapter): Browser adapter for handling browser-specific operations.
+                                           If None, defaults to PlaywrightAdapter.
             **kwargs: Additional arguments for backwards compatibility and extending functionality.
         """
         # Initialize browser config, either from provided object or kwargs
         self.browser_config = browser_config or BrowserConfig.from_kwargs(kwargs)
         self.logger = logger
+        
+        # Initialize browser adapter
+        self.adapter = browser_adapter or PlaywrightAdapter()
 
         # Initialize session management
         self._downloaded_files = []
@@ -104,7 +110,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
         # Initialize browser manager with config
         self.browser_manager = BrowserManager(
-            browser_config=self.browser_config, logger=self.logger
+            browser_config=self.browser_config, 
+            logger=self.logger,
+            use_undetected=isinstance(self.adapter, UndetectedAdapter)
         )
 
     async def __aenter__(self):
@@ -322,7 +330,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         """
 
         try:
-            result = await page.evaluate(wrapper_js)
+            result = await self.adapter.evaluate(page, wrapper_js)
             return result
         except Exception as e:
             if "Error evaluating condition" in str(e):
@@ -367,7 +375,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
                     # Replace the iframe with a div containing the extracted content
                     _iframe = iframe_content.replace("`", "\\`")
-                    await page.evaluate(
+                    await self.adapter.evaluate(page,
                         f"""
                         () => {{
                             const iframe = document.getElementById('iframe-{i}');
@@ -628,91 +636,16 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             page.on("requestfailed", handle_request_failed_capture)
 
         # Console Message Capturing
+        handle_console = None
+        handle_error = None
         if config.capture_console_messages:
-            def handle_console_capture(msg):
-                try:
-                    message_type = "unknown"
-                    try:
-                        message_type = msg.type
-                    except:
-                        pass
-                        
-                    message_text = "unknown"
-                    try:
-                        message_text = msg.text
-                    except:
-                        pass
-                        
-                    # Basic console message with minimal content
-                    entry = {
-                        "type": message_type,
-                        "text": message_text,
-                        "timestamp": time.time()
-                    }
-                    
-                    captured_console.append(entry)
-                    
-                except Exception as e:
-                    if self.logger:
-                        self.logger.warning(f"Error capturing console message: {e}", tag="CAPTURE")
-                    # Still add something to the list even on error
-                    captured_console.append({
-                        "type": "console_capture_error", 
-                        "error": str(e), 
-                        "timestamp": time.time()
-                    })
-
-            def handle_pageerror_capture(err):
-                try:
-                    error_message = "Unknown error"
-                    try:
-                        error_message = err.message
-                    except:
-                        pass
-                        
-                    error_stack = ""
-                    try:
-                        error_stack = err.stack
-                    except:
-                        pass
-                        
-                    captured_console.append({
-                        "type": "error",
-                        "text": error_message,
-                        "stack": error_stack,
-                        "timestamp": time.time()
-                    })
-                except Exception as e:
-                    if self.logger:
-                        self.logger.warning(f"Error capturing page error: {e}", tag="CAPTURE")
-                    captured_console.append({
-                        "type": "pageerror_capture_error", 
-                        "error": str(e), 
-                        "timestamp": time.time()
-                    })
-
-            # Add event listeners directly
-            page.on("console", handle_console_capture)
-            page.on("pageerror", handle_pageerror_capture)
+            # Set up console capture using adapter
+            handle_console = await self.adapter.setup_console_capture(page, captured_console)
+            handle_error = await self.adapter.setup_error_capture(page, captured_console)
 
         # Set up console logging if requested
-        if config.log_console:
-            def log_consol(
-                msg, console_log_type="debug"
-            ):  # Corrected the parameter syntax
-                if console_log_type == "error":
-                    self.logger.error(
-                        message=f"Console error: {msg}",  # Use f-string for variable interpolation
-                        tag="CONSOLE"
-                    )
-                elif console_log_type == "debug":
-                    self.logger.debug(
-                        message=f"Console: {msg}",  # Use f-string for variable interpolation
-                        tag="CONSOLE"
-                    )
-
-            page.on("console", log_consol)
-            page.on("pageerror", lambda e: log_consol(e, "error"))
+        # Note: For undetected browsers, console logging won't work directly
+        # but captured messages can still be logged after retrieval
 
         try:
             # Get SSL certificate information if requested and URL is HTTPS
@@ -824,7 +757,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             except Error:
                 visibility_info = await self.check_visibility(page)
 
-                if self.browser_config.config.verbose:
+                if self.browser_config.verbose:
                     self.logger.debug(
                         message="Body visibility info: {info}",
                         tag="DEBUG",
@@ -998,7 +931,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         await page.wait_for_load_state("domcontentloaded", timeout=5)
                     except PlaywrightTimeoutError:
                         pass
-                    await page.evaluate(update_image_dimensions_js)
+                    await self.adapter.evaluate(page, update_image_dimensions_js)
                 except Exception as e:
                     self.logger.error(
                         message="Error updating image dimensions: {error}",
@@ -1027,7 +960,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     
                     for selector in selectors:
                         try:
-                            content = await page.evaluate(
+                            content = await self.adapter.evaluate(page,
                                 f"""Array.from(document.querySelectorAll("{selector}"))
                                     .map(el => el.outerHTML)
                                     .join('')"""
@@ -1085,6 +1018,11 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 await asyncio.sleep(delay)
                 return await page.content()
 
+            # For undetected browsers, retrieve console messages before returning
+            if config.capture_console_messages and hasattr(self.adapter, 'retrieve_console_messages'):
+                final_messages = await self.adapter.retrieve_console_messages(page)
+                captured_console.extend(final_messages)
+
             # Return complete response
             return AsyncCrawlResponse(
                 html=html,
@@ -1123,8 +1061,13 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     page.remove_listener("response", handle_response_capture)
                     page.remove_listener("requestfailed", handle_request_failed_capture)
                 if config.capture_console_messages:
-                    page.remove_listener("console", handle_console_capture)
-                    page.remove_listener("pageerror", handle_pageerror_capture)
+                    # Retrieve any final console messages for undetected browsers
+                    if hasattr(self.adapter, 'retrieve_console_messages'):
+                        final_messages = await self.adapter.retrieve_console_messages(page)
+                        captured_console.extend(final_messages)
+                    
+                    # Clean up console capture
+                    await self.adapter.cleanup_console_capture(page, handle_console, handle_error)
                 
                 # Close the page
                 await page.close()
@@ -1354,7 +1297,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             """
             
             # Execute virtual scroll capture
-            result = await page.evaluate(virtual_scroll_js, config.to_dict())
+            result = await self.adapter.evaluate(page, virtual_scroll_js, config.to_dict())
             
             if result.get("replaced", False):
                 self.logger.success(
@@ -1438,7 +1381,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         remove_overlays_js = load_js_script("remove_overlay_elements")
 
         try:
-            await page.evaluate(
+            await self.adapter.evaluate(page,
                 f"""
                 (() => {{
                     try {{
@@ -1843,7 +1786,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         # When {script} contains statements (e.g., const link = …; link.click();), 
                         # this forms invalid JavaScript, causing Playwright execution error: SyntaxError: Unexpected token 'const'.
                         # """
-                        result = await page.evaluate(
+                        result = await self.adapter.evaluate(page,
                             f"""
                         (async () => {{
                             try {{
@@ -1965,7 +1908,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             for script in scripts:
                 try:
                     # Execute the script and wait for network idle
-                    result = await page.evaluate(
+                    result = await self.adapter.evaluate(page,
                         f"""
                         (() => {{
                             return new Promise((resolve) => {{
@@ -2049,7 +1992,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         Returns:
             Boolean indicating visibility
         """
-        return await page.evaluate(
+        return await self.adapter.evaluate(page,
             """
             () => {
                 const element = document.body;
@@ -2090,7 +2033,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             Dict containing scroll status and position information
         """
         try:
-            result = await page.evaluate(
+            result = await self.adapter.evaluate(page,
                 f"""() => {{
                     try {{
                         const startX = window.scrollX;
@@ -2147,7 +2090,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         Returns:
             Dict containing width and height of the page
         """
-        return await page.evaluate(
+        return await self.adapter.evaluate(page,
             """
             () => {
                 const {scrollWidth, scrollHeight} = document.documentElement;
@@ -2167,7 +2110,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             bool: True if page needs scrolling
         """
         try:
-            need_scroll = await page.evaluate(
+            need_scroll = await self.adapter.evaluate(page,
                 """
             () => {
                 const scrollHeight = document.documentElement.scrollHeight;

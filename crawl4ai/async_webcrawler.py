@@ -502,9 +502,12 @@ class AsyncWebCrawler:
             metadata = result.get("metadata", {})
         else:
             cleaned_html = sanitize_input_encode(result.cleaned_html)
-            media = result.media.model_dump()
-            tables = media.pop("tables", [])
-            links = result.links.model_dump()
+            # media = result.media.model_dump()
+            # tables = media.pop("tables", [])
+            # links = result.links.model_dump()
+            media = result.media.model_dump() if hasattr(result.media, 'model_dump') else result.media
+            tables = media.pop("tables", []) if isinstance(media, dict) else []
+            links = result.links.model_dump() if hasattr(result.links, 'model_dump') else result.links
             metadata = result.metadata
 
         fit_html = preprocess_html_for_schema(html_content=html, text_threshold= 500, max_size= 300_000)
@@ -650,7 +653,7 @@ class AsyncWebCrawler:
     async def arun_many(
         self,
         urls: List[str],
-        config: Optional[CrawlerRunConfig] = None,
+        config: Optional[Union[CrawlerRunConfig, List[CrawlerRunConfig]]] = None,
         dispatcher: Optional[BaseDispatcher] = None,
         # Legacy parameters maintained for backwards compatibility
         # word_count_threshold=MIN_WORD_THRESHOLD,
@@ -671,7 +674,9 @@ class AsyncWebCrawler:
 
         Args:
         urls: List of URLs to crawl
-        config: Configuration object controlling crawl behavior for all URLs
+        config: Configuration object(s) controlling crawl behavior. Can be:
+            - Single CrawlerRunConfig: Used for all URLs
+            - List[CrawlerRunConfig]: Configs with url_matcher for URL-specific settings
         dispatcher: The dispatcher strategy instance to use. Defaults to MemoryAdaptiveDispatcher
         [other parameters maintained for backwards compatibility]
 
@@ -736,7 +741,11 @@ class AsyncWebCrawler:
                 or task_result.result
             )
 
-        stream = config.stream
+        # Handle stream setting - use first config's stream setting if config is a list
+        if isinstance(config, list):
+            stream = config[0].stream if config else False
+        else:
+            stream = config.stream
 
         if stream:
 
