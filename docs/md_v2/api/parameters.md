@@ -155,6 +155,7 @@ If your page is a single-page app with repeated JS updates, set `js_only=True` i
 | **`exclude_external_links`** | `bool` (False)          | Removes all links pointing outside the current domain.                                                                      |
 | **`exclude_social_media_links`** | `bool` (False)      | Strips links specifically to social sites (like Facebook or Twitter).                                                      |
 | **`exclude_domains`**        | `list` ([])             | Provide a custom list of domains to exclude (like `["ads.com", "trackers.io"]`).                                            |
+| **`preserve_https_for_internal_links`** | `bool` (False) | If `True`, preserves HTTPS scheme for internal links even when the server redirects to HTTP. Useful for security-conscious crawling. |
 
 Use these for link-level content filtering (often to keep crawls “internal” or to remove spammy domains).
 

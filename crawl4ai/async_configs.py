@@ -1124,6 +1124,7 @@ class CrawlerRunConfig():
         exclude_domains: list = None,
         exclude_internal_links: bool = False,
         score_links: bool = False,
+        preserve_https_for_internal_links: bool = False,
         # Debugging and Logging Parameters
         verbose: bool = True,
         log_console: bool = False,
@@ -1247,6 +1248,7 @@ class CrawlerRunConfig():
         self.exclude_domains = exclude_domains or []
         self.exclude_internal_links = exclude_internal_links
         self.score_links = score_links
+        self.preserve_https_for_internal_links = preserve_https_for_internal_links
 
         # Debugging and Logging Parameters
         self.verbose = verbose
@@ -1520,6 +1522,7 @@ class CrawlerRunConfig():
             exclude_domains=kwargs.get("exclude_domains", []),
             exclude_internal_links=kwargs.get("exclude_internal_links", False),
             score_links=kwargs.get("score_links", False),
+            preserve_https_for_internal_links=kwargs.get("preserve_https_for_internal_links", False),
             # Debugging and Logging Parameters
             verbose=kwargs.get("verbose", True),
             log_console=kwargs.get("log_console", False),
@@ -1626,6 +1629,7 @@ class CrawlerRunConfig():
             "exclude_domains": self.exclude_domains,
             "exclude_internal_links": self.exclude_internal_links,
             "score_links": self.score_links,
+            "preserve_https_for_internal_links": self.preserve_https_for_internal_links,
             "verbose": self.verbose,
             "log_console": self.log_console,
             "capture_network_requests": self.capture_network_requests,
