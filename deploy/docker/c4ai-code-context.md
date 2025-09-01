@@ -7698,7 +7698,7 @@ class BrowserManager:
             "accept_downloads": self.config.accept_downloads,
             "storage_state": self.config.storage_state,
             "ignore_https_errors": self.config.ignore_https_errors,
-            "device_scale_factor": 1.0,
+            "device_scale_factor": self.config.device_scale_factor,
             "java_script_enabled": self.config.java_script_enabled,
         }
         

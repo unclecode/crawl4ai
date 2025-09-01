@@ -365,6 +365,13 @@ class BrowserConfig:
         viewport_height (int): Default viewport height for pages. Default: 600.
         viewport (dict): Default viewport dimensions for pages. If set, overrides viewport_width and viewport_height.
                          Default: None.
+        device_scale_factor (float): The device pixel ratio used for rendering pages. Controls how many
+                                     physical pixels map to one CSS pixel, allowing simulation of HiDPI
+                                     or Retina displays. For example, a viewport of 1920x1080 with a
+                                     device_scale_factor of 2.0 produces screenshots at 3840x2160 resolution.
+                                     Increasing this value improves screenshot quality but may increase
+                                     memory usage and rendering time.
+                                     Default: 1.0.
         verbose (bool): Enable verbose logging.
                         Default: True.
         accept_downloads (bool): Whether to allow file downloads. If True, requires a downloads_path.
@@ -411,6 +418,7 @@ class BrowserConfig:
         viewport_width: int = 1080,
         viewport_height: int = 600,
         viewport: dict = None,
+        device_scale_factor: float = 1.0,
         accept_downloads: bool = False,
         downloads_path: str = None,
         storage_state: Union[str, dict, None] = None,
@@ -461,6 +469,7 @@ class BrowserConfig:
         if self.viewport is not None:
             self.viewport_width = self.viewport.get("width", 1080)
             self.viewport_height = self.viewport.get("height", 600)
+        self.device_scale_factor = device_scale_factor
         self.accept_downloads = accept_downloads
         self.downloads_path = downloads_path
         self.storage_state = storage_state
@@ -534,6 +543,7 @@ class BrowserConfig:
             proxy_config=kwargs.get("proxy_config", None),
             viewport_width=kwargs.get("viewport_width", 1080),
             viewport_height=kwargs.get("viewport_height", 600),
+            device_scale_factor=kwargs.get("device_scale_factor", 1.0),
             accept_downloads=kwargs.get("accept_downloads", False),
             downloads_path=kwargs.get("downloads_path"),
             storage_state=kwargs.get("storage_state"),
@@ -571,6 +581,7 @@ class BrowserConfig:
             "proxy_config": self.proxy_config,
             "viewport_width": self.viewport_width,
             "viewport_height": self.viewport_height,
+            "device_scale_factor": self.device_scale_factor,
             "accept_downloads": self.accept_downloads,
             "downloads_path": self.downloads_path,
             "storage_state": self.storage_state,
