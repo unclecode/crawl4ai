@@ -1790,6 +1790,10 @@ def perform_completion_with_backoff(
         except RateLimitError as e:
             print("Rate limit error:", str(e))
 
+            if attempt == max_attempts - 1:
+                # Last attempt failed, raise the error.
+                raise
+
             # Check if we have exhausted our max attempts
             if attempt < max_attempts - 1:
                 # Calculate the delay and wait
