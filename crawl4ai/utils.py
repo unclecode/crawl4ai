@@ -2149,8 +2149,10 @@ def normalize_url(
     *,
     drop_query_tracking=True,
     sort_query=True,
-    keep_fragment=False,
+    keep_fragment=True,
+    remove_fragments=None,  # alias for keep_fragment=False
     extra_drop_params=None,
+    params_to_remove=None,  # alias for extra_drop_params
     preserve_https=False,
     original_scheme=None
 ):
@@ -2175,10 +2177,20 @@ def normalize_url(
     Returns
     -------
     str | None
-        A clean, canonical URL or None if href is empty/None.
+        A clean, canonical URL or the base URL if href is empty/None.
     """
     if not href:
-        return None
+        # For empty href, return the base URL (matching urljoin behavior)
+        return base_url
+
+    # Validate base URL format
+    parsed_base = urlparse(base_url)
+    if not parsed_base.scheme or not parsed_base.netloc:
+        raise ValueError(f"Invalid base URL format: {base_url}")
+    
+    if parsed_base.scheme.lower() not in ["http", "https"]:
+        # Handle special protocols
+        raise ValueError(f"Invalid base URL format: {base_url}")
 
     # Resolve relative paths first
     full_url = urljoin(base_url, href.strip())
@@ -2199,6 +2211,12 @@ def normalize_url(
 
     # ── netloc ──
     netloc = parsed.netloc.lower()
+    
+    # Remove default ports (80 for http, 443 for https)
+    if ':' in netloc:
+        host, port = netloc.rsplit(':', 1)
+        if (parsed.scheme == 'http' and port == '80') or (parsed.scheme == 'https' and port == '443'):
+            netloc = host
 
     # ── path ──
     # Strip duplicate slashes and trailing "/" (except root)
@@ -2206,7 +2224,17 @@ def normalize_url(
     # The path from urlparse is already properly encoded
     path = parsed.path
     if path.endswith('/') and path != '/':
-        path = path.rstrip('/')
+        # Only strip trailing slash if the original href didn't have a trailing slash
+        # and the base_url didn't end with a slash
+        base_parsed = urlparse(base_url)
+        if not href.strip().endswith('/') and not base_parsed.path.endswith('/'):
+            path = path.rstrip('/')
+    # Add trailing slash for URLs without explicit paths (indicates directory)
+    # But skip this for special protocols that don't use standard URL structure
+    elif not path:
+        special_protocols = {"javascript:", "mailto:", "tel:", "file:", "data:"}
+        if not any(href.strip().lower().startswith(p) for p in special_protocols):
+            path = '/'
 
     # ── query ──
     query = parsed.query
@@ -2221,6 +2249,8 @@ def normalize_url(
             }
             if extra_drop_params:
                 default_tracking |= {p.lower() for p in extra_drop_params}
+            if params_to_remove:
+                default_tracking |= {p.lower() for p in params_to_remove}
             params = [(k, v) for k, v in params if k not in default_tracking]
 
         if sort_query:
@@ -2229,7 +2259,10 @@ def normalize_url(
         query = urlencode(params, doseq=True) if params else ''
 
     # ── fragment ──
-    fragment = parsed.fragment if keep_fragment else ''
+    if remove_fragments is True:
+        fragment = ''
+    else:
+        fragment = parsed.fragment if keep_fragment else ''
 
     # Re-assemble
     normalized = urlunparse((
@@ -2453,9 +2486,19 @@ def is_external_url(url: str, base_domain: str) -> bool:
         if not parsed.netloc:  # Relative URL
             return False
 
-        # Strip 'www.' from both domains for comparison
-        url_domain = parsed.netloc.lower().replace("www.", "")
-        base = base_domain.lower().replace("www.", "")
+        # Don't strip 'www.' from domains for comparison - treat www.example.com and example.com as different
+        url_domain = parsed.netloc.lower()
+        base = base_domain.lower()
+        
+        # Strip user credentials from URL domain
+        if '@' in url_domain:
+            url_domain = url_domain.split('@', 1)[1]
+        
+        # Strip ports from both for comparison (any port should be considered same domain)
+        if ':' in url_domain:
+            url_domain = url_domain.rsplit(':', 1)[0]
+        if ':' in base:
+            base = base.rsplit(':', 1)[0]
 
         # Check if URL domain ends with base domain
         return not url_domain.endswith(base)
