@@ -468,7 +468,7 @@ class BrowserConfig:
             self.channel = ""
             self.chrome_channel = ""
         if proxy:
-            warnings.warn("The 'proxy' parameter is deprecated and will be removed in a future release. Use 'proxy_config' instead.", DeprecationWarning)
+            warnings.warn("The 'proxy' parameter is deprecated and will be removed in a future release. Use 'proxy_config' instead.", UserWarning)
         self.proxy = proxy
         self.proxy_config = proxy_config
         if isinstance(self.proxy_config, dict):
@@ -478,7 +478,6 @@ class BrowserConfig:
         
         if self.proxy and self.proxy_config:
             warnings.warn("Both 'proxy' and 'proxy_config' are provided. 'proxy_config' will take precedence.", UserWarning)
-            print(f"[DEBUG] Both proxy and proxy_config provided. Setting proxy to None.")
             self.proxy = None
         elif self.proxy:
             # Convert proxy string to ProxyConfig if proxy_config is not provided
