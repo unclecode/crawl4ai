@@ -649,16 +649,7 @@ class BrowserManager:
         else:
             from playwright.async_api import async_playwright
 
-        # Initialize playwright with or without stealth
-        if self.config.enable_stealth and not self.use_undetected:
-            # Import stealth only when needed
-            from playwright_stealth import Stealth
-            # Use the recommended stealth wrapper approach
-            self._stealth_instance = Stealth()
-            self._stealth_cm = self._stealth_instance.use_async(async_playwright())
-            self.playwright = await self._stealth_cm.__aenter__()
-        else:
-            self.playwright = await async_playwright().start()
+        self.playwright = await async_playwright().start()
 
         if self.config.cdp_url or self.config.use_managed_browser:
             self.config.use_managed_browser = True
@@ -783,6 +774,7 @@ class BrowserManager:
         14. Set default timeouts for navigation and download if enabled.
         15. Set user agent if provided.
         16. Set browser hints if provided.
+        17. Apply stealth if enabled.
 
         Args:
             context (BrowserContext): The browser context to set up
@@ -838,7 +830,15 @@ class BrowserManager:
                 or crawlerRunConfig.simulate_user
                 or crawlerRunConfig.magic
             ):
-                await context.add_init_script(load_js_script("navigator_overrider"))        
+                await context.add_init_script(load_js_script("navigator_overrider"))
+
+        # Apply stealth headers and script to the context
+        if self.config.enable_stealth and not self.use_undetected and self.config.browser_type == "chromium":
+            from playwright_stealth import stealth
+            prop = stealth.Properties(browser_type=stealth.BrowserType.CHROME)       
+            stealth_script = stealth.combine_scripts(prop, None)
+            await stealth.generate_stealth_headers_async(prop, context)
+            context.add_init_script(stealth_script)    
 
     async def create_browser_context(self, crawlerRunConfig: CrawlerRunConfig = None):
         """
