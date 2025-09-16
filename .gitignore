@@ -1,3 +1,6 @@
+# Scripts folder (private tools)
+.scripts/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -262,3 +265,9 @@ CLAUDE.md
 tests/**/test_site
 tests/**/reports
 tests/**/benchmark_reports
+
+docs/**/data
+.codecat/
+
+docs/apps/linkdin/debug*/
+docs/apps/linkdin/samples/insights/*

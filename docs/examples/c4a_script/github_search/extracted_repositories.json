@@ -1,0 +1,111 @@
+[
+  {
+    "repository_name": "unclecode/crawl4ai",
+    "repository_owner": "unclecode/crawl4ai",
+    "repository_url": "/unclecode/crawl4ai",
+    "description": "\ud83d\ude80\ud83e\udd16Crawl4AI: Open-source LLM Friendly Web Crawler & Scraper. Don't be shy, join here:https://discord.gg/jP8KfhDhyN",
+    "primary_language": "Python",
+    "star_count": "45.1k",
+    "topics": [],
+    "last_updated": "23 hours ago"
+  },
+  {
+    "repository_name": "coleam00/mcp-crawl4ai-rag",
+    "repository_owner": "coleam00/mcp-crawl4ai-rag",
+    "repository_url": "/coleam00/mcp-crawl4ai-rag",
+    "description": "Web Crawling and RAG Capabilities for AI Agents and AI Coding Assistants",
+    "primary_language": "Python",
+    "star_count": "748",
+    "topics": [],
+    "last_updated": "yesterday"
+  },
+  {
+    "repository_name": "pdichone/crawl4ai-rag-system",
+    "repository_owner": "pdichone/crawl4ai-rag-system",
+    "repository_url": "/pdichone/crawl4ai-rag-system",
+    "primary_language": "Python",
+    "star_count": "44",
+    "topics": [],
+    "last_updated": "on 21 Jan"
+  },
+  {
+    "repository_name": "weidwonder/crawl4ai-mcp-server",
+    "repository_owner": "weidwonder/crawl4ai-mcp-server",
+    "repository_url": "/weidwonder/crawl4ai-mcp-server",
+    "description": "\u7528\u4e8e\u63d0\u4f9b\u7ed9\u672c\u5730\u5f00\u53d1\u8005\u7684 LLM\u7684\u9ad8\u6548\u4e92\u8054\u7f51\u641c\u7d22&\u5185\u5bb9\u83b7\u53d6\u7684MCP Server\uff0c \u8282\u7701\u4f60\u7684token",
+    "primary_language": "Python",
+    "star_count": "87",
+    "topics": [],
+    "last_updated": "24 days ago"
+  },
+  {
+    "repository_name": "leonardogrig/crawl4ai-deepseek-example",
+    "repository_owner": "leonardogrig/crawl4ai-deepseek-example",
+    "repository_url": "/leonardogrig/crawl4ai-deepseek-example",
+    "primary_language": "Python",
+    "star_count": "29",
+    "topics": [],
+    "last_updated": "on 18 Jan"
+  },
+  {
+    "repository_name": "laurentvv/crawl4ai-mcp",
+    "repository_owner": "laurentvv/crawl4ai-mcp",
+    "repository_url": "/laurentvv/crawl4ai-mcp",
+    "description": "Web crawling tool that integrates with AI assistants via the MCP",
+    "primary_language": "Python",
+    "star_count": "10",
+    "topics": [
+      {},
+      {},
+      {},
+      {},
+      {}
+    ],
+    "last_updated": "on 16 Mar"
+  },
+  {
+    "repository_name": "kaymen99/ai-web-scraper",
+    "repository_owner": "kaymen99/ai-web-scraper",
+    "repository_url": "/kaymen99/ai-web-scraper",
+    "description": "AI web scraper built withCrawl4AIfor extracting structured leads data from websites.",
+    "primary_language": "Python",
+    "star_count": "30",
+    "topics": [
+      {},
+      {},
+      {},
+      {},
+      {}
+    ],
+    "last_updated": "on 13 Feb"
+  },
+  {
+    "repository_name": "atakkant/ai_web_crawler",
+    "repository_owner": "atakkant/ai_web_crawler",
+    "repository_url": "/atakkant/ai_web_crawler",
+    "description": "crawl4ai, DeepSeek, Groq",
+    "primary_language": "Python",
+    "star_count": "9",
+    "topics": [],
+    "last_updated": "on 19 Feb"
+  },
+  {
+    "repository_name": "Croups/auto-scraper-with-llms",
+    "repository_owner": "Croups/auto-scraper-with-llms",
+    "repository_url": "/Croups/auto-scraper-with-llms",
+    "description": "Web scraping AI that leverages thecrawl4ailibrary to extract structured data from web pages using various large language models (LLMs).",
+    "primary_language": "Python",
+    "star_count": "49",
+    "topics": [],
+    "last_updated": "on 8 Apr"
+  },
+  {
+    "repository_name": "leonardogrig/crawl4ai_llm_examples",
+    "repository_owner": "leonardogrig/crawl4ai_llm_examples",
+    "repository_url": "/leonardogrig/crawl4ai_llm_examples",
+    "primary_language": "Python",
+    "star_count": "8",
+    "topics": [],
+    "last_updated": "on 29 Jan"
+  }
+]

@@ -29,6 +29,7 @@ class BrowserConfig:
         text_mode=False,
         light_mode=False,
         extra_args=None,
+        enable_stealth=False,
         # ... other advanced parameters omitted here
     ):
         ...
@@ -83,6 +84,11 @@ class BrowserConfig:
 10. **`extra_args`**:  
     - Additional flags for the underlying browser.  
     - E.g. `["--disable-extensions"]`.
+
+11. **`enable_stealth`**:  
+    - If `True`, enables stealth mode using playwright-stealth.  
+    - Modifies browser fingerprints to avoid basic bot detection.  
+    - Default is `False`. Recommended for sites with bot protection.
 
 ### Helper Methods
 
@@ -209,7 +215,13 @@ class CrawlerRunConfig:
     - The maximum number of concurrent crawl sessions.  
     - Helps prevent overwhelming the system.
 
-14. **`display_mode`**:  
+14. **`url_matcher`** & **`match_mode`**:  
+    - Enable URL-specific configurations when used with `arun_many()`.
+    - Set `url_matcher` to patterns (glob, function, or list) to match specific URLs.
+    - Use `match_mode` (OR/AND) to control how multiple patterns combine.
+    - See [URL-Specific Configurations](../api/arun_many.md#url-specific-configurations) for examples.
+
+15. **`display_mode`**:  
     - The display mode for progress information (`DETAILED`, `BRIEF`, etc.).  
     - Affects how much information is printed during the crawl.
 
@@ -252,7 +264,7 @@ The `clone()` method:
 ### Key fields to note
 
 1. **`provider`**:  
-- Which LLM provoder to use. 
+- Which LLM provider to use. 
 - Possible values are `"ollama/llama3","groq/llama3-70b-8192","groq/llama3-8b-8192", "openai/gpt-4o-mini" ,"openai/gpt-4o","openai/o1-mini","openai/o1-preview","openai/o3-mini","openai/o3-mini-high","anthropic/claude-3-haiku-20240307","anthropic/claude-3-opus-20240229","anthropic/claude-3-sonnet-20240229","anthropic/claude-3-5-sonnet-20240620","gemini/gemini-pro","gemini/gemini-1.5-pro","gemini/gemini-2.0-flash","gemini/gemini-2.0-flash-exp","gemini/gemini-2.0-flash-lite-preview-02-05","deepseek/deepseek-chat"`<br/>*(default: `"openai/gpt-4o-mini"`)*
 
 2. **`api_token`**:  
@@ -273,8 +285,8 @@ In a typical scenario, you define **one** `BrowserConfig` for your crawler sessi
 
 ```python
 import asyncio
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, LLMConfig
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, LLMConfig, LLMContentFilter, DefaultMarkdownGenerator
+from crawl4ai import JsonCssExtractionStrategy
 
 async def main():
     # 1) Browser config: headless, bigger viewport, no proxy
@@ -298,7 +310,7 @@ async def main():
     # 3) Example LLM content filtering
 
     gemini_config = LLMConfig(
-        provider="gemini/gemini-1.5-pro" 
+        provider="gemini/gemini-1.5-pro", 
         api_token = "env:GEMINI_API_TOKEN"
     )
 
@@ -322,8 +334,9 @@ async def main():
     )
 
     md_generator = DefaultMarkdownGenerator(
-    content_filter=filter,
-    options={"ignore_links": True}
+        content_filter=filter,
+        options={"ignore_links": True}
+    )
 
     # 4) Crawler run config: skip cache, use extraction
     run_conf = CrawlerRunConfig(

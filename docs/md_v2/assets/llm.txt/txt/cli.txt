@@ -1,0 +1,295 @@
+## CLI & Identity-Based Browsing
+
+Command-line interface for web crawling with persistent browser profiles, authentication, and identity management.
+
+### Basic CLI Usage
+
+```bash
+# Simple crawling
+crwl https://example.com
+
+# Get markdown output
+crwl https://example.com -o markdown
+
+# JSON output with cache bypass
+crwl https://example.com -o json --bypass-cache
+
+# Verbose mode with specific browser settings
+crwl https://example.com -b "headless=false,viewport_width=1280" -v
+```
+
+### Profile Management Commands
+
+```bash
+# Launch interactive profile manager
+crwl profiles
+
+# Create, list, and manage browser profiles
+# This opens a menu where you can:
+# 1. List existing profiles
+# 2. Create new profile (opens browser for setup)
+# 3. Delete profiles
+# 4. Use profile to crawl a website
+
+# Use a specific profile for crawling
+crwl https://example.com -p my-profile-name
+
+# Example workflow for authenticated sites:
+# 1. Create profile and log in
+crwl profiles  # Select "Create new profile"
+# 2. Use profile for crawling authenticated content
+crwl https://site-requiring-login.com/dashboard -p my-profile-name
+```
+
+### CDP Browser Management
+
+```bash
+# Launch browser with CDP debugging (default port 9222)
+crwl cdp
+
+# Use specific profile and custom port
+crwl cdp -p my-profile -P 9223
+
+# Launch headless browser with CDP
+crwl cdp --headless
+
+# Launch in incognito mode (ignores profile)
+crwl cdp --incognito
+
+# Use custom user data directory
+crwl cdp --user-data-dir ~/my-browser-data --port 9224
+```
+
+### Builtin Browser Management
+
+```bash
+# Start persistent browser instance
+crwl browser start
+
+# Check browser status
+crwl browser status
+
+# Open visible window to see the browser
+crwl browser view --url https://example.com
+
+# Stop the browser
+crwl browser stop
+
+# Restart with different options
+crwl browser restart --browser-type chromium --port 9223 --no-headless
+
+# Use builtin browser in crawling
+crwl https://example.com -b "browser_mode=builtin"
+```
+
+### Authentication Workflow Examples
+
+```bash
+# Complete workflow for LinkedIn scraping
+# 1. Create authenticated profile
+crwl profiles
+# Select "Create new profile" → login to LinkedIn in browser → press 'q' to save
+
+# 2. Use profile for crawling
+crwl https://linkedin.com/in/someone -p linkedin-profile -o markdown
+
+# 3. Extract structured data with authentication
+crwl https://linkedin.com/search/results/people/ \
+    -p linkedin-profile \
+    -j "Extract people profiles with names, titles, and companies" \
+    -b "headless=false"
+
+# GitHub authenticated crawling
+crwl profiles  # Create github-profile
+crwl https://github.com/settings/profile -p github-profile
+
+# Twitter/X authenticated access
+crwl profiles  # Create twitter-profile  
+crwl https://twitter.com/home -p twitter-profile -o markdown
+```
+
+### Advanced CLI Configuration
+
+```bash
+# Complex crawling with multiple configs
+crwl https://example.com \
+    -B browser.yml \
+    -C crawler.yml \
+    -e extract_llm.yml \
+    -s llm_schema.json \
+    -p my-auth-profile \
+    -o json \
+    -v
+
+# Quick LLM extraction with authentication
+crwl https://private-site.com/dashboard \
+    -p auth-profile \
+    -j "Extract user dashboard data including metrics and notifications" \
+    -b "headless=true,viewport_width=1920"
+
+# Content filtering with authentication
+crwl https://members-only-site.com \
+    -p member-profile \
+    -f filter_bm25.yml \
+    -c "css_selector=.member-content,scan_full_page=true" \
+    -o markdown-fit
+```
+
+### Configuration Files for Identity Browsing
+
+```yaml
+# browser_auth.yml
+headless: false
+use_managed_browser: true
+user_data_dir: "/path/to/profile"
+viewport_width: 1280
+viewport_height: 720
+simulate_user: true
+override_navigator: true
+
+# crawler_auth.yml  
+magic: true
+remove_overlay_elements: true
+simulate_user: true
+wait_for: "css:.authenticated-content"
+page_timeout: 60000
+delay_before_return_html: 2
+scan_full_page: true
+```
+
+### Global Configuration Management
+
+```bash
+# List all configuration settings
+crwl config list
+
+# Set default LLM provider
+crwl config set DEFAULT_LLM_PROVIDER "anthropic/claude-3-sonnet"
+crwl config set DEFAULT_LLM_PROVIDER_TOKEN "your-api-token"
+
+# Set browser defaults
+crwl config set BROWSER_HEADLESS false  # Always show browser
+crwl config set USER_AGENT_MODE random  # Random user agents
+
+# Enable verbose mode globally
+crwl config set VERBOSE true
+```
+
+### Q&A with Authenticated Content
+
+```bash
+# Ask questions about authenticated content
+crwl https://private-dashboard.com -p dashboard-profile \
+    -q "What are the key metrics shown in my dashboard?"
+
+# Multiple questions workflow
+crwl https://company-intranet.com -p work-profile -o markdown  # View content
+crwl https://company-intranet.com -p work-profile \
+    -q "Summarize this week's announcements"
+crwl https://company-intranet.com -p work-profile \
+    -q "What are the upcoming deadlines?"
+```
+
+### Profile Creation Programmatically
+
+```python
+# Create profiles via Python API
+import asyncio
+from crawl4ai import BrowserProfiler
+
+async def create_auth_profile():
+    profiler = BrowserProfiler()
+    
+    # Create profile interactively (opens browser)
+    profile_path = await profiler.create_profile("linkedin-auth")
+    print(f"Profile created at: {profile_path}")
+    
+    # List all profiles
+    profiles = profiler.list_profiles()
+    for profile in profiles:
+        print(f"Profile: {profile['name']} at {profile['path']}")
+    
+    # Use profile for crawling
+    from crawl4ai import AsyncWebCrawler, BrowserConfig
+    
+    browser_config = BrowserConfig(
+        headless=True,
+        use_managed_browser=True,
+        user_data_dir=profile_path
+    )
+    
+    async with AsyncWebCrawler(config=browser_config) as crawler:
+        result = await crawler.arun("https://linkedin.com/feed")
+        return result
+
+# asyncio.run(create_auth_profile())
+```
+
+### Identity Browsing Best Practices
+
+```bash
+# 1. Create specific profiles for different sites
+crwl profiles  # Create "linkedin-work"
+crwl profiles  # Create "github-personal" 
+crwl profiles  # Create "company-intranet"
+
+# 2. Use descriptive profile names
+crwl https://site1.com -p site1-admin-account
+crwl https://site2.com -p site2-user-account
+
+# 3. Combine with appropriate browser settings
+crwl https://secure-site.com \
+    -p secure-profile \
+    -b "headless=false,simulate_user=true,magic=true" \
+    -c "wait_for=.logged-in-indicator,page_timeout=30000"
+
+# 4. Test profile before automated crawling
+crwl cdp -p test-profile  # Manually verify login status
+crwl https://test-url.com -p test-profile -v  # Verbose test crawl
+```
+
+### Troubleshooting Authentication Issues
+
+```bash
+# Debug authentication problems
+crwl https://auth-site.com -p auth-profile \
+    -b "headless=false,verbose=true" \
+    -c "verbose=true,page_timeout=60000" \
+    -v
+
+# Check profile status
+crwl profiles  # List profiles and check creation dates
+
+# Recreate problematic profiles
+crwl profiles  # Delete old profile, create new one
+
+# Test with visible browser
+crwl https://problem-site.com -p profile-name \
+    -b "headless=false" \
+    -c "delay_before_return_html=5"
+```
+
+### Common Use Cases
+
+```bash
+# Social media monitoring (after authentication)
+crwl https://twitter.com/home -p twitter-monitor \
+    -j "Extract latest tweets with sentiment and engagement metrics"
+
+# E-commerce competitor analysis (with account access)
+crwl https://competitor-site.com/products -p competitor-account \
+    -j "Extract product prices, availability, and descriptions"
+
+# Company dashboard monitoring
+crwl https://company-dashboard.com -p work-profile \
+    -c "css_selector=.dashboard-content" \
+    -q "What alerts or notifications need attention?"
+
+# Research data collection (authenticated access)
+crwl https://research-platform.com/data -p research-profile \
+    -e extract_research.yml \
+    -s research_schema.json \
+    -o json
+```
+
+**📖 Learn more:** [Identity-Based Crawling Documentation](https://docs.crawl4ai.com/advanced/identity-based-crawling/), [Browser Profile Management](https://docs.crawl4ai.com/advanced/session-management/), [CLI Examples](https://docs.crawl4ai.com/core/cli/)

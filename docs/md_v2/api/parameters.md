@@ -169,7 +169,111 @@ Use these for link-level content filtering (often to keep crawls “internal” 
 
 ---
 
-## 2.2 Helper Methods
+
+### H) **Virtual Scroll Configuration**
+
+| **Parameter**                | **Type / Default**           | **What It Does**                                                                                                                    |
+|------------------------------|------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
+| **`virtual_scroll_config`**  | `VirtualScrollConfig or dict` (None) | Configuration for handling virtualized scrolling on sites like Twitter/Instagram where content is replaced rather than appended. |
+
+When sites use virtual scrolling (content replaced as you scroll), use `VirtualScrollConfig`:
+
+```python
+from crawl4ai import VirtualScrollConfig
+
+virtual_config = VirtualScrollConfig(
+    container_selector="#timeline",    # CSS selector for scrollable container
+    scroll_count=30,                   # Number of times to scroll
+    scroll_by="container_height",      # How much to scroll: "container_height", "page_height", or pixels (e.g. 500)
+    wait_after_scroll=0.5             # Seconds to wait after each scroll for content to load
+)
+
+config = CrawlerRunConfig(
+    virtual_scroll_config=virtual_config
+)
+```
+
+**VirtualScrollConfig Parameters:**
+
+| **Parameter**          | **Type / Default**        | **What It Does**                                                                          |
+|------------------------|---------------------------|-------------------------------------------------------------------------------------------|
+| **`container_selector`** | `str` (required)        | CSS selector for the scrollable container (e.g., `"#feed"`, `".timeline"`)              |
+| **`scroll_count`**     | `int` (10)               | Maximum number of scrolls to perform                                                      |
+| **`scroll_by`**        | `str or int` ("container_height") | Scroll amount: `"container_height"`, `"page_height"`, or pixels (e.g., `500`)   |
+| **`wait_after_scroll`** | `float` (0.5)           | Time in seconds to wait after each scroll for new content to load                        |
+
+**When to use Virtual Scroll vs scan_full_page:**
+- Use `virtual_scroll_config` when content is **replaced** during scroll (Twitter, Instagram)
+- Use `scan_full_page` when content is **appended** during scroll (traditional infinite scroll)
+
+See [Virtual Scroll documentation](../../advanced/virtual-scroll.md) for detailed examples.
+
+---
+
+### I) **URL Matching Configuration**
+
+| **Parameter**          | **Type / Default**           | **What It Does**                                                                                                                    |
+|------------------------|------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
+| **`url_matcher`**      | `UrlMatcher` (None)          | Pattern(s) to match URLs against. Can be: string (glob), function, or list of mixed types. **None means match ALL URLs**         |
+| **`match_mode`**       | `MatchMode` (MatchMode.OR)   | How to combine multiple matchers in a list: `MatchMode.OR` (any match) or `MatchMode.AND` (all must match)                       |
+
+The `url_matcher` parameter enables URL-specific configurations when used with `arun_many()`:
+
+```python
+from crawl4ai import CrawlerRunConfig, MatchMode
+from crawl4ai.processors.pdf import PDFContentScrapingStrategy
+from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+
+# Simple string pattern (glob-style)
+pdf_config = CrawlerRunConfig(
+    url_matcher="*.pdf",
+    scraping_strategy=PDFContentScrapingStrategy()
+)
+
+# Multiple patterns with OR logic (default)
+blog_config = CrawlerRunConfig(
+    url_matcher=["*/blog/*", "*/article/*", "*/news/*"],
+    match_mode=MatchMode.OR  # Any pattern matches
+)
+
+# Function matcher
+api_config = CrawlerRunConfig(
+    url_matcher=lambda url: 'api' in url or url.endswith('.json'),
+    # Other settings like extraction_strategy
+)
+
+# Mixed: String + Function with AND logic
+complex_config = CrawlerRunConfig(
+    url_matcher=[
+        lambda url: url.startswith('https://'),  # Must be HTTPS
+        "*.org/*",                               # Must be .org domain
+        lambda url: 'docs' in url                # Must contain 'docs'
+    ],
+    match_mode=MatchMode.AND  # ALL conditions must match
+)
+
+# Combined patterns and functions with AND logic
+secure_docs = CrawlerRunConfig(
+    url_matcher=["https://*", lambda url: '.doc' in url],
+    match_mode=MatchMode.AND  # Must be HTTPS AND contain .doc
+)
+
+# Default config - matches ALL URLs
+default_config = CrawlerRunConfig()  # No url_matcher = matches everything
+```
+
+**UrlMatcher Types:**
+- **None (default)**: When `url_matcher` is None or not set, the config matches ALL URLs
+- **String patterns**: Glob-style patterns like `"*.pdf"`, `"*/api/*"`, `"https://*.example.com/*"`
+- **Functions**: `lambda url: bool` - Custom logic for complex matching
+- **Lists**: Mix strings and functions, combined with `MatchMode.OR` or `MatchMode.AND`
+
+**Important Behavior:**
+- When passing a list of configs to `arun_many()`, URLs are matched against each config's `url_matcher` in order. First match wins!
+- If no config matches a URL and there's no default config (one without `url_matcher`), the URL will fail with "No matching configuration found"
+- Always include a default config as the last item if you want to handle all URLs
+
+---## 2.2 Helper Methods
 
 Both `BrowserConfig` and `CrawlerRunConfig` provide a `clone()` method to create modified copies:
 
@@ -259,7 +363,7 @@ LLMConfig is useful to pass LLM provider config to strategies and functions that
 ## 3.1 Parameters
 | **Parameter**         | **Type / Default**                     | **What It Does**                                                                                                                     |
 |-----------------------|----------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
-| **`provider`**    | `"ollama/llama3","groq/llama3-70b-8192","groq/llama3-8b-8192", "openai/gpt-4o-mini" ,"openai/gpt-4o","openai/o1-mini","openai/o1-preview","openai/o3-mini","openai/o3-mini-high","anthropic/claude-3-haiku-20240307","anthropic/claude-3-opus-20240229","anthropic/claude-3-sonnet-20240229","anthropic/claude-3-5-sonnet-20240620","gemini/gemini-pro","gemini/gemini-1.5-pro","gemini/gemini-2.0-flash","gemini/gemini-2.0-flash-exp","gemini/gemini-2.0-flash-lite-preview-02-05","deepseek/deepseek-chat"`<br/>*(default: `"openai/gpt-4o-mini"`)* | Which LLM provoder to use. 
+| **`provider`**    | `"ollama/llama3","groq/llama3-70b-8192","groq/llama3-8b-8192", "openai/gpt-4o-mini" ,"openai/gpt-4o","openai/o1-mini","openai/o1-preview","openai/o3-mini","openai/o3-mini-high","anthropic/claude-3-haiku-20240307","anthropic/claude-3-opus-20240229","anthropic/claude-3-sonnet-20240229","anthropic/claude-3-5-sonnet-20240620","gemini/gemini-pro","gemini/gemini-1.5-pro","gemini/gemini-2.0-flash","gemini/gemini-2.0-flash-exp","gemini/gemini-2.0-flash-lite-preview-02-05","deepseek/deepseek-chat"`<br/>*(default: `"openai/gpt-4o-mini"`)* | Which LLM provider to use. 
 | **`api_token`**         |1.Optional. When not provided explicitly, api_token will be read from environment variables based on provider. For example: If a gemini model is passed as provider then,`"GEMINI_API_KEY"` will be read from environment variables  <br/> 2. API token of LLM provider <br/> eg: `api_token = "gsk_1ClHGGJ7Lpn4WGybR7vNWGdyb3FY7zXEw3SCiy0BAVM9lL8CQv"` <br/> 3. Environment variable - use with prefix "env:" <br/> eg:`api_token = "env: GROQ_API_KEY"`              | API token to use for the given provider 
 | **`base_url`**         |Optional. Custom API endpoint | If your provider has a custom endpoint
 

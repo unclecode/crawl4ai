@@ -102,7 +102,7 @@ import json
 from pydantic import BaseModel, Field
 from typing import List
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, LLMConfig
-from crawl4ai.extraction_strategy import LLMExtractionStrategy
+from crawl4ai import LLMExtractionStrategy
 
 class Product(BaseModel):
     name: str
@@ -218,8 +218,8 @@ import json
 import asyncio
 from typing import List
 from pydantic import BaseModel, Field
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
-from crawl4ai.extraction_strategy import LLMExtractionStrategy
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, LLMConfig
+from crawl4ai import LLMExtractionStrategy
 
 class Entity(BaseModel):
     name: str
@@ -238,8 +238,8 @@ class KnowledgeGraph(BaseModel):
 async def main():
     # LLM extraction strategy
     llm_strat = LLMExtractionStrategy(
-        llmConfig = LlmConfig(provider="openai/gpt-4", api_token=os.getenv('OPENAI_API_KEY')),
-        schema=KnowledgeGraph.schema_json(),
+        llmConfig = LLMConfig(provider="openai/gpt-4", api_token=os.getenv('OPENAI_API_KEY')),
+        schema=KnowledgeGraph.model_json_schema(),
         extraction_type="schema",
         instruction="Extract entities and relationships from the content. Return valid JSON.",
         chunk_token_threshold=1400,
@@ -257,6 +257,10 @@ async def main():
         # Example page
         url = "https://www.nbcnews.com/business"
         result = await crawler.arun(url=url, config=crawl_config)
+
+        print("--- LLM RAW RESPONSE ---")
+        print(result.extracted_content)
+        print("--- END LLM RAW RESPONSE ---")
 
         if result.success:
             with open("kb_result.json", "w", encoding="utf-8") as f:

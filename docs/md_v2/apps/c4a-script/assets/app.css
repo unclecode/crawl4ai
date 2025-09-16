@@ -1,0 +1,906 @@
+/* ================================================================
+   C4A-Script Tutorial - App Layout CSS
+   Terminal theme with Dank Mono font
+   ================================================================ */
+
+/* CSS Variables */
+:root {
+    --bg-primary: #070708;
+    --bg-secondary: #0e0e10;
+    --bg-tertiary: #1a1a1b;
+    --border-color: #2a2a2c;
+    --border-hover: #3a3a3c;
+    --text-primary: #e0e0e0;
+    --text-secondary: #8b8b8d;
+    --text-muted: #606065;
+    --primary-color: #0fbbaa;
+    --primary-hover: #0da89a;
+    --primary-dim: #0a8577;
+    --error-color: #ff5555;
+    --warning-color: #ffb86c;
+    --success-color: #50fa7b;
+    --info-color: #8be9fd;
+    --code-bg: #1e1e20;
+    --modal-overlay: rgba(0, 0, 0, 0.8);
+}
+
+/* Base Reset */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* Fonts */
+@font-face {
+    font-family: 'Dank Mono';
+    src: url('DankMono-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Dank Mono';
+    src: url('DankMono-Bold.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Dank Mono';
+    src: url('DankMono-Italic.woff2') format('woff2');
+    font-weight: 400;
+    font-style: italic;
+}
+
+/* Body & App Container */
+body {
+    font-family: 'Dank Mono', 'Monaco', 'Consolas', monospace;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 14px;
+    line-height: 1.6;
+    overflow: hidden;
+}
+
+.app-container {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+}
+
+/* Panels */
+.editor-panel,
+.playground-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+.editor-panel {
+    flex: 1;
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border-color);
+    min-width: 400px;
+}
+
+.playground-panel {
+    flex: 1;
+    background: var(--bg-primary);
+    min-width: 400px;
+}
+
+/* Panel Headers */
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.panel-header h2 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--primary-color);
+    margin: 0;
+}
+
+.header-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* Action Buttons */
+.action-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.action-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-color: var(--border-hover);
+}
+
+.action-btn.primary {
+    background: var(--primary-color);
+    color: var(--bg-primary);
+    border-color: var(--primary-color);
+}
+
+.action-btn.primary:hover {
+    background: var(--primary-hover);
+    border-color: var(--primary-hover);
+}
+
+.action-btn .icon {
+    font-size: 16px;
+}
+
+/* Editor Wrapper */
+.editor-wrapper {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    position: relative;
+    z-index: 1; /* Ensure it's above any potential overlays */
+}
+
+.editor-wrapper .CodeMirror {
+    flex: 1;
+    height: 100%;
+    font-family: 'Dank Mono', monospace;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+/* Ensure CodeMirror is interactive */
+.CodeMirror {
+    background: var(--bg-primary) !important;
+}
+
+.CodeMirror-scroll {
+    overflow: auto !important;
+}
+
+/* Make cursor more visible */
+.CodeMirror-cursor {
+    border-left: 2px solid var(--primary-color) !important;
+    border-left-width: 2px !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* Ensure cursor is visible when focused */
+.CodeMirror-focused .CodeMirror-cursor {
+    visibility: visible !important;
+}
+
+/* Fix for CodeMirror in flex container */
+.CodeMirror-sizer {
+    min-height: auto !important;
+}
+
+/* Remove aggressive pointer-events override */
+.CodeMirror-code {
+    cursor: text;
+}
+
+.editor-wrapper textarea {
+    display: none;
+}
+
+/* Output Section (Bottom of Editor) */
+.output-section {
+    height: 250px;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+}
+
+/* Tabs */
+.tabs {
+    display: flex;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.tab {
+    padding: 8px 20px;
+    background: transparent;
+    color: var(--text-secondary);
+    border: none;
+    border-bottom: 2px solid transparent;
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.tab:hover {
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+}
+
+.tab.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+}
+
+/* Tab Content */
+.tab-content {
+    flex: 1;
+    overflow: hidden;
+}
+
+.tab-pane {
+    display: none;
+    height: 100%;
+    overflow-y: auto;
+}
+
+.tab-pane.active {
+    display: block;
+}
+
+/* Console */
+.console {
+    padding: 12px;
+    background: var(--bg-primary);
+    font-size: 13px;
+    min-height: 100%;
+}
+
+.console-line {
+    margin-bottom: 8px;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.console-prompt {
+    color: var(--primary-color);
+    flex-shrink: 0;
+}
+
+.console-text {
+    color: var(--text-primary);
+}
+
+.console-error {
+    color: var(--error-color);
+}
+
+.console-warning {
+    color: var(--warning-color);
+}
+
+.console-success {
+    color: var(--success-color);
+}
+
+/* JavaScript Output */
+.js-output-header {
+    display: flex;
+    justify-content: flex-end;
+    padding: 8px 12px;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.js-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.mini-btn {
+    padding: 4px 8px;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.mini-btn:hover {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.js-output {
+    padding: 12px;
+    background: var(--code-bg);
+    color: var(--text-primary);
+    font-family: 'Dank Mono', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    margin: 0;
+    min-height: calc(100% - 44px);
+}
+
+/* Execution Progress */
+.execution-progress {
+    padding: 12px;
+    background: var(--bg-primary);
+}
+
+.progress-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 13px;
+}
+
+.progress-icon {
+    color: var(--text-muted);
+}
+
+.progress-item.active .progress-icon {
+    color: var(--info-color);
+    animation: pulse 1s infinite;
+}
+
+.progress-item.completed .progress-icon {
+    color: var(--success-color);
+}
+
+.progress-item.error .progress-icon {
+    color: var(--error-color);
+}
+
+/* Playground */
+.playground-wrapper {
+    flex: 1;
+    overflow: hidden;
+}
+
+#playground-frame {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: var(--bg-secondary);
+}
+
+/* Tutorial Intro Modal */
+.tutorial-intro-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--modal-overlay);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    transition: opacity 0.3s;
+}
+
+.tutorial-intro-modal.hidden {
+    display: none;
+}
+
+.intro-content {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 32px;
+    max-width: 500px;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+}
+
+.intro-content h2 {
+    color: var(--primary-color);
+    margin-bottom: 16px;
+    font-size: 24px;
+}
+
+.intro-content p {
+    color: var(--text-primary);
+    margin-bottom: 16px;
+    line-height: 1.6;
+}
+
+.intro-content ul {
+    list-style: none;
+    margin-bottom: 24px;
+}
+
+.intro-content li {
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    padding-left: 20px;
+    position: relative;
+}
+
+.intro-content li:before {
+    content: "▸";
+    position: absolute;
+    left: 0;
+    color: var(--primary-color);
+}
+
+.intro-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+}
+
+.intro-btn {
+    padding: 10px 24px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.intro-btn:hover {
+    background: var(--bg-primary);
+    border-color: var(--border-hover);
+}
+
+.intro-btn.primary {
+    background: var(--primary-color);
+    color: var(--bg-primary);
+    border-color: var(--primary-color);
+}
+
+.intro-btn.primary:hover {
+    background: var(--primary-hover);
+    border-color: var(--primary-hover);
+}
+
+/* Tutorial Navigation Bar */
+.tutorial-nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--primary-color);
+    z-index: 1000;
+    transition: transform 0.3s;
+}
+
+.tutorial-nav.hidden {
+    transform: translateY(-100%);
+}
+
+.tutorial-nav-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px;
+}
+
+.tutorial-left {
+    flex: 1;
+}
+
+.tutorial-step-title {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 8px;
+}
+
+.tutorial-step-title span:first-child {
+    color: var(--text-secondary);
+    font-size: 12px;
+    text-transform: uppercase;
+}
+
+.tutorial-step-title span:last-child {
+    color: var(--primary-color);
+    font-weight: 600;
+    font-size: 16px;
+}
+
+.tutorial-description {
+    color: var(--text-primary);
+    margin: 0;
+    font-size: 14px;
+    max-width: 600px;
+}
+
+.tutorial-right {
+    display: flex;
+    align-items: center;
+}
+
+.tutorial-progress-bar {
+    height: 3px;
+    background: var(--bg-secondary);
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+}
+
+.tutorial-progress-bar .progress-fill {
+    height: 100%;
+    background: var(--primary-color);
+    transition: width 0.3s;
+}
+
+/* Adjust app container when tutorial is active */
+.app-container.tutorial-active {
+    padding-top: 80px;
+}
+
+.tutorial-controls {
+    display: flex;
+    gap: 12px;
+}
+
+.nav-btn {
+    padding: 8px 16px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.nav-btn:hover:not(:disabled) {
+    background: var(--bg-primary);
+    border-color: var(--border-hover);
+}
+
+.nav-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.nav-btn.primary {
+    background: var(--primary-color);
+    color: var(--bg-primary);
+    border-color: var(--primary-color);
+}
+
+.nav-btn.primary:hover {
+    background: var(--primary-hover);
+    border-color: var(--primary-hover);
+}
+
+.exit-btn {
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    color: var(--text-secondary);
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s;
+    margin-left: 16px;
+}
+
+.exit-btn:hover {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+/* Fullscreen Mode */
+.playground-panel.fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1500;
+}
+
+/* Animations */
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--border-hover);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .app-container {
+        flex-direction: column;
+    }
+    
+    .editor-panel,
+    .playground-panel {
+        min-width: auto;
+        width: 100%;
+    }
+    
+    .editor-panel {
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .output-section {
+        height: 200px;
+    }
+}
+
+/* ================================================================
+   Recording Timeline Styles
+   ================================================================ */
+
+.action-btn.record {
+    background: var(--bg-tertiary);
+    border-color: var(--error-color);
+}
+
+.action-btn.record:hover {
+    background: var(--error-color);
+    border-color: var(--error-color);
+}
+
+.action-btn.record.recording {
+    background: var(--error-color);
+    animation: pulse 1.5s infinite;
+}
+
+.action-btn.record.recording .icon {
+    animation: blink 1s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.8; }
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+.editor-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+#editor-view,
+#timeline-view {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.recording-timeline {
+    background: var(--bg-secondary);
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.timeline-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
+}
+
+.timeline-header h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.timeline-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.timeline-events {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+}
+
+.timeline-event {
+    display: flex;
+    align-items: center;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.timeline-event:hover {
+    border-color: var(--border-hover);
+    background: var(--code-bg);
+}
+
+.timeline-event.selected {
+    border-color: var(--primary-color);
+    background: rgba(15, 187, 170, 0.1);
+}
+
+.event-checkbox {
+    margin-right: 10px;
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.event-time {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-right: 10px;
+    font-family: 'Dank Mono', monospace;
+    min-width: 45px;
+}
+
+.event-command {
+    flex: 1;
+    font-family: 'Dank Mono', monospace;
+    font-size: 13px;
+    color: var(--text-primary);
+}
+
+.event-command .cmd-name {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+.event-command .cmd-selector {
+    color: var(--info-color);
+}
+
+.event-command .cmd-value {
+    color: var(--warning-color);
+}
+
+.event-command .cmd-detail {
+    color: var(--text-secondary);
+    font-size: 11px;
+    margin-left: 5px;
+}
+
+.event-edit {
+    margin-left: 10px;
+    padding: 2px 8px;
+    font-size: 11px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.2s;
+}
+
+.event-edit:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+/* Event Editor Modal */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--modal-overlay);
+    z-index: 999;
+}
+
+.event-editor-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+    z-index: 1000;
+    min-width: 400px;
+}
+
+.event-editor-modal h4 {
+    margin: 0 0 15px 0;
+    color: var(--text-primary);
+    font-family: 'Dank Mono', monospace;
+}
+
+.editor-field {
+    margin-bottom: 15px;
+}
+
+.editor-field label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-family: 'Dank Mono', monospace;
+}
+
+.editor-field input,
+.editor-field select {
+    width: 100%;
+    padding: 8px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: 4px;
+    font-family: 'Dank Mono', monospace;
+    font-size: 13px;
+}
+
+.editor-field input:focus,
+.editor-field select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.editor-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+/* Blockly Button */
+#blockly-btn .icon {
+    font-size: 16px;
+}
+
+/* Hidden State */
+.hidden {
+    display: none !important;
+}

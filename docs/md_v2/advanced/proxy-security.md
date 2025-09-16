@@ -25,44 +25,70 @@ Use an authenticated proxy with `BrowserConfig`:
 ```python
 from crawl4ai.async_configs import BrowserConfig
 
-proxy_config = {
-    "server": "http://proxy.example.com:8080",
-    "username": "user",
-    "password": "pass"
-}
-
-browser_config = BrowserConfig(proxy_config=proxy_config)
+browser_config = BrowserConfig(proxy="http://[username]:[password]@[host]:[port]")
 async with AsyncWebCrawler(config=browser_config) as crawler:
     result = await crawler.arun(url="https://example.com")
 ```
 
-Here's the corrected documentation:
 
 ## Rotating Proxies 
 
 Example using a proxy rotation service dynamically:
 
 ```python
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
-
-async def get_next_proxy():
-    # Your proxy rotation logic here
-    return {"server": "http://next.proxy.com:8080"}
-
+import re
+from crawl4ai import (
+    AsyncWebCrawler,
+    BrowserConfig,
+    CrawlerRunConfig,
+    CacheMode,
+    RoundRobinProxyStrategy,
+)
+import asyncio
+from crawl4ai import ProxyConfig
 async def main():
-    browser_config = BrowserConfig()
-    run_config = CrawlerRunConfig()
-    
-    async with AsyncWebCrawler(config=browser_config) as crawler:
-        # For each URL, create a new run config with different proxy
-        for url in urls:
-            proxy = await get_next_proxy()
-            # Clone the config and update proxy - this creates a new browser context
-            current_config = run_config.clone(proxy_config=proxy)
-            result = await crawler.arun(url=url, config=current_config)
+    # Load proxies and create rotation strategy
+    proxies = ProxyConfig.from_env()
+    #eg: export PROXIES="ip1:port1:username1:password1,ip2:port2:username2:password2"
+    if not proxies:
+        print("No proxies found in environment. Set PROXIES env variable!")
+        return
 
-if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
+    proxy_strategy = RoundRobinProxyStrategy(proxies)
+
+    # Create configs
+    browser_config = BrowserConfig(headless=True, verbose=False)
+    run_config = CrawlerRunConfig(
+        cache_mode=CacheMode.BYPASS,
+        proxy_rotation_strategy=proxy_strategy
+    )
+
+    async with AsyncWebCrawler(config=browser_config) as crawler:
+        urls = ["https://httpbin.org/ip"] * (len(proxies) * 2)  # Test each proxy twice
+
+        print("\n📈 Initializing crawler with proxy rotation...")
+        async with AsyncWebCrawler(config=browser_config) as crawler:
+            print("\n🚀 Starting batch crawl with proxy rotation...")
+            results = await crawler.arun_many(
+                urls=urls,
+                config=run_config
+            )
+            for result in results:
+                if result.success:
+                    ip_match = re.search(r'(?:[0-9]{1,3}\.){3}[0-9]{1,3}', result.html)
+                    current_proxy = run_config.proxy_config if run_config.proxy_config else None
+
+                    if current_proxy and ip_match:
+                        print(f"URL {result.url}")
+                        print(f"Proxy {current_proxy.server} -> Response IP: {ip_match.group(0)}")
+                        verified = ip_match.group(0) == current_proxy.ip
+                        if verified:
+                            print(f"✅ Proxy working! IP matches: {current_proxy.ip}")
+                        else:
+                            print("❌ Proxy failed or IP mismatch!")
+                    print("---")
+
+asyncio.run(main())
+
 ```
 

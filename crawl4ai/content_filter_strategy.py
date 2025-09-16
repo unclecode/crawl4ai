@@ -27,8 +27,7 @@ import json
 import hashlib
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
-from .async_logger import AsyncLogger, LogLevel
-from colorama import Fore, Style
+from .async_logger import AsyncLogger, LogLevel, LogColor
 
 
 class RelevantContentFilter(ABC):
@@ -406,6 +405,7 @@ class BM25ContentFilter(RelevantContentFilter):
         user_query: str = None,
         bm25_threshold: float = 1.0,
         language: str = "english",
+        use_stemming: bool = True,
     ):
         """
         Initializes the BM25ContentFilter class, if not provided, falls back to page metadata.
@@ -417,9 +417,11 @@ class BM25ContentFilter(RelevantContentFilter):
             user_query (str): User query for filtering (optional).
             bm25_threshold (float): BM25 threshold for filtering (default: 1.0).
             language (str): Language for stemming (default: 'english').
+            use_stemming (bool): Whether to apply stemming (default: True).
         """
         super().__init__(user_query=user_query)
         self.bm25_threshold = bm25_threshold
+        self.use_stemming = use_stemming
         self.priority_tags = {
             "h1": 5.0,
             "h2": 4.0,
@@ -433,7 +435,7 @@ class BM25ContentFilter(RelevantContentFilter):
             "pre": 1.5,
             "th": 1.5,  # Table headers
         }
-        self.stemmer = stemmer(language)
+        self.stemmer = stemmer(language) if use_stemming else None
 
     def filter_content(self, html: str, min_word_threshold: int = None) -> List[str]:
         """
@@ -480,13 +482,19 @@ class BM25ContentFilter(RelevantContentFilter):
         #                 for _, chunk, _, _ in candidates]
         # tokenized_query = [ps.stem(word) for word in query.lower().split()]
 
-        tokenized_corpus = [
-            [self.stemmer.stemWord(word) for word in chunk.lower().split()]
-            for _, chunk, _, _ in candidates
-        ]
-        tokenized_query = [
-            self.stemmer.stemWord(word) for word in query.lower().split()
-        ]
+        if self.use_stemming:
+            tokenized_corpus = [
+                [self.stemmer.stemWord(word) for word in chunk.lower().split()]
+                for _, chunk, _, _ in candidates
+            ]
+            tokenized_query = [
+                self.stemmer.stemWord(word) for word in query.lower().split()
+            ]
+        else:
+            tokenized_corpus = [
+                chunk.lower().split() for _, chunk, _, _ in candidates
+            ]
+            tokenized_query = query.lower().split()
 
         # tokenized_corpus = [[self.stemmer.stemWord(word) for word in tokenize_text(chunk.lower())]
         #            for _, chunk, _, _ in candidates]
@@ -846,8 +854,7 @@ class LLMContentFilter(RelevantContentFilter):
                 },
                 colors={
                     **AsyncLogger.DEFAULT_COLORS,
-                    LogLevel.INFO: Fore.MAGENTA
-                    + Style.DIM,  # Dimmed purple for LLM ops
+                    LogLevel.INFO: LogColor.DIM_MAGENTA  # Dimmed purple for LLM ops
                 },
             )
         else:
@@ -892,7 +899,7 @@ class LLMContentFilter(RelevantContentFilter):
                 "Starting LLM markdown content filtering process",
                 tag="LLM",
                 params={"provider": self.llm_config.provider},
-                colors={"provider": Fore.CYAN},
+                colors={"provider": LogColor.CYAN},
             )
 
         # Cache handling
@@ -929,7 +936,7 @@ class LLMContentFilter(RelevantContentFilter):
                 "LLM markdown: Split content into {chunk_count} chunks",
                 tag="CHUNK",
                 params={"chunk_count": len(html_chunks)},
-                colors={"chunk_count": Fore.YELLOW},
+                colors={"chunk_count": LogColor.YELLOW},
             )
 
         start_time = time.time()
@@ -1038,7 +1045,7 @@ class LLMContentFilter(RelevantContentFilter):
                 "LLM markdown: Completed processing in {time:.2f}s",
                 tag="LLM",
                 params={"time": end_time - start_time},
-                colors={"time": Fore.YELLOW},
+                colors={"time": LogColor.YELLOW},
             )
 
         result = ordered_results if ordered_results else []

@@ -1,0 +1,8 @@
+GO https://myapp.com/login
+WAIT `input#email` 5
+CLICK `input#email`
+TYPE "user@example.com"
+PRESS Tab
+TYPE "password123"
+CLICK `button.login-btn`
+WAIT `.dashboard` 10

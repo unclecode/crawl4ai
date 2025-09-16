@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from crawl4ai import AsyncWebCrawler, CacheMode, BrowserConfig, CrawlerRunConfig
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 from crawl4ai.content_filter_strategy import PruningContentFilter
-from crawl4ai.extraction_strategy import (
+from crawl4ai import (
     JsonCssExtractionStrategy,
     LLMExtractionStrategy,
 )
@@ -416,7 +416,7 @@ async def crawl_dynamic_content_pages_method_2():
 
 
 async def cosine_similarity_extraction():
-    from crawl4ai.extraction_strategy import CosineStrategy
+    from crawl4ai import CosineStrategy
     crawl_config = CrawlerRunConfig(
         cache_mode=CacheMode.BYPASS,
         extraction_strategy=CosineStrategy(

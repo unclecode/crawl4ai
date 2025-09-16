@@ -58,13 +58,15 @@ Pull and run images directly from Docker Hub without building locally.
 
 #### 1. Pull the Image
 
-Our latest release candidate is `0.6.0-r2`. Images are built with multi-arch manifests, so Docker automatically pulls the correct version for your system.
+Our latest release is `0.7.3`. Images are built with multi-arch manifests, so Docker automatically pulls the correct version for your system.
+
+> 💡 **Note**: The `latest` tag points to the stable `0.7.3` version.
 
 ```bash
-# Pull the release candidate (recommended for latest features)
-docker pull unclecode/crawl4ai:0.6.0-r1
+# Pull the latest version
+docker pull unclecode/crawl4ai:0.7.3
 
-# Or pull the latest stable version
+# Or pull using the latest tag
 docker pull unclecode/crawl4ai:latest
 ```
 
@@ -124,7 +126,7 @@ docker stop crawl4ai && docker rm crawl4ai
 #### Docker Hub Versioning Explained
 
 *   **Image Name:** `unclecode/crawl4ai`
-*   **Tag Format:** `LIBRARY_VERSION[-SUFFIX]` (e.g., `0.6.0-r2`)
+*   **Tag Format:** `LIBRARY_VERSION[-SUFFIX]` (e.g., `0.7.3`)
     *   `LIBRARY_VERSION`: The semantic version of the core `crawl4ai` Python library
     *   `SUFFIX`: Optional tag for release candidates (``) and revisions (`r1`)
 *   **`latest` Tag:** Points to the most recent stable version
@@ -151,6 +153,30 @@ cp deploy/docker/.llm.env.example .llm.env
 
 # Now edit .llm.env and add your API keys
 ```
+
+**Flexible LLM Provider Configuration:**
+
+The Docker setup now supports flexible LLM provider configuration through three methods:
+
+1. **Environment Variable** (Highest Priority): Set `LLM_PROVIDER` to override the default
+   ```bash
+   export LLM_PROVIDER="anthropic/claude-3-opus"
+   # Or in your .llm.env file:
+   # LLM_PROVIDER=anthropic/claude-3-opus
+   ```
+
+2. **API Request Parameter**: Specify provider per request
+   ```json
+   {
+     "url": "https://example.com",
+     "f": "llm",
+     "provider": "groq/mixtral-8x7b"
+   }
+   ```
+
+3. **Config File Default**: Falls back to `config.yml` (default: `openai/gpt-4o-mini`)
+
+The system automatically selects the appropriate API key based on the configured `api_key_env` in the config file.
 
 #### 3. Build and Run with Compose
 
@@ -666,7 +692,7 @@ app:
 
 # Default LLM Configuration
 llm:
-  provider: "openai/gpt-4o-mini"
+  provider: "openai/gpt-4o-mini"  # Can be overridden by LLM_PROVIDER env var
   api_key_env: "OPENAI_API_KEY"
   # api_key: sk-...  # If you pass the API key directly then api_key_env will be ignored
 

@@ -1,0 +1,47 @@
+{% set extra_html_attrs = 'data-theme="dark"' %}
+{% extends "base.html" %}
+
+{% block extrahead %}
+{{ super() }}
+<script>
+    document.documentElement.setAttribute("data-theme", "dark");
+</script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pushfeedback/dist/pushfeedback/pushfeedback.css">
+
+<style>
+    :root {
+        /* brand */
+        --feedback-primary-color: #09b5a5;
+        --feedback-highlight-color: #fed500;
+
+
+        /* align with the value you really use in :root */
+        --header-height: 65px;
+
+        /* Push modal content down */
+        --feedback-modal-content-position-top: var(--header-height);
+
+        --feedback-modal-modal-wrapper-z-index: 1100;
+        /*  >  header’s 1000 */
+        --feedback-modal-content-z-index: 1101;
+    }
+
+    feedback-modal::part(overlay) {
+        top: var(--header-height);
+        /* start below header */
+        height: calc(100vh - var(--header-height));
+        /* fill the rest */
+
+
+    }
+</style>
+<script type="module"
+    src="https://cdn.jsdelivr.net/npm/pushfeedback@latest/dist/pushfeedback/pushfeedback.esm.js"></script>
+{% endblock %}
+
+{% block footer %}
+<feedback-button project="w8plzp8vjp" button-style="dark" button-position="center-right" modal-position="sidebar-right">
+    >
+    Feedback
+</feedback-button>
+{% endblock %}

@@ -15,12 +15,12 @@ import shutil
 import json
 import subprocess
 import time
-from typing import List, Dict, Optional, Any, Tuple
-from colorama import Fore, Style, init
+from typing import List, Dict, Optional, Any
+from rich.console import Console
 
 from .async_configs import BrowserConfig
 from .browser_manager import ManagedBrowser
-from .async_logger import AsyncLogger, AsyncLoggerBase
+from .async_logger import AsyncLogger, AsyncLoggerBase, LogColor
 from .utils import get_home_folder
 
 
@@ -45,8 +45,8 @@ class BrowserProfiler:
             logger (AsyncLoggerBase, optional): Logger for outputting messages.
                 If None, a default AsyncLogger will be created.
         """
-        # Initialize colorama for colorful terminal output
-        init()
+        # Initialize rich console for colorful input prompts
+        self.console = Console()
         
         # Create a logger if not provided
         if logger is None:
@@ -64,6 +64,213 @@ class BrowserProfiler:
         self.builtin_browser_dir = os.path.join(get_home_folder(), "builtin-browser")
         self.builtin_config_file = os.path.join(self.builtin_browser_dir, "browser_config.json")
         os.makedirs(self.builtin_browser_dir, exist_ok=True)
+    
+    def _is_windows(self) -> bool:
+        """Check if running on Windows platform."""
+        return sys.platform.startswith('win') or sys.platform == 'cygwin'
+    
+    def _is_macos(self) -> bool:
+        """Check if running on macOS platform."""
+        return sys.platform == 'darwin'
+    
+    def _is_linux(self) -> bool:
+        """Check if running on Linux platform."""
+        return sys.platform.startswith('linux')
+    
+    def _get_quit_message(self, tag: str) -> str:
+        """Get appropriate quit message based on context."""
+        if tag == "PROFILE":
+            return "Closing browser and saving profile..."
+        elif tag == "CDP":
+            return "Closing browser..."
+        else:
+            return "Closing browser..."
+    
+    async def _listen_windows(self, user_done_event, check_browser_process, tag: str):
+        """Windows-specific keyboard listener using msvcrt."""
+        try:
+            import msvcrt
+        except ImportError:
+            raise ImportError("msvcrt module not available on this platform")
+        
+        while True:
+            try:
+                # Check for keyboard input
+                if msvcrt.kbhit():
+                    raw = msvcrt.getch()
+                    
+                    # Handle Unicode decoding more robustly
+                    key = None
+                    try:
+                        key = raw.decode("utf-8")
+                    except UnicodeDecodeError:
+                        try:
+                            # Try different encodings
+                            key = raw.decode("latin1")
+                        except UnicodeDecodeError:
+                            # Skip if we can't decode
+                            continue
+                    
+                    # Validate key
+                    if not key or len(key) != 1:
+                        continue
+                    
+                    # Check for printable characters only
+                    if not key.isprintable():
+                        continue
+                    
+                    # Check for quit command
+                    if key.lower() == "q":
+                        self.logger.info(
+                            self._get_quit_message(tag),
+                            tag=tag,
+                            base_color=LogColor.GREEN
+                        )
+                        user_done_event.set()
+                        return
+                
+                # Check if browser process ended
+                if await check_browser_process():
+                    return
+                
+                # Small delay to prevent busy waiting
+                await asyncio.sleep(0.1)
+                
+            except Exception as e:
+                self.logger.warning(f"Error in Windows keyboard listener: {e}", tag=tag)
+                # Continue trying instead of failing completely
+                await asyncio.sleep(0.1)
+                continue
+    
+    async def _listen_unix(self, user_done_event: asyncio.Event, check_browser_process, tag: str):
+        """Unix/Linux/macOS keyboard listener using termios and select."""
+        try:
+            import termios
+            import tty
+            import select
+        except ImportError:
+            raise ImportError("termios/tty/select modules not available on this platform")
+        
+        # Get stdin file descriptor
+        try:
+            fd = sys.stdin.fileno()
+        except (AttributeError, OSError):
+            raise ImportError("stdin is not a terminal")
+        
+        # Save original terminal settings
+        old_settings = None
+        try:
+            old_settings = termios.tcgetattr(fd)
+        except termios.error as e:
+            raise ImportError(f"Cannot get terminal attributes: {e}")
+        
+        try:
+            # Switch to non-canonical mode (cbreak mode)
+            tty.setcbreak(fd)
+            
+            while True:
+                try:
+                    # Use select to check if input is available (non-blocking)
+                    # Timeout of 0.5 seconds to periodically check browser process
+                    readable, _, _ = select.select([sys.stdin], [], [], 0.5)
+                    
+                    if readable:
+                        # Read one character
+                        key = sys.stdin.read(1)
+                        
+                        if key and key.lower() == "q":
+                            self.logger.info(
+                                self._get_quit_message(tag),
+                                tag=tag,
+                                base_color=LogColor.GREEN
+                            )
+                            user_done_event.set()
+                            return
+                    
+                    # Check if browser process ended
+                    if await check_browser_process():
+                        return
+                    
+                    # Small delay to prevent busy waiting
+                    await asyncio.sleep(0.1)
+                    
+                except (KeyboardInterrupt, EOFError):
+                    # Handle Ctrl+C or EOF gracefully
+                    self.logger.info("Keyboard interrupt received", tag=tag)
+                    user_done_event.set()
+                    return
+                except Exception as e:
+                    self.logger.warning(f"Error in Unix keyboard listener: {e}", tag=tag)
+                    await asyncio.sleep(0.1)
+                    continue
+                    
+        finally:
+            # Always restore terminal settings
+            if old_settings is not None:
+                try:
+                    termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+                except Exception as e:
+                    self.logger.error(f"Failed to restore terminal settings: {e}", tag=tag)
+    
+    async def _listen_fallback(self, user_done_event: asyncio.Event, check_browser_process, tag: str):
+        """Fallback keyboard listener using simple input() method."""
+        self.logger.info("Using fallback input mode. Type 'q' and press Enter to quit.", tag=tag)
+        
+        # Run input in a separate thread to avoid blocking
+        import threading
+        import queue
+        
+        input_queue = queue.Queue()
+        
+        def input_thread():
+            """Thread function to handle input."""
+            try:
+                while not user_done_event.is_set():
+                    try:
+                        # Use input() with a prompt
+                        user_input = input("Press 'q' + Enter to quit: ").strip().lower()
+                        input_queue.put(user_input)
+                        if user_input == 'q':
+                            break
+                    except (EOFError, KeyboardInterrupt):
+                        input_queue.put('q')
+                        break
+                    except Exception as e:
+                        self.logger.warning(f"Error in input thread: {e}", tag=tag)
+                        break
+            except Exception as e:
+                self.logger.error(f"Input thread failed: {e}", tag=tag)
+        
+        # Start input thread
+        thread = threading.Thread(target=input_thread, daemon=True)
+        thread.start()
+        
+        try:
+            while not user_done_event.is_set():
+                # Check for user input
+                try:
+                    user_input = input_queue.get_nowait()
+                    if user_input == 'q':
+                        self.logger.info(
+                            self._get_quit_message(tag),
+                            tag=tag,
+                            base_color=LogColor.GREEN
+                        )
+                        user_done_event.set()
+                        return
+                except queue.Empty:
+                    pass
+                
+                # Check if browser process ended
+                if await check_browser_process():
+                    return
+                
+                # Small delay
+                await asyncio.sleep(0.5)
+                
+        except Exception as e:
+            self.logger.error(f"Fallback listener failed: {e}", tag=tag)
+            user_done_event.set()
     
     async def create_profile(self, 
                             profile_name: Optional[str] = None, 
@@ -127,26 +334,30 @@ class BrowserProfiler:
         profile_path = os.path.join(self.profiles_dir, profile_name)
         os.makedirs(profile_path, exist_ok=True)
         
-        # Print instructions for the user with colorama formatting
-        border = f"{Fore.CYAN}{'='*80}{Style.RESET_ALL}"
-        self.logger.info(f"\n{border}", tag="PROFILE")
-        self.logger.info(f"Creating browser profile: {Fore.GREEN}{profile_name}{Style.RESET_ALL}", tag="PROFILE")
-        self.logger.info(f"Profile directory: {Fore.YELLOW}{profile_path}{Style.RESET_ALL}", tag="PROFILE")
+        # Print instructions for the user with rich formatting
+        border = f"{'='*80}"
+        self.logger.info("{border}", tag="PROFILE", params={"border": f"\n{border}"}, colors={"border": LogColor.CYAN})
+        self.logger.info("Creating browser profile: {profile_name}", tag="PROFILE", params={"profile_name": profile_name}, colors={"profile_name": LogColor.GREEN})
+        self.logger.info("Profile directory: {profile_path}", tag="PROFILE", params={"profile_path": profile_path}, colors={"profile_path": LogColor.YELLOW})
         
         self.logger.info("\nInstructions:", tag="PROFILE")
         self.logger.info("1. A browser window will open for you to set up your profile.", tag="PROFILE")
-        self.logger.info(f"2. {Fore.CYAN}Log in to websites{Style.RESET_ALL}, configure settings, etc. as needed.", tag="PROFILE")
-        self.logger.info(f"3. When you're done, {Fore.YELLOW}press 'q' in this terminal{Style.RESET_ALL} to close the browser.", tag="PROFILE")
+        self.logger.info("{segment}, configure settings, etc. as needed.", tag="PROFILE", params={"segment": "2. Log in to websites"}, colors={"segment": LogColor.CYAN})
+        self.logger.info("3. When you're done, {segment} to close the browser.", tag="PROFILE", params={"segment": "press 'q' in this terminal"}, colors={"segment": LogColor.YELLOW})
         self.logger.info("4. The profile will be saved and ready to use with Crawl4AI.", tag="PROFILE")
-        self.logger.info(f"{border}\n", tag="PROFILE")
+        self.logger.info("{border}", tag="PROFILE", params={"border": f"{border}\n"}, colors={"border": LogColor.CYAN})
+        
+        browser_config.headless = False
+        browser_config.user_data_dir = profile_path
+        
         
         # Create managed browser instance
         managed_browser = ManagedBrowser(
-            browser_type=browser_config.browser_type,
-            user_data_dir=profile_path,
-            headless=False,  # Must be visible
+            browser_config=browser_config,
+            # user_data_dir=profile_path,
+            # headless=False,  # Must be visible
             logger=self.logger,
-            debugging_port=browser_config.debugging_port
+            # debugging_port=browser_config.debugging_port
         )
         
         # Set up signal handlers to ensure cleanup on interrupt
@@ -176,46 +387,52 @@ class BrowserProfiler:
         
         # Run keyboard input loop in a separate task
         async def listen_for_quit_command():
-            import termios
-            import tty
-            import select
-            
+            """Cross-platform keyboard listener that waits for 'q' key press."""
             # First output the prompt
-            self.logger.info(f"{Fore.CYAN}Press '{Fore.WHITE}q{Fore.CYAN}' when you've finished using the browser...{Style.RESET_ALL}", tag="PROFILE")
-            
-            # Save original terminal settings
-            fd = sys.stdin.fileno()
-            old_settings = termios.tcgetattr(fd)
-            
+            self.logger.info(
+                "Press {segment} when you've finished using the browser...",
+                tag="PROFILE",
+                params={"segment": "'q'"}, colors={"segment": LogColor.YELLOW},
+                base_color=LogColor.CYAN
+            )
+
+            async def check_browser_process():
+                """Check if browser process is still running."""
+                if (
+                    managed_browser.browser_process
+                    and managed_browser.browser_process.poll() is not None
+                ):
+                    self.logger.info(
+                        "Browser already closed. Ending input listener.", tag="PROFILE"
+                    )
+                    user_done_event.set()
+                    return True
+                return False
+
+            # Try platform-specific implementations with fallback
             try:
-                # Switch to non-canonical mode (no line buffering)
-                tty.setcbreak(fd)
-                
-                while True:
-                    # Check if input is available (non-blocking)
-                    readable, _, _ = select.select([sys.stdin], [], [], 0.5)
-                    if readable:
-                        key = sys.stdin.read(1)
-                        if key.lower() == 'q':
-                            self.logger.info(f"{Fore.GREEN}Closing browser and saving profile...{Style.RESET_ALL}", tag="PROFILE")
-                            user_done_event.set()
-                            return
-                    
-                    # Check if the browser process has already exited
-                    if managed_browser.browser_process and managed_browser.browser_process.poll() is not None:
-                        self.logger.info("Browser already closed. Ending input listener.", tag="PROFILE")
-                        user_done_event.set()
-                        return
-                        
-                    await asyncio.sleep(0.1)
-            
-            finally:
-                # Restore terminal settings 
-                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+                if self._is_windows():
+                    await self._listen_windows(user_done_event, check_browser_process, "PROFILE")
+                else:
+                    await self._listen_unix(user_done_event, check_browser_process, "PROFILE")
+            except Exception as e:
+                self.logger.warning(f"Platform-specific keyboard listener failed: {e}", tag="PROFILE")
+                self.logger.info("Falling back to simple input mode...", tag="PROFILE")
+                await self._listen_fallback(user_done_event, check_browser_process, "PROFILE")
         
         try:
+            from playwright.async_api import async_playwright
+
             # Start the browser
-            await managed_browser.start()
+            # await managed_browser.start()
+            # 1. ── Start the browser ─────────────────────────────────────────
+            cdp_url = await managed_browser.start()
+
+            # 2. ── Attach Playwright to that running Chrome ──────────────────
+            pw       = await async_playwright().start()
+            browser  = await pw.chromium.connect_over_cdp(cdp_url)
+            # Grab the existing default context (there is always one)
+            context  = browser.contexts[0]
             
             # Check if browser started successfully
             browser_process = managed_browser.browser_process
@@ -223,7 +440,7 @@ class BrowserProfiler:
                 self.logger.error("Failed to start browser process.", tag="PROFILE")
                 return None
             
-            self.logger.info(f"Browser launched. {Fore.CYAN}Waiting for you to finish...{Style.RESET_ALL}", tag="PROFILE") 
+            self.logger.info("Browser launched. Waiting for you to finish...", tag="PROFILE") 
             
             # Start listening for keyboard input
             listener_task = asyncio.create_task(listen_for_quit_command())
@@ -240,15 +457,27 @@ class BrowserProfiler:
                 except asyncio.CancelledError:
                     pass
             
+            # 3. ── Persist storage state *before* we kill Chrome ─────────────
+            state_file = os.path.join(profile_path, "storage_state.json")
+            try:
+                await context.storage_state(path=state_file)
+                self.logger.info(f"[PROFILE].i  storage_state saved → {state_file}", tag="PROFILE")
+            except Exception as e:
+                self.logger.warning(f"[PROFILE].w  failed to save storage_state: {e}", tag="PROFILE")
+
+            # 4. ── Close everything cleanly ──────────────────────────────────
+            await browser.close()
+            await pw.stop()
+
             # If the browser is still running and the user pressed 'q', terminate it
             if browser_process.poll() is None and user_done_event.is_set():
                 self.logger.info("Terminating browser process...", tag="PROFILE")
                 await managed_browser.cleanup()
             
-            self.logger.success(f"Browser closed. Profile saved at: {Fore.GREEN}{profile_path}{Style.RESET_ALL}", tag="PROFILE")
+            self.logger.success(f"Browser closed. Profile saved at: {profile_path}", tag="PROFILE")
                 
         except Exception as e:
-            self.logger.error(f"Error creating profile: {str(e)}", tag="PROFILE")
+            self.logger.error(f"Error creating profile: {e!s}", tag="PROFILE")
             await managed_browser.cleanup()
             return None
         finally:
@@ -440,25 +669,27 @@ class BrowserProfiler:
             ```
         """
         while True:
-            self.logger.info(f"\n{Fore.CYAN}Profile Management Options:{Style.RESET_ALL}", tag="MENU")
-            self.logger.info(f"1. {Fore.GREEN}Create a new profile{Style.RESET_ALL}", tag="MENU")
-            self.logger.info(f"2. {Fore.YELLOW}List available profiles{Style.RESET_ALL}", tag="MENU")
-            self.logger.info(f"3. {Fore.RED}Delete a profile{Style.RESET_ALL}", tag="MENU")
+            self.logger.info("\nProfile Management Options:", tag="MENU")
+            self.logger.info("1. Create a new profile", tag="MENU", base_color=LogColor.GREEN)
+            self.logger.info("2. List available profiles", tag="MENU", base_color=LogColor.YELLOW)
+            self.logger.info("3. Delete a profile", tag="MENU", base_color=LogColor.RED)
             
             # Only show crawl option if callback provided
             if crawl_callback:
-                self.logger.info(f"4. {Fore.CYAN}Use a profile to crawl a website{Style.RESET_ALL}", tag="MENU")
-                self.logger.info(f"5. {Fore.MAGENTA}Exit{Style.RESET_ALL}", tag="MENU")
+                self.logger.info("4. Use a profile to crawl a website", tag="MENU", base_color=LogColor.CYAN)
+                self.logger.info("5. Exit", tag="MENU", base_color=LogColor.MAGENTA)
                 exit_option = "5"
             else:
-                self.logger.info(f"4. {Fore.MAGENTA}Exit{Style.RESET_ALL}", tag="MENU")
+                self.logger.info("4. Exit", tag="MENU", base_color=LogColor.MAGENTA)
                 exit_option = "4"
             
-            choice = input(f"\n{Fore.CYAN}Enter your choice (1-{exit_option}): {Style.RESET_ALL}")
+            self.logger.info(f"\n[cyan]Enter your choice (1-{exit_option}): [/cyan]", end="")
+            choice = input()
             
             if choice == "1":
                 # Create new profile
-                name = input(f"{Fore.GREEN}Enter a name for the new profile (or press Enter for auto-generated name): {Style.RESET_ALL}")
+                self.console.print("[green]Enter a name for the new profile (or press Enter for auto-generated name): [/green]", end="")
+                name = input()
                 await self.create_profile(name or None)
                 
             elif choice == "2":
@@ -469,11 +700,11 @@ class BrowserProfiler:
                     self.logger.warning("  No profiles found. Create one first with option 1.", tag="PROFILES")
                     continue
                 
-                # Print profile information with colorama formatting
+                # Print profile information 
                 self.logger.info("\nAvailable profiles:", tag="PROFILES")
                 for i, profile in enumerate(profiles):
-                    self.logger.info(f"[{i+1}] {Fore.CYAN}{profile['name']}{Style.RESET_ALL}", tag="PROFILES")
-                    self.logger.info(f"    Path: {Fore.YELLOW}{profile['path']}{Style.RESET_ALL}", tag="PROFILES")
+                    self.logger.info(f"[{i+1}] {profile['name']}", tag="PROFILES")
+                    self.logger.info(f"    Path: {profile['path']}", tag="PROFILES", base_color=LogColor.YELLOW)
                     self.logger.info(f"    Created: {profile['created'].strftime('%Y-%m-%d %H:%M:%S')}", tag="PROFILES")
                     self.logger.info(f"    Browser type: {profile['type']}", tag="PROFILES")
                     self.logger.info("", tag="PROFILES")  # Empty line for spacing
@@ -486,12 +717,13 @@ class BrowserProfiler:
                     continue
                     
                 # Display numbered list
-                self.logger.info(f"\n{Fore.YELLOW}Available profiles:{Style.RESET_ALL}", tag="PROFILES")
+                self.logger.info("\nAvailable profiles:", tag="PROFILES", base_color=LogColor.YELLOW)
                 for i, profile in enumerate(profiles):
                     self.logger.info(f"[{i+1}] {profile['name']}", tag="PROFILES")
                     
                 # Get profile to delete
-                profile_idx = input(f"{Fore.RED}Enter the number of the profile to delete (or 'c' to cancel): {Style.RESET_ALL}")
+                self.console.print("[red]Enter the number of the profile to delete (or 'c' to cancel): [/red]", end="")
+                profile_idx = input()
                 if profile_idx.lower() == 'c':
                     continue
                     
@@ -499,17 +731,18 @@ class BrowserProfiler:
                     idx = int(profile_idx) - 1
                     if 0 <= idx < len(profiles):
                         profile_name = profiles[idx]["name"]
-                        self.logger.info(f"Deleting profile: {Fore.YELLOW}{profile_name}{Style.RESET_ALL}", tag="PROFILES")
+                        self.logger.info(f"Deleting profile: [yellow]{profile_name}[/yellow]", tag="PROFILES")
                         
                         # Confirm deletion
-                        confirm = input(f"{Fore.RED}Are you sure you want to delete this profile? (y/n): {Style.RESET_ALL}")
+                        self.console.print("[red]Are you sure you want to delete this profile? (y/n): [/red]", end="")
+                        confirm = input()
                         if confirm.lower() == 'y':
                             success = self.delete_profile(profiles[idx]["path"])
                             
                             if success:
-                                self.logger.success(f"Profile {Fore.GREEN}{profile_name}{Style.RESET_ALL} deleted successfully", tag="PROFILES")
+                                self.logger.success(f"Profile {profile_name} deleted successfully", tag="PROFILES")
                             else:
-                                self.logger.error(f"Failed to delete profile {Fore.RED}{profile_name}{Style.RESET_ALL}", tag="PROFILES")
+                                self.logger.error(f"Failed to delete profile {profile_name}", tag="PROFILES")
                     else:
                         self.logger.error("Invalid profile number", tag="PROFILES")
                 except ValueError:
@@ -523,12 +756,13 @@ class BrowserProfiler:
                     continue
                     
                 # Display numbered list
-                self.logger.info(f"\n{Fore.YELLOW}Available profiles:{Style.RESET_ALL}", tag="PROFILES")
+                self.logger.info("\nAvailable profiles:", tag="PROFILES", base_color=LogColor.YELLOW)
                 for i, profile in enumerate(profiles):
                     self.logger.info(f"[{i+1}] {profile['name']}", tag="PROFILES")
                     
                 # Get profile to use
-                profile_idx = input(f"{Fore.CYAN}Enter the number of the profile to use (or 'c' to cancel): {Style.RESET_ALL}")
+                self.console.print("[cyan]Enter the number of the profile to use (or 'c' to cancel): [/cyan]", end="")
+                profile_idx = input()
                 if profile_idx.lower() == 'c':
                     continue
                     
@@ -536,7 +770,8 @@ class BrowserProfiler:
                     idx = int(profile_idx) - 1
                     if 0 <= idx < len(profiles):
                         profile_path = profiles[idx]["path"]
-                        url = input(f"{Fore.CYAN}Enter the URL to crawl: {Style.RESET_ALL}")
+                        self.console.print("[cyan]Enter the URL to crawl: [/cyan]", end="")
+                        url = input()
                         if url:
                             # Call the provided crawl callback
                             await crawl_callback(profile_path, url)
@@ -597,17 +832,26 @@ class BrowserProfiler:
             os.makedirs(profile_path, exist_ok=True)
         
         # Print initial information
-        border = f"{Fore.CYAN}{'='*80}{Style.RESET_ALL}"
-        self.logger.info(f"\n{border}", tag="CDP")
-        self.logger.info(f"Launching standalone browser with CDP debugging", tag="CDP")
-        self.logger.info(f"Browser type: {Fore.GREEN}{browser_type}{Style.RESET_ALL}", tag="CDP")
-        self.logger.info(f"Profile path: {Fore.YELLOW}{profile_path}{Style.RESET_ALL}", tag="CDP")
-        self.logger.info(f"Debugging port: {Fore.CYAN}{debugging_port}{Style.RESET_ALL}", tag="CDP")
-        self.logger.info(f"Headless mode: {Fore.CYAN}{headless}{Style.RESET_ALL}", tag="CDP")
+        border = f"{'='*80}"
+        self.logger.info("{border}", tag="CDP", params={"border": border}, colors={"border": LogColor.CYAN})
+        self.logger.info("Launching standalone browser with CDP debugging", tag="CDP")
+        self.logger.info("Browser type: {browser_type}", tag="CDP", params={"browser_type": browser_type}, colors={"browser_type": LogColor.CYAN})
+        self.logger.info("Profile path: {profile_path}", tag="CDP", params={"profile_path": profile_path}, colors={"profile_path": LogColor.YELLOW})
+        self.logger.info(f"Debugging port: {debugging_port}", tag="CDP")
+        self.logger.info(f"Headless mode: {headless}", tag="CDP")
+        
+        # create browser config
+        browser_config = BrowserConfig(
+            browser_type=browser_type,
+            headless=headless,
+            user_data_dir=profile_path,
+            debugging_port=debugging_port,
+            verbose=True
+        )
         
         # Create managed browser instance
         managed_browser = ManagedBrowser(
-            browser_type=browser_type,
+            browser_config=browser_config,
             user_data_dir=profile_path,
             headless=headless,
             logger=self.logger,
@@ -641,42 +885,33 @@ class BrowserProfiler:
         
         # Run keyboard input loop in a separate task
         async def listen_for_quit_command():
-            import termios
-            import tty
-            import select
-            
+            """Cross-platform keyboard listener that waits for 'q' key press."""
             # First output the prompt
-            self.logger.info(f"{Fore.CYAN}Press '{Fore.WHITE}q{Fore.CYAN}' to stop the browser and exit...{Style.RESET_ALL}", tag="CDP")
-            
-            # Save original terminal settings
-            fd = sys.stdin.fileno()
-            old_settings = termios.tcgetattr(fd)
-            
+            self.logger.info(
+                "Press {segment} to stop the browser and exit...",
+                tag="CDP",
+                params={"segment": "'q'"}, colors={"segment": LogColor.YELLOW},
+                base_color=LogColor.CYAN
+            )
+
+            async def check_browser_process():
+                """Check if browser process is still running."""
+                if managed_browser.browser_process and managed_browser.browser_process.poll() is not None:
+                    self.logger.info("Browser already closed. Ending input listener.", tag="CDP")
+                    user_done_event.set()
+                    return True
+                return False
+
+            # Try platform-specific implementations with fallback
             try:
-                # Switch to non-canonical mode (no line buffering)
-                tty.setcbreak(fd)
-                
-                while True:
-                    # Check if input is available (non-blocking)
-                    readable, _, _ = select.select([sys.stdin], [], [], 0.5)
-                    if readable:
-                        key = sys.stdin.read(1)
-                        if key.lower() == 'q':
-                            self.logger.info(f"{Fore.GREEN}Closing browser...{Style.RESET_ALL}", tag="CDP")
-                            user_done_event.set()
-                            return
-                    
-                    # Check if the browser process has already exited
-                    if managed_browser.browser_process and managed_browser.browser_process.poll() is not None:
-                        self.logger.info("Browser already closed. Ending input listener.", tag="CDP")
-                        user_done_event.set()
-                        return
-                        
-                    await asyncio.sleep(0.1)
-            
-            finally:
-                # Restore terminal settings 
-                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+                if self._is_windows():
+                    await self._listen_windows(user_done_event, check_browser_process, "CDP")
+                else:
+                    await self._listen_unix(user_done_event, check_browser_process, "CDP")
+            except Exception as e:
+                self.logger.warning(f"Platform-specific keyboard listener failed: {e}", tag="CDP")
+                self.logger.info("Falling back to simple input mode...", tag="CDP")
+                await self._listen_fallback(user_done_event, check_browser_process, "CDP")
                 
         # Function to retrieve and display CDP JSON config
         async def get_cdp_json(port):
@@ -716,20 +951,20 @@ class BrowserProfiler:
                 self.logger.error("Failed to start browser process.", tag="CDP")
                 return None
             
-            self.logger.info(f"Browser launched successfully. Retrieving CDP information...", tag="CDP") 
+            self.logger.info("Browser launched successfully. Retrieving CDP information...", tag="CDP") 
             
             # Get CDP URL and JSON config
             cdp_url, config_json = await get_cdp_json(debugging_port)
             
             if cdp_url:
-                self.logger.success(f"CDP URL: {Fore.GREEN}{cdp_url}{Style.RESET_ALL}", tag="CDP")
+                self.logger.success(f"CDP URL: {cdp_url}", tag="CDP")
                 
                 if config_json:
                     # Display relevant CDP information
-                    self.logger.info(f"Browser: {Fore.CYAN}{config_json.get('Browser', 'Unknown')}{Style.RESET_ALL}", tag="CDP")
-                    self.logger.info(f"Protocol Version: {config_json.get('Protocol-Version', 'Unknown')}", tag="CDP")
+                    self.logger.info(f"Browser: {config_json.get('Browser', 'Unknown')}", tag="CDP", colors={"Browser": LogColor.CYAN})
+                    self.logger.info(f"Protocol Version: {config_json.get('Protocol-Version', 'Unknown')}", tag="CDP", colors={"Protocol-Version": LogColor.CYAN})
                     if 'webSocketDebuggerUrl' in config_json:
-                        self.logger.info(f"WebSocket URL: {Fore.GREEN}{config_json['webSocketDebuggerUrl']}{Style.RESET_ALL}", tag="CDP")
+                        self.logger.info("WebSocket URL: {webSocketDebuggerUrl}", tag="CDP", params={"webSocketDebuggerUrl": config_json['webSocketDebuggerUrl']}, colors={"webSocketDebuggerUrl": LogColor.GREEN})
                 else:
                     self.logger.warning("Could not retrieve CDP configuration JSON", tag="CDP")
             else:
@@ -757,7 +992,7 @@ class BrowserProfiler:
                 self.logger.info("Terminating browser process...", tag="CDP")
                 await managed_browser.cleanup()
             
-            self.logger.success(f"Browser closed.", tag="CDP")
+            self.logger.success("Browser closed.", tag="CDP")
                 
         except Exception as e:
             self.logger.error(f"Error launching standalone browser: {str(e)}", tag="CDP")
@@ -972,3 +1207,30 @@ class BrowserProfiler:
             'info': browser_info
         }
 
+
+if __name__ == "__main__":
+    # Example usage
+    profiler = BrowserProfiler()
+    
+    # Create a new profile
+    import os
+    from pathlib import Path
+    home_dir = Path.home()
+    profile_path = asyncio.run(profiler.create_profile( str(home_dir / ".crawl4ai/profiles/test-profile")))
+
+        
+            
+    # Launch a standalone browser
+    asyncio.run(profiler.launch_standalone_browser())
+    
+    # List profiles
+    profiles = profiler.list_profiles()
+    for profile in profiles:
+        print(f"Profile: {profile['name']}, Path: {profile['path']}")
+    
+    # Delete a profile
+    success = profiler.delete_profile("my-profile")
+    if success:
+        print("Profile deleted successfully")
+    else:
+        print("Failed to delete profile")

@@ -1,0 +1,19 @@
+# Simple form submission example
+# This script fills out a contact form and submits it
+
+GO https://example.com/contact
+WAIT `form#contact-form` 10
+
+# Fill out the form fields
+CLICK `input[name="name"]`
+TYPE "Alice Smith"
+PRESS Tab
+TYPE "alice@example.com"
+PRESS Tab
+TYPE "I'd like to learn more about your services"
+
+# Submit the form
+CLICK `button[type="submit"]`
+
+# Wait for success message
+WAIT "Thank you for your message" 5

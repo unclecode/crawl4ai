@@ -1,0 +1,56 @@
+# Data extraction example
+# Scrapes product information from an e-commerce site
+
+# Navigate to products page
+GO https://shop.example.com/products
+WAIT `.product-list` 10
+
+# Scroll to load lazy-loaded content
+SCROLL DOWN 500
+WAIT 1
+SCROLL DOWN 500
+WAIT 1
+SCROLL DOWN 500
+WAIT 2
+
+# Extract product data
+EVAL `
+  // Extract all product information
+  const products = Array.from(document.querySelectorAll('.product-card')).map((card, index) => {
+    return {
+      id: index + 1,
+      name: card.querySelector('.product-title')?.textContent?.trim() || 'N/A',
+      price: card.querySelector('.price')?.textContent?.trim() || 'N/A',
+      rating: card.querySelector('.rating')?.textContent?.trim() || 'N/A',
+      availability: card.querySelector('.in-stock') ? 'In Stock' : 'Out of Stock',
+      image: card.querySelector('img')?.src || 'N/A'
+    };
+  });
+
+  // Log results
+  console.log('=== Product Extraction Results ===');
+  console.log('Total products found:', products.length);
+  console.log(JSON.stringify(products, null, 2));
+  
+  // Save to localStorage for retrieval
+  localStorage.setItem('scraped_products', JSON.stringify(products));
+`
+
+# Optional: Click on first product for details
+CLICK `.product-card:first-child`
+WAIT `.product-details` 5
+
+# Extract detailed information
+EVAL `
+  const details = {
+    description: document.querySelector('.product-description')?.textContent?.trim(),
+    specifications: Array.from(document.querySelectorAll('.spec-item')).map(spec => ({
+      label: spec.querySelector('.spec-label')?.textContent,
+      value: spec.querySelector('.spec-value')?.textContent
+    })),
+    reviews: document.querySelector('.review-count')?.textContent
+  };
+  
+  console.log('=== Product Details ===');
+  console.log(JSON.stringify(details, null, 2));
+`

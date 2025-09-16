@@ -18,7 +18,7 @@ crawl4ai-setup
 ```
 
 **What does it do?**
-- Installs or updates required Playwright browsers (Chromium, Firefox, etc.)
+- Installs or updates required browser dependencies for both regular and undetected modes
 - Performs OS-level checks (e.g., missing libs on Linux)
 - Confirms your environment is ready to crawl
 

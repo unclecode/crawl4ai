@@ -11,7 +11,7 @@ from .extraction_strategy import *
 from .crawler_strategy import *
 from typing import List
 from concurrent.futures import ThreadPoolExecutor
-from .content_scraping_strategy import WebScrapingStrategy
+from ..content_scraping_strategy import LXMLWebScrapingStrategy as WebScrapingStrategy
 from .config import *
 import warnings
 import json
