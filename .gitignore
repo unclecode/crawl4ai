@@ -265,7 +265,7 @@ CLAUDE.md
 tests/**/test_site
 tests/**/reports
 tests/**/benchmark_reports
-
+test_scripts/
 docs/**/data
 .codecat/
 

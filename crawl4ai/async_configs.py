@@ -1,5 +1,6 @@
 import os
 from typing import Union
+import warnings
 from .config import (
     DEFAULT_PROVIDER,
     DEFAULT_PROVIDER_API_KEY,
@@ -257,24 +258,39 @@ class ProxyConfig:
     
     @staticmethod
     def from_string(proxy_str: str) -> "ProxyConfig":
-        """Create a ProxyConfig from a string in the format 'ip:port:username:password'."""
-        parts = proxy_str.split(":")
-        if len(parts) == 4:  # ip:port:username:password
+        """Create a ProxyConfig from a string.
+
+        Supported formats:
+        - 'http://username:password@ip:port'
+        - 'http://ip:port'
+        - 'socks5://ip:port'
+        - 'ip:port:username:password'
+        - 'ip:port'
+        """
+        s = (proxy_str or "").strip()
+        # URL with credentials
+        if "@" in s and "://" in s:
+            auth_part, server_part = s.split("@", 1)
+            protocol, credentials = auth_part.split("://", 1)
+            if ":" in credentials:
+                username, password = credentials.split(":", 1)
+                return ProxyConfig(
+                    server=f"{protocol}://{server_part}",
+                    username=username,
+                    password=password,
+                )
+        # URL without credentials (keep scheme)
+        if "://" in s and "@" not in s:
+            return ProxyConfig(server=s)
+        # Colon separated forms
+        parts = s.split(":")
+        if len(parts) == 4:
             ip, port, username, password = parts
-            return ProxyConfig(
-                server=f"http://{ip}:{port}",
-                username=username,
-                password=password,
-                ip=ip
-            )
-        elif len(parts) == 2:  # ip:port only
+            return ProxyConfig(server=f"http://{ip}:{port}", username=username, password=password)
+        if len(parts) == 2:
             ip, port = parts
-            return ProxyConfig(
-                server=f"http://{ip}:{port}",
-                ip=ip
-            )
-        else:
-            raise ValueError(f"Invalid proxy string format: {proxy_str}")
+            return ProxyConfig(server=f"http://{ip}:{port}")
+        raise ValueError(f"Invalid proxy string format: {proxy_str}")
     
     @staticmethod
     def from_dict(proxy_dict: Dict) -> "ProxyConfig":
@@ -438,6 +454,7 @@ class BrowserConfig:
         host: str = "localhost",
         enable_stealth: bool = False,
     ):
+        
         self.browser_type = browser_type
         self.headless = headless 
         self.browser_mode = browser_mode
@@ -450,13 +467,22 @@ class BrowserConfig:
         if self.browser_type in ["firefox", "webkit"]:
             self.channel = ""
             self.chrome_channel = ""
+        if proxy:
+            warnings.warn("The 'proxy' parameter is deprecated and will be removed in a future release. Use 'proxy_config' instead.", UserWarning)
         self.proxy = proxy
         self.proxy_config = proxy_config
         if isinstance(self.proxy_config, dict):
             self.proxy_config = ProxyConfig.from_dict(self.proxy_config)
         if isinstance(self.proxy_config, str):
             self.proxy_config = ProxyConfig.from_string(self.proxy_config)
-
+        
+        if self.proxy and self.proxy_config:
+            warnings.warn("Both 'proxy' and 'proxy_config' are provided. 'proxy_config' will take precedence.", UserWarning)
+            self.proxy = None
+        elif self.proxy:
+            # Convert proxy string to ProxyConfig if proxy_config is not provided
+            self.proxy_config = ProxyConfig.from_string(self.proxy)
+            self.proxy = None
 
         self.viewport_width = viewport_width
         self.viewport_height = viewport_height

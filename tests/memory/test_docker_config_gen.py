@@ -24,7 +24,7 @@ CASES = [
     # --- BrowserConfig variants ---
     "BrowserConfig()",
     "BrowserConfig(headless=False, extra_args=['--disable-gpu'])",
-    "BrowserConfig(browser_mode='builtin', proxy='http://1.2.3.4:8080')",
+    "BrowserConfig(browser_mode='builtin', proxy_config={'server': 'http://1.2.3.4:8080'})",
 ]
 
 for code in CASES:
