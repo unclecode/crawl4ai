@@ -692,8 +692,7 @@ app:
 # Default LLM Configuration
 llm:
   provider: "openai/gpt-4o-mini"  # Can be overridden by LLM_PROVIDER env var
-  api_key_env: "OPENAI_API_KEY"
-  # api_key: sk-...  # If you pass the API key directly then api_key_env will be ignored
+  # api_key: sk-...  # If you pass the API key directly (not recommended)
 
 # Redis Configuration (Used by internal Redis server managed by supervisord)
 redis:

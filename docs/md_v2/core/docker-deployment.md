@@ -89,6 +89,16 @@ ANTHROPIC_API_KEY=your-anthropic-key
 # TOGETHER_API_KEY=your-together-key
 # MISTRAL_API_KEY=your-mistral-key
 # GEMINI_API_TOKEN=your-gemini-token
+
+# Optional: Global LLM settings
+# LLM_PROVIDER=openai/gpt-4o-mini
+# LLM_TEMPERATURE=0.7
+# LLM_BASE_URL=https://api.custom.com/v1
+
+# Optional: Provider-specific overrides
+# OPENAI_TEMPERATURE=0.5
+# OPENAI_BASE_URL=https://custom-openai.com/v1
+# ANTHROPIC_TEMPERATURE=0.3
 EOL
 ```
 > 🔑 **Note**: Keep your API keys secure! Never commit `.llm.env` to version control.
@@ -156,27 +166,43 @@ cp deploy/docker/.llm.env.example .llm.env
 
 **Flexible LLM Provider Configuration:**
 
-The Docker setup now supports flexible LLM provider configuration through three methods:
+The Docker setup now supports flexible LLM provider configuration through a hierarchical system:
 
-1. **Environment Variable** (Highest Priority): Set `LLM_PROVIDER` to override the default
-   ```bash
-   export LLM_PROVIDER="anthropic/claude-3-opus"
-   # Or in your .llm.env file:
-   # LLM_PROVIDER=anthropic/claude-3-opus
-   ```
-
-2. **API Request Parameter**: Specify provider per request
+1. **API Request Parameters** (Highest Priority): Specify per request
    ```json
    {
      "url": "https://example.com",
      "f": "llm",
-     "provider": "groq/mixtral-8x7b"
+     "provider": "groq/mixtral-8x7b",
+     "temperature": 0.7,
+     "base_url": "https://api.custom.com/v1"
    }
    ```
 
-3. **Config File Default**: Falls back to `config.yml` (default: `openai/gpt-4o-mini`)
+2. **Provider-Specific Environment Variables**: Override for specific providers
+   ```bash
+   # In your .llm.env file:
+   OPENAI_TEMPERATURE=0.5
+   OPENAI_BASE_URL=https://custom-openai.com/v1
+   ANTHROPIC_TEMPERATURE=0.3
+   ```
 
-The system automatically selects the appropriate API key based on the configured `api_key_env` in the config file.
+3. **Global Environment Variables**: Set defaults for all providers
+   ```bash
+   # In your .llm.env file:
+   LLM_PROVIDER=anthropic/claude-3-opus
+   LLM_TEMPERATURE=0.7
+   LLM_BASE_URL=https://api.proxy.com/v1
+   ```
+
+4. **Config File Default**: Falls back to `config.yml` (default: `openai/gpt-4o-mini`)
+
+The system automatically selects the appropriate API key based on the provider. LiteLLM handles finding the correct environment variable for each provider (e.g., OPENAI_API_KEY for OpenAI, GEMINI_API_TOKEN for Google Gemini, etc.).
+
+**Supported LLM Parameters:**
+- `provider`: LLM provider and model (e.g., "openai/gpt-4", "anthropic/claude-3-opus")
+- `temperature`: Controls randomness (0.0-2.0, lower = more focused, higher = more creative)
+- `base_url`: Custom API endpoint for proxy servers or alternative endpoints
 
 #### 3. Build and Run with Compose
 
@@ -555,6 +581,101 @@ Crucially, when sending configurations directly via JSON, they **must** follow t
 **LLM Extraction Strategy** *(Keep example, ensure schema uses type/value wrapper)*
 *(Keep Deep Crawler Example)*
 
+### LLM Configuration Examples
+
+The Docker API supports dynamic LLM configuration through multiple levels:
+
+#### Temperature Control
+
+Temperature affects the randomness of LLM responses (0.0 = deterministic, 2.0 = very creative):
+
+```python
+import requests
+
+# Low temperature for factual extraction
+response = requests.post(
+    "http://localhost:11235/md",
+    json={
+        "url": "https://example.com",
+        "f": "llm",
+        "q": "Extract all dates and numbers from this page",
+        "temperature": 0.2  # Very focused, deterministic
+    }
+)
+
+# High temperature for creative tasks
+response = requests.post(
+    "http://localhost:11235/md",
+    json={
+        "url": "https://example.com", 
+        "f": "llm",
+        "q": "Write a creative summary of this content",
+        "temperature": 1.2  # More creative, varied responses
+    }
+)
+```
+
+#### Custom API Endpoints
+
+Use custom base URLs for proxy servers or alternative API endpoints:
+
+```python
+
+# Using a local LLM server
+response = requests.post(
+    "http://localhost:11235/md",
+    json={
+        "url": "https://example.com",
+        "f": "llm",
+        "q": "Extract key information",
+        "provider": "ollama/llama2",
+        "base_url": "http://localhost:11434/v1"
+    }
+)
+```
+
+#### Dynamic Provider Selection
+
+Switch between providers based on task requirements:
+
+```python
+async def smart_extraction(url: str, content_type: str):
+    """Select provider and temperature based on content type"""
+    
+    configs = {
+        "technical": {
+            "provider": "openai/gpt-4",
+            "temperature": 0.3,
+            "query": "Extract technical specifications and code examples"
+        },
+        "creative": {
+            "provider": "anthropic/claude-3-opus",
+            "temperature": 0.9,
+            "query": "Create an engaging narrative summary"
+        },
+        "quick": {
+            "provider": "groq/mixtral-8x7b",
+            "temperature": 0.5,
+            "query": "Quick summary in bullet points"
+        }
+    }
+    
+    config = configs.get(content_type, configs["quick"])
+    
+    response = await httpx.post(
+        "http://localhost:11235/md",
+        json={
+            "url": url,
+            "f": "llm",
+            "q": config["query"],
+            "provider": config["provider"],
+            "temperature": config["temperature"]
+        }
+    )
+    
+    return response.json()
+```
+
 ### REST API Examples
 
 Update URLs to use port `11235`.
@@ -693,8 +814,8 @@ app:
 # Default LLM Configuration
 llm:
   provider: "openai/gpt-4o-mini"  # Can be overridden by LLM_PROVIDER env var
-  api_key_env: "OPENAI_API_KEY"
-  # api_key: sk-...  # If you pass the API key directly then api_key_env will be ignored
+  # api_key: sk-...  # If you pass the API key directly (not recommended)
+  # temperature and base_url are controlled via environment variables or request parameters
 
 # Redis Configuration (Used by internal Redis server managed by supervisord)
 redis:

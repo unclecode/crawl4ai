@@ -15,6 +15,7 @@ from .js_snippet import load_js_script
 from .config import DOWNLOAD_PAGE_TIMEOUT
 from .async_configs import BrowserConfig, CrawlerRunConfig
 from .utils import get_chromium_path
+import warnings
 
 
 BROWSER_DISABLE_OPTIONS = [
@@ -741,17 +742,18 @@ class BrowserManager:
             )
             os.makedirs(browser_args["downloads_path"], exist_ok=True)
 
-        if self.config.proxy or self.config.proxy_config:
+        if self.config.proxy:
+            warnings.warn(
+                "BrowserConfig.proxy is deprecated and ignored. Use proxy_config instead.",
+                DeprecationWarning,
+            )
+        if self.config.proxy_config:
             from playwright.async_api import ProxySettings
 
-            proxy_settings = (
-                ProxySettings(server=self.config.proxy)
-                if self.config.proxy
-                else ProxySettings(
-                    server=self.config.proxy_config.server,
-                    username=self.config.proxy_config.username,
-                    password=self.config.proxy_config.password,
-                )
+            proxy_settings = ProxySettings(
+                server=self.config.proxy_config.server,
+                username=self.config.proxy_config.username,
+                password=self.config.proxy_config.password,
             )
             browser_args["proxy"] = proxy_settings
 

@@ -4,7 +4,7 @@ import asyncio
 from typing import List, Tuple, Dict
 from functools import partial
 from uuid import uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 from base64 import b64encode
 
 import logging
@@ -42,7 +42,9 @@ from utils import (
     should_cleanup_task,
     decode_redis_hash,
     get_llm_api_key,
-    validate_llm_provider
+    validate_llm_provider,
+    get_llm_temperature,
+    get_llm_base_url
 )
 
 import psutil, time
@@ -96,7 +98,9 @@ async def handle_llm_qa(
         response = perform_completion_with_backoff(
             provider=config["llm"]["provider"],
             prompt_with_variables=prompt,
-            api_token=get_llm_api_key(config)
+            api_token=get_llm_api_key(config),  # Returns None to let litellm handle it
+            temperature=get_llm_temperature(config),
+            base_url=get_llm_base_url(config)
         )
 
         return response.choices[0].message.content
@@ -115,7 +119,9 @@ async def process_llm_extraction(
     instruction: str,
     schema: Optional[str] = None,
     cache: str = "0",
-    provider: Optional[str] = None
+    provider: Optional[str] = None,
+    temperature: Optional[float] = None,
+    base_url: Optional[str] = None
 ) -> None:
     """Process LLM extraction in background."""
     try:
@@ -127,11 +133,13 @@ async def process_llm_extraction(
                 "error": error_msg
             })
             return
-        api_key = get_llm_api_key(config, provider)
+        api_key = get_llm_api_key(config, provider)  # Returns None to let litellm handle it
         llm_strategy = LLMExtractionStrategy(
             llm_config=LLMConfig(
                 provider=provider or config["llm"]["provider"],
-                api_token=api_key
+                api_token=api_key,
+                temperature=temperature or get_llm_temperature(config, provider),
+                base_url=base_url or get_llm_base_url(config, provider)
             ),
             instruction=instruction,
             schema=json.loads(schema) if schema else None,
@@ -178,7 +186,9 @@ async def handle_markdown_request(
     query: Optional[str] = None,
     cache: str = "0",
     config: Optional[dict] = None,
-    provider: Optional[str] = None
+    provider: Optional[str] = None,
+    temperature: Optional[float] = None,
+    base_url: Optional[str] = None
 ) -> str:
     """Handle markdown generation requests."""
     try:
@@ -203,7 +213,9 @@ async def handle_markdown_request(
                 FilterType.LLM: LLMContentFilter(
                     llm_config=LLMConfig(
                         provider=provider or config["llm"]["provider"],
-                        api_token=get_llm_api_key(config, provider),
+                        api_token=get_llm_api_key(config, provider),  # Returns None to let litellm handle it
+                        temperature=temperature or get_llm_temperature(config, provider),
+                        base_url=base_url or get_llm_base_url(config, provider)
                     ),
                     instruction=query or "Extract main content"
                 )
@@ -248,7 +260,9 @@ async def handle_llm_request(
     schema: Optional[str] = None,
     cache: str = "0",
     config: Optional[dict] = None,
-    provider: Optional[str] = None
+    provider: Optional[str] = None,
+    temperature: Optional[float] = None,
+    api_base_url: Optional[str] = None
 ) -> JSONResponse:
     """Handle LLM extraction requests."""
     base_url = get_base_url(request)
@@ -279,7 +293,9 @@ async def handle_llm_request(
             cache,
             base_url,
             config,
-            provider
+            provider,
+            temperature,
+            api_base_url
         )
 
     except Exception as e:
@@ -324,7 +340,9 @@ async def create_new_task(
     cache: str,
     base_url: str,
     config: dict,
-    provider: Optional[str] = None
+    provider: Optional[str] = None,
+    temperature: Optional[float] = None,
+    api_base_url: Optional[str] = None
 ) -> JSONResponse:
     """Create and initialize a new task."""
     decoded_url = unquote(input_path)
@@ -349,7 +367,9 @@ async def create_new_task(
         query,
         schema,
         cache,
-        provider
+        provider,
+        temperature,
+        api_base_url
     )
 
     return JSONResponse({
@@ -393,6 +413,9 @@ async def stream_results(crawler: AsyncWebCrawler, results_gen: AsyncGenerator) 
                 server_memory_mb = _get_memory_mb()
                 result_dict = result.model_dump()
                 result_dict['server_memory_mb'] = server_memory_mb
+                # Ensure fit_html is JSON-serializable
+                if "fit_html" in result_dict and not (result_dict["fit_html"] is None or isinstance(result_dict["fit_html"], str)):
+                    result_dict["fit_html"] = None
                 # If PDF exists, encode it to base64
                 if result_dict.get('pdf') is not None:
                     result_dict['pdf'] = b64encode(result_dict['pdf']).decode('utf-8')
@@ -473,6 +496,9 @@ async def handle_crawl_request(
         processed_results = []
         for result in results:
             result_dict = result.model_dump()
+            # if fit_html is not a string, set it to None to avoid serialization errors
+            if "fit_html" in result_dict and not (result_dict["fit_html"] is None or isinstance(result_dict["fit_html"], str)):
+                result_dict["fit_html"] = None
             # If PDF exists, encode it to base64
             if result_dict.get('pdf') is not None:
                 result_dict['pdf'] = b64encode(result_dict['pdf']).decode('utf-8')
@@ -576,7 +602,7 @@ async def handle_crawl_job(
     task_id = f"crawl_{uuid4().hex[:8]}"
     await redis.hset(f"task:{task_id}", mapping={
         "status": TaskStatus.PROCESSING,         # <-- keep enum values consistent
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
         "url": json.dumps(urls),                 # store list as JSON string
         "result": "",
         "error": "",

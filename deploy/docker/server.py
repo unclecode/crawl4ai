@@ -241,7 +241,8 @@ async def get_markdown(
         raise HTTPException(
             400, "Invalid URL format. Must start with http://, https://, or for raw HTML (raw:, raw://)")
     markdown = await handle_markdown_request(
-        body.url, body.f, body.q, body.c, config, body.provider
+        body.url, body.f, body.q, body.c, config, body.provider,
+        body.temperature, body.base_url
     )
     return JSONResponse({
         "url": body.url,
@@ -266,12 +267,26 @@ async def generate_html(
     Use when you need sanitized HTML structures for building schemas or further processing.
     """
     cfg = CrawlerRunConfig()
-    async with AsyncWebCrawler(config=BrowserConfig()) as crawler:
-        results = await crawler.arun(url=body.url, config=cfg)
-    raw_html = results[0].html
-    from crawl4ai.utils import preprocess_html_for_schema
-    processed_html = preprocess_html_for_schema(raw_html)
-    return JSONResponse({"html": processed_html, "url": body.url, "success": True})
+    try:
+        async with AsyncWebCrawler(config=BrowserConfig()) as crawler:
+            results = await crawler.arun(url=body.url, config=cfg)
+        # Check if the crawl was successful
+        if not results[0].success:
+            raise HTTPException(
+                status_code=500,
+                detail=results[0].error_message or "Crawl failed"
+            )
+        
+        raw_html = results[0].html
+        from crawl4ai.utils import preprocess_html_for_schema
+        processed_html = preprocess_html_for_schema(raw_html)
+        return JSONResponse({"html": processed_html, "url": body.url, "success": True})
+    except Exception as e:
+        # Log and raise as HTTP 500 for other exceptions
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
 
 # Screenshot endpoint
 
@@ -289,18 +304,29 @@ async def generate_screenshot(
     Use when you need an image snapshot of the rendered page. Its recommened to provide an output path to save the screenshot.
     Then in result instead of the screenshot you will get a path to the saved file.
     """
-    cfg = CrawlerRunConfig(
-        screenshot=True, screenshot_wait_for=body.screenshot_wait_for)
-    async with AsyncWebCrawler(config=BrowserConfig()) as crawler:
-        results = await crawler.arun(url=body.url, config=cfg)
-    screenshot_data = results[0].screenshot
-    if body.output_path:
-        abs_path = os.path.abspath(body.output_path)
-        os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-        with open(abs_path, "wb") as f:
-            f.write(base64.b64decode(screenshot_data))
-        return {"success": True, "path": abs_path}
-    return {"success": True, "screenshot": screenshot_data}
+    try:
+        cfg = CrawlerRunConfig(
+            screenshot=True, screenshot_wait_for=body.screenshot_wait_for)
+        async with AsyncWebCrawler(config=BrowserConfig()) as crawler:
+            results = await crawler.arun(url=body.url, config=cfg)
+        if not results[0].success:
+            raise HTTPException(
+                status_code=500,
+                detail=results[0].error_message or "Crawl failed"
+            )
+        screenshot_data = results[0].screenshot
+        if body.output_path:
+            abs_path = os.path.abspath(body.output_path)
+            os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+            with open(abs_path, "wb") as f:
+                f.write(base64.b64decode(screenshot_data))
+            return {"success": True, "path": abs_path}
+        return {"success": True, "screenshot": screenshot_data}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
 
 # PDF endpoint
 
@@ -318,17 +344,28 @@ async def generate_pdf(
     Use when you need a printable or archivable snapshot of the page. It is recommended to provide an output path to save the PDF.
     Then in result instead of the PDF you will get a path to the saved file.
     """
-    cfg = CrawlerRunConfig(pdf=True)
-    async with AsyncWebCrawler(config=BrowserConfig()) as crawler:
-        results = await crawler.arun(url=body.url, config=cfg)
-    pdf_data = results[0].pdf
-    if body.output_path:
-        abs_path = os.path.abspath(body.output_path)
-        os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-        with open(abs_path, "wb") as f:
-            f.write(pdf_data)
-        return {"success": True, "path": abs_path}
-    return {"success": True, "pdf": base64.b64encode(pdf_data).decode()}
+    try:
+        cfg = CrawlerRunConfig(pdf=True)
+        async with AsyncWebCrawler(config=BrowserConfig()) as crawler:
+            results = await crawler.arun(url=body.url, config=cfg)
+        if not results[0].success:
+            raise HTTPException(
+                status_code=500,
+                detail=results[0].error_message or "Crawl failed"
+            )
+        pdf_data = results[0].pdf
+        if body.output_path:
+            abs_path = os.path.abspath(body.output_path)
+            os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+            with open(abs_path, "wb") as f:
+                f.write(pdf_data)
+            return {"success": True, "path": abs_path}
+        return {"success": True, "pdf": base64.b64encode(pdf_data).decode()}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
 
 
 @app.post("/execute_js")
@@ -384,12 +421,23 @@ async def execute_js(
         ```
 
     """
-    cfg = CrawlerRunConfig(js_code=body.scripts)
-    async with AsyncWebCrawler(config=BrowserConfig()) as crawler:
-        results = await crawler.arun(url=body.url, config=cfg)
-    # Return JSON-serializable dict of the first CrawlResult
-    data = results[0].model_dump()
-    return JSONResponse(data)
+    try:
+        cfg = CrawlerRunConfig(js_code=body.scripts)
+        async with AsyncWebCrawler(config=BrowserConfig()) as crawler:
+            results = await crawler.arun(url=body.url, config=cfg)
+        if not results[0].success:
+            raise HTTPException(
+                status_code=500,
+                detail=results[0].error_message or "Crawl failed"
+            )
+        # Return JSON-serializable dict of the first CrawlResult
+        data = results[0].model_dump()
+        return JSONResponse(data)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
 
 
 @app.get("/llm/{url:path}")
@@ -438,23 +486,21 @@ async def crawl(
     """
     if not crawl_request.urls:
         raise HTTPException(400, "At least one URL required")
-        
+
     # Check whether it is a redirection for a streaming request
     crawler_config = CrawlerRunConfig.load(crawl_request.crawler_config)
     if crawler_config.stream:
-        return RedirectResponse(
-            url="/crawl/stream",
-            status_code=307,
-            headers={"Content-Type": "application/json"}
-        )
-
-    res = await handle_crawl_request(
+        return await stream_process(crawl_request=crawl_request)
+    results = await handle_crawl_request(
         urls=crawl_request.urls,
         browser_config=crawl_request.browser_config,
         crawler_config=crawl_request.crawler_config,
         config=config,
     )
-    return JSONResponse(res)
+    # check if all of the results are not successful
+    if all(not result["success"] for result in results["results"]):
+        raise HTTPException(500, f"Crawl request failed: {results['results'][0]['error_message']}")
+    return JSONResponse(results)
 
 
 @app.post("/crawl/stream")
@@ -466,12 +512,16 @@ async def crawl_stream(
 ):
     if not crawl_request.urls:
         raise HTTPException(400, "At least one URL required")
+
+    return await stream_process(crawl_request=crawl_request)
+
+async def stream_process(crawl_request: CrawlRequest):
     crawler, gen = await handle_stream_crawl_request(
         urls=crawl_request.urls,
         browser_config=crawl_request.browser_config,
         crawler_config=crawl_request.crawler_config,
         config=config,
-    )
+)
     return StreamingResponse(
         stream_results(crawler, gen),
         media_type="application/x-ndjson",

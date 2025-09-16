@@ -108,7 +108,19 @@ config = AdaptiveConfig(
     embedding_min_confidence_threshold=0.1  # Stop if completely irrelevant
 )
 
-# With custom embedding provider (e.g., OpenAI)
+# With custom LLM provider for query expansion (recommended)
+from crawl4ai import LLMConfig
+
+config = AdaptiveConfig(
+    strategy="embedding",
+    embedding_llm_config=LLMConfig(
+        provider='openai/text-embedding-3-small',
+        api_token='your-api-key',
+        temperature=0.7
+    )
+)
+
+# Alternative: Dictionary format (backward compatible)
 config = AdaptiveConfig(
     strategy="embedding",
     embedding_llm_config={
