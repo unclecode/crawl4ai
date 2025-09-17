@@ -2212,21 +2212,22 @@ def normalize_url(
     query = parsed.query
     if query:
         # explode, mutate, then rebuild
-        params = [(k.lower(), v) for k, v in parse_qsl(query, keep_blank_values=True)]
+        params = list(parse_qsl(query, keep_blank_values=True)) # Parse query string into key-value pairs, preserving blank values
 
         if drop_query_tracking:
+            # Define default tracking parameters to remove for cleaner URLs
             default_tracking = {
                 'utm_source', 'utm_medium', 'utm_campaign', 'utm_term',
                 'utm_content', 'gclid', 'fbclid', 'ref', 'ref_src'
             }
             if extra_drop_params:
-                default_tracking |= {p.lower() for p in extra_drop_params}
-            params = [(k, v) for k, v in params if k not in default_tracking]
+                default_tracking |= {p.lower() for p in extra_drop_params} # Add any extra parameters to drop, case-insensitive
+            params = [(k, v) for k, v in params if k not in default_tracking] # Filter out tracking parameters
 
         if sort_query:
-            params.sort(key=lambda kv: kv[0])
+            params.sort(key=lambda kv: kv[0].lower()) # Sort parameters alphabetically by key for consistent output
 
-        query = urlencode(params, doseq=True) if params else ''
+        query = urlencode(params, doseq=True) if params else '' # Rebuild query string, handling sequences properly
 
     # ── fragment ──
     fragment = parsed.fragment if keep_fragment else ''
