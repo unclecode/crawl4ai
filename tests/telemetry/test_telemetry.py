@@ -142,15 +142,19 @@ class TestConsentManager:
     def test_docker_default_enabled(self):
         """Test that Docker environment has telemetry enabled by default."""
         with patch('crawl4ai.telemetry.consent.EnvironmentDetector.detect', return_value=Environment.DOCKER):
-            config = Mock()
-            config.get_consent.return_value = TelemetryConsent.NOT_SET
-            
-            consent_manager = ConsentManager(config)
-            consent = consent_manager.check_and_prompt()
-            
-            # Should be enabled by default in Docker
-            assert config.set_consent.called
-            assert config.set_consent.call_args[0][0] == TelemetryConsent.ALWAYS
+            with patch('os.environ.get') as mock_env_get:
+                # Mock os.environ.get to return None for CRAWL4AI_TELEMETRY
+                mock_env_get.return_value = None
+                
+                config = Mock()
+                config.get_consent.return_value = TelemetryConsent.NOT_SET
+                
+                consent_manager = ConsentManager(config)
+                consent_manager.check_and_prompt()
+                
+                # Should be enabled by default in Docker
+                assert config.set_consent.called
+                assert config.set_consent.call_args[0][0] == TelemetryConsent.ALWAYS
     
     def test_docker_disabled_by_env(self):
         """Test that Docker telemetry can be disabled via environment variable."""
