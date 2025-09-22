@@ -469,10 +469,13 @@ async def handle_crawl_request(
         # await crawler.start()
         
         base_config = config["crawler"]["base_config"]
-        # Iterate on key-value pairs in global_config then use haseattr to set them 
+        # Iterate on key-value pairs in global_config then use hasattr to set them
         for key, value in base_config.items():
             if hasattr(crawler_config, key):
-                setattr(crawler_config, key, value)
+                current_value = getattr(crawler_config, key)
+                # Only set base config if user didn't provide a value
+                if current_value is None or current_value == "":
+                    setattr(crawler_config, key, value)
 
         results = []
         func = getattr(crawler, "arun" if len(urls) == 1 else "arun_many")
