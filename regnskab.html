@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beach Volleyball Club - Årsregnskab 2024</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        :root {
+            --primary: #1e7a93;
+            --secondary: #fec726;
+            --accent: #83c7d0;
+            --background: #f8f9fa;
+            --text: #333333;
+            --card-bg: #ffffff;
+            --success: #4CAF50;
+            --danger: #F44336;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: var(--background);
+            color: var(--text);
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        header {
+            background: var(--primary);
+            color: white;
+            padding: 2rem 0;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        h2 {
+            font-weight: 400;
+            opacity: 0.9;
+        }
+
+        .section {
+            margin-bottom: 3rem;
+        }
+
+        .section-title {
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--primary);
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 1rem;
+            background: var(--primary);
+            color: white;
+        }
+
+        .card-title {
+            font-size: 1.2rem;
+        }
+
+        .card-body {
+            padding: 1.5rem;
+        }
+
+        .stat {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            color: var(--primary);
+        }
+
+        .stat-label {
+            color: #777;
+            font-size: 0.9rem;
+        }
+
+        .comparison {
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .up {
+            color: var(--success);
+        }
+
+        .down {
+            color: var(--danger);
+        }
+
+        .chart-container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+            height: 400px;
+        }
+
+        .tabs {
+            display: flex;
+            margin-bottom: 1.5rem;
+        }
+
+        .tab {
+            padding: 0.75rem 1.5rem;
+            background: #e9ecef;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .tab:first-child {
+            border-radius: 4px 0 0 4px;
+        }
+
+        .tab:last-child {
+            border-radius: 0 4px 4px 0;
+        }
+
+        .tab.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 2rem;
+            background: white;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background-color: #f1f3f5;
+            font-weight: 600;
+        }
+
+        .positive {
+            color: var(--success);
+        }
+
+        .negative {
+            color: var(--danger);
+        }
+
+        @media (max-width: 768px) {
+            .cards {
+                grid-template-columns: 1fr;
+            }
+            
+            .tabs {
+                flex-direction: column;
+            }
+            
+            .tab {
+                border-radius: 0;
+            }
+            
+            .tab:first-child {
+                border-radius: 4px 4px 0 0;
+            }
+            
+            .tab:last-child {
+                border-radius: 0 0 4px 4px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="logo-container">
+                <img src="/Users/lassedrud-lund/Documents/ABC/Logo/abc-mobile-logo-retina-2-e1582565011307.png" alt="Aarhus Beachvolley Club Logo" class="logo">
+                <div>
+                    <h1>Aarhus Beachvolley Club</h1>
+                    <h2>Årsregnskab 2024</h2>
+                </div>
+            </div>
+        </div>
+    </header>
+    <style>
+        .logo-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+        .logo {
+            width: 80px;
+            height: 80px;
+        }
+        @media (max-width: 768px) {
+            .logo-container {
+                flex-direction: column;
+            }
+        }
+    </style>
+
+    <div class="container">
+        <section class="section">
+            <h3 class="section-title">Økonomisk Overblik</h3>
+            
+            <div class="cards">
+                <div class="card">
+                    <div class="card-header">
+                        <h4 class="card-title">Indtægter</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="stat">1.961.733 kr.</div>
+                        <div class="comparison">
+                            <span class="up">↑ 25,9%</span> fra 2023
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h4 class="card-title">Udgifter</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="stat">1.461.675 kr.</div>
+                        <div class="comparison">
+                            <span class="up">↑ 17,5%</span> fra 2023
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h4 class="card-title">Årets Resultat</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="stat">500.057 kr.</div>
+                        <div class="comparison">
+                            <span class="up">↑ 59,1%</span> fra 2023
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section">
+            <h3 class="section-title">Indtægtsfordeling</h3>
+            
+            <div class="chart-container">
+                <canvas id="income-chart"></canvas>
+            </div>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Indtægtskilde</th>
+                        <th>Beløb (kr.)</th>
+                        <th>% af Total</th>
+                        <th>Ændring fra 2023</th>
+                        <th>% fra Budget</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Kontingent</td>
+                        <td>497.440</td>
+                        <td>25,36%</td>
+                        <td class="negative">-40,51%*</td>
+                        <td class="negative">-31,4%</td>
+                    </tr>
+                    <tr>
+                        <td title="Note 1 : Ungdoms kontingent budget + 2023 indeholdt i kontigent">Kontingent - Ungdom (note 1)</td>
+                        <td>212.495</td>
+                        <td>10,83%</td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td>Udlån af baner</td>
+                        <td>302.148</td>
+                        <td>15,40%</td>
+                        <td class="positive">+65,12%</td>
+                        <td class="positive">202,1%</td>
+                    </tr>
+                    <tr>
+                        <td>Aktivitetstilskud</td>
+                        <td>17.756</td>
+                        <td>0,91%</td>
+                        <td class="positive">+796%</td>
+                        <td class="negative">-11,2%</td>
+                    </tr>
+                    <tr>
+                        <td>Lokaletilskud</td>
+                        <td>204.051</td>
+                        <td>10,40%</td>
+                        <td class="positive">+2,03%</td>
+                        <td class="positive">2,0%</td>
+                    </tr>
+                    <tr>
+                        <td>Bevillinger, fonde</td>
+                        <td>199.459</td>
+                        <td>10,17%</td>
+                        <td class="negative">-7,93%</td>
+                        <td class="negative">-37,1%</td>
+                    </tr>
+                    <tr>
+                        <td>Tilskud til Børn- og ungeansvarlig</td>
+                        <td>383.975</td>
+                        <td>19,57%</td>
+                        <td class="positive">+18,69%</td>
+                        <td class="negative">-1,0%</td>
+                    </tr>
+                    <tr>
+                        <td title="Omsætningen dækker over hele 2024, alle arrangementer">Kiosk (note 5)</td>
+                        <td>124.132</td>
+                        <td>6,33%</td>
+                        <td class="positive">+54,82%</td>
+                        <td class="positive">3,4%</td>
+                    </tr>
+                    <tr>
+                        <td>Tøj</td>
+                        <td>20.277</td>
+                        <td>1,03%</td>
+                        <td class="positive">+4,14%</td>
+                        <td class="positive">1,4%</td>
+                    </tr>
+                    <tr>
+                        <td>Øvrige</td>
+                        <td>-</td>
+                        <td>0%</td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td><strong>I alt</strong></td>
+                        <td><strong>1.961.733</strong></td>
+                        <td>100%</td>
+                        <td class="positive"><strong>+25,87%</strong></td>
+                        <td class="positive"><strong>3,7%</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="section">
+            <h3 class="section-title">Udgiftsfordeling</h3>
+            
+            <div class="chart-container">
+                <canvas id="expense-chart"></canvas>
+            </div>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Udgiftskategori</th>
+                        <th>Beløb (kr.)</th>
+                        <th>% af Total</th>
+                        <th>Ændring fra 2023</th>
+                        <th>Ændring fra 2023</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="5"><strong>Udgifter/materialer</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Indkøb tøj</td>
+                        <td>38.450</td>
+                        <td>2,6%</td>
+                        <td class="positive">35,1%</td>
+                        <td class="positive">284,5%</td>
+                    </tr>
+                    <tr>
+                        <td>Indkøb Bolde</td>
+                        <td>26.005</td>
+                        <td>1,8%</td>
+                        <td class="positive">62,6%</td>
+                        <td class="negative">-13,3%</td>
+                    </tr>
+                    <tr>
+                        <td>Indkøb Kiosk</td>
+                        <td>63.187</td>
+                        <td>4,3%</td>
+                        <td class="positive">78,3%</td>
+                        <td class="positive">97,5%</td>
+                    </tr>
+                    <tr>
+                        <td>Øvrige materialer</td>
+                        <td>5.579</td>
+                        <td>0,4%</td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td title="Beløbet dækker over de netto udgifter der direkte kan henføres til den forskellige arrangementer  evt. kiosk salg, frivillge mv er ikke indregnet i arrangementer. Arrangementer dækker over:  Aarhus Challenger, Grand Slam, Half moon, beach Games mv.">Arrangementer (netto) (note 6)</td>
+                        <td>17.980</td>
+                        <td>1,2%</td>
+                        <td class="negative">-36,0%</td>
+                        <td class="negative">-28,1%</td>
+                    </tr>
+                    <tr>
+                        <td>Daglig leder, sommer</td>
+                        <td>16.525</td>
+                        <td>1,1%</td>
+                        <td class="negative">-7,7%</td>
+                        <td class="negative">-33,9%</td>
+                    </tr>
+                    <tr>
+                        <td>Frivillige</td>
+                        <td>14.686</td>
+                        <td>1,0%</td>
+                        <td class="negative">-12,7%</td>
+                        <td class="negative">-2,1%</td>
+                    </tr>
+                    <tr>
+                        <td>Udgifter sommerferie aktiviteter</td>
+                        <td>10.891</td>
+                        <td>0,7%</td>
+                        <td class="positive">29,0%</td>
+                        <td class="positive">8,9%</td>
+                    </tr>
+                    <tr>
+                        <td><strong>I alt</strong></td>
+                        <td><strong>193.302</strong></td>
+                        <td>13,2%</td>
+                        <td class="positive">27,9%</td>
+                        <td class="positive">31,5%</td>
+                    </tr>
+                    <tr>
+                        <td colspan="5"><strong>Udgifter - Beach Park Aarhus</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Byggematerialer m.m.</td>
+                        <td>118.619</td>
+                        <td>8,1%</td>
+                        <td class="positive">117,8%</td>
+                        <td class="negative">-56,1%</td>
+                    </tr>
+                    <tr>
+                        <td>Forbrug (el, vand m.m.) og forsikringer</td>
+                        <td>16.648</td>
+                        <td>1,1%</td>
+                        <td class="negative">-32,5%</td>
+                        <td class="negative">-38,3%</td>
+                    </tr>
+                    <tr>
+                        <td>Afskrivninger</td>
+                        <td>-</td>
+                        <td>0,0%</td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td>Baner og materialer</td>
+                        <td>25.112</td>
+                        <td>1,7%</td>
+                        <td class="positive">8,4%</td>
+                        <td class="negative">-16,3%</td>
+                    </tr>
+                    <tr>
+                        <td>Diverse</td>
+                        <td>8.435</td>
+                        <td>0,6%</td>
+                        <td></td>
+                        <td class="positive">68,7%</td>
+                    </tr>
+                    <tr>
+                        <td><strong>I alt</strong></td>
+                        <td><strong>168.814</strong></td>
+                        <td>11,5%</td>
+                        <td class="positive">65,0%</td>
+                        <td class="negative">-49,2%</td>
+                    </tr>
+                    <tr>
+                        <td colspan="5"><strong>Udgifter - Beachdomen</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Opførelse</td>
+                        <td>-</td>
+                        <td>0,0%</td>
+                        <td class="positive">505.405 kr.</td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td>Forbrug, renovation, forsikringer</td>
+                        <td>191.412</td>
+                        <td>13,1%</td>
+                        <td class="positive">65,1%</td>
+                        <td class="positive">59,5%</td>
+                    </tr>
+                    <tr>
+                        <td>Vedligehold</td>
+                        <td>87.259</td>
+                        <td>6,0%</td>
+                        <td class="positive">630,6%</td>
+                        <td class="positive">74,5%</td>
+                    </tr>
+                    <tr>
+                        <td>Vestereng IdrætsZone (omklædningsrum)</td>
+                        <td>51.455</td>
+                        <td>3,5%</td>
+                        <td class="negative">-54,7%*</td>
+                        <td class="negative">-26,5%*</td>
+                    </tr>
+                    <tr>
+                        <td><strong>I alt</strong></td>
+                        <td><strong>330.126</strong></td>
+                        <td>22,6%</td>
+                        <td class="negative">-55,8%</td>
+                        <td class="positive">37,6%</td>
+                    </tr>
+                    <tr>
+                        <td colspan="5"><strong>Udgifter - Udvalg</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Træner</td>
+                        <td>110.241</td>
+                        <td>7,5%</td>
+                        <td class="negative">-5,4%</td>
+                        <td class="negative">-8,1%</td>
+                    </tr>
+                    <tr>
+                        <td>Elite</td>
+                        <td>45.078</td>
+                        <td>3,1%</td>
+                        <td class="positive">25,9%</td>
+                        <td class="negative">-43,7%</td>
+                    </tr>
+                    <tr>
+                        <td>Børne-unge-ansvarlig (FIBU)</td>
+                        <td>396.404</td>
+                        <td>27,1%</td>
+                        <td class="positive">19,37</td>
+                        <td class="positive">3,5%</td>
+                    </tr>
+                    <tr>
+                        <td>Ekstern hjælp</td>
+                        <td>22.000</td>
+                        <td>1,5%</td>
+                        <td></td>
+                        <td class="negative">-68,6%</td>
+                    </tr>
+                    <tr>
+                        <td>PR og kommunikation</td>
+                        <td>17.406</td>
+                        <td>1,2%</td>
+                        <td class="negative">-23,7%</td>
+                        <td class="negative">-0,5%</td>
+                    </tr>
+                    <tr>
+                        <td>Øvrige udvalg</td>
+                        <td>-</td>
+                        <td>0,0%</td>
+                        <td></td>
+                        <td class="positive">2000 kr.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>I alt</strong></td>
+                        <td><strong>591.128</strong></td>
+                        <td>40,4%</td>
+                        <td class="positive">203,7%</td>
+                        <td class="negative">-12,1%</td>
+                    </tr>
+                    <tr>
+                        <td colspan="5"><strong>Udgifter - Administration</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Møder og bestyrelse</td>
+                        <td>10.078</td>
+                        <td>0,7%</td>
+                        <td class="negative">-48,2%</td>
+                        <td class="negative">-66,4%</td>
+                    </tr>
+                    <tr>
+                        <td>Bank- og betalingsgebyr</td>
+                        <td>5.267</td>
+                        <td>0,4%</td>
+                        <td class="positive">148,1%</td>
+                        <td class="positive">31,7%</td>
+                    </tr>
+                    <tr>
+                        <td>Kontingent og abonnementer</td>
+                        <td>25.392</td>
+                        <td>1,7%</td>
+                        <td class="positive">3,6%</td>
+                        <td class="negative">-15,4%</td>
+                    </tr>
+                    <tr>
+                        <td>Kurser</td>
+                        <td>2.939</td>
+                        <td>0,2%</td>
+                        <td></td>
+                        <td class="negative">-41,2%</td>
+                    </tr>
+                    <tr>
+                        <td>Gaver</td>
+                        <td>670</td>
+                        <td>0,0%</td>
+                        <td class="positive">7,4%</td>
+                        <td class="negative">-66,5%</td>
+                    </tr>
+                    <tr>
+                        <td>Øvrige adm.</td>
+                        <td>(538)</td>
+                        <td>0,0%</td>
+                        <td class="negative">-119,8%</td>
+                        <td class="negative">-117,9%</td>
+                    </tr>
+                    <tr>
+                        <td><strong>I alt</strong></td>
+                        <td><strong>43.809</strong></td>
+                        <td>3,0%</td>
+                        <td class="negative">-11,4%</td>
+                        <td class="negative">-40,8%</td>
+                    </tr>
+                    <tr>
+                        <td>Renteudgifter - Beachdome-lån (Netto)</td>
+                        <td>134.497</td>
+                        <td>9,2%</td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td><strong>I alt udgifter</strong></td>
+                        <td><strong>1.461.675</strong></td>
+                        <td>100,0%</td>
+                        <td></td>
+                        <td class="negative">-0,3%</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="section">
+            <h3 class="section-title">Balance</h3>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Balance</th>
+                        <th>2024</th>
+                        <th>2024 budget</th>
+                        <th>2023</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="4"><strong>Aktiver</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Likvid beholdning</td>
+                        <td>907.722</td>
+                        <td>1.917.194</td>
+                        <td>1.492.694</td>
+                    </tr>
+                    <tr>
+                        <td>Tilgodehavender</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>-</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Aktiver i alt</strong></td>
+                        <td><strong>907.722</strong></td>
+                        <td><strong>1.917.194</strong></td>
+                        <td><strong>1.492.694</strong></td>
+                    </tr>
+                    <tr>
+                        <td colspan="4"><strong>Passiver</strong></td>
+                    </tr>
+                    <tr>
+                        <td colspan="4"><strong>Egenkapital</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Egenkapital pr. 1/1 2024</td>
+                        <td>-917.100</td>
+                        <td>-917.100</td>
+                        <td>-1.231.350</td>
+                    </tr>
+                    <tr>
+                        <td>Årets resultat</td>
+                        <td>500.057</td>
+                        <td>424.500</td>
+                        <td>314.250</td>
+                    </tr>
+                    <tr>
+                        <td>Egenkapital pr. 31/12 2024</td>
+                        <td><strong>-417.043</strong></td>
+                        <td><strong>-492.600</strong></td>
+                        <td><strong>-917.100</strong></td>
+                    </tr>
+                    <tr>
+                        <td colspan="4"><strong>Gæld</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Gæld, Kommune kredit 7</td>
+                        <td>880.425</td>
+                        <td>2.300.000</td>
+                        <td>2.300.000</td>
+                    </tr>
+                    <tr>
+                        <td>Gæld DIF 8</td>
+                        <td>175.000</td>
+                        <td>-</td>
+                        <td>-</td>
+                    </tr>
+                    <tr>
+                        <td>Forudbetalinger/skyldige udgifter 9</td>
+                        <td>269.340</td>
+                        <td>95.744</td>
+                        <td>95.744</td>
+                    </tr>
+                    <tr>
+                        <td>Nøgledeposita</td>
+                        <td>-</td>
+                        <td>14.050</td>
+                        <td>14.050</td>
+                    </tr>
+                    <tr>
+                        <td><strong>I alt gæld</strong></td>
+                        <td><strong>1.324.765</strong></td>
+                        <td><strong>2.409.794</strong></td>
+                        <td><strong>2.409.794</strong></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Passiver i alt</strong></td>
+                        <td><strong>907.722</strong></td>
+                        <td><strong>1.917.194</strong></td>
+                        <td><strong>1.492.694</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+        
+            <div class="chart-container">
+                <canvas id="balance-chart"></canvas>
+            </div>
+        </section>
+
+        <section class="section">
+            <h3 class="section-title">Medlemsstatistik</h3>
+            
+            <div class="cards">
+                <div class="card">
+                    <div class="card-header">
+                        <h4 class="card-title">Antal Medlemmer</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="stat">1039</div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h4 class="card-title">Fastholdelsesgrad</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="stat">71,8%</div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h4 class="card-title">Gns. alder</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="stat">29,4 år</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <canvas id="membership-chart"></canvas>
+            </div>
+
+            <div class="chart-container">
+                <canvas id="ageChart"></canvas>
+            </div>
+        </section>
+
+
+    
+    <script>
+    // Balance visualization chart
+    document.addEventListener('DOMContentLoaded', function() {
+        const balanceCtx = document.getElementById('balance-chart').getContext('2d');
+        const balanceChart = new Chart(balanceCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Aktiver', 'Egenkapital', 'Gæld'],
+                datasets: [
+                    {
+                        label: '2024',
+                        data: [907722, -417043, 1324765],
+                        backgroundColor: '#1e7a93',
+                        borderColor: '#0d697f',
+                        borderWidth: 1
+                    },
+                    {
+                        label: '2024 budget',
+                        data: [1917194, -492600, 2409794],
+                        backgroundColor: '#fec726',
+                        borderColor: '#e4b320',
+                        borderWidth: 1
+                    },
+                    {
+                        label: '2023',
+                        data: [1492694, -917100, 2409794],
+                        backgroundColor: '#83c7d0',
+                        borderColor: '#6bb8c2',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        title: {
+                            display: true,
+                            text: 'Beløb (kr.)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Balance Kategorier'
+                        }
+                    }
+                }
+            }
+        });
+    });
+    </script>
+    <script>
+        // Chart configurations
+        document.addEventListener('DOMContentLoaded', function() {
+            // Income Distribution Chart
+            const incomeCtx = document.getElementById('income-chart').getContext('2d');
+            const incomeChart = new Chart(incomeCtx, {
+                type: 'pie',
+                data: {
+                    labels: ['Kontingent', 'Kontingent - Ungdom', 'Udlån af baner', 'Aktivitetstilskud', 'Lokaletilskud', 'Bevillinger, fonde', 'Tilskud til Børn- og ungeansvarlig', 'Kiosk', 'Tøj', 'Øvrige'],
+                    datasets: [{
+                        data: [497440, 212495, 302148, 17756, 204051, 199459, 383975, 124132, 20277, 0],
+                        backgroundColor: [
+                            '#1e7a93',
+                            '#fec726',
+                            '#83c7d0',
+                            '#56a6b7',
+                            '#a8d5db',
+                            '#f4a261',
+                            '#e76f51',
+                            '#2a9d8f',
+                            '#264653',
+                            '#e9c46a'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const value = context.raw;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = Math.round((value / total) * 100);
+                                    return `${context.label}: ${value.toLocaleString('da-DK')} kr. (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Expense Breakdown Chart
+            const expenseCtx = document.getElementById('expense-chart').getContext('2d');
+            const expenseChart = new Chart(expenseCtx, {
+                type: 'pie',
+                data: {
+                    labels: [
+                        'Materialer', 
+                        'Beach Park Aarhus', 
+                        'Beachdomen', 
+                        'Udvalg', 
+                        'Administration', 
+                        'Renteudgifter - Beachdome-lån (Netto)'
+                    ],
+                    datasets: [{
+                        data: [193302.35, 168813.61, 330126, 591127.98, 43808.87, 134496.56],
+                        backgroundColor: [
+                            '#1e7a93',
+                            '#fec726',
+                            '#83c7d0',
+                            '#56a6b7',
+                            '#a8d5db',
+                            '#f4a261'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const value = context.raw;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = Math.round((value / total) * 100);
+                                    return `${context.label}: ${value.toLocaleString('da-DK')} kr. (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Membership Chart (Anciennitet)
+            const membershipCtx = document.getElementById('membership-chart').getContext('2d');
+            const membershipChart = new Chart(membershipCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'],
+                    datasets: [{
+                        label: 'Medlemmer (unikke)',
+                        data: [293, 291, 137, 52, 55, 53, 29, 16, 21, 24, 20, 30, 1],
+                        backgroundColor: '#1e7a93',
+                        borderColor: '#0d697f',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const value = context.raw;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = Math.round((value / total) * 100);
+                                    return `Medlemmer: ${value} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Antal Medlemmer'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Anciennitet (år)'
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Age Distribution Chart
+            const ageCtx = document.getElementById('ageChart').getContext('2d');
+            const ageChart = new Chart(ageCtx, {
+            type: 'bar',
+            data: {
+                labels: [2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+                         20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34,
+                         35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
+                         50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 65,
+                         67, 71, 72, 76],
+                datasets: [{
+                    label: 'Antal medlemmer',
+                    data: [1, 2, 3, 2, 3, 5, 1, 6, 17, 2, 7, 13, 13, 10, 4, 5, 6, 11, 19,
+                           37, 56, 70, 66, 67, 71, 66, 63, 60, 41, 34, 18, 22, 19, 13,
+                           12, 13, 4, 7, 6, 11, 8, 12, 8, 8, 4, 5, 11, 10, 5, 4, 6, 7,
+                           4, 4, 2, 5, 1, 4, 2, 3, 2, 1, 4, 1, 1, 1],
+                    backgroundColor: 'rgba(75, 192, 192, 0.7)',
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
+                        title: { display: true, text: 'Alder' }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Antal medlemmer' }
+                    }
+                },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        });
+        </script>
+    </div>
+    </section>
+</body>
+</html>
