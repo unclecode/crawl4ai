@@ -685,7 +685,7 @@ async def hook(page, context, **kwargs):
     }''')
     
     if metadata:
-        console.log("Extracted metadata:", metadata)
+        print("Extracted metadata:", metadata)
     
     return page
 """
