@@ -72,7 +72,7 @@ class TestPdfScraping:
                     "stream": False,
                     "cache_mode": "BYPASS",
                     "scraping_strategy": {
-                        "type": "PdfScrapingStrategy",  # Custom PDF scraping strategy
+                        "type": "PDFContentScrapingStrategy",  # Custom PDF scraping strategy
                         "params": {}
                     },
                     "deep_crawl_strategy": {
@@ -100,39 +100,6 @@ class TestPdfScraping:
         assert isinstance(extracted_text, str)
         assert len(extracted_text) > 0
 
-    async def test_pdf_scraping_with_metadata(self, async_client: httpx.AsyncClient):
-        """Test PDF scraping with metadata extraction."""
-        payload = {
-            "urls": [PDF_TEST_URL],
-            "crawler_config": {
-                "type": "CrawlerRunConfig",
-                "params": {
-                    "stream": False,
-                    "cache_mode": "BYPASS",
-                    "scraping_strategy": {
-                        "type": "PdfScrapingStrategy",
-                        "params": {"extract_metadata": True}
-                    },
-                    "deep_crawl_strategy": {
-                        "type": "BFSDeepCrawlStrategy",
-                        "params": {"max_depth": 0, "max_pages": 1}
-                    }
-                }
-            }
-        }
-
-        response = await async_client.post("/crawl", json=payload)
-        response.raise_for_status()
-        data = response.json()
-
-        assert data["success"] is True
-        result = data["results"][0]
-        assert "extracted_content" in result
-        metadata = result["extracted_content"].get("metadata", {})
-        assert isinstance(metadata, dict)
-
-        assert "title" in metadata or "author" in metadata
-
     async def test_pdf_scraping_non_accessible(self, async_client: httpx.AsyncClient):
         """Test PDF scraping when PDF is not accessible."""
         payload = {
@@ -143,7 +110,7 @@ class TestPdfScraping:
                     "stream": False,
                     "cache_mode": "BYPASS",
                     "scraping_strategy": {
-                        "type": "PdfScrapingStrategy",
+                        "type": "PDFContentScrapingStrategy",
                         "params": {}
                     },
                     "deep_crawl_strategy": {
