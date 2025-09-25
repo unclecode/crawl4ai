@@ -75,10 +75,6 @@ class TestPdfScraping:
                         "type": "PDFContentScrapingStrategy",  # Custom PDF scraping strategy
                         "params": {}
                     },
-                    "deep_crawl_strategy": {
-                        "type": "BFSDeepCrawlStrategy",
-                        "params": {"max_depth": 0, "max_pages": 1}
-                    }
                 }
             }
         }
@@ -113,10 +109,6 @@ class TestPdfScraping:
                         "type": "PDFContentScrapingStrategy",
                         "params": {}
                     },
-                    "deep_crawl_strategy": {
-                        "type": "BFSDeepCrawlStrategy",
-                        "params": {"max_depth": 0, "max_pages": 1}
-                    }
                 }
             }
         }
