@@ -1,10 +1,10 @@
 # crawler_pool.py  (new file)
 import asyncio, json, hashlib, time, psutil
 from contextlib import suppress
-from typing import Dict
+from typing import Dict, Optional
 from crawl4ai import AsyncWebCrawler, BrowserConfig
-from typing import Dict
 from utils import load_config 
+
 
 CONFIG = load_config()
 
@@ -15,20 +15,31 @@ LOCK = asyncio.Lock()
 MEM_LIMIT  = CONFIG.get("crawler", {}).get("memory_threshold_percent", 95.0)   # % RAM – refuse new browsers above this
 IDLE_TTL  = CONFIG.get("crawler", {}).get("pool", {}).get("idle_ttl_sec", 1800)   # close if unused for 30 min
 
-def _sig(cfg: BrowserConfig) -> str:
-    payload = json.dumps(cfg.to_dict(), sort_keys=True, separators=(",",":"))
-    return hashlib.sha1(payload.encode()).hexdigest()
+def _sig(cfg: BrowserConfig, crawler_strategy: Optional[object]  = None) -> str:
+    """
+    Generate a unique signature for a crawler based on browser config
+    and optional crawler strategy. This ensures that crawlers with
+    different strategies (e.g., PDF) are stored separately in the pool.
+    """
+    payload = cfg.to_dict()
 
-async def get_crawler(cfg: BrowserConfig) -> AsyncWebCrawler:
+    if crawler_strategy is not None:
+        payload["strategy"] = crawler_strategy.__class__.__name__
+
+    json_payload = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha1(json_payload.encode()).hexdigest()
+
+
+async def get_crawler(cfg: BrowserConfig, crawler_strategy: Optional[object] = None) -> AsyncWebCrawler:
     try:
-        sig = _sig(cfg)
+        sig = _sig(cfg, crawler_strategy=crawler_strategy)
         async with LOCK:
             if sig in POOL:
                 LAST_USED[sig] = time.time();  
                 return POOL[sig]
             if psutil.virtual_memory().percent >= MEM_LIMIT:
                 raise MemoryError("RAM pressure – new browser denied")
-            crawler = AsyncWebCrawler(config=cfg, thread_safe=False)
+            crawler = AsyncWebCrawler(config=cfg, thread_safe=False, crawler_strategy=crawler_strategy)
             await crawler.start()
             POOL[sig] = crawler; LAST_USED[sig] = time.time()
             return crawler
@@ -44,6 +55,7 @@ async def get_crawler(cfg: BrowserConfig) -> AsyncWebCrawler:
             POOL.pop(sig, None)
             LAST_USED.pop(sig, None)
         # If we failed to start the browser, we should remove it from the pool
+        
 async def close_all():
     async with LOCK:
         await asyncio.gather(*(c.close() for c in POOL.values()), return_exceptions=True)

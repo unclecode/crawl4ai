@@ -10,6 +10,9 @@ from .content_scraping_strategy import (
     LXMLWebScrapingStrategy,
     WebScrapingStrategy,  # Backward compatibility alias
 )
+
+from .processors.pdf import PDFCrawlerStrategy, PDFContentScrapingStrategy
+
 from .async_logger import (
     AsyncLoggerBase,
     AsyncLogger,
@@ -128,6 +131,8 @@ __all__ = [
     "BFSDeepCrawlStrategy",
     "BestFirstCrawlingStrategy",
     "DFSDeepCrawlStrategy",
+    "PDFCrawlerStrategy",
+    "PDFContentScrapingStrategy",
     "FilterChain",
     "URLPatternFilter",
     "ContentTypeFilter",

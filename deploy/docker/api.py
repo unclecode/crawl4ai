@@ -13,7 +13,11 @@ from urllib.parse import unquote
 from fastapi import HTTPException, Request, status
 from fastapi.background import BackgroundTasks
 from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
+
 from redis import asyncio as aioredis
+
+from utils import is_pdf_url
 
 from crawl4ai import (
     AsyncWebCrawler,
@@ -31,6 +35,10 @@ from crawl4ai.content_filter_strategy import (
     BM25ContentFilter,
     LLMContentFilter
 )
+
+from crawl4ai.processors.pdf import PDFCrawlerStrategy, PDFContentScrapingStrategy
+from crawl4ai.async_configs import to_serializable_dict
+
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 from crawl4ai.content_scraping_strategy import LXMLWebScrapingStrategy
 
@@ -431,6 +439,18 @@ async def handle_crawl_request(
         urls = [('https://' + url) if not url.startswith(('http://', 'https://')) and not url.startswith(("raw:", "raw://")) else url for url in urls]
         browser_config = BrowserConfig.load(browser_config)
         crawler_config = CrawlerRunConfig.load(crawler_config)
+        
+        is_pdf_flags = await asyncio.gather(*(is_pdf_url(url) for url in urls))
+        is_pdf = any(is_pdf_flags)
+        crawler_strategy = PDFCrawlerStrategy() if is_pdf else None
+
+        if is_pdf and crawler_config.scraping_strategy is None:
+            # Default strategy if not set
+            crawler_config.scraping_strategy = PDFContentScrapingStrategy(
+                extract_images=False,
+                save_images_locally=False,
+                batch_size=2
+            )
 
         dispatcher = MemoryAdaptiveDispatcher(
             memory_threshold_percent=config["crawler"]["memory_threshold_percent"],
@@ -440,7 +460,7 @@ async def handle_crawl_request(
         )
         
         from crawler_pool import get_crawler
-        crawler = await get_crawler(browser_config)
+        crawler = await get_crawler(browser_config, crawler_strategy)
 
         # crawler: AsyncWebCrawler = AsyncWebCrawler(config=browser_config)
         # await crawler.start()
@@ -476,7 +496,8 @@ async def handle_crawl_request(
             # If PDF exists, encode it to base64
             if result_dict.get('pdf') is not None:
                 result_dict['pdf'] = b64encode(result_dict['pdf']).decode('utf-8')
-            processed_results.append(result_dict)
+
+            processed_results.append(to_serializable_dict(result_dict))
             
         return {
             "success": True,
@@ -521,8 +542,19 @@ async def handle_stream_crawl_request(
         # browser_config.verbose = True # Set to False or remove for production stress testing
         browser_config.verbose = False
         crawler_config = CrawlerRunConfig.load(crawler_config)
-        crawler_config.scraping_strategy = LXMLWebScrapingStrategy()
         crawler_config.stream = True
+        
+        is_pdf_flags = await asyncio.gather(*(is_pdf_url(url) for url in urls))
+        is_pdf = any(is_pdf_flags)
+        crawler_strategy = PDFCrawlerStrategy() if is_pdf else None
+
+        if is_pdf and crawler_config.scraping_strategy is None:
+            # Default strategy if not set
+            crawler_config.scraping_strategy = PDFContentScrapingStrategy(
+                extract_images=True,
+                save_images_locally=False,
+                batch_size=2
+            )
 
         dispatcher = MemoryAdaptiveDispatcher(
             memory_threshold_percent=config["crawler"]["memory_threshold_percent"],
@@ -532,7 +564,7 @@ async def handle_stream_crawl_request(
         )
 
         from crawler_pool import get_crawler
-        crawler = await get_crawler(browser_config)
+        crawler = await get_crawler(browser_config, crawler_strategy)
 
         # crawler = AsyncWebCrawler(config=browser_config)
         # await crawler.start()
