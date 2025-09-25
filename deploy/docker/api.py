@@ -445,7 +445,7 @@ async def handle_crawl_request(
         crawler_strategy = PDFCrawlerStrategy() if is_pdf else None
 
         if is_pdf and crawler_config.scraping_strategy is None:
-            # Default strategy if not set
+            # Default strategy if not set.
             crawler_config.scraping_strategy = PDFContentScrapingStrategy(
                 extract_images=False,
                 save_images_locally=False,
