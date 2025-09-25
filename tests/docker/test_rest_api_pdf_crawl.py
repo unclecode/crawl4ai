@@ -1,4 +1,4 @@
-# ==== File: test_rest_api_deep_crawl.py ====
+# ==== File: test_rest_api_pdf_crawl.py ====
 
 import pytest
 import pytest_asyncio
@@ -151,7 +151,7 @@ class TestPdfScraping:
         assert result["success"] is True
         assert "extracted_content" in result
         assert result["extracted_content"] is not None
-        # Vérifier que le texte extrait est non vide
+
         extracted_text = result["extracted_content"].get("text", "")
         assert isinstance(extracted_text, str)
         assert len(extracted_text) > 0
@@ -167,7 +167,7 @@ class TestPdfScraping:
                     "cache_mode": "BYPASS",
                     "scraping_strategy": {
                         "type": "PdfScrapingStrategy",
-                        "params": {"extract_metadata": True}  # Param spécifique pour métadonnées
+                        "params": {"extract_metadata": True}
                     },
                     "deep_crawl_strategy": {
                         "type": "BFSDeepCrawlStrategy",
@@ -186,13 +186,13 @@ class TestPdfScraping:
         assert "extracted_content" in result
         metadata = result["extracted_content"].get("metadata", {})
         assert isinstance(metadata, dict)
-        # Vérification simple : titre et auteur peuvent exister
+
         assert "title" in metadata or "author" in metadata
 
     async def test_pdf_scraping_non_accessible(self, async_client: httpx.AsyncClient):
         """Test PDF scraping when PDF is not accessible."""
         payload = {
-            "urls": [PDF_TEST_INVALID_URL],  # URL invalide
+            "urls": [PDF_TEST_INVALID_URL],
             "crawler_config": {
                 "type": "CrawlerRunConfig",
                 "params": {
@@ -211,7 +211,7 @@ class TestPdfScraping:
         }
 
         response = await async_client.post("/crawl", json=payload)
-        # Le serveur doit répondre OK mais le résultat doit indiquer échec
+
         data = response.json()
         assert data["success"] is True
         result = data["results"][0]
