@@ -18,41 +18,6 @@ PDF_TEST_URL = "https://arxiv.org/pdf/2310.06825"
 PDF_TEST_INVALID_URL = "https://docs.crawl4ai.com/samples/deepcrawl/"
 
 # --- Helper Functions ---
-def load_proxies_from_env() -> List[Dict]:
-    """Load proxies from PROXIES environment variable"""
-    proxies = []
-    proxies_str = os.getenv("PROXIES", "")
-    if not proxies_str:
-        print("PROXIES environment variable not set or empty.")
-        return proxies
-    try:
-        proxy_list = proxies_str.split(",")
-        for proxy in proxy_list:
-            proxy = proxy.strip()
-            if not proxy:
-                continue
-            parts = proxy.split(":")
-            if len(parts) == 4:
-                ip, port, username, password = parts
-                proxies.append({
-                    "server": f"http://{ip}:{port}", # Assuming http, adjust if needed
-                    "username": username,
-                    "password": password,
-                    "ip": ip  # Store original IP if available
-                })
-            elif len(parts) == 2: # ip:port only
-                 ip, port = parts
-                 proxies.append({
-                    "server": f"http://{ip}:{port}",
-                    "ip": ip
-                 })
-            else:
-                 print(f"Skipping invalid proxy string format: {proxy}")
-
-    except Exception as e:
-        print(f"Error loading proxies from environment: {e}")
-    return proxies
-
 
 async def check_server_health(client: httpx.AsyncClient):
     """Check if the server is healthy before running tests."""
@@ -77,27 +42,6 @@ async def assert_crawl_result_structure(result: Dict[str, Any], check_ssl=False)
     if check_ssl:
         assert "ssl_certificate" in result # Check if SSL info is present
         assert isinstance(result["ssl_certificate"], dict) or result["ssl_certificate"] is None
-
-
-async def process_streaming_response(response: httpx.Response) -> List[Dict[str, Any]]:
-    """Processes an NDJSON streaming response."""
-    results = []
-    completed = False
-    async for line in response.aiter_lines():
-        if line:
-            try:
-                data = json.loads(line)
-                if data.get("status") == "completed":
-                    completed = True
-                    break # Stop processing after completion marker
-                elif data.get("url"): # Ensure it looks like a result object
-                    results.append(data)
-                else:
-                    print(f"Received non-result JSON line: {data}") # Log other status messages if needed
-            except json.JSONDecodeError:
-                pytest.fail(f"Failed to decode JSON line: {line}")
-    assert completed, "Streaming response did not end with a completion marker."
-    return results
 
 
 # --- Pytest Fixtures ---
