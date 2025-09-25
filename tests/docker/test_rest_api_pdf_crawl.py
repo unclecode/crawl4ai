@@ -12,8 +12,10 @@ from dotenv import load_dotenv
 load_dotenv() # Load environment variables from .env file if present
 
 # --- Test Configuration ---
-BASE_URL = os.getenv("CRAWL4AI_TEST_URL", "http://localhost:11235") # If server is running in Docker, use the host's IP
-BASE_URL = os.getenv("CRAWL4AI_TEST_URL", "http://localhost:8020") # If server is running in dev debug mode
+BASE_URL = os.getenv(
+    "CRAWL4AI_TEST_URL",
+    "http://localhost:11235",  # Docker default; override via env for dev/debug (e.g., 8020)
+)
 PDF_TEST_URL = "https://arxiv.org/pdf/2310.06825"
 PDF_TEST_INVALID_URL = "https://docs.crawl4ai.com/samples/deepcrawl/"
 

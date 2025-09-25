@@ -442,6 +442,12 @@ async def handle_crawl_request(
         
         is_pdf_flags = await asyncio.gather(*(is_pdf_url(url) for url in urls))
         is_pdf = any(is_pdf_flags)
+        if any(is_pdf_flags) and not all(is_pdf_flags):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Mix of PDF and non-PDF URLs in a single request is not supported yet."
+            )
+            
         crawler_strategy = PDFCrawlerStrategy() if is_pdf else None
 
         if is_pdf and crawler_config.scraping_strategy is None:
@@ -546,6 +552,12 @@ async def handle_stream_crawl_request(
         
         is_pdf_flags = await asyncio.gather(*(is_pdf_url(url) for url in urls))
         is_pdf = any(is_pdf_flags)
+        if any(is_pdf_flags) and not all(is_pdf_flags):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Mix of PDF and non-PDF URLs in a single request is not supported yet."
+            )
+            
         crawler_strategy = PDFCrawlerStrategy() if is_pdf else None
 
         if is_pdf and crawler_config.scraping_strategy is None:
