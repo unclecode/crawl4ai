@@ -23,7 +23,7 @@ from api import (
     stream_results
 )
 from schemas import (
-    CrawlRequest,
+    CrawlRequestWithHooks,
     MarkdownRequest,
     RawCode,
     HTMLRequest,
@@ -462,6 +462,72 @@ async def get_schema():
             "crawler": CrawlerRunConfig().dump()}
 
 
+@app.get("/hooks/info")
+async def get_hooks_info():
+    """Get information about available hook points and their signatures"""
+    from hook_manager import UserHookManager
+    
+    hook_info = {}
+    for hook_point, params in UserHookManager.HOOK_SIGNATURES.items():
+        hook_info[hook_point] = {
+            "parameters": params,
+            "description": get_hook_description(hook_point),
+            "example": get_hook_example(hook_point)
+        }
+    
+    return JSONResponse({
+        "available_hooks": hook_info,
+        "timeout_limits": {
+            "min": 1,
+            "max": 120,
+            "default": 30
+        }
+    })
+
+
+def get_hook_description(hook_point: str) -> str:
+    """Get description for each hook point"""
+    descriptions = {
+        "on_browser_created": "Called after browser instance is created",
+        "on_page_context_created": "Called after page and context are created - ideal for authentication",
+        "before_goto": "Called before navigating to the target URL",
+        "after_goto": "Called after navigation is complete",
+        "on_user_agent_updated": "Called when user agent is updated",
+        "on_execution_started": "Called when custom JavaScript execution begins",
+        "before_retrieve_html": "Called before retrieving the final HTML - ideal for scrolling",
+        "before_return_html": "Called just before returning the HTML content"
+    }
+    return descriptions.get(hook_point, "")
+
+
+def get_hook_example(hook_point: str) -> str:
+    """Get example code for each hook point"""
+    examples = {
+        "on_page_context_created": """async def hook(page, context, **kwargs):
+    # Add authentication cookie
+    await context.add_cookies([{
+        'name': 'session',
+        'value': 'my-session-id',
+        'domain': '.example.com'
+    }])
+    return page""",
+        
+        "before_retrieve_html": """async def hook(page, context, **kwargs):
+    # Scroll to load lazy content
+    await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+    await page.wait_for_timeout(2000)
+    return page""",
+        
+        "before_goto": """async def hook(page, context, url, **kwargs):
+    # Set custom headers
+    await page.set_extra_http_headers({
+        'X-Custom-Header': 'value'
+    })
+    return page"""
+    }
+    return examples.get(hook_point, "# Implement your hook logic here\nreturn page")
+
+
 @app.get(config["observability"]["health_check"]["endpoint"])
 async def health():
     return {"status": "ok", "timestamp": time.time(), "version": __version__}
@@ -477,12 +543,13 @@ async def metrics():
 @mcp_tool("crawl")
 async def crawl(
     request: Request,
-    crawl_request: CrawlRequest,
+    crawl_request: CrawlRequestWithHooks,
     _td: Dict = Depends(token_dep),
 ):
     """
     Crawl a list of URLs and return the results as JSON.
     For streaming responses, use /crawl/stream endpoint.
+    Supports optional user-provided hook functions for customization.
     """
     if not crawl_request.urls:
         raise HTTPException(400, "At least one URL required")
@@ -490,11 +557,21 @@ async def crawl(
     crawler_config = CrawlerRunConfig.load(crawl_request.crawler_config)
     if crawler_config.stream:
         return await stream_process(crawl_request=crawl_request)
+    
+    # Prepare hooks config if provided
+    hooks_config = None
+    if crawl_request.hooks:
+        hooks_config = {
+            'code': crawl_request.hooks.code,
+            'timeout': crawl_request.hooks.timeout
+        }
+    
     results = await handle_crawl_request(
         urls=crawl_request.urls,
         browser_config=crawl_request.browser_config,
         crawler_config=crawl_request.crawler_config,
         config=config,
+        hooks_config=hooks_config
     )
     # check if all of the results are not successful
     if all(not result["success"] for result in results["results"]):
@@ -506,7 +583,7 @@ async def crawl(
 @limiter.limit(config["rate_limiting"]["default_limit"])
 async def crawl_stream(
     request: Request,
-    crawl_request: CrawlRequest,
+    crawl_request: CrawlRequestWithHooks,
     _td: Dict = Depends(token_dep),
 ):
     if not crawl_request.urls:
@@ -514,21 +591,38 @@ async def crawl_stream(
 
     return await stream_process(crawl_request=crawl_request)
 
-async def stream_process(crawl_request: CrawlRequest):
-    crawler, gen = await handle_stream_crawl_request(
+async def stream_process(crawl_request: CrawlRequestWithHooks):
+    
+    # Prepare hooks config if provided# Prepare hooks config if provided
+    hooks_config = None
+    if crawl_request.hooks:
+        hooks_config = {
+            'code': crawl_request.hooks.code,
+            'timeout': crawl_request.hooks.timeout
+        }
+    
+    crawler, gen, hooks_info = await handle_stream_crawl_request(
         urls=crawl_request.urls,
         browser_config=crawl_request.browser_config,
         crawler_config=crawl_request.crawler_config,
         config=config,
-)
+        hooks_config=hooks_config
+    )
+    
+    # Add hooks info to response headers if available
+    headers = {
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "X-Stream-Status": "active",
+    }
+    if hooks_info:
+        import json
+        headers["X-Hooks-Status"] = json.dumps(hooks_info['status']['status'])
+    
     return StreamingResponse(
         stream_results(crawler, gen),
         media_type="application/x-ndjson",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Stream-Status": "active",
-        },
+        headers=headers,
     )
 
 

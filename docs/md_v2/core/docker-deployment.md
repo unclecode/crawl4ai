@@ -431,6 +431,409 @@ Executes JavaScript snippets on the specified URL and returns the full crawl res
 
 ---
 
+## User-Provided Hooks API
+
+The Docker API supports user-provided hook functions, allowing you to customize the crawling behavior by injecting your own Python code at specific points in the crawling pipeline. This powerful feature enables authentication, performance optimization, and custom content extraction without modifying the server code.
+
+> ⚠️ **IMPORTANT SECURITY WARNING**: 
+> - **Never use hooks with untrusted code or on untrusted websites**
+> - **Be extremely careful when crawling sites that might be phishing or malicious**
+> - **Hook code has access to page context and can interact with the website**
+> - **Always validate and sanitize any data extracted through hooks**
+> - **Never expose credentials or sensitive data in hook code**
+> - **Consider running the Docker container in an isolated network when testing**
+
+### Hook Information Endpoint
+
+```
+GET /hooks/info
+```
+
+Returns information about available hook points and their signatures:
+
+```bash
+curl http://localhost:11235/hooks/info
+```
+
+### Available Hook Points
+
+The API supports 8 hook points that match the local SDK:
+
+| Hook Point | Parameters | Description | Best Use Cases |
+|------------|------------|-------------|----------------|
+| `on_browser_created` | `browser` | After browser instance creation | Light setup tasks |
+| `on_page_context_created` | `page, context` | After page/context creation | **Authentication, cookies, route blocking** |
+| `before_goto` | `page, context, url` | Before navigating to URL | Custom headers, logging |
+| `after_goto` | `page, context, url, response` | After navigation completes | Verification, waiting for elements |
+| `on_user_agent_updated` | `page, context, user_agent` | When user agent changes | UA-specific logic |
+| `on_execution_started` | `page, context` | When JS execution begins | JS-related setup |
+| `before_retrieve_html` | `page, context` | Before getting final HTML | **Scrolling, lazy loading** |
+| `before_return_html` | `page, context, html` | Before returning HTML | Final modifications, metrics |
+
+### Using Hooks in Requests
+
+Add hooks to any crawl request by including the `hooks` parameter:
+
+```json
+{
+  "urls": ["https://httpbin.org/html"],
+  "hooks": {
+    "code": {
+      "hook_point_name": "async def hook(...): ...",
+      "another_hook": "async def hook(...): ..."
+    },
+    "timeout": 30  // Optional, default 30 seconds (max 120)
+  }
+}
+```
+
+### Hook Examples with Real URLs
+
+#### 1. Authentication with Cookies (GitHub)
+
+```python
+import requests
+
+# Example: Setting GitHub session cookie (use your actual session)
+hooks_code = {
+    "on_page_context_created": """
+async def hook(page, context, **kwargs):
+    # Add authentication cookies for GitHub
+    # WARNING: Never hardcode real credentials!
+    await context.add_cookies([
+        {
+            'name': 'user_session',
+            'value': 'your_github_session_token',  # Replace with actual token
+            'domain': '.github.com',
+            'path': '/',
+            'httpOnly': True,
+            'secure': True,
+            'sameSite': 'Lax'
+        }
+    ])
+    return page
+"""
+}
+
+response = requests.post("http://localhost:11235/crawl", json={
+    "urls": ["https://github.com/settings/profile"],  # Protected page
+    "hooks": {"code": hooks_code, "timeout": 30}
+})
+```
+
+#### 2. Basic Authentication (httpbin.org for testing)
+
+```python
+# Safe testing with httpbin.org (a service designed for HTTP testing)
+hooks_code = {
+    "before_goto": """
+async def hook(page, context, url, **kwargs):
+    import base64
+    # httpbin.org/basic-auth expects username="user" and password="passwd"
+    credentials = base64.b64encode(b"user:passwd").decode('ascii')
+    
+    await page.set_extra_http_headers({
+        'Authorization': f'Basic {credentials}'
+    })
+    return page
+"""
+}
+
+response = requests.post("http://localhost:11235/crawl", json={
+    "urls": ["https://httpbin.org/basic-auth/user/passwd"],
+    "hooks": {"code": hooks_code, "timeout": 15}
+})
+```
+
+#### 3. Performance Optimization (News Sites)
+
+```python
+# Example: Optimizing crawling of news sites like CNN or BBC
+hooks_code = {
+    "on_page_context_created": """
+async def hook(page, context, **kwargs):
+    # Block images, fonts, and media to speed up crawling
+    await context.route("**/*.{png,jpg,jpeg,gif,webp,svg,ico}", lambda route: route.abort())
+    await context.route("**/*.{woff,woff2,ttf,otf,eot}", lambda route: route.abort())
+    await context.route("**/*.{mp4,webm,ogg,mp3,wav,flac}", lambda route: route.abort())
+    
+    # Block common tracking and ad domains
+    await context.route("**/googletagmanager.com/*", lambda route: route.abort())
+    await context.route("**/google-analytics.com/*", lambda route: route.abort())
+    await context.route("**/doubleclick.net/*", lambda route: route.abort())
+    await context.route("**/facebook.com/tr/*", lambda route: route.abort())
+    await context.route("**/amazon-adsystem.com/*", lambda route: route.abort())
+    
+    # Disable CSS animations for faster rendering
+    await page.add_style_tag(content='''
+        *, *::before, *::after {
+            animation-duration: 0s !important;
+            transition-duration: 0s !important;
+        }
+    ''')
+    
+    return page
+"""
+}
+
+response = requests.post("http://localhost:11235/crawl", json={
+    "urls": ["https://www.bbc.com/news"],  # Heavy news site
+    "hooks": {"code": hooks_code, "timeout": 30}
+})
+```
+
+#### 4. Handling Infinite Scroll (Twitter/X)
+
+```python
+# Example: Scrolling on Twitter/X (requires authentication)
+hooks_code = {
+    "before_retrieve_html": """
+async def hook(page, context, **kwargs):
+    # Scroll to load more tweets
+    previous_height = 0
+    for i in range(5):  # Limit scrolls to avoid infinite loop
+        current_height = await page.evaluate("document.body.scrollHeight")
+        if current_height == previous_height:
+            break  # No more content to load
+            
+        await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+        await page.wait_for_timeout(2000)  # Wait for content to load
+        previous_height = current_height
+    
+    return page
+"""
+}
+
+# Note: Twitter requires authentication for most content
+response = requests.post("http://localhost:11235/crawl", json={
+    "urls": ["https://twitter.com/nasa"],  # Public profile
+    "hooks": {"code": hooks_code, "timeout": 30}
+})
+```
+
+#### 5. E-commerce Login (Example Pattern)
+
+```python
+# SECURITY WARNING: This is a pattern example. 
+# Never use real credentials in code!
+# Always use environment variables or secure vaults.
+
+hooks_code = {
+    "on_page_context_created": """
+async def hook(page, context, **kwargs):
+    # Example pattern for e-commerce sites
+    # DO NOT use real credentials here!
+    
+    # Navigate to login page first
+    await page.goto("https://example-shop.com/login")
+    
+    # Wait for login form to load
+    await page.wait_for_selector("#email", timeout=5000)
+    
+    # Fill login form (use environment variables in production!)
+    await page.fill("#email", "test@example.com")  # Never use real email
+    await page.fill("#password", "test_password")   # Never use real password
+    
+    # Handle "Remember Me" checkbox if present
+    try:
+        await page.uncheck("#remember_me")  # Don't remember on shared systems
+    except:
+        pass
+    
+    # Submit form
+    await page.click("button[type='submit']")
+    
+    # Wait for redirect after login
+    await page.wait_for_url("**/account/**", timeout=10000)
+    
+    return page
+"""
+}
+```
+
+#### 6. Extracting Structured Data (Wikipedia)
+
+```python
+# Safe example using Wikipedia
+hooks_code = {
+    "after_goto": """
+async def hook(page, context, url, response, **kwargs):
+    # Wait for Wikipedia content to load
+    await page.wait_for_selector("#content", timeout=5000)
+    return page
+""",
+    
+    "before_retrieve_html": """
+async def hook(page, context, **kwargs):
+    # Extract structured data from Wikipedia infobox
+    metadata = await page.evaluate('''() => {
+        const infobox = document.querySelector('.infobox');
+        if (!infobox) return null;
+        
+        const data = {};
+        const rows = infobox.querySelectorAll('tr');
+        
+        rows.forEach(row => {
+            const header = row.querySelector('th');
+            const value = row.querySelector('td');
+            if (header && value) {
+                data[header.innerText.trim()] = value.innerText.trim();
+            }
+        });
+        
+        return data;
+    }''')
+    
+    if metadata:
+        console.log("Extracted metadata:", metadata)
+    
+    return page
+"""
+}
+
+response = requests.post("http://localhost:11235/crawl", json={
+    "urls": ["https://en.wikipedia.org/wiki/Python_(programming_language)"],
+    "hooks": {"code": hooks_code, "timeout": 20}
+})
+```
+
+### Security Best Practices
+
+> 🔒 **Critical Security Guidelines**:
+
+1. **Never Trust User Input**: If accepting hook code from users, always validate and sandbox it
+2. **Avoid Phishing Sites**: Never use hooks on suspicious or unverified websites
+3. **Protect Credentials**: 
+   - Never hardcode passwords, tokens, or API keys in hook code
+   - Use environment variables or secure secret management
+   - Rotate credentials regularly
+4. **Network Isolation**: Run the Docker container in an isolated network when testing
+5. **Audit Hook Code**: Always review hook code before execution
+6. **Limit Permissions**: Use the least privileged access needed
+7. **Monitor Execution**: Check hook execution logs for suspicious behavior
+8. **Timeout Protection**: Always set reasonable timeouts (default 30s)
+
+### Hook Response Information
+
+When hooks are used, the response includes detailed execution information:
+
+```json
+{
+  "success": true,
+  "results": [...],
+  "hooks": {
+    "status": {
+      "status": "success",  // or "partial" or "failed"
+      "attached_hooks": ["on_page_context_created", "before_retrieve_html"],
+      "validation_errors": [],
+      "successfully_attached": 2,
+      "failed_validation": 0
+    },
+    "execution_log": [
+      {
+        "hook_point": "on_page_context_created",
+        "status": "success",
+        "execution_time": 0.523,
+        "timestamp": 1234567890.123
+      }
+    ],
+    "errors": [],  // Any runtime errors
+    "summary": {
+      "total_executions": 2,
+      "successful": 2,
+      "failed": 0,
+      "timed_out": 0,
+      "success_rate": 100.0
+    }
+  }
+}
+```
+
+### Error Handling
+
+The hooks system is designed to be resilient:
+
+1. **Validation Errors**: Caught before execution (syntax errors, wrong parameters)
+2. **Runtime Errors**: Handled gracefully - crawl continues with original page object
+3. **Timeout Protection**: Hooks automatically terminated after timeout (configurable 1-120s)
+
+### Complete Example: Safe Multi-Hook Crawling
+
+```python
+import requests
+import json
+import os
+
+# Safe example using httpbin.org for testing
+hooks_code = {
+    "on_page_context_created": """
+async def hook(page, context, **kwargs):
+    # Set viewport and test cookies
+    await page.set_viewport_size({"width": 1920, "height": 1080})
+    await context.add_cookies([
+        {"name": "test_cookie", "value": "test_value", "domain": ".httpbin.org", "path": "/"}
+    ])
+    
+    # Block unnecessary resources for httpbin
+    await context.route("**/*.{png,jpg,jpeg}", lambda route: route.abort())
+    return page
+""",
+    
+    "before_goto": """
+async def hook(page, context, url, **kwargs):
+    # Add custom headers for testing
+    await page.set_extra_http_headers({
+        "X-Test-Header": "crawl4ai-test",
+        "Accept-Language": "en-US,en;q=0.9"
+    })
+    print(f"[HOOK] Navigating to: {url}")
+    return page
+""",
+    
+    "before_retrieve_html": """
+async def hook(page, context, **kwargs):
+    # Simple scroll for any lazy-loaded content
+    await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+    await page.wait_for_timeout(1000)
+    return page
+"""
+}
+
+# Make the request to safe testing endpoints
+response = requests.post("http://localhost:11235/crawl", json={
+    "urls": [
+        "https://httpbin.org/html",
+        "https://httpbin.org/json"
+    ],
+    "hooks": {
+        "code": hooks_code,
+        "timeout": 30
+    },
+    "crawler_config": {
+        "cache_mode": "bypass"
+    }
+})
+
+# Check results
+if response.status_code == 200:
+    data = response.json()
+    
+    # Check hook execution
+    if data['hooks']['status']['status'] == 'success':
+        print(f"✅ All {len(data['hooks']['status']['attached_hooks'])} hooks executed successfully")
+        print(f"Execution stats: {data['hooks']['summary']}")
+    
+    # Process crawl results
+    for result in data['results']:
+        print(f"Crawled: {result['url']} - Success: {result['success']}")
+else:
+    print(f"Error: {response.status_code}")
+```
+
+> 💡 **Remember**: Always test your hooks on safe, known websites first before using them on production sites. Never crawl sites that you don't have permission to access or that might be malicious.
+
+---
+
 ## Dockerfile Parameters
 
 You can customize the image build process using build arguments (`--build-arg`). These are typically used via `docker buildx build` or within the `docker-compose.yml` file.

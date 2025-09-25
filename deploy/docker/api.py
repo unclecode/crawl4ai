@@ -442,13 +442,15 @@ async def handle_crawl_request(
     urls: List[str],
     browser_config: dict,
     crawler_config: dict,
-    config: dict
+    config: dict,
+    hooks_config: Optional[dict] = None
 ) -> dict:
-    """Handle non-streaming crawl requests."""
+    """Handle non-streaming crawl requests with optional hooks."""
     start_mem_mb = _get_memory_mb() # <--- Get memory before
     start_time = time.time()
     mem_delta_mb = None
     peak_mem_mb = start_mem_mb
+    hook_manager = None
     
     try:
         urls = [('https://' + url) if not url.startswith(('http://', 'https://')) and not url.startswith(("raw:", "raw://")) else url for url in urls]
@@ -468,6 +470,19 @@ async def handle_crawl_request(
         # crawler: AsyncWebCrawler = AsyncWebCrawler(config=browser_config)
         # await crawler.start()
         
+        # Attach hooks if provided
+        hooks_status = {}
+        if hooks_config:
+            from hook_manager import attach_user_hooks_to_crawler, UserHookManager
+            hook_manager = UserHookManager(timeout=hooks_config.get('timeout', 30))
+            hooks_status, hook_manager = await attach_user_hooks_to_crawler(
+                crawler,
+                hooks_config.get('code', {}),
+                timeout=hooks_config.get('timeout', 30),
+                hook_manager=hook_manager
+            )
+            logger.info(f"Hooks attachment status: {hooks_status['status']}")
+        
         base_config = config["crawler"]["base_config"]
         # Iterate on key-value pairs in global_config then use hasattr to set them
         for key, value in base_config.items():
@@ -484,6 +499,10 @@ async def handle_crawl_request(
                                 config=crawler_config, 
                                 dispatcher=dispatcher)
         results = await partial_func()
+        
+        # Ensure results is always a list
+        if not isinstance(results, list):
+            results = [results]
 
         # await crawler.close()
         
@@ -498,22 +517,72 @@ async def handle_crawl_request(
         # Process results to handle PDF bytes
         processed_results = []
         for result in results:
-            result_dict = result.model_dump()
-            # if fit_html is not a string, set it to None to avoid serialization errors
-            if "fit_html" in result_dict and not (result_dict["fit_html"] is None or isinstance(result_dict["fit_html"], str)):
-                result_dict["fit_html"] = None
-            # If PDF exists, encode it to base64
-            if result_dict.get('pdf') is not None:
-                result_dict['pdf'] = b64encode(result_dict['pdf']).decode('utf-8')
-            processed_results.append(result_dict)
+            try:
+                # Check if result has model_dump method (is a proper CrawlResult)
+                if hasattr(result, 'model_dump'):
+                    result_dict = result.model_dump()
+                elif isinstance(result, dict):
+                    result_dict = result
+                else:
+                    # Handle unexpected result type
+                    logger.warning(f"Unexpected result type: {type(result)}")
+                    result_dict = {
+                        "url": str(result) if hasattr(result, '__str__') else "unknown",
+                        "success": False,
+                        "error_message": f"Unexpected result type: {type(result).__name__}"
+                    }
+                
+                # if fit_html is not a string, set it to None to avoid serialization errors
+                if "fit_html" in result_dict and not (result_dict["fit_html"] is None or isinstance(result_dict["fit_html"], str)):
+                    result_dict["fit_html"] = None
+                    
+                # If PDF exists, encode it to base64
+                if result_dict.get('pdf') is not None and isinstance(result_dict.get('pdf'), bytes):
+                    result_dict['pdf'] = b64encode(result_dict['pdf']).decode('utf-8')
+                    
+                processed_results.append(result_dict)
+            except Exception as e:
+                logger.error(f"Error processing result: {e}")
+                processed_results.append({
+                    "url": "unknown",
+                    "success": False,
+                    "error_message": str(e)
+                })
             
-        return {
+        response = {
             "success": True,
             "results": processed_results,
             "server_processing_time_s": end_time - start_time,
             "server_memory_delta_mb": mem_delta_mb,
             "server_peak_memory_mb": peak_mem_mb
         }
+        
+        # Add hooks information if hooks were used
+        if hooks_config and hook_manager:
+            from hook_manager import UserHookManager
+            if isinstance(hook_manager, UserHookManager):
+                try:
+                    # Ensure all hook data is JSON serializable
+                    import json
+                    hook_data = {
+                        "status": hooks_status,
+                        "execution_log": hook_manager.execution_log,
+                        "errors": hook_manager.errors,
+                        "summary": hook_manager.get_summary()
+                    }
+                    # Test that it's serializable
+                    json.dumps(hook_data)
+                    response["hooks"] = hook_data
+                except (TypeError, ValueError) as e:
+                    logger.error(f"Hook data not JSON serializable: {e}")
+                    response["hooks"] = {
+                        "status": {"status": "error", "message": "Hook data serialization failed"},
+                        "execution_log": [],
+                        "errors": [{"error": str(e)}],
+                        "summary": {}
+                    }
+        
+        return response
 
     except Exception as e:
         logger.error(f"Crawl error: {str(e)}", exc_info=True)
@@ -542,9 +611,11 @@ async def handle_stream_crawl_request(
     urls: List[str],
     browser_config: dict,
     crawler_config: dict,
-    config: dict
-) -> Tuple[AsyncWebCrawler, AsyncGenerator]:
-    """Handle streaming crawl requests."""
+    config: dict,
+    hooks_config: Optional[dict] = None
+) -> Tuple[AsyncWebCrawler, AsyncGenerator, Optional[Dict]]:
+    """Handle streaming crawl requests with optional hooks."""
+    hooks_info = None
     try:
         browser_config = BrowserConfig.load(browser_config)
         # browser_config.verbose = True # Set to False or remove for production stress testing
@@ -565,6 +636,20 @@ async def handle_stream_crawl_request(
 
         # crawler = AsyncWebCrawler(config=browser_config)
         # await crawler.start()
+        
+        # Attach hooks if provided
+        if hooks_config:
+            from hook_manager import attach_user_hooks_to_crawler, UserHookManager
+            hook_manager = UserHookManager(timeout=hooks_config.get('timeout', 30))
+            hooks_status, hook_manager = await attach_user_hooks_to_crawler(
+                crawler,
+                hooks_config.get('code', {}),
+                timeout=hooks_config.get('timeout', 30),
+                hook_manager=hook_manager
+            )
+            logger.info(f"Hooks attachment status for streaming: {hooks_status['status']}")
+            # Include hook manager in hooks_info for proper tracking
+            hooks_info = {'status': hooks_status, 'manager': hook_manager}
 
         results_gen = await crawler.arun_many(
             urls=urls,
@@ -572,7 +657,7 @@ async def handle_stream_crawl_request(
             dispatcher=dispatcher
         )
 
-        return crawler, results_gen
+        return crawler, results_gen, hooks_info
 
     except Exception as e:
         # Make sure to close crawler if started during an error here
