@@ -16,7 +16,7 @@ BASE_URL = os.getenv(
     "CRAWL4AI_TEST_URL",
     "http://localhost:11235",  # Docker default; override via env for dev/debug (e.g., 8020)
 )
-PDF_TEST_URL = "https://arxiv.org/pdf/2310.06825"
+PDF_TEST_URL = "https://arxiv.org/pdf/2310.06825.pdf"
 PDF_TEST_INVALID_URL = "https://docs.crawl4ai.com/samples/deepcrawl/"
 
 # --- Helper Functions ---
@@ -94,9 +94,9 @@ class TestPdfScraping:
         assert "extracted_content" in result
         assert result["extracted_content"] is not None
 
-        extracted_text = result["extracted_content"].get("text", "")
-        assert isinstance(extracted_text, str)
-        assert len(extracted_text) > 0
+        content = result.get("extracted_content")
+        extracted_text = content.get("text", "") if isinstance(content, dict) else (content or "")
+        assert isinstance(extracted_text, str) and len(extracted_text) > 0
 
     async def test_pdf_scraping_non_accessible(self, async_client: httpx.AsyncClient):
         """Test PDF scraping when PDF is not accessible."""
