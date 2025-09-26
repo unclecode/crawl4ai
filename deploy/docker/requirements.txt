@@ -7,7 +7,6 @@ redis>=5.2.1
 jwt>=1.3.1
 dnspython>=2.7.0
 email-validator==2.2.0
-sse-starlette==2.2.1
 pydantic>=2.11
 rank-bm25==0.2.2
 anyio==4.9.0
