@@ -30,25 +30,55 @@ def _sig(cfg: BrowserConfig, crawler_strategy: Optional[object]  = None) -> str:
     return hashlib.sha256(json_payload.encode()).hexdigest()
 
 
-async def get_crawler(cfg: BrowserConfig, crawler_strategy: Optional[object] = None) -> AsyncWebCrawler:
+# Track in-flight creations to dedupe concurrent get_crawler() calls
+CREATING: Dict[str, asyncio.Future] = {}
+
+async def get_crawler(
+    cfg: BrowserConfig, crawler_strategy: Optional[object] = None
+) -> AsyncWebCrawler:
     sig: Optional[str] = None
     try:
         sig = _sig(cfg, crawler_strategy=crawler_strategy)
+
+        # First pass under lock: reuse or join/create in-flight
         async with LOCK:
             if sig in POOL:
                 LAST_USED[sig] = time.time()
                 return POOL[sig]
-            if psutil.virtual_memory().percent >= MEM_LIMIT:
-                raise MemoryError("RAM pressure - new browser denied")
-            crawler = AsyncWebCrawler(config=cfg, thread_safe=False, crawler_strategy=crawler_strategy)
-            await crawler.start()
-            POOL[sig] = crawler; LAST_USED[sig] = time.time()
-            return crawler
-    except MemoryError as e:
+            fut = CREATING.get(sig)
+            if fut is None:
+                if psutil.virtual_memory().percent >= MEM_LIMIT:
+                    raise MemoryError("RAM pressure - new browser denied")
+                fut = asyncio.get_running_loop().create_future()
+                CREATING[sig] = fut
+
+        # Outside lock: create/start if we're the creator
+        if not fut.done():
+            try:
+                crawler = AsyncWebCrawler(
+                    config=cfg, thread_safe=False, crawler_strategy=crawler_strategy
+                )
+                await crawler.start()
+                async with LOCK:
+                    POOL[sig] = crawler
+                    LAST_USED[sig] = time.time()
+                fut.set_result(crawler)
+            except Exception as e:
+                fut.set_exception(e)
+                raise RuntimeError("Failed to start browser") from e
+            finally:
+                async with LOCK:
+                    CREATING.pop(sig, None)
+
+        # Await the shared result (crawler or the same exception)
+        return await fut
+
+    except MemoryError:
         raise
     except Exception as e:
         raise RuntimeError(f"Failed to start browser: {e}")
     finally:
+        # Update last-used if a crawler exists
         async with LOCK:
             if sig and sig in POOL:
                 LAST_USED[sig] = time.time()
@@ -56,6 +86,7 @@ async def get_crawler(cfg: BrowserConfig, crawler_strategy: Optional[object] = N
                 if sig:
                     POOL.pop(sig, None)
                     LAST_USED.pop(sig, None)
+
         
 async def close_all():
     async with LOCK:
