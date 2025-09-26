@@ -118,13 +118,13 @@ EOL
 *   **With custom host port:**
     ```bash
     docker run -d \
-      -p 11235:11235 \
+      -p 8080:11235 \
       --name crawl4ai \
       --env-file .llm.env \
       --shm-size=1g \
       unclecode/crawl4ai:0.7.0-r1
     ```
-    > Access at `http://localhost:11235` (mapped to container's internal port 11235)
+    > Access at `http://localhost:8080` (mapped to container's internal port 11235)
 
 > The server will be available at `http://localhost:11235`. Visit `/playground` to access the interactive testing interface.
 
@@ -305,10 +305,8 @@ MCP is an open protocol that standardizes how applications provide context to LL
 
 ### Connecting via MCP
 
-The Crawl4AI server exposes two MCP endpoints:
+The Crawl4AI server exposes an MCP HTTP endpoint:
 
-- **Server-Sent Events (SSE)**: `http://localhost:11235/mcp/sse`
-- **WebSocket**: `ws://localhost:11235/mcp/ws`
 - **FastMCP HTTP**: `http://localhost:11235/mcp`
 
 > ⚠️ **Known limitation:** The FastMCP HTTP proxy does not yet forward JWT `Authorization`
@@ -322,8 +320,8 @@ The Crawl4AI server exposes two MCP endpoints:
 You can add Crawl4AI as an MCP tool provider in Claude Code with a simple command:
 
 ```bash
-# Add the Crawl4AI server as an MCP provider
-claude mcp add --transport sse c4ai-sse http://localhost:11235/mcp/sse
+# Add the Crawl4AI server as an MCP provider (HTTP transport)
+claude mcp add --transport http c4ai-http http://localhost:11235/mcp
 
 # List all MCP providers to verify it was added
 claude mcp list

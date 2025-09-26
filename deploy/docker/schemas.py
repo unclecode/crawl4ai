@@ -20,7 +20,7 @@ class MarkdownRequest(BaseModel):
         None,
         description="Query used when f is 'bm25' or 'llm' (recommended/required for meaningful results)",
     )
-    c: Optional[str] = Field("0", description="Cache‑bust / revision counter")
+    c: Optional[str] = Field("0", description="Cache-bust / revision counter")
     provider: Optional[str] = Field(
         None,
         description="LLM provider override for f='llm' (e.g., 'openai/gpt-4o-mini'). API key must be configured",

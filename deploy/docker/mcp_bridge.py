@@ -3,35 +3,66 @@
 from __future__ import annotations
 import inspect, json, re
 import urllib.parse
-from typing import Any, Callable, Dict, List, get_origin, get_args
+from typing import Callable, List, get_origin, get_args
 from contextlib import asynccontextmanager
 import httpx
 
-from fastapi import FastAPI, HTTPException
+from fastapi import HTTPException
 from pydantic import BaseModel
 from fastmcp import FastMCP
 
-# Decorator functions for marking FastAPI routes
 def mcp_resource(name: str | None = None):
+    """Decorator to mark FastAPI route as MCP resource.
+
+    Args:
+        name: Optional custom name for the resource.
+
+    Returns:
+        Decorated function with MCP metadata.
+    """
     def deco(fn):
         fn.__mcp_kind__, fn.__mcp_name__ = "resource", name
         return fn
     return deco
 
 def mcp_template(name: str | None = None):
+    """Decorator to mark FastAPI route as MCP template.
+
+    Args:
+        name: Optional custom name for the template.
+
+    Returns:
+        Decorated function with MCP metadata.
+    """
     def deco(fn):
         fn.__mcp_kind__, fn.__mcp_name__ = "template", name
         return fn
     return deco
 
 def mcp_tool(name: str | None = None):
+    """Decorator to mark FastAPI route as MCP tool.
+
+    Args:
+        name: Optional custom name for the tool.
+
+    Returns:
+        Decorated function with MCP metadata.
+    """
     def deco(fn):
         fn.__mcp_kind__, fn.__mcp_name__ = "tool", name
         return fn
     return deco
 
 def _make_http_proxy(base_url: str, route):
-    """Create HTTP proxy function for FastAPI route."""
+    """Create HTTP proxy function for FastAPI route.
+
+    Args:
+        base_url: Base URL of the FastAPI server.
+        route: FastAPI route object to proxy.
+
+    Returns:
+        Async function that proxies requests to the route.
+    """
     method = list(route.methods - {"HEAD", "OPTIONS"})[0]
 
     async def proxy(**kwargs):
@@ -48,10 +79,11 @@ def _make_http_proxy(base_url: str, route):
             # Process each parameter normally
             for k, v in list(kwargs.items()):
                 placeholder = "{" + k + "}"
-                if placeholder in path:
-                    # Path parameter - ensure safe URL encoding
-                    encoded_value = urllib.parse.quote(str(v), safe="")
-                    path = path.replace(placeholder, encoded_value)
+                # Path parameter - support typed params e.g. {k:path}
+                encoded_value = urllib.parse.quote(str(v), safe="")
+                pattern = re.compile(r"\{" + re.escape(k) + r"(?:\:[^}]*)?\}")
+                if pattern.search(path):
+                    path = pattern.sub(encoded_value, path)
                     kwargs.pop(k)
                 elif hasattr(v, "model_dump"):
                     # Pydantic model serialization
@@ -83,21 +115,22 @@ def _make_http_proxy(base_url: str, route):
                 raise HTTPException(e.response.status_code, e.response.text)
     return proxy
 
-def _body_model(fn: Callable) -> type[BaseModel] | None:
-    """Extract Pydantic model from function signature."""
-    for p in inspect.signature(fn).parameters.values():
-        a = p.annotation
-        if inspect.isclass(a) and issubclass(a, BaseModel):
-            return a
-    return None
-
 def create_mcp_server(
     *,
     name: str | None = None,
     routes: list,
     base_url: str,
 ) -> FastMCP:
-    """Create FastMCP server instance with registered tools."""
+    """Create FastMCP server instance with registered tools.
+
+    Args:
+        name: Optional name for the MCP server.
+        routes: List of FastAPI routes to register.
+        base_url: Base URL for internal HTTP requests.
+
+    Returns:
+        Configured FastMCP server instance.
+    """
     server_name = name or "FastAPI-MCP"
 
     # Create FastMCP instance
@@ -111,14 +144,17 @@ def create_mcp_server(
         if kind != "tool":
             continue
 
-        tool_name = fn.__mcp_name__ or re.sub(r"[/{}}]", "_", route.path).strip("_")
+        raw_name = fn.__mcp_name__ or route.path
+        tool_name = re.sub(r"[^0-9a-zA-Z_]", "_", raw_name).strip("_")
+        if not re.match(r"[A-Za-z_]", tool_name):
+            tool_name = f"tool_{tool_name}"
         proxy_fn = _make_http_proxy(base_url, route)
         description = inspect.getdoc(fn) or f"Tool for {route.path}"
 
         # Get function signature to create properly typed wrapper
         sig = inspect.signature(fn)
         params = []
-        for param_name, param in sig.parameters.items():
+        for param in sig.parameters.values():
             # Skip Request, Depends, and other FastAPI-specific params
             if param.annotation in (inspect.Parameter.empty, type(None)):
                 continue
@@ -151,7 +187,15 @@ async def {tool_name}_wrapper({param_sig}):
     return mcp
 
 def combine_lifespans(mcp_lifespan, existing_lifespan):
-    """Combine MCP and existing lifespans into a single context manager."""
+    """Combine MCP and existing lifespans into a single context manager.
+
+    Args:
+        mcp_lifespan: MCP server lifespan context manager.
+        existing_lifespan: Existing application lifespan context manager.
+
+    Returns:
+        Combined lifespan context manager.
+    """
     @asynccontextmanager
     async def combined(app):
         # Run both lifespans - MCP outer, existing inner
@@ -165,6 +209,11 @@ def register_tools_from_routes(mcp_server: FastMCP, routes: list, base_url: str)
 
     Preserves Pydantic model schemas by using them directly as parameters.
     FastMCP automatically extracts JSON schemas from Pydantic type annotations.
+
+    Args:
+        mcp_server: FastMCP server instance to register tools to.
+        routes: List of FastAPI routes to scan for tools.
+        base_url: Base URL for internal HTTP proxy requests.
     """
     tool_count = 0
     for route in routes:
