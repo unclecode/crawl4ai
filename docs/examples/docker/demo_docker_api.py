@@ -25,7 +25,7 @@ LINKS_URL = "https://httpbin.org/links/10/0"
 FORMS_URL = "https://httpbin.org/forms/post"  # For JS demo
 BOOKS_URL = "http://books.toscrape.com/"  # For CSS extraction
 PYTHON_URL = "https://python.org"  # For deeper crawl
-PDF_URL = "https://arxiv.org/pdf/2310.06825.pdf" # For PDF demo
+PDF_URL = "https://arxiv.org/pdf/2310.06825" # For PDF demo
 # Use the same sample site as deep crawl tests for consistency
 DEEP_CRAWL_BASE_URL = os.getenv(
     "DEEP_CRAWL_TEST_SITE", "https://docs.crawl4ai.com/samples/deepcrawl/")
@@ -1290,12 +1290,9 @@ async def demo_pdf_crawl(client: httpx.AsyncClient):
     print("Number of results:", len(data.get("results", [])))
     if data.get("results"):
         first = data["results"][0]
-        text = first.get("extracted_content") or first.get("text") or ""
-        if isinstance(text, dict):
-            text = text.get("text") or ""
+        text_snippet = (first.get("text") or "")[:500]
         print("Extracted text (first 500 chars):")
-        print((text or "")[:500])
-
+        print(text_snippet)
         
 # 11. Crawl PDF stream
 
@@ -1311,7 +1308,7 @@ async def demo_pdf_crawl_stream(client: httpx.AsyncClient):
             "params": {
                 "stream": True,
                 "cache_mode": "BYPASS",
-                "scraping_strategy": {
+                "scraping_strategy": {  # <-- Default strategy if not set
                     "type": "PDFContentScrapingStrategy",
                     "params": {
                         "extract_images": False,     
