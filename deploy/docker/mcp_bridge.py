@@ -70,7 +70,12 @@ def _make_http_proxy(base_url: str, route):
                     else await client.request(method, url, json=json_body)
                 )
                 r.raise_for_status()
-                return r.text if method == "GET" else r.json()
+                # Try to parse JSON for both GET and other methods to avoid double-encoding
+                try:
+                    return r.json()
+                except (ValueError, TypeError):
+                    # Fallback to text if JSON parsing fails
+                    return r.text
             except httpx.HTTPStatusError as e:
                 raise HTTPException(e.response.status_code, e.response.text)
     return proxy
@@ -204,20 +209,43 @@ def register_tools_from_routes(mcp_server: FastMCP, routes: list, base_url: str)
         # Unwrap Pydantic model if found, otherwise use params directly
         try:
             if pydantic_model:
-                # Unwrap Pydantic model - use its fields directly
+                # Unwrap Pydantic model - use its fields directly with defaults preserved
                 param_annotations = {}
-                for field_name, field_info in pydantic_model.model_fields.items():
-                    param_annotations[field_name] = field_info.annotation
+                param_defaults = {}
+                param_signature_parts = []
 
-                param_list = list(param_annotations.keys())
-                param_signature = ", ".join(param_list)
+                for field_name, field_info in pydantic_model.model_fields.items():
+                    # Convert enum annotations to their base type for better MCP compatibility
+                    annotation = field_info.annotation
+                    if hasattr(annotation, '__bases__') and len(annotation.__bases__) > 0:
+                        # This is likely an enum - use its base type (usually str)
+                        for base in annotation.__bases__:
+                            if base in (str, int, float, bool):
+                                annotation = base
+                                break
+                    param_annotations[field_name] = annotation
+
+                    # Simplified approach: all optional fields default to None
+                    if hasattr(field_info, 'default') and field_info.default is not ...:
+                        # Has a default - make it optional with None
+                        param_defaults[field_name] = None
+                        param_signature_parts.append(f"{field_name}=None")
+                    elif hasattr(field_info, 'default_factory') and field_info.default_factory is not None:
+                        # Has default factory - make it optional with None
+                        param_defaults[field_name] = None
+                        param_signature_parts.append(f"{field_name}=None")
+                    else:
+                        # Required field
+                        param_signature_parts.append(field_name)
+
+                param_signature = ", ".join(param_signature_parts)
 
                 # Generate wrapper that reconstructs Pydantic model
                 # Pass model dict directly to proxy (FastAPI expects body content, not wrapped)
                 func_code = f"""
 async def {tool_name}_wrapper({param_signature}):
     import json
-    model_data = {{{", ".join(f'"{p}": {p}' for p in param_list)}}}
+    model_data = {{{", ".join(f'"{p}": {p}' for p in param_annotations.keys())}}}
     # Pass the model data dict directly - proxy will handle it
     result = await proxy_fn(_pydantic_body=model_data, _param_name="{pydantic_param_name}")
     return json.dumps(result, default=str)
@@ -230,15 +258,29 @@ async def {tool_name}_wrapper({param_signature}):
                     "pydantic_param_name": pydantic_param_name
                 }
             else:
-                # Use individual parameters directly
+                # Use individual parameters directly - preserve defaults from FastAPI signature
                 param_annotations = all_params.copy()
-                param_list = list(param_annotations.keys())
-                param_signature = ", ".join(param_list)
+                param_signature_parts = []
+
+                # Get original function signature to extract defaults - handle FastAPI types safely
+                orig_sig = inspect.signature(fn)
+                for param_name in param_annotations.keys():
+                    if param_name in orig_sig.parameters:
+                        orig_param = orig_sig.parameters[param_name]
+                        if orig_param.default is not inspect.Parameter.empty:
+                            # All parameters with defaults become None (simplified approach)
+                            param_signature_parts.append(f"{param_name}=None")
+                        else:
+                            param_signature_parts.append(param_name)
+                    else:
+                        param_signature_parts.append(param_name)
+
+                param_signature = ", ".join(param_signature_parts)
 
                 func_code = f"""
 async def {tool_name}_wrapper({param_signature}):
     import json
-    kwargs = {{{", ".join(f'"{p}": {p}' for p in param_list)}}}
+    kwargs = {{{", ".join(f'"{p}": {p}' for p in param_annotations.keys())}}}
     result = await proxy_fn(**kwargs)
     return json.dumps(result, default=str)
 """

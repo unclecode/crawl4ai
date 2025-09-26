@@ -107,7 +107,7 @@ mcp_app = mcp_server.http_app(path="/mcp")
 
 # Define existing crawler lifespan
 @asynccontextmanager
-async def crawler_lifespan(_: FastAPI):
+async def crawler_lifespan(app: FastAPI):
     await get_crawler(BrowserConfig(
         extra_args=config["crawler"]["browser"].get("extra_args", []),
         **config["crawler"]["browser"].get("kwargs", {}),
@@ -609,11 +609,16 @@ async def get_context(
 # Register tools to the existing MCP server and mount it
 print(f"MCP server running on {config['app']['host']}:{config['app']['port']}")
 from mcp_bridge import register_tools_from_routes
+# Fix: Map 0.0.0.0 to 127.0.0.1 for internal proxy - HTTP clients can't connect to 0.0.0.0
+proxy_host = "127.0.0.1" if config['app']['host'] == "0.0.0.0" else config['app']['host']
 register_tools_from_routes(
     mcp_server=mcp_server,
     routes=app.routes,
-    base_url=f"http://{config['app']['host']}:{config['app']['port']}"
+    base_url=f"http://{proxy_host}:{config['app']['port']}"
 )
+# Intentionally mount MCP app at "/" with internal path "/mcp" for clear endpoint separation
+# Known limitation: MCP tools don't forward JWT Authorization headers when security.jwt_enabled=true
+# Internal proxy calls will fail authentication. Disable JWT or implement header forwarding for MCP usage.
 app.mount("/", app=mcp_app, name="mcp")
 print(f"Mounted MCP app at / (MCP endpoint at /mcp)")
 
