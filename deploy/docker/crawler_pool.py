@@ -27,7 +27,7 @@ def _sig(cfg: BrowserConfig, crawler_strategy: Optional[object]  = None) -> str:
         payload["strategy"] = crawler_strategy.__class__.__name__
 
     json_payload = json.dumps(payload, sort_keys=True, separators=(",", ":"))
-    return hashlib.sha1(json_payload.encode()).hexdigest()
+    return hashlib.sha256(json_payload.encode()).hexdigest()
 
 
 async def get_crawler(cfg: BrowserConfig, crawler_strategy: Optional[object] = None) -> AsyncWebCrawler:
@@ -36,16 +36,16 @@ async def get_crawler(cfg: BrowserConfig, crawler_strategy: Optional[object] = N
         sig = _sig(cfg, crawler_strategy=crawler_strategy)
         async with LOCK:
             if sig in POOL:
-                LAST_USED[sig] = time.time();  
+                LAST_USED[sig] = time.time()
                 return POOL[sig]
             if psutil.virtual_memory().percent >= MEM_LIMIT:
-                raise MemoryError("RAM pressure – new browser denied")
+                raise MemoryError("RAM pressure - new browser denied")
             crawler = AsyncWebCrawler(config=cfg, thread_safe=False, crawler_strategy=crawler_strategy)
             await crawler.start()
             POOL[sig] = crawler; LAST_USED[sig] = time.time()
             return crawler
     except MemoryError as e:
-        raise MemoryError(f"RAM pressure – new browser denied: {e}")
+        raise
     except Exception as e:
         raise RuntimeError(f"Failed to start browser: {e}")
     finally:
