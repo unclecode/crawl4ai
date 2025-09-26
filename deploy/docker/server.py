@@ -16,6 +16,7 @@ import re
 import sys
 import time
 import urllib.parse
+import uuid
 from contextlib import asynccontextmanager
 from typing import Dict, List, Optional
 
@@ -322,8 +323,8 @@ async def generate_screenshot(
             os.makedirs(target_dir, exist_ok=True)
             parsed = urllib.parse.urlparse(body.url)
             host = parsed.netloc or "page"
-            ts = int(time.time())
-            filename = f"screenshot_{host}_{ts}.png"
+            unique_id = uuid.uuid4().hex
+            filename = f"screenshot_{host}_{unique_id}.png"
             abs_path = os.path.join(target_dir, filename)
             with open(abs_path, "wb") as f:
                 f.write(base64.b64decode(screenshot_data))
@@ -367,8 +368,8 @@ async def generate_pdf(
             os.makedirs(target_dir, exist_ok=True)
             parsed = urllib.parse.urlparse(body.url)
             host = parsed.netloc or "page"
-            ts = int(time.time())
-            filename = f"document_{host}_{ts}.pdf"
+            unique_id = uuid.uuid4().hex
+            filename = f"document_{host}_{unique_id}.pdf"
             abs_path = os.path.join(target_dir, filename)
             with open(abs_path, "wb") as f:
                 f.write(pdf_data)
