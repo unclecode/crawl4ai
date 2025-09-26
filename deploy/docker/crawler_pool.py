@@ -3,8 +3,7 @@ import asyncio, json, hashlib, time, psutil
 from contextlib import suppress
 from typing import Dict, Optional
 from crawl4ai import AsyncWebCrawler, BrowserConfig
-from utils import load_config 
-
+from .utils import load_config
 
 CONFIG = load_config()
 
@@ -36,24 +35,34 @@ CREATING: Dict[str, asyncio.Future] = {}
 async def get_crawler(
     cfg: BrowserConfig, crawler_strategy: Optional[object] = None
 ) -> AsyncWebCrawler:
+    """
+    Return a shared AsyncWebCrawler instance for the given config.
+    Only the 'creator' coroutine actually starts the crawler and sets
+    the future result to avoid InvalidStateError and double creation.
+    """
     sig: Optional[str] = None
     try:
         sig = _sig(cfg, crawler_strategy=crawler_strategy)
 
-        # First pass under lock: reuse or join/create in-flight
+        creator = False  # Track whether *this* caller will create the crawler
         async with LOCK:
+            # Reuse an existing crawler if available
             if sig in POOL:
                 LAST_USED[sig] = time.time()
                 return POOL[sig]
+
+            # Join in-flight creation if it exists
             fut = CREATING.get(sig)
             if fut is None:
+                # First caller becomes the creator
                 if psutil.virtual_memory().percent >= MEM_LIMIT:
-                    raise MemoryError("RAM pressure - new browser denied")
+                    raise MemoryError("RAM pressure – new browser denied")
                 fut = asyncio.get_running_loop().create_future()
                 CREATING[sig] = fut
+                creator = True
 
-        # Outside lock: create/start if we're the creator
-        if not fut.done():
+        if creator:
+            # Only the creator actually creates/starts the crawler
             try:
                 crawler = AsyncWebCrawler(
                     config=cfg, thread_safe=False, crawler_strategy=crawler_strategy
@@ -78,7 +87,7 @@ async def get_crawler(
     except Exception as e:
         raise RuntimeError(f"Failed to start browser: {e}")
     finally:
-        # Update last-used if a crawler exists
+        # Update last-used if a crawler now exists
         async with LOCK:
             if sig and sig in POOL:
                 LAST_USED[sig] = time.time()
@@ -86,7 +95,6 @@ async def get_crawler(
                 if sig:
                     POOL.pop(sig, None)
                     LAST_USED.pop(sig, None)
-
         
 async def close_all():
     async with LOCK:
