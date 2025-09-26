@@ -137,7 +137,7 @@ async def is_pdf_url(url: str) -> bool:
     if url.lower().endswith(".pdf"):
         return True
 
-    timeout = httpx.Timeout(5.0)
+    timeout = httpx.Timeout(connect=5.0, read=10.0, write=5.0, pool=5.0)
     async with httpx.AsyncClient(follow_redirects=True, timeout=timeout) as client:
         # HEAD request to check Content-Type (ignore servers that reject HEAD)
         try:
@@ -150,9 +150,12 @@ async def is_pdf_url(url: str) -> bool:
 
         # Fallback: GET first 5 bytes to check PDF magic number
         try:
-            get_resp = await client.get(url, headers={"Range": "bytes=0-4"})
+            get_resp = await client.get(url, headers={"Range": "bytes=0-4", "Accept": "*/*"})
             if get_resp.status_code in (200, 206):  # 206 Partial Content
                 return get_resp.content.startswith(b"%PDF-")
         except httpx.HTTPError:
             return False
+        
+    # Default: not a PDF (or unable to determine)
+    return False
 
