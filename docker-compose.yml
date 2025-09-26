@@ -1,7 +1,7 @@
 # Shared configuration for all environments
 x-base-config: &base-config
   ports:
-    - "11235:11235"  # FastAPI server with MCP endpoint at /mcp
+    - "${HOST_PORT:-11235}:11235"  # Map host port to container port 11235
   env_file:
     - .llm.env       # API keys (create from .llm.env.example)
   environment:

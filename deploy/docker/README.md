@@ -115,6 +115,17 @@ EOL
       unclecode/crawl4ai:0.7.0-r1
     ```
 
+*   **With custom host port:**
+    ```bash
+    docker run -d \
+      -p 11235:11235 \
+      --name crawl4ai \
+      --env-file .llm.env \
+      --shm-size=1g \
+      unclecode/crawl4ai:0.7.0-r1
+    ```
+    > Access at `http://localhost:11235` (mapped to container's internal port 11235)
+
 > The server will be available at `http://localhost:11235`. Visit `/playground` to access the interactive testing interface.
 
 #### 4. Stopping the Container
@@ -143,15 +154,24 @@ git clone https://github.com/unclecode/crawl4ai.git
 cd crawl4ai
 ```
 
-#### 2. Environment Setup (API Keys)
+#### 2. Environment Setup
 
-If you plan to use LLMs, copy the example environment file and add your API keys. This file should be in the **project root directory**.
+Crawl4AI uses two environment files:
+
+- **`.env`** - Docker Compose variables (port mapping, image tags)
+- **`.llm.env`** - Container runtime variables (API keys, runtime config)
 
 ```bash
 # Make sure you are in the 'crawl4ai' root directory
-cp deploy/docker/.llm.env.example .llm.env
 
-# Now edit .llm.env and add your API keys
+# 1. (Optional) Copy Docker Compose config to customize host port
+cp .env.example .env
+# Edit .env to set HOST_PORT (default: 11235)
+# The container always runs on port 11235 internally
+
+# 2. Copy API keys config (if using LLMs)
+cp deploy/docker/.llm.env.example .llm.env
+# Edit .llm.env and add your API keys
 ```
 
 **Flexible LLM Provider Configuration:**
@@ -199,12 +219,15 @@ The `docker-compose.yml` file in the project root provides a simplified approach
     ```bash
     # Build with all features (includes torch and transformers)
     INSTALL_TYPE=all docker compose up --build -d
-    
+
     # Build with GPU support (for AMD64 platforms)
     ENABLE_GPU=true docker compose up --build -d
+
+    # Run on custom host port
+    HOST_PORT=8080 docker compose up -d
     ```
 
-> The server will be available at `http://localhost:11235`.
+> The server will be available at `http://localhost:11235` (or your custom `HOST_PORT`).
 
 #### 4. Stopping the Service
 
