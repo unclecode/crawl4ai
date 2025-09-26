@@ -3,7 +3,8 @@ import asyncio, json, hashlib, time, psutil
 from contextlib import suppress
 from typing import Dict, Optional
 from crawl4ai import AsyncWebCrawler, BrowserConfig
-from .utils import load_config
+from utils import load_config 
+
 
 CONFIG = load_config()
 
@@ -29,72 +30,34 @@ def _sig(cfg: BrowserConfig, crawler_strategy: Optional[object]  = None) -> str:
     return hashlib.sha256(json_payload.encode()).hexdigest()
 
 
-# Track in-flight creations to dedupe concurrent get_crawler() calls
-CREATING: Dict[str, asyncio.Future] = {}
 
-async def get_crawler(
-    cfg: BrowserConfig, crawler_strategy: Optional[object] = None
-) -> AsyncWebCrawler:
-    """
-    Return a shared AsyncWebCrawler instance for the given config.
-    Only the 'creator' coroutine actually starts the crawler and sets
-    the future result to avoid InvalidStateError and double creation.
-    """
+async def get_crawler(cfg: BrowserConfig, crawler_strategy: Optional[object] = None) -> AsyncWebCrawler:
     sig: Optional[str] = None
     try:
         sig = _sig(cfg, crawler_strategy=crawler_strategy)
-
-        creator = False  # Track whether *this* caller will create the crawler
         async with LOCK:
-            # Reuse an existing crawler if available
             if sig in POOL:
-                LAST_USED[sig] = time.time()
+                LAST_USED[sig] = time.time();  
                 return POOL[sig]
-
-            # Join in-flight creation if it exists
-            fut = CREATING.get(sig)
-            if fut is None:
-                # First caller becomes the creator
-                if psutil.virtual_memory().percent >= MEM_LIMIT:
-                    raise MemoryError("RAM pressure – new browser denied")
-                fut = asyncio.get_running_loop().create_future()
-                CREATING[sig] = fut
-                creator = True
-
-        if creator:
-            # Only the creator actually creates/starts the crawler
-            try:
-                crawler = AsyncWebCrawler(
-                    config=cfg, thread_safe=False, crawler_strategy=crawler_strategy
-                )
-                await crawler.start()
-                async with LOCK:
-                    POOL[sig] = crawler
-                    LAST_USED[sig] = time.time()
-                fut.set_result(crawler)
-            except Exception as e:
-                fut.set_exception(e)
-                raise RuntimeError("Failed to start browser") from e
-            finally:
-                async with LOCK:
-                    CREATING.pop(sig, None)
-
-        # Await the shared result (crawler or the same exception)
-        return await fut
-
-    except MemoryError:
-        raise
+            if psutil.virtual_memory().percent >= MEM_LIMIT:
+                raise MemoryError("RAM pressure – new browser denied")
+            crawler = AsyncWebCrawler(config=cfg, thread_safe=False, crawler_strategy=crawler_strategy)
+            await crawler.start()
+            POOL[sig] = crawler; LAST_USED[sig] = time.time()
+            return crawler
+    except MemoryError as e:
+        raise MemoryError(f"RAM pressure – new browser denied: {e}")
     except Exception as e:
         raise RuntimeError(f"Failed to start browser: {e}")
     finally:
-        # Update last-used if a crawler now exists
-        async with LOCK:
-            if sig and sig in POOL:
-                LAST_USED[sig] = time.time()
-            else:
-                if sig:
-                    POOL.pop(sig, None)
-                    LAST_USED.pop(sig, None)
+        if sig and sig in POOL:
+            LAST_USED[sig] = time.time()
+        else:
+            # If we failed to start the browser, we should remove it from the pool
+            if sig:
+                POOL.pop(sig, None)
+                LAST_USED.pop(sig, None)
+        # If we failed to start the browser, we should remove it from the pool
         
 async def close_all():
     async with LOCK:
