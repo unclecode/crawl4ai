@@ -49,14 +49,13 @@ async def get_crawler(cfg: BrowserConfig, crawler_strategy: Optional[object] = N
     except Exception as e:
         raise RuntimeError(f"Failed to start browser: {e}")
     finally:
-        if sig and sig in POOL:
-            LAST_USED[sig] = time.time()
-        else:
-            # If we failed to start the browser, we should remove it from the pool
-            if sig:
-                POOL.pop(sig, None)
-                LAST_USED.pop(sig, None)
-        # If we failed to start the browser, we should remove it from the pool
+        async with LOCK:
+            if sig and sig in POOL:
+                LAST_USED[sig] = time.time()
+            else:
+                if sig:
+                    POOL.pop(sig, None)
+                    LAST_USED.pop(sig, None)
         
 async def close_all():
     async with LOCK:
