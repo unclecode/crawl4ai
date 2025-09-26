@@ -137,7 +137,7 @@ async def is_pdf_url(url: str) -> bool:
     if url.lower().endswith(".pdf"):
         return True
 
-    timeout = httpx.Timeout(connect=5.0, read=10.0, write=5.0)
+    timeout = httpx.Timeout(5.0)
     async with httpx.AsyncClient(follow_redirects=True, timeout=timeout) as client:
         # HEAD request to check Content-Type (ignore servers that reject HEAD)
         try:
