@@ -37,7 +37,7 @@ from crawl4ai.content_filter_strategy import (
 )
 
 from crawl4ai.processors.pdf import PDFCrawlerStrategy, PDFContentScrapingStrategy
-from crawl4ai.async_configs import to_serializable_dict
+# from crawl4ai.async_configs import to_serializable_dict
 
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 from crawl4ai.content_scraping_strategy import LXMLWebScrapingStrategy
@@ -451,7 +451,6 @@ async def handle_crawl_request(
         crawler_strategy = PDFCrawlerStrategy() if is_pdf else None
 
         if is_pdf and crawler_config.scraping_strategy is None:
-            # Default strategy if not set.
             crawler_config.scraping_strategy = PDFContentScrapingStrategy(
                 extract_images=False,
                 save_images_locally=False,
@@ -484,6 +483,7 @@ async def handle_crawl_request(
                                 config=crawler_config, 
                                 dispatcher=dispatcher)
         results = await partial_func()
+        results_list = results if isinstance(results, list) else [results]
 
         # await crawler.close()
         
@@ -497,13 +497,14 @@ async def handle_crawl_request(
 
         # Process results to handle PDF bytes
         processed_results = []
-        for result in results:
+        for result in results_list:
             result_dict = result.model_dump()
             # If PDF exists, encode it to base64
             if result_dict.get('pdf') is not None:
                 result_dict['pdf'] = b64encode(result_dict['pdf']).decode('utf-8')
 
-            processed_results.append(to_serializable_dict(result_dict))
+            # Keep response shape consistent with streaming (plain JSON-serializable dict)
+            processed_results.append(jsonable_encoder(result_dict))
             
         return {
             "success": True,
@@ -550,6 +551,9 @@ async def handle_stream_crawl_request(
         crawler_config = CrawlerRunConfig.load(crawler_config)
         crawler_config.stream = True
         
+        # Normalize URLs to include scheme (match non-streaming behavior)
+        urls = [('https://' + url) if not url.startswith(('http://', 'https://')) and not url.startswith(("raw:", "raw://")) else url for url in urls]
+        
         is_pdf_flags = await asyncio.gather(*(is_pdf_url(url) for url in urls))
         is_pdf = any(is_pdf_flags)
         if any(is_pdf_flags) and not all(is_pdf_flags):
@@ -561,9 +565,8 @@ async def handle_stream_crawl_request(
         crawler_strategy = PDFCrawlerStrategy() if is_pdf else None
 
         if is_pdf and crawler_config.scraping_strategy is None:
-            # Default strategy if not set
             crawler_config.scraping_strategy = PDFContentScrapingStrategy(
-                extract_images=True,
+                extract_images=False,
                 save_images_locally=False,
                 batch_size=2
             )
@@ -572,7 +575,7 @@ async def handle_stream_crawl_request(
             memory_threshold_percent=config["crawler"]["memory_threshold_percent"],
             rate_limiter=RateLimiter(
                 base_delay=tuple(config["crawler"]["rate_limiter"]["base_delay"])
-            )
+            ) if config["crawler"]["rate_limiter"]["enabled"] else None
         )
 
         from crawler_pool import get_crawler
