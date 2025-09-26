@@ -1265,6 +1265,7 @@ async def demo_config_dump_invalid(client: httpx.AsyncClient):
 async def demo_pdf_crawl(client: httpx.AsyncClient):
     payload = {
         "urls": [PDF_URL],
+        "browser_config": {"type": "BrowserConfig", "params": {"headless": True}},
         "crawler_config": {
             "type": "CrawlerRunConfig",
             "params": {
@@ -1304,6 +1305,7 @@ async def demo_pdf_crawl_stream(client: httpx.AsyncClient):
     """
     payload = {
         "urls": [PDF_URL],
+        "browser_config": {"type": "BrowserConfig", "params": {"headless": True}},
         "crawler_config": {
             "type": "CrawlerRunConfig",
             "params": {
