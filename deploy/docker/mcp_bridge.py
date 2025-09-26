@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 import inspect, json, re
+import urllib.parse
 from typing import Any, Callable, Dict, List, get_origin, get_args
 from contextlib import asynccontextmanager
 import httpx
@@ -48,8 +49,9 @@ def _make_http_proxy(base_url: str, route):
             for k, v in list(kwargs.items()):
                 placeholder = "{" + k + "}"
                 if placeholder in path:
-                    # Path parameter
-                    path = path.replace(placeholder, str(v))
+                    # Path parameter - ensure safe URL encoding
+                    encoded_value = urllib.parse.quote(str(v), safe="")
+                    path = path.replace(placeholder, encoded_value)
                     kwargs.pop(k)
                 elif hasattr(v, "model_dump"):
                     # Pydantic model serialization

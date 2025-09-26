@@ -1,21 +1,31 @@
-# pip install "mcp-sdk[ws]" anyio
-import anyio, json
-from mcp.client.websocket import websocket_client
-from mcp.client.session import ClientSession
+"""Interactive MCP HTTP smoke test.
 
-async def test_list():
-    async with websocket_client("ws://localhost:8020/mcp/ws") as (r, w):
-        async with ClientSession(r, w) as s:
-            await s.initialize()
+These helper coroutines mirror the legacy WebSocket test but target the
+FastMCP Streamable HTTP transport exposed at ``/mcp``.
+Run with ``python tests/mcp/test_mcp_socket.py`` once the server is up.
+"""
 
-            print("tools      :", [t.name for t in (await s.list_tools()).tools])
-            print("resources  :", [r.name for r in (await s.list_resources()).resources])
-            print("templates  :", [t.name for t in (await s.list_resource_templates()).resource_templates])
+import anyio
+import json
+from typing import Iterable
+
+from fastmcp.client import Client
+
+MCP_URL = "http://localhost:11235/mcp"
 
 
-async def test_crawl(s: ClientSession) -> None:
+def _first_text_block(content_blocks: Iterable[object]) -> str:
+    """Return the first textual content block emitted by a tool call."""
+    for block in content_blocks:
+        text = getattr(block, "text", None)
+        if isinstance(text, str):
+            return text
+    raise RuntimeError("Tool response did not include textual content")
+
+
+async def test_crawl(client: Client) -> None:
     """Hit the @mcp_tool('crawl') endpoint."""
-    res = await s.call_tool(
+    result = await client.call_tool(
         "crawl",
         {
             "urls": ["https://example.com"],
@@ -23,97 +33,106 @@ async def test_crawl(s: ClientSession) -> None:
             "crawler_config": {},
         },
     )
-    print("crawl →", json.loads(res.content[0].text))
+    print("crawl →", json.loads(_first_text_block(result.content)))
 
 
-async def test_md(s: ClientSession) -> None:
+async def test_md(client: Client) -> None:
     """Hit the @mcp_tool('md') endpoint."""
-    res = await s.call_tool(
+    result = await client.call_tool(
         "md",
         {
             "url": "https://example.com",
-            "f": "fit",   # or RAW, BM25, LLM
+            "f": "fit",  # or raw, bm25, llm
             "q": None,
             "c": "0",
         },
     )
-    result = json.loads(res.content[0].text)
-    print("md →", result['markdown'][:100], "...")
+    markdown = json.loads(_first_text_block(result.content))
+    snippet = markdown.get("markdown", "")[:100]
+    print("md →", snippet, "...")
 
-async def test_screenshot(s: ClientSession):
-    res = await s.call_tool(
+
+async def test_screenshot(client: Client) -> None:
+    result = await client.call_tool(
         "screenshot",
         {
             "url": "https://example.com",
             "screenshot_wait_for": 1.0,
         },
     )
-    png_b64 = json.loads(res.content[0].text)["screenshot"]
-    print("screenshot →", png_b64[:60], "… (base64)")
+    payload = json.loads(_first_text_block(result.content))
+    key = "path" if "path" in payload else "screenshot"
+    value = payload[key]
+    display = value if key == "path" else value[:60] + "… (base64)"
+    print("screenshot →", display)
 
 
-async def test_pdf(s: ClientSession):
-    res = await s.call_tool(
+async def test_pdf(client: Client) -> None:
+    result = await client.call_tool(
         "pdf",
         {
             "url": "https://example.com",
         },
     )
-    pdf_b64 = json.loads(res.content[0].text)["pdf"]
-    print("pdf →", pdf_b64[:60], "… (base64)")
+    payload = json.loads(_first_text_block(result.content))
+    key = "path" if "path" in payload else "pdf"
+    value = payload[key]
+    display = value if key == "path" else value[:60] + "… (base64)"
+    print("pdf →", display)
 
-async def test_execute_js(s: ClientSession):
-    # click the “More” link on Hacker News front page and wait 1 s
-    res = await s.call_tool(
+
+async def test_execute_js(client: Client) -> None:
+    result = await client.call_tool(
         "execute_js",
         {
             "url": "https://news.ycombinator.com/news",
-            "js_code": [
+            "scripts": [
                 "await page.click('a.morelink')",
                 "await page.waitForTimeout(1000)",
             ],
         },
     )
-    crawl_result = json.loads(res.content[0].text)
-    print("execute_js → status", crawl_result["success"], "| html len:", len(crawl_result["html"]))
-    
-async def test_html(s: ClientSession):
-    # click the “More” link on Hacker News front page and wait 1 s
-    res = await s.call_tool(
+    crawl_result = json.loads(_first_text_block(result.content))
+    print("execute_js → status", crawl_result.get("success"), "| html len:", len(crawl_result.get("html", "")))
+
+
+async def test_html(client: Client) -> None:
+    result = await client.call_tool(
         "html",
         {
             "url": "https://news.ycombinator.com/news",
         },
     )
-    crawl_result = json.loads(res.content[0].text)
-    print("execute_js → status", crawl_result["success"], "| html len:", len(crawl_result["html"]))    
-    
-async def test_context(s: ClientSession):
-    # click the “More” link on Hacker News front page and wait 1 s
-    res = await s.call_tool(
+    crawl_result = json.loads(_first_text_block(result.content))
+    print("html → status", crawl_result.get("success"), "| html len:", len(crawl_result.get("html", "")))
+
+
+async def test_context(client: Client) -> None:
+    result = await client.call_tool(
         "ask",
         {
-            "query": "I hv a question about Crawl4ai library, how to extract internal links when crawling a page?"
+            "query": "How do I extract internal links when crawling a page?",
+            "context_type": "code",
+            "score_ratio": 0.4,
         },
     )
-    crawl_result = json.loads(res.content[0].text)
-    print("execute_js → status", crawl_result["success"], "| html len:", len(crawl_result["html"]))    
+    context_result = json.loads(_first_text_block(result.content))
+    print("ask → keys", list(context_result.keys()))
 
 
 async def main() -> None:
-    async with websocket_client("ws://localhost:11235/mcp/ws") as (r, w):
-        async with ClientSession(r, w) as s:
-            await s.initialize()                       # handshake
-            tools = (await s.list_tools()).tools
-            print("tools:", [t.name for t in tools])
+    async with Client(MCP_URL) as client:
+        tools = await client.list_tools()
+        print("tools:", [t.name for t in tools])
 
-            # await test_list()
-            await test_crawl(s)
-            await test_md(s)
-            await test_screenshot(s)
-            await test_pdf(s)
-            await test_execute_js(s)
-            await test_html(s)
-            await test_context(s)
+        await test_crawl(client)
+        await test_md(client)
+        await test_screenshot(client)
+        await test_pdf(client)
+        await test_execute_js(client)
+        await test_html(client)
+        await test_context(client)
 
-anyio.run(main)
+
+if __name__ == "__main__":
+    anyio.run(main)

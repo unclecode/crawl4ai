@@ -286,6 +286,13 @@ The Crawl4AI server exposes two MCP endpoints:
 
 - **Server-Sent Events (SSE)**: `http://localhost:11235/mcp/sse`
 - **WebSocket**: `ws://localhost:11235/mcp/ws`
+- **FastMCP HTTP**: `http://localhost:11235/mcp`
+
+> ⚠️ **Known limitation:** The FastMCP HTTP proxy does not yet forward JWT `Authorization`
+> headers. If `security.jwt_enabled=true`, MCP tool calls will fail authentication.
+> Until the auth-forwarding work lands, either
+> disable JWT for MCP usage or introduce an internal-only token/header that the
+> proxy can inject.
 
 ### Using with Claude Code
 

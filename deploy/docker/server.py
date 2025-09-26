@@ -7,64 +7,59 @@ Crawl4AI FastAPI entry‑point
 """
 
 # ── stdlib & 3rd‑party imports ───────────────────────────────
-from crawler_pool import get_crawler, close_all, janitor
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
-from auth import create_access_token, get_token_dependency, TokenRequest
-from pydantic import BaseModel
-from typing import Optional, List, Dict
-from fastapi import Request, Depends
-from fastapi.responses import FileResponse
+import asyncio
+import ast
 import base64
-import re
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
-from api import (
-    handle_markdown_request, handle_llm_qa,
-    handle_stream_crawl_request, handle_crawl_request,
-    stream_results
-)
-from schemas import (
-    CrawlRequest,
-    MarkdownRequest,
-    RawCode,
-    HTMLRequest,
-    ScreenshotRequest,
-    PDFRequest,
-    JSEndpointRequest,
-)
-
-from utils import (
-    FilterType, load_config, setup_logging, verify_email_domain
-)
 import os
+import pathlib
+import re
 import sys
 import time
-import asyncio
-from typing import List
-from contextlib import asynccontextmanager
-import pathlib
 import urllib.parse
+from contextlib import asynccontextmanager
+from typing import Dict, List, Optional
 
-from fastapi import (
-    FastAPI, HTTPException, Request, Path, Query, Depends
-)
-from rank_bm25 import BM25Okapi
-from fastapi.responses import (
-    StreamingResponse, RedirectResponse, PlainTextResponse, JSONResponse
-)
+from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.responses import (
+    FileResponse,
+    JSONResponse,
+    PlainTextResponse,
+    RedirectResponse,
+    StreamingResponse,
+)
 from fastapi.staticfiles import StaticFiles
-from job import init_job_router
-
-from mcp_bridge import create_mcp_server, combine_lifespans, mcp_resource, mcp_template, mcp_tool
-
-import ast
-import crawl4ai as _c4
-from pydantic import BaseModel, Field
+from prometheus_fastapi_instrumentator import Instrumentator
+from rank_bm25 import BM25Okapi
+from redis import asyncio as aioredis
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from prometheus_fastapi_instrumentator import Instrumentator
-from redis import asyncio as aioredis
+
+from api import (
+    handle_crawl_request,
+    handle_llm_qa,
+    handle_markdown_request,
+    handle_stream_crawl_request,
+    stream_results,
+)
+from auth import TokenRequest, create_access_token, get_token_dependency
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
+import crawl4ai as _c4
+from crawler_pool import close_all, get_crawler, janitor
+from job import init_job_router
+from mcp_bridge import combine_lifespans, create_mcp_server, mcp_resource, mcp_template, mcp_tool
+from schemas import (
+    CrawlRequest,
+    HTMLRequest,
+    JSEndpointRequest,
+    MarkdownRequest,
+    PDFRequest,
+    RawCode,
+    ScreenshotRequest,
+)
+from utils import FilterType, load_config, setup_logging, verify_email_domain
+from pydantic import BaseModel, Field
 
 # ── internal imports (after sys.path append) ─────────────────
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
