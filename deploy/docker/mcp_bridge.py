@@ -64,7 +64,8 @@ def _make_http_proxy(base_url: str, route):
 
         url = base_url.rstrip("/") + path
 
-        async with httpx.AsyncClient() as client:
+        # Use longer timeout for LLM operations (can take 30+ seconds)
+        async with httpx.AsyncClient(timeout=60.0) as client:
             try:
                 r = (
                     await client.get(url, params=json_body)
