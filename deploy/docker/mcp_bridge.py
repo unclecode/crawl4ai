@@ -240,12 +240,20 @@ def register_tools_from_routes(mcp_server: FastMCP, routes: list, base_url: str)
 
                 param_signature = ", ".join(param_signature_parts)
 
-                # Generate wrapper that reconstructs Pydantic model
-                # Pass model dict directly to proxy (FastAPI expects body content, not wrapped)
+                # Generate wrapper that reconstructs Pydantic model with preprocessing
+                # Filter out empty strings and None values to let FastAPI use its defaults
+                param_key_value_pairs = ", ".join(f'("{p}", {p})' for p in param_annotations.keys())
                 func_code = f"""
 async def {tool_name}_wrapper({param_signature}):
     import json
-    model_data = {{{", ".join(f'"{p}": {p}' for p in param_annotations.keys())}}}
+    # Preprocess arguments - handle MCP client quirks (empty strings, null values)
+    model_data = {{}}
+    for key, value in [{param_key_value_pairs}]:
+        # Skip empty strings and None - let FastAPI use defaults
+        if value == "" or value is None:
+            continue
+        model_data[key] = value
+
     # Pass the model data dict directly - proxy will handle it
     result = await proxy_fn(_pydantic_body=model_data, _param_name="{pydantic_param_name}")
     return json.dumps(result, default=str)
@@ -277,10 +285,19 @@ async def {tool_name}_wrapper({param_signature}):
 
                 param_signature = ", ".join(param_signature_parts)
 
+                # Generate wrapper with preprocessing for Query parameters
+                param_key_value_pairs = ", ".join(f'("{p}", {p})' for p in param_annotations.keys())
                 func_code = f"""
 async def {tool_name}_wrapper({param_signature}):
     import json
-    kwargs = {{{", ".join(f'"{p}": {p}' for p in param_annotations.keys())}}}
+    # Preprocess arguments - handle MCP client quirks (empty strings, null values)
+    kwargs = {{}}
+    for key, value in [{param_key_value_pairs}]:
+        # Skip empty strings and None - let FastAPI use defaults
+        if value == "" or value is None:
+            continue
+        kwargs[key] = value
+
     result = await proxy_fn(**kwargs)
     return json.dumps(result, default=str)
 """
