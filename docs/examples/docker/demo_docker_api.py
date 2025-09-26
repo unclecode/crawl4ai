@@ -18,10 +18,8 @@ load_dotenv()  # Load environment variables from .env file
 console = Console()
 
 # --- Configuration ---
-BASE_URL = os.getenv("CRAWL4AI_TEST_URL", "http://localhost:8020")
 BASE_URL = os.getenv("CRAWL4AI_TEST_URL", "http://localhost:11235")
 # Target URLs
-SIMPLE_URL = "https://example.com"  # For demo purposes
 SIMPLE_URL = "https://httpbin.org/html"
 LINKS_URL = "https://httpbin.org/links/10/0"
 FORMS_URL = "https://httpbin.org/forms/post"  # For JS demo
