@@ -1,5 +1,3 @@
-version: '3.8'
-
 # Shared configuration for all environments
 x-base-config: &base-config
   ports:

@@ -89,3 +89,8 @@ observability:
     endpoint: "/metrics"
   health_check:
     endpoint: "/health"
+
+# Binary output handling (screenshots, PDFs)
+binary:
+  default_mode: "inline"   # options: inline, file
+  default_dir: "/tmp/crawl4ai-exports"

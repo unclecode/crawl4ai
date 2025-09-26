@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 import inspect, json, re
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict, List, get_origin, get_args
 from contextlib import asynccontextmanager
 import httpx
 
@@ -213,10 +213,34 @@ def register_tools_from_routes(mcp_server: FastMCP, routes: list, base_url: str)
                 param_annotations = {}
                 param_defaults = {}
                 param_signature_parts = []
+                list_fields: List[str] = []
+                numeric_int_fields: List[str] = []
+                numeric_float_fields: List[str] = []
 
                 for field_name, field_info in pydantic_model.model_fields.items():
                     # Convert enum annotations to their base type for better MCP compatibility
                     annotation = field_info.annotation
+                    # Track list-typed fields for preprocessing in wrapper
+                    try:
+                        origin = get_origin(annotation)
+                    except Exception:
+                        origin = None
+                    if origin in (list, List):
+                        list_fields.append(field_name)
+
+                    # Track numeric-typed fields (int/float), including Optional[...] and Unions
+                    try:
+                        args = get_args(annotation) or ()
+                    except Exception:
+                        args = ()
+                    # Helper flags
+                    is_int = annotation is int or int in args
+                    is_float = annotation is float or float in args
+                    if is_int:
+                        numeric_int_fields.append(field_name)
+                    if is_float:
+                        numeric_float_fields.append(field_name)
+
                     if hasattr(annotation, '__bases__') and len(annotation.__bases__) > 0:
                         # This is likely an enum - use its base type (usually str)
                         for base in annotation.__bases__:
@@ -252,6 +276,21 @@ async def {tool_name}_wrapper({param_signature}):
         # Skip empty strings and None - let FastAPI use defaults
         if value == "" or value is None:
             continue
+        # Normalize single string into list for list-typed fields
+        if key in {set(list_fields)}:
+            if isinstance(value, str):
+                value = [value]
+        # Coerce numeric strings for numeric fields
+        if key in {set(numeric_int_fields)} and isinstance(value, str):
+            try:
+                value = int(value.strip())
+            except Exception:
+                pass
+        if key in {set(numeric_float_fields)} and isinstance(value, str):
+            try:
+                value = float(value.strip())
+            except Exception:
+                pass
         model_data[key] = value
 
     # Pass the model data dict directly - proxy will handle it
@@ -269,6 +308,8 @@ async def {tool_name}_wrapper({param_signature}):
                 # Use individual parameters directly - preserve defaults from FastAPI signature
                 param_annotations = all_params.copy()
                 param_signature_parts = []
+                numeric_int_fields: List[str] = []
+                numeric_float_fields: List[str] = []
 
                 # Get original function signature to extract defaults - handle FastAPI types safely
                 orig_sig = inspect.signature(fn)
@@ -283,6 +324,21 @@ async def {tool_name}_wrapper({param_signature}):
                     else:
                         param_signature_parts.append(param_name)
 
+                    # Track numeric-typed fields (int/float), including Optional[...] and Unions
+                    ann = param_annotations[param_name]
+                    try:
+                        args = get_args(ann) or ()
+                        origin = get_origin(ann)
+                    except Exception:
+                        args = ()
+                        origin = None
+                    is_int = ann is int or int in args
+                    is_float = ann is float or float in args
+                    if is_int:
+                        numeric_int_fields.append(param_name)
+                    if is_float:
+                        numeric_float_fields.append(param_name)
+
                 param_signature = ", ".join(param_signature_parts)
 
                 # Generate wrapper with preprocessing for Query parameters
@@ -296,6 +352,17 @@ async def {tool_name}_wrapper({param_signature}):
         # Skip empty strings and None - let FastAPI use defaults
         if value == "" or value is None:
             continue
+        # Coerce numeric strings for numeric fields
+        if key in {set(numeric_int_fields)} and isinstance(value, str):
+            try:
+                value = int(value.strip())
+            except Exception:
+                pass
+        if key in {set(numeric_float_fields)} and isinstance(value, str):
+            try:
+                value = float(value.strip())
+            except Exception:
+                pass
         kwargs[key] = value
 
     result = await proxy_fn(**kwargs)
@@ -307,7 +374,7 @@ async def {tool_name}_wrapper({param_signature}):
             exec(func_code, namespace)
             wrapper_fn = namespace[f"{tool_name}_wrapper"]
 
-            # Set type annotations
+            # Set type annotations for MCP schema (preserve originals)
             wrapper_fn.__annotations__ = param_annotations.copy()
             wrapper_fn.__annotations__["return"] = str
 

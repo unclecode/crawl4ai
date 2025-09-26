@@ -42,6 +42,7 @@ import asyncio
 from typing import List
 from contextlib import asynccontextmanager
 import pathlib
+import urllib.parse
 
 from fastapi import (
     FastAPI, HTTPException, Request, Path, Query, Depends
@@ -245,6 +246,16 @@ async def get_markdown(
     body: MarkdownRequest,
     _td: Dict = Depends(token_dep),
 ):
+    """
+    Tool for /md
+
+    Generate Markdown from a URL or raw HTML.
+
+    - Filter `f` allowed values: 'raw', 'fit', 'bm25', 'llm'.
+    - Query `q` is used only by 'bm25' and 'llm' filters (recommended/required for meaningful results).
+    - For `f="llm"`, ensure an LLM API key is configured (via environment or server config).
+    - URLs must start with http(s) or use the raw scheme: `raw:` or `raw://` for inline HTML.
+    """
     if not body.url.startswith(("http://", "https://")) and not body.url.startswith(("raw:", "raw://")):
         raise HTTPException(
             400, "Invalid URL format. Must start with http://, https://, or for raw HTML (raw:, raw://)")
@@ -293,9 +304,9 @@ async def generate_screenshot(
     _td: Dict = Depends(token_dep),
 ):
     """
-    Capture a full-page PNG screenshot of the specified URL, waiting an optional delay before capture,
-    Use when you need an image snapshot of the rendered page. Its recommened to provide an output path to save the screenshot.
-    Then in result instead of the screenshot you will get a path to the saved file.
+    Capture a full-page PNG screenshot of the specified URL, waiting an optional delay before capture, returning base64 data if output_path is omitted.
+    Use when you need an image snapshot of the rendered page. It is strongly recommended to provide `output_path` to save the screenshot to disk.
+    This avoids returning large base64 payloads that can exceed token/context limits. When `output_path` is provided, the response returns the saved file path instead of inline data.
     """
     cfg = CrawlerRunConfig(
         screenshot=True, screenshot_wait_for=body.screenshot_wait_for)
@@ -308,6 +319,23 @@ async def generate_screenshot(
         with open(abs_path, "wb") as f:
             f.write(base64.b64decode(screenshot_data))
         return {"success": True, "path": abs_path}
+    # Default-to-file mode when configured
+    try:
+        bin_cfg = config.get("binary", {})
+        if bin_cfg.get("default_mode") == "file":
+            target_dir = os.path.abspath(bin_cfg.get("default_dir", "/tmp/crawl4ai-exports"))
+            os.makedirs(target_dir, exist_ok=True)
+            parsed = urllib.parse.urlparse(body.url)
+            host = parsed.netloc or "page"
+            ts = int(time.time())
+            filename = f"screenshot_{host}_{ts}.png"
+            abs_path = os.path.join(target_dir, filename)
+            with open(abs_path, "wb") as f:
+                f.write(base64.b64decode(screenshot_data))
+            return {"success": True, "path": abs_path}
+    except Exception as e:
+        # Fall through to inline on any file write error
+        pass
     return {"success": True, "screenshot": screenshot_data}
 
 # PDF endpoint
@@ -322,9 +350,9 @@ async def generate_pdf(
     _td: Dict = Depends(token_dep),
 ):
     """
-    Generate a PDF document of the specified URL,
-    Use when you need a printable or archivable snapshot of the page. It is recommended to provide an output path to save the PDF.
-    Then in result instead of the PDF you will get a path to the saved file.
+    Generate a PDF document of the specified URL, returning base64 data if output_path is omitted.
+    Use when you need a printable or archivable snapshot of the page. It is strongly recommended to provide `output_path` to save the PDF to disk.
+    This avoids returning large binary/base64 payloads that can exceed token/context limits. When `output_path` is provided, the response returns the saved file path instead of inline data.
     """
     cfg = CrawlerRunConfig(pdf=True)
     async with AsyncWebCrawler(config=BrowserConfig()) as crawler:
@@ -336,6 +364,23 @@ async def generate_pdf(
         with open(abs_path, "wb") as f:
             f.write(pdf_data)
         return {"success": True, "path": abs_path}
+    # Default-to-file mode when configured
+    try:
+        bin_cfg = config.get("binary", {})
+        if bin_cfg.get("default_mode") == "file":
+            target_dir = os.path.abspath(bin_cfg.get("default_dir", "/tmp/crawl4ai-exports"))
+            os.makedirs(target_dir, exist_ok=True)
+            parsed = urllib.parse.urlparse(body.url)
+            host = parsed.netloc or "page"
+            ts = int(time.time())
+            filename = f"document_{host}_{ts}.pdf"
+            abs_path = os.path.join(target_dir, filename)
+            with open(abs_path, "wb") as f:
+                f.write(pdf_data)
+            return {"success": True, "path": abs_path}
+    except Exception:
+        # Fall through to inline on any file write error
+        pass
     return {"success": True, "pdf": base64.b64encode(pdf_data).decode()}
 
 
@@ -350,6 +395,7 @@ async def execute_js(
     """
     Execute a sequence of JavaScript snippets on the specified URL.
     Return the full CrawlResult JSON (first result).
+    Note: Does not return the script's output value, only confirms execution.
     Use this when you need to interact with dynamic pages using JS.
     REMEMBER: Scripts accept a list of separated JS snippets to execute and execute them in order.
     IMPORTANT: Each script should be an expression that returns a value. It can be an IIFE or an async function. You can think of it as such.
@@ -441,7 +487,7 @@ async def crawl(
     _td: Dict = Depends(token_dep),
 ):
     """
-    Crawl a list of URLs and return the results as JSON.
+    Crawl a list of URLs and return the results as JSON. Accepts a single string or a list of strings.
     """
     if not crawl_request.urls:
         raise HTTPException(400, "At least one URL required")
@@ -526,7 +572,7 @@ def chunk_doc_sections(doc: str) -> List[str]:
 async def get_context(
     request: Request,
     _td: Dict = Depends(token_dep),
-    context_type: str = Query("all", regex="^(code|doc|all)$"),
+    context_type: str = Query("all", pattern="^(code|doc|all)$"),
     query: Optional[str] = Query(
         None, description="search query to filter chunks"),
     score_ratio: float = Query(

@@ -11,11 +11,20 @@ class CrawlRequest(BaseModel):
 
 class MarkdownRequest(BaseModel):
     """Request body for the /md endpoint."""
-    url: str                    = Field(...,  description="Absolute http/https URL to fetch")
-    f:   FilterType             = Field(FilterType.FIT, description="Content‑filter strategy: fit, raw, bm25, or llm")
-    q:   Optional[str] = Field(None,  description="Query string used by BM25/LLM filters")
-    c:   Optional[str] = Field("0",   description="Cache‑bust / revision counter")
-    provider: Optional[str] = Field(None, description="LLM provider override (e.g., 'anthropic/claude-3-opus')")
+    url: str = Field(..., description="Absolute URL to fetch (http/https) or raw HTML via raw: scheme")
+    f: FilterType = Field(
+        FilterType.FIT,
+        description="Filter type. Allowed values: 'raw', 'fit', 'bm25', 'llm'",
+    )
+    q: Optional[str] = Field(
+        None,
+        description="Query used when f is 'bm25' or 'llm' (recommended/required for meaningful results)",
+    )
+    c: Optional[str] = Field("0", description="Cache‑bust / revision counter")
+    provider: Optional[str] = Field(
+        None,
+        description="LLM provider override for f='llm' (e.g., 'openai/gpt-4o-mini'). API key must be configured",
+    )
 
 
 class RawCode(BaseModel):
@@ -26,12 +35,12 @@ class HTMLRequest(BaseModel):
     
 class ScreenshotRequest(BaseModel):
     url: str
-    screenshot_wait_for: Optional[float] = 2
-    output_path: Optional[str] = None
+    screenshot_wait_for: Optional[float] = Field(2, description="Delay before capture in seconds (optional)")
+    output_path: Optional[str] = Field(None, description="Path to save PNG to disk (recommended to avoid large base64 responses)")
 
 class PDFRequest(BaseModel):
     url: str
-    output_path: Optional[str] = None
+    output_path: Optional[str] = Field(None, description="Path to save PDF to disk (recommended to avoid large base64 responses)")
 
 
 class JSEndpointRequest(BaseModel):
