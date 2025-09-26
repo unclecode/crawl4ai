@@ -1,7 +1,7 @@
 # deploy/docker/mcp_bridge.py
 
 from __future__ import annotations
-import inspect, json, re
+import inspect, json, re, logging
 import urllib.parse
 from typing import Callable, List, get_origin, get_args
 from contextlib import asynccontextmanager
@@ -63,7 +63,8 @@ def _make_http_proxy(base_url: str, route):
     Returns:
         Async function that proxies requests to the route.
     """
-    method = list(route.methods - {"HEAD", "OPTIONS"})[0]
+    methods = route.methods - {"HEAD", "OPTIONS"}
+    method = next(iter(methods)) if methods else "GET"
 
     async def proxy(**kwargs):
         path = route.path
@@ -71,16 +72,17 @@ def _make_http_proxy(base_url: str, route):
 
         # Check for unwrapped Pydantic body
         if "_pydantic_body" in kwargs:
-            kwargs.pop("_param_name")  # Not needed in proxy
+            kwargs.pop("_param_name", None)  # Not needed in proxy
             pydantic_data = kwargs.pop("_pydantic_body")
             # FastAPI expects Pydantic model data as the root JSON body, not wrapped
             json_body = pydantic_data
         else:
             # Process each parameter normally
             for k, v in list(kwargs.items()):
-                placeholder = "{" + k + "}"
-                # Path parameter - support typed params e.g. {k:path}
-                encoded_value = urllib.parse.quote(str(v), safe="")
+                # Path parameter - support typed params e.g. {k:path}; preserve slashes for :path
+                typed_match = re.search(r"\{" + re.escape(k) + r":([^}]*)\}", path)
+                safe_chars = "/" if typed_match and typed_match.group(1) == "path" else ""
+                encoded_value = urllib.parse.quote(str(v), safe=safe_chars)
                 pattern = re.compile(r"\{" + re.escape(k) + r"(?:\:[^}]*)?\}")
                 if pattern.search(path):
                     path = pattern.sub(encoded_value, path)
@@ -112,7 +114,7 @@ def _make_http_proxy(base_url: str, route):
                     # Fallback to text if JSON parsing fails
                     return r.text
             except httpx.HTTPStatusError as e:
-                raise HTTPException(e.response.status_code, e.response.text)
+                raise HTTPException(e.response.status_code, e.response.text) from e
     return proxy
 
 def create_mcp_server(
@@ -155,10 +157,14 @@ def create_mcp_server(
         sig = inspect.signature(fn)
         params = []
         for param in sig.parameters.values():
-            # Skip Request, Depends, and other FastAPI-specific params
+            # Skip Request and Depends (FastAPI-specific)
             if param.annotation in (inspect.Parameter.empty, type(None)):
                 continue
-            if hasattr(param.annotation, "__origin__"):  # Skip complex types like Depends
+            if hasattr(param.annotation, "__name__") and param.annotation.__name__ == "Request":
+                continue
+            if str(param.annotation).startswith("Depends") or (
+                param.default is not inspect.Parameter.empty and "Depends" in str(param.default)
+            ):
                 continue
             params.append(param)
 
@@ -182,7 +188,9 @@ async def {tool_name}_wrapper({param_sig}):
         # Register the properly typed function
         mcp.tool(name=tool_name, description=description)(wrapper_fn)
 
-    print(f"Registered {len([r for r in routes if getattr(getattr(r, 'endpoint', None), '__mcp_kind__', None) == 'tool'])} MCP tools")
+    logger = logging.getLogger(__name__)
+    tool_count = len([r for r in routes if getattr(getattr(r, 'endpoint', None), '__mcp_kind__', None) == 'tool'])
+    logger.info("Registered %d MCP tools", tool_count)
 
     return mcp
 
@@ -224,7 +232,10 @@ def register_tools_from_routes(mcp_server: FastMCP, routes: list, base_url: str)
             continue
 
         tool_count += 1
-        tool_name = fn.__mcp_name__ or re.sub(r"[/{}}]", "_", route.path).strip("_")
+        raw_name = fn.__mcp_name__ or route.path
+        tool_name = re.sub(r"[^0-9a-zA-Z_]", "_", raw_name).strip("_")
+        if not re.match(r"[A-Za-z_]", tool_name):
+            tool_name = f"tool_{tool_name}"
         proxy_fn = _make_http_proxy(base_url, route)
         description = inspect.getdoc(fn) or f"Tool for {route.path}"
 
@@ -434,9 +445,11 @@ async def {tool_name}_wrapper({param_signature}):
             mcp_server.tool(name=tool_name, description=description)(wrapper_fn)
 
         except Exception as e:
-            print(f"Error creating wrapper for {tool_name}: {e}")
+            logger = logging.getLogger(__name__)
+            logger.error("Error creating wrapper for %s: %s", tool_name, e)
             import traceback
             traceback.print_exc()
             continue
 
-    print(f"Registered {tool_count} MCP tools")
+    logger = logging.getLogger(__name__)
+    logger.info("Registered %d MCP tools", tool_count)

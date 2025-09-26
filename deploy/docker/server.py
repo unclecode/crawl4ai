@@ -661,7 +661,7 @@ register_tools_from_routes(
 # Known limitation: MCP tools don't forward JWT Authorization headers when security.jwt_enabled=true
 # Internal proxy calls will fail authentication. Disable JWT or implement header forwarding for MCP usage.
 app.mount("/", app=mcp_app, name="mcp")
-print(f"Mounted MCP app at / (MCP endpoint at /mcp)")
+print("Mounted MCP app at / (MCP endpoint at /mcp)")
 
 # ────────────────────────── cli ──────────────────────────────
 if __name__ == "__main__":
