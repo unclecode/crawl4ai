@@ -55,7 +55,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.staticfiles import StaticFiles
 from job import init_job_router
 
-from mcp_bridge import attach_mcp, mcp_resource, mcp_template, mcp_tool
+from mcp_bridge import create_mcp_server, combine_lifespans, mcp_resource, mcp_template, mcp_tool
 
 import ast
 import crawl4ai as _c4
@@ -98,11 +98,16 @@ async def capped_arun(self, *a, **kw):
         return await orig_arun(self, *a, **kw)
 AsyncWebCrawler.arun = capped_arun
 
-# ───────────────────── FastAPI lifespan ──────────────────────
+# ───────────────────── MCP & FastAPI setup ──────────────────────
 
+# Create empty MCP server first (tools will be registered after routes exist)
+from fastmcp import FastMCP
+mcp_server = FastMCP(name=config["app"]["title"])
+mcp_app = mcp_server.http_app(path="/mcp")
 
+# Define existing crawler lifespan
 @asynccontextmanager
-async def lifespan(_: FastAPI):
+async def crawler_lifespan(_: FastAPI):
     await get_crawler(BrowserConfig(
         extra_args=config["crawler"]["browser"].get("extra_args", []),
         **config["crawler"]["browser"].get("kwargs", {}),
@@ -112,11 +117,14 @@ async def lifespan(_: FastAPI):
     app.state.janitor.cancel()
     await close_all()
 
+# Combine MCP and crawler lifespans
+combined_lifespan = combine_lifespans(mcp_app.lifespan, crawler_lifespan)
+
 # ───────────────────── FastAPI instance ──────────────────────
 app = FastAPI(
     title=config["app"]["title"],
     version=config["app"]["version"],
-    lifespan=lifespan,
+    lifespan=combined_lifespan,
 )
 
 # ── static playground ──────────────────────────────────────
@@ -598,12 +606,16 @@ async def get_context(
     return JSONResponse(results)
 
 
-# attach MCP layer (adds /mcp/ws, /mcp/sse, /mcp/schema)
+# Register tools to the existing MCP server and mount it
 print(f"MCP server running on {config['app']['host']}:{config['app']['port']}")
-attach_mcp(
-    app,
+from mcp_bridge import register_tools_from_routes
+register_tools_from_routes(
+    mcp_server=mcp_server,
+    routes=app.routes,
     base_url=f"http://{config['app']['host']}:{config['app']['port']}"
 )
+app.mount("/", app=mcp_app, name="mcp")
+print(f"Mounted MCP app at / (MCP endpoint at /mcp)")
 
 # ────────────────────────── cli ──────────────────────────────
 if __name__ == "__main__":

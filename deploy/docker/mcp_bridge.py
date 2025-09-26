@@ -1,23 +1,16 @@
 # deploy/docker/mcp_bridge.py
 
 from __future__ import annotations
-import inspect, json, re, anyio
-from contextlib import suppress
-from typing import Any, Callable, Dict, List, Tuple
+import inspect, json, re
+from typing import Any, Callable, Dict, List
+from contextlib import asynccontextmanager
 import httpx
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
-from fastapi.responses import JSONResponse
-from fastapi import Request
-from sse_starlette.sse import EventSourceResponse
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from mcp.server.sse import SseServerTransport
+from fastmcp import FastMCP
 
-import mcp.types as t
-from mcp.server.lowlevel.server import Server, NotificationOptions
-from mcp.server.models import InitializationOptions
-
-# ── opt‑in decorators ───────────────────────────────────────────
+# Decorator functions for marking FastAPI routes
 def mcp_resource(name: str | None = None):
     def deco(fn):
         fn.__mcp_kind__, fn.__mcp_name__ = "resource", name
@@ -36,217 +29,236 @@ def mcp_tool(name: str | None = None):
         return fn
     return deco
 
-# ── HTTP‑proxy helper for FastAPI endpoints ─────────────────────
 def _make_http_proxy(base_url: str, route):
+    """Create HTTP proxy function for FastAPI route."""
     method = list(route.methods - {"HEAD", "OPTIONS"})[0]
+
     async def proxy(**kwargs):
-        # replace `/items/{id}` style params first
         path = route.path
-        for k, v in list(kwargs.items()):
-            placeholder = "{" + k + "}"
-            if placeholder in path:
-                path = path.replace(placeholder, str(v))
-                kwargs.pop(k)
+        json_body = {}
+
+        # Check for unwrapped Pydantic body
+        if "_pydantic_body" in kwargs:
+            kwargs.pop("_param_name")  # Not needed in proxy
+            pydantic_data = kwargs.pop("_pydantic_body")
+            # FastAPI expects Pydantic model data as the root JSON body, not wrapped
+            json_body = pydantic_data
+        else:
+            # Process each parameter normally
+            for k, v in list(kwargs.items()):
+                placeholder = "{" + k + "}"
+                if placeholder in path:
+                    # Path parameter
+                    path = path.replace(placeholder, str(v))
+                    kwargs.pop(k)
+                elif hasattr(v, "model_dump"):
+                    # Pydantic model serialization
+                    json_body[k] = v.model_dump()
+                    kwargs.pop(k)
+
+            # Remaining kwargs are query/body params
+            if kwargs:
+                json_body.update(kwargs)
+
         url = base_url.rstrip("/") + path
 
         async with httpx.AsyncClient() as client:
             try:
                 r = (
-                    await client.get(url, params=kwargs)
+                    await client.get(url, params=json_body)
                     if method == "GET"
-                    else await client.request(method, url, json=kwargs)
+                    else await client.request(method, url, json=json_body)
                 )
                 r.raise_for_status()
                 return r.text if method == "GET" else r.json()
             except httpx.HTTPStatusError as e:
-                # surface FastAPI error details instead of plain 500
                 raise HTTPException(e.response.status_code, e.response.text)
     return proxy
 
-# ── main entry point ────────────────────────────────────────────
-def attach_mcp(
-    app: FastAPI,
-    *,                          # keyword‑only
-    base: str = "/mcp",
+def _body_model(fn: Callable) -> type[BaseModel] | None:
+    """Extract Pydantic model from function signature."""
+    for p in inspect.signature(fn).parameters.values():
+        a = p.annotation
+        if inspect.isclass(a) and issubclass(a, BaseModel):
+            return a
+    return None
+
+def create_mcp_server(
+    *,
     name: str | None = None,
-    base_url: str,              # eg. "http://127.0.0.1:8020"
-) -> None:
-    """Call once after all routes are declared to expose WS+SSE MCP endpoints."""
-    server_name = name or app.title or "FastAPI-MCP"
-    mcp = Server(server_name)
+    routes: list,
+    base_url: str,
+) -> FastMCP:
+    """Create FastMCP server instance with registered tools."""
+    server_name = name or "FastAPI-MCP"
 
-    # tools: Dict[str, Callable] = {}
-    tools: Dict[str, Tuple[Callable, Callable]] = {}
-    resources: Dict[str, Callable] = {}
-    templates: Dict[str, Callable] = {}
+    # Create FastMCP instance
+    mcp = FastMCP(name=server_name)
 
-    # register decorated FastAPI routes
-    for route in app.routes:
+    # Register tools by scanning decorated FastAPI routes
+    for route in routes:
         fn = getattr(route, "endpoint", None)
         kind = getattr(fn, "__mcp_kind__", None)
-        if not kind:
+
+        if kind != "tool":
             continue
 
-        key = fn.__mcp_name__ or re.sub(r"[/{}}]", "_", route.path).strip("_")
+        tool_name = fn.__mcp_name__ or re.sub(r"[/{}}]", "_", route.path).strip("_")
+        proxy_fn = _make_http_proxy(base_url, route)
+        description = inspect.getdoc(fn) or f"Tool for {route.path}"
 
-        # if kind == "tool":
-        #     tools[key] = _make_http_proxy(base_url, route)
-        if kind == "tool":
-            proxy = _make_http_proxy(base_url, route)
-            tools[key] = (proxy, fn)
+        # Get function signature to create properly typed wrapper
+        sig = inspect.signature(fn)
+        params = []
+        for param_name, param in sig.parameters.items():
+            # Skip Request, Depends, and other FastAPI-specific params
+            if param.annotation in (inspect.Parameter.empty, type(None)):
+                continue
+            if hasattr(param.annotation, "__origin__"):  # Skip complex types like Depends
+                continue
+            params.append(param)
+
+        # Create function dynamically with explicit parameters
+        param_names = [p.name for p in params]
+        param_sig = ", ".join(param_names)
+
+        # Build the async function code
+        func_code = f"""
+async def {tool_name}_wrapper({param_sig}):
+    kwargs = {{{", ".join(f'"{name}": {name}' for name in param_names)}}}
+    result = await proxy_fn(**kwargs)
+    return json.dumps(result, default=str)
+"""
+
+        # Execute in a namespace that has access to proxy_fn and json
+        namespace = {"proxy_fn": proxy_fn, "json": json}
+        exec(func_code, namespace)
+        wrapper_fn = namespace[f"{tool_name}_wrapper"]
+
+        # Register the properly typed function
+        mcp.tool(name=tool_name, description=description)(wrapper_fn)
+
+    print(f"Registered {len([r for r in routes if getattr(getattr(r, 'endpoint', None), '__mcp_kind__', None) == 'tool'])} MCP tools")
+
+    return mcp
+
+def combine_lifespans(mcp_lifespan, existing_lifespan):
+    """Combine MCP and existing lifespans into a single context manager."""
+    @asynccontextmanager
+    async def combined(app):
+        # Run both lifespans - MCP outer, existing inner
+        async with mcp_lifespan(app):
+            async with existing_lifespan(app):
+                yield
+    return combined
+
+def register_tools_from_routes(mcp_server: FastMCP, routes: list, base_url: str):
+    """Register tools to an existing FastMCP server from FastAPI routes.
+
+    Preserves Pydantic model schemas by using them directly as parameters.
+    FastMCP automatically extracts JSON schemas from Pydantic type annotations.
+    """
+    tool_count = 0
+    for route in routes:
+        fn = getattr(route, "endpoint", None)
+        kind = getattr(fn, "__mcp_kind__", None)
+
+        if kind != "tool":
             continue
-        if kind == "resource":
-            resources[key] = fn
-        if kind == "template":
-            templates[key] = fn
 
-    # helpers for JSON‑Schema
-    def _schema(model: type[BaseModel] | None) -> dict:
-        return {"type": "object"} if model is None else model.model_json_schema()
+        tool_count += 1
+        tool_name = fn.__mcp_name__ or re.sub(r"[/{}}]", "_", route.path).strip("_")
+        proxy_fn = _make_http_proxy(base_url, route)
+        description = inspect.getdoc(fn) or f"Tool for {route.path}"
 
-    def _body_model(fn: Callable) -> type[BaseModel] | None:
-        for p in inspect.signature(fn).parameters.values():
-            a = p.annotation
-            if inspect.isclass(a) and issubclass(a, BaseModel):
-                return a
-        return None
+        # Extract parameters from function signature
+        sig = inspect.signature(fn)
+        pydantic_model = None
+        pydantic_param_name = None
+        all_params = {}
 
-    # MCP handlers
-    @mcp.list_tools()
-    async def _list_tools() -> List[t.Tool]:
-        out = []
-        for k, (proxy, orig_fn) in tools.items():
-            desc   = getattr(orig_fn, "__mcp_description__", None) or inspect.getdoc(orig_fn) or ""
-            schema = getattr(orig_fn, "__mcp_schema__", None) or _schema(_body_model(orig_fn))
-            out.append(
-                t.Tool(name=k, description=desc, inputSchema=schema)
-            )
-        return out
-             
+        for param_name, param in sig.parameters.items():
+            # Skip Request type
+            if hasattr(param.annotation, "__name__") and param.annotation.__name__ == "Request":
+                continue
+            # Skip Depends - check both annotation string and default value
+            if str(param.annotation).startswith("Depends"):
+                continue
+            if param.default != inspect.Parameter.empty and "Depends" in str(param.default):
+                continue
+            # Skip empty annotations
+            if param.annotation == inspect.Parameter.empty:
+                continue
 
-    @mcp.call_tool()
-    async def _call_tool(name: str, arguments: Dict | None) -> List[t.TextContent]:
-        if name not in tools:
-            raise HTTPException(404, "tool not found")
-        
-        proxy, _ = tools[name]
+            all_params[param_name] = param.annotation
+
+            # Check if this is a Pydantic model (has model_fields attribute)
+            if hasattr(param.annotation, "model_fields") and not pydantic_model:
+                pydantic_model = param.annotation
+                pydantic_param_name = param_name
+
+        if not all_params:
+            print(f"Warning: No parameters found for tool {tool_name}, skipping")
+            continue
+
+        # Unwrap Pydantic model if found, otherwise use params directly
         try:
-            res = await proxy(**(arguments or {}))
-        except HTTPException as exc:
-            # map server‑side errors into MCP "text/error" payloads
-            err = {"error": exc.status_code, "detail": exc.detail}
-            return [t.TextContent(type = "text", text=json.dumps(err))]
-        return [t.TextContent(type = "text", text=json.dumps(res, default=str))]
+            if pydantic_model:
+                # Unwrap Pydantic model - use its fields directly
+                param_annotations = {}
+                for field_name, field_info in pydantic_model.model_fields.items():
+                    param_annotations[field_name] = field_info.annotation
 
-    @mcp.list_resources()
-    async def _list_resources() -> List[t.Resource]:
-        return [
-            t.Resource(name=k, description=inspect.getdoc(f) or "", mime_type="application/json")
-            for k, f in resources.items()
-        ]
+                param_list = list(param_annotations.keys())
+                param_signature = ", ".join(param_list)
 
-    @mcp.read_resource()
-    async def _read_resource(name: str) -> List[t.TextContent]:
-        if name not in resources:
-            raise HTTPException(404, "resource not found")
-        res = resources[name]()
-        return [t.TextContent(type = "text", text=json.dumps(res, default=str))]
+                # Generate wrapper that reconstructs Pydantic model
+                # Pass model dict directly to proxy (FastAPI expects body content, not wrapped)
+                func_code = f"""
+async def {tool_name}_wrapper({param_signature}):
+    import json
+    model_data = {{{", ".join(f'"{p}": {p}' for p in param_list)}}}
+    # Pass the model data dict directly - proxy will handle it
+    result = await proxy_fn(_pydantic_body=model_data, _param_name="{pydantic_param_name}")
+    return json.dumps(result, default=str)
+"""
 
-    @mcp.list_resource_templates()
-    async def _list_templates() -> List[t.ResourceTemplate]:
-        return [
-            t.ResourceTemplate(
-                name=k,
-                description=inspect.getdoc(f) or "",
-                parameters={
-                    p: {"type": "string"} for p in _path_params(app, f)
-                },
-            )
-            for k, f in templates.items()
-        ]
+                namespace = {
+                    "proxy_fn": proxy_fn,
+                    "json": json,
+                    "pydantic_model": pydantic_model,
+                    "pydantic_param_name": pydantic_param_name
+                }
+            else:
+                # Use individual parameters directly
+                param_annotations = all_params.copy()
+                param_list = list(param_annotations.keys())
+                param_signature = ", ".join(param_list)
 
-    init_opts = InitializationOptions(
-        server_name=server_name,
-        server_version="0.1.0",
-        capabilities=mcp.get_capabilities(
-            notification_options=NotificationOptions(),
-            experimental_capabilities={},
-        ),
-    )
+                func_code = f"""
+async def {tool_name}_wrapper({param_signature}):
+    import json
+    kwargs = {{{", ".join(f'"{p}": {p}' for p in param_list)}}}
+    result = await proxy_fn(**kwargs)
+    return json.dumps(result, default=str)
+"""
 
-    # ── WebSocket transport ────────────────────────────────────
-    @app.websocket_route(f"{base}/ws")
-    async def _ws(ws: WebSocket):
-        await ws.accept()
-        c2s_send, c2s_recv = anyio.create_memory_object_stream(100)
-        s2c_send, s2c_recv = anyio.create_memory_object_stream(100)
+                namespace = {"proxy_fn": proxy_fn, "json": json}
 
-        from pydantic import TypeAdapter
-        from mcp.types import JSONRPCMessage
-        adapter = TypeAdapter(JSONRPCMessage)
+            exec(func_code, namespace)
+            wrapper_fn = namespace[f"{tool_name}_wrapper"]
 
-        init_done = anyio.Event()
+            # Set type annotations
+            wrapper_fn.__annotations__ = param_annotations.copy()
+            wrapper_fn.__annotations__["return"] = str
 
-        async def srv_to_ws():
-            first = True 
-            try:
-                async for msg in s2c_recv:
-                    await ws.send_json(msg.model_dump())
-                    if first:
-                        init_done.set()
-                        first = False
-            finally:
-                # make sure cleanup survives TaskGroup cancellation
-                with anyio.CancelScope(shield=True):
-                    with suppress(RuntimeError):       # idempotent close
-                        await ws.close()
+            # Register with FastMCP
+            mcp_server.tool(name=tool_name, description=description)(wrapper_fn)
 
-        async def ws_to_srv():
-            try:
-                # 1st frame is always "initialize"
-                first = adapter.validate_python(await ws.receive_json())
-                await c2s_send.send(first)
-                await init_done.wait()          # block until server ready
-                while True:
-                    data = await ws.receive_json()
-                    await c2s_send.send(adapter.validate_python(data))
-            except WebSocketDisconnect:
-                await c2s_send.aclose()
+        except Exception as e:
+            print(f"Error creating wrapper for {tool_name}: {e}")
+            import traceback
+            traceback.print_exc()
+            continue
 
-        async with anyio.create_task_group() as tg:
-            tg.start_soon(mcp.run, c2s_recv, s2c_send, init_opts)
-            tg.start_soon(ws_to_srv)
-            tg.start_soon(srv_to_ws)
-
-    # ── SSE transport (official) ─────────────────────────────
-    sse = SseServerTransport(f"{base}/messages/")
-
-    @app.get(f"{base}/sse")
-    async def _mcp_sse(request: Request):
-        async with sse.connect_sse(
-            request.scope, request.receive, request._send  # starlette ASGI primitives
-        ) as (read_stream, write_stream):
-            await mcp.run(read_stream, write_stream, init_opts)
-
-    # client → server frames are POSTed here
-    app.mount(f"{base}/messages", app=sse.handle_post_message)
-
-    # ── schema endpoint ───────────────────────────────────────
-    @app.get(f"{base}/schema")
-    async def _schema_endpoint():
-        return JSONResponse({
-            "tools": [x.model_dump() for x in await _list_tools()],
-            "resources": [x.model_dump() for x in await _list_resources()],
-            "resource_templates": [x.model_dump() for x in await _list_templates()],
-        })
-
-
-# ── helpers ────────────────────────────────────────────────────
-def _route_name(path: str) -> str:
-    return re.sub(r"[/{}}]", "_", path).strip("_")
-
-def _path_params(app: FastAPI, fn: Callable) -> List[str]:
-    for r in app.routes:
-        if r.endpoint is fn:
-            return list(r.param_convertors.keys())
-    return []
+    print(f"Registered {tool_count} MCP tools")
