@@ -1,10 +1,11 @@
 import os
 import json
 import asyncio
+import pathlib
 from typing import List, Tuple, Dict
 from functools import partial
 from uuid import uuid4
-from datetime import datetime
+from datetime import datetime, date
 from base64 import b64encode
 
 import logging
@@ -42,7 +43,8 @@ from utils import (
     should_cleanup_task,
     decode_redis_hash,
     get_llm_api_key,
-    validate_llm_provider
+    validate_llm_provider,
+    datetime_handler
 )
 from utils import _ensure_within_base_dir
 
@@ -544,18 +546,25 @@ async def handle_crawl_request(
             for key, value in result_dict.items():
                 try:
                     # Test if value is JSON serializable
-                    import json
                     json.dumps(value)
                     cleaned_dict[key] = value
                 except (TypeError, ValueError):
-                    # Handle special cases
-                    if key == 'pdf' and value is not None:
+                    # Handle special cases with proper type detection and normalization
+                    if isinstance(value, (datetime, date)):
+                        # Use existing datetime_handler for datetime/date objects
+                        cleaned_dict[key] = datetime_handler(value)
+                    elif isinstance(value, (os.PathLike, pathlib.Path)):
+                        # Convert PathLike objects to string paths
+                        cleaned_dict[key] = os.fspath(value)
+                    elif key == 'pdf' and value is not None:
+                        # Special handling for PDF binary data
                         cleaned_dict[key] = b64encode(value).decode('utf-8')
                     elif isinstance(value, bytes):
+                        # General bytes handling
                         cleaned_dict[key] = b64encode(value).decode('utf-8')
                     else:
-                        # Skip non-serializable properties
-                        logger.warning(f"Skipping non-serializable field '{key}' of type {type(value)}")
+                        # Skip truly unsupported types while logging
+                        logger.warning(f"Skipping non-serializable field '{key}' of type {type(value)}: {value}")
 
             processed_results.append(cleaned_dict)
 
