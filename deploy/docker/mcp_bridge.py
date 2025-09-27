@@ -264,10 +264,12 @@ def _build_tool_wrapper(
 
 
 def _normalize_annotation(annotation: object) -> object:
+    """Normalize annotation but preserve List/typing information for FastMCP schema generation."""
     if inspect.isclass(annotation) and issubclass(annotation, Enum):
         for base in annotation.__mro__[1:]:
             if base in {str, int, float, bool}:
                 return base
+    # Preserve List[T] and other typing constructs - don't normalize them away
     return annotation
 
 

@@ -757,9 +757,9 @@ async def get_context(
         20, ge=1, description="absolute cap on returned chunks"),
 ):
     """
-    This end point is design for any questions about Crawl4ai library. It returns a plain text markdown with extensive information about Crawl4ai. 
-    You can use this as a context for any AI assistant. Use this endpoint for AI assistants to retrieve library context for decision making or code generation tasks.
-    Alway is BEST practice you provide a query to filter the context. Otherwise the lenght of the response will be very long.
+    This endpoint is designed for any questions about the Crawl4AI library. It returns plain text markdown with extensive information about Crawl4AI.
+    You can use this as context for any AI assistant. Use this endpoint for AI assistants to retrieve library context for decision making or code generation tasks.
+    It is BEST practice to provide a query to filter the context. Otherwise the length of the response will be very long.
 
     Parameters:
     - context_type: Specify "code" for code context, "doc" for documentation context, or "all" for both.
@@ -855,9 +855,8 @@ async def get_mcp_schema():
     and capabilities in a structured format.
     """
     try:
-        tools = await mcp_server.get_tools()
-        resources = await mcp_server.get_resources()
-        prompts = await mcp_server.get_prompts()
+        # Get tools directly from FastMCP server
+        tools_dict = await mcp_server.get_tools()
         
         schema_data = {
             "tools": [],
@@ -865,115 +864,110 @@ async def get_mcp_schema():
             "prompts": []
         }
         
-        # Process tools
-        for tool in tools.tools:
-            tool_info = {
-                "name": tool.name,
-                "description": tool.description,
-                "inputSchema": tool.inputSchema.model_dump() if tool.inputSchema else None
-            }
-            schema_data["tools"].append(tool_info)
-        
-        # Process resources  
-        for resource in resources.resources:
-            resource_info = {
-                "name": resource.name,
-                "description": resource.description,
-                "mimeType": resource.mimeType,
-                "uri": resource.uri
-            }
-            schema_data["resources"].append(resource_info)
-            
-        # Process prompts
-        for prompt in prompts.prompts:
-            prompt_info = {
-                "name": prompt.name,
-                "description": prompt.description,
-                "arguments": [arg.model_dump() for arg in prompt.arguments] if prompt.arguments else []
-            }
-            schema_data["prompts"].append(prompt_info)
+        # Process FastMCP tools (they come as a dict, not an object with .tools)
+        for tool_name, function_tool in tools_dict.items():
+            try:
+                # Extract schema from the FastMCP FunctionTool
+                tool_info = {
+                    "name": tool_name,
+                    "description": function_tool.description or "No description available",
+                    "inputSchema": {"type": "object", "properties": {}}
+                }
+                
+                # Get the function and its signature
+                if hasattr(function_tool, 'fn'):
+                    fn = function_tool.fn
+                    sig = inspect.signature(fn)
+                    
+                    # Process each parameter
+                    for param_name, param in sig.parameters.items():
+                        if param.annotation == inspect.Parameter.empty:
+                            continue
+                            
+                        # Create proper schema for each parameter type
+                        param_schema = _create_param_schema(param.annotation, param.default)
+                        tool_info["inputSchema"]["properties"][param_name] = param_schema
+                
+                schema_data["tools"].append(tool_info)
+                
+            except Exception as e:
+                # Log but don't fail for individual tools
+                import logging
+                logging.getLogger(__name__).warning(f"Failed to extract schema for tool {tool_name}: {e}")
+                continue
         
         return JSONResponse(schema_data)
         
     except Exception as e:
-        # Fallback: provide basic tool information from route inspection
-        schema_data = {
+        return JSONResponse({
+            "error": f"Failed to generate MCP schema: {str(e)}",
             "tools": [],
             "resources": [],
-            "prompts": [],
-            "note": "Generated from route inspection (MCP introspection failed)"
-        }
+            "prompts": []
+        }, status_code=500)
+
+
+def _create_param_schema(annotation, default_value):
+    """Create JSON schema for a parameter based on its type annotation."""
+    import json
+    from typing import get_origin, get_args
+    
+    schema = {"type": "string"}  # Default fallback
+    
+    try:
+        # Handle basic types
+        if annotation is str:
+            schema = {"type": "string"}
+        elif annotation is int:
+            schema = {"type": "integer"}
+        elif annotation is float:
+            schema = {"type": "number"}
+        elif annotation is bool:
+            schema = {"type": "boolean"}
+        else:
+            # Handle typing constructs
+            origin = get_origin(annotation)
+            args = get_args(annotation)
+            
+            if origin is list:
+                schema = {"type": "array"}
+                if args and len(args) > 0:
+                    # Recursive call for array items
+                    item_schema = _create_param_schema(args[0], None)
+                    schema["items"] = item_schema
+            elif origin is dict:
+                schema = {"type": "object"}
+                if args and len(args) >= 2:
+                    # Could add additionalProperties for typed dicts
+                    schema["additionalProperties"] = True
+            elif origin is type(None) or str(origin) == "typing.Union":
+                # Handle Optional[T] (Union[T, None])
+                if args:
+                    non_none_types = [arg for arg in args if arg is not type(None)]
+                    if non_none_types:
+                        schema = _create_param_schema(non_none_types[0], default_value)
+            else:
+                # For unknown types, try to get a string representation
+                schema = {"type": "string", "description": f"Type: {annotation}"}
         
-        # Extract tool info from decorated routes
-        for route in app.routes:
-            if hasattr(route, 'endpoint'):
-                fn = route.endpoint
-                mcp_kind = getattr(fn, '__mcp_kind__', None)
-                if mcp_kind == 'tool':
-                    tool_name = getattr(fn, '__mcp_name__', None) or route.path.strip('/')
-                    tool_info = {
-                        "name": tool_name,
-                        "description": inspect.getdoc(fn) or f"Tool for {route.path}",
-                        "inputSchema": {"type": "object", "properties": {}}
-                    }
+        # Add default value if present and JSON serializable
+        if default_value != inspect.Parameter.empty and default_value is not None:
+            try:
+                json.dumps(default_value)  # Test if serializable
+                schema["default"] = default_value
+            except (TypeError, ValueError):
+                # If not serializable, convert to string representation
+                if isinstance(default_value, (str, int, float, bool)):
+                    schema["default"] = default_value
+                else:
+                    schema["default"] = str(default_value)
                     
-                    # Extract parameter info from Pydantic models only (ignore deprecated query params)
-                    try:
-                        sig = inspect.signature(fn)
-                        for param_name, param in sig.parameters.items():
-                            # Skip framework parameters and deprecated query parameters
-                            if param_name in ['request', '_td', 'f', 'q', 'c']:
-                                continue
-                            
-                            if param.annotation != inspect.Parameter.empty and hasattr(param.annotation, 'model_fields'):
-                                # Pydantic model - extract field info (this is what MCP clients should use)
-                                for field_name, field_info in param.annotation.model_fields.items():
-                                    field_desc = None
-                                    if hasattr(field_info, 'description'):
-                                        field_desc = field_info.description
-                                    
-                                    # Determine field type from annotation
-                                    field_type = "string"  # Default
-                                    if hasattr(field_info, 'annotation'):
-                                        ann_str = str(field_info.annotation).lower()
-                                        if 'int' in ann_str:
-                                            field_type = "integer"
-                                        elif 'float' in ann_str:
-                                            field_type = "number" 
-                                        elif 'bool' in ann_str:
-                                            field_type = "boolean"
-                                        elif 'list' in ann_str:
-                                            field_type = "array"
-                                    
-                                    field_schema = {
-                                        "type": field_type,
-                                        "description": field_desc
-                                    }
-                                    
-                                    # Add default if available
-                                    if hasattr(field_info, 'default'):
-                                        default_val = field_info.default
-                                        # Handle Pydantic special values safely
-                                        if default_val is not ... and str(type(default_val)) != "<class 'pydantic_core.PydanticUndefined'>":
-                                            try:
-                                                # Try to JSON serialize the default to make sure it's safe
-                                                import json
-                                                json.dumps(default_val)
-                                                field_schema["default"] = default_val
-                                            except (TypeError, ValueError):
-                                                # If it can't be serialized, convert to string or skip
-                                                if isinstance(default_val, (str, int, float, bool, type(None))):
-                                                    field_schema["default"] = default_val
-                                                else:
-                                                    field_schema["default"] = str(default_val)
-                                    
-                                    tool_info["inputSchema"]["properties"][field_name] = field_schema
-                    except Exception:
-                        pass
-                    
-                    schema_data["tools"].append(tool_info)
-        
-        return JSONResponse(schema_data)
+    except Exception:
+        # Fallback for any errors in schema generation
+        schema = {"type": "string", "description": f"Type: {annotation}"}
+    
+    return schema
+
 
 # Mount MCP app at root level but preserve our FastAPI routes
 # Known limitation: MCP tools don't forward JWT Authorization headers when security.jwt_enabled=true
