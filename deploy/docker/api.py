@@ -491,6 +491,9 @@ async def handle_crawl_request(
                 elif isinstance(results_gen, (list, tuple)):
                     # It's already a sequence
                     results = list(results_gen)
+                elif hasattr(results_gen, 'results'):
+                    # CrawlResultContainer or similar - extract internal per-URL entries
+                    results = list(results_gen.results)
                 else:
                     # Single model/object, wrap it in a list
                     results = [results_gen]
