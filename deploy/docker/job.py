@@ -5,7 +5,7 @@ Relies on the existing Redis task helpers in api.py
 
 from typing import Dict, Optional, Callable
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl
 
 from api import (
     handle_llm_request,
@@ -32,8 +32,10 @@ def init_job_router(redis, config, token_dep) -> APIRouter:
 
 # ---------- payload models --------------------------------------------------
 class LlmJobPayload(BaseModel):
+    model_config = {"populate_by_name": True}
+    
     url:    HttpUrl
-    query:  str
+    query:  str = Field(..., alias="q")
     schema: Optional[str] = None
     cache:  bool = False
     provider: Optional[str] = None

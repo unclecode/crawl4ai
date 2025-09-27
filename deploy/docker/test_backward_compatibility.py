@@ -79,7 +79,7 @@ async def test_parameter_precedence():
             if (data.get('filter') == expected_filter and
                 data.get('query') == expected_query and
                 data.get('cache') == expected_cache):
-                print(f"✓ Precedence works: body params override query params")
+                print("✓ Precedence works: body params override query params")
                 return True
             else:
                 print(f"✗ Precedence failed: got filter={data.get('filter')}, query={data.get('query')}, cache={data.get('cache')}")
@@ -108,7 +108,7 @@ async def test_default_fallback():
 
             if (data.get('filter') == expected_filter and
                 data.get('query') == expected_query):
-                print(f"✓ Default fallback works: query params used when body has defaults")
+                print("✓ Default fallback works: query params used when body has defaults")
                 return True
             else:
                 print(f"✗ Default fallback failed: got filter={data.get('filter')}, query={data.get('query')}")

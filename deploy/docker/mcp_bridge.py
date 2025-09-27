@@ -311,7 +311,7 @@ def _build_pydantic_wrapper(
             numeric_float_fields.add(field_name)
 
         field_annotations[field_name] = annotation
-        if field_info.is_required():
+        if field_info.is_required:
             default = inspect._empty
         else:
             if field_info.default_factory is not None:

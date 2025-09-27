@@ -490,12 +490,12 @@ async def handle_crawl_request(
             fallback_results = []
             for url in urls:
                 try:
-                    single_results = await crawler.arun(
+                    single_result = await crawler.arun(
                         url=url,
                         config=crawler_config,
                         dispatcher=dispatcher,
                     )
-                    fallback_results.extend(single_results)
+                    fallback_results.append(single_result)
                 except Exception as url_error:
                     logger.warning("Crawl failed for %s: %s", url, url_error)
                     fallback_results.append(
