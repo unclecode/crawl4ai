@@ -385,11 +385,11 @@ Generates a PDF document of the specified URL.
 
 ### JavaScript Execution Endpoint
 
-```
+```http
 POST /execute_js
 ```
 
-Executes JavaScript snippets against a fresh instance of the target page and returns the resulting crawl data.
+Executes JavaScript snippets against a fresh instance of the target page and returns js_execution_result with return_values.
 
 ```json
 {
@@ -401,12 +401,9 @@ Executes JavaScript snippets against a fresh instance of the target page and ret
 }
 ```
 
-- `scripts`: List of JavaScript expressions (typically self-invoking
-  functions) that run sequentially in the page context. There is no `page`
-  handle; use DOM APIs such as `document` or `window`.
-- Results only report success or errors—returned values are not surfaced. Run
-  related snippets in a single call; each request creates and tears down a
-  fresh page.
+- `scripts`: List of JavaScript expressions (typically self‑invoking functions) that run sequentially in the page context. There is no `page` handle; use DOM APIs such as `document` or `window`.
+- Returned values are surfaced via `js_execution_result.return_values`. Errors are represented as objects (e.g., with `message`/`stack`) in the corresponding positions.
+- Each request creates a fresh page; run related snippets in a single call.
 
 ---
 

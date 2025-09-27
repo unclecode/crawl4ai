@@ -126,14 +126,20 @@ def verify_email_domain(email: str) -> bool:
         return False
 
 def _ensure_within_base_dir(path: str, base_dir: str) -> None:
+    # Normalize and resolve symlinks
+    base_dir_real = os.path.realpath(os.path.abspath(base_dir))
+    path_real = os.path.realpath(os.path.abspath(path))
+    # Validate absolute base_dir
+    if not os.path.isabs(base_dir_real):
+        raise HTTPException(400, "Security restriction: base directory must be absolute.")
     try:
-        common = os.path.commonpath([base_dir, path])
+        common = os.path.commonpath([base_dir_real, path_real])
     except ValueError:
         common = ""
-    if common != base_dir:
+    if common != base_dir_real:
         raise HTTPException(
             400,
-            f"Security restriction: output_path must be within {base_dir}. "
-            f"Your path '{path}' is outside the allowed directory. "
-            f"Example valid path: {base_dir}/myfile.json"
+            f"Security restriction: output_path must be within {base_dir_real}. "
+            f"Your path '{path_real}' is outside the allowed directory. "
+            f"Example valid path: {base_dir_real}/myfile.json"
         )
