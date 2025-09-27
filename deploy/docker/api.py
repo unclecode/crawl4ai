@@ -541,30 +541,39 @@ async def handle_crawl_request(
                     "error_message": getattr(result, "error_message", "Unknown error"),
                 }
 
-            # Clean up non-serializable properties
+            # Clean up non-serializable properties with recursive normalization
+            def _normalize_value(val):
+                if isinstance(val, (datetime, date)):
+                    return datetime_handler(val)
+                if isinstance(val, (os.PathLike, pathlib.Path)):
+                    return os.fspath(val)
+                if isinstance(val, bytes):
+                    return b64encode(val).decode('utf-8')
+                if isinstance(val, dict):
+                    return {k: _normalize_value(v) for k, v in val.items()}
+                if isinstance(val, (list, tuple, set)):
+                    return [_normalize_value(v) for v in val]
+                return val
+
             cleaned_dict = {}
             for key, value in result_dict.items():
+                # Special handling for PDF binary data (preserve existing logic)
+                if key == 'pdf' and value is not None and isinstance(value, bytes):
+                    cleaned_dict[key] = b64encode(value).decode('utf-8')
+                    continue
+
+                # Recursively normalize the value
+                normalized = _normalize_value(value)
                 try:
-                    # Test if value is JSON serializable
-                    json.dumps(value)
-                    cleaned_dict[key] = value
+                    json.dumps(normalized)
+                    cleaned_dict[key] = normalized
                 except (TypeError, ValueError):
-                    # Handle special cases with proper type detection and normalization
-                    if isinstance(value, (datetime, date)):
-                        # Use existing datetime_handler for datetime/date objects
-                        cleaned_dict[key] = datetime_handler(value)
-                    elif isinstance(value, (os.PathLike, pathlib.Path)):
-                        # Convert PathLike objects to string paths
-                        cleaned_dict[key] = os.fspath(value)
-                    elif key == 'pdf' and value is not None:
-                        # Special handling for PDF binary data
-                        cleaned_dict[key] = b64encode(value).decode('utf-8')
-                    elif isinstance(value, bytes):
-                        # General bytes handling
-                        cleaned_dict[key] = b64encode(value).decode('utf-8')
-                    else:
-                        # Skip truly unsupported types while logging
-                        logger.warning(f"Skipping non-serializable field '{key}' of type {type(value)}: {value}")
+                    logger.warning(
+                        "Skipping non-serializable field '%s' of type %s: %s",
+                        key,
+                        type(value),
+                        value,
+                    )
 
             processed_results.append(cleaned_dict)
 
