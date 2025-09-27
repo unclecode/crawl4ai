@@ -25,10 +25,6 @@ redis:
   ssl_ca_certs: None
   ssl_certfile: None
   ssl_keyfile: None
-  ssl_cert_reqs: None
-  ssl_ca_certs: None
-  ssl_certfile: None
-  ssl_keyfile: None
 
 # Rate Limiting Configuration
 rate_limiting:

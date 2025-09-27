@@ -416,19 +416,25 @@ Generates a PDF document of the specified URL.
 POST /execute_js
 ```
 
-Executes JavaScript snippets on the specified URL and returns the full crawl result.
+Executes JavaScript snippets against a fresh instance of the target page and
+returns the resulting crawl data.
 
 ```json
 {
   "url": "https://example.com",
   "scripts": [
-    "return document.title",
-    "return Array.from(document.querySelectorAll('a')).map(a => a.href)"
+    "(() => { document.body.dataset.demo = 'set'; return true; })()",
+    "(async () => { await new Promise(r => setTimeout(r, 500)); window.snapshot = document.body.dataset.demo; })()"
   ]
 }
 ```
 
-- `scripts`: List of JavaScript snippets to execute sequentially
+- `scripts`: List of JavaScript expressions (typically self-invoking
+  functions) that run sequentially in the page context. There is no `page`
+  handle; use DOM APIs such as `document` or `window`.
+- Results only report success or errors—returned values are not surfaced.  Run
+  all related snippets in a single call; each request creates and tears down a
+  fresh page.
 
 ---
 
@@ -713,7 +719,7 @@ app:
   title: "Crawl4AI API"
   version: "1.0.0" # Consider setting this to match library version, e.g., "0.5.1"
   host: "0.0.0.0"
-  port: 8020 # NOTE: This port is used ONLY when running server.py directly. Gunicorn overrides this (see supervisord.conf).
+  port: 11235 # NOTE: This port is used ONLY when running server.py directly. Gunicorn overrides this (see supervisord.conf).
   reload: False # Default set to False - suitable for production
   timeout_keep_alive: 300
 

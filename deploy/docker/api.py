@@ -44,6 +44,7 @@ from utils import (
     get_llm_api_key,
     validate_llm_provider
 )
+from utils import _ensure_within_base_dir
 
 import psutil, time
 
@@ -76,9 +77,12 @@ async def handle_llm_qa(
         async with AsyncWebCrawler() as crawler:
             result = await crawler.arun(url)
             if not result.success:
+                from server import _extract_user_friendly_error
+                error_msg = result.error_message or "Failed to fetch content"
+                friendly_error = _extract_user_friendly_error(error_msg, "LLM QA")
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=result.error_message
+                    detail=friendly_error
                 )
             content = result.markdown.fit_markdown or result.markdown.raw_markdown
 
@@ -221,11 +225,14 @@ async def handle_markdown_request(
                     cache_mode=cache_mode
                 )
             )
-            
+
             if not result.success:
+                from server import _extract_user_friendly_error
+                error_msg = result.error_message or "Failed to fetch content"
+                friendly_error = _extract_user_friendly_error(error_msg, "Markdown generation")
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=result.error_message
+                    detail=friendly_error
                 )
 
             return (result.markdown.raw_markdown 
@@ -419,7 +426,8 @@ async def handle_crawl_request(
     urls: List[str],
     browser_config: dict,
     crawler_config: dict,
-    config: dict
+    config: dict,
+    output_path: str = None
 ) -> dict:
     """Handle non-streaming crawl requests."""
     start_mem_mb = _get_memory_mb() # <--- Get memory before
@@ -430,6 +438,12 @@ async def handle_crawl_request(
     try:
         urls = [('https://' + url) if not url.startswith(('http://', 'https://')) and not url.startswith(("raw:", "raw://")) else url for url in urls]
         browser_config = BrowserConfig.load(browser_config)
+        if getattr(browser_config, "headless", True) is False:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                "Non-headless browser sessions are not supported inside the Docker image. "
+                "Set browser_config.headless=true or omit the flag."
+            )
         crawler_config = CrawlerRunConfig.load(crawler_config)
 
         dispatcher = MemoryAdaptiveDispatcher(
@@ -453,11 +467,45 @@ async def handle_crawl_request(
 
         results = []
         func = getattr(crawler, "arun" if len(urls) == 1 else "arun_many")
-        partial_func = partial(func, 
-                                urls[0] if len(urls) == 1 else urls, 
-                                config=crawler_config, 
-                                dispatcher=dispatcher)
-        results = await partial_func()
+        payload = urls[0] if len(urls) == 1 else urls
+        partial_func = partial(
+            func,
+            payload,
+            config=crawler_config,
+            dispatcher=dispatcher,
+        )
+        try:
+            results_gen = await partial_func()
+            # Handle both list and async generator results
+            if hasattr(results_gen, '__aiter__'):
+                # It's an async generator, collect all results
+                results = []
+                async for result in results_gen:
+                    results.append(result)
+            else:
+                # It's already a list
+                results = results_gen
+        except Exception as bulk_error:
+            logger.warning("Bulk crawl failed, retrying per-URL: %s", bulk_error)
+            fallback_results = []
+            for url in urls:
+                try:
+                    single_results = await crawler.arun(
+                        url=url,
+                        config=crawler_config,
+                        dispatcher=dispatcher,
+                    )
+                    fallback_results.extend(single_results)
+                except Exception as url_error:
+                    logger.warning("Crawl failed for %s: %s", url, url_error)
+                    fallback_results.append(
+                        {
+                            "url": url,
+                            "success": False,
+                            "error_message": str(url_error),
+                        }
+                    )
+            results = fallback_results
 
         # await crawler.close()
         
@@ -472,13 +520,39 @@ async def handle_crawl_request(
         # Process results to handle PDF bytes
         processed_results = []
         for result in results:
-            result_dict = result.model_dump()
-            # If PDF exists, encode it to base64
-            if result_dict.get('pdf') is not None:
-                result_dict['pdf'] = b64encode(result_dict['pdf']).decode('utf-8')
-            processed_results.append(result_dict)
-            
-        return {
+            if hasattr(result, "model_dump"):
+                result_dict = result.model_dump()
+            elif isinstance(result, dict):
+                result_dict = result.copy()
+                result_dict.setdefault("success", False)
+            else:
+                result_dict = {
+                    "url": getattr(result, "url", ""),
+                    "success": getattr(result, "success", False),
+                    "error_message": getattr(result, "error_message", "Unknown error"),
+                }
+
+            # Clean up non-serializable properties
+            cleaned_dict = {}
+            for key, value in result_dict.items():
+                try:
+                    # Test if value is JSON serializable
+                    import json
+                    json.dumps(value)
+                    cleaned_dict[key] = value
+                except (TypeError, ValueError):
+                    # Handle special cases
+                    if key == 'pdf' and value is not None:
+                        cleaned_dict[key] = b64encode(value).decode('utf-8')
+                    elif isinstance(value, bytes):
+                        cleaned_dict[key] = b64encode(value).decode('utf-8')
+                    else:
+                        # Skip non-serializable properties
+                        logger.warning(f"Skipping non-serializable field '{key}' of type {type(value)}")
+
+            processed_results.append(cleaned_dict)
+
+        response_data = {
             "success": True,
             "results": processed_results,
             "server_processing_time_s": end_time - start_time,
@@ -486,6 +560,41 @@ async def handle_crawl_request(
             "server_peak_memory_mb": peak_mem_mb
         }
 
+        # Handle output_path if provided
+        if output_path:
+            binary_base_dir = config.get("binary", {}).get("default_dir", "/tmp/crawl4ai-exports")
+            abs_path = os.path.abspath(output_path)
+
+            # Validate path is within allowed directory
+            _ensure_within_base_dir(abs_path, binary_base_dir)
+
+            # Ensure directory exists
+            os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+
+            # Write JSON to file
+            try:
+                from utils import datetime_handler
+                with open(abs_path, 'w', encoding='utf-8') as f:
+                    json.dump(response_data, f, ensure_ascii=False, indent=2, default=datetime_handler)
+                return {
+                    "success": True,
+                    "path": abs_path,
+                    "results_count": len(processed_results),
+                    "server_processing_time_s": end_time - start_time,
+                    "server_memory_delta_mb": mem_delta_mb,
+                    "server_peak_memory_mb": peak_mem_mb
+                }
+            except (OSError, TypeError) as write_error:
+                logger.warning("crawl file write failed: %s", write_error, exc_info=True)
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Failed to write to {abs_path}: {str(write_error)}"
+                )
+
+        return response_data
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Crawl error: {str(e)}", exc_info=True)
         if 'crawler' in locals() and crawler.ready: # Check if crawler was initialized and started
@@ -500,9 +609,10 @@ async def handle_crawl_request(
         if start_mem_mb is not None and end_mem_mb_error is not None:
             mem_delta_mb = end_mem_mb_error - start_mem_mb
 
+        import json as json_module  # Import locally to avoid any scoping issues
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=json.dumps({ # Send structured error
+            detail=json_module.dumps({ # Send structured error
                 "error": str(e),
                 "server_memory_delta_mb": mem_delta_mb,
                 "server_peak_memory_mb": max(peak_mem_mb if peak_mem_mb else 0, end_mem_mb_error or 0)

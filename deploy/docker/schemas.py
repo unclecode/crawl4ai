@@ -8,22 +8,23 @@ class CrawlRequest(BaseModel):
     urls: List[str] = Field(min_length=1, max_length=100)
     browser_config: Optional[Dict] = Field(default_factory=dict)
     crawler_config: Optional[Dict] = Field(default_factory=dict)
+    output_path: Optional[str] = Field(None, description="Path to save crawl results as JSON (recommended for large multi-URL crawls to avoid MCP token limits)")
 
 class MarkdownRequest(BaseModel):
     """Request body for the /md endpoint."""
     url: str = Field(..., description="Absolute URL to fetch (http/https) or raw HTML via raw: scheme")
-    f: FilterType = Field(
+    filter: FilterType = Field(
         FilterType.FIT,
-        description="Filter type. Allowed values: 'raw', 'fit', 'bm25', 'llm'",
+        description="Filter type. Allowed values: 'raw', 'fit', 'bm25', 'llm'"
     )
-    q: Optional[str] = Field(
+    query: Optional[str] = Field(
         None,
-        description="Query used when f is 'bm25' or 'llm' (recommended/required for meaningful results)",
+        description="Query used when filter is 'bm25' or 'llm' (recommended/required for meaningful results)"
     )
-    c: Optional[str] = Field("0", description="Cache-bust / revision counter")
+    cache: Optional[str] = Field("0", description="Cache-bust / revision counter")
     provider: Optional[str] = Field(
         None,
-        description="LLM provider override for f='llm' (e.g., 'openai/gpt-4o-mini'). API key must be configured",
+        description="LLM provider override for filter='llm' (e.g., 'openai/gpt-4o-mini'). API key must be configured",
     )
 
 
@@ -35,7 +36,7 @@ class HTMLRequest(BaseModel):
     
 class ScreenshotRequest(BaseModel):
     url: str
-    screenshot_wait_for: Optional[float] = Field(2, description="Delay before capture in seconds (optional)")
+    screenshot_wait_for: Optional[float] = Field(2, description="Delay before capture in seconds. Zero/negative values accepted (treated as immediate capture). Default: 2 seconds")
     output_path: Optional[str] = Field(None, description="Path to save PNG to disk (recommended to avoid large base64 responses)")
 
 class PDFRequest(BaseModel):

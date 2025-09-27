@@ -1,15 +1,25 @@
 # deploy/docker/mcp_bridge.py
 
 from __future__ import annotations
-import inspect, json, re, logging
+
+import inspect
+import json
+import logging
+import re
 import urllib.parse
-from typing import Callable, List, get_origin, get_args
 from contextlib import asynccontextmanager
+from enum import Enum
+from typing import Callable, Dict, List, Optional, get_args, get_origin
+
 import httpx
 
 from fastapi import HTTPException
-from pydantic import BaseModel
+from fastapi.params import Param
 from fastmcp import FastMCP
+from pydantic import BaseModel
+
+
+logger = logging.getLogger(__name__)
 
 def mcp_resource(name: str | None = None):
     """Decorator to mark FastAPI route as MCP resource.
@@ -117,112 +127,58 @@ def _make_http_proxy(base_url: str, route):
                 raise HTTPException(e.response.status_code, e.response.text) from e
     return proxy
 
+
+def _sanitize_tool_name(raw_name: str) -> str:
+    sanitized = re.sub(r"[^0-9a-zA-Z_]", "_", raw_name).strip("_")
+    if not sanitized or not re.match(r"[A-Za-z_]", sanitized):
+        sanitized = f"tool_{sanitized}" if sanitized else "tool"
+    return sanitized
+
+
 def create_mcp_server(
     *,
     name: str | None = None,
     routes: list,
     base_url: str,
 ) -> FastMCP:
-    """Create FastMCP server instance with registered tools.
+    """Create FastMCP server instance with registered tools."""
 
-    Args:
-        name: Optional name for the MCP server.
-        routes: List of FastAPI routes to register.
-        base_url: Base URL for internal HTTP requests.
-
-    Returns:
-        Configured FastMCP server instance.
-    """
     server_name = name or "FastAPI-MCP"
-
-    # Create FastMCP instance
     mcp = FastMCP(name=server_name)
-
-    # Register tools by scanning decorated FastAPI routes
-    for route in routes:
-        fn = getattr(route, "endpoint", None)
-        kind = getattr(fn, "__mcp_kind__", None)
-
-        if kind != "tool":
-            continue
-
-        raw_name = fn.__mcp_name__ or route.path
-        tool_name = re.sub(r"[^0-9a-zA-Z_]", "_", raw_name).strip("_")
-        if not re.match(r"[A-Za-z_]", tool_name):
-            tool_name = f"tool_{tool_name}"
-        proxy_fn = _make_http_proxy(base_url, route)
-        description = inspect.getdoc(fn) or f"Tool for {route.path}"
-
-        # Get function signature to create properly typed wrapper
-        sig = inspect.signature(fn)
-        params = []
-        for param in sig.parameters.values():
-            # Skip Request and Depends (FastAPI-specific)
-            if param.annotation in (inspect.Parameter.empty, type(None)):
-                continue
-            if hasattr(param.annotation, "__name__") and param.annotation.__name__ == "Request":
-                continue
-            if str(param.annotation).startswith("Depends") or (
-                param.default is not inspect.Parameter.empty and "Depends" in str(param.default)
-            ):
-                continue
-            params.append(param)
-
-        # Create function dynamically with explicit parameters
-        param_names = [p.name for p in params]
-        param_sig = ", ".join(param_names)
-
-        # Build the async function code
-        func_code = f"""
-async def {tool_name}_wrapper({param_sig}):
-    kwargs = {{{", ".join(f'"{name}": {name}' for name in param_names)}}}
-    result = await proxy_fn(**kwargs)
-    return json.dumps(result, default=str)
-"""
-
-        # Execute in a namespace that has access to proxy_fn and json
-        namespace = {"proxy_fn": proxy_fn, "json": json}
-        exec(func_code, namespace)
-        wrapper_fn = namespace[f"{tool_name}_wrapper"]
-
-        # Register the properly typed function
-        mcp.tool(name=tool_name, description=description)(wrapper_fn)
-
-    logger = logging.getLogger(__name__)
-    tool_count = len([r for r in routes if getattr(getattr(r, 'endpoint', None), '__mcp_kind__', None) == 'tool'])
-    logger.info("Registered %d MCP tools", tool_count)
-
+    register_tools_from_routes(mcp_server=mcp, routes=routes, base_url=base_url)
     return mcp
 
+
+
 def combine_lifespans(mcp_lifespan, existing_lifespan):
-    """Combine MCP and existing lifespans into a single context manager.
+    """Combine MCP and existing lifespans into a single context manager."""
 
-    Args:
-        mcp_lifespan: MCP server lifespan context manager.
-        existing_lifespan: Existing application lifespan context manager.
-
-    Returns:
-        Combined lifespan context manager.
-    """
     @asynccontextmanager
     async def combined(app):
         # Run both lifespans - MCP outer, existing inner
+        if mcp_lifespan is None and existing_lifespan is None:
+            yield
+            return
+        if mcp_lifespan is None:
+            async with existing_lifespan(app):
+                yield
+            return
+        if existing_lifespan is None:
+            async with mcp_lifespan(app):
+                yield
+            return
+
         async with mcp_lifespan(app):
             async with existing_lifespan(app):
                 yield
+
     return combined
 
+
+
 def register_tools_from_routes(mcp_server: FastMCP, routes: list, base_url: str):
-    """Register tools to an existing FastMCP server from FastAPI routes.
+    """Register tools to an existing FastMCP server from FastAPI routes."""
 
-    Preserves Pydantic model schemas by using them directly as parameters.
-    FastMCP automatically extracts JSON schemas from Pydantic type annotations.
-
-    Args:
-        mcp_server: FastMCP server instance to register tools to.
-        routes: List of FastAPI routes to scan for tools.
-        base_url: Base URL for internal HTTP proxy requests.
-    """
     tool_count = 0
     for route in routes:
         fn = getattr(route, "endpoint", None)
@@ -233,223 +189,249 @@ def register_tools_from_routes(mcp_server: FastMCP, routes: list, base_url: str)
 
         tool_count += 1
         raw_name = fn.__mcp_name__ or route.path
-        tool_name = re.sub(r"[^0-9a-zA-Z_]", "_", raw_name).strip("_")
-        if not re.match(r"[A-Za-z_]", tool_name):
-            tool_name = f"tool_{tool_name}"
+        tool_name = _sanitize_tool_name(raw_name)
         proxy_fn = _make_http_proxy(base_url, route)
         description = inspect.getdoc(fn) or f"Tool for {route.path}"
 
-        # Extract parameters from function signature
-        sig = inspect.signature(fn)
-        pydantic_model = None
-        pydantic_param_name = None
-        all_params = {}
-
-        for param_name, param in sig.parameters.items():
-            # Skip Request type
-            if hasattr(param.annotation, "__name__") and param.annotation.__name__ == "Request":
-                continue
-            # Skip Depends - check both annotation string and default value
-            if str(param.annotation).startswith("Depends"):
-                continue
-            if param.default != inspect.Parameter.empty and "Depends" in str(param.default):
-                continue
-            # Skip empty annotations
-            if param.annotation == inspect.Parameter.empty:
-                continue
-
-            all_params[param_name] = param.annotation
-
-            # Check if this is a Pydantic model (has model_fields attribute)
-            if hasattr(param.annotation, "model_fields") and not pydantic_model:
-                pydantic_model = param.annotation
-                pydantic_param_name = param_name
-
-        if not all_params:
-            print(f"Warning: No parameters found for tool {tool_name}, skipping")
-            continue
-
-        # Unwrap Pydantic model if found, otherwise use params directly
         try:
-            if pydantic_model:
-                # Unwrap Pydantic model - use its fields directly with defaults preserved
-                param_annotations = {}
-                param_defaults = {}
-                param_signature_parts = []
-                list_fields: List[str] = []
-                numeric_int_fields: List[str] = []
-                numeric_float_fields: List[str] = []
-
-                for field_name, field_info in pydantic_model.model_fields.items():
-                    # Convert enum annotations to their base type for better MCP compatibility
-                    annotation = field_info.annotation
-                    # Track list-typed fields for preprocessing in wrapper
-                    try:
-                        origin = get_origin(annotation)
-                    except Exception:
-                        origin = None
-                    if origin in (list, List):
-                        list_fields.append(field_name)
-
-                    # Track numeric-typed fields (int/float), including Optional[...] and Unions
-                    try:
-                        args = get_args(annotation) or ()
-                    except Exception:
-                        args = ()
-                    # Helper flags
-                    is_int = annotation is int or int in args
-                    is_float = annotation is float or float in args
-                    if is_int:
-                        numeric_int_fields.append(field_name)
-                    if is_float:
-                        numeric_float_fields.append(field_name)
-
-                    if hasattr(annotation, '__bases__') and len(annotation.__bases__) > 0:
-                        # This is likely an enum - use its base type (usually str)
-                        for base in annotation.__bases__:
-                            if base in (str, int, float, bool):
-                                annotation = base
-                                break
-                    param_annotations[field_name] = annotation
-
-                    # Simplified approach: all optional fields default to None
-                    if hasattr(field_info, 'default') and field_info.default is not ...:
-                        # Has a default - make it optional with None
-                        param_defaults[field_name] = None
-                        param_signature_parts.append(f"{field_name}=None")
-                    elif hasattr(field_info, 'default_factory') and field_info.default_factory is not None:
-                        # Has default factory - make it optional with None
-                        param_defaults[field_name] = None
-                        param_signature_parts.append(f"{field_name}=None")
-                    else:
-                        # Required field
-                        param_signature_parts.append(field_name)
-
-                param_signature = ", ".join(param_signature_parts)
-
-                # Generate wrapper that reconstructs Pydantic model with preprocessing
-                # Filter out empty strings and None values to let FastAPI use its defaults
-                param_key_value_pairs = ", ".join(f'("{p}", {p})' for p in param_annotations.keys())
-                func_code = f"""
-async def {tool_name}_wrapper({param_signature}):
-    import json
-    # Preprocess arguments - handle MCP client quirks (empty strings, null values)
-    model_data = {{}}
-    for key, value in [{param_key_value_pairs}]:
-        # Skip empty strings and None - let FastAPI use defaults
-        if value == "" or value is None:
+            wrapper_fn = _build_tool_wrapper(
+                fn=fn,
+                proxy_fn=proxy_fn,
+                tool_name=tool_name,
+            )
+        except ValueError as error:
+            logger.warning("Skipping tool %s: %s", tool_name, error)
             continue
-        # Normalize single string into list for list-typed fields
-        if key in {set(list_fields)}:
-            if isinstance(value, str):
-                value = [value]
-        # Coerce numeric strings for numeric fields
-        if key in {set(numeric_int_fields)} and isinstance(value, str):
-            try:
-                value = int(value.strip())
-            except Exception:
-                pass
-        if key in {set(numeric_float_fields)} and isinstance(value, str):
-            try:
-                value = float(value.strip())
-            except Exception:
-                pass
-        model_data[key] = value
+        except Exception:  # pragma: no cover - log unexpected wrapper failures
+            logger.exception("Error creating wrapper for %s", tool_name)
+            raise
 
-    # Pass the model data dict directly - proxy will handle it
-    result = await proxy_fn(_pydantic_body=model_data, _param_name="{pydantic_param_name}")
-    return json.dumps(result, default=str)
-"""
+        mcp_server.tool(name=tool_name, description=description)(wrapper_fn)
 
-                namespace = {
-                    "proxy_fn": proxy_fn,
-                    "json": json,
-                    "pydantic_model": pydantic_model,
-                    "pydantic_param_name": pydantic_param_name
-                }
-            else:
-                # Use individual parameters directly - preserve defaults from FastAPI signature
-                param_annotations = all_params.copy()
-                param_signature_parts = []
-                numeric_int_fields: List[str] = []
-                numeric_float_fields: List[str] = []
-
-                # Get original function signature to extract defaults - handle FastAPI types safely
-                orig_sig = inspect.signature(fn)
-                for param_name in param_annotations.keys():
-                    if param_name in orig_sig.parameters:
-                        orig_param = orig_sig.parameters[param_name]
-                        if orig_param.default is not inspect.Parameter.empty:
-                            # All parameters with defaults become None (simplified approach)
-                            param_signature_parts.append(f"{param_name}=None")
-                        else:
-                            param_signature_parts.append(param_name)
-                    else:
-                        param_signature_parts.append(param_name)
-
-                    # Track numeric-typed fields (int/float), including Optional[...] and Unions
-                    ann = param_annotations[param_name]
-                    try:
-                        args = get_args(ann) or ()
-                        origin = get_origin(ann)
-                    except Exception:
-                        args = ()
-                        origin = None
-                    is_int = ann is int or int in args
-                    is_float = ann is float or float in args
-                    if is_int:
-                        numeric_int_fields.append(param_name)
-                    if is_float:
-                        numeric_float_fields.append(param_name)
-
-                param_signature = ", ".join(param_signature_parts)
-
-                # Generate wrapper with preprocessing for Query parameters
-                param_key_value_pairs = ", ".join(f'("{p}", {p})' for p in param_annotations.keys())
-                func_code = f"""
-async def {tool_name}_wrapper({param_signature}):
-    import json
-    # Preprocess arguments - handle MCP client quirks (empty strings, null values)
-    kwargs = {{}}
-    for key, value in [{param_key_value_pairs}]:
-        # Skip empty strings and None - let FastAPI use defaults
-        if value == "" or value is None:
-            continue
-        # Coerce numeric strings for numeric fields
-        if key in {set(numeric_int_fields)} and isinstance(value, str):
-            try:
-                value = int(value.strip())
-            except Exception:
-                pass
-        if key in {set(numeric_float_fields)} and isinstance(value, str):
-            try:
-                value = float(value.strip())
-            except Exception:
-                pass
-        kwargs[key] = value
-
-    result = await proxy_fn(**kwargs)
-    return json.dumps(result, default=str)
-"""
-
-                namespace = {"proxy_fn": proxy_fn, "json": json}
-
-            exec(func_code, namespace)
-            wrapper_fn = namespace[f"{tool_name}_wrapper"]
-
-            # Set type annotations for MCP schema (preserve originals)
-            wrapper_fn.__annotations__ = param_annotations.copy()
-            wrapper_fn.__annotations__["return"] = str
-
-            # Register with FastMCP
-            mcp_server.tool(name=tool_name, description=description)(wrapper_fn)
-
-        except Exception as e:
-            logger = logging.getLogger(__name__)
-            logger.error("Error creating wrapper for %s: %s", tool_name, e)
-            import traceback
-            traceback.print_exc()
-            continue
-
-    logger = logging.getLogger(__name__)
     logger.info("Registered %d MCP tools", tool_count)
+
+
+def _build_tool_wrapper(
+    *, fn: Callable[..., object], proxy_fn: Callable[..., object], tool_name: str
+) -> Callable[..., object]:
+    """Build an async wrapper for a FastAPI endpoint without using exec."""
+
+    sig = inspect.signature(fn)
+    usable_params: Dict[str, inspect.Parameter] = {}
+    pydantic_model: Optional[type[BaseModel]] = None
+    pydantic_param_name: Optional[str] = None
+
+    for name, param in sig.parameters.items():
+        if param.kind in {inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD}:
+            continue
+
+        annotation = param.annotation
+        if annotation is inspect.Parameter.empty or annotation is type(None):  # noqa: E721
+            continue
+
+        if getattr(annotation, "__name__", "") == "Request":
+            continue
+
+        if "Depends" in str(annotation) or "Depends" in str(param.default):
+            continue
+
+        usable_params[name] = param
+
+        if (
+            pydantic_model is None
+            and inspect.isclass(annotation)
+            and issubclass(annotation, BaseModel)
+        ):
+            pydantic_model = annotation
+            pydantic_param_name = name
+
+    if not usable_params:
+        raise ValueError("No MCP-exposable parameters found")
+
+    if pydantic_model and pydantic_param_name:
+        return _build_pydantic_wrapper(
+            proxy_fn=proxy_fn,
+            tool_name=tool_name,
+            model=pydantic_model,
+            param_name=pydantic_param_name,
+        )
+
+    return _build_parameter_wrapper(
+        proxy_fn=proxy_fn,
+        tool_name=tool_name,
+        params=usable_params,
+    )
+
+
+def _normalize_annotation(annotation: object) -> object:
+    if inspect.isclass(annotation) and issubclass(annotation, Enum):
+        for base in annotation.__mro__[1:]:
+            if base in {str, int, float, bool}:
+                return base
+    return annotation
+
+
+def _annotation_is_list(annotation: object) -> bool:
+    origin = get_origin(annotation)
+    return origin in (list, List)
+
+
+def _annotation_has_numeric(annotation: object, target: type) -> bool:
+    if annotation is target:
+        return True
+    origin = get_origin(annotation)
+    if not origin:
+        return False
+    return any(_annotation_has_numeric(arg, target) for arg in get_args(annotation))
+
+
+def _build_pydantic_wrapper(
+    *,
+    proxy_fn: Callable[..., object],
+    tool_name: str,
+    model: type[BaseModel],
+    param_name: str,
+) -> Callable[..., object]:
+    field_annotations: Dict[str, object] = {}
+    parameters: List[inspect.Parameter] = []
+    list_fields: set[str] = set()
+    numeric_int_fields: set[str] = set()
+    numeric_float_fields: set[str] = set()
+    list_fields: set[str] = set()
+
+    for field_name, field_info in model.model_fields.items():
+        annotation = _normalize_annotation(field_info.annotation)
+        if _annotation_is_list(field_info.annotation):
+            list_fields.add(field_name)
+        if _annotation_has_numeric(field_info.annotation, int):
+            numeric_int_fields.add(field_name)
+        if _annotation_has_numeric(field_info.annotation, float):
+            numeric_float_fields.add(field_name)
+
+        field_annotations[field_name] = annotation
+        if field_info.is_required():
+            default = inspect._empty
+        else:
+            if field_info.default_factory is not None:
+                default = field_info.default_factory()
+            else:
+                default = field_info.default
+        parameters.append(
+            inspect.Parameter(
+                name=field_name,
+                kind=inspect.Parameter.KEYWORD_ONLY,
+                default=default,
+                annotation=annotation,
+            )
+        )
+
+    async def wrapper(**kwargs):
+        model_data: Dict[str, object] = {}
+        for key in field_annotations:
+            if key not in kwargs:
+                continue
+            value = kwargs[key]
+            if value == "" or value is None:
+                continue
+            if key in list_fields and isinstance(value, str):
+                value = [value]
+            if key in numeric_int_fields and isinstance(value, str):
+                try:
+                    value = int(value.strip())
+                except (TypeError, ValueError):
+                    pass
+            if key in numeric_float_fields and isinstance(value, str):
+                try:
+                    value = float(value.strip())
+                except (TypeError, ValueError):
+                    pass
+            model_data[key] = value
+
+        result = await proxy_fn(_pydantic_body=model_data, _param_name=param_name)
+        return json.dumps(result, default=str)
+
+    wrapper.__name__ = f"{tool_name}_wrapper"
+    wrapper.__annotations__ = {**field_annotations, "return": str}
+    wrapper.__signature__ = inspect.Signature(
+        parameters,
+        return_annotation=str,
+    )
+    return wrapper
+
+
+def _build_parameter_wrapper(
+    *,
+    proxy_fn: Callable[..., object],
+    tool_name: str,
+    params: Dict[str, inspect.Parameter],
+) -> Callable[..., object]:
+    param_annotations: Dict[str, object] = {}
+    numeric_int_fields: set[str] = set()
+    numeric_float_fields: set[str] = set()
+    list_fields: set[str] = set()
+    parameters: List[inspect.Parameter] = []
+
+    for name, param in params.items():
+        annotation = _normalize_annotation(param.annotation)
+        param_annotations[name] = annotation
+
+        if _annotation_has_numeric(param.annotation, int):
+            numeric_int_fields.add(name)
+        if _annotation_has_numeric(param.annotation, float):
+            numeric_float_fields.add(name)
+        if _annotation_is_list(param.annotation):
+            list_fields.add(name)
+
+        if param.default is inspect.Parameter.empty:
+            default = inspect._empty
+        else:
+            default_candidate = param.default
+            if isinstance(default_candidate, Param):
+                default = (
+                    default_candidate.default
+                    if default_candidate.default is not inspect._empty
+                    else inspect._empty
+                )
+            else:
+                default = default_candidate
+        parameters.append(
+            inspect.Parameter(
+                name=name,
+                kind=inspect.Parameter.KEYWORD_ONLY,
+                default=default,
+                annotation=annotation,
+            )
+        )
+
+    async def wrapper(**kwargs):
+        prepared: Dict[str, object] = {}
+        for key in param_annotations:
+            if key not in kwargs:
+                continue
+            value = kwargs[key]
+            if value == "" or value is None:
+                continue
+            if key in numeric_int_fields and isinstance(value, str):
+                try:
+                    value = int(value.strip())
+                except (TypeError, ValueError):
+                    pass
+            if key in numeric_float_fields and isinstance(value, str):
+                try:
+                    value = float(value.strip())
+                except (TypeError, ValueError):
+                    pass
+            if key in list_fields and isinstance(value, str):
+                value = [value]
+            prepared[key] = value
+
+        result = await proxy_fn(**prepared)
+        return json.dumps(result, default=str)
+
+    wrapper.__name__ = f"{tool_name}_wrapper"
+    wrapper.__annotations__ = {**param_annotations, "return": str}
+    wrapper.__signature__ = inspect.Signature(
+        parameters,
+        return_annotation=str,
+    )
+    return wrapper

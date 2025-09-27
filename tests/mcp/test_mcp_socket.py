@@ -5,13 +5,15 @@ FastMCP Streamable HTTP transport exposed at ``/mcp``.
 Run with ``python tests/mcp/test_mcp_socket.py`` once the server is up.
 """
 
-import anyio
 import json
+import os
 from typing import Iterable
+
+import anyio
 
 from fastmcp.client import Client
 
-MCP_URL = "http://localhost:11235/mcp"
+MCP_URL = os.getenv("MCP_URL", f"http://localhost:{os.getenv('HOST_PORT', '11235')}/mcp")
 
 
 def _first_text_block(content_blocks: Iterable[object]) -> str:
@@ -42,9 +44,9 @@ async def test_md(client: Client) -> None:
         "md",
         {
             "url": "https://example.com",
-            "f": "fit",  # or raw, bm25, llm
-            "q": None,
-            "c": "0",
+            "filter": "fit",  # or raw, bm25, llm
+            "query": None,
+            "cache": "0",
         },
     )
     markdown = json.loads(_first_text_block(result.content))

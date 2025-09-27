@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from fastapi import Request
+from fastapi import Request, HTTPException
 from typing import Dict, Optional
 
 class TaskStatus(str, Enum):
@@ -70,7 +70,6 @@ def decode_redis_hash(hash_data: Dict[bytes, bytes]) -> Dict[str, str]:
     return {k.decode('utf-8'): v.decode('utf-8') for k, v in hash_data.items()}
 
 
-
 def get_llm_api_key(config: Dict, provider: Optional[str] = None) -> str:
     """Get the appropriate API key based on the LLM provider.
     
@@ -125,3 +124,16 @@ def verify_email_domain(email: str) -> bool:
         return True if records else False
     except Exception as e:
         return False
+
+def _ensure_within_base_dir(path: str, base_dir: str) -> None:
+    try:
+        common = os.path.commonpath([base_dir, path])
+    except ValueError:
+        common = ""
+    if common != base_dir:
+        raise HTTPException(
+            400,
+            f"Security restriction: output_path must be within {base_dir}. "
+            f"Your path '{path}' is outside the allowed directory. "
+            f"Example valid path: {base_dir}/myfile.json"
+        )

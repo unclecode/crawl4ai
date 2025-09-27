@@ -33,7 +33,7 @@ def init_job_router(redis, config, token_dep) -> APIRouter:
 # ---------- payload models --------------------------------------------------
 class LlmJobPayload(BaseModel):
     url:    HttpUrl
-    q:      str
+    query:  str
     schema: Optional[str] = None
     cache:  bool = False
     provider: Optional[str] = None
@@ -58,7 +58,7 @@ async def llm_job_enqueue(
         background_tasks,
         request,
         str(payload.url),
-        query=payload.q,
+        query=payload.query,
         schema=payload.schema,
         cache=payload.cache,
         config=_config,

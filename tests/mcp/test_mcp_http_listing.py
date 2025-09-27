@@ -4,11 +4,13 @@ Run with ``python tests/mcp/test_mcp_http_listing.py`` while the server is
 running to verify that the HTTP transport exposes tools and resources.
 """
 
+import os
+
 import anyio
 
 from fastmcp.client import Client
 
-MCP_URL = "http://127.0.0.1:11235/mcp"
+MCP_URL = os.getenv("MCP_URL", f"http://127.0.0.1:{os.getenv('HOST_PORT', '11235')}/mcp")
 
 
 async def main() -> None:

@@ -10,6 +10,8 @@ Crawl4AI FastAPI entry‑point
 import asyncio
 import ast
 import base64
+import inspect
+import logging
 import os
 import pathlib
 import re
@@ -59,7 +61,7 @@ from schemas import (
     RawCode,
     ScreenshotRequest,
 )
-from utils import FilterType, load_config, setup_logging, verify_email_domain
+from utils import FilterType, load_config, setup_logging, verify_email_domain, _ensure_within_base_dir
 from pydantic import BaseModel, Field
 
 # ── internal imports (after sys.path append) ─────────────────
@@ -74,6 +76,8 @@ __version__ = "0.7.4"
 # ── global page semaphore (hard cap) ─────────────────────────
 MAX_PAGES = config["crawler"]["pool"].get("max_pages", 30)
 GLOBAL_SEM = asyncio.Semaphore(MAX_PAGES)
+INLINE_BINARY_MAX_BYTES = 16 * 1024  # ~16KB (~21k base64 chars ≈ <25k tokens)
+INLINE_BINARY_MAX_BASE64_CHARS = INLINE_BINARY_MAX_BYTES * 4 // 3
 
 # import logging
 # page_log = logging.getLogger("page_cap")
@@ -165,6 +169,11 @@ _setup_security(app)
 
 if config["observability"]["prometheus"]["enabled"]:
     Instrumentator().instrument(app).expose(app)
+else:
+
+    @app.get(config["observability"]["prometheus"]["endpoint"])
+    async def metrics_disabled():
+        return PlainTextResponse("Prometheus metrics disabled", status_code=404)
 
 token_dep = get_token_dependency(config)
 
@@ -181,6 +190,47 @@ ALLOWED_TYPES = {
     "CrawlerRunConfig": CrawlerRunConfig,
     "BrowserConfig": BrowserConfig,
 }
+
+
+logger = logging.getLogger(__name__)
+
+
+def _resolve_binary_base_dir() -> str:
+    base_dir = config.get("binary", {}).get("default_dir", "/tmp/crawl4ai-exports")
+    return os.path.abspath(base_dir)
+
+
+
+
+
+def _ensure_directory(path: str) -> None:
+    os.makedirs(path, mode=0o750, exist_ok=True)
+
+
+def _extract_user_friendly_error(error_msg: str, operation: str = "operation") -> str:
+    """Extract user-friendly error message from crawler error."""
+    if "ERR_NAME_NOT_RESOLVED" in error_msg:
+        return f"{operation} failed: Unable to resolve hostname. Please check the URL is valid and accessible."
+    elif "ERR_CONNECTION_REFUSED" in error_msg:
+        return f"{operation} failed: Connection refused. The server may be down or unreachable."
+    elif "ERR_CONNECTION_TIMED_OUT" in error_msg or "Timeout" in error_msg:
+        return f"{operation} failed: Connection timed out. The server took too long to respond."
+    elif "ERR_CONNECTION_CLOSED" in error_msg:
+        return f"{operation} failed: Connection closed unexpectedly. The server may have terminated the connection."
+    elif "ERR_SSL_PROTOCOL_ERROR" in error_msg or "SSL" in error_msg:
+        return f"{operation} failed: SSL/TLS error. The server's certificate may be invalid or expired."
+    elif "ERR_CERT" in error_msg:
+        return f"{operation} failed: Certificate error. The server's SSL certificate is invalid."
+    elif "ERR_TOO_MANY_REDIRECTS" in error_msg:
+        return f"{operation} failed: Too many redirects. The URL may be misconfigured."
+    elif "net::" in error_msg:
+        import re
+        match = re.search(r'net::(ERR_[A-Z_]+)', error_msg)
+        if match:
+            return f"{operation} failed: Network error ({match.group(1)}). Please check the URL and network connectivity."
+
+    # Return original message if no specific pattern matched
+    return f"{operation} failed: {error_msg}"
 
 
 def _safe_eval_config(expr: str) -> dict:
@@ -230,8 +280,10 @@ async def get_token(req: TokenRequest):
 async def config_dump(raw: RawCode):
     try:
         return JSONResponse(_safe_eval_config(raw.code.strip()))
+    except ValueError as e:
+        raise HTTPException(400, f"Configuration validation error: {str(e)}")
     except Exception as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, f"Failed to parse configuration: {str(e)}. Ensure you're using valid CrawlerRunConfig() or BrowserConfig() syntax.")
 
 
 @app.post("/md")
@@ -241,28 +293,48 @@ async def get_markdown(
     request: Request,
     body: MarkdownRequest,
     _td: Dict = Depends(token_dep),
+    # Backward compatibility query parameters
+    f: Optional[str] = Query(None, description="Deprecated: use 'filter' in request body"),
+    q: Optional[str] = Query(None, description="Deprecated: use 'query' in request body"),
+    c: Optional[str] = Query(None, description="Deprecated: use 'cache' in request body"),
 ):
     """
     Tool for /md
 
     Generate Markdown from a URL or raw HTML.
 
-    - Filter `f` allowed values: 'raw', 'fit', 'bm25', 'llm'.
-    - Query `q` is used only by 'bm25' and 'llm' filters (recommended/required for meaningful results).
-    - For `f="llm"`, ensure an LLM API key is configured (via environment or server config).
+    - Filter `filter` allowed values: 'raw', 'fit', 'bm25', 'llm'.
+    - Query `query` is used only by 'bm25' and 'llm' filters (recommended/required for meaningful results).
+    - For `filter="llm"`, ensure an LLM API key is configured (via environment or server config).
     - URLs must start with http(s) or use the raw scheme: `raw:` or `raw://` for inline HTML.
+
+    Note: Query parameters f/q/c are deprecated but supported for backward compatibility.
+    Use request body parameters filter/query/cache instead.
     """
+    # Parameter precedence: body params > query params (backward compatibility)
+    # Use query params as fallback for default values
+    filter_param = body.filter
+    if body.filter == FilterType.FIT and f is not None:
+        try:
+            filter_param = FilterType(f)
+        except ValueError:
+            raise HTTPException(400, f"Invalid filter value: {f}. Must be one of: raw, fit, bm25, llm")
+
+    query_param = q if body.query is None and q is not None else body.query
+    cache_param = c if body.cache == "0" and c is not None else body.cache
+    provider_param = body.provider
+
     if not body.url.startswith(("http://", "https://")) and not body.url.startswith(("raw:", "raw://")):
         raise HTTPException(
             400, "Invalid URL format. Must start with http://, https://, or for raw HTML (raw:, raw://)")
     markdown = await handle_markdown_request(
-        body.url, body.f, body.q, body.c, config, body.provider
+        body.url, filter_param, query_param, cache_param, config, provider_param
     )
     return JSONResponse({
         "url": body.url,
-        "filter": body.f,
-        "query": body.q,
-        "cache": body.c,
+        "filter": filter_param,
+        "query": query_param,
+        "cache": cache_param,
         "markdown": markdown,
         "success": True
     })
@@ -283,7 +355,13 @@ async def generate_html(
     cfg = CrawlerRunConfig()
     async with AsyncWebCrawler(config=BrowserConfig()) as crawler:
         results = await crawler.arun(url=body.url, config=cfg)
-    raw_html = results[0].html
+    first_result = results[0]
+    if not getattr(first_result, "success", False) or not getattr(first_result, "html", ""):
+        error_msg = getattr(first_result, "error_message", "Unable to retrieve HTML")
+        friendly_error = _extract_user_friendly_error(error_msg, "Fetch HTML")
+        raise HTTPException(502, friendly_error)
+
+    raw_html = first_result.html
     from crawl4ai.utils import preprocess_html_for_schema
     processed_html = preprocess_html_for_schema(raw_html)
     return JSONResponse({"html": processed_html, "url": body.url, "success": True})
@@ -303,35 +381,64 @@ async def generate_screenshot(
     Capture a full-page PNG screenshot of the specified URL, waiting an optional delay before capture, returning base64 data if output_path is omitted.
     Use when you need an image snapshot of the rendered page. It is strongly recommended to provide `output_path` to save the screenshot to disk.
     This avoids returning large base64 payloads that can exceed token/context limits. When `output_path` is provided, the response returns the saved file path instead of inline data.
+
+    Note on screenshot_wait_for:
+    - Positive values: Wait the specified number of seconds before capturing
+    - Zero or negative values: Accepted but treated as no wait (immediate capture)
+    - Default: 0.0 seconds (immediate capture after page load)
     """
     cfg = CrawlerRunConfig(
         screenshot=True, screenshot_wait_for=body.screenshot_wait_for)
     async with AsyncWebCrawler(config=BrowserConfig()) as crawler:
         results = await crawler.arun(url=body.url, config=cfg)
-    screenshot_data = results[0].screenshot
+
+    first_result = results[0]
+    if not first_result.success:
+        error_msg = first_result.error_message or "Screenshot capture failed"
+        friendly_error = _extract_user_friendly_error(error_msg, "Screenshot capture")
+        raise HTTPException(502, friendly_error)
+
+    screenshot_data = first_result.screenshot
+    if screenshot_data is None:
+        raise HTTPException(502, "Screenshot capture failed: No screenshot data returned")
+
+    binary_base_dir = _resolve_binary_base_dir()
+    decoded_bytes: Optional[bytes] = None
+
+    def ensure_decoded() -> bytes:
+        nonlocal decoded_bytes
+        if decoded_bytes is None:
+            decoded_bytes = base64.b64decode(screenshot_data)
+        return decoded_bytes
+
     if body.output_path:
         abs_path = os.path.abspath(body.output_path)
-        os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-        with open(abs_path, "wb") as f:
-            f.write(base64.b64decode(screenshot_data))
-        return {"success": True, "path": abs_path}
-    # Default-to-file mode when configured
-    try:
-        bin_cfg = config.get("binary", {})
-        if bin_cfg.get("default_mode") == "file":
-            target_dir = os.path.abspath(bin_cfg.get("default_dir", "/tmp/crawl4ai-exports"))
-            os.makedirs(target_dir, exist_ok=True)
-            parsed = urllib.parse.urlparse(body.url)
-            host = parsed.netloc or "page"
-            unique_id = uuid.uuid4().hex
-            filename = f"screenshot_{host}_{unique_id}.png"
-            abs_path = os.path.join(target_dir, filename)
-            with open(abs_path, "wb") as f:
-                f.write(base64.b64decode(screenshot_data))
+        _ensure_within_base_dir(abs_path, binary_base_dir)
+        _ensure_directory(os.path.dirname(abs_path))
+        try:
+            with open(abs_path, "wb") as file_handle:
+                file_handle.write(ensure_decoded())
+        except OSError as write_error:
+            logger.warning("screenshot file write failed: %s", write_error)
+        else:
             return {"success": True, "path": abs_path}
-    except Exception as e:
-        # Fall through to inline on any file write error
-        pass
+
+    bin_cfg = config.get("binary", {})
+    if bin_cfg.get("default_mode") == "file":
+        _ensure_directory(binary_base_dir)
+        parsed = urllib.parse.urlparse(body.url)
+        host = parsed.netloc or "page"
+        unique_id = uuid.uuid4().hex
+        filename = f"screenshot_{host}_{unique_id}.png"
+        abs_path = os.path.join(binary_base_dir, filename)
+        try:
+            with open(abs_path, "wb") as file_handle:
+                file_handle.write(ensure_decoded())
+        except OSError as write_error:
+            logger.warning("screenshot file write failed: %s", write_error)
+        else:
+            return {"success": True, "path": abs_path}
+
     return {"success": True, "screenshot": screenshot_data}
 
 # PDF endpoint
@@ -353,31 +460,51 @@ async def generate_pdf(
     cfg = CrawlerRunConfig(pdf=True)
     async with AsyncWebCrawler(config=BrowserConfig()) as crawler:
         results = await crawler.arun(url=body.url, config=cfg)
-    pdf_data = results[0].pdf
+
+    first_result = results[0]
+    if not first_result.success:
+        error_msg = first_result.error_message or "PDF generation failed - page navigation failed"
+        friendly_error = _extract_user_friendly_error(error_msg, "PDF generation")
+        raise HTTPException(502, friendly_error)
+
+    pdf_data = first_result.pdf
+    binary_base_dir = _resolve_binary_base_dir()
+
     if body.output_path:
         abs_path = os.path.abspath(body.output_path)
-        os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-        with open(abs_path, "wb") as f:
-            f.write(pdf_data)
-        return {"success": True, "path": abs_path}
-    # Default-to-file mode when configured
-    try:
-        bin_cfg = config.get("binary", {})
-        if bin_cfg.get("default_mode") == "file":
-            target_dir = os.path.abspath(bin_cfg.get("default_dir", "/tmp/crawl4ai-exports"))
-            os.makedirs(target_dir, exist_ok=True)
-            parsed = urllib.parse.urlparse(body.url)
-            host = parsed.netloc or "page"
-            unique_id = uuid.uuid4().hex
-            filename = f"document_{host}_{unique_id}.pdf"
-            abs_path = os.path.join(target_dir, filename)
-            with open(abs_path, "wb") as f:
-                f.write(pdf_data)
+        _ensure_within_base_dir(abs_path, binary_base_dir)
+        _ensure_directory(os.path.dirname(abs_path))
+        try:
+            with open(abs_path, "wb") as file_handle:
+                file_handle.write(pdf_data)
+        except OSError as write_error:
+            logger.warning("pdf file write failed: %s", write_error)
+        else:
             return {"success": True, "path": abs_path}
-    except Exception:
-        # Fall through to inline on any file write error
-        pass
-    return {"success": True, "pdf": base64.b64encode(pdf_data).decode()}
+
+    bin_cfg = config.get("binary", {})
+    default_mode = bin_cfg.get("default_mode") == "file"
+    if default_mode and pdf_data is not None:
+        _ensure_directory(binary_base_dir)
+        parsed = urllib.parse.urlparse(body.url)
+        host = parsed.netloc or "page"
+        unique_id = uuid.uuid4().hex
+        filename = f"document_{host}_{unique_id}.pdf"
+        abs_path = os.path.join(binary_base_dir, filename)
+        try:
+            with open(abs_path, "wb") as file_handle:
+                file_handle.write(pdf_data)
+        except OSError as write_error:
+            logger.warning("pdf file write failed: %s", write_error)
+        else:
+            return {"success": True, "path": abs_path}
+
+    if pdf_data is None:
+        raise HTTPException(502, "PDF generation failed")
+
+    encoded_pdf = base64.b64encode(pdf_data).decode()
+
+    return {"success": True, "pdf": encoded_pdf}
 
 
 @app.post("/execute_js")
@@ -389,15 +516,33 @@ async def execute_js(
     _td: Dict = Depends(token_dep),
 ):
     """
-    Execute a sequence of JavaScript snippets on the specified URL.
-    Return the full CrawlResult JSON (first result).
-    Note: Does not return the script's output value, only confirms execution.
-    Use this when you need to interact with dynamic pages using JS.
-    REMEMBER: Scripts accept a list of separated JS snippets to execute and execute them in order.
-    IMPORTANT: Each script should be an expression that returns a value. It can be an IIFE or an async function. You can think of it as such.
-        Your script will replace '{script}' and execute in the browser context. So provide either an IIFE or a sync/async function that returns a value.
+    Execute JavaScript snippets against a fresh instance of the requested page.
+
+    Each call loads ``body.url`` in a new browser context, runs the supplied
+    ``scripts`` sequentially (as if passed to ``page.evaluate``), captures the
+    resulting page content, and then tears the context down.  There is no
+    persistent session between requests.
+
+    Usage notes:
+
+    - Snippets execute in the page scope.  Do **not** reference a ``page``
+      object; use DOM APIs such as ``document`` or ``window``.
+    - Provide each snippet as an expression (a self-invoking sync/async
+      function is the safest pattern).  A snippet may ``return`` a value which
+      will be captured and made available in the response.
+    - All snippets run even if one fails; inspect
+      ``js_execution_result['results']`` for per-snippet status and error
+      stacks, and ``js_execution_result['return_values']`` for actual returned values.
+
+    The endpoint returns the first ``CrawlResult`` produced by the crawl so you
+    can inspect the mutated HTML, links, markdown, etc., after the scripts have
+    executed.  Use this when you need to poke a page with a bit of JavaScript
+    but don't require a long-lived automated session.
+
     Return Format:
-        - The return result is an instance of CrawlResult, so you have access to markdown, links, and other stuff. If this is enough, you don't need to call again for other endpoints.
+        - The return result is an instance of CrawlResult, so you have access to
+          markdown, links, and other fields.  If that contains what you need,
+          there is no need to call other endpoints.
 
         ```python
         class CrawlResult(BaseModel):
@@ -437,8 +582,44 @@ async def execute_js(
     cfg = CrawlerRunConfig(js_code=body.scripts)
     async with AsyncWebCrawler(config=BrowserConfig()) as crawler:
         results = await crawler.arun(url=body.url, config=cfg)
+
     # Return JSON-serializable dict of the first CrawlResult
-    data = results[0].model_dump()
+    result = results[0]
+    data = result.model_dump()
+
+    # Ensure js_execution_result is properly structured and extract return values
+    if data.get('js_execution_result'):
+        logger.info(f"JS execution results: {data['js_execution_result']}")
+
+        # Post-process to extract actual return values for backward compatibility
+        js_result = data['js_execution_result']
+
+        if js_result.get('success') and js_result.get('results'):
+            processed_results = []
+            for result_item in js_result['results']:
+                # Handle different result structures
+                if isinstance(result_item, dict):
+                    if result_item.get('success') is False:
+                        # Keep error results as-is for debugging
+                        processed_results.append(result_item)
+                    elif result_item.get('success') is True and 'result' in result_item:
+                        # Extract the actual return value from {success: true, result: value}
+                        processed_results.append(result_item['result'])
+                    elif result_item.get('success') is True:
+                        # Handle {success: true} without result field - means undefined/null return
+                        processed_results.append(None)
+                    else:
+                        # Direct value object - this IS the return value
+                        processed_results.append(result_item)
+                else:
+                    # Direct primitive value - this IS the return value
+                    processed_results.append(result_item)
+
+            # Update the js_execution_result to include both raw results and processed return values
+            data['js_execution_result']['return_values'] = processed_results
+    else:
+        logger.warning(f"No JS execution results found. Result fields: {list(data.keys())}")
+
     return JSONResponse(data)
 
 
@@ -469,11 +650,6 @@ async def health():
     return {"status": "ok", "timestamp": time.time(), "version": __version__}
 
 
-@app.get(config["observability"]["prometheus"]["endpoint"])
-async def metrics():
-    return RedirectResponse(config["observability"]["prometheus"]["endpoint"])
-
-
 @app.post("/crawl")
 @limiter.limit(config["rate_limiting"]["default_limit"])
 @mcp_tool("crawl")
@@ -484,6 +660,9 @@ async def crawl(
 ):
     """
     Crawl a list of URLs and return the results as JSON. Accepts a single string or a list of strings.
+
+    If your MCP client encounters token/size limit errors with large responses, use the `output_path` parameter
+    to export results to a file instead.
     """
     if not crawl_request.urls:
         raise HTTPException(400, "At least one URL required")
@@ -492,6 +671,7 @@ async def crawl(
         browser_config=crawl_request.browser_config,
         crawler_config=crawl_request.crawler_config,
         config=config,
+        output_path=crawl_request.output_path,
     )
     return JSONResponse(res)
 
@@ -600,50 +780,55 @@ async def get_context(
     if not os.path.exists(code_path) or not os.path.exists(doc_path):
         raise HTTPException(404, "Context files not found")
 
-    with open(code_path, "r") as f:
+    with open(code_path, "r", encoding="utf-8") as f:
         code_content = f.read()
-    with open(doc_path, "r") as f:
+    with open(doc_path, "r", encoding="utf-8") as f:
         doc_content = f.read()
 
-    # if no query, just return raw contexts
-    if not query:
-        if context_type == "code":
-            return JSONResponse({"code_context": code_content})
-        if context_type == "doc":
-            return JSONResponse({"doc_context": doc_content})
-        return JSONResponse({
-            "code_context": code_content,
-            "doc_context": doc_content,
-        })
+    def _truncate(text: str, limit: int = 800) -> str:
+        if len(text) <= limit:
+            return text
+        return text[:limit].rstrip() + "…"
 
-    tokens = query.split()
-    results: Dict[str, List[Dict[str, float]]] = {}
+    results: Dict[str, List[Dict[str, object]]] = {}
 
-    # code BM25 over functions/classes
-    if context_type in ("code", "all"):
-        code_chunks = chunk_code_functions(code_content)
-        bm25 = BM25Okapi([c.split() for c in code_chunks])
-        scores = bm25.get_scores(tokens)
-        max_sc = float(scores.max()) if scores.size > 0 else 0.0
-        cutoff = max_sc * score_ratio
-        picked = [(c, s) for c, s in zip(code_chunks, scores) if s >= cutoff]
-        picked = sorted(picked, key=lambda x: x[1], reverse=True)[:max_results]
-        results["code_results"] = [{"text": c, "score": s} for c, s in picked]
+    if query:
+        tokens = query.split()
+        if context_type in ("code", "all"):
+            code_chunks = chunk_code_functions(code_content)
+            bm25 = BM25Okapi([c.split() for c in code_chunks])
+            scores = bm25.get_scores(tokens)
+            max_sc = float(scores.max()) if scores.size > 0 else 0.0
+            cutoff = max_sc * score_ratio
+            picked = [(c, s) for c, s in zip(code_chunks, scores) if s >= cutoff]
+            picked = sorted(picked, key=lambda x: x[1], reverse=True)[:max_results]
+            results["code_results"] = [{"text": c, "score": s} for c, s in picked]
 
-    # doc BM25 over markdown sections
-    if context_type in ("doc", "all"):
-        sections = chunk_doc_sections(doc_content)
-        bm25d = BM25Okapi([sec.split() for sec in sections])
-        scores_d = bm25d.get_scores(tokens)
-        max_sd = float(scores_d.max()) if scores_d.size > 0 else 0.0
-        cutoff_d = max_sd * score_ratio
-        idxs = [i for i, s in enumerate(scores_d) if s >= cutoff_d]
-        neighbors = set(i for idx in idxs for i in (idx-1, idx, idx+1))
-        valid = [i for i in sorted(neighbors) if 0 <= i < len(sections)]
-        valid = valid[:max_results]
-        results["doc_results"] = [
-            {"text": sections[i], "score": scores_d[i]} for i in valid
-        ]
+        if context_type in ("doc", "all"):
+            sections = chunk_doc_sections(doc_content)
+            bm25d = BM25Okapi([sec.split() for sec in sections])
+            scores_d = bm25d.get_scores(tokens)
+            max_sd = float(scores_d.max()) if scores_d.size > 0 else 0.0
+            cutoff_d = max_sd * score_ratio
+            idxs = [i for i, s in enumerate(scores_d) if s >= cutoff_d]
+            neighbors = set(i for idx in idxs for i in (idx - 1, idx, idx + 1))
+            valid = [i for i in sorted(neighbors) if 0 <= i < len(sections)]
+            valid = valid[:max_results]
+            results["doc_results"] = [
+                {"text": sections[i], "score": scores_d[i]} for i in valid
+            ]
+    else:
+        default_cap = min(max_results, 5)
+        if context_type in ("code", "all"):
+            code_chunks = chunk_code_functions(code_content)[:default_cap]
+            results["code_results"] = [
+                {"text": _truncate(chunk), "score": None} for chunk in code_chunks
+            ]
+        if context_type in ("doc", "all"):
+            doc_sections = chunk_doc_sections(doc_content)[:default_cap]
+            results["doc_results"] = [
+                {"text": _truncate(section), "score": None} for section in doc_sections
+            ]
 
     return JSONResponse(results)
 
@@ -658,11 +843,144 @@ register_tools_from_routes(
     routes=app.routes,
     base_url=f"http://{proxy_host}:{config['app']['port']}"
 )
-# Intentionally mount MCP app at "/" with internal path "/mcp" for clear endpoint separation
+
+# Add MCP schema endpoint for documentation and introspection
+@app.get("/mcp/schema")
+@mcp_resource("mcp_schema")
+async def get_mcp_schema():
+    """
+    Get MCP tool schemas for documentation and introspection.
+    
+    Returns detailed information about available MCP tools, their parameters,
+    and capabilities in a structured format.
+    """
+    try:
+        tools = await mcp_server.get_tools()
+        resources = await mcp_server.get_resources()
+        prompts = await mcp_server.get_prompts()
+        
+        schema_data = {
+            "tools": [],
+            "resources": [],
+            "prompts": []
+        }
+        
+        # Process tools
+        for tool in tools.tools:
+            tool_info = {
+                "name": tool.name,
+                "description": tool.description,
+                "inputSchema": tool.inputSchema.model_dump() if tool.inputSchema else None
+            }
+            schema_data["tools"].append(tool_info)
+        
+        # Process resources  
+        for resource in resources.resources:
+            resource_info = {
+                "name": resource.name,
+                "description": resource.description,
+                "mimeType": resource.mimeType,
+                "uri": resource.uri
+            }
+            schema_data["resources"].append(resource_info)
+            
+        # Process prompts
+        for prompt in prompts.prompts:
+            prompt_info = {
+                "name": prompt.name,
+                "description": prompt.description,
+                "arguments": [arg.model_dump() for arg in prompt.arguments] if prompt.arguments else []
+            }
+            schema_data["prompts"].append(prompt_info)
+        
+        return JSONResponse(schema_data)
+        
+    except Exception as e:
+        # Fallback: provide basic tool information from route inspection
+        schema_data = {
+            "tools": [],
+            "resources": [],
+            "prompts": [],
+            "note": "Generated from route inspection (MCP introspection failed)"
+        }
+        
+        # Extract tool info from decorated routes
+        for route in app.routes:
+            if hasattr(route, 'endpoint'):
+                fn = route.endpoint
+                mcp_kind = getattr(fn, '__mcp_kind__', None)
+                if mcp_kind == 'tool':
+                    tool_name = getattr(fn, '__mcp_name__', None) or route.path.strip('/')
+                    tool_info = {
+                        "name": tool_name,
+                        "description": inspect.getdoc(fn) or f"Tool for {route.path}",
+                        "inputSchema": {"type": "object", "properties": {}}
+                    }
+                    
+                    # Extract parameter info from Pydantic models only (ignore deprecated query params)
+                    try:
+                        sig = inspect.signature(fn)
+                        for param_name, param in sig.parameters.items():
+                            # Skip framework parameters and deprecated query parameters
+                            if param_name in ['request', '_td', 'f', 'q', 'c']:
+                                continue
+                            
+                            if param.annotation != inspect.Parameter.empty and hasattr(param.annotation, 'model_fields'):
+                                # Pydantic model - extract field info (this is what MCP clients should use)
+                                for field_name, field_info in param.annotation.model_fields.items():
+                                    field_desc = None
+                                    if hasattr(field_info, 'description'):
+                                        field_desc = field_info.description
+                                    
+                                    # Determine field type from annotation
+                                    field_type = "string"  # Default
+                                    if hasattr(field_info, 'annotation'):
+                                        ann_str = str(field_info.annotation).lower()
+                                        if 'int' in ann_str:
+                                            field_type = "integer"
+                                        elif 'float' in ann_str:
+                                            field_type = "number" 
+                                        elif 'bool' in ann_str:
+                                            field_type = "boolean"
+                                        elif 'list' in ann_str:
+                                            field_type = "array"
+                                    
+                                    field_schema = {
+                                        "type": field_type,
+                                        "description": field_desc
+                                    }
+                                    
+                                    # Add default if available
+                                    if hasattr(field_info, 'default'):
+                                        default_val = field_info.default
+                                        # Handle Pydantic special values safely
+                                        if default_val is not ... and str(type(default_val)) != "<class 'pydantic_core.PydanticUndefined'>":
+                                            try:
+                                                # Try to JSON serialize the default to make sure it's safe
+                                                import json
+                                                json.dumps(default_val)
+                                                field_schema["default"] = default_val
+                                            except (TypeError, ValueError):
+                                                # If it can't be serialized, convert to string or skip
+                                                if isinstance(default_val, (str, int, float, bool, type(None))):
+                                                    field_schema["default"] = default_val
+                                                else:
+                                                    field_schema["default"] = str(default_val)
+                                    
+                                    tool_info["inputSchema"]["properties"][field_name] = field_schema
+                    except Exception:
+                        pass
+                    
+                    schema_data["tools"].append(tool_info)
+        
+        return JSONResponse(schema_data)
+
+# Mount MCP app at root level but preserve our FastAPI routes
 # Known limitation: MCP tools don't forward JWT Authorization headers when security.jwt_enabled=true
 # Internal proxy calls will fail authentication. Disable JWT or implement header forwarding for MCP usage.
 app.mount("/", app=mcp_app, name="mcp")
 print("Mounted MCP app at / (MCP endpoint at /mcp)")
+print(f"MCP schema available at http://{config['app']['host']}:{config['app']['port']}/mcp/schema")
 
 # ────────────────────────── cli ──────────────────────────────
 if __name__ == "__main__":
