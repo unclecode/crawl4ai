@@ -483,8 +483,15 @@ async def handle_crawl_request(
                 async for result in results_gen:
                     results.append(result)
             else:
-                # It's already a list
-                results = results_gen
+                # Normalize non-async-generator results
+                if results_gen is None:
+                    results = []
+                elif isinstance(results_gen, (list, tuple)):
+                    # It's already a sequence
+                    results = list(results_gen)
+                else:
+                    # Single model/object, wrap it in a list
+                    results = [results_gen]
         except Exception as bulk_error:
             logger.warning("Bulk crawl failed, retrying per-URL: %s", bulk_error)
             fallback_results = []
