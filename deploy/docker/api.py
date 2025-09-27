@@ -507,7 +507,16 @@ async def handle_crawl_request(
                         config=crawler_config,
                         dispatcher=dispatcher,
                     )
-                    fallback_results.append(single_result)
+                    # Handle container/iterable wrappers from AsyncWebCrawler.arun
+                    if hasattr(single_result, 'results'):
+                        # CrawlResultContainer or similar - extend with inner results
+                        fallback_results.extend(single_result.results)
+                    elif hasattr(single_result, '__iter__') and not isinstance(single_result, (str, bytes, dict)):
+                        # Other iterable wrapper - iterate and append each result
+                        fallback_results.extend(single_result)
+                    else:
+                        # Non-iterable single result - append as-is
+                        fallback_results.append(single_result)
                 except Exception as url_error:
                     logger.warning("Crawl failed for %s: %s", url, url_error)
                     fallback_results.append(
