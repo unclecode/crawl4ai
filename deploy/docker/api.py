@@ -35,6 +35,14 @@ from crawl4ai.content_filter_strategy import (
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 from crawl4ai.content_scraping_strategy import LXMLWebScrapingStrategy
 
+# Import new result normalization modules
+from result_normalizer import (
+    normalize_results_protocol_dispatch,
+    normalize_single_result,
+    normalize_value_recursive
+)
+from schemas import StandardizedResponse
+
 from utils import (
     TaskStatus,
     FilterType,
@@ -485,18 +493,8 @@ async def handle_crawl_request(
                 async for result in results_gen:
                     results.append(result)
             else:
-                # Normalize non-async-generator results
-                if results_gen is None:
-                    results = []
-                elif isinstance(results_gen, (list, tuple)):
-                    # It's already a sequence
-                    results = list(results_gen)
-                elif hasattr(results_gen, 'results'):
-                    # CrawlResultContainer or similar - extract internal per-URL entries
-                    results = list(results_gen.results)
-                else:
-                    # Single model/object, wrap it in a list
-                    results = [results_gen]
+                # Use protocol-based normalization instead of hasattr() detection
+                results = normalize_results_protocol_dispatch(results_gen)
         except Exception as bulk_error:
             logger.warning("Bulk crawl failed, retrying per-URL: %s", bulk_error)
             fallback_results = []
@@ -507,16 +505,9 @@ async def handle_crawl_request(
                         config=crawler_config,
                         dispatcher=dispatcher,
                     )
-                    # Handle container/iterable wrappers from AsyncWebCrawler.arun
-                    if hasattr(single_result, 'results'):
-                        # CrawlResultContainer or similar - extend with inner results
-                        fallback_results.extend(single_result.results)
-                    elif hasattr(single_result, '__iter__') and not isinstance(single_result, (str, bytes, dict)):
-                        # Other iterable wrapper - iterate and append each result
-                        fallback_results.extend(single_result)
-                    else:
-                        # Non-iterable single result - append as-is
-                        fallback_results.append(single_result)
+                    # Use protocol-based normalization for single results
+                    normalized_single = normalize_results_protocol_dispatch(single_result)
+                    fallback_results.extend(normalized_single)
                 except Exception as url_error:
                     logger.warning("Crawl failed for %s: %s", url, url_error)
                     fallback_results.append(
@@ -538,56 +529,11 @@ async def handle_crawl_request(
             peak_mem_mb = max(peak_mem_mb if peak_mem_mb else 0, end_mem_mb) # <--- Get peak memory
         logger.info(f"Memory usage: Start: {start_mem_mb} MB, End: {end_mem_mb} MB, Delta: {mem_delta_mb} MB, Peak: {peak_mem_mb} MB")
 
-        # Process results to handle PDF bytes
+        # Process results using centralized normalization
         processed_results = []
         for result in results:
-            if hasattr(result, "model_dump"):
-                result_dict = result.model_dump()
-            elif isinstance(result, dict):
-                result_dict = result.copy()
-                result_dict.setdefault("success", False)
-            else:
-                result_dict = {
-                    "url": getattr(result, "url", ""),
-                    "success": getattr(result, "success", False),
-                    "error_message": getattr(result, "error_message", "Unknown error"),
-                }
-
-            # Clean up non-serializable properties with recursive normalization
-            def _normalize_value(val):
-                if isinstance(val, (datetime, date)):
-                    return datetime_handler(val)
-                if isinstance(val, (os.PathLike, pathlib.Path)):
-                    return os.fspath(val)
-                if isinstance(val, bytes):
-                    return b64encode(val).decode('utf-8')
-                if isinstance(val, dict):
-                    return {k: _normalize_value(v) for k, v in val.items()}
-                if isinstance(val, (list, tuple, set)):
-                    return [_normalize_value(v) for v in val]
-                return val
-
-            cleaned_dict = {}
-            for key, value in result_dict.items():
-                # Special handling for PDF binary data (preserve existing logic)
-                if key == 'pdf' and value is not None and isinstance(value, bytes):
-                    cleaned_dict[key] = b64encode(value).decode('utf-8')
-                    continue
-
-                # Recursively normalize the value
-                normalized = _normalize_value(value)
-                try:
-                    json.dumps(normalized)
-                    cleaned_dict[key] = normalized
-                except (TypeError, ValueError):
-                    logger.warning(
-                        "Skipping non-serializable field '%s' of type %s: %s",
-                        key,
-                        type(value),
-                        value,
-                    )
-
-            processed_results.append(cleaned_dict)
+            normalized_result = normalize_single_result(result)
+            processed_results.append(normalized_result)
 
         response_data = {
             "success": True,
@@ -600,7 +546,15 @@ async def handle_crawl_request(
         # Handle output_path if provided
         if output_path:
             binary_base_dir = config.get("binary", {}).get("default_dir", "/tmp/crawl4ai-exports")
-            abs_path = os.path.abspath(output_path)
+
+            # Clean up the path - remove any surrounding quotes and normalize
+            clean_path = output_path.strip('"\'')
+
+            # Only use abspath if it's not already an absolute path
+            if os.path.isabs(clean_path):
+                abs_path = os.path.normpath(clean_path)
+            else:
+                abs_path = os.path.abspath(clean_path)
 
             # Validate path is within allowed directory
             _ensure_within_base_dir(abs_path, binary_base_dir)

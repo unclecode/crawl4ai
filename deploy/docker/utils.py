@@ -126,6 +126,61 @@ def verify_email_domain(email: str) -> bool:
         return False
 
 def _ensure_within_base_dir(path: str, base_dir: str) -> None:
+    """
+    Ensure path is within base directory using new error handling system.
+
+    Args:
+        path: Path to validate
+        base_dir: Base directory that path must be within
+
+    Raises:
+        HTTPException: If path is outside base directory
+    """
+    try:
+        from error_handler import handle_error, create_http_exception_from_error
+        from error_protocols import SecurityErrorImpl
+    except ImportError:
+        # Fallback to legacy error handling if new system not available
+        _ensure_within_base_dir_legacy(path, base_dir)
+        return
+
+    # Normalize and resolve symlinks
+    base_dir_real = os.path.realpath(os.path.abspath(base_dir))
+    path_real = os.path.realpath(os.path.abspath(path))
+
+    # Validate absolute base_dir
+    if not os.path.isabs(base_dir_real):
+        security_error = SecurityErrorImpl(
+            violation_type="invalid_base_directory",
+            attempted_action=f"Set base directory to: {base_dir}",
+            allowed_scope="absolute directory paths only",
+            message="Security restriction: base directory must be absolute."
+        )
+        error_response = handle_error(security_error, "Path validation")
+        raise create_http_exception_from_error(error_response, 400)
+
+    try:
+        common = os.path.commonpath([base_dir_real, path_real])
+    except ValueError:
+        common = ""
+
+    if common != base_dir_real:
+        security_error = SecurityErrorImpl(
+            violation_type="path_traversal",
+            attempted_action=f"Access path: {path_real}",
+            allowed_scope=base_dir_real,
+            message=(
+                f"Security restriction: output_path must be within {base_dir_real}. "
+                f"Your path '{path_real}' is outside the allowed directory. "
+                f"Example valid path: {base_dir_real}/myfile.json"
+            )
+        )
+        error_response = handle_error(security_error, "Path validation")
+        raise create_http_exception_from_error(error_response, 400)
+
+
+def _ensure_within_base_dir_legacy(path: str, base_dir: str) -> None:
+    """Legacy path validation - kept for backward compatibility."""
     # Normalize and resolve symlinks
     base_dir_real = os.path.realpath(os.path.abspath(base_dir))
     path_real = os.path.realpath(os.path.abspath(path))

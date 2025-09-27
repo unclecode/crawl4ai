@@ -57,12 +57,17 @@ from schemas import (
     HTMLRequest,
     JSEndpointRequest,
     MarkdownRequest,
+    ErrorResponse,
     PDFRequest,
     RawCode,
     ScreenshotRequest,
 )
 from utils import FilterType, load_config, setup_logging, verify_email_domain, _ensure_within_base_dir
 from pydantic import BaseModel, Field
+
+# Import new error handling system
+from error_handler import handle_error, parse_network_error, parse_security_error, create_http_exception_from_error
+from error_protocols import NetworkErrorImpl, SecurityErrorImpl
 
 # ── internal imports (after sys.path append) ─────────────────
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
@@ -207,30 +212,14 @@ def _ensure_directory(path: str) -> None:
     os.makedirs(path, mode=0o750, exist_ok=True)
 
 
+# Legacy function - replaced by protocol-based error handling
+# Kept for backward compatibility during transition
 def _extract_user_friendly_error(error_msg: str, operation: str = "operation") -> str:
-    """Extract user-friendly error message from crawler error."""
-    if "ERR_NAME_NOT_RESOLVED" in error_msg:
-        return f"{operation} failed: Unable to resolve hostname. Please check the URL is valid and accessible."
-    elif "ERR_CONNECTION_REFUSED" in error_msg:
-        return f"{operation} failed: Connection refused. The server may be down or unreachable."
-    elif "ERR_CONNECTION_TIMED_OUT" in error_msg or "Timeout" in error_msg:
-        return f"{operation} failed: Connection timed out. The server took too long to respond."
-    elif "ERR_CONNECTION_CLOSED" in error_msg:
-        return f"{operation} failed: Connection closed unexpectedly. The server may have terminated the connection."
-    elif "ERR_SSL_PROTOCOL_ERROR" in error_msg or "SSL" in error_msg:
-        return f"{operation} failed: SSL/TLS error. The server's certificate may be invalid or expired."
-    elif "ERR_CERT" in error_msg:
-        return f"{operation} failed: Certificate error. The server's SSL certificate is invalid."
-    elif "ERR_TOO_MANY_REDIRECTS" in error_msg:
-        return f"{operation} failed: Too many redirects. The URL may be misconfigured."
-    elif "net::" in error_msg:
-        import re
-        match = re.search(r'net::(ERR_[A-Z_]+)', error_msg)
-        if match:
-            return f"{operation} failed: Network error ({match.group(1)}). Please check the URL and network connectivity."
-
-    # Return original message if no specific pattern matched
-    return f"{operation} failed: {error_msg}"
+    """Legacy function - use error_handler.parse_network_error() instead."""
+    from error_handler import parse_network_error, handle_error
+    network_error = parse_network_error(error_msg, operation)
+    error_response = handle_error(network_error, operation)
+    return error_response.error_message
 
 
 def _safe_eval_config(expr: str) -> dict:
@@ -412,7 +401,12 @@ async def generate_screenshot(
         return decoded_bytes
 
     if body.output_path:
-        abs_path = os.path.abspath(body.output_path)
+        # Clean up the path - remove any surrounding quotes and normalize
+        clean_path = body.output_path.strip('"\'')
+        if os.path.isabs(clean_path):
+            abs_path = os.path.normpath(clean_path)
+        else:
+            abs_path = os.path.abspath(clean_path)
         _ensure_within_base_dir(abs_path, binary_base_dir)
         _ensure_directory(os.path.dirname(abs_path))
         try:
@@ -471,7 +465,12 @@ async def generate_pdf(
     binary_base_dir = _resolve_binary_base_dir()
 
     if body.output_path:
-        abs_path = os.path.abspath(body.output_path)
+        # Clean up the path - remove any surrounding quotes and normalize
+        clean_path = body.output_path.strip('"\'')
+        if os.path.isabs(clean_path):
+            abs_path = os.path.normpath(clean_path)
+        else:
+            abs_path = os.path.abspath(clean_path)
         _ensure_within_base_dir(abs_path, binary_base_dir)
         _ensure_directory(os.path.dirname(abs_path))
         try:
