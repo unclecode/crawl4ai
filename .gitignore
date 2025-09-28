@@ -270,4 +270,4 @@ docs/**/data
 .codecat/
 
 docs/apps/linkdin/debug*/
-docs/apps/linkdin/samples/insights/*
+docs/apps/linkdin/samples/insights/*.env.local
