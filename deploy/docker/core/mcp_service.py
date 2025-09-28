@@ -57,6 +57,80 @@ class MCPService:
     - OpenAPI-based tool registration
     - Centralized proxy creation
     """
+    def get_mcp_schema(self, openapi_schema: dict, routes: list) -> dict:
+        """
+        Generate the MCP tool schema from the FastAPI app's OpenAPI schema and routes.
+        """
+        mcp_schema = {
+            "tools": [],
+            "resources": [],
+            "prompts": []
+        }
+
+        # Helper to resolve $ref links in the OpenAPI schema
+        def resolve_ref(ref):
+            parts = ref.strip("#/").split("/")
+            d = openapi_schema
+            for part in parts:
+                d = d[part]
+            return d
+
+        # Iterate through the app's routes to find functions marked as tools
+        for route in routes:
+            if not isinstance(route, APIRoute) or not hasattr(route.endpoint, "__mcp_kind__") or getattr(route.endpoint, "__mcp_kind__") != "tool":
+                continue
+
+            path = route.path
+            if not route.methods:
+                continue
+            method = next(iter(route.methods)).lower()
+
+            if path not in openapi_schema.get("paths", {}) or method not in openapi_schema["paths"].get(path, {}):
+                continue
+            
+            operation = openapi_schema["paths"][path][method]
+
+            tool_name = getattr(route.endpoint, "__mcp_name__", None) or operation.get("summary") or route.name
+
+            input_schema = {"type": "object", "properties": {}}
+
+            if "requestBody" in operation:
+                request_body = operation.get("requestBody", {})
+                if "content" in request_body and "$ref" in request_body.get("content", {}).get("application/json", {}).get("schema", {}):
+                    schema_ref = request_body["content"]["application/json"]["schema"]["$ref"]
+                    input_schema = resolve_ref(schema_ref)
+                elif "content" in request_body:
+                    input_schema = request_body["content"].get("application/json", {}).get("schema", {})
+
+            if "parameters" in operation:
+                if "properties" not in input_schema:
+                    input_schema["properties"] = {}
+                
+                properties = input_schema["properties"]
+                for param in operation["parameters"]:
+                    if "$ref" in param:
+                        param = resolve_ref(param["$ref"])
+                    
+                    if param.get("in") not in ["query", "path"]:
+                        continue
+
+                    param_name = param["name"]
+                    param_schema = param.get("schema", {})
+                    
+                    if "description" in param:
+                        param_schema["description"] = param["description"]
+                        
+                    properties[param_name] = param_schema
+
+            tool_schema = {
+                "name": tool_name,
+                "description": operation.get("description", "") or inspect.getdoc(route.endpoint) or "",
+                "inputSchema": input_schema
+            }
+
+            mcp_schema["tools"].append(tool_schema)
+
+        return mcp_schema
 
     def __init__(self, base_url: str, server_name: str = "FastAPI-MCP"):
         self.base_url = base_url

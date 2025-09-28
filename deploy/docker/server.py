@@ -870,50 +870,11 @@ async def get_mcp_schema():
     and capabilities in a structured format.
     """
     try:
-        # Get tools directly from FastMCP server
-        tools_dict = await mcp_service.mcp_server.get_tools()
-        
-        schema_data = {
-            "tools": [],
-            "resources": [],
-            "prompts": []
-        }
-        
-        # Process FastMCP tools (they come as a dict, not an object with .tools)
-        for tool_name, function_tool in tools_dict.items():
-            try:
-                # Extract schema from the FastMCP FunctionTool
-                tool_info = {
-                    "name": tool_name,
-                    "description": function_tool.description or "No description available",
-                    "inputSchema": {"type": "object", "properties": {}}
-                }
-                
-                # Get the function and its signature
-                if hasattr(function_tool, 'fn'):
-                    fn = function_tool.fn
-                    sig = inspect.signature(fn)
-                    
-                    # Process each parameter
-                    for param_name, param in sig.parameters.items():
-                        if param.annotation == inspect.Parameter.empty:
-                            continue
-                            
-                        # Create proper schema for each parameter type
-                        param_schema = _create_param_schema(param.annotation, param.default)
-                        tool_info["inputSchema"]["properties"][param_name] = param_schema
-                
-                schema_data["tools"].append(tool_info)
-                
-            except Exception as e:
-                # Log but don't fail for individual tools
-                import logging
-                logging.getLogger(__name__).warning(f"Failed to extract schema for tool {tool_name}: {e}")
-                continue
-        
+        schema_data = mcp_service.get_mcp_schema(app.openapi(), app.routes)
         return JSONResponse(schema_data)
-        
     except Exception as e:
+        import traceback
+        logging.error(f"Failed to generate MCP schema: {e}\n{traceback.format_exc()}")
         return JSONResponse({
             "error": f"Failed to generate MCP schema: {str(e)}",
             "tools": [],
@@ -921,67 +882,6 @@ async def get_mcp_schema():
             "prompts": []
         }, status_code=500)
 
-
-def _create_param_schema(annotation, default_value):
-    """Create JSON schema for a parameter based on its type annotation."""
-    import json
-    from typing import get_origin, get_args
-    
-    schema = {"type": "string"}  # Default fallback
-    
-    try:
-        # Handle basic types
-        if annotation is str:
-            schema = {"type": "string"}
-        elif annotation is int:
-            schema = {"type": "integer"}
-        elif annotation is float:
-            schema = {"type": "number"}
-        elif annotation is bool:
-            schema = {"type": "boolean"}
-        else:
-            # Handle typing constructs
-            origin = get_origin(annotation)
-            args = get_args(annotation)
-            
-            if origin is list:
-                schema = {"type": "array"}
-                if args and len(args) > 0:
-                    # Recursive call for array items
-                    item_schema = _create_param_schema(args[0], None)
-                    schema["items"] = item_schema
-            elif origin is dict:
-                schema = {"type": "object"}
-                if args and len(args) >= 2:
-                    # Could add additionalProperties for typed dicts
-                    schema["additionalProperties"] = True
-            elif origin is type(None) or str(origin) == "typing.Union":
-                # Handle Optional[T] (Union[T, None])
-                if args:
-                    non_none_types = [arg for arg in args if arg is not type(None)]
-                    if non_none_types:
-                        schema = _create_param_schema(non_none_types[0], default_value)
-            else:
-                # For unknown types, try to get a string representation
-                schema = {"type": "string", "description": f"Type: {annotation}"}
-        
-        # Add default value if present and JSON serializable
-        if default_value != inspect.Parameter.empty and default_value is not None:
-            try:
-                json.dumps(default_value)  # Test if serializable
-                schema["default"] = default_value
-            except (TypeError, ValueError):
-                # If not serializable, convert to string representation
-                if isinstance(default_value, (str, int, float, bool)):
-                    schema["default"] = default_value
-                else:
-                    schema["default"] = str(default_value)
-                    
-    except Exception:
-        # Fallback for any errors in schema generation
-        schema = {"type": "string", "description": f"Type: {annotation}"}
-    
-    return schema
 
 
 # Mount MCP app at root level but preserve our FastAPI routes
