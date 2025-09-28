@@ -1427,6 +1427,9 @@ class CrawlerRunConfig():
         sig = inspect.signature(self.__init__)
         all_params = sig.parameters  # Dictionary of parameter names and their details
 
+        if name == 'wait_for' and value is not None and not isinstance(value, str):
+            raise ValueError("'wait_for' must be a string (e.g., a CSS selector or JS expression).")
+        
         if name in self._UNWANTED_PROPS and value is not all_params[name].default:
             raise AttributeError(f"Setting '{name}' is deprecated. {self._UNWANTED_PROPS[name]}")
         
