@@ -5,7 +5,7 @@ import pathlib
 from typing import List, Tuple, Dict
 from functools import partial
 from uuid import uuid4
-from datetime import datetime, date
+from datetime import datetime, date, UTC
 from base64 import b64encode
 
 import logging
@@ -673,7 +673,7 @@ async def handle_crawl_job(
     task_id = f"crawl_{uuid4().hex[:8]}"
     await redis.hset(f"task:{task_id}", mapping={
         "status": TaskStatus.PROCESSING,         # <-- keep enum values consistent
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
         "url": json.dumps(urls),                 # store list as JSON string
         "result": "",
         "error": "",

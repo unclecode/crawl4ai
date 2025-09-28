@@ -7,7 +7,7 @@ import re
 import uuid
 from contextvars import ContextVar
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any, Dict, List, Optional
 
 from fastapi import HTTPException
@@ -46,7 +46,7 @@ class ErrorContext:
     message: str
     operation: str = "operation"
     correlation_id: str = field(default_factory=get_correlation_id)
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     error_code: Optional[str] = None
     field_name: Optional[str] = None
