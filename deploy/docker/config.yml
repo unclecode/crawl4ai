@@ -3,7 +3,7 @@ app:
   title: "Crawl4AI API"
   version: "1.0.0"
   host: "0.0.0.0"
-  port: 11234
+  port: 11235
   reload: False
   workers: 1
   timeout_keep_alive: 300
@@ -21,10 +21,6 @@ redis:
   db: 0
   password: ""
   ssl: False
-  ssl_cert_reqs: None
-  ssl_ca_certs: None
-  ssl_certfile: None
-  ssl_keyfile: None
   ssl_cert_reqs: None
   ssl_ca_certs: None
   ssl_certfile: None
@@ -89,3 +85,8 @@ observability:
     endpoint: "/metrics"
   health_check:
     endpoint: "/health"
+
+# Binary output handling (screenshots, PDFs)
+binary:
+  default_mode: "inline"   # options: inline, file
+  default_dir: "/tmp/crawl4ai-exports"

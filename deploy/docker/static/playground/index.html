@@ -620,7 +620,7 @@
 
             const endpointMap = {
                 crawl: '/crawl',
-                // crawl_stream: '/crawl/stream',
+                crawl_stream: '/crawl/stream',
                 md: '/md',
                 llm: '/llm'
             };
@@ -635,12 +635,12 @@
                 const query = document.getElementById('md-query').value.trim();
                 const cache = document.getElementById('md-cache').value;
                 
-                // MD endpoint expects: { url, f, q, c }
+                // MD endpoint expects: { url, filter, query, cache }
                 payload = {
                     url: urls[0], // Take first URL
-                    f: filterType, // Lowercase filter type as required by server
-                    q: query || null, // Use the query if provided, otherwise null
-                    c: cache
+                    filter: filterType, // Filter type as required by server
+                    query: query || null, // Use the query if provided, otherwise null
+                    cache: cache
                 };
             } else if (endpoint === 'llm') {
                 // LLM endpoint has a different URL pattern and uses query params

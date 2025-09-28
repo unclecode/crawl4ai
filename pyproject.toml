@@ -97,4 +97,25 @@ crawl4ai = { workspace = true }
 [dependency-groups]
 dev = [
     "crawl4ai",
+    "pytest>=7.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.0.0",
 ]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+pythonpath = ["."]
+xfail_strict = true
+markers = [
+    "asyncio: tests using asyncio event loop",
+    "mcp: end-to-end MCP protocol/API tests",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::UserWarning"
+]
+
+[tool.coverage.report]
+skip_covered = true
+skip_empty = true

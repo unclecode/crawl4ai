@@ -161,6 +161,14 @@ response = requests.post("http://localhost:11235/execute_js", json={
     ]
 })
 
+# Access returned values
+result = response.json()
+if result.get('js_execution_result', {}).get('return_values'):
+    title = result['js_execution_result']['return_values'][0]  # document.title
+    links = result['js_execution_result']['return_values'][1]  # array of hrefs
+    print(f"Page title: {title}")
+    print(f"Found {len(links)} links")
+
 # Markdown generation
 response = requests.post("http://localhost:11235/md", json={
     "url": "https://example.com",

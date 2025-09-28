@@ -1,10 +1,11 @@
 import os
 import json
 import asyncio
+import pathlib
 from typing import List, Tuple, Dict
 from functools import partial
 from uuid import uuid4
-from datetime import datetime
+from datetime import datetime, date
 from base64 import b64encode
 
 import logging
@@ -32,9 +33,13 @@ from crawl4ai.content_filter_strategy import (
     LLMContentFilter
 )
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
+from core.error_context import parse_network_error
 from crawl4ai.content_scraping_strategy import LXMLWebScrapingStrategy
 
-from utils import (
+from core.result_handler import ResultHandler
+from app.schemas import StandardizedResponse
+
+from app.utils import (
     TaskStatus,
     FilterType,
     get_base_url,
@@ -42,8 +47,10 @@ from utils import (
     should_cleanup_task,
     decode_redis_hash,
     get_llm_api_key,
-    validate_llm_provider
+    validate_llm_provider,
+    datetime_handler
 )
+from app.utils import _ensure_within_base_dir
 
 import psutil, time
 
@@ -76,10 +83,9 @@ async def handle_llm_qa(
         async with AsyncWebCrawler() as crawler:
             result = await crawler.arun(url)
             if not result.success:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=result.error_message
-                )
+                error_msg = result.error_message or "Failed to fetch content"
+                error_ctx = parse_network_error(error_msg, "LLM QA")
+                raise error_ctx.to_http_exception(status.HTTP_500_INTERNAL_SERVER_ERROR)
             content = result.markdown.fit_markdown or result.markdown.raw_markdown
 
         # Create prompt and get LLM response
@@ -221,12 +227,11 @@ async def handle_markdown_request(
                     cache_mode=cache_mode
                 )
             )
-            
+
             if not result.success:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=result.error_message
-                )
+                error_msg = result.error_message or "Failed to fetch content"
+                error_ctx = parse_network_error(error_msg, "Markdown generation")
+                raise error_ctx.to_http_exception(status.HTTP_500_INTERNAL_SERVER_ERROR)
 
             return (result.markdown.raw_markdown 
                    if filter_type == FilterType.RAW 
@@ -385,7 +390,7 @@ def create_task_response(task: dict, task_id: str, base_url: str) -> dict:
 async def stream_results(crawler: AsyncWebCrawler, results_gen: AsyncGenerator) -> AsyncGenerator[bytes, None]:
     """Stream results with heartbeats and completion markers."""
     import json
-    from utils import datetime_handler
+    from app.utils import datetime_handler
 
     try:
         async for result in results_gen:
@@ -419,7 +424,8 @@ async def handle_crawl_request(
     urls: List[str],
     browser_config: dict,
     crawler_config: dict,
-    config: dict
+    config: dict,
+    output_path: str = None
 ) -> dict:
     """Handle non-streaming crawl requests."""
     start_mem_mb = _get_memory_mb() # <--- Get memory before
@@ -430,6 +436,16 @@ async def handle_crawl_request(
     try:
         urls = [('https://' + url) if not url.startswith(('http://', 'https://')) and not url.startswith(("raw:", "raw://")) else url for url in urls]
         browser_config = BrowserConfig.load(browser_config)
+        if getattr(browser_config, "headless", True) is False:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                "Non-headless browser sessions are not supported inside the Docker image. "
+                "Set browser_config.headless=true or omit the flag."
+            )
+
+        # Extract limit before loading CrawlerRunConfig (limit is not a valid CrawlerRunConfig param)
+        limit = crawler_config.pop("limit", None) if isinstance(crawler_config, dict) else None
+
         crawler_config = CrawlerRunConfig.load(crawler_config)
 
         dispatcher = MemoryAdaptiveDispatcher(
@@ -439,7 +455,7 @@ async def handle_crawl_request(
             ) if config["crawler"]["rate_limiter"]["enabled"] else None
         )
         
-        from crawler_pool import get_crawler
+        from app.crawler_pool import get_crawler
         crawler = await get_crawler(browser_config)
 
         # crawler: AsyncWebCrawler = AsyncWebCrawler(config=browser_config)
@@ -453,11 +469,52 @@ async def handle_crawl_request(
 
         results = []
         func = getattr(crawler, "arun" if len(urls) == 1 else "arun_many")
-        partial_func = partial(func, 
-                                urls[0] if len(urls) == 1 else urls, 
-                                config=crawler_config, 
-                                dispatcher=dispatcher)
-        results = await partial_func()
+        payload = urls[0] if len(urls) == 1 else urls
+        partial_func = partial(
+            func,
+            payload,
+            config=crawler_config,
+            dispatcher=dispatcher,
+        )
+        try:
+            results_gen = await partial_func()
+            # Handle both list and async generator results
+            if hasattr(results_gen, '__aiter__'):
+                # It's an async generator, collect results up to limit
+                results = []
+                async for result in results_gen:
+                    results.append(result)
+                    if limit and len(results) >= limit:
+                        break
+            else:
+                results = ResultHandler.normalize_results(results_gen)
+                if limit and len(results) > limit:
+                    results = results[:limit]
+        except Exception as bulk_error:
+            logger.warning("Bulk crawl failed, retrying per-URL: %s", bulk_error)
+            fallback_results = []
+            for url in urls:
+                # Respect limit in fallback mode
+                if limit and len(fallback_results) >= limit:
+                    break
+                try:
+                    single_result = await crawler.arun(
+                        url=url,
+                        config=crawler_config,
+                        dispatcher=dispatcher,
+                    )
+                    normalized_single = ResultHandler.normalize_results(single_result)
+                    fallback_results.extend(normalized_single)
+                except Exception as url_error:
+                    logger.warning("Crawl failed for %s: %s", url, url_error)
+                    fallback_results.append(
+                        {
+                            "url": url,
+                            "success": False,
+                            "error_message": str(url_error),
+                        }
+                    )
+            results = fallback_results
 
         # await crawler.close()
         
@@ -469,16 +526,12 @@ async def handle_crawl_request(
             peak_mem_mb = max(peak_mem_mb if peak_mem_mb else 0, end_mem_mb) # <--- Get peak memory
         logger.info(f"Memory usage: Start: {start_mem_mb} MB, End: {end_mem_mb} MB, Delta: {mem_delta_mb} MB, Peak: {peak_mem_mb} MB")
 
-        # Process results to handle PDF bytes
-        processed_results = []
-        for result in results:
-            result_dict = result.model_dump()
-            # If PDF exists, encode it to base64
-            if result_dict.get('pdf') is not None:
-                result_dict['pdf'] = b64encode(result_dict['pdf']).decode('utf-8')
-            processed_results.append(result_dict)
-            
-        return {
+        processed_results = [
+            ResultHandler.normalize_single_result(result)
+            for result in results
+        ]
+
+        response_data = {
             "success": True,
             "results": processed_results,
             "server_processing_time_s": end_time - start_time,
@@ -486,6 +539,49 @@ async def handle_crawl_request(
             "server_peak_memory_mb": peak_mem_mb
         }
 
+        # Handle output_path if provided
+        if output_path:
+            binary_base_dir = config.get("binary", {}).get("default_dir", "/tmp/crawl4ai-exports")
+
+            # Clean up the path - remove any surrounding quotes and normalize
+            clean_path = output_path.strip('"\'')
+
+            # Only use abspath if it's not already an absolute path
+            if os.path.isabs(clean_path):
+                abs_path = os.path.normpath(clean_path)
+            else:
+                abs_path = os.path.abspath(clean_path)
+
+            # Validate path is within allowed directory
+            _ensure_within_base_dir(abs_path, binary_base_dir)
+
+            # Ensure directory exists
+            os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+
+            # Write JSON to file
+            try:
+                from app.utils import datetime_handler
+                with open(abs_path, 'w', encoding='utf-8') as f:
+                    json.dump(response_data, f, ensure_ascii=False, indent=2, default=datetime_handler)
+                return {
+                    "success": True,
+                    "path": abs_path,
+                    "results_count": len(processed_results),
+                    "server_processing_time_s": end_time - start_time,
+                    "server_memory_delta_mb": mem_delta_mb,
+                    "server_peak_memory_mb": peak_mem_mb
+                }
+            except (OSError, TypeError) as write_error:
+                logger.warning("crawl file write failed: %s", write_error, exc_info=True)
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Failed to write to {abs_path}: {str(write_error)}"
+                )
+
+        return response_data
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Crawl error: {str(e)}", exc_info=True)
         if 'crawler' in locals() and crawler.ready: # Check if crawler was initialized and started
@@ -500,9 +596,10 @@ async def handle_crawl_request(
         if start_mem_mb is not None and end_mem_mb_error is not None:
             mem_delta_mb = end_mem_mb_error - start_mem_mb
 
+        import json as json_module  # Import locally to avoid any scoping issues
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=json.dumps({ # Send structured error
+            detail=json_module.dumps({ # Send structured error
                 "error": str(e),
                 "server_memory_delta_mb": mem_delta_mb,
                 "server_peak_memory_mb": max(peak_mem_mb if peak_mem_mb else 0, end_mem_mb_error or 0)
@@ -531,7 +628,7 @@ async def handle_stream_crawl_request(
             )
         )
 
-        from crawler_pool import get_crawler
+        from app.crawler_pool import get_crawler
         crawler = await get_crawler(browser_config)
 
         # crawler = AsyncWebCrawler(config=browser_config)

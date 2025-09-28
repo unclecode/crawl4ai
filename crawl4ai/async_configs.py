@@ -614,11 +614,12 @@ class BrowserConfig:
 
     @staticmethod
     def load(data: dict) -> "BrowserConfig":
-        # Deserialize the object from a dictionary
+        if data is None:
+            return BrowserConfig()
         config = from_serializable_dict(data)
         if isinstance(config, BrowserConfig):
             return config
-        return BrowserConfig.from_kwargs(config)
+        return BrowserConfig.from_kwargs(config if config is not None else {})
 
 class VirtualScrollConfig:
     """Configuration for virtual scroll handling.
@@ -1549,11 +1550,12 @@ class CrawlerRunConfig():
 
     @staticmethod
     def load(data: dict) -> "CrawlerRunConfig":
-        # Deserialize the object from a dictionary
+        if data is None:
+            return CrawlerRunConfig()
         config = from_serializable_dict(data)
         if isinstance(config, CrawlerRunConfig):
             return config
-        return CrawlerRunConfig.from_kwargs(config)
+        return CrawlerRunConfig.from_kwargs(config if config is not None else {})
 
     def to_dict(self):
         return {

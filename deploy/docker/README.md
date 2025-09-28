@@ -72,11 +72,11 @@ docker pull unclecode/crawl4ai:latest
 
 #### 2. Setup Environment (API Keys)
 
-If you plan to use LLMs, create a `.llm.env` file in your working directory:
+If you plan to use LLMs, create a `.env` file in your working directory:
 
 ```bash
-# Create a .llm.env file with your API keys
-cat > .llm.env << EOL
+# Create a .env file with your API keys
+cat > .env << EOL
 # OpenAI
 OPENAI_API_KEY=sk-your-key
 
@@ -91,7 +91,7 @@ ANTHROPIC_API_KEY=your-anthropic-key
 # GEMINI_API_TOKEN=your-gemini-token
 EOL
 ```
-> 🔑 **Note**: Keep your API keys secure! Never commit `.llm.env` to version control.
+> 🔑 **Note**: Keep your API keys secure! Never commit `.env` to version control.
 
 #### 3. Run the Container
 
@@ -106,14 +106,25 @@ EOL
 
 *   **With LLM support:**
     ```bash
-    # Make sure .llm.env is in the current directory
+    # Make sure .env is in the current directory
     docker run -d \
       -p 11235:11235 \
       --name crawl4ai \
-      --env-file .llm.env \
+      --env-file .env \
       --shm-size=1g \
       unclecode/crawl4ai:0.7.0-r1
     ```
+
+*   **With custom host port:**
+    ```bash
+    docker run -d \
+      -p 8080:11235 \
+      --name crawl4ai \
+      --env-file .env \
+      --shm-size=1g \
+      unclecode/crawl4ai:0.7.0-r1
+    ```
+    > Access at `http://localhost:8080` (mapped to container's internal port 11235)
 
 > The server will be available at `http://localhost:11235`. Visit `/playground` to access the interactive testing interface.
 
@@ -143,15 +154,19 @@ git clone https://github.com/unclecode/crawl4ai.git
 cd crawl4ai
 ```
 
-#### 2. Environment Setup (API Keys)
+#### 2. Environment Setup
 
-If you plan to use LLMs, copy the example environment file and add your API keys. This file should be in the **project root directory**.
+Crawl4AI uses a single `.env` file for all configuration:
 
 ```bash
 # Make sure you are in the 'crawl4ai' root directory
-cp deploy/docker/.llm.env.example .llm.env
 
-# Now edit .llm.env and add your API keys
+# Copy environment template and customize
+cp .env.example .env
+# Edit .env to:
+# - Set HOST_PORT (default: 11235)
+# - Add your API keys for LLM providers
+# - Configure build options (if building locally)
 ```
 
 **Flexible LLM Provider Configuration:**
@@ -161,7 +176,7 @@ The Docker setup now supports flexible LLM provider configuration through three 
 1. **Environment Variable** (Highest Priority): Set `LLM_PROVIDER` to override the default
    ```bash
    export LLM_PROVIDER="anthropic/claude-3-opus"
-   # Or in your .llm.env file:
+   # Or in your .env file:
    # LLM_PROVIDER=anthropic/claude-3-opus
    ```
 
@@ -199,12 +214,15 @@ The `docker-compose.yml` file in the project root provides a simplified approach
     ```bash
     # Build with all features (includes torch and transformers)
     INSTALL_TYPE=all docker compose up --build -d
-    
+
     # Build with GPU support (for AMD64 platforms)
     ENABLE_GPU=true docker compose up --build -d
+
+    # Run on custom host port
+    HOST_PORT=8080 docker compose up -d
     ```
 
-> The server will be available at `http://localhost:11235`.
+> The server will be available at `http://localhost:11235` (or your custom `HOST_PORT`).
 
 #### 4. Stopping the Service
 
@@ -219,7 +237,7 @@ If you prefer not to use Docker Compose for direct control over the build and ru
 
 #### 1. Clone Repository & Setup Environment
 
-Follow steps 1 and 2 from the Docker Compose section above (clone repo, `cd crawl4ai`, create `.llm.env` in the root).
+Follow steps 1 and 2 from the Docker Compose section above (clone repo, `cd crawl4ai`, create `.env` in the root).
 
 #### 2. Build the Image (Multi-Arch)
 
@@ -253,11 +271,11 @@ docker buildx build \
 
 *   **With LLM support:**
     ```bash
-    # Make sure .llm.env is in the current directory (project root)
+    # Make sure .env is in the current directory (project root)
     docker run -d \
       -p 11235:11235 \
       --name crawl4ai-standalone \
-      --env-file .llm.env \
+      --env-file .env \
       --shm-size=1g \
       crawl4ai-local:latest
     ```
@@ -282,18 +300,23 @@ MCP is an open protocol that standardizes how applications provide context to LL
 
 ### Connecting via MCP
 
-The Crawl4AI server exposes two MCP endpoints:
+The Crawl4AI server exposes an MCP HTTP endpoint:
 
-- **Server-Sent Events (SSE)**: `http://localhost:11235/mcp/sse`
-- **WebSocket**: `ws://localhost:11235/mcp/ws`
+- **FastMCP HTTP**: `http://localhost:11235/mcp`
+
+> ⚠️ **Known limitation:** The FastMCP HTTP proxy does not yet forward JWT `Authorization`
+> headers. If `security.jwt_enabled=true`, MCP tool calls will fail authentication.
+> Until the auth-forwarding work lands, either
+> disable JWT for MCP usage or introduce an internal-only token/header that the
+> proxy can inject.
 
 ### Using with Claude Code
 
 You can add Crawl4AI as an MCP tool provider in Claude Code with a simple command:
 
 ```bash
-# Add the Crawl4AI server as an MCP provider
-claude mcp add --transport sse c4ai-sse http://localhost:11235/mcp/sse
+# Add the Crawl4AI server as an MCP provider (HTTP transport)
+claude mcp add --transport http c4ai-http http://localhost:11235/mcp
 
 # List all MCP providers to verify it was added
 claude mcp list
@@ -388,19 +411,25 @@ Generates a PDF document of the specified URL.
 POST /execute_js
 ```
 
-Executes JavaScript snippets on the specified URL and returns the full crawl result.
+Executes JavaScript snippets against a fresh instance of the target page and
+returns the resulting crawl data.
 
 ```json
 {
   "url": "https://example.com",
   "scripts": [
-    "return document.title",
-    "return Array.from(document.querySelectorAll('a')).map(a => a.href)"
+    "(() => { document.body.dataset.demo = 'set'; return true; })()",
+    "(async () => { await new Promise(r => setTimeout(r, 500)); window.snapshot = document.body.dataset.demo; })()"
   ]
 }
 ```
 
-- `scripts`: List of JavaScript snippets to execute sequentially
+- `scripts`: List of JavaScript expressions (typically self-invoking
+  functions) that run sequentially in the page context. There is no `page`
+  handle; use DOM APIs such as `document` or `window`.
+- Results only report success or errors—returned values are not surfaced.  Run
+  all related snippets in a single call; each request creates and tears down a
+  fresh page.
 
 ---
 
@@ -685,7 +714,7 @@ app:
   title: "Crawl4AI API"
   version: "1.0.0" # Consider setting this to match library version, e.g., "0.5.1"
   host: "0.0.0.0"
-  port: 8020 # NOTE: This port is used ONLY when running server.py directly. Gunicorn overrides this (see supervisord.conf).
+  port: 11235 # NOTE: This port is used ONLY when running server.py directly. Gunicorn overrides this (see supervisord.conf).
   reload: False # Default set to False - suitable for production
   timeout_keep_alive: 300
 
@@ -768,7 +797,7 @@ You can override the default `config.yml`.
         # Assumes my-custom-config.yml is in the current directory
         docker run -d -p 11235:11235 \
           --name crawl4ai-custom-config \
-          --env-file .llm.env \
+          --env-file .env \
           --shm-size=1g \
           -v $(pwd)/my-custom-config.yml:/app/config.yml \
           unclecode/crawl4ai:latest # Or your specific tag

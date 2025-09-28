@@ -4,7 +4,7 @@ from contextlib import suppress
 from typing import Dict
 from crawl4ai import AsyncWebCrawler, BrowserConfig
 from typing import Dict
-from utils import load_config 
+from app.utils import load_config 
 
 CONFIG = load_config()
 
