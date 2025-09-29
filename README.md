@@ -27,11 +27,13 @@
 
 Crawl4AI turns the web into clean, LLM ready Markdown for RAG, agents, and data pipelines. Fast, controllable, battle tested by a 50k+ star community.
 
-[✨ Check out latest update v0.7.4](#-recent-updates)
+[✨ Check out latest update v0.7.5](#-recent-updates)
 
-✨ New in v0.7.4: Revolutionary LLM Table Extraction with intelligent chunking, enhanced concurrency fixes, memory management refactor, and critical stability improvements. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.4.md)
+✨ New in v0.7.5: Docker Hooks System for pipeline customization, Enhanced LLM Integration with custom providers, HTTPS Preservation, and multiple community-reported bug fixes. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.5.md)
 
-✨ Recent v0.7.3: Undetected Browser Support, Multi-URL Configurations, Memory Monitoring, Enhanced Table Extraction, GitHub Sponsors. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.3.md)
+✨ Recent v0.7.4: Revolutionary LLM Table Extraction with intelligent chunking, enhanced concurrency fixes, memory management refactor, and critical stability improvements. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.4.md)
+
+✨ Previous v0.7.3: Undetected Browser Support, Multi-URL Configurations, Memory Monitoring, Enhanced Table Extraction, GitHub Sponsors. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.3.md)
 
 <details>
   <summary>🤓 <strong>My Personal Story</strong></summary>
@@ -543,6 +545,48 @@ async def test_news_crawl():
 </details>
 
 ## ✨ Recent Updates
+
+<details>
+<summary><strong>Version 0.7.5 Release Highlights - The Docker Hooks & Security Update</strong></summary>
+
+- **🔧 Docker Hooks System**: Complete pipeline customization with user-provided Python functions:
+  ```python
+  import requests
+
+  # Real working hooks for httpbin.org
+  hooks_config = {
+      "on_page_context_created": """
+  async def hook(page, context, **kwargs):
+      print("Hook: Setting up page context")
+      # Block images to speed up crawling
+      await context.route("**/*.{png,jpg,jpeg,gif,webp}", lambda route: route.abort())
+      return page
+  """,
+      "before_goto": """
+  async def hook(page, context, url, **kwargs):
+      print(f"Hook: About to navigate to {url}")
+      # Add custom headers
+      await page.set_extra_http_headers({'X-Test-Header': 'crawl4ai-hooks-test'})
+      return page
+  """
+  }
+
+  # Test with Docker API
+  payload = {
+      "urls": ["https://httpbin.org/html"],
+      "hooks": {"code": hooks_config, "timeout": 30}
+  }
+  response = requests.post("http://localhost:11235/crawl", json=payload)
+  ```
+
+- **🤖 Enhanced LLM Integration**: Custom providers with temperature control and base_url configuration
+- **🔒 HTTPS Preservation**: Secure internal link handling with `preserve_https_for_internal_links=True`
+- **🐍 Python 3.10+ Support**: Modern language features and enhanced performance
+- **🛠️ Bug Fixes**: Resolved multiple community-reported issues including URL processing, JWT authentication, and proxy configuration
+
+[Full v0.7.5 Release Notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.5.md)
+
+</details>
 
 <details>
 <summary><strong>Version 0.7.4 Release Highlights - The Intelligent Table Extraction & Performance Update</strong></summary>
