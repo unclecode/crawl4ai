@@ -271,3 +271,4 @@ docs/**/data
 
 docs/apps/linkdin/debug*/
 docs/apps/linkdin/samples/insights/*
+.yoyo/
