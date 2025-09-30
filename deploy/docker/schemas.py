@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 from enum import Enum
 from pydantic import BaseModel, Field
 from utils import FilterType
@@ -86,3 +86,9 @@ class JSEndpointRequest(BaseModel):
         ...,
         description="List of separated JavaScript snippets to execute"
     )
+
+
+class SeedRequest(BaseModel):
+    """Request model for URL seeding endpoint."""
+    url: str = Field(..., example="https://docs.crawl4ai.com")
+    config: Dict[str, Any] = Field(default_factory=dict)

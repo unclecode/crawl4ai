@@ -14,7 +14,6 @@ from fastapi import HTTPException, Request, status
 from fastapi.background import BackgroundTasks
 from fastapi.responses import JSONResponse
 from redis import asyncio as aioredis
-
 from crawl4ai import (
     AsyncWebCrawler,
     CrawlerRunConfig,
@@ -23,7 +22,9 @@ from crawl4ai import (
     BrowserConfig,
     MemoryAdaptiveDispatcher,
     RateLimiter, 
-    LLMConfig
+    LLMConfig,
+    AsyncUrlSeeder, 
+    SeedingConfig
 )
 from crawl4ai.utils import perform_completion_with_backoff
 from crawl4ai.content_filter_strategy import (
@@ -717,3 +718,21 @@ async def handle_crawl_job(
 
     background_tasks.add_task(_runner)
     return {"task_id": task_id}
+
+async def handle_seed(url ,cfg):
+    # Create the configuration from the request body
+    try:
+        seeding_config = cfg
+        config = SeedingConfig(**seeding_config)
+
+        # Use an async context manager for the seeder
+        async with AsyncUrlSeeder() as seeder:
+            # The seeder's 'urls' method expects a domain, not a full URL
+            urls = await seeder.urls(url, config)
+        return urls
+    except Exception as e:
+        return {
+                "seeded_urls": [],
+                "count": 0,
+                "message": "No URLs found for the given domain and configuration.",
+            }

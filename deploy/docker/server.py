@@ -11,16 +11,22 @@ from crawler_pool import get_crawler, close_all, janitor
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
 from auth import create_access_token, get_token_dependency, TokenRequest
 from pydantic import BaseModel
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 from fastapi import Request, Depends
 from fastapi.responses import FileResponse
 import base64
 import re
+import os
+import sys
+import asyncio
+from contextlib import asynccontextmanager
+from pathlib import Path
+from urllib.parse import urlparse
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
 from api import (
     handle_markdown_request, handle_llm_qa,
     handle_stream_crawl_request, handle_crawl_request,
-    stream_results
+    stream_results, handle_seed
 )
 from schemas import (
     CrawlRequestWithHooks,
@@ -30,6 +36,7 @@ from schemas import (
     ScreenshotRequest,
     PDFRequest,
     JSEndpointRequest,
+    SeedRequest,
 )
 
 from utils import (
@@ -227,6 +234,30 @@ async def config_dump(raw: RawCode):
         return JSONResponse(_safe_eval_config(raw.code.strip()))
     except Exception as e:
         raise HTTPException(400, str(e))
+
+
+@app.post("/seed")
+async def seed_url(request: SeedRequest):
+    """
+    Seed a domain for crawling based on a URL.
+    • Extract domain from provided URL
+    • Generate crawlable URLs using AsyncUrlSeeder
+    • Return list of seeded URLs for testing
+    """
+    try:
+        # Extract the domain (e.g., "docs.crawl4ai.com") from the full URL
+        domain = urlparse(request.url).netloc
+        if not domain:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid URL provided. Could not extract domain.",
+            )
+        res = await handle_seed(request.url , request.config)
+        return JSONResponse({"seed_url":res , "count":len(res)})
+        
+    except Exception as e:
+        print(f"❌ Error in seed_url: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/md")
