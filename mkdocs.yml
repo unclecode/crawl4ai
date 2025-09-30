@@ -1,5 +1,4 @@
 site_name: Crawl4AI Documentation (v0.7.x)
-site_favicon: docs/md_v2/favicon.ico
 site_description:  🚀🤖 Crawl4AI, Open-source LLM-Friendly Web Crawler & Scraper
 site_url: https://docs.crawl4ai.com
 repo_url: https://github.com/unclecode/crawl4ai
@@ -66,10 +65,12 @@ nav:
     - "CrawlResult": "api/crawl-result.md"
     - "Strategies": "api/strategies.md"
     - "C4A-Script Reference": "api/c4a-script-reference.md"
+  - "Brand Book": "branding/index.md"
 
 theme:
   name: 'terminal'
   palette: 'dark'
+  favicon: favicon.ico
   custom_dir: docs/md_v2/overrides
   color_mode: 'dark'
   icon:
@@ -98,6 +99,7 @@ extra_css:
   - assets/highlight.css
   - assets/dmvendor.css
   - assets/feedback-overrides.css
+  - assets/page_actions.css
 
 extra_javascript:
   - https://www.googletagmanager.com/gtag/js?id=G-58W0K2ZQ25
@@ -106,8 +108,9 @@ extra_javascript:
   - assets/highlight_init.js
   - https://buttons.github.io/buttons.js
   - assets/toc.js
-  - assets/github_stats.js 
+  - assets/github_stats.js
   - assets/selection_ask_ai.js
   - assets/copy_code.js
   - assets/floating_ask_ai_button.js
   - assets/mobile_menu.js
+  - assets/page_actions.js
