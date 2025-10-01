@@ -124,7 +124,7 @@ COPY . /tmp/project/
 
 # Copy supervisor config first (might need root later, but okay for now)
 COPY deploy/docker/supervisord.conf .
-
+COPY deploy/docker/routers ./routers
 COPY deploy/docker/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
