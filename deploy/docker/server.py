@@ -20,7 +20,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
-import adaptive_routes
 from api import (
     handle_crawl_request,
     handle_llm_qa,
@@ -48,6 +47,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, Field
 from rank_bm25 import BM25Okapi
 from redis import asyncio as aioredis
+from routers import adaptive, scripts
 from schemas import (
     CrawlRequestWithHooks,
     HTMLRequest,
@@ -124,7 +124,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.include_router(adaptive_routes.router)
 # ── static playground ──────────────────────────────────────
 STATIC_DIR = pathlib.Path(__file__).parent / "static" / "playground"
 if not STATIC_DIR.exists():
@@ -219,6 +218,8 @@ def _safe_eval_config(expr: str) -> dict:
 
 # ── job router ──────────────────────────────────────────────
 app.include_router(init_job_router(redis, config, token_dep))
+app.include_router(adaptive.router)
+app.include_router(scripts.router)
 
 
 # ──────────────────────── Endpoints ──────────────────────────

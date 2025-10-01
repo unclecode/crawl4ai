@@ -1,9 +1,8 @@
-import asyncio
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
-from fastapi import APIRouter, BackgroundTasks, Body, HTTPException
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, BackgroundTasks, HTTPException
+from schemas import AdaptiveConfigPayload, AdaptiveCrawlRequest, AdaptiveJobStatus
 
 from crawl4ai import AsyncWebCrawler
 from crawl4ai.adaptive_crawler import AdaptiveConfig, AdaptiveCrawler
@@ -11,40 +10,6 @@ from crawl4ai.utils import get_error_context
 
 # --- In-memory storage for job statuses. For production, use Redis or a database. ---
 ADAPTIVE_JOBS: Dict[str, Dict[str, Any]] = {}
-
-# --- Pydantic Models for API Validation ---
-
-
-class AdaptiveConfigPayload(BaseModel):
-    """Pydantic model for receiving AdaptiveConfig parameters."""
-
-    confidence_threshold: float = 0.7
-    max_pages: int = 20
-    top_k_links: int = 3
-    strategy: str = "statistical"  # "statistical" or "embedding"
-    embedding_model: Optional[str] = "sentence-transformers/all-MiniLM-L6-v2"
-    # Add any other AdaptiveConfig fields you want to expose
-
-
-class AdaptiveCrawlRequest(BaseModel):
-    """Input model for the adaptive digest job."""
-
-    start_url: str = Field(..., description="The starting URL for the adaptive crawl.")
-    query: str = Field(..., description="The user query to guide the crawl.")
-    config: Optional[AdaptiveConfigPayload] = Field(
-        None, description="Optional adaptive crawler configuration."
-    )
-
-
-class AdaptiveJobStatus(BaseModel):
-    """Output model for the job status."""
-
-    task_id: str
-    status: str
-    metrics: Optional[Dict[str, Any]] = None
-    result: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
-
 
 # --- APIRouter for Adaptive Crawling Endpoints ---
 router = APIRouter(
