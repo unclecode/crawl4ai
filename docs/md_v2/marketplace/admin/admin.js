@@ -1,5 +1,5 @@
 // Admin Dashboard - Smart & Powerful
-const API_BASE = 'http://localhost:8100/api';
+const API_BASE = '/api';
 
 class AdminDashboard {
     constructor() {
