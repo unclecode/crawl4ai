@@ -1,0 +1,75 @@
+database:
+  name: marketplace.db
+
+tables:
+  apps:
+    columns:
+      id: {type: INTEGER, primary: true, autoincrement: true}
+      name: {type: TEXT, required: true}
+      slug: {type: TEXT, unique: true}
+      description: {type: TEXT}
+      long_description: {type: TEXT}
+      logo_url: {type: TEXT}
+      image: {type: TEXT}
+      screenshots: {type: JSON, default: '[]'}
+      category: {type: TEXT}
+      type: {type: TEXT, default: 'Open Source'}
+      status: {type: TEXT, default: 'Active'}
+      website_url: {type: TEXT}
+      github_url: {type: TEXT}
+      demo_url: {type: TEXT}
+      video_url: {type: TEXT}
+      documentation_url: {type: TEXT}
+      support_url: {type: TEXT}
+      discord_url: {type: TEXT}
+      pricing: {type: TEXT}
+      rating: {type: REAL, default: 0.0}
+      downloads: {type: INTEGER, default: 0}
+      featured: {type: BOOLEAN, default: 0}
+      sponsored: {type: BOOLEAN, default: 0}
+      integration_guide: {type: TEXT}
+      documentation: {type: TEXT}
+      examples: {type: TEXT}
+      installation_command: {type: TEXT}
+      requirements: {type: TEXT}
+      changelog: {type: TEXT}
+      tags: {type: JSON, default: '[]'}
+      added_date: {type: DATETIME, default: CURRENT_TIMESTAMP}
+      updated_date: {type: DATETIME, default: CURRENT_TIMESTAMP}
+      contact_email: {type: TEXT}
+      views: {type: INTEGER, default: 0}
+
+  articles:
+    columns:
+      id: {type: INTEGER, primary: true, autoincrement: true}
+      title: {type: TEXT, required: true}
+      slug: {type: TEXT, unique: true}
+      content: {type: TEXT}
+      author: {type: TEXT, default: 'Crawl4AI Team'}
+      category: {type: TEXT}
+      related_apps: {type: JSON, default: '[]'}
+      featured_image: {type: TEXT}
+      published_date: {type: DATETIME, default: CURRENT_TIMESTAMP}
+      tags: {type: JSON, default: '[]'}
+      views: {type: INTEGER, default: 0}
+
+  categories:
+    columns:
+      id: {type: INTEGER, primary: true, autoincrement: true}
+      name: {type: TEXT, unique: true}
+      slug: {type: TEXT, unique: true}
+      icon: {type: TEXT}
+      description: {type: TEXT}
+      order_index: {type: INTEGER, default: 0}
+
+  sponsors:
+    columns:
+      id: {type: INTEGER, primary: true, autoincrement: true}
+      company_name: {type: TEXT, required: true}
+      logo_url: {type: TEXT}
+      tier: {type: TEXT, default: 'Bronze'}
+      banner_url: {type: TEXT}
+      landing_url: {type: TEXT}
+      active: {type: BOOLEAN, default: 1}
+      start_date: {type: DATETIME}
+      end_date: {type: DATETIME}

@@ -14,6 +14,8 @@ nav:
     - "Demo Apps": "apps/index.md"
     - "C4A-Script Editor": "apps/c4a-script/index.html"
     - "LLM Context Builder": "apps/llmtxt/index.html"
+    - "Marketplace": "marketplace/frontend/index.html"
+    - "Marketplace Admin": "marketplace/admin/index.html"
   - Setup & Installation:
     - "Installation": "core/installation.md"
     - "Docker Deployment": "core/docker-deployment.md"
