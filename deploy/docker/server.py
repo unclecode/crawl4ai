@@ -49,6 +49,7 @@ from rank_bm25 import BM25Okapi
 from redis import asyncio as aioredis
 from routers import adaptive, scripts
 from schemas import (
+    CrawlRequest,
     CrawlRequestWithHooks,
     HTMLRequest,
     JSEndpointRequest,
@@ -575,7 +576,7 @@ async def metrics():
 @mcp_tool("crawl")
 async def crawl(
     request: Request,
-    crawl_request: CrawlRequestWithHooks,
+    crawl_request: CrawlRequest | CrawlRequestWithHooks,
     _td: Dict = Depends(token_dep),
 ):
     """
@@ -592,7 +593,7 @@ async def crawl(
 
     # Prepare hooks config if provided
     hooks_config = None
-    if crawl_request.hooks:
+    if hasattr(crawl_request, 'hooks') and crawl_request.hooks:
         hooks_config = {
             "code": crawl_request.hooks.code,
             "timeout": crawl_request.hooks.timeout,
@@ -604,6 +605,8 @@ async def crawl(
         crawler_config=crawl_request.crawler_config,
         config=config,
         hooks_config=hooks_config,
+        anti_bot_strategy=crawl_request.anti_bot_strategy,
+        headless=crawl_request.headless,
     )
     # check if all of the results are not successful
     if all(not result["success"] for result in results["results"]):
@@ -627,9 +630,9 @@ async def crawl_stream(
 
 
 async def stream_process(crawl_request: CrawlRequestWithHooks):
-    # Prepare hooks config if provided# Prepare hooks config if provided
+    # Prepare hooks config if provided
     hooks_config = None
-    if crawl_request.hooks:
+    if hasattr(crawl_request, 'hooks') and crawl_request.hooks:
         hooks_config = {
             "code": crawl_request.hooks.code,
             "timeout": crawl_request.hooks.timeout,
@@ -641,6 +644,8 @@ async def stream_process(crawl_request: CrawlRequestWithHooks):
         crawler_config=crawl_request.crawler_config,
         config=config,
         hooks_config=hooks_config,
+        anti_bot_strategy=crawl_request.anti_bot_strategy,
+        headless=crawl_request.headless,
     )
 
     # Add hooks info to response headers if available

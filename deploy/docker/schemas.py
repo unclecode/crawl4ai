@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 from utils import FilterType
@@ -9,6 +9,11 @@ class CrawlRequest(BaseModel):
     urls: List[str] = Field(min_length=1, max_length=100)
     browser_config: Optional[Dict] = Field(default_factory=dict)
     crawler_config: Optional[Dict] = Field(default_factory=dict)
+
+    anti_bot_strategy: Literal["default", "stealth", "undetected", "max_evasion"] = (
+        Field("default", description="The anti-bot strategy to use for the crawl.")
+    )
+    headless: bool = Field(True, description="Run the browser in headless mode.")
 
 
 class HookConfig(BaseModel):
