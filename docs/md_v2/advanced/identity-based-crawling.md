@@ -82,6 +82,42 @@ If you installed Crawl4AI (which installs Playwright under the hood), you alread
 
 ---
 
+### Creating a Profile Using the Crawl4AI CLI (Easiest)
+
+If you prefer a guided, interactive setup, use the built-in CLI to create and manage persistent browser profiles.
+
+1.⠀Launch the profile manager:
+   ```bash
+   crwl profiles
+   ```
+
+2.⠀Choose "Create new profile" and enter a profile name. A Chromium window opens so you can log in to sites and configure settings. When finished, return to the terminal and press `q` to save the profile.
+
+3.⠀Profiles are saved under `~/.crawl4ai/profiles/<profile_name>` (for example: `/home/<you>/.crawl4ai/profiles/test_profile_1`) along with a `storage_state.json` for cookies and session data.
+
+4.⠀Optionally, choose "List profiles" in the CLI to view available profiles and their paths.
+
+5.⠀Use the saved path with `BrowserConfig.user_data_dir`:
+   ```python
+   from crawl4ai import AsyncWebCrawler, BrowserConfig
+
+   profile_path = "/home/<you>/.crawl4ai/profiles/test_profile_1"
+
+   browser_config = BrowserConfig(
+       headless=True,
+       use_managed_browser=True,
+       user_data_dir=profile_path,
+       browser_type="chromium",
+   )
+
+   async with AsyncWebCrawler(config=browser_config) as crawler:
+       result = await crawler.arun(url="https://example.com/private")
+   ```
+
+The CLI also supports listing and deleting profiles, and even testing a crawl directly from the menu.
+
+---
+
 ## 3. Using Managed Browsers in Crawl4AI
 
 Once you have a data directory with your session data, pass it to **`BrowserConfig`**:
