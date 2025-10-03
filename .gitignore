@@ -1,6 +1,13 @@
 # Scripts folder (private tools)
 .scripts/
 
+# Database files
+*.db
+
+# Environment files
+.env
+.env.local
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -271,3 +278,5 @@ docs/**/data
 
 docs/apps/linkdin/debug*/
 docs/apps/linkdin/samples/insights/*
+
+scripts/

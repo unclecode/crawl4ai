@@ -563,7 +563,6 @@ async def handle_crawl_request(
             if isinstance(hook_manager, UserHookManager):
                 try:
                     # Ensure all hook data is JSON serializable
-                    import json
                     hook_data = {
                         "status": hooks_status,
                         "execution_log": hook_manager.execution_log,
