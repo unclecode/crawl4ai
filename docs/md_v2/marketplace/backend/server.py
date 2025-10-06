@@ -1,11 +1,13 @@
-from fastapi import FastAPI, HTTPException, Query, Depends, Body
+from fastapi import FastAPI, HTTPException, Query, Depends, Body, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from typing import Optional, List, Dict, Any
+from typing import Optional, Dict, Any
 import json
 import hashlib
 import secrets
+from pathlib import Path
 from database import DatabaseManager
 from datetime import datetime, timedelta
 
@@ -30,6 +32,21 @@ app.add_middleware(
 
 # Initialize database with configurable path
 db = DatabaseManager(Config.DATABASE_PATH)
+
+BASE_DIR = Path(__file__).parent
+UPLOAD_ROOT = BASE_DIR / "uploads"
+UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+
+app.mount("/uploads", StaticFiles(directory=UPLOAD_ROOT), name="uploads")
+
+ALLOWED_IMAGE_TYPES = {
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/webp": ".webp",
+    "image/svg+xml": ".svg"
+}
+ALLOWED_UPLOAD_FOLDERS = {"sponsors"}
+MAX_UPLOAD_SIZE = 2 * 1024 * 1024  # 2 MB
 
 def json_response(data, cache_time=3600):
     """Helper to return JSON with cache headers"""
@@ -182,6 +199,31 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     if token not in tokens or tokens[token] < datetime.now():
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     return token
+
+
+@app.post("/api/admin/upload-image", dependencies=[Depends(verify_token)])
+async def upload_image(file: UploadFile = File(...), folder: str = Form("sponsors")):
+    """Upload image files for admin assets"""
+    folder = (folder or "").strip().lower()
+    if folder not in ALLOWED_UPLOAD_FOLDERS:
+        raise HTTPException(status_code=400, detail="Invalid upload folder")
+
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail="Unsupported file type")
+
+    contents = await file.read()
+    if len(contents) > MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=400, detail="File too large (max 2MB)")
+
+    extension = ALLOWED_IMAGE_TYPES[file.content_type]
+    filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{secrets.token_hex(8)}{extension}"
+
+    target_dir = UPLOAD_ROOT / folder
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target_path = target_dir / filename
+    target_path.write_bytes(contents)
+
+    return {"url": f"/uploads/{folder}/{filename}"}
 
 @app.post("/api/admin/login")
 async def admin_login(password: str = Body(..., embed=True)):
