@@ -6,7 +6,7 @@ import time
 from base64 import b64encode
 from datetime import datetime, timezone
 from functools import partial
-from typing import AsyncGenerator, Dict, List, Optional, Tuple
+from typing import AsyncGenerator, Dict, List, Optional, Tuple, Any
 from urllib.parse import unquote
 from fastapi import HTTPException, Request, status
 from fastapi.background import BackgroundTasks
@@ -55,15 +55,56 @@ from crawl4ai.content_scraping_strategy import LXMLWebScrapingStrategy
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 from crawl4ai.utils import perform_completion_with_backoff
 
+# Import missing utility functions and types
+try:
+    from utils import (
+        FilterType, TaskStatus, get_base_url, is_task_id,
+        get_llm_api_key, get_llm_temperature, get_llm_base_url,
+        validate_llm_provider
+    )
+except ImportError:
+    # Fallback definitions for development/testing
+    from enum import Enum
+    
+    class FilterType(str, Enum):
+        RAW = "raw"
+        FIT = "fit"
+        BM25 = "bm25"
+        LLM = "llm"
+    
+    class TaskStatus(str, Enum):
+        PROCESSING = "processing"
+        FAILED = "failed"
+        COMPLETED = "completed"
+    
+    def get_base_url(request): 
+        return f"{request.url.scheme}://{request.url.netloc}"
+    
+    def is_task_id(value: str): 
+        return value.startswith("llm_") and "_" in value
+    
+    def get_llm_api_key(config, provider=None): 
+        return None
+    
+    def get_llm_temperature(config, provider=None): 
+        return 0.7
+    
+    def get_llm_base_url(config, provider=None): 
+        return None
+    
+    def validate_llm_provider(config, provider): 
+        return True, None
+
 logger = logging.getLogger(__name__)
 
 
 # --- Helper to get memory ---
 def _get_memory_mb():
     try:
+        import psutil
         return psutil.Process().memory_info().rss / (1024 * 1024)
     except Exception as e:
-        logger.warning(f"Could not get memory info: {e}")
+        logger.warning("Could not get memory info: %s", e)
         return None
 
 
@@ -89,6 +130,63 @@ def _apply_headless_setting(browser_config: BrowserConfig, headless: bool):
     """Apply headless setting to browser config."""
     browser_config.headless = headless
     return browser_config
+
+
+# --- Helper to create proxy rotation strategy ---
+def _create_proxy_rotation_strategy(
+    strategy_name: Optional[str],
+    proxies: Optional[List[Dict[str, Any]]],
+    failure_threshold: int = 3,
+    recovery_time: int = 300
+):
+    """Create proxy rotation strategy from request parameters."""
+    if not strategy_name or not proxies:
+        return None
+    
+    # Import proxy strategies
+    from crawl4ai.proxy_strategy import (
+        RoundRobinProxyStrategy, RandomProxyStrategy, 
+        LeastUsedProxyStrategy, FailureAwareProxyStrategy
+    )
+    from crawl4ai.async_configs import ProxyConfig
+    
+    # Convert proxy inputs to ProxyConfig objects
+    proxy_configs = []
+    try:
+        for proxy in proxies:
+            if isinstance(proxy, dict):
+                # Validate required fields
+                if "server" not in proxy:
+                    raise ValueError(f"Proxy configuration missing 'server' field: {proxy}")
+                proxy_configs.append(ProxyConfig.from_dict(proxy))
+            else:
+                raise ValueError(f"Invalid proxy format: {type(proxy)}")
+    except Exception as e:
+        raise ValueError(f"Invalid proxy configuration: {str(e)}")
+    
+    if not proxy_configs:
+        return None
+    
+    # Strategy factory with optimized implementations
+    strategy_name = strategy_name.lower()
+    
+    if strategy_name == "round_robin":
+        return RoundRobinProxyStrategy(proxy_configs)
+    elif strategy_name == "random":
+        return RandomProxyStrategy(proxy_configs)
+    elif strategy_name == "least_used":
+        return LeastUsedProxyStrategy(proxy_configs)
+    elif strategy_name == "failure_aware":
+        return FailureAwareProxyStrategy(
+            proxy_configs, 
+            failure_threshold=failure_threshold,
+            recovery_time=recovery_time
+        )
+    else:
+        raise ValueError(
+            f"Unsupported proxy rotation strategy: {strategy_name}. "
+            f"Available: round_robin, random, least_used, failure_aware"
+        )
 
 
 async def handle_llm_qa(url: str, query: str, config: dict) -> str:
@@ -498,6 +596,10 @@ async def handle_crawl_request(
     hooks_config: Optional[dict] = None,
     anti_bot_strategy: str = "default",
     headless: bool = True,
+    proxy_rotation_strategy: Optional[str] = None,
+    proxies: Optional[List[Dict[str, Any]]] = None,
+    proxy_failure_threshold: int = 3,
+    proxy_recovery_time: int = 300,
 ) -> dict:
     """Handle non-streaming crawl requests with optional hooks."""
     start_mem_mb = _get_memory_mb()  # <--- Get memory before
@@ -517,6 +619,19 @@ async def handle_crawl_request(
         browser_config = BrowserConfig.load(browser_config)
         _apply_headless_setting(browser_config, headless)
         crawler_config = CrawlerRunConfig.load(crawler_config)
+
+        # Configure proxy rotation strategy if specified
+        if proxy_rotation_strategy and proxies:
+            try:
+                proxy_strategy = _create_proxy_rotation_strategy(
+                    proxy_rotation_strategy,
+                    proxies,
+                    proxy_failure_threshold,
+                    proxy_recovery_time
+                )
+                crawler_config.proxy_rotation_strategy = proxy_strategy
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e))
 
         # Configure browser adapter based on anti_bot_strategy
         browser_adapter = _get_browser_adapter(anti_bot_strategy, browser_config)
@@ -643,8 +758,6 @@ async def handle_crawl_request(
             if isinstance(hook_manager, UserHookManager):
                 try:
                     # Ensure all hook data is JSON serializable
-                    import json
-
                     hook_data = {
                         "status": hooks_status,
                         "execution_log": hook_manager.execution_log,
@@ -706,6 +819,10 @@ async def handle_stream_crawl_request(
     hooks_config: Optional[dict] = None,
     anti_bot_strategy: str = "default",
     headless: bool = True,
+    proxy_rotation_strategy: Optional[str] = None,
+    proxies: Optional[List[Dict[str, Any]]] = None,
+    proxy_failure_threshold: int = 3,
+    proxy_recovery_time: int = 300,
 ) -> Tuple[AsyncWebCrawler, AsyncGenerator, Optional[Dict]]:
     """Handle streaming crawl requests with optional hooks."""
     hooks_info = None
@@ -717,6 +834,19 @@ async def handle_stream_crawl_request(
         crawler_config = CrawlerRunConfig.load(crawler_config)
         crawler_config.scraping_strategy = LXMLWebScrapingStrategy()
         crawler_config.stream = True
+
+        # Configure proxy rotation strategy if specified
+        if proxy_rotation_strategy and proxies:
+            try:
+                proxy_strategy = _create_proxy_rotation_strategy(
+                    proxy_rotation_strategy,
+                    proxies,
+                    proxy_failure_threshold,
+                    proxy_recovery_time
+                )
+                crawler_config.proxy_rotation_strategy = proxy_strategy
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e))
 
         # Configure browser adapter based on anti_bot_strategy
         browser_adapter = _get_browser_adapter(anti_bot_strategy, browser_config)

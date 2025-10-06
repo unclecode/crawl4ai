@@ -14,6 +14,20 @@ class CrawlRequest(BaseModel):
         Field("default", description="The anti-bot strategy to use for the crawl.")
     )
     headless: bool = Field(True, description="Run the browser in headless mode.")
+    
+    # Proxy rotation configuration
+    proxy_rotation_strategy: Optional[Literal["round_robin", "random", "least_used", "failure_aware"]] = Field(
+        None, description="Proxy rotation strategy to use for the crawl."
+    )
+    proxies: Optional[List[Dict[str, Any]]] = Field(
+        None, description="List of proxy configurations (dicts with server, username, password, etc.)"
+    )
+    proxy_failure_threshold: Optional[int] = Field(
+        3, ge=1, le=10, description="Failure threshold for failure_aware strategy"
+    )
+    proxy_recovery_time: Optional[int] = Field(
+        300, ge=60, le=3600, description="Recovery time in seconds for failure_aware strategy"
+    )
 
 
 class HookConfig(BaseModel):

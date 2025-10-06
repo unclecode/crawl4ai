@@ -607,6 +607,10 @@ async def crawl(
         hooks_config=hooks_config,
         anti_bot_strategy=crawl_request.anti_bot_strategy,
         headless=crawl_request.headless,
+        proxy_rotation_strategy=crawl_request.proxy_rotation_strategy,
+        proxies=crawl_request.proxies,
+        proxy_failure_threshold=crawl_request.proxy_failure_threshold,
+        proxy_recovery_time=crawl_request.proxy_recovery_time,
     )
     # check if all of the results are not successful
     if all(not result["success"] for result in results["results"]):
@@ -646,6 +650,10 @@ async def stream_process(crawl_request: CrawlRequestWithHooks):
         hooks_config=hooks_config,
         anti_bot_strategy=crawl_request.anti_bot_strategy,
         headless=crawl_request.headless,
+        proxy_rotation_strategy=crawl_request.proxy_rotation_strategy,
+        proxies=crawl_request.proxies,
+        proxy_failure_threshold=crawl_request.proxy_failure_threshold,
+        proxy_recovery_time=crawl_request.proxy_recovery_time,
     )
 
     # Add hooks info to response headers if available

@@ -2,6 +2,11 @@ from typing import List, Dict, Optional
 from abc import ABC, abstractmethod
 from itertools import cycle
 import os
+import random
+import time
+import asyncio
+import logging
+from collections import defaultdict
 
 
 ########### ATTENTION PEOPLE OF EARTH ###########
@@ -131,7 +136,7 @@ class ProxyRotationStrategy(ABC):
         """Add proxy configurations to the strategy"""
         pass
 
-class RoundRobinProxyStrategy:
+class RoundRobinProxyStrategy(ProxyRotationStrategy):
     """Simple round-robin proxy rotation strategy using ProxyConfig objects"""
 
     def __init__(self, proxies: List[ProxyConfig] = None):
@@ -156,3 +161,113 @@ class RoundRobinProxyStrategy:
         if not self._proxy_cycle:
             return None
         return next(self._proxy_cycle)
+
+
+class RandomProxyStrategy(ProxyRotationStrategy):
+    """Random proxy selection strategy for unpredictable traffic patterns."""
+    
+    def __init__(self, proxies: List[ProxyConfig] = None):
+        self._proxies = []
+        self._lock = asyncio.Lock()
+        if proxies:
+            self.add_proxies(proxies)
+    
+    def add_proxies(self, proxies: List[ProxyConfig]):
+        """Add new proxies to the rotation pool."""
+        self._proxies.extend(proxies)
+    
+    async def get_next_proxy(self) -> Optional[ProxyConfig]:
+        """Get randomly selected proxy."""
+        async with self._lock:
+            if not self._proxies:
+                return None
+            return random.choice(self._proxies)
+
+
+class LeastUsedProxyStrategy(ProxyRotationStrategy):
+    """Least used proxy strategy for optimal load distribution."""
+    
+    def __init__(self, proxies: List[ProxyConfig] = None):
+        self._proxies = []
+        self._usage_count: Dict[str, int] = defaultdict(int)
+        self._lock = asyncio.Lock()
+        if proxies:
+            self.add_proxies(proxies)
+    
+    def add_proxies(self, proxies: List[ProxyConfig]):
+        """Add new proxies to the rotation pool."""
+        self._proxies.extend(proxies)
+        for proxy in proxies:
+            self._usage_count[proxy.server] = 0
+    
+    async def get_next_proxy(self) -> Optional[ProxyConfig]:
+        """Get least used proxy for optimal load balancing."""
+        async with self._lock:
+            if not self._proxies:
+                return None
+            
+            # Find proxy with minimum usage
+            min_proxy = min(self._proxies, key=lambda p: self._usage_count[p.server])
+            self._usage_count[min_proxy.server] += 1
+            return min_proxy
+
+
+class FailureAwareProxyStrategy(ProxyRotationStrategy):
+    """Failure-aware proxy strategy with automatic recovery and health tracking."""
+    
+    def __init__(self, proxies: List[ProxyConfig] = None, failure_threshold: int = 3, recovery_time: int = 300):
+        self._proxies = []
+        self._healthy_proxies = []
+        self._failure_count: Dict[str, int] = defaultdict(int)
+        self._last_failure_time: Dict[str, float] = defaultdict(float)
+        self._failure_threshold = failure_threshold
+        self._recovery_time = recovery_time  # seconds
+        self._lock = asyncio.Lock()
+        if proxies:
+            self.add_proxies(proxies)
+    
+    def add_proxies(self, proxies: List[ProxyConfig]):
+        """Add new proxies to the rotation pool."""
+        self._proxies.extend(proxies)
+        self._healthy_proxies.extend(proxies)
+        for proxy in proxies:
+            self._failure_count[proxy.server] = 0
+    
+    async def get_next_proxy(self) -> Optional[ProxyConfig]:
+        """Get next healthy proxy with automatic recovery."""
+        async with self._lock:
+            # Recovery check: re-enable proxies after recovery_time
+            current_time = time.time()
+            recovered_proxies = []
+            
+            for proxy in self._proxies:
+                if (proxy not in self._healthy_proxies and 
+                    current_time - self._last_failure_time[proxy.server] > self._recovery_time):
+                    recovered_proxies.append(proxy)
+                    self._failure_count[proxy.server] = 0
+            
+            # Add recovered proxies back to healthy pool
+            self._healthy_proxies.extend(recovered_proxies)
+            
+            # If no healthy proxies, reset all (emergency fallback)
+            if not self._healthy_proxies and self._proxies:
+                logging.warning("All proxies failed, resetting health status")
+                self._healthy_proxies = self._proxies.copy()
+                for proxy in self._proxies:
+                    self._failure_count[proxy.server] = 0
+            
+            if not self._healthy_proxies:
+                return None
+                
+            return random.choice(self._healthy_proxies)
+    
+    async def mark_proxy_failed(self, proxy: ProxyConfig):
+        """Mark a proxy as failed and remove from healthy pool if threshold exceeded."""
+        async with self._lock:
+            self._failure_count[proxy.server] += 1
+            self._last_failure_time[proxy.server] = time.time()
+            
+            if (self._failure_count[proxy.server] >= self._failure_threshold and 
+                proxy in self._healthy_proxies):
+                self._healthy_proxies.remove(proxy)
+                logging.warning(f"Proxy {proxy.server} marked as unhealthy after {self._failure_count[proxy.server]} failures")
