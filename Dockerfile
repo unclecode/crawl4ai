@@ -179,10 +179,6 @@ RUN chown -R appuser:appuser ${APP_HOME}
 # give permissions to redis persistence dirs if used
 RUN mkdir -p /var/lib/redis /var/log/redis && chown -R appuser:appuser /var/lib/redis /var/log/redis
 
-# Create cache directory for url_seeder with proper permissions
-RUN mkdir -p /home/appuser/.cache/url_seeder && chown -R appuser:appuser /home/appuser/.cache/url_seeder
-
-
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD bash -c '\
     MEM=$(free -m | awk "/^Mem:/{print \$2}"); \
