@@ -981,12 +981,13 @@ class AsyncUrlSeeder:
         if extract:
             self._log("debug", "Fetching head for {url}", params={
                       "url": url}, tag="URL_SEED")
-            ok, html, final = await self._fetch_head(url, timeout)
+            ok, html, final, content_type = await self._fetch_head(url, timeout)
             status = "valid" if ok else "not_valid"
             self._log("info" if ok else "warning", "HEAD {status} for {final_url}",
                       params={"status": status.upper(), "final_url": final or url}, tag="URL_SEED")
             # head_data = _parse_head(html) if ok else {}
             head_data = await asyncio.to_thread(_parse_head, html) if ok else {}
+            head_data["content_type"] = content_type
             entry = {
                 "url": final or url,
                 "status": status,
@@ -1037,6 +1038,25 @@ class AsyncUrlSeeder:
         max_bytes: int = 65_536,  # stop after 64 kB even if </head> never comes
         chunk_size: int = 4096,       # how much we read per await
     ):
+        # First, do a HEAD request to get content-type without downloading body
+        try:
+            head_response = await self.client.head(url, timeout=timeout, follow_redirects=True)
+            content_type = head_response.headers.get("Content-Type", "")
+            final_url = str(head_response.url)
+
+            if content_type:
+                self._log("debug", "HEAD request successful with content-type: {content_type}",
+                          params={"content_type": content_type}, tag="URL_SEED")
+                return True, "", final_url, content_type
+
+        except httpx.RequestError as e:
+            # HEAD request failed, fall through to GET request
+            self._log("debug", "HEAD request failed for {url}: {error}, falling back to GET",
+                      params={"url": url, "error": str(e)}, tag="URL_SEED")
+            content_type = None
+            final_url = url
+
+        # For HTML content (or if HEAD failed), do the streaming GET to extract <head> section
         for _ in range(max_redirects+1):
             try:
                 # ask the first `max_bytes` and force plain text to avoid
@@ -1063,21 +1083,28 @@ class AsyncUrlSeeder:
                             self._log("warning", "Redirect status {status_code} but no Location header for {url}",
                                       params={"status_code": r.status_code, "url": r.url}, tag="URL_SEED")
                             # Return original URL if no new location
-                            return False, "", str(r.url)
+                            return False, "", str(r.url), None
 
                     # For 2xx or other non-redirect codes, proceed to read content
                     # Only allow successful codes, or continue
                     if not (200 <= r.status_code < 400):
                         self._log("warning", "Non-success status {status_code} when fetching head for {url}",
                                   params={"status_code": r.status_code, "url": r.url}, tag="URL_SEED")
-                        return False, "", str(r.url)
+                        return False, "", str(r.url), None
+
+                    if not content_type:
+                        content_type = r.headers.get("Content-Type", "")
 
                     buf = bytearray()
                     async for chunk in r.aiter_bytes(chunk_size):
                         buf.extend(chunk)
                         low = buf.lower()
                         if b"</head>" in low or len(buf) >= max_bytes:
-                            await r.aclose()
+                            try:
+                                await r.aclose()
+                            except httpx.RemoteProtocolError:
+                                # Server sent STREAM_RESET after we got what we needed - this is fine
+                                pass
                             break
 
                     enc = r.headers.get("Content-Encoding", "").lower()
@@ -1126,18 +1153,18 @@ class AsyncUrlSeeder:
                         )
                         html = html_bytes.decode("latin-1", "replace")
 
-                    # Return the actual URL after redirects
-                    return True, html, str(r.url)
+                    # Return the actual URL after redirects and content type
+                    return True, html, str(r.url), content_type
 
             except httpx.RequestError as e:
                 self._log("debug", "Fetch head network error for {url}: {error}",
                           params={"url": url, "error": str(e)}, tag="URL_SEED")
-                return False, "", url
+                return False, "", url, None
 
         # If loop finishes without returning (e.g. too many redirects)
         self._log("warning", "Exceeded max redirects ({max_redirects}) for {url}",
                   params={"max_redirects": max_redirects, "url": url}, tag="URL_SEED")
-        return False, "", url
+        return False, "", url, None
 
     # ─────────────────────────────── BM25 scoring helpers
     def _extract_text_context(self, head_data: Dict[str, Any]) -> str:
