@@ -1038,6 +1038,25 @@ class AsyncUrlSeeder:
         max_bytes: int = 65_536,  # stop after 64 kB even if </head> never comes
         chunk_size: int = 4096,       # how much we read per await
     ):
+        # First, do a HEAD request to get content-type without downloading body
+        try:
+            head_response = await self.client.head(url, timeout=timeout, follow_redirects=True)
+            content_type = head_response.headers.get("Content-Type", "")
+            final_url = str(head_response.url)
+            
+            if content_type:
+                self._log("debug", "HEAD request successful with content-type: {content_type}",
+                          params={"content_type": content_type}, tag="URL_SEED")
+                return True, "", final_url, content_type
+                
+        except httpx.RequestError as e:
+            # HEAD request failed, fall through to GET request
+            self._log("debug", "HEAD request failed for {url}: {error}, falling back to GET",
+                      params={"url": url, "error": str(e)}, tag="URL_SEED")
+            content_type = None
+            final_url = url
+        
+        # For HTML content (or if HEAD failed), do the streaming GET to extract <head> section
         for _ in range(max_redirects+1):
             try:
                 # ask the first `max_bytes` and force plain text to avoid
@@ -1064,18 +1083,18 @@ class AsyncUrlSeeder:
                             self._log("warning", "Redirect status {status_code} but no Location header for {url}",
                                       params={"status_code": r.status_code, "url": r.url}, tag="URL_SEED")
                             # Return original URL if no new location
-                            return False, "", str(r.url)
+                            return False, "", str(r.url), None
 
                     # For 2xx or other non-redirect codes, proceed to read content
                     # Only allow successful codes, or continue
                     if not (200 <= r.status_code < 400):
                         self._log("warning", "Non-success status {status_code} when fetching head for {url}",
                                   params={"status_code": r.status_code, "url": r.url}, tag="URL_SEED")
-                        return False, "", str(r.url)
+                        return False, "", str(r.url), None
                     
-                    # Capture content-type header
-                    content_type = r.headers.get("Content-Type", "")
-
+                    # Capture content-type from GET response (may differ from HEAD)
+                    if not content_type:
+                        content_type = r.headers.get("Content-Type", "")
 
                     buf = bytearray()
                     async for chunk in r.aiter_bytes(chunk_size):
@@ -1135,7 +1154,7 @@ class AsyncUrlSeeder:
                         )
                         html = html_bytes.decode("latin-1", "replace")
 
-                    # Return the actual URL after redirects
+                    # Return the actual URL after redirects and content-type
                     return True, html, str(r.url), content_type
 
             except httpx.RequestError as e:
