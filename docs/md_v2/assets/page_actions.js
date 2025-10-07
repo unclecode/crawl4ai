@@ -176,13 +176,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 </li>
                 <div class="page-actions-divider"></div>
                 <li class="page-action-item">
-                    <a href="#" class="page-action-link disabled" id="action-ask-ai" role="menuitem">
+                    <a href="#" class="page-action-link page-action-external" id="action-open-chatgpt" role="menuitem">
                         <span class="page-action-icon icon-ai"></span>
                         <span class="page-action-text">
-                            <span class="page-action-label">Ask AI about page</span>
-                            <span class="page-action-description">
-                                <span class="page-action-badge">Coming Soon</span>
-                            </span>
+                            <span class="page-action-label">Open in ChatGPT</span>
+                            <span class="page-action-description">Ask questions about this page</span>
                         </span>
                     </a>
                 </li>
@@ -277,6 +275,18 @@ document.addEventListener('DOMContentLoaded', () => {
         window.open(githubUrl, '_blank', 'noopener,noreferrer');
     }
 
+    function getCurrentPageUrl() {
+        const { href } = window.location;
+        return href.split('#')[0];
+    }
+
+    function openChatGPT() {
+        const pageUrl = getCurrentPageUrl();
+        const prompt = encodeURIComponent(`Read ${pageUrl} so I can ask questions about it.`);
+        const chatUrl = `https://chatgpt.com/?hint=search&prompt=${prompt}`;
+        window.open(chatUrl, '_blank', 'noopener,noreferrer');
+    }
+
     (async () => {
         if (!shouldShowButton()) {
             return;
@@ -319,12 +329,12 @@ document.addEventListener('DOMContentLoaded', () => {
             closeDropdown(button, dropdown, overlay);
         });
 
-        // Ask AI action (disabled for now)
-        document.getElementById('action-ask-ai').addEventListener('click', (e) => {
+        // Open in ChatGPT action
+        document.getElementById('action-open-chatgpt').addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            // Future: Integrate with Ask AI feature
-            // For now, do nothing (disabled state)
+            openChatGPT();
+            closeDropdown(button, dropdown, overlay);
         });
 
         // Close on ESC key
