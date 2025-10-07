@@ -13,6 +13,7 @@
   - [Understanding Request Schema](#understanding-request-schema)
   - [REST API Examples](#rest-api-examples)
 - [Additional API Endpoints](#additional-api-endpoints)
+  - [Dispatcher Management](#dispatcher-management)
   - [HTML Extraction Endpoint](#html-extraction-endpoint)
   - [Screenshot Endpoint](#screenshot-endpoint)
   - [PDF Export Endpoint](#pdf-export-endpoint)
@@ -34,6 +35,8 @@
   - [Configuration Tips and Best Practices](#configuration-tips-and-best-practices)
   - [Customizing Your Configuration](#customizing-your-configuration)
   - [Configuration Recommendations](#configuration-recommendations)
+- [Testing & Validation](#testing--validation)
+  - [Dispatcher Demo Test Suite](#dispatcher-demo-test-suite)
 - [Getting Help](#getting-help)
 - [Summary](#summary)
 
@@ -331,6 +334,134 @@ Access the MCP tool schemas at `http://localhost:11235/mcp/schema` for detailed 
 ## Additional API Endpoints
 
 In addition to the core `/crawl` and `/crawl/stream` endpoints, the server provides several specialized endpoints:
+
+### Dispatcher Management
+
+The server supports multiple dispatcher strategies for managing concurrent crawling operations. Dispatchers control how many crawl jobs run simultaneously based on different rules like fixed concurrency limits or system memory availability.
+
+#### Available Dispatchers
+
+**Memory Adaptive Dispatcher** (Default)
+- Dynamically adjusts concurrency based on system memory usage
+- Monitors memory pressure and adapts crawl sessions accordingly
+- Automatically requeues tasks under high memory conditions
+- Implements fairness timeout for long-waiting URLs
+
+**Semaphore Dispatcher**
+- Fixed concurrency limit using semaphore-based control
+- Simple and predictable resource usage
+- Ideal for controlled crawling scenarios
+
+#### Dispatcher Endpoints
+
+**List Available Dispatchers**
+```bash
+GET /dispatchers
+```
+
+Returns information about all available dispatcher types, their configurations, and features.
+
+```bash
+curl http://localhost:11234/dispatchers | jq
+```
+
+**Get Default Dispatcher**
+```bash
+GET /dispatchers/default
+```
+
+Returns the current default dispatcher configuration.
+
+```bash
+curl http://localhost:11234/dispatchers/default | jq
+```
+
+**Get Dispatcher Statistics**
+```bash
+GET /dispatchers/{dispatcher_type}/stats
+```
+
+Returns real-time statistics for a specific dispatcher including active sessions, memory usage, and configuration.
+
+```bash
+# Get memory_adaptive dispatcher stats
+curl http://localhost:11234/dispatchers/memory_adaptive/stats | jq
+
+# Get semaphore dispatcher stats
+curl http://localhost:11234/dispatchers/semaphore/stats | jq
+```
+
+#### Using Dispatchers in Crawl Requests
+
+You can specify which dispatcher to use in your crawl requests by adding the `dispatcher` field:
+
+**Using Default Dispatcher (memory_adaptive)**
+```bash
+curl -X POST http://localhost:11234/crawl \
+  -H "Content-Type: application/json" \
+  -d '{
+    "urls": ["https://example.com"],
+    "browser_config": {},
+    "crawler_config": {}
+  }'
+```
+
+**Using Semaphore Dispatcher**
+```bash
+curl -X POST http://localhost:11234/crawl \
+  -H "Content-Type: application/json" \
+  -d '{
+    "urls": ["https://example.com", "https://httpbin.org/html"],
+    "browser_config": {},
+    "crawler_config": {},
+    "dispatcher": "semaphore"
+  }'
+```
+
+**Python SDK Example**
+```python
+import requests
+
+# Crawl with memory adaptive dispatcher (default)
+response = requests.post(
+    "http://localhost:11234/crawl",
+    json={
+        "urls": ["https://example.com"],
+        "browser_config": {},
+        "crawler_config": {}
+    }
+)
+
+# Crawl with semaphore dispatcher
+response = requests.post(
+    "http://localhost:11234/crawl",
+    json={
+        "urls": ["https://example.com"],
+        "browser_config": {},
+        "crawler_config": {},
+        "dispatcher": "semaphore"
+    }
+)
+```
+
+#### Dispatcher Configuration
+
+Dispatchers are configured with sensible defaults that work well for most use cases:
+
+**Memory Adaptive Dispatcher Defaults:**
+- `memory_threshold_percent`: 70.0 - Start adjusting at 70% memory usage
+- `critical_threshold_percent`: 85.0 - Critical memory pressure threshold
+- `recovery_threshold_percent`: 65.0 - Resume normal operation below 65%
+- `check_interval`: 1.0 - Check memory every second
+- `max_session_permit`: 20 - Maximum concurrent sessions
+- `fairness_timeout`: 600.0 - Prioritize URLs waiting > 10 minutes
+- `memory_wait_timeout`: 600.0 - Fail if high memory persists > 10 minutes
+
+**Semaphore Dispatcher Defaults:**
+- `semaphore_count`: 5 - Maximum concurrent crawl operations
+- `max_session_permit`: 10 - Maximum total sessions allowed
+
+> 💡 **Tip**: Use `memory_adaptive` for dynamic workloads where memory availability varies. Use `semaphore` for predictable, controlled crawling with fixed concurrency limits.
 
 ### HTML Extraction Endpoint
 
@@ -812,6 +943,93 @@ You can override the default `config.yml`.
    - Start with conservative rate limiter delays
    - Increase batch_process timeout for large content
    - Adjust stream_init timeout based on initial response times
+
+## Testing & Validation
+
+We provide two comprehensive test suites to validate all Docker server functionality:
+
+### 1. Extended Features Test Suite ✅ **100% Pass Rate**
+
+Complete validation of all advanced features including URL seeding, adaptive crawling, browser adapters, proxy rotation, and dispatchers.
+
+```bash
+# Run all extended features tests
+cd tests/docker/extended_features
+./run_extended_tests.sh
+
+# Custom server URL
+./run_extended_tests.sh --server http://localhost:8080
+```
+
+**Test Coverage (12 tests):**
+- ✅ **URL Seeding** (2 tests): Basic seeding + domain filters
+- ✅ **Adaptive Crawling** (2 tests): Basic + custom thresholds  
+- ✅ **Browser Adapters** (3 tests): Default, Stealth, Undetected
+- ✅ **Proxy Rotation** (2 tests): Round Robin, Random strategies
+- ✅ **Dispatchers** (3 tests): Memory Adaptive, Semaphore, Management APIs
+
+**Current Status:**
+```
+Total Tests: 12
+Passed: 12
+Failed: 0
+Pass Rate: 100.0% ✅
+Average Duration: ~8.8 seconds
+```
+
+Features:
+- Rich formatted output with tables and panels
+- Real-time progress indicators
+- Detailed error diagnostics
+- Category-based results grouping
+- Server health checks
+
+See [`tests/docker/extended_features/README_EXTENDED_TESTS.md`](../../tests/docker/extended_features/README_EXTENDED_TESTS.md) for full documentation and API response format reference.
+
+### 2. Dispatcher Demo Test Suite
+
+Focused tests for dispatcher functionality with performance comparisons:
+
+```bash
+# Run all tests
+cd test_scripts
+./run_dispatcher_tests.sh
+
+# Run specific category
+./run_dispatcher_tests.sh -c basic          # Basic dispatcher usage
+./run_dispatcher_tests.sh -c integration   # Integration with other features
+./run_dispatcher_tests.sh -c endpoints     # Dispatcher management endpoints
+./run_dispatcher_tests.sh -c performance   # Performance comparison
+./run_dispatcher_tests.sh -c error         # Error handling
+
+# Custom server URL
+./run_dispatcher_tests.sh -s http://your-server:port
+```
+
+**Test Coverage (17 tests):**
+- **Basic Usage Tests**: Single/multiple URL crawling with different dispatchers
+- **Integration Tests**: Dispatchers combined with anti-bot strategies, browser configs, JS execution, screenshots
+- **Endpoint Tests**: Dispatcher management API validation
+- **Performance Tests**: Side-by-side comparison of memory_adaptive vs semaphore
+- **Error Handling**: Edge cases and validation tests
+
+Results are displayed with rich formatting, timing information, and success rates. See `test_scripts/README_DISPATCHER_TESTS.md` for full documentation.
+
+### Quick Test Commands
+
+```bash
+# Test all features (recommended)
+./tests/docker/extended_features/run_extended_tests.sh
+
+# Test dispatchers only
+./test_scripts/run_dispatcher_tests.sh
+
+# Test server health
+curl http://localhost:11235/health
+
+# Test dispatcher endpoint
+curl http://localhost:11235/dispatchers | jq
+```
 
 ## Getting Help
 

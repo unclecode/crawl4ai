@@ -59,6 +59,7 @@ nav:
     - "Clustering Strategies": "extraction/clustring-strategies.md"
     - "Chunking": "extraction/chunking.md"
   - API Reference:
+    - "Docker Server API": "api/docker-server.md"
     - "AsyncWebCrawler": "api/async-webcrawler.md"
     - "arun()": "api/arun.md"
     - "arun_many()": "api/arun_many.md"

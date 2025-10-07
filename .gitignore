@@ -1,6 +1,9 @@
 # Scripts folder (private tools)
 .scripts/
 
+# Docker automation scripts (personal use)
+docker-scripts/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

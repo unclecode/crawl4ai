@@ -47,7 +47,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, Field
 from rank_bm25 import BM25Okapi
 from redis import asyncio as aioredis
-from routers import adaptive, scripts
+from routers import adaptive, dispatchers, scripts
 from schemas import (
     CrawlRequest,
     CrawlRequestWithHooks,
@@ -61,10 +61,18 @@ from schemas import (
 )
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from utils import FilterType, load_config, setup_logging, verify_email_domain
+from utils import (
+    FilterType, 
+    load_config, 
+    setup_logging, 
+    verify_email_domain,
+    create_dispatcher,
+    DEFAULT_DISPATCHER_TYPE,
+)
 
 import crawl4ai as _c4
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
+from crawl4ai.async_dispatcher import BaseDispatcher
 
 # ── internal imports (after sys.path append) ─────────────────
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
@@ -106,15 +114,41 @@ AsyncWebCrawler.arun = capped_arun
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # Initialize crawler pool
     await get_crawler(
         BrowserConfig(
             extra_args=config["crawler"]["browser"].get("extra_args", []),
             **config["crawler"]["browser"].get("kwargs", {}),
         )
     )  # warm‑up
+    
+    # Initialize dispatchers
+    try:
+        app.state.dispatchers: Dict[str, BaseDispatcher] = {}
+        app.state.default_dispatcher_type = DEFAULT_DISPATCHER_TYPE
+        
+        # Pre-create both dispatcher types
+        app.state.dispatchers["memory_adaptive"] = create_dispatcher("memory_adaptive")
+        app.state.dispatchers["semaphore"] = create_dispatcher("semaphore")
+        
+        logger.info(f"✓ Initialized dispatchers: {list(app.state.dispatchers.keys())}")
+        logger.info(f"✓ Default dispatcher: {app.state.default_dispatcher_type}")
+    except Exception as e:
+        logger.error(f"✗ Failed to initialize dispatchers: {e}")
+        raise
+    
+    # Start background tasks
     app.state.janitor = asyncio.create_task(janitor())  # idle GC
+    
     yield
+    
+    # Cleanup
     app.state.janitor.cancel()
+    app.state.dispatchers.clear()
+    logger.info("✓ Dispatchers cleaned up")
     await close_all()
 
 
@@ -220,33 +254,172 @@ def _safe_eval_config(expr: str) -> dict:
 # ── job router ──────────────────────────────────────────────
 app.include_router(init_job_router(redis, config, token_dep))
 app.include_router(adaptive.router)
+app.include_router(dispatchers.router)
 app.include_router(scripts.router)
 
 
 # ──────────────────────── Endpoints ──────────────────────────
-@app.post("/token")
+@app.post("/token", 
+    summary="Get Authentication Token",
+    description="Generate a JWT authentication token for API access using your email address.",
+    response_description="JWT token with expiration time",
+    tags=["Authentication"]
+)
 async def get_token(req: TokenRequest):
+    """
+    Generate an authentication token for API access.
+    
+    This endpoint creates a JWT token that must be included in the Authorization 
+    header of subsequent requests. Tokens are valid for the duration specified 
+    in server configuration (default: 60 minutes).
+    
+    **Example Request:**
+    ```json
+    {
+        "email": "user@example.com"
+    }
+    ```
+    
+    **Example Response:**
+    ```json
+    {
+        "email": "user@example.com",
+        "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        "token_type": "bearer"
+    }
+    ```
+    
+    **Usage:**
+    ```python
+    import requests
+    
+    response = requests.post(
+        "http://localhost:11235/token",
+        json={"email": "user@example.com"}
+    )
+    token = response.json()["access_token"]
+    
+    # Use token in subsequent requests
+    headers = {"Authorization": f"Bearer {token}"}
+    ```
+    
+    **Notes:**
+    - Email domain must be in the allowed list (configurable via config.yml)
+    - Tokens expire after configured duration
+    - Store tokens securely and refresh before expiration
+    """
     if not verify_email_domain(req.email):
         raise HTTPException(400, "Invalid email domain")
     token = create_access_token({"sub": req.email})
     return {"email": req.email, "access_token": token, "token_type": "bearer"}
 
 
-@app.post("/config/dump")
+@app.post("/config/dump",
+    summary="Validate and Dump Configuration",
+    description="Validate CrawlerRunConfig or BrowserConfig and return serialized version.",
+    response_description="Serialized configuration dictionary",
+    tags=["Utility"]
+)
 async def config_dump(raw: RawCode):
+    """
+    Validate and serialize crawler or browser configuration.
+    
+    This endpoint accepts Python code containing a CrawlerRunConfig or BrowserConfig
+    constructor and returns the serialized configuration dict. Useful for validating
+    configurations before use.
+    
+    **Example Request:**
+    ```json
+    {
+        "code": "CrawlerRunConfig(word_count_threshold=10, screenshot=True)"
+    }
+    ```
+    
+    **Example Response:**
+    ```json
+    {
+        "word_count_threshold": 10,
+        "screenshot": true,
+        "wait_until": "networkidle",
+        ...
+    }
+    ```
+    
+    **Security:**
+    - Only CrawlerRunConfig() and BrowserConfig() constructors allowed
+    - No nested function calls permitted
+    - Prevents code injection attempts
+    """
     try:
         return JSONResponse(_safe_eval_config(raw.code.strip()))
     except Exception as e:
         raise HTTPException(400, str(e))
 
 
-@app.post("/seed")
+@app.post("/seed",
+    summary="URL Discovery and Seeding",
+    description="Discover and extract crawlable URLs from a website for subsequent crawling.",
+    response_description="List of discovered URLs with count",
+    tags=["Core Crawling"]
+)
 async def seed_url(request: SeedRequest):
     """
-    Seed a domain for crawling based on a URL.
-    • Extract domain from provided URL
-    • Generate crawlable URLs using AsyncUrlSeeder
-    • Return list of seeded URLs for testing
+    Discover and seed URLs from a website.
+    
+    This endpoint crawls a starting URL and discovers all available links based on
+    specified filters. Useful for finding URLs to crawl before running a full crawl.
+    
+    **Parameters:**
+    - **url**: Starting URL to discover links from
+    - **config**: Seeding configuration
+      - **max_urls**: Maximum number of URLs to return (default: 100)
+      - **filter_type**: Filter strategy for URLs
+        - `all`: Include all discovered URLs
+        - `domain`: Only URLs from same domain
+        - `subdomain`: Only URLs from same subdomain
+      - **exclude_external**: Exclude external links (default: false)
+    
+    **Example Request:**
+    ```json
+    {
+        "url": "https://www.nbcnews.com",
+        "config": {
+            "max_urls": 20,
+            "filter_type": "domain",
+            "exclude_external": true
+        }
+    }
+    ```
+    
+    **Example Response:**
+    ```json
+    {
+        "seed_url": [
+            "https://www.nbcnews.com/news/page1",
+            "https://www.nbcnews.com/news/page2",
+            "https://www.nbcnews.com/about"
+        ],
+        "count": 3
+    }
+    ```
+    
+    **Usage:**
+    ```python
+    response = requests.post(
+        "http://localhost:11235/seed",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "url": "https://www.nbcnews.com",
+            "config": {"max_urls": 20, "filter_type": "domain"}
+        }
+    )
+    urls = response.json()["seed_url"]
+    ```
+    
+    **Notes:**
+    - Returns direct list of URLs in `seed_url` field (not nested dict)
+    - Empty list returned if no URLs found
+    - Respects robots.txt if configured
     """
     try:
         # Extract the domain (e.g., "docs.crawl4ai.com") from the full URL
@@ -264,7 +437,12 @@ async def seed_url(request: SeedRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/md")
+@app.post("/md",
+    summary="Extract Markdown",
+    description="Extract clean markdown content from a URL or raw HTML.",
+    response_description="Markdown content with metadata",
+    tags=["Content Extraction"]
+)
 @limiter.limit(config["rate_limiting"]["default_limit"])
 @mcp_tool("md")
 async def get_markdown(
@@ -272,6 +450,62 @@ async def get_markdown(
     body: MarkdownRequest,
     _td: Dict = Depends(token_dep),
 ):
+    """
+    Extract clean markdown content from a URL.
+    
+    This endpoint fetches a page and converts it to clean, readable markdown format.
+    Useful for LLM processing, content analysis, or markdown export.
+    
+    **Request Body:**
+    ```json
+    {
+        "url": "https://example.com",
+        "f": "markdown",
+        "q": "",
+        "c": true,
+        "provider": "openai",
+        "temperature": 0.0
+    }
+    ```
+    
+    **Parameters:**
+    - `url`: Target URL (or raw:// for raw HTML)
+    - `f`: Output format ("markdown", "fit_markdown")
+    - `q`: Query for filtered extraction
+    - `c`: Enable caching (default: true)
+    - `provider`: LLM provider for enhanced extraction
+    - `temperature`: LLM temperature setting
+    - `base_url`: Custom LLM API base URL
+    
+    **Response:**
+    ```json
+    {
+        "url": "https://example.com",
+        "markdown": "# Example Domain\\n\\nThis domain is for use...",
+        "success": true,
+        "filter": "markdown",
+        "query": "",
+        "cache": true
+    }
+    ```
+    
+    **Usage:**
+    ```python
+    response = requests.post(
+        "http://localhost:11235/md",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"url": "https://example.com"}
+    )
+    markdown = response.json()["markdown"]
+    print(markdown)
+    ```
+    
+    **Notes:**
+    - Supports raw HTML input with `raw://` prefix
+    - Returns clean, structured markdown
+    - LLM-friendly format for AI processing
+    - Caching improves performance for repeated requests
+    """
     if not body.url.startswith(("http://", "https://")) and not body.url.startswith(
         ("raw:", "raw://")
     ):
@@ -301,7 +535,12 @@ async def get_markdown(
     )
 
 
-@app.post("/html")
+@app.post("/html",
+    summary="Extract Processed HTML",
+    description="Crawl a URL and return preprocessed HTML suitable for schema extraction.",
+    response_description="Processed HTML content",
+    tags=["Content Extraction"]
+)
 @limiter.limit(config["rate_limiting"]["default_limit"])
 @mcp_tool("html")
 async def generate_html(
@@ -310,8 +549,43 @@ async def generate_html(
     _td: Dict = Depends(token_dep),
 ):
     """
-    Crawls the URL, preprocesses the raw HTML for schema extraction, and returns the processed HTML.
-    Use when you need sanitized HTML structures for building schemas or further processing.
+    Crawl a URL and return sanitized, preprocessed HTML.
+    
+    This endpoint crawls a page and returns processed HTML that's been cleaned
+    and prepared for schema extraction or further processing. The HTML is
+    sanitized to remove scripts, styles, and other non-content elements.
+    
+    **Request Body:**
+    ```json
+    {
+        "url": "https://example.com"
+    }
+    ```
+    
+    **Response:**
+    ```json
+    {
+        "url": "https://example.com",
+        "html": "<html><body><h1>Example Domain</h1>...</body></html>",
+        "success": true
+    }
+    ```
+    
+    **Usage:**
+    ```python
+    response = requests.post(
+        "http://localhost:11235/html",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"url": "https://example.com"}
+    )
+    html = response.json()["html"]
+    ```
+    
+    **Notes:**
+    - HTML is preprocessed for schema extraction
+    - Scripts, styles, and non-content elements removed
+    - Preserves semantic structure
+    - Useful for building data extraction schemas
     """
     cfg = CrawlerRunConfig()
     try:
@@ -336,7 +610,12 @@ async def generate_html(
 # Screenshot endpoint
 
 
-@app.post("/screenshot")
+@app.post("/screenshot",
+    summary="Capture Screenshot",
+    description="Capture a full-page PNG screenshot of a URL.",
+    response_description="Screenshot data (base64 or file path)",
+    tags=["Content Extraction"]
+)
 @limiter.limit(config["rate_limiting"]["default_limit"])
 @mcp_tool("screenshot")
 async def generate_screenshot(
@@ -345,9 +624,73 @@ async def generate_screenshot(
     _td: Dict = Depends(token_dep),
 ):
     """
-    Capture a full-page PNG screenshot of the specified URL, waiting an optional delay before capture,
-    Use when you need an image snapshot of the rendered page. Its recommened to provide an output path to save the screenshot.
-    Then in result instead of the screenshot you will get a path to the saved file.
+    Capture a full-page PNG screenshot of a URL.
+    
+    This endpoint navigates to a URL and captures a full-page screenshot.
+    Optionally wait for page content to load before capturing.
+    
+    **Request Body:**
+    ```json
+    {
+        "url": "https://example.com",
+        "screenshot_wait_for": 2.0,
+        "output_path": "/path/to/screenshot.png"
+    }
+    ```
+    
+    **Parameters:**
+    - `url`: Target URL to screenshot
+    - `screenshot_wait_for`: Seconds to wait before capture (default: 0)
+    - `output_path`: Optional path to save screenshot file
+    
+    **Response (with output_path):**
+    ```json
+    {
+        "url": "https://example.com",
+        "screenshot": "/absolute/path/to/screenshot.png",
+        "success": true
+    }
+    ```
+    
+    **Response (without output_path):**
+    ```json
+    {
+        "url": "https://example.com",
+        "screenshot": "iVBORw0KGgoAAAANS...",
+        "success": true
+    }
+    ```
+    
+    **Usage:**
+    ```python
+    # Save to file
+    response = requests.post(
+        "http://localhost:11235/screenshot",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "url": "https://example.com",
+            "output_path": "./screenshot.png"
+        }
+    )
+    print(response.json()["screenshot"])  # File path
+    
+    # Get base64 data
+    response = requests.post(
+        "http://localhost:11235/screenshot",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"url": "https://example.com"}
+    )
+    import base64
+    screenshot_data = base64.b64decode(response.json()["screenshot"])
+    with open("screenshot.png", "wb") as f:
+        f.write(screenshot_data)
+    ```
+    
+    **Notes:**
+    - Captures full page (scrolls to bottom)
+    - Returns base64 PNG data if no output_path specified
+    - Saves to file and returns path if output_path provided
+    - Wait time helps ensure dynamic content is loaded
     """
     try:
         cfg = CrawlerRunConfig(
@@ -374,7 +717,12 @@ async def generate_screenshot(
 # PDF endpoint
 
 
-@app.post("/pdf")
+@app.post("/pdf",
+    summary="Generate PDF",
+    description="Generate a PDF document from a URL.",
+    response_description="PDF data (base64 or file path)",
+    tags=["Content Extraction"]
+)
 @limiter.limit(config["rate_limiting"]["default_limit"])
 @mcp_tool("pdf")
 async def generate_pdf(
@@ -383,9 +731,69 @@ async def generate_pdf(
     _td: Dict = Depends(token_dep),
 ):
     """
-    Generate a PDF document of the specified URL,
-    Use when you need a printable or archivable snapshot of the page. It is recommended to provide an output path to save the PDF.
-    Then in result instead of the PDF you will get a path to the saved file.
+    Generate a PDF document from a URL.
+    
+    This endpoint navigates to a URL and generates a PDF document of the page.
+    Useful for archiving, printing, or offline viewing.
+    
+    **Request Body:**
+    ```json
+    {
+        "url": "https://example.com",
+        "output_path": "/path/to/document.pdf"
+    }
+    ```
+    
+    **Parameters:**
+    - `url`: Target URL to convert to PDF
+    - `output_path`: Optional path to save PDF file
+    
+    **Response (with output_path):**
+    ```json
+    {
+        "success": true,
+        "path": "/absolute/path/to/document.pdf"
+    }
+    ```
+    
+    **Response (without output_path):**
+    ```json
+    {
+        "success": true,
+        "pdf": "JVBERi0xLjQKJeLjz9MKMy..."
+    }
+    ```
+    
+    **Usage:**
+    ```python
+    # Save to file
+    response = requests.post(
+        "http://localhost:11235/pdf",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "url": "https://example.com",
+            "output_path": "./document.pdf"
+        }
+    )
+    print(response.json()["path"])
+    
+    # Get base64 data
+    response = requests.post(
+        "http://localhost:11235/pdf",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"url": "https://example.com"}
+    )
+    import base64
+    pdf_data = base64.b64decode(response.json()["pdf"])
+    with open("document.pdf", "wb") as f:
+        f.write(pdf_data)
+    ```
+    
+    **Notes:**
+    - Generates printable PDF format
+    - Returns base64 PDF data if no output_path specified
+    - Saves to file and returns path if output_path provided
+    - Preserves page layout and styling
     """
     try:
         cfg = CrawlerRunConfig(pdf=True)
@@ -407,7 +815,12 @@ async def generate_pdf(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/execute_js")
+@app.post("/execute_js",
+    summary="Execute JavaScript",
+    description="Execute JavaScript code on a page and return the full crawl result.",
+    response_description="Complete CrawlResult with JS execution results",
+    tags=["Advanced"]
+)
 @limiter.limit(config["rate_limiting"]["default_limit"])
 @mcp_tool("execute_js")
 async def execute_js(
@@ -416,14 +829,78 @@ async def execute_js(
     _td: Dict = Depends(token_dep),
 ):
     """
-    Execute a sequence of JavaScript snippets on the specified URL.
-    Return the full CrawlResult JSON (first result).
-    Use this when you need to interact with dynamic pages using JS.
-    REMEMBER: Scripts accept a list of separated JS snippets to execute and execute them in order.
-    IMPORTANT: Each script should be an expression that returns a value. It can be an IIFE or an async function. You can think of it as such.
-        Your script will replace '{script}' and execute in the browser context. So provide either an IIFE or a sync/async function that returns a value.
-    Return Format:
-        - The return result is an instance of CrawlResult, so you have access to markdown, links, and other stuff. If this is enough, you don't need to call again for other endpoints.
+    Execute JavaScript code on a page and return the complete crawl result.
+    
+    This endpoint navigates to a URL and executes custom JavaScript code in the
+    browser context. Each script must be an expression that returns a value.
+    
+    **Request Body:**
+    ```json
+    {
+        "url": "https://example.com",
+        "scripts": [
+            "document.title",
+            "(async () => { await new Promise(r => setTimeout(r, 1000)); return document.body.innerText; })()"
+        ],
+        "wait_for": "css:.content"
+    }
+    ```
+    
+    **Parameters:**
+    - `url`: Target URL to execute scripts on
+    - `scripts`: List of JavaScript expressions to execute in order
+    - `wait_for`: Optional selector or condition to wait for
+    
+    **Script Format:**
+    Each script should be an expression that returns a value:
+    - Simple expression: `"document.title"`
+    - IIFE: `"(() => { return window.location.href; })()"`
+    - Async IIFE: `"(async () => { await fetch('/api'); return 'done'; })()"`
+    
+    **Response:**
+    Returns complete CrawlResult with:
+    ```json
+    {
+        "url": "https://example.com",
+        "html": "<html>...",
+        "markdown": "# Page Content...",
+        "js_execution_result": {
+            "0": "Example Domain",
+            "1": "This domain is for use in..."
+        },
+        "links": {...},
+        "media": {...},
+        "success": true
+    }
+    ```
+    
+    **Usage:**
+    ```python
+    response = requests.post(
+        "http://localhost:11235/execute_js",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "url": "https://example.com",
+            "scripts": [
+                "document.title",
+                "document.querySelectorAll('p').length"
+            ]
+        }
+    )
+    result = response.json()
+    print(result["js_execution_result"])  # {"0": "Example Domain", "1": 2}
+    print(result["markdown"])  # Full markdown content
+    ```
+    
+    **Notes:**
+    - Scripts execute in order
+    - Each script must return a value
+    - Returns full CrawlResult (no need to call other endpoints)
+    - Use for dynamic content, button clicks, form submissions
+    - Access results via js_execution_result dictionary (indexed by position)
+    
+    **Return Format:**
+    The return result is an instance of CrawlResult, so you have access to markdown, links, and other stuff. If this is enough, you don't need to call again for other endpoints.
 
         ```python
         class CrawlResult(BaseModel):
@@ -475,13 +952,67 @@ async def execute_js(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/llm/{url:path}")
+@app.get("/llm/{url:path}",
+    summary="LLM Q&A",
+    description="Ask questions about a webpage using LLM.",
+    response_description="Answer from LLM based on page content",
+    tags=["Advanced"]
+)
 async def llm_endpoint(
     request: Request,
-    url: str = Path(...),
-    q: str = Query(...),
+    url: str = Path(..., description="URL to analyze (can omit https://)"),
+    q: str = Query(..., description="Question to ask about the page"),
     _td: Dict = Depends(token_dep),
 ):
+    """
+    Ask questions about a webpage using an LLM.
+    
+    This endpoint crawls a page and uses an LLM to answer questions about
+    the content. Useful for extracting specific information or insights.
+    
+    **Request:**
+    ```
+    GET /llm/example.com?q=What is this page about?
+    ```
+    
+    **Parameters:**
+    - `url`: Target URL (path parameter, https:// is optional)
+    - `q`: Question to ask (query parameter)
+    
+    **Response:**
+    ```json
+    {
+        "answer": "This page is the official documentation for Example Domain..."
+    }
+    ```
+    
+    **Usage:**
+    ```python
+    import requests
+    from urllib.parse import quote
+    
+    url = "example.com"
+    question = "What is this page about?"
+    
+    response = requests.get(
+        f"http://localhost:11235/llm/{url}?q={quote(question)}",
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    print(response.json()["answer"])
+    ```
+    
+    ```bash
+    curl "http://localhost:11235/llm/example.com?q=What%20is%20this%20page%20about?" \\
+      -H "Authorization: Bearer YOUR_TOKEN"
+    ```
+    
+    **Notes:**
+    - Automatically crawls the page and extracts content
+    - Uses configured LLM to generate answers
+    - URL can omit https:// prefix
+    - URL-encode the query parameter
+    - Supports raw:// prefix for raw HTML
+    """
     if not q:
         raise HTTPException(400, "Query parameter 'q' is required")
     if not url.startswith(("http://", "https://")) and not url.startswith(
@@ -492,8 +1023,58 @@ async def llm_endpoint(
     return JSONResponse({"answer": answer})
 
 
-@app.get("/schema")
+@app.get("/schema",
+    summary="Get Configuration Schemas",
+    description="Get JSON schemas for BrowserConfig and CrawlerRunConfig.",
+    response_description="Configuration schemas",
+    tags=["Utility"]
+)
 async def get_schema():
+    """
+    Get JSON schemas for configuration objects.
+    
+    Returns the complete schemas for BrowserConfig and CrawlerRunConfig,
+    showing all available configuration options and their types.
+    
+    **Response:**
+    ```json
+    {
+        "browser": {
+            "type": "object",
+            "properties": {
+                "headless": {"type": "boolean", "default": true},
+                "verbose": {"type": "boolean", "default": false},
+                ...
+            }
+        },
+        "crawler": {
+            "type": "object",
+            "properties": {
+                "word_count_threshold": {"type": "integer", "default": 10},
+                "wait_for": {"type": "string"},
+                ...
+            }
+        }
+    }
+    ```
+    
+    **Usage:**
+    ```python
+    response = requests.get(
+        "http://localhost:11235/schema",
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    schemas = response.json()
+    print(schemas["browser"])  # BrowserConfig schema
+    print(schemas["crawler"])  # CrawlerRunConfig schema
+    ```
+    
+    **Notes:**
+    - No authentication required
+    - Shows all available configuration options
+    - Includes default values and types
+    - Useful for building configuration UIs
+    """
     from crawl4ai import BrowserConfig, CrawlerRunConfig
 
     return {"browser": BrowserConfig().dump(), "crawler": CrawlerRunConfig().dump()}
@@ -561,17 +1142,96 @@ def get_hook_example(hook_point: str) -> str:
     return examples.get(hook_point, "# Implement your hook logic here\nreturn page")
 
 
-@app.get(config["observability"]["health_check"]["endpoint"])
+@app.get(config["observability"]["health_check"]["endpoint"],
+    summary="Health Check",
+    description="Check if the API server is running and healthy.",
+    response_description="Health status with timestamp and version",
+    tags=["Utility"]
+)
 async def health():
+    """
+    Health check endpoint.
+    
+    Returns the current health status of the API server, including
+    timestamp and version information.
+    
+    **Response:**
+    ```json
+    {
+        "status": "ok",
+        "timestamp": 1704067200.0,
+        "version": "0.4.0"
+    }
+    ```
+    
+    **Usage:**
+    ```python
+    response = requests.get("http://localhost:11235/health")
+    print(response.json())
+    ```
+    
+    ```bash
+    curl http://localhost:11235/health
+    ```
+    
+    **Notes:**
+    - No authentication required
+    - Returns 200 OK if server is healthy
+    - Use for monitoring and load balancer checks
+    """
     return {"status": "ok", "timestamp": time.time(), "version": __version__}
 
 
-@app.get(config["observability"]["prometheus"]["endpoint"])
+@app.get(config["observability"]["prometheus"]["endpoint"],
+    summary="Prometheus Metrics",
+    description="Get Prometheus-formatted metrics for monitoring.",
+    response_description="Prometheus metrics",
+    tags=["Utility"]
+)
 async def metrics():
+    """
+    Get Prometheus metrics.
+    
+    Returns Prometheus-formatted metrics for monitoring API performance,
+    including request counts, latencies, and error rates.
+    
+    **Response:**
+    ```
+    # HELP http_requests_total Total HTTP requests
+    # TYPE http_requests_total counter
+    http_requests_total{method="POST",path="/crawl",status="200"} 42
+    
+    # HELP http_request_duration_seconds HTTP request latency
+    # TYPE http_request_duration_seconds histogram
+    http_request_duration_seconds_bucket{le="0.5"} 38
+    ...
+    ```
+    
+    **Usage:**
+    ```python
+    response = requests.get("http://localhost:11235/metrics")
+    print(response.text)
+    ```
+    
+    ```bash
+    curl http://localhost:11235/metrics
+    ```
+    
+    **Notes:**
+    - No authentication required
+    - Returns metrics in Prometheus exposition format
+    - Configure Prometheus to scrape this endpoint
+    - Includes request counts, latencies, and errors
+    """
     return RedirectResponse(config["observability"]["prometheus"]["endpoint"])
 
 
-@app.post("/crawl")
+@app.post("/crawl",
+    summary="Crawl URLs",
+    description="Main endpoint for crawling one or more URLs and extracting content.",
+    response_description="Crawl results with extracted content, metadata, and media",
+    tags=["Core Crawling"]
+)
 @limiter.limit(config["rate_limiting"]["default_limit"])
 @mcp_tool("crawl")
 async def crawl(
@@ -580,9 +1240,122 @@ async def crawl(
     _td: Dict = Depends(token_dep),
 ):
     """
-    Crawl a list of URLs and return the results as JSON.
-    For streaming responses, use /crawl/stream endpoint.
-    Supports optional user-provided hook functions for customization.
+    Crawl one or more URLs and extract content.
+    
+    This is the main crawling endpoint that fetches pages, extracts content, and returns
+    structured data including HTML, markdown, links, media, and metadata.
+    
+    **Request Body:**
+    ```json
+    {
+        "urls": ["https://example.com"],
+        "browser_config": {
+            "headless": true,
+            "viewport_width": 1920,
+            "viewport_height": 1080
+        },
+        "crawler_config": {
+            "word_count_threshold": 10,
+            "wait_until": "networkidle",
+            "screenshot": true,
+            "pdf": false
+        },
+        "dispatcher": "memory_adaptive",
+        "anti_bot_strategy": "stealth",
+        "proxy_rotation_strategy": "round_robin",
+        "proxies": ["http://proxy1:8080"]
+    }
+    ```
+    
+    **Response:**
+    ```json
+    {
+        "success": true,
+        "results": [
+            {
+                "url": "https://example.com",
+                "html": "<html>...</html>",
+                "markdown": "# Example Domain\\n\\nThis domain is...",
+                "cleaned_html": "<div>...</div>",
+                "screenshot": "base64_encoded_image",
+                "success": true,
+                "status_code": 200,
+                "metadata": {
+                    "title": "Example Domain",
+                    "description": "Example description"
+                },
+                "links": {
+                    "internal": ["https://example.com/about"],
+                    "external": ["https://other.com"]
+                },
+                "media": {
+                    "images": [{"src": "image.jpg", "alt": "Image"}]
+                }
+            }
+        ]
+    }
+    ```
+    
+    **Configuration Options:**
+    
+    *Browser Config:*
+    - `headless`: Run browser in headless mode (default: true)
+    - `viewport_width`: Browser width in pixels (default: 1920)
+    - `viewport_height`: Browser height in pixels (default: 1080)
+    - `user_agent`: Custom user agent string
+    - `java_script_enabled`: Enable JavaScript (default: true)
+    
+    *Crawler Config:*
+    - `word_count_threshold`: Minimum words per content block (default: 10)
+    - `wait_until`: Page load strategy ("networkidle", "domcontentloaded", "load")
+    - `wait_for`: CSS selector to wait for before extraction
+    - `screenshot`: Capture page screenshot (base64 encoded)
+    - `pdf`: Generate PDF export
+    - `remove_overlay_elements`: Remove popups/modals automatically
+    - `css_selector`: Extract only specific elements
+    - `js_code`: Execute custom JavaScript before extraction
+    
+    *Dispatcher Options:*
+    - `memory_adaptive`: Dynamic concurrency based on memory usage (recommended)
+    - `semaphore`: Fixed concurrency limit
+    
+    *Anti-Bot Strategies:*
+    - `stealth`: Basic stealth mode
+    - `undetected`: Maximum evasion techniques
+    
+    *Proxy Rotation:*
+    - `round_robin`: Sequential proxy rotation
+    - `random`: Random proxy selection
+    
+    **Usage Examples:**
+    
+    ```python
+    import requests
+    
+    response = requests.post(
+        "http://localhost:11235/crawl",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "urls": ["https://example.com"],
+            "browser_config": {"headless": True},
+            "crawler_config": {"screenshot": True},
+            "dispatcher": "memory_adaptive"
+        }
+    )
+    
+    data = response.json()
+    if data["success"]:
+        result = data["results"][0]
+        print(f"Title: {result['metadata']['title']}")
+        print(f"Content: {result['markdown'][:200]}...")
+    ```
+    
+    **Notes:**
+    - For streaming responses with real-time progress, use `/crawl/stream`
+    - Set `stream: true` in crawler_config to auto-redirect to streaming endpoint
+    - All URLs must start with http:// or https://
+    - Rate limiting applies (default: 100 requests/minute)
+    - Supports custom hooks for advanced processing
     """
     if not crawl_request.urls:
         raise HTTPException(400, "At least one URL required")
@@ -599,6 +1372,16 @@ async def crawl(
             "timeout": crawl_request.hooks.timeout,
         }
 
+    # Get dispatcher from app state
+    dispatcher_type = crawl_request.dispatcher.value if crawl_request.dispatcher else app.state.default_dispatcher_type
+    dispatcher = app.state.dispatchers.get(dispatcher_type)
+    
+    if not dispatcher:
+        raise HTTPException(
+            500, 
+            f"Dispatcher '{dispatcher_type}' not available. Available dispatchers: {list(app.state.dispatchers.keys())}"
+        )
+    
     results = await handle_crawl_request(
         urls=crawl_request.urls,
         browser_config=crawl_request.browser_config,
@@ -611,6 +1394,7 @@ async def crawl(
         proxies=crawl_request.proxies,
         proxy_failure_threshold=crawl_request.proxy_failure_threshold,
         proxy_recovery_time=crawl_request.proxy_recovery_time,
+        dispatcher=dispatcher,
     )
     # check if all of the results are not successful
     if all(not result["success"] for result in results["results"]):
@@ -620,13 +1404,109 @@ async def crawl(
     return JSONResponse(results)
 
 
-@app.post("/crawl/stream")
+@app.post("/crawl/stream",
+    summary="Crawl URLs with Streaming",
+    description="Stream crawl progress in real-time using Server-Sent Events (SSE).",
+    response_description="Server-Sent Events stream with progress updates and results",
+    tags=["Core Crawling"]
+)
 @limiter.limit(config["rate_limiting"]["default_limit"])
 async def crawl_stream(
     request: Request,
     crawl_request: CrawlRequestWithHooks,
     _td: Dict = Depends(token_dep),
 ):
+    """
+    Crawl URLs with real-time streaming progress updates.
+    
+    This endpoint returns Server-Sent Events (SSE) stream with real-time updates
+    about crawl progress, allowing you to monitor long-running crawl operations.
+    
+    **Request Body:**
+    Same as `/crawl` endpoint.
+    
+    **Response Stream:**
+    Server-Sent Events with the following event types:
+    
+    ```
+    data: {"type": "progress", "url": "https://example.com", "status": "started"}
+    
+    data: {"type": "progress", "url": "https://example.com", "status": "fetching"}
+    
+    data: {"type": "result", "url": "https://example.com", "data": {...}}
+    
+    data: {"type": "complete", "success": true, "total_urls": 1}
+    ```
+    
+    **Event Types:**
+    - `progress`: Crawl progress updates
+    - `result`: Individual URL result
+    - `complete`: All URLs processed
+    - `error`: Error occurred
+    
+    **Usage Examples:**
+    
+    *Python with requests:*
+    ```python
+    import requests
+    import json
+    
+    response = requests.post(
+        "http://localhost:11235/crawl/stream",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        },
+        json={"urls": ["https://example.com"]},
+        stream=True
+    )
+    
+    for line in response.iter_lines():
+        if line:
+            line = line.decode('utf-8')
+            if line.startswith('data: '):
+                data = json.loads(line[6:])
+                print(f"Event: {data.get('type')} - {data}")
+                
+                if data['type'] == 'complete':
+                    break
+    ```
+    
+    *JavaScript with EventSource:*
+    ```javascript
+    const eventSource = new EventSource('http://localhost:11235/crawl/stream');
+    
+    eventSource.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        console.log('Progress:', data);
+        
+        if (data.type === 'result') {
+            console.log('Got result for:', data.url);
+        }
+        
+        if (data.type === 'complete') {
+            eventSource.close();
+        }
+    };
+    
+    eventSource.onerror = (error) => {
+        console.error('Stream error:', error);
+        eventSource.close();
+    };
+    ```
+    
+    **Benefits:**
+    - Real-time progress monitoring
+    - Immediate feedback on each URL
+    - Better for long-running operations
+    - Can process results as they arrive
+    
+    **Notes:**
+    - Response uses `text/event-stream` content type
+    - Keep connection alive to receive all events
+    - Connection automatically closes after completion
+    - Use `/crawl` for simple batch operations without streaming
+    """
     if not crawl_request.urls:
         raise HTTPException(400, "At least one URL required")
 
@@ -642,6 +1522,16 @@ async def stream_process(crawl_request: CrawlRequestWithHooks):
             "timeout": crawl_request.hooks.timeout,
         }
 
+    # Get dispatcher from app state
+    dispatcher_type = crawl_request.dispatcher.value if crawl_request.dispatcher else app.state.default_dispatcher_type
+    dispatcher = app.state.dispatchers.get(dispatcher_type)
+    
+    if not dispatcher:
+        raise HTTPException(
+            500, 
+            f"Dispatcher '{dispatcher_type}' not available. Available dispatchers: {list(app.state.dispatchers.keys())}"
+        )
+
     crawler, gen, hooks_info = await handle_stream_crawl_request(
         urls=crawl_request.urls,
         browser_config=crawl_request.browser_config,
@@ -654,6 +1544,7 @@ async def stream_process(crawl_request: CrawlRequestWithHooks):
         proxies=crawl_request.proxies,
         proxy_failure_threshold=crawl_request.proxy_failure_threshold,
         proxy_recovery_time=crawl_request.proxy_recovery_time,
+        dispatcher=dispatcher,
     )
 
     # Add hooks info to response headers if available

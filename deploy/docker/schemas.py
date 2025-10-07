@@ -5,6 +5,49 @@ from pydantic import BaseModel, Field
 from utils import FilterType
 
 
+# ============================================================================
+# Dispatcher Schemas
+# ============================================================================
+
+class DispatcherType(str, Enum):
+    """Available dispatcher types for crawling."""
+    MEMORY_ADAPTIVE = "memory_adaptive"
+    SEMAPHORE = "semaphore"
+
+
+class DispatcherInfo(BaseModel):
+    """Information about a dispatcher type."""
+    type: DispatcherType
+    name: str
+    description: str
+    config: Dict[str, Any]
+    features: List[str]
+
+
+class DispatcherStatsResponse(BaseModel):
+    """Response model for dispatcher statistics."""
+    type: DispatcherType
+    active_sessions: int
+    config: Dict[str, Any]
+    stats: Optional[Dict[str, Any]] = Field(
+        None, 
+        description="Additional dispatcher-specific statistics"
+    )
+
+
+class DispatcherSelection(BaseModel):
+    """Model for selecting a dispatcher in crawl requests."""
+    dispatcher: Optional[DispatcherType] = Field(
+        None, 
+        description="Dispatcher type to use. Defaults to memory_adaptive if not specified."
+    )
+
+
+# ============================================================================
+# End Dispatcher Schemas
+# ============================================================================
+
+
 class CrawlRequest(BaseModel):
     urls: List[str] = Field(min_length=1, max_length=100)
     browser_config: Optional[Dict] = Field(default_factory=dict)
@@ -14,6 +57,12 @@ class CrawlRequest(BaseModel):
         Field("default", description="The anti-bot strategy to use for the crawl.")
     )
     headless: bool = Field(True, description="Run the browser in headless mode.")
+    
+    # Dispatcher selection
+    dispatcher: Optional[DispatcherType] = Field(
+        None, 
+        description="Dispatcher type to use for crawling. Defaults to memory_adaptive if not specified."
+    )
     
     # Proxy rotation configuration
     proxy_rotation_strategy: Optional[Literal["round_robin", "random", "least_used", "failure_aware"]] = Field(

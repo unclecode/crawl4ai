@@ -71,16 +71,86 @@ async def run_adaptive_digest(task_id: str, request: AdaptiveCrawlRequest):
 # --- API Endpoints ---
 
 
-@router.post("/job", response_model=AdaptiveJobStatus, status_code=202)
+@router.post("/job",
+    summary="Submit Adaptive Crawl Job",
+    description="Start a long-running adaptive crawling job that intelligently discovers relevant content.",
+    response_description="Job ID for status polling",
+    response_model=AdaptiveJobStatus,
+    status_code=202
+)
 async def submit_adaptive_digest_job(
     request: AdaptiveCrawlRequest,
     background_tasks: BackgroundTasks,
 ):
     """
     Submit a new adaptive crawling job.
-
-    This endpoint starts a long-running adaptive crawl in the background and
-    immediately returns a task ID for polling the job's status.
+    
+    This endpoint starts an intelligent, long-running crawl that automatically
+    discovers and extracts relevant content based on your query. Returns
+    immediately with a task ID for polling.
+    
+    **Request Body:**
+    ```json
+    {
+        "start_url": "https://example.com",
+        "query": "Find all product documentation",
+        "config": {
+            "max_depth": 3,
+            "max_pages": 50,
+            "confidence_threshold": 0.7,
+            "timeout": 300
+        }
+    }
+    ```
+    
+    **Parameters:**
+    - `start_url`: Starting URL for the crawl
+    - `query`: Natural language query describing what to find
+    - `config`: Optional adaptive configuration (max_depth, max_pages, etc.)
+    
+    **Response:**
+    ```json
+    {
+        "task_id": "550e8400-e29b-41d4-a716-446655440000",
+        "status": "PENDING",
+        "metrics": null,
+        "result": null,
+        "error": null
+    }
+    ```
+    
+    **Usage:**
+    ```python
+    # Submit job
+    response = requests.post(
+        "http://localhost:11235/adaptive/digest/job",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "start_url": "https://example.com",
+            "query": "Find all API documentation"
+        }
+    )
+    task_id = response.json()["task_id"]
+    
+    # Poll for results
+    while True:
+        status_response = requests.get(
+            f"http://localhost:11235/adaptive/digest/job/{task_id}",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        status = status_response.json()
+        if status["status"] in ["COMPLETED", "FAILED"]:
+            print(status["result"])
+            break
+        time.sleep(2)
+    ```
+    
+    **Notes:**
+    - Job runs in background, returns immediately
+    - Use task_id to poll status with GET /adaptive/digest/job/{task_id}
+    - Adaptive crawler intelligently follows links based on relevance
+    - Automatically stops when sufficient content found
+    - Returns HTTP 202 Accepted
     """
 
     print("Received adaptive crawl request:", request)
@@ -101,13 +171,93 @@ async def submit_adaptive_digest_job(
     return ADAPTIVE_JOBS[task_id]
 
 
-@router.get("/job/{task_id}", response_model=AdaptiveJobStatus)
+@router.get("/job/{task_id}",
+    summary="Get Adaptive Job Status",
+    description="Poll the status and results of an adaptive crawling job.",
+    response_description="Job status, metrics, and results",
+    response_model=AdaptiveJobStatus
+)
 async def get_adaptive_digest_status(task_id: str):
     """
     Get the status and result of an adaptive crawling job.
-
-    Poll this endpoint with the `task_id` returned from the submission
-    endpoint until the status is 'COMPLETED' or 'FAILED'.
+    
+    Poll this endpoint with the task_id returned from the submission endpoint
+    until the status is 'COMPLETED' or 'FAILED'.
+    
+    **Parameters:**
+    - `task_id`: Job ID from POST /adaptive/digest/job
+    
+    **Response (Running):**
+    ```json
+    {
+        "task_id": "550e8400-e29b-41d4-a716-446655440000",
+        "status": "RUNNING",
+        "metrics": {
+            "confidence": 0.45,
+            "pages_crawled": 15,
+            "relevant_pages": 8
+        },
+        "result": null,
+        "error": null
+    }
+    ```
+    
+    **Response (Completed):**
+    ```json
+    {
+        "task_id": "550e8400-e29b-41d4-a716-446655440000",
+        "status": "COMPLETED",
+        "metrics": {
+            "confidence": 0.85,
+            "pages_crawled": 42,
+            "relevant_pages": 28
+        },
+        "result": {
+            "confidence": 0.85,
+            "is_sufficient": true,
+            "coverage_stats": {...},
+            "relevant_content": [...]
+        },
+        "error": null
+    }
+    ```
+    
+    **Status Values:**
+    - `PENDING`: Job queued, not started yet
+    - `RUNNING`: Job actively crawling
+    - `COMPLETED`: Job finished successfully
+    - `FAILED`: Job encountered an error
+    
+    **Usage:**
+    ```python
+    import time
+    
+    # Poll until complete
+    while True:
+        response = requests.get(
+            f"http://localhost:11235/adaptive/digest/job/{task_id}",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        job = response.json()
+        
+        print(f"Status: {job['status']}")
+        if job['status'] == 'RUNNING':
+            print(f"Progress: {job['metrics']['pages_crawled']} pages")
+        elif job['status'] == 'COMPLETED':
+            print(f"Found {len(job['result']['relevant_content'])} relevant items")
+            break
+        elif job['status'] == 'FAILED':
+            print(f"Error: {job['error']}")
+            break
+        
+        time.sleep(2)
+    ```
+    
+    **Notes:**
+    - Poll every 1-5 seconds
+    - Metrics updated in real-time while running
+    - Returns 404 if task_id not found
+    - Results include top relevant content and statistics
     """
     job = ADAPTIVE_JOBS.get(task_id)
     if not job:

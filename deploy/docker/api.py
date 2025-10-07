@@ -600,6 +600,7 @@ async def handle_crawl_request(
     proxies: Optional[List[Dict[str, Any]]] = None,
     proxy_failure_threshold: int = 3,
     proxy_recovery_time: int = 300,
+    dispatcher = None,
 ) -> dict:
     """Handle non-streaming crawl requests with optional hooks."""
     start_mem_mb = _get_memory_mb()  # <--- Get memory before
@@ -636,16 +637,17 @@ async def handle_crawl_request(
         # Configure browser adapter based on anti_bot_strategy
         browser_adapter = _get_browser_adapter(anti_bot_strategy, browser_config)
 
-        # TODO: add support for other dispatchers
-
-        dispatcher = MemoryAdaptiveDispatcher(
-            memory_threshold_percent=config["crawler"]["memory_threshold_percent"],
-            rate_limiter=RateLimiter(
-                base_delay=tuple(config["crawler"]["rate_limiter"]["base_delay"])
+        # Use provided dispatcher or fallback to legacy behavior
+        if dispatcher is None:
+            # Legacy fallback: create MemoryAdaptiveDispatcher with old config
+            dispatcher = MemoryAdaptiveDispatcher(
+                memory_threshold_percent=config["crawler"]["memory_threshold_percent"],
+                rate_limiter=RateLimiter(
+                    base_delay=tuple(config["crawler"]["rate_limiter"]["base_delay"])
+                )
+                if config["crawler"]["rate_limiter"]["enabled"]
+                else None,
             )
-            if config["crawler"]["rate_limiter"]["enabled"]
-            else None,
-        )
 
         from crawler_pool import get_crawler
 
@@ -823,6 +825,7 @@ async def handle_stream_crawl_request(
     proxies: Optional[List[Dict[str, Any]]] = None,
     proxy_failure_threshold: int = 3,
     proxy_recovery_time: int = 300,
+    dispatcher = None,
 ) -> Tuple[AsyncWebCrawler, AsyncGenerator, Optional[Dict]]:
     """Handle streaming crawl requests with optional hooks."""
     hooks_info = None
@@ -851,12 +854,15 @@ async def handle_stream_crawl_request(
         # Configure browser adapter based on anti_bot_strategy
         browser_adapter = _get_browser_adapter(anti_bot_strategy, browser_config)
 
-        dispatcher = MemoryAdaptiveDispatcher(
-            memory_threshold_percent=config["crawler"]["memory_threshold_percent"],
-            rate_limiter=RateLimiter(
-                base_delay=tuple(config["crawler"]["rate_limiter"]["base_delay"])
-            ),
-        )
+        # Use provided dispatcher or fallback to legacy behavior
+        if dispatcher is None:
+            # Legacy fallback: create MemoryAdaptiveDispatcher with old config
+            dispatcher = MemoryAdaptiveDispatcher(
+                memory_threshold_percent=config["crawler"]["memory_threshold_percent"],
+                rate_limiter=RateLimiter(
+                    base_delay=tuple(config["crawler"]["rate_limiter"]["base_delay"])
+                ),
+            )
 
         from crawler_pool import get_crawler
 

@@ -8,6 +8,13 @@ from pathlib import Path
 from fastapi import Request
 from typing import Dict, Optional
 
+# Import dispatchers from crawl4ai
+from crawl4ai.async_dispatcher import (
+    BaseDispatcher,
+    MemoryAdaptiveDispatcher,
+    SemaphoreDispatcher,
+)
+
 class TaskStatus(str, Enum):
     PROCESSING = "processing"
     FAILED = "failed"
@@ -18,6 +25,124 @@ class FilterType(str, Enum):
     FIT = "fit"
     BM25 = "bm25"
     LLM = "llm"
+
+
+# ============================================================================
+# Dispatcher Configuration and Factory
+# ============================================================================
+
+# Default dispatcher configurations (hardcoded, no env variables)
+DISPATCHER_DEFAULTS = {
+    "memory_adaptive": {
+        "memory_threshold_percent": 70.0,
+        "critical_threshold_percent": 85.0,
+        "recovery_threshold_percent": 65.0,
+        "check_interval": 1.0,
+        "max_session_permit": 20,
+        "fairness_timeout": 600.0,
+        "memory_wait_timeout": 600.0,
+    },
+    "semaphore": {
+        "semaphore_count": 5,
+        "max_session_permit": 10,
+    }
+}
+
+DEFAULT_DISPATCHER_TYPE = "memory_adaptive"
+
+
+def create_dispatcher(dispatcher_type: str) -> BaseDispatcher:
+    """
+    Factory function to create dispatcher instances.
+    
+    Args:
+        dispatcher_type: Type of dispatcher to create ("memory_adaptive" or "semaphore")
+        
+    Returns:
+        BaseDispatcher instance
+        
+    Raises:
+        ValueError: If dispatcher type is unknown
+    """
+    dispatcher_type = dispatcher_type.lower()
+    
+    if dispatcher_type == "memory_adaptive":
+        config = DISPATCHER_DEFAULTS["memory_adaptive"]
+        return MemoryAdaptiveDispatcher(
+            memory_threshold_percent=config["memory_threshold_percent"],
+            critical_threshold_percent=config["critical_threshold_percent"],
+            recovery_threshold_percent=config["recovery_threshold_percent"],
+            check_interval=config["check_interval"],
+            max_session_permit=config["max_session_permit"],
+            fairness_timeout=config["fairness_timeout"],
+            memory_wait_timeout=config["memory_wait_timeout"],
+        )
+    elif dispatcher_type == "semaphore":
+        config = DISPATCHER_DEFAULTS["semaphore"]
+        return SemaphoreDispatcher(
+            semaphore_count=config["semaphore_count"],
+            max_session_permit=config["max_session_permit"],
+        )
+    else:
+        raise ValueError(f"Unknown dispatcher type: {dispatcher_type}")
+
+
+def get_dispatcher_config(dispatcher_type: str) -> Dict:
+    """
+    Get configuration for a dispatcher type.
+    
+    Args:
+        dispatcher_type: Type of dispatcher ("memory_adaptive" or "semaphore")
+        
+    Returns:
+        Dictionary containing dispatcher configuration
+        
+    Raises:
+        ValueError: If dispatcher type is unknown
+    """
+    dispatcher_type = dispatcher_type.lower()
+    if dispatcher_type not in DISPATCHER_DEFAULTS:
+        raise ValueError(f"Unknown dispatcher type: {dispatcher_type}")
+    return DISPATCHER_DEFAULTS[dispatcher_type].copy()
+
+
+def get_available_dispatchers() -> Dict[str, Dict]:
+    """
+    Get information about all available dispatchers.
+    
+    Returns:
+        Dictionary mapping dispatcher types to their metadata
+    """
+    return {
+        "memory_adaptive": {
+            "name": "Memory Adaptive Dispatcher",
+            "description": "Dynamically adjusts concurrency based on system memory usage. "
+                          "Monitors memory pressure and adapts crawl sessions accordingly.",
+            "config": DISPATCHER_DEFAULTS["memory_adaptive"],
+            "features": [
+                "Dynamic concurrency adjustment",
+                "Memory pressure monitoring",
+                "Automatic task requeuing under high memory",
+                "Fairness timeout for long-waiting URLs"
+            ]
+        },
+        "semaphore": {
+            "name": "Semaphore Dispatcher",
+            "description": "Fixed concurrency limit using semaphore-based control. "
+                          "Simple and predictable for controlled crawling.",
+            "config": DISPATCHER_DEFAULTS["semaphore"],
+            "features": [
+                "Fixed concurrency limit",
+                "Simple semaphore-based control",
+                "Predictable resource usage"
+            ]
+        }
+    }
+
+# ============================================================================
+# End Dispatcher Configuration
+# ============================================================================
+
 
 def load_config() -> Dict:
     """Load and return application configuration with environment variable overrides."""

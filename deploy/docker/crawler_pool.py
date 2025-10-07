@@ -56,14 +56,23 @@ async def get_crawler(
             if psutil.virtual_memory().percent >= MEM_LIMIT:
                 raise MemoryError("RAM pressure – new browser denied")
 
-            # Create strategy with the specified adapter
-            strategy = AsyncPlaywrightCrawlerStrategy(
-                browser_config=cfg, browser_adapter=adapter or PlaywrightAdapter()
-            )
-
+            # Create crawler - let it initialize the strategy with proper logger
+            # Pass browser_adapter as a kwarg so AsyncWebCrawler can use it when creating the strategy
             crawler = AsyncWebCrawler(
-                config=cfg, crawler_strategy=strategy, thread_safe=False
+                config=cfg, 
+                thread_safe=False
             )
+            
+            # Set the browser adapter on the strategy after crawler initialization
+            if adapter:
+                # Create a new strategy with the adapter and the crawler's logger
+                from crawl4ai.async_crawler_strategy import AsyncPlaywrightCrawlerStrategy
+                crawler.crawler_strategy = AsyncPlaywrightCrawlerStrategy(
+                    browser_config=cfg, 
+                    logger=crawler.logger,
+                    browser_adapter=adapter
+                )
+            
             await crawler.start()
             POOL[sig] = crawler
             LAST_USED[sig] = time.time()
