@@ -7,6 +7,7 @@ from typing import Optional, Dict, Any
 import json
 import hashlib
 import secrets
+import re
 from pathlib import Path
 from database import DatabaseManager
 from datetime import datetime, timedelta
@@ -57,6 +58,29 @@ def json_response(data, cache_time=3600):
             "X-Content-Type-Options": "nosniff"
         }
     )
+
+
+def to_int(value, default=0):
+    """Coerce incoming values to integers, falling back to default."""
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, (int, float)):
+        return int(value)
+
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return default
+
+        match = re.match(r"^-?\d+", stripped)
+        if match:
+            try:
+                return int(match.group())
+            except ValueError:
+                return default
+    return default
 
 # ============= PUBLIC ENDPOINTS =============
 
@@ -141,6 +165,8 @@ async def get_article(slug: str):
 async def get_categories():
     """Get all categories ordered by index"""
     categories = db.get_all('categories', limit=50)
+    for category in categories:
+        category['order_index'] = to_int(category.get('order_index'), 0)
     categories.sort(key=lambda x: x.get('order_index', 0))
     return json_response(categories, cache_time=7200)
 
@@ -360,6 +386,9 @@ async def delete_article(article_id: int):
 async def create_category(category_data: Dict[str, Any]):
     """Create new category"""
     try:
+        category_data = dict(category_data)
+        category_data['order_index'] = to_int(category_data.get('order_index'), 0)
+
         cursor = db.conn.cursor()
         columns = ', '.join(category_data.keys())
         placeholders = ', '.join(['?' for _ in category_data])
@@ -374,12 +403,28 @@ async def create_category(category_data: Dict[str, Any]):
 async def update_category(cat_id: int, category_data: Dict[str, Any]):
     """Update category"""
     try:
+        category_data = dict(category_data)
+        if 'order_index' in category_data:
+            category_data['order_index'] = to_int(category_data.get('order_index'), 0)
+
         set_clause = ', '.join([f"{k} = ?" for k in category_data.keys()])
         cursor = db.conn.cursor()
         cursor.execute(f"UPDATE categories SET {set_clause} WHERE id = ?",
                       list(category_data.values()) + [cat_id])
         db.conn.commit()
         return {"message": "Category updated"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.delete("/api/admin/categories/{cat_id}", dependencies=[Depends(verify_token)])
+async def delete_category(cat_id: int):
+    """Delete category"""
+    try:
+        cursor = db.conn.cursor()
+        cursor.execute("DELETE FROM categories WHERE id = ?", (cat_id,))
+        db.conn.commit()
+        return {"message": "Category deleted"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -408,6 +453,18 @@ async def update_sponsor(sponsor_id: int, sponsor_data: Dict[str, Any]):
                       list(sponsor_data.values()) + [sponsor_id])
         db.conn.commit()
         return {"message": "Sponsor updated"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.delete("/api/admin/sponsors/{sponsor_id}", dependencies=[Depends(verify_token)])
+async def delete_sponsor(sponsor_id: int):
+    """Delete sponsor"""
+    try:
+        cursor = db.conn.cursor()
+        cursor.execute("DELETE FROM sponsors WHERE id = ?", (sponsor_id,))
+        db.conn.commit()
+        return {"message": "Sponsor deleted"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

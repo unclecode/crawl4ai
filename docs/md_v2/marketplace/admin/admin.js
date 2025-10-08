@@ -1,10 +1,38 @@
 // Admin Dashboard - Smart & Powerful
 const { API_BASE, API_ORIGIN } = (() => {
-    const { hostname, port } = window.location;
-    if ((hostname === 'localhost' || hostname === '127.0.0.1') && port === '8000') {
-        const origin = 'http://127.0.0.1:8100';
-        return { API_BASE: `${origin}/api`, API_ORIGIN: origin };
+    const cleanOrigin = (value) => value ? value.replace(/\/$/, '') : '';
+    const params = new URLSearchParams(window.location.search);
+    const overrideParam = cleanOrigin(params.get('api_origin'));
+
+    let storedOverride = '';
+    try {
+        storedOverride = cleanOrigin(localStorage.getItem('marketplace_api_origin'));
+    } catch (error) {
+        storedOverride = '';
     }
+
+    let origin = overrideParam || storedOverride;
+
+    if (overrideParam && overrideParam !== storedOverride) {
+        try {
+            localStorage.setItem('marketplace_api_origin', overrideParam);
+        } catch (error) {
+            // ignore storage errors (private mode, etc.)
+        }
+    }
+
+    const { protocol, hostname, port } = window.location;
+    const isLocalHost = ['localhost', '127.0.0.1', '0.0.0.0'].includes(hostname);
+
+    if (!origin && isLocalHost && port !== '8100') {
+        origin = `${protocol}//127.0.0.1:8100`;
+    }
+
+    if (origin) {
+        const normalized = cleanOrigin(origin);
+        return { API_BASE: `${normalized}/api`, API_ORIGIN: normalized };
+    }
+
     return { API_BASE: '/api', API_ORIGIN: '' };
 })();
 
@@ -185,7 +213,9 @@ class AdminDashboard {
     }
 
     async loadStats() {
-        const stats = await this.apiCall('/admin/stats');
+        const stats = await this.apiCall(`/admin/stats?_=${Date.now()}`, {
+            cache: 'no-store'
+        });
 
         document.getElementById('stat-apps').textContent = stats.apps.total;
         document.getElementById('stat-featured').textContent = stats.apps.featured;
@@ -196,17 +226,24 @@ class AdminDashboard {
     }
 
     async loadApps() {
-        this.data.apps = await this.apiCall('/apps?limit=100');
+        this.data.apps = await this.apiCall(`/apps?limit=100&_=${Date.now()}`, {
+            cache: 'no-store'
+        });
         this.renderAppsTable(this.data.apps);
     }
 
     async loadArticles() {
-        this.data.articles = await this.apiCall('/articles?limit=100');
+        this.data.articles = await this.apiCall(`/articles?limit=100&_=${Date.now()}`, {
+            cache: 'no-store'
+        });
         this.renderArticlesTable(this.data.articles);
     }
 
     async loadCategories() {
-        this.data.categories = await this.apiCall('/categories');
+        const cacheBuster = Date.now();
+        this.data.categories = await this.apiCall(`/categories?_=${cacheBuster}`, {
+            cache: 'no-store'
+        });
         this.renderCategoriesTable(this.data.categories);
     }
 
@@ -664,8 +701,10 @@ class AdminDashboard {
             data.description = document.getElementById('form-description').value;
             data.category = document.getElementById('form-category').value;
             data.type = document.getElementById('form-type').value;
-            data.rating = parseFloat(document.getElementById('form-rating').value);
-            data.downloads = parseInt(document.getElementById('form-downloads').value);
+            const rating = parseFloat(document.getElementById('form-rating').value);
+            const downloads = parseInt(document.getElementById('form-downloads').value, 10);
+            data.rating = Number.isFinite(rating) ? rating : 0;
+            data.downloads = Number.isFinite(downloads) ? downloads : 0;
             data.image = document.getElementById('form-image').value;
             data.website_url = document.getElementById('form-website').value;
             data.github_url = document.getElementById('form-github').value;
@@ -686,7 +725,8 @@ class AdminDashboard {
             data.slug = this.generateSlug(data.name);
             data.icon = document.getElementById('form-icon').value;
             data.description = document.getElementById('form-description').value;
-            data.order_index = parseInt(document.getElementById('form-order').value);
+            const orderIndex = parseInt(document.getElementById('form-order').value, 10);
+            data.order_index = Number.isFinite(orderIndex) ? orderIndex : 0;
         } else if (type === 'sponsors') {
             data.company_name = document.getElementById('form-name').value;
             data.logo_url = document.getElementById('form-logo-url').value;
