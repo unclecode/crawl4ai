@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Query, Depends, Body, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, Query, Depends, Body, UploadFile, File, Form, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 from config import Config
 
 app = FastAPI(title="Crawl4AI Marketplace API")
+router = APIRouter(prefix="/marketplace/api")
 
 # Security setup
 security = HTTPBearer()
@@ -84,7 +85,7 @@ def to_int(value, default=0):
 
 # ============= PUBLIC ENDPOINTS =============
 
-@app.get("/api/apps")
+@router.get("/apps")
 async def get_apps(
     category: Optional[str] = None,
     type: Optional[str] = None,
@@ -114,7 +115,7 @@ async def get_apps(
 
     return json_response(apps)
 
-@app.get("/api/apps/{slug}")
+@router.get("/apps/{slug}")
 async def get_app(slug: str):
     """Get single app by slug"""
     apps = db.get_all('apps', where=f"slug = '{slug}'", limit=1)
@@ -127,7 +128,7 @@ async def get_app(slug: str):
 
     return json_response(app)
 
-@app.get("/api/articles")
+@router.get("/articles")
 async def get_articles(
     category: Optional[str] = None,
     limit: int = Query(default=20, le=10000),
@@ -146,7 +147,7 @@ async def get_articles(
 
     return json_response(articles)
 
-@app.get("/api/articles/{slug}")
+@router.get("/articles/{slug}")
 async def get_article(slug: str):
     """Get single article by slug"""
     articles = db.get_all('articles', where=f"slug = '{slug}'", limit=1)
@@ -161,7 +162,7 @@ async def get_article(slug: str):
 
     return json_response(article)
 
-@app.get("/api/categories")
+@router.get("/categories")
 async def get_categories():
     """Get all categories ordered by index"""
     categories = db.get_all('categories', limit=50)
@@ -170,7 +171,7 @@ async def get_categories():
     categories.sort(key=lambda x: x.get('order_index', 0))
     return json_response(categories, cache_time=7200)
 
-@app.get("/api/sponsors")
+@router.get("/sponsors")
 async def get_sponsors(active: Optional[bool] = True):
     """Get sponsors, default active only"""
     where = f"active = {1 if active else 0}" if active is not None else None
@@ -185,7 +186,7 @@ async def get_sponsors(active: Optional[bool] = True):
 
     return json_response(sponsors)
 
-@app.get("/api/search")
+@router.get("/search")
 async def search(q: str = Query(min_length=2)):
     """Search across apps and articles"""
     if len(q) < 2:
@@ -206,7 +207,7 @@ async def search(q: str = Query(min_length=2)):
 
     return json_response(results, cache_time=1800)
 
-@app.get("/api/stats")
+@router.get("/stats")
 async def get_stats():
     """Get marketplace statistics"""
     stats = {
@@ -227,7 +228,7 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     return token
 
 
-@app.post("/api/admin/upload-image", dependencies=[Depends(verify_token)])
+@router.post("/admin/upload-image", dependencies=[Depends(verify_token)])
 async def upload_image(file: UploadFile = File(...), folder: str = Form("sponsors")):
     """Upload image files for admin assets"""
     folder = (folder or "").strip().lower()
@@ -251,7 +252,7 @@ async def upload_image(file: UploadFile = File(...), folder: str = Form("sponsor
 
     return {"url": f"/uploads/{folder}/{filename}"}
 
-@app.post("/api/admin/login")
+@router.post("/admin/login")
 async def admin_login(password: str = Body(..., embed=True)):
     """Admin login with password"""
     provided_hash = hashlib.sha256(password.encode()).hexdigest()
@@ -272,7 +273,7 @@ async def admin_login(password: str = Body(..., embed=True)):
 
 # ============= ADMIN ENDPOINTS =============
 
-@app.get("/api/admin/stats", dependencies=[Depends(verify_token)])
+@router.get("/admin/stats", dependencies=[Depends(verify_token)])
 async def get_admin_stats():
     """Get detailed admin statistics"""
     stats = {
@@ -292,7 +293,7 @@ async def get_admin_stats():
     return stats
 
 # Apps CRUD
-@app.post("/api/admin/apps", dependencies=[Depends(verify_token)])
+@router.post("/admin/apps", dependencies=[Depends(verify_token)])
 async def create_app(app_data: Dict[str, Any]):
     """Create new app"""
     try:
@@ -311,7 +312,7 @@ async def create_app(app_data: Dict[str, Any]):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.put("/api/admin/apps/{app_id}", dependencies=[Depends(verify_token)])
+@router.put("/admin/apps/{app_id}", dependencies=[Depends(verify_token)])
 async def update_app(app_id: int, app_data: Dict[str, Any]):
     """Update app"""
     try:
@@ -329,7 +330,7 @@ async def update_app(app_id: int, app_data: Dict[str, Any]):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.delete("/api/admin/apps/{app_id}", dependencies=[Depends(verify_token)])
+@router.delete("/admin/apps/{app_id}", dependencies=[Depends(verify_token)])
 async def delete_app(app_id: int):
     """Delete app"""
     cursor = db.conn.cursor()
@@ -338,7 +339,7 @@ async def delete_app(app_id: int):
     return {"message": "App deleted"}
 
 # Articles CRUD
-@app.post("/api/admin/articles", dependencies=[Depends(verify_token)])
+@router.post("/admin/articles", dependencies=[Depends(verify_token)])
 async def create_article(article_data: Dict[str, Any]):
     """Create new article"""
     try:
@@ -356,7 +357,7 @@ async def create_article(article_data: Dict[str, Any]):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.put("/api/admin/articles/{article_id}", dependencies=[Depends(verify_token)])
+@router.put("/admin/articles/{article_id}", dependencies=[Depends(verify_token)])
 async def update_article(article_id: int, article_data: Dict[str, Any]):
     """Update article"""
     try:
@@ -373,7 +374,7 @@ async def update_article(article_id: int, article_data: Dict[str, Any]):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.delete("/api/admin/articles/{article_id}", dependencies=[Depends(verify_token)])
+@router.delete("/admin/articles/{article_id}", dependencies=[Depends(verify_token)])
 async def delete_article(article_id: int):
     """Delete article"""
     cursor = db.conn.cursor()
@@ -382,7 +383,7 @@ async def delete_article(article_id: int):
     return {"message": "Article deleted"}
 
 # Categories CRUD
-@app.post("/api/admin/categories", dependencies=[Depends(verify_token)])
+@router.post("/admin/categories", dependencies=[Depends(verify_token)])
 async def create_category(category_data: Dict[str, Any]):
     """Create new category"""
     try:
@@ -399,7 +400,7 @@ async def create_category(category_data: Dict[str, Any]):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.put("/api/admin/categories/{cat_id}", dependencies=[Depends(verify_token)])
+@router.put("/admin/categories/{cat_id}", dependencies=[Depends(verify_token)])
 async def update_category(cat_id: int, category_data: Dict[str, Any]):
     """Update category"""
     try:
@@ -417,7 +418,7 @@ async def update_category(cat_id: int, category_data: Dict[str, Any]):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@app.delete("/api/admin/categories/{cat_id}", dependencies=[Depends(verify_token)])
+@router.delete("/admin/categories/{cat_id}", dependencies=[Depends(verify_token)])
 async def delete_category(cat_id: int):
     """Delete category"""
     try:
@@ -429,7 +430,7 @@ async def delete_category(cat_id: int):
         raise HTTPException(status_code=400, detail=str(e))
 
 # Sponsors CRUD
-@app.post("/api/admin/sponsors", dependencies=[Depends(verify_token)])
+@router.post("/admin/sponsors", dependencies=[Depends(verify_token)])
 async def create_sponsor(sponsor_data: Dict[str, Any]):
     """Create new sponsor"""
     try:
@@ -443,7 +444,7 @@ async def create_sponsor(sponsor_data: Dict[str, Any]):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.put("/api/admin/sponsors/{sponsor_id}", dependencies=[Depends(verify_token)])
+@router.put("/admin/sponsors/{sponsor_id}", dependencies=[Depends(verify_token)])
 async def update_sponsor(sponsor_id: int, sponsor_data: Dict[str, Any]):
     """Update sponsor"""
     try:
@@ -457,7 +458,7 @@ async def update_sponsor(sponsor_id: int, sponsor_data: Dict[str, Any]):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@app.delete("/api/admin/sponsors/{sponsor_id}", dependencies=[Depends(verify_token)])
+@router.delete("/admin/sponsors/{sponsor_id}", dependencies=[Depends(verify_token)])
 async def delete_sponsor(sponsor_id: int):
     """Delete sponsor"""
     try:
@@ -468,6 +469,9 @@ async def delete_sponsor(sponsor_id: int):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+app.include_router(router)
+
+
 @app.get("/")
 async def root():
     """API info"""
@@ -475,12 +479,12 @@ async def root():
         "name": "Crawl4AI Marketplace API",
         "version": "1.0.0",
         "endpoints": [
-            "/api/apps",
-            "/api/articles",
-            "/api/categories",
-            "/api/sponsors",
-            "/api/search?q=query",
-            "/api/stats"
+            "/marketplace/api/apps",
+            "/marketplace/api/articles",
+            "/marketplace/api/categories",
+            "/marketplace/api/sponsors",
+            "/marketplace/api/search?q=query",
+            "/marketplace/api/stats"
         ]
     }
 

@@ -30,10 +30,10 @@ const { API_BASE, API_ORIGIN } = (() => {
 
     if (origin) {
         const normalized = cleanOrigin(origin);
-        return { API_BASE: `${normalized}/api`, API_ORIGIN: normalized };
+        return { API_BASE: `${normalized}/marketplace/api`, API_ORIGIN: normalized };
     }
 
-    return { API_BASE: '/api', API_ORIGIN: '' };
+    return { API_BASE: '/marketplace/api', API_ORIGIN: '' };
 })();
 
 const resolveAssetUrl = (path) => {

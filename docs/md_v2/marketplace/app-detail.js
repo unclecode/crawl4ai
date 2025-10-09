@@ -1,5 +1,5 @@
 // App Detail Page JavaScript
-const API_BASE = '/api';
+const API_BASE = '/marketplace/api';
 
 class AppDetailPage {
     constructor() {

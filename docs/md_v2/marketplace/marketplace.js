@@ -3,9 +3,9 @@ const { API_BASE, API_ORIGIN } = (() => {
     const { hostname, port } = window.location;
     if ((hostname === 'localhost' || hostname === '127.0.0.1') && port === '8000') {
         const origin = 'http://127.0.0.1:8100';
-        return { API_BASE: `${origin}/api`, API_ORIGIN: origin };
+        return { API_BASE: `${origin}/marketplace/api`, API_ORIGIN: origin };
     }
-    return { API_BASE: '/api', API_ORIGIN: '' };
+    return { API_BASE: '/marketplace/api', API_ORIGIN: '' };
 })();
 
 const resolveAssetUrl = (path) => {

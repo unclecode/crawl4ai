@@ -1,5 +1,5 @@
 // Marketplace JS - Magazine Layout
-const API_BASE = '/api';
+const API_BASE = '/marketplace/api';
 const CACHE_TTL = 3600000; // 1 hour in ms
 
 class MarketplaceCache {
