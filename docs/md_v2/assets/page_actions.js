@@ -7,8 +7,11 @@ document.addEventListener('DOMContentLoaded', () => {
         githubRepo: 'unclecode/crawl4ai',
         githubBranch: 'main',
         docsPath: 'docs/md_v2',
-        excludePaths: ['/apps/c4a-script/', '/apps/llmtxt/', '/apps/crawl4ai-assistant/'], // Don't show on app pages
+        excludePaths: ['/apps/c4a-script/', '/apps/llmtxt/', '/apps/crawl4ai-assistant/', '/core/ask-ai/'], // Don't show on app pages
     };
+
+    let cachedMarkdown = null;
+    let cachedMarkdownPath = null;
 
     // Check if we should show the button on this page
     function shouldShowButton() {
@@ -16,6 +19,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Don't show on homepage
         if (currentPath === '/' || currentPath === '/index.html') {
+            return false;
+        }
+
+        // Don't show on 404 pages
+        if (document.title && document.title.toLowerCase().includes('404')) {
+            return false;
+        }
+
+        // Require mkdocs main content container
+        const mainContent = document.getElementById('terminal-mkdocs-main-content');
+        if (!mainContent) {
             return false;
         }
 
@@ -51,6 +65,56 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Add .md extension
         return `${path}.md`;
+    }
+
+    async function loadMarkdownContent() {
+        const mdPath = getCurrentMarkdownPath();
+
+        if (!mdPath) {
+            throw new Error('Invalid markdown path');
+        }
+
+        const rawUrl = getGithubRawUrl();
+        const response = await fetch(rawUrl);
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch markdown: ${response.status}`);
+        }
+
+        const markdown = await response.text();
+        cachedMarkdown = markdown;
+        cachedMarkdownPath = mdPath;
+        return markdown;
+    }
+
+    async function ensureMarkdownCached() {
+        const mdPath = getCurrentMarkdownPath();
+
+        if (!mdPath) {
+            return false;
+        }
+
+        if (cachedMarkdown && cachedMarkdownPath === mdPath) {
+            return true;
+        }
+
+        try {
+            await loadMarkdownContent();
+            return true;
+        } catch (error) {
+            console.warn('Page Actions: Markdown not available for this page.', error);
+            cachedMarkdown = null;
+            cachedMarkdownPath = null;
+            return false;
+        }
+    }
+
+    async function getMarkdownContent() {
+        const available = await ensureMarkdownCached();
+        if (!available) {
+            throw new Error('Markdown not available for this page.');
+        }
+        return cachedMarkdown;
     }
 
     // Get GitHub raw URL for current page
@@ -112,13 +176,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 </li>
                 <div class="page-actions-divider"></div>
                 <li class="page-action-item">
-                    <a href="#" class="page-action-link disabled" id="action-ask-ai" role="menuitem">
+                    <a href="#" class="page-action-link page-action-external" id="action-open-chatgpt" role="menuitem">
                         <span class="page-action-icon icon-ai"></span>
                         <span class="page-action-text">
-                            <span class="page-action-label">Ask AI about page</span>
-                            <span class="page-action-description">
-                                <span class="page-action-badge">Coming Soon</span>
-                            </span>
+                            <span class="page-action-label">Open in ChatGPT</span>
+                            <span class="page-action-description">Ask questions about this page</span>
                         </span>
                     </a>
                 </li>
@@ -180,19 +242,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Copy markdown to clipboard
     async function copyMarkdownToClipboard(link) {
-        const rawUrl = getGithubRawUrl();
-
         // Add loading state
         link.classList.add('loading');
 
         try {
-            const response = await fetch(rawUrl);
-
-            if (!response.ok) {
-                throw new Error(`Failed to fetch markdown: ${response.status}`);
-            }
-
-            const markdown = await response.text();
+            const markdown = await getMarkdownContent();
 
             // Copy to clipboard
             await navigator.clipboard.writeText(markdown);
@@ -221,126 +275,153 @@ document.addEventListener('DOMContentLoaded', () => {
         window.open(githubUrl, '_blank', 'noopener,noreferrer');
     }
 
-    // Initialize
-    const { button, dropdown, overlay } = createPageActionsUI();
+    function getCurrentPageUrl() {
+        const { href } = window.location;
+        return href.split('#')[0];
+    }
 
-    // Event listeners
-    button.addEventListener('click', (e) => {
-        e.stopPropagation();
-        toggleDropdown(button, dropdown, overlay);
-    });
+    function openChatGPT() {
+        const pageUrl = getCurrentPageUrl();
+        const prompt = encodeURIComponent(`Read ${pageUrl} so I can ask questions about it.`);
+        const chatUrl = `https://chatgpt.com/?hint=search&prompt=${prompt}`;
+        window.open(chatUrl, '_blank', 'noopener,noreferrer');
+    }
 
-    overlay.addEventListener('click', () => {
-        closeDropdown(button, dropdown, overlay);
-    });
-
-    // Copy markdown action
-    document.getElementById('action-copy-markdown').addEventListener('click', async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        await copyMarkdownToClipboard(e.currentTarget);
-    });
-
-    // View markdown action
-    document.getElementById('action-view-markdown').addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        viewMarkdown();
-        closeDropdown(button, dropdown, overlay);
-    });
-
-    // Ask AI action (disabled for now)
-    document.getElementById('action-ask-ai').addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        // Future: Integrate with Ask AI feature
-        // For now, do nothing (disabled state)
-    });
-
-    // Close on ESC key
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && dropdown.classList.contains('active')) {
-            closeDropdown(button, dropdown, overlay);
+    (async () => {
+        if (!shouldShowButton()) {
+            return;
         }
-    });
 
-    // Close when clicking outside
-    document.addEventListener('click', (e) => {
-        if (!dropdown.contains(e.target) && !button.contains(e.target)) {
-            closeDropdown(button, dropdown, overlay);
+        const markdownAvailable = await ensureMarkdownCached();
+        if (!markdownAvailable) {
+            return;
         }
-    });
 
-    // Prevent dropdown from closing when clicking inside
-    dropdown.addEventListener('click', (e) => {
-        // Only stop propagation if not clicking on a link
-        if (!e.target.closest('.page-action-link')) {
+        const ui = createPageActionsUI();
+        if (!ui) {
+            return;
+        }
+
+        const { button, dropdown, overlay } = ui;
+
+        // Event listeners
+        button.addEventListener('click', (e) => {
             e.stopPropagation();
-        }
-    });
-
-    // Close dropdown on link click (except for copy which handles itself)
-    dropdown.querySelectorAll('.page-action-link:not(#action-copy-markdown)').forEach(link => {
-        link.addEventListener('click', () => {
-            if (!link.classList.contains('disabled')) {
-                setTimeout(() => {
-                    closeDropdown(button, dropdown, overlay);
-                }, 100);
-            }
+            toggleDropdown(button, dropdown, overlay);
         });
-    });
 
-    // Handle window resize
-    let resizeTimer;
-    window.addEventListener('resize', () => {
-        clearTimeout(resizeTimer);
-        resizeTimer = setTimeout(() => {
-            // Close dropdown on resize to prevent positioning issues
-            if (dropdown.classList.contains('active')) {
+        overlay.addEventListener('click', () => {
+            closeDropdown(button, dropdown, overlay);
+        });
+
+        // Copy markdown action
+        document.getElementById('action-copy-markdown').addEventListener('click', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            await copyMarkdownToClipboard(e.currentTarget);
+        });
+
+        // View markdown action
+        document.getElementById('action-view-markdown').addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            viewMarkdown();
+            closeDropdown(button, dropdown, overlay);
+        });
+
+        // Open in ChatGPT action
+        document.getElementById('action-open-chatgpt').addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            openChatGPT();
+            closeDropdown(button, dropdown, overlay);
+        });
+
+        // Close on ESC key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && dropdown.classList.contains('active')) {
                 closeDropdown(button, dropdown, overlay);
             }
-        }, 250);
-    });
+        });
 
-    // Accessibility: Focus management
-    button.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            toggleDropdown(button, dropdown, overlay);
+        // Close when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!dropdown.contains(e.target) && !button.contains(e.target)) {
+                closeDropdown(button, dropdown, overlay);
+            }
+        });
 
-            // Focus first menu item when opening
-            if (dropdown.classList.contains('active')) {
-                const firstLink = dropdown.querySelector('.page-action-link:not(.disabled)');
-                if (firstLink) {
-                    setTimeout(() => firstLink.focus(), 100);
+        // Prevent dropdown from closing when clicking inside
+        dropdown.addEventListener('click', (e) => {
+            // Only stop propagation if not clicking on a link
+            if (!e.target.closest('.page-action-link')) {
+                e.stopPropagation();
+            }
+        });
+
+        // Close dropdown on link click (except for copy which handles itself)
+        dropdown.querySelectorAll('.page-action-link:not(#action-copy-markdown)').forEach(link => {
+            link.addEventListener('click', () => {
+                if (!link.classList.contains('disabled')) {
+                    setTimeout(() => {
+                        closeDropdown(button, dropdown, overlay);
+                    }, 100);
+                }
+            });
+        });
+
+        // Handle window resize
+        let resizeTimer;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                // Close dropdown on resize to prevent positioning issues
+                if (dropdown.classList.contains('active')) {
+                    closeDropdown(button, dropdown, overlay);
+                }
+            }, 250);
+        });
+
+        // Accessibility: Focus management
+        button.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                toggleDropdown(button, dropdown, overlay);
+
+                // Focus first menu item when opening
+                if (dropdown.classList.contains('active')) {
+                    const firstLink = dropdown.querySelector('.page-action-link:not(.disabled)');
+                    if (firstLink) {
+                        setTimeout(() => firstLink.focus(), 100);
+                    }
                 }
             }
-        }
-    });
+        });
 
-    // Arrow key navigation within menu
-    dropdown.addEventListener('keydown', (e) => {
-        if (!dropdown.classList.contains('active')) return;
+        // Arrow key navigation within menu
+        dropdown.addEventListener('keydown', (e) => {
+            if (!dropdown.classList.contains('active')) return;
 
-        const links = Array.from(dropdown.querySelectorAll('.page-action-link:not(.disabled)'));
-        const currentIndex = links.indexOf(document.activeElement);
+            const links = Array.from(dropdown.querySelectorAll('.page-action-link:not(.disabled)'));
+            const currentIndex = links.indexOf(document.activeElement);
 
-        if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            const nextIndex = (currentIndex + 1) % links.length;
-            links[nextIndex].focus();
-        } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            const prevIndex = (currentIndex - 1 + links.length) % links.length;
-            links[prevIndex].focus();
-        } else if (e.key === 'Home') {
-            e.preventDefault();
-            links[0].focus();
-        } else if (e.key === 'End') {
-            e.preventDefault();
-            links[links.length - 1].focus();
-        }
-    });
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                const nextIndex = (currentIndex + 1) % links.length;
+                links[nextIndex].focus();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                const prevIndex = (currentIndex - 1 + links.length) % links.length;
+                links[prevIndex].focus();
+            } else if (e.key === 'Home') {
+                e.preventDefault();
+                links[0].focus();
+            } else if (e.key === 'End') {
+                e.preventDefault();
+                links[links.length - 1].focus();
+            }
+        });
 
-    console.log('Page Actions initialized for:', getCurrentMarkdownPath());
+        console.log('Page Actions initialized for:', getCurrentMarkdownPath());
+    })();
 });

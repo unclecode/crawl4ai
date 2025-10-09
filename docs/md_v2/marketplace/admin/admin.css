@@ -431,6 +431,16 @@
     gap: 0.5rem;
 }
 
+.table-logo {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    border-radius: 6px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    padding: 4px;
+}
+
 .btn-edit, .btn-delete, .btn-duplicate {
     padding: 0.25rem 0.5rem;
     background: transparent;
@@ -583,6 +593,105 @@
     align-items: center;
     gap: 0.5rem;
     cursor: pointer;
+}
+
+.sponsor-form {
+    grid-template-columns: 200px repeat(2, minmax(220px, 1fr));
+    align-items: flex-start;
+    grid-auto-flow: dense;
+}
+
+.sponsor-logo-group {
+    grid-row: span 3;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.span-two {
+    grid-column: span 2;
+}
+
+.logo-upload {
+    position: relative;
+    width: 180px;
+}
+
+.image-preview {
+    width: 180px;
+    height: 180px;
+    border: 1px dashed var(--border-color);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-tertiary);
+    overflow: hidden;
+}
+
+.image-preview.empty {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    text-align: center;
+    padding: 0.75rem;
+}
+
+.image-preview img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.upload-btn {
+    position: absolute;
+    left: 50%;
+    bottom: 12px;
+    transform: translateX(-50%);
+    padding: 0.35rem 1rem;
+    background: linear-gradient(135deg, var(--primary-cyan), var(--primary-teal));
+    border: none;
+    border-radius: 999px;
+    color: var(--bg-dark);
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 6px 18px rgba(80, 255, 255, 0.25);
+}
+
+.upload-btn:hover {
+    box-shadow: 0 8px 22px rgba(80, 255, 255, 0.35);
+}
+
+.logo-upload input[type="file"] {
+    display: none;
+}
+
+.upload-hint {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+@media (max-width: 960px) {
+    .sponsor-form {
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }
+
+    .sponsor-logo-group {
+        grid-column: 1 / -1;
+        grid-row: auto;
+        flex-direction: row;
+        align-items: center;
+        gap: 1.5rem;
+    }
+
+    .logo-upload {
+        width: 160px;
+    }
+
+    .span-two {
+        grid-column: 1 / -1;
+    }
 }
 
 /* Rich Text Editor */

@@ -1,5 +1,49 @@
 // Admin Dashboard - Smart & Powerful
-const API_BASE = '/api';
+const { API_BASE, API_ORIGIN } = (() => {
+    const cleanOrigin = (value) => value ? value.replace(/\/$/, '') : '';
+    const params = new URLSearchParams(window.location.search);
+    const overrideParam = cleanOrigin(params.get('api_origin'));
+
+    let storedOverride = '';
+    try {
+        storedOverride = cleanOrigin(localStorage.getItem('marketplace_api_origin'));
+    } catch (error) {
+        storedOverride = '';
+    }
+
+    let origin = overrideParam || storedOverride;
+
+    if (overrideParam && overrideParam !== storedOverride) {
+        try {
+            localStorage.setItem('marketplace_api_origin', overrideParam);
+        } catch (error) {
+            // ignore storage errors (private mode, etc.)
+        }
+    }
+
+    const { protocol, hostname, port } = window.location;
+    const isLocalHost = ['localhost', '127.0.0.1', '0.0.0.0'].includes(hostname);
+
+    if (!origin && isLocalHost && port !== '8100') {
+        origin = `${protocol}//127.0.0.1:8100`;
+    }
+
+    if (origin) {
+        const normalized = cleanOrigin(origin);
+        return { API_BASE: `${normalized}/api`, API_ORIGIN: normalized };
+    }
+
+    return { API_BASE: '/api', API_ORIGIN: '' };
+})();
+
+const resolveAssetUrl = (path) => {
+    if (!path) return '';
+    if (/^https?:\/\//i.test(path)) return path;
+    if (path.startsWith('/') && API_ORIGIN) {
+        return `${API_ORIGIN}${path}`;
+    }
+    return path;
+};
 
 class AdminDashboard {
     constructor() {
@@ -144,13 +188,19 @@ class AdminDashboard {
     }
 
     async apiCall(endpoint, options = {}) {
+        const isFormData = options.body instanceof FormData;
+        const headers = {
+            'Authorization': `Bearer ${this.token}`,
+            ...options.headers
+        };
+
+        if (!isFormData && !headers['Content-Type']) {
+            headers['Content-Type'] = 'application/json';
+        }
+
         const response = await fetch(`${API_BASE}${endpoint}`, {
             ...options,
-            headers: {
-                'Authorization': `Bearer ${this.token}`,
-                'Content-Type': 'application/json',
-                ...options.headers
-            }
+            headers
         });
 
         if (response.status === 401) {
@@ -163,7 +213,9 @@ class AdminDashboard {
     }
 
     async loadStats() {
-        const stats = await this.apiCall('/admin/stats');
+        const stats = await this.apiCall(`/admin/stats?_=${Date.now()}`, {
+            cache: 'no-store'
+        });
 
         document.getElementById('stat-apps').textContent = stats.apps.total;
         document.getElementById('stat-featured').textContent = stats.apps.featured;
@@ -174,22 +226,32 @@ class AdminDashboard {
     }
 
     async loadApps() {
-        this.data.apps = await this.apiCall('/apps?limit=100');
+        this.data.apps = await this.apiCall(`/apps?limit=100&_=${Date.now()}`, {
+            cache: 'no-store'
+        });
         this.renderAppsTable(this.data.apps);
     }
 
     async loadArticles() {
-        this.data.articles = await this.apiCall('/articles?limit=100');
+        this.data.articles = await this.apiCall(`/articles?limit=100&_=${Date.now()}`, {
+            cache: 'no-store'
+        });
         this.renderArticlesTable(this.data.articles);
     }
 
     async loadCategories() {
-        this.data.categories = await this.apiCall('/categories');
+        const cacheBuster = Date.now();
+        this.data.categories = await this.apiCall(`/categories?_=${cacheBuster}`, {
+            cache: 'no-store'
+        });
         this.renderCategoriesTable(this.data.categories);
     }
 
     async loadSponsors() {
-        this.data.sponsors = await this.apiCall('/sponsors');
+        const cacheBuster = Date.now();
+        this.data.sponsors = await this.apiCall(`/sponsors?limit=100&_=${cacheBuster}`, {
+            cache: 'no-store'
+        });
         this.renderSponsorsTable(this.data.sponsors);
     }
 
@@ -314,6 +376,7 @@ class AdminDashboard {
                 <thead>
                     <tr>
                         <th>ID</th>
+                        <th>Logo</th>
                         <th>Company</th>
                         <th>Tier</th>
                         <th>Start</th>
@@ -326,6 +389,7 @@ class AdminDashboard {
                     ${sponsors.map(sponsor => `
                         <tr>
                             <td>${sponsor.id}</td>
+                            <td>${sponsor.logo_url ? `<img class="table-logo" src="${resolveAssetUrl(sponsor.logo_url)}" alt="${sponsor.company_name} logo">` : '-'}</td>
                             <td>${sponsor.company_name}</td>
                             <td>${sponsor.tier}</td>
                             <td>${new Date(sponsor.start_date).toLocaleDateString()}</td>
@@ -389,6 +453,10 @@ class AdminDashboard {
 
         modal.classList.remove('hidden');
         modal.dataset.type = type;
+
+        if (type === 'sponsors') {
+            this.setupLogoUploadHandlers();
+        }
     }
 
     getAppForm(app) {
@@ -524,9 +592,22 @@ class AdminDashboard {
     }
 
     getSponsorForm(sponsor) {
+        const existingFile = sponsor?.logo_url ? sponsor.logo_url.split('/').pop().split('?')[0] : '';
         return `
-            <div class="form-grid">
-                <div class="form-group">
+            <div class="form-grid sponsor-form">
+                <div class="form-group sponsor-logo-group">
+                    <label>Logo</label>
+                    <input type="hidden" id="form-logo-url" value="${sponsor?.logo_url || ''}">
+                    <div class="logo-upload">
+                        <div class="image-preview ${sponsor?.logo_url ? '' : 'empty'}" id="form-logo-preview">
+                            ${sponsor?.logo_url ? `<img src="${resolveAssetUrl(sponsor.logo_url)}" alt="Logo preview">` : '<span>No logo uploaded</span>'}
+                        </div>
+                        <button type="button" class="upload-btn" id="form-logo-button">Upload Logo</button>
+                        <input type="file" id="form-logo-file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden>
+                    </div>
+                    <p class="upload-hint" id="form-logo-filename">${existingFile ? `Current: ${existingFile}` : 'No file selected'}</p>
+                </div>
+                <div class="form-group span-two">
                     <label>Company Name *</label>
                     <input type="text" id="form-name" value="${sponsor?.company_name || ''}" required>
                 </div>
@@ -567,9 +648,30 @@ class AdminDashboard {
     async saveItem() {
         const modal = document.getElementById('form-modal');
         const type = modal.dataset.type;
-        const data = this.collectFormData(type);
 
         try {
+            if (type === 'sponsors') {
+                const fileInput = document.getElementById('form-logo-file');
+                if (fileInput && fileInput.files && fileInput.files[0]) {
+                    const formData = new FormData();
+                    formData.append('file', fileInput.files[0]);
+                    formData.append('folder', 'sponsors');
+
+                    const uploadResponse = await this.apiCall('/admin/upload-image', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!uploadResponse.url) {
+                        throw new Error('Image upload failed');
+                    }
+
+                    document.getElementById('form-logo-url').value = uploadResponse.url;
+                }
+            }
+
+            const data = this.collectFormData(type);
+
             if (this.editingItem) {
                 await this.apiCall(`/admin/${type}/${this.editingItem.id}`, {
                     method: 'PUT',
@@ -599,8 +701,10 @@ class AdminDashboard {
             data.description = document.getElementById('form-description').value;
             data.category = document.getElementById('form-category').value;
             data.type = document.getElementById('form-type').value;
-            data.rating = parseFloat(document.getElementById('form-rating').value);
-            data.downloads = parseInt(document.getElementById('form-downloads').value);
+            const rating = parseFloat(document.getElementById('form-rating').value);
+            const downloads = parseInt(document.getElementById('form-downloads').value, 10);
+            data.rating = Number.isFinite(rating) ? rating : 0;
+            data.downloads = Number.isFinite(downloads) ? downloads : 0;
             data.image = document.getElementById('form-image').value;
             data.website_url = document.getElementById('form-website').value;
             data.github_url = document.getElementById('form-github').value;
@@ -621,9 +725,11 @@ class AdminDashboard {
             data.slug = this.generateSlug(data.name);
             data.icon = document.getElementById('form-icon').value;
             data.description = document.getElementById('form-description').value;
-            data.order_index = parseInt(document.getElementById('form-order').value);
+            const orderIndex = parseInt(document.getElementById('form-order').value, 10);
+            data.order_index = Number.isFinite(orderIndex) ? orderIndex : 0;
         } else if (type === 'sponsors') {
             data.company_name = document.getElementById('form-name').value;
+            data.logo_url = document.getElementById('form-logo-url').value;
             data.tier = document.getElementById('form-tier').value;
             data.landing_url = document.getElementById('form-landing').value;
             data.banner_url = document.getElementById('form-banner').value;
@@ -633,6 +739,63 @@ class AdminDashboard {
         }
 
         return data;
+    }
+
+    setupLogoUploadHandlers() {
+        const fileInput = document.getElementById('form-logo-file');
+        const preview = document.getElementById('form-logo-preview');
+        const logoUrlInput = document.getElementById('form-logo-url');
+        const trigger = document.getElementById('form-logo-button');
+        const fileNameEl = document.getElementById('form-logo-filename');
+
+        if (!fileInput || !preview || !logoUrlInput) return;
+
+        const setFileName = (text) => {
+            if (fileNameEl) {
+                fileNameEl.textContent = text;
+            }
+        };
+
+        const setEmptyState = () => {
+            preview.innerHTML = '<span>No logo uploaded</span>';
+            preview.classList.add('empty');
+            setFileName('No file selected');
+        };
+
+        const setExistingState = () => {
+            if (logoUrlInput.value) {
+                const existingFile = logoUrlInput.value.split('/').pop().split('?')[0];
+                preview.innerHTML = `<img src="${resolveAssetUrl(logoUrlInput.value)}" alt="Logo preview">`;
+                preview.classList.remove('empty');
+                setFileName(existingFile ? `Current: ${existingFile}` : 'Current logo');
+            } else {
+                setEmptyState();
+            }
+        };
+
+        setExistingState();
+
+        if (trigger) {
+            trigger.onclick = () => fileInput.click();
+        }
+
+        fileInput.addEventListener('change', (event) => {
+            const file = event.target.files && event.target.files[0];
+
+            if (!file) {
+                setExistingState();
+                return;
+            }
+
+            setFileName(file.name);
+
+            const reader = new FileReader();
+            reader.onload = () => {
+                preview.innerHTML = `<img src="${reader.result}" alt="Logo preview">`;
+                preview.classList.remove('empty');
+            };
+            reader.readAsDataURL(file);
+        });
     }
 
     async deleteItem(type, id) {

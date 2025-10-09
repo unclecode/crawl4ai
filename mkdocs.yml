@@ -115,4 +115,4 @@ extra_javascript:
   - assets/copy_code.js
   - assets/floating_ask_ai_button.js
   - assets/mobile_menu.js
-  - assets/page_actions.js
+  - assets/page_actions.js?v=20251006
