@@ -201,18 +201,6 @@ ul>li.page-action-item::after{
 }
 
 /* Badge */
-.page-action-badge {
-    display: inline-block;
-    background: #f59e0b;
-    color: #070708;
-    padding: 0.125rem 0.5rem;
-    border-radius: 12px;
-    font-size: 0.65rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
 /* External link indicator */
 .page-action-external::after {
     content: '→';

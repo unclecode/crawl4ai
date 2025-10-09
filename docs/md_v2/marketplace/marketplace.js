@@ -1,5 +1,21 @@
 // Marketplace JS - Magazine Layout
-const API_BASE = '/api';
+const { API_BASE, API_ORIGIN } = (() => {
+    const { hostname, port } = window.location;
+    if ((hostname === 'localhost' || hostname === '127.0.0.1') && port === '8000') {
+        const origin = 'http://127.0.0.1:8100';
+        return { API_BASE: `${origin}/api`, API_ORIGIN: origin };
+    }
+    return { API_BASE: '/api', API_ORIGIN: '' };
+})();
+
+const resolveAssetUrl = (path) => {
+    if (!path) return '';
+    if (/^https?:\/\//i.test(path)) return path;
+    if (path.startsWith('/') && API_ORIGIN) {
+        return `${API_ORIGIN}${path}`;
+    }
+    return path;
+};
 const CACHE_TTL = 3600000; // 1 hour in ms
 
 class MarketplaceCache {
@@ -204,6 +220,7 @@ class MarketplaceUI {
         const container = document.getElementById('sponsored-content');
         container.innerHTML = sponsors.slice(0, 5).map(sponsor => `
             <div class="sponsor-card">
+                ${sponsor.logo_url ? `<div class="sponsor-logo"><img src="${resolveAssetUrl(sponsor.logo_url)}" alt="${sponsor.company_name} logo"></div>` : ''}
                 <h4>${sponsor.company_name}</h4>
                 <p>${sponsor.tier} Sponsor - Premium Solutions</p>
                 <a href="${sponsor.landing_url}" target="_blank">Learn More →</a>

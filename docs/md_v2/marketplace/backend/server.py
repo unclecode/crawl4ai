@@ -1,11 +1,14 @@
-from fastapi import FastAPI, HTTPException, Query, Depends, Body
+from fastapi import FastAPI, HTTPException, Query, Depends, Body, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from typing import Optional, List, Dict, Any
+from typing import Optional, Dict, Any
 import json
 import hashlib
 import secrets
+import re
+from pathlib import Path
 from database import DatabaseManager
 from datetime import datetime, timedelta
 
@@ -31,6 +34,21 @@ app.add_middleware(
 # Initialize database with configurable path
 db = DatabaseManager(Config.DATABASE_PATH)
 
+BASE_DIR = Path(__file__).parent
+UPLOAD_ROOT = BASE_DIR / "uploads"
+UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+
+app.mount("/uploads", StaticFiles(directory=UPLOAD_ROOT), name="uploads")
+
+ALLOWED_IMAGE_TYPES = {
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/webp": ".webp",
+    "image/svg+xml": ".svg"
+}
+ALLOWED_UPLOAD_FOLDERS = {"sponsors"}
+MAX_UPLOAD_SIZE = 2 * 1024 * 1024  # 2 MB
+
 def json_response(data, cache_time=3600):
     """Helper to return JSON with cache headers"""
     return JSONResponse(
@@ -40,6 +58,29 @@ def json_response(data, cache_time=3600):
             "X-Content-Type-Options": "nosniff"
         }
     )
+
+
+def to_int(value, default=0):
+    """Coerce incoming values to integers, falling back to default."""
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, (int, float)):
+        return int(value)
+
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return default
+
+        match = re.match(r"^-?\d+", stripped)
+        if match:
+            try:
+                return int(match.group())
+            except ValueError:
+                return default
+    return default
 
 # ============= PUBLIC ENDPOINTS =============
 
@@ -124,6 +165,8 @@ async def get_article(slug: str):
 async def get_categories():
     """Get all categories ordered by index"""
     categories = db.get_all('categories', limit=50)
+    for category in categories:
+        category['order_index'] = to_int(category.get('order_index'), 0)
     categories.sort(key=lambda x: x.get('order_index', 0))
     return json_response(categories, cache_time=7200)
 
@@ -182,6 +225,31 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     if token not in tokens or tokens[token] < datetime.now():
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     return token
+
+
+@app.post("/api/admin/upload-image", dependencies=[Depends(verify_token)])
+async def upload_image(file: UploadFile = File(...), folder: str = Form("sponsors")):
+    """Upload image files for admin assets"""
+    folder = (folder or "").strip().lower()
+    if folder not in ALLOWED_UPLOAD_FOLDERS:
+        raise HTTPException(status_code=400, detail="Invalid upload folder")
+
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail="Unsupported file type")
+
+    contents = await file.read()
+    if len(contents) > MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=400, detail="File too large (max 2MB)")
+
+    extension = ALLOWED_IMAGE_TYPES[file.content_type]
+    filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{secrets.token_hex(8)}{extension}"
+
+    target_dir = UPLOAD_ROOT / folder
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target_path = target_dir / filename
+    target_path.write_bytes(contents)
+
+    return {"url": f"/uploads/{folder}/{filename}"}
 
 @app.post("/api/admin/login")
 async def admin_login(password: str = Body(..., embed=True)):
@@ -318,6 +386,9 @@ async def delete_article(article_id: int):
 async def create_category(category_data: Dict[str, Any]):
     """Create new category"""
     try:
+        category_data = dict(category_data)
+        category_data['order_index'] = to_int(category_data.get('order_index'), 0)
+
         cursor = db.conn.cursor()
         columns = ', '.join(category_data.keys())
         placeholders = ', '.join(['?' for _ in category_data])
@@ -332,12 +403,28 @@ async def create_category(category_data: Dict[str, Any]):
 async def update_category(cat_id: int, category_data: Dict[str, Any]):
     """Update category"""
     try:
+        category_data = dict(category_data)
+        if 'order_index' in category_data:
+            category_data['order_index'] = to_int(category_data.get('order_index'), 0)
+
         set_clause = ', '.join([f"{k} = ?" for k in category_data.keys()])
         cursor = db.conn.cursor()
         cursor.execute(f"UPDATE categories SET {set_clause} WHERE id = ?",
                       list(category_data.values()) + [cat_id])
         db.conn.commit()
         return {"message": "Category updated"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.delete("/api/admin/categories/{cat_id}", dependencies=[Depends(verify_token)])
+async def delete_category(cat_id: int):
+    """Delete category"""
+    try:
+        cursor = db.conn.cursor()
+        cursor.execute("DELETE FROM categories WHERE id = ?", (cat_id,))
+        db.conn.commit()
+        return {"message": "Category deleted"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -366,6 +453,18 @@ async def update_sponsor(sponsor_id: int, sponsor_data: Dict[str, Any]):
                       list(sponsor_data.values()) + [sponsor_id])
         db.conn.commit()
         return {"message": "Sponsor updated"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.delete("/api/admin/sponsors/{sponsor_id}", dependencies=[Depends(verify_token)])
+async def delete_sponsor(sponsor_id: int):
+    """Delete sponsor"""
+    try:
+        cursor = db.conn.cursor()
+        cursor.execute("DELETE FROM sponsors WHERE id = ?", (sponsor_id,))
+        db.conn.commit()
+        return {"message": "Sponsor deleted"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

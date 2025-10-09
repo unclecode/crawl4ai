@@ -410,6 +410,21 @@ a:hover {
     border: 1px solid var(--border-color);
 }
 
+.sponsor-logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 60px;
+    margin-bottom: 0.75rem;
+}
+
+.sponsor-logo img {
+    max-height: 60px;
+    max-width: 100%;
+    width: auto;
+    object-fit: contain;
+}
+
 .sponsor-card h4 {
     color: var(--accent-pink);
     margin-bottom: 0.5rem;
