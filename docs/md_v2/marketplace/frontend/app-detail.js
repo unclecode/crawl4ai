@@ -1,5 +1,15 @@
 // App Detail Page JavaScript
-const API_BASE = '/marketplace/api';
+const { API_BASE, API_ORIGIN } = (() => {
+    const { hostname, port, protocol } = window.location;
+    const isLocalHost = ['localhost', '127.0.0.1', '0.0.0.0'].includes(hostname);
+
+    if (isLocalHost && port && port !== '8100') {
+        const origin = `${protocol}//127.0.0.1:8100`;
+        return { API_BASE: `${origin}/marketplace/api`, API_ORIGIN: origin };
+    }
+
+    return { API_BASE: '/marketplace/api', API_ORIGIN: '' };
+})();
 
 class AppDetailPage {
     constructor() {
