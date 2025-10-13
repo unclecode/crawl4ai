@@ -47,6 +47,7 @@ from urllib.parse import (
     urljoin, urlparse, urlunparse,
     parse_qsl, urlencode, quote, unquote
 )
+import inspect
 
 
 # Monkey patch to fix wildcard handling in urllib.robotparser
@@ -3530,3 +3531,51 @@ def get_memory_stats() -> Tuple[float, float, float]:
     used_percent = get_true_memory_usage_percent()
     
     return used_percent, available_gb, total_gb
+
+
+# Hook utilities for Docker API
+def hooks_to_string(hooks: Dict[str, Callable]) -> Dict[str, str]:
+    """
+    Convert hook function objects to string representations for Docker API.
+
+    This utility simplifies the process of using hooks with the Docker API by converting
+    Python function objects into the string format required by the API.
+
+    Args:
+        hooks: Dictionary mapping hook point names to Python function objects.
+               Functions should be async and follow hook signature requirements.
+
+    Returns:
+        Dictionary mapping hook point names to string representations of the functions.
+
+    Example:
+        >>> async def my_hook(page, context, **kwargs):
+        ...     await page.set_viewport_size({"width": 1920, "height": 1080})
+        ...     return page
+        >>>
+        >>> hooks_dict = {"on_page_context_created": my_hook}
+        >>> api_hooks = hooks_to_string(hooks_dict)
+        >>> # api_hooks is now ready to use with Docker API
+
+    Raises:
+        ValueError: If a hook is not callable or source cannot be extracted
+    """
+    result = {}
+
+    for hook_name, hook_func in hooks.items():
+        if not callable(hook_func):
+            raise ValueError(f"Hook '{hook_name}' must be a callable function, got {type(hook_func)}")
+
+        try:
+            # Get the source code of the function
+            source = inspect.getsource(hook_func)
+            # Remove any leading indentation to get clean source
+            source = textwrap.dedent(source)
+            result[hook_name] = source
+        except (OSError, TypeError) as e:
+            raise ValueError(
+                f"Cannot extract source code for hook '{hook_name}'. "
+                f"Make sure the function is defined in a file (not interactively). Error: {e}"
+            )
+
+    return result
