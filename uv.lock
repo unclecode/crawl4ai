@@ -600,7 +600,7 @@ requires-dist = [
     { name = "humanize", specifier = ">=4.10.0" },
     { name = "lark", specifier = ">=1.2.2" },
     { name = "litellm", specifier = ">=1.53.1" },
-    { name = "lxml", specifier = "==6.0" },
+    { name = "lxml", specifier = "~=6.0" },
     { name = "nltk", specifier = ">=3.9.1" },
     { name = "nltk", marker = "extra == 'all'" },
     { name = "nltk", marker = "extra == 'cosine'" },
