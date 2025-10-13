@@ -26,6 +26,7 @@ from api import (
     handle_markdown_request,
     handle_seed,
     handle_stream_crawl_request,
+    handle_url_discovery,
     stream_results,
 )
 from auth import TokenRequest, create_access_token, get_token_dependency
@@ -58,6 +59,7 @@ from schemas import (
     RawCode,
     ScreenshotRequest,
     SeedRequest,
+    URLDiscoveryRequest,
 )
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -434,6 +436,97 @@ async def seed_url(request: SeedRequest):
 
     except Exception as e:
         print(f"❌ Error in seed_url: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/urls/discover",
+    summary="URL Discovery and Seeding",
+    description="Discover and extract crawlable URLs from a domain using AsyncUrlSeeder functionality.",
+    response_description="List of discovered URL objects with metadata",
+    tags=["Core Crawling"]
+)
+async def discover_urls(request: URLDiscoveryRequest):
+    """
+    Discover URLs from a domain using AsyncUrlSeeder functionality.
+    
+    This endpoint allows users to find relevant URLs from a domain before 
+    committing to a full crawl. It supports various discovery sources like 
+    sitemaps and Common Crawl, with filtering and scoring capabilities.
+    
+    **Parameters:**
+    - **domain**: Domain to discover URLs from (e.g., "example.com")
+    - **seeding_config**: Configuration object mirroring SeedingConfig parameters
+      - **source**: Discovery source(s) - "sitemap", "cc", or "sitemap+cc" (default: "sitemap+cc")
+      - **pattern**: URL pattern filter using glob-style wildcards (default: "*")
+      - **live_check**: Whether to verify URL liveness with HEAD requests (default: false)
+      - **extract_head**: Whether to fetch and parse <head> metadata (default: false)
+      - **max_urls**: Maximum URLs to discover, -1 for no limit (default: -1)
+      - **concurrency**: Maximum concurrent requests (default: 1000)
+      - **hits_per_sec**: Rate limit in requests per second (default: 5)
+      - **force**: Bypass internal cache and re-fetch URLs (default: false)
+      - **query**: Search query for BM25 relevance scoring (optional)
+      - **scoring_method**: Scoring method when query provided (default: "bm25")
+      - **score_threshold**: Minimum score threshold for filtering (optional)
+      - **filter_nonsense_urls**: Filter out nonsense URLs (default: true)
+    
+    **Example Request:**
+    ```json
+    {
+        "domain": "docs.crawl4ai.com",
+        "seeding_config": {
+            "source": "sitemap",
+            "pattern": "*/docs/*",
+            "extract_head": true,
+            "max_urls": 50,
+            "query": "API documentation"
+        }
+    }
+    ```
+    
+    **Example Response:**
+    ```json
+    [
+        {
+            "url": "https://docs.crawl4ai.com/api/getting-started",
+            "status": "valid",
+            "head_data": {
+                "title": "Getting Started - Crawl4AI API",
+                "description": "Learn how to get started with Crawl4AI API"
+            },
+            "score": 0.85
+        }
+    ]
+    ```
+    
+    **Usage:**
+    ```python
+    response = requests.post(
+        "http://localhost:11235/urls/discover",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "domain": "docs.crawl4ai.com",
+            "seeding_config": {
+                "source": "sitemap+cc",
+                "extract_head": true,
+                "max_urls": 100
+            }
+        }
+    )
+    urls = response.json()
+    ```
+    
+    **Notes:**
+    - Returns direct list of URL objects with metadata if requested
+    - Empty list returned if no URLs found
+    - Supports BM25 relevance scoring when query is provided
+    - Can combine multiple sources for maximum coverage
+    """
+    try:
+        res = await handle_url_discovery(request.domain, request.seeding_config)
+        return JSONResponse(res)
+
+    except Exception as e:
+        print(f"❌ Error in discover_urls: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

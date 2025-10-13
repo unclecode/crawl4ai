@@ -60,7 +60,7 @@ try:
     from utils import (
         FilterType, TaskStatus, get_base_url, is_task_id,
         get_llm_api_key, get_llm_temperature, get_llm_base_url,
-        validate_llm_provider
+        validate_llm_provider, create_chunking_strategy
     )
 except ImportError:
     # Fallback definitions for development/testing
@@ -249,6 +249,7 @@ async def process_llm_extraction(
     provider: Optional[str] = None,
     temperature: Optional[float] = None,
     base_url: Optional[str] = None,
+    chunking_strategy_config: Optional[dict] = None,
 ) -> None:
     """Process LLM extraction in background."""
     try:
@@ -263,44 +264,145 @@ async def process_llm_extraction(
         api_key = get_llm_api_key(
             config, provider
         )  # Returns None to let litellm handle it
-        llm_strategy = LLMExtractionStrategy(
-            llm_config=LLMConfig(
+
+        cache_mode = CacheMode.ENABLED if cache == "1" else CacheMode.WRITE_ONLY
+
+        if chunking_strategy_config:
+            # API-level chunking approach: crawl first, then chunk, then extract
+            try:
+                chunking_strategy = create_chunking_strategy(chunking_strategy_config)
+            except ValueError as e:
+                await redis.hset(
+                    f"task:{task_id}",
+                    mapping={"status": TaskStatus.FAILED, "error": f"Invalid chunking strategy: {str(e)}"},
+                )
+                return
+
+            # Step 1: Crawl the URL to get raw content
+            async with AsyncWebCrawler() as crawler:
+                crawl_result = await crawler.arun(
+                    url=url,
+                    config=CrawlerRunConfig(
+                        extraction_strategy=NoExtractionStrategy(),
+                        scraping_strategy=LXMLWebScrapingStrategy(),
+                        cache_mode=cache_mode,
+                    ),
+                )
+
+            if not crawl_result.success:
+                await redis.hset(
+                    f"task:{task_id}",
+                    mapping={"status": TaskStatus.FAILED, "error": crawl_result.error_message},
+                )
+                return
+
+            # Step 2: Apply chunking to the raw content
+            raw_content = crawl_result.markdown_v2.raw_markdown if hasattr(crawl_result, 'markdown_v2') else crawl_result.markdown
+            if not raw_content:
+                await redis.hset(
+                    f"task:{task_id}",
+                    mapping={"status": TaskStatus.FAILED, "error": "No content extracted from URL"},
+                )
+                return
+
+            chunks = chunking_strategy.chunk(raw_content)
+            # Filter out empty chunks
+            chunks = [chunk for chunk in chunks if chunk.strip()]
+
+            if not chunks:
+                await redis.hset(
+                    f"task:{task_id}",
+                    mapping={"status": TaskStatus.FAILED, "error": "No valid chunks after applying chunking strategy"},
+                )
+                return
+
+            # Step 3: Process each chunk with LLM extraction
+            llm_config = LLMConfig(
                 provider=provider or config["llm"]["provider"],
                 api_token=api_key,
                 temperature=temperature or get_llm_temperature(config, provider),
                 base_url=base_url or get_llm_base_url(config, provider),
-            ),
-            instruction=instruction,
-            schema=json.loads(schema) if schema else None,
-        )
-
-        cache_mode = CacheMode.ENABLED if cache == "1" else CacheMode.WRITE_ONLY
-
-        async with AsyncWebCrawler() as crawler:
-            result = await crawler.arun(
-                url=url,
-                config=CrawlerRunConfig(
-                    extraction_strategy=llm_strategy,
-                    scraping_strategy=LXMLWebScrapingStrategy(),
-                    cache_mode=cache_mode,
-                ),
             )
 
-        if not result.success:
+            all_results = []
+            for i, chunk in enumerate(chunks):
+                try:
+                    # Create LLM strategy for this chunk
+                    chunk_instruction = f"{instruction}\n\nContent chunk {i+1}/{len(chunks)}:\n{chunk}"
+                    llm_strategy = LLMExtractionStrategy(
+                        llm_config=llm_config,
+                        instruction=chunk_instruction,
+                        schema=json.loads(schema) if schema else None,
+                    )
+
+                    # Extract from this chunk
+                    async with AsyncWebCrawler() as crawler:
+                        chunk_result = await crawler.arun(
+                            url=url,
+                            config=CrawlerRunConfig(
+                                extraction_strategy=llm_strategy,
+                                scraping_strategy=LXMLWebScrapingStrategy(),
+                                cache_mode=cache_mode,
+                            ),
+                        )
+
+                    if chunk_result.success:
+                        try:
+                            chunk_content = json.loads(chunk_result.extracted_content)
+                            all_results.extend(chunk_content if isinstance(chunk_content, list) else [chunk_content])
+                        except json.JSONDecodeError:
+                            all_results.append(chunk_result.extracted_content)
+                    # Continue with other chunks even if one fails
+
+                except Exception as chunk_error:
+                    # Log chunk error but continue with other chunks
+                    print(f"Error processing chunk {i+1}: {chunk_error}")
+                    continue
+
+            # Step 4: Store merged results
             await redis.hset(
                 f"task:{task_id}",
-                mapping={"status": TaskStatus.FAILED, "error": result.error_message},
+                mapping={"status": TaskStatus.COMPLETED, "result": json.dumps(all_results)},
             )
-            return
 
-        try:
-            content = json.loads(result.extracted_content)
-        except json.JSONDecodeError:
-            content = result.extracted_content
-        await redis.hset(
-            f"task:{task_id}",
-            mapping={"status": TaskStatus.COMPLETED, "result": json.dumps(content)},
-        )
+        else:
+            # Original approach: direct LLM extraction without chunking
+            llm_strategy = LLMExtractionStrategy(
+                llm_config=LLMConfig(
+                    provider=provider or config["llm"]["provider"],
+                    api_token=api_key,
+                    temperature=temperature or get_llm_temperature(config, provider),
+                    base_url=base_url or get_llm_base_url(config, provider),
+                ),
+                instruction=instruction,
+                schema=json.loads(schema) if schema else None,
+            )
+
+            async with AsyncWebCrawler() as crawler:
+                result = await crawler.arun(
+                    url=url,
+                    config=CrawlerRunConfig(
+                        extraction_strategy=llm_strategy,
+                        scraping_strategy=LXMLWebScrapingStrategy(),
+                        cache_mode=cache_mode,
+                    ),
+                )
+
+            if not result.success:
+                await redis.hset(
+                    f"task:{task_id}",
+                    mapping={"status": TaskStatus.FAILED, "error": result.error_message},
+                )
+                return
+
+            try:
+                content = json.loads(result.extracted_content)
+            except json.JSONDecodeError:
+                content = result.extracted_content
+            await redis.hset(
+                f"task:{task_id}",
+                mapping={"status": TaskStatus.COMPLETED, "result": json.dumps(content)},
+            )
 
     except Exception as e:
         logger.error(f"LLM extraction error: {str(e)}", exc_info=True)
@@ -398,6 +500,7 @@ async def handle_llm_request(
     provider: Optional[str] = None,
     temperature: Optional[float] = None,
     api_base_url: Optional[str] = None,
+    chunking_strategy_config: Optional[dict] = None,
 ) -> JSONResponse:
     """Handle LLM extraction requests."""
     base_url = get_base_url(request)
@@ -431,6 +534,7 @@ async def handle_llm_request(
             provider,
             temperature,
             api_base_url,
+            chunking_strategy_config,
         )
 
     except Exception as e:
@@ -473,6 +577,7 @@ async def create_new_task(
     provider: Optional[str] = None,
     temperature: Optional[float] = None,
     api_base_url: Optional[str] = None,
+    chunking_strategy_config: Optional[dict] = None,
 ) -> JSONResponse:
     """Create and initialize a new task."""
     decoded_url = unquote(input_path)
@@ -506,6 +611,7 @@ async def create_new_task(
         provider,
         temperature,
         api_base_url,
+        chunking_strategy_config,
     )
 
     return JSONResponse(
@@ -982,3 +1088,26 @@ async def handle_seed(url, cfg):
             "count": 0,
             "message": "No URLs found for the given domain and configuration.",
         }
+
+
+async def handle_url_discovery(domain, seeding_config):
+    """
+    Handle URL discovery using AsyncUrlSeeder functionality.
+    
+    Args:
+        domain (str): Domain to discover URLs from
+        seeding_config (dict): Configuration for URL discovery
+        
+    Returns:
+        List[Dict[str, Any]]: Discovered URL objects with metadata
+    """
+    try:
+        config = SeedingConfig(**seeding_config)
+
+        # Use an async context manager for the seeder
+        async with AsyncUrlSeeder() as seeder:
+            # The seeder's 'urls' method expects a domain
+            urls = await seeder.urls(domain, config)
+        return urls
+    except Exception as e:
+        return []

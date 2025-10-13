@@ -779,6 +779,144 @@ async def test_stream_crawl(token: str = None): # Made token optional
 # asyncio.run(test_stream_crawl())
 ```
 
+#### LLM Job with Chunking Strategy
+
+```python
+import requests
+import time
+
+# Example: LLM extraction with RegexChunking strategy
+# This breaks large documents into smaller chunks before LLM processing
+
+llm_job_payload = {
+    "url": "https://example.com/long-article",
+    "q": "Extract all key points and main ideas from this article",
+    "chunking_strategy": {
+        "type": "RegexChunking",
+        "params": {
+            "patterns": ["\\n\\n"],  # Split on double newlines (paragraphs)
+            "overlap": 50
+        }
+    }
+}
+
+# Submit LLM job
+response = requests.post(
+    "http://localhost:11235/llm/job",
+    json=llm_job_payload
+)
+
+if response.ok:
+    job_data = response.json()
+    job_id = job_data["task_id"]
+    print(f"Job submitted successfully. Job ID: {job_id}")
+    
+    # Poll for completion
+    while True:
+        status_response = requests.get(f"http://localhost:11235/llm/job/{job_id}")
+        if status_response.ok:
+            status_data = status_response.json()
+            if status_data["status"] == "completed":
+                print("Job completed!")
+                print("Extracted content:", status_data["result"])
+                break
+            elif status_data["status"] == "failed":
+                print("Job failed:", status_data.get("error"))
+                break
+            else:
+                print(f"Job status: {status_data['status']}")
+                time.sleep(2)  # Wait 2 seconds before checking again
+        else:
+            print(f"Error checking job status: {status_response.text}")
+            break
+else:
+    print(f"Error submitting job: {response.text}")
+```
+
+**Available Chunking Strategies:**
+
+- **IdentityChunking**: Returns the entire content as a single chunk (no splitting)
+  ```json
+  {
+    "type": "IdentityChunking",
+    "params": {}
+  }
+  ```
+
+- **RegexChunking**: Split content using regular expression patterns
+  ```json
+  {
+    "type": "RegexChunking",
+    "params": {
+      "patterns": ["\\n\\n"]
+    }
+  }
+  ```
+
+- **NlpSentenceChunking**: Split content into sentences using NLP (requires NLTK)
+  ```json
+  {
+    "type": "NlpSentenceChunking",
+    "params": {}
+  }
+  ```
+
+- **TopicSegmentationChunking**: Segment content into topics using TextTiling (requires NLTK)
+  ```json
+  {
+    "type": "TopicSegmentationChunking",
+    "params": {
+      "num_keywords": 3
+    }
+  }
+  ```
+
+- **FixedLengthWordChunking**: Split into fixed-length word chunks
+  ```json
+  {
+    "type": "FixedLengthWordChunking",
+    "params": {
+      "chunk_size": 100
+    }
+  }
+  ```
+
+- **SlidingWindowChunking**: Overlapping word chunks with configurable step size
+  ```json
+  {
+    "type": "SlidingWindowChunking",
+    "params": {
+      "window_size": 100,
+      "step": 50
+    }
+  }
+  ```
+
+- **OverlappingWindowChunking**: Fixed-size chunks with word overlap
+  ```json
+  {
+    "type": "OverlappingWindowChunking",
+    "params": {
+      "window_size": 1000,
+      "overlap": 100
+    }
+  }
+  ```
+  {
+    "type": "OverlappingWindowChunking", 
+    "params": {
+      "chunk_size": 1500,
+      "overlap": 100
+    }
+  }
+  ```
+
+**Notes:**
+- `chunking_strategy` is optional - if omitted, default token-based chunking is used
+- Chunking is applied at the API level without modifying the core SDK
+- Results from all chunks are merged into a single response
+- Each chunk is processed independently with the same LLM instruction
+
 ---
 
 ## Metrics & Monitoring

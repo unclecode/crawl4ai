@@ -6,7 +6,26 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from fastapi import Request
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
+
+# Import dispatchers from crawl4ai
+from crawl4ai.async_dispatcher import (
+    BaseDispatcher,
+    MemoryAdaptiveDispatcher,
+    SemaphoreDispatcher,
+)
+
+# Import chunking strategies from crawl4ai
+from crawl4ai.chunking_strategy import (
+    ChunkingStrategy,
+    IdentityChunking,
+    RegexChunking,
+    NlpSentenceChunking,
+    TopicSegmentationChunking,
+    FixedLengthWordChunking,
+    SlidingWindowChunking,
+    OverlappingWindowChunking,
+)
 
 # Import dispatchers from crawl4ai
 from crawl4ai.async_dispatcher import (
@@ -304,3 +323,54 @@ def verify_email_domain(email: str) -> bool:
         return True if records else False
     except Exception as e:
         return False
+
+
+def create_chunking_strategy(config: Optional[Dict[str, Any]] = None) -> Optional[ChunkingStrategy]:
+    """
+    Factory function to create chunking strategy instances from configuration.
+    
+    Args:
+        config: Dictionary containing 'type' and 'params' keys
+               Example: {"type": "RegexChunking", "params": {"patterns": ["\\n\\n+"]}}
+    
+    Returns:
+        ChunkingStrategy instance or None if config is None
+        
+    Raises:
+        ValueError: If chunking strategy type is unknown or config is invalid
+    """
+    if config is None:
+        return None
+    
+    if not isinstance(config, dict):
+        raise ValueError(f"Chunking strategy config must be a dictionary, got {type(config)}")
+    
+    if "type" not in config:
+        raise ValueError("Chunking strategy config must contain 'type' field")
+    
+    strategy_type = config["type"]
+    params = config.get("params", {})
+    
+    # Validate params is a dict
+    if not isinstance(params, dict):
+        raise ValueError(f"Chunking strategy params must be a dictionary, got {type(params)}")
+    
+    # Strategy factory mapping
+    strategies = {
+        "IdentityChunking": IdentityChunking,
+        "RegexChunking": RegexChunking,
+        "NlpSentenceChunking": NlpSentenceChunking,
+        "TopicSegmentationChunking": TopicSegmentationChunking,
+        "FixedLengthWordChunking": FixedLengthWordChunking,
+        "SlidingWindowChunking": SlidingWindowChunking,
+        "OverlappingWindowChunking": OverlappingWindowChunking,
+    }
+    
+    if strategy_type not in strategies:
+        available = ", ".join(strategies.keys())
+        raise ValueError(f"Unknown chunking strategy type: {strategy_type}. Available: {available}")
+    
+    try:
+        return strategies[strategy_type](**params)
+    except Exception as e:
+        raise ValueError(f"Failed to create {strategy_type} with params {params}: {str(e)}")

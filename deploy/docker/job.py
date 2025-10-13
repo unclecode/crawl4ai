@@ -39,6 +39,7 @@ class LlmJobPayload(BaseModel):
     provider: Optional[str] = None
     temperature: Optional[float] = None
     base_url: Optional[str] = None
+    chunking_strategy: Optional[Dict] = None
 
 
 class CrawlJobPayload(BaseModel):
@@ -67,6 +68,7 @@ async def llm_job_enqueue(
         provider=payload.provider,
         temperature=payload.temperature,
         api_base_url=payload.base_url,
+        chunking_strategy_config=payload.chunking_strategy,
     )
 
 

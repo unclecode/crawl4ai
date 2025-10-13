@@ -107,13 +107,11 @@ def test_api_endpoint(base_url="http://localhost:11235"):
                         else:
                             # If markdown is a string
                             markdown_text = markdown_content or ""
-                        
+
                         if "user-agent" in markdown_text.lower():
                             print("  🕷️  User agent info found in response")
 
-                        print(
-                            f"  📄 Markdown length: {len(markdown_text)} characters"
-                        )
+                        print(f"  📄 Markdown length: {len(markdown_text)} characters")
                     else:
                         error_msg = first_result.get("error_message", "Unknown error")
                         print(f"❌ {test_config['name']} - FAILED: {error_msg}")
@@ -137,7 +135,6 @@ def test_api_endpoint(base_url="http://localhost:11235"):
         time.sleep(1)
 
     print("🏁 Testing completed!")
-    return True
 
 
 def test_schema_validation():

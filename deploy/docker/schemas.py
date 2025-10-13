@@ -174,6 +174,31 @@ class SeedRequest(BaseModel):
     config: Dict[str, Any] = Field(default_factory=dict)
 
 
+class URLDiscoveryRequest(BaseModel):
+    """Request model for URL discovery endpoint."""
+
+    domain: str = Field(..., example="docs.crawl4ai.com", description="Domain to discover URLs from")
+    seeding_config: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Configuration for URL discovery using AsyncUrlSeeder",
+        example={
+            "source": "sitemap+cc",
+            "pattern": "*",
+            "live_check": False,
+            "extract_head": False,
+            "max_urls": -1,
+            "concurrency": 1000,
+            "hits_per_sec": 5,
+            "force": False,
+            "verbose": False,
+            "query": None,
+            "score_threshold": None,
+            "scoring_method": "bm25",
+            "filter_nonsense_urls": True
+        }
+    )
+
+
 # --- C4A Script Schemas ---
 
 

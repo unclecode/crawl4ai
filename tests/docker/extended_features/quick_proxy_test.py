@@ -11,265 +11,294 @@ Usage:
 """
 
 import requests
-import json
-from colorama import Fore, Style, init
+from rich.console import Console
 
-init(autoreset=True)
+console = Console()
 
 API_URL = "http://localhost:11235"
 
+
 def test_api_accepts_proxy_params():
     """Test 1: Verify API accepts proxy rotation parameters"""
-    print(f"\n{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
-    print(f"{Fore.CYAN}Test 1: API Parameter Validation{Style.RESET_ALL}")
-    print(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}\n")
-    
+    console.print(f"\n[cyan]{'=' * 60}[/cyan]")
+    console.print(f"[cyan]Test 1: API Parameter Validation[/cyan]")
+    console.print(f"[cyan]{'=' * 60}[/cyan]\n")
+
     # Test valid strategy names
     strategies = ["round_robin", "random", "least_used", "failure_aware"]
-    
+
     for strategy in strategies:
         payload = {
             "urls": ["https://httpbin.org/html"],
             "proxy_rotation_strategy": strategy,
             "proxies": [
-                {"server": "http://proxy1.com:8080", "username": "user", "password": "pass"}
+                {
+                    "server": "http://proxy1.com:8080",
+                    "username": "user",
+                    "password": "pass",
+                }
             ],
-            "headless": True
+            "headless": True,
         }
-        
-        print(f"Testing strategy: {Fore.YELLOW}{strategy}{Style.RESET_ALL}")
-        
+
+        console.print(f"Testing strategy: [yellow]{strategy}[/yellow]")
+
         try:
             # We expect this to fail on proxy connection, but API should accept it
             response = requests.post(f"{API_URL}/crawl", json=payload, timeout=10)
-            
+
             if response.status_code == 200:
-                print(f"  {Fore.GREEN}✅ API accepted {strategy} strategy{Style.RESET_ALL}")
-            elif response.status_code == 500 and "PROXY_CONNECTION_FAILED" in response.text:
-                print(f"  {Fore.GREEN}✅ API accepted {strategy} strategy (proxy connection failed as expected){Style.RESET_ALL}")
+                console.print(f"  [green]✅ API accepted {strategy} strategy[/green]")
+            elif (
+                response.status_code == 500
+                and "PROXY_CONNECTION_FAILED" in response.text
+            ):
+                console.print(
+                    f"  [green]✅ API accepted {strategy} strategy (proxy connection failed as expected)[/green]"
+                )
             elif response.status_code == 422:
-                print(f"  {Fore.RED}❌ API rejected {strategy} strategy{Style.RESET_ALL}")
+                console.print(f"  [red]❌ API rejected {strategy} strategy[/red]")
                 print(f"     {response.json()}")
             else:
-                print(f"  {Fore.YELLOW}⚠️  Unexpected response: {response.status_code}{Style.RESET_ALL}")
-                
+                console.print(
+                    f"  [yellow]⚠️  Unexpected response: {response.status_code}[/yellow]"
+                )
+
         except requests.Timeout:
-            print(f"  {Fore.YELLOW}⚠️  Request timeout{Style.RESET_ALL}")
+            console.print(f"  [yellow]⚠️  Request timeout[/yellow]")
         except Exception as e:
-            print(f"  {Fore.RED}❌ Error: {e}{Style.RESET_ALL}")
+            console.print(f"  [red]❌ Error: {e}[/red]")
 
 
 def test_invalid_strategy():
     """Test 2: Verify API rejects invalid strategies"""
-    print(f"\n{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
-    print(f"{Fore.CYAN}Test 2: Invalid Strategy Rejection{Style.RESET_ALL}")
-    print(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}\n")
-    
+    console.print(f"\n[cyan]{'=' * 60}[/cyan]")
+    console.print(f"[cyan]Test 2: Invalid Strategy Rejection[/cyan]")
+    console.print(f"[cyan]{'=' * 60}[/cyan]\n")
+
     payload = {
         "urls": ["https://httpbin.org/html"],
         "proxy_rotation_strategy": "invalid_strategy",
         "proxies": [{"server": "http://proxy1.com:8080"}],
-        "headless": True
+        "headless": True,
     }
-    
-    print(f"Testing invalid strategy: {Fore.YELLOW}invalid_strategy{Style.RESET_ALL}")
-    
+
+    console.print(f"Testing invalid strategy: [yellow]invalid_strategy[/yellow]")
+
     try:
         response = requests.post(f"{API_URL}/crawl", json=payload, timeout=10)
-        
+
         if response.status_code == 422:
-            print(f"{Fore.GREEN}✅ API correctly rejected invalid strategy{Style.RESET_ALL}")
+            console.print(f"[green]✅ API correctly rejected invalid strategy[/green]")
             error = response.json()
-            if isinstance(error, dict) and 'detail' in error:
+            if isinstance(error, dict) and "detail" in error:
                 print(f"   Validation message: {error['detail'][0]['msg']}")
         else:
-            print(f"{Fore.RED}❌ API did not reject invalid strategy{Style.RESET_ALL}")
-            
+            console.print(f"[red]❌ API did not reject invalid strategy[/red]")
+
     except Exception as e:
-        print(f"{Fore.RED}❌ Error: {e}{Style.RESET_ALL}")
+        console.print(f"[red]❌ Error: {e}[/red]")
 
 
 def test_optional_params():
     """Test 3: Verify failure-aware optional parameters"""
-    print(f"\n{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
-    print(f"{Fore.CYAN}Test 3: Optional Parameters{Style.RESET_ALL}")
-    print(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}\n")
-    
+    console.print(f"\n[cyan]{'=' * 60}[/cyan]")
+    console.print(f"[cyan]Test 3: Optional Parameters[/cyan]")
+    console.print(f"[cyan]{'=' * 60}[/cyan]\n")
+
     payload = {
         "urls": ["https://httpbin.org/html"],
         "proxy_rotation_strategy": "failure_aware",
-        "proxy_failure_threshold": 5,      # Custom threshold
-        "proxy_recovery_time": 600,        # Custom recovery time
+        "proxy_failure_threshold": 5,  # Custom threshold
+        "proxy_recovery_time": 600,  # Custom recovery time
         "proxies": [
             {"server": "http://proxy1.com:8080", "username": "user", "password": "pass"}
         ],
-        "headless": True
+        "headless": True,
     }
-    
+
     print(f"Testing failure-aware with custom parameters:")
     print(f"  - proxy_failure_threshold: {payload['proxy_failure_threshold']}")
     print(f"  - proxy_recovery_time: {payload['proxy_recovery_time']}")
-    
+
     try:
         response = requests.post(f"{API_URL}/crawl", json=payload, timeout=10)
-        
+
         if response.status_code in [200, 500]:  # 500 is ok (proxy connection fails)
-            print(f"{Fore.GREEN}✅ API accepted custom failure-aware parameters{Style.RESET_ALL}")
+            console.print(
+                f"[green]✅ API accepted custom failure-aware parameters[/green]"
+            )
         elif response.status_code == 422:
-            print(f"{Fore.RED}❌ API rejected custom parameters{Style.RESET_ALL}")
+            console.print(f"[red]❌ API rejected custom parameters[/red]")
             print(response.json())
         else:
-            print(f"{Fore.YELLOW}⚠️  Unexpected response: {response.status_code}{Style.RESET_ALL}")
-            
+            console.print(
+                f"[yellow]⚠️  Unexpected response: {response.status_code}[/yellow]"
+            )
+
     except Exception as e:
-        print(f"{Fore.RED}❌ Error: {e}{Style.RESET_ALL}")
+        console.print(f"[red]❌ Error: {e}[/red]")
 
 
 def test_without_proxies():
     """Test 4: Normal crawl without proxy rotation (baseline)"""
-    print(f"\n{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
-    print(f"{Fore.CYAN}Test 4: Baseline Crawl (No Proxies){Style.RESET_ALL}")
-    print(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}\n")
-    
+    console.print(f"\n[cyan]{'=' * 60}[/cyan]")
+    console.print(f"[cyan]Test 4: Baseline Crawl (No Proxies)[/cyan]")
+    console.print(f"[cyan]{'=' * 60}[/cyan]\n")
+
     payload = {
         "urls": ["https://httpbin.org/html"],
         "headless": True,
         "browser_config": {
             "type": "BrowserConfig",
-            "params": {"headless": True, "verbose": False}
+            "params": {"headless": True, "verbose": False},
         },
         "crawler_config": {
             "type": "CrawlerRunConfig",
-            "params": {"cache_mode": "bypass", "verbose": False}
-        }
+            "params": {"cache_mode": "bypass", "verbose": False},
+        },
     }
-    
+
     print("Testing normal crawl without proxy rotation...")
-    
+
     try:
         response = requests.post(f"{API_URL}/crawl", json=payload, timeout=30)
-        
+
         if response.status_code == 200:
             data = response.json()
-            results = data.get('results', [])
-            if results and results[0].get('success'):
-                print(f"{Fore.GREEN}✅ Baseline crawl successful{Style.RESET_ALL}")
+            results = data.get("results", [])
+            if results and results[0].get("success"):
+                console.print(f"[green]✅ Baseline crawl successful[/green]")
                 print(f"   URL: {results[0].get('url')}")
                 print(f"   Content length: {len(results[0].get('html', ''))} chars")
             else:
-                print(f"{Fore.YELLOW}⚠️  Crawl completed but with issues{Style.RESET_ALL}")
+                console.print(f"[yellow]⚠️  Crawl completed but with issues[/yellow]")
         else:
-            print(f"{Fore.RED}❌ Baseline crawl failed: {response.status_code}{Style.RESET_ALL}")
-            
+            console.print(
+                f"[red]❌ Baseline crawl failed: {response.status_code}[/red]"
+            )
+
     except Exception as e:
-        print(f"{Fore.RED}❌ Error: {e}{Style.RESET_ALL}")
+        console.print(f"[red]❌ Error: {e}[/red]")
 
 
 def test_proxy_config_formats():
     """Test 5: Different proxy configuration formats"""
-    print(f"\n{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
-    print(f"{Fore.CYAN}Test 5: Proxy Configuration Formats{Style.RESET_ALL}")
-    print(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}\n")
-    
+    console.print(f"\n[cyan]{'=' * 60}[/cyan]")
+    console.print(f"[cyan]Test 5: Proxy Configuration Formats[/cyan]")
+    console.print(f"[cyan]{'=' * 60}[/cyan]\n")
+
     test_cases = [
         {
             "name": "With username/password",
-            "proxy": {"server": "http://proxy.com:8080", "username": "user", "password": "pass"}
+            "proxy": {
+                "server": "http://proxy.com:8080",
+                "username": "user",
+                "password": "pass",
+            },
         },
-        {
-            "name": "Server only",
-            "proxy": {"server": "http://proxy.com:8080"}
-        },
+        {"name": "Server only", "proxy": {"server": "http://proxy.com:8080"}},
         {
             "name": "HTTPS proxy",
-            "proxy": {"server": "https://proxy.com:8080", "username": "user", "password": "pass"}
+            "proxy": {
+                "server": "https://proxy.com:8080",
+                "username": "user",
+                "password": "pass",
+            },
         },
     ]
-    
+
     for test_case in test_cases:
-        print(f"Testing: {Fore.YELLOW}{test_case['name']}{Style.RESET_ALL}")
-        
+        console.print(f"Testing: [yellow]{test_case['name']}[/yellow]")
+
         payload = {
             "urls": ["https://httpbin.org/html"],
             "proxy_rotation_strategy": "round_robin",
-            "proxies": [test_case['proxy']],
-            "headless": True
+            "proxies": [test_case["proxy"]],
+            "headless": True,
         }
-        
+
         try:
             response = requests.post(f"{API_URL}/crawl", json=payload, timeout=10)
-            
+
             if response.status_code in [200, 500]:
-                print(f"  {Fore.GREEN}✅ Format accepted{Style.RESET_ALL}")
+                console.print(f"  [green]✅ Format accepted[/green]")
             elif response.status_code == 422:
-                print(f"  {Fore.RED}❌ Format rejected{Style.RESET_ALL}")
+                console.print(f"  [red]❌ Format rejected[/red]")
                 print(f"     {response.json()}")
             else:
-                print(f"  {Fore.YELLOW}⚠️  Unexpected: {response.status_code}{Style.RESET_ALL}")
-                
+                console.print(
+                    f"  [yellow]⚠️  Unexpected: {response.status_code}[/yellow]"
+                )
+
         except Exception as e:
-            print(f"  {Fore.RED}❌ Error: {e}{Style.RESET_ALL}")
+            console.print(f"  [red]❌ Error: {e}[/red]")
 
 
 def main():
-    print(f"""
-{Fore.CYAN}╔══════════════════════════════════════════════════════════╗
+    console.print(f"""
+[cyan]╔══════════════════════════════════════════════════════════╗
 ║                                                          ║
 ║        Quick Proxy Rotation Feature Test                ║
 ║                                                          ║
 ║  Verifying API integration without real proxies         ║
 ║                                                          ║
-╚══════════════════════════════════════════════════════════╝{Style.RESET_ALL}
+╚══════════════════════════════════════════════════════════╝[/cyan]
 """)
-    
+
     # Check server
     try:
         response = requests.get(f"{API_URL}/health", timeout=5)
         if response.status_code == 200:
-            print(f"{Fore.GREEN}✅ Server is running at {API_URL}{Style.RESET_ALL}\n")
+            console.print(f"[green]✅ Server is running at {API_URL}[/green]\n")
         else:
-            print(f"{Fore.RED}❌ Server returned status {response.status_code}{Style.RESET_ALL}\n")
+            console.print(
+                f"[red]❌ Server returned status {response.status_code}[/red]\n"
+            )
             return
     except Exception as e:
-        print(f"{Fore.RED}❌ Cannot connect to server: {e}{Style.RESET_ALL}")
-        print(f"{Fore.YELLOW}Make sure Crawl4AI server is running on {API_URL}{Style.RESET_ALL}\n")
+        console.print(f"[red]❌ Cannot connect to server: {e}[/red]")
+        console.print(
+            f"[yellow]Make sure Crawl4AI server is running on {API_URL}[/yellow]\n"
+        )
         return
-    
+
     # Run tests
     test_api_accepts_proxy_params()
     test_invalid_strategy()
     test_optional_params()
     test_without_proxies()
     test_proxy_config_formats()
-    
+
     # Summary
-    print(f"\n{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
-    print(f"{Fore.CYAN}Test Summary{Style.RESET_ALL}")
-    print(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}\n")
-    
-    print(f"{Fore.GREEN}✅ Proxy rotation feature is integrated correctly!{Style.RESET_ALL}")
+    console.print(f"\n[cyan]{'=' * 60}[/cyan]")
+    console.print(f"[cyan]Test Summary[/cyan]")
+    console.print(f"[cyan]{'=' * 60}[/cyan]\n")
+
+    console.print(f"[green]✅ Proxy rotation feature is integrated correctly![/green]")
     print()
-    print(f"{Fore.YELLOW}What was tested:{Style.RESET_ALL}")
+    console.print(f"[yellow]What was tested:[/yellow]")
     print("  • All 4 rotation strategies accepted by API")
     print("  • Invalid strategies properly rejected")
     print("  • Custom failure-aware parameters work")
     print("  • Different proxy config formats accepted")
     print("  • Baseline crawling still works")
     print()
-    print(f"{Fore.YELLOW}Next steps:{Style.RESET_ALL}")
+    console.print(f"[yellow]Next steps:[/yellow]")
     print("  1. Add real proxy servers to test actual rotation")
     print("  2. Run: python demo_proxy_rotation.py (full demo)")
     print("  3. Run: python test_proxy_rotation_strategies.py (comprehensive tests)")
     print()
-    print(f"{Fore.CYAN}🎉 Feature is ready for production!{Style.RESET_ALL}\n")
+    console.print(f"[cyan]🎉 Feature is ready for production![/cyan]\n")
 
 
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print(f"\n{Fore.YELLOW}Test interrupted{Style.RESET_ALL}")
+        console.print(f"\n[yellow]Test interrupted[/yellow]")
     except Exception as e:
-        print(f"\n{Fore.RED}Unexpected error: {e}{Style.RESET_ALL}")
+        console.print(f"\n[red]Unexpected error: {e}[/red]")
         import traceback
+
         traceback.print_exc()
