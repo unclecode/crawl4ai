@@ -1,5 +1,15 @@
 // App Detail Page JavaScript
-const API_BASE = '/api';
+const { API_BASE, API_ORIGIN } = (() => {
+    const { hostname, port, protocol } = window.location;
+    const isLocalHost = ['localhost', '127.0.0.1', '0.0.0.0'].includes(hostname);
+
+    if (isLocalHost && port && port !== '8100') {
+        const origin = `${protocol}//127.0.0.1:8100`;
+        return { API_BASE: `${origin}/marketplace/api`, API_ORIGIN: origin };
+    }
+
+    return { API_BASE: '/marketplace/api', API_ORIGIN: '' };
+})();
 
 class AppDetailPage {
     constructor() {
@@ -70,7 +80,6 @@ class AppDetailPage {
         document.getElementById('app-description').textContent = this.appData.description;
         document.getElementById('app-type').textContent = this.appData.type || 'Open Source';
         document.getElementById('app-category').textContent = this.appData.category;
-        document.getElementById('app-pricing').textContent = this.appData.pricing || 'Free';
 
         // Badges
         if (this.appData.featured) {
@@ -105,6 +114,15 @@ class AppDetailPage {
         // Contact
         document.getElementById('app-contact').textContent = this.appData.contact_email || 'Not available';
 
+        // Sidebar info
+        document.getElementById('sidebar-downloads').textContent = this.formatNumber(this.appData.downloads || 0);
+        document.getElementById('sidebar-rating').textContent = (this.appData.rating || 0).toFixed(1);
+        document.getElementById('sidebar-category').textContent = this.appData.category || '-';
+        document.getElementById('sidebar-type').textContent = this.appData.type || '-';
+        document.getElementById('sidebar-status').textContent = this.appData.status || 'Active';
+        document.getElementById('sidebar-pricing').textContent = this.appData.pricing || 'Free';
+        document.getElementById('sidebar-contact').textContent = this.appData.contact_email || 'contact@example.com';
+
         // Integration guide
         this.renderIntegrationGuide();
     }
@@ -112,24 +130,27 @@ class AppDetailPage {
     renderIntegrationGuide() {
         // Installation code
         const installCode = document.getElementById('install-code');
-        if (this.appData.type === 'Open Source' && this.appData.github_url) {
-            installCode.textContent = `# Clone from GitHub
+        if (installCode) {
+            if (this.appData.type === 'Open Source' && this.appData.github_url) {
+                installCode.textContent = `# Clone from GitHub
 git clone ${this.appData.github_url}
 
 # Install dependencies
 pip install -r requirements.txt`;
-        } else if (this.appData.name.toLowerCase().includes('api')) {
-            installCode.textContent = `# Install via pip
+            } else if (this.appData.name.toLowerCase().includes('api')) {
+                installCode.textContent = `# Install via pip
 pip install ${this.appData.slug}
 
 # Or install from source
 pip install git+${this.appData.github_url || 'https://github.com/example/repo'}`;
+            }
         }
 
         // Usage code - customize based on category
         const usageCode = document.getElementById('usage-code');
-        if (this.appData.category === 'Browser Automation') {
-            usageCode.textContent = `from crawl4ai import AsyncWebCrawler
+        if (usageCode) {
+            if (this.appData.category === 'Browser Automation') {
+                usageCode.textContent = `from crawl4ai import AsyncWebCrawler
 from ${this.appData.slug.replace(/-/g, '_')} import ${this.appData.name.replace(/\s+/g, '')}
 
 async def main():
@@ -178,11 +199,13 @@ async with AsyncWebCrawler() as crawler:
         extraction_strategy=strategy
     )
     print(result.extracted_content)`;
+            }
         }
 
         // Integration example
         const integrationCode = document.getElementById('integration-code');
-        integrationCode.textContent = this.appData.integration_guide ||
+        if (integrationCode) {
+            integrationCode.textContent = this.appData.integration_guide ||
 `# Complete ${this.appData.name} Integration Example
 
 from crawl4ai import AsyncWebCrawler
@@ -237,6 +260,7 @@ async def crawl_with_${this.appData.slug.replace(/-/g, '_')}():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(crawl_with_${this.appData.slug.replace(/-/g, '_')}())`;
+        }
     }
 
     formatNumber(num) {
@@ -250,7 +274,7 @@ if __name__ == "__main__":
 
     setupEventListeners() {
         // Tab switching
-        const tabs = document.querySelectorAll('.nav-tab');
+        const tabs = document.querySelectorAll('.tab-btn');
         tabs.forEach(tab => {
             tab.addEventListener('click', () => {
                 // Update active tab
