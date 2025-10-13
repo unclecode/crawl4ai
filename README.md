@@ -952,6 +952,6 @@ A heartfelt thanks to our individual supporters! Every contribution helps us kee
   <a href="https://github.com/work-flow-manager"><img src="https://avatars.githubusercontent.com/u/217665461?s=60&v=4" style="border-radius:50%;"width="64px;"/></a>
 </p>
 
-> Want to join them? [Sponsor Crawl4AI →](https://github.com/sponsors/crawl4ai)
+> Want to join them? [Sponsor Crawl4AI →](https://github.com/sponsors/unclecode)
 
 ---
