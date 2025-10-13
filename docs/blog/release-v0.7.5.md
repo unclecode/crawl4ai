@@ -8,7 +8,8 @@ Today I'm releasing Crawl4AI v0.7.5—focused on extensibility and security. Thi
 
 ## 🎯 What's New at a Glance
 
-- **Docker Hooks System**: Custom Python functions at key pipeline points
+- **Docker Hooks System**: Custom Python functions at key pipeline points with function-based API
+- **Function-Based Hooks**: New `hooks_to_string()` utility with Docker client auto-conversion
 - **Enhanced LLM Integration**: Custom providers with temperature control
 - **HTTPS Preservation**: Secure internal link handling
 - **Bug Fixes**: Resolved multiple community-reported issues
@@ -81,6 +82,85 @@ if result.get('success'):
 - `on_execution_started`: Crawl initialization
 - `before_retrieve_html`: Pre-extraction processing
 - `before_return_html`: Final HTML processing
+
+### Function-Based Hooks API
+
+Writing hooks as strings works, but lacks IDE support and type checking. v0.7.5 introduces a function-based approach with automatic conversion!
+
+**Option 1: Using the `hooks_to_string()` Utility**
+
+```python
+from crawl4ai import hooks_to_string
+import requests
+
+# Define hooks as regular Python functions (with full IDE support!)
+async def on_page_context_created(page, context, **kwargs):
+    """Block images to speed up crawling"""
+    await context.route("**/*.{png,jpg,jpeg,gif,webp}", lambda route: route.abort())
+    await page.set_viewport_size({"width": 1920, "height": 1080})
+    return page
+
+async def before_goto(page, context, url, **kwargs):
+    """Add custom headers"""
+    await page.set_extra_http_headers({
+        'X-Crawl4AI': 'v0.7.5',
+        'X-Custom-Header': 'my-value'
+    })
+    return page
+
+# Convert functions to strings
+hooks_code = hooks_to_string({
+    "on_page_context_created": on_page_context_created,
+    "before_goto": before_goto
+})
+
+# Use with REST API
+payload = {
+    "urls": ["https://httpbin.org/html"],
+    "hooks": {"code": hooks_code, "timeout": 30}
+}
+response = requests.post("http://localhost:11235/crawl", json=payload)
+```
+
+**Option 2: Docker Client with Automatic Conversion (Recommended!)**
+
+```python
+from crawl4ai.docker_client import Crawl4aiDockerClient
+
+# Define hooks as functions (same as above)
+async def on_page_context_created(page, context, **kwargs):
+    await context.route("**/*.{png,jpg,jpeg,gif,webp}", lambda route: route.abort())
+    return page
+
+async def before_retrieve_html(page, context, **kwargs):
+    # Scroll to load lazy content
+    await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+    await page.wait_for_timeout(1000)
+    return page
+
+# Use Docker client - conversion happens automatically!
+client = Crawl4aiDockerClient(base_url="http://localhost:11235")
+
+results = await client.crawl(
+    urls=["https://httpbin.org/html"],
+    hooks={
+        "on_page_context_created": on_page_context_created,
+        "before_retrieve_html": before_retrieve_html
+    },
+    hooks_timeout=30
+)
+
+if results and results.success:
+    print(f"✅ Hooks executed! HTML length: {len(results.html)}")
+```
+
+**Benefits of Function-Based Hooks:**
+- ✅ Full IDE support (autocomplete, syntax highlighting)
+- ✅ Type checking and linting
+- ✅ Easier to test and debug
+- ✅ Reusable across projects
+- ✅ Automatic conversion in Docker client
+- ✅ No breaking changes - string hooks still work!
 
 ## 🤖 Enhanced LLM Integration
 
