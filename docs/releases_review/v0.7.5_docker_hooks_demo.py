@@ -32,8 +32,8 @@ from crawl4ai import hooks_to_string
 from crawl4ai.docker_client import Crawl4aiDockerClient
 
 # Configuration
-# DOCKER_URL = "http://localhost:11235"
-DOCKER_URL = "http://localhost:11234"
+DOCKER_URL = "http://localhost:11235"
+# DOCKER_URL = "http://localhost:11234"
 TEST_URLS = [
     # "https://httpbin.org/html",
     "https://www.kidocode.com",
@@ -573,7 +573,7 @@ async def main():
         ("String-Based Hooks (REST API)", demo_1_string_based_hooks, False),
         ("hooks_to_string() Utility", demo_2_hooks_to_string_utility, False),
         ("Docker Client Auto-Conversion", demo_3_docker_client_auto_conversion, True),
-        ("Complete Hook Pipeline", demo_4_complete_hook_pipeline, True),
+        # ("Complete Hook Pipeline", demo_4_complete_hook_pipeline, True),
     ]
 
     for i, (name, demo_func, is_async) in enumerate(demos, 1):
@@ -592,7 +592,7 @@ async def main():
             # Pause between demos (except the last one)
             if i < len(demos):
                 print("\n⏸️  Press Enter to continue to next demo...")
-                input()
+                # input()
 
         except KeyboardInterrupt:
             print(f"\n⏹️  Demo interrupted by user")
@@ -605,40 +605,40 @@ async def main():
             continue
 
     # Final summary
-    # print("\n" + "=" * 70)
-    # print("  🎉 All Demonstrations Complete!")
-    # print("=" * 70)
+    print("\n" + "=" * 70)
+    print("  🎉 All Demonstrations Complete!")
+    print("=" * 70)
 
-    # print("\n📊 Summary of v0.7.5 Docker Hooks System:")
-    # print("\n🆕 COMPLETELY NEW FEATURE in v0.7.5:")
-    # print("   The Docker Hooks System lets you customize the crawling pipeline")
-    # print("   with user-provided Python functions at 8 strategic points.")
+    print("\n📊 Summary of v0.7.5 Docker Hooks System:")
+    print("\n🆕 COMPLETELY NEW FEATURE in v0.7.5:")
+    print("   The Docker Hooks System lets you customize the crawling pipeline")
+    print("   with user-provided Python functions at 8 strategic points.")
 
-    # print("\n✨ Three Ways to Use Docker Hooks (All NEW!):")
-    # print("   1. String-based - Write hooks as strings for REST API")
-    # print("   2. hooks_to_string() - Convert Python functions to strings")
-    # print("   3. Docker Client - Automatic conversion (RECOMMENDED)")
+    print("\n✨ Three Ways to Use Docker Hooks (All NEW!):")
+    print("   1. String-based - Write hooks as strings for REST API")
+    print("   2. hooks_to_string() - Convert Python functions to strings")
+    print("   3. Docker Client - Automatic conversion (RECOMMENDED)")
 
-    # print("\n💡 Key Benefits:")
-    # print("   ✓ Full IDE support (autocomplete, syntax highlighting)")
-    # print("   ✓ Type checking and linting")
-    # print("   ✓ Easy to test and debug")
-    # print("   ✓ Reusable across projects")
-    # print("   ✓ Complete pipeline control")
+    print("\n💡 Key Benefits:")
+    print("   ✓ Full IDE support (autocomplete, syntax highlighting)")
+    print("   ✓ Type checking and linting")
+    print("   ✓ Easy to test and debug")
+    print("   ✓ Reusable across projects")
+    print("   ✓ Complete pipeline control")
 
-    # print("\n🎯 8 Hook Points Available:")
-    # print("   • on_browser_created, on_page_context_created")
-    # print("   • on_user_agent_updated, before_goto, after_goto")
-    # print("   • on_execution_started, before_retrieve_html, before_return_html")
+    print("\n🎯 8 Hook Points Available:")
+    print("   • on_browser_created, on_page_context_created")
+    print("   • on_user_agent_updated, before_goto, after_goto")
+    print("   • on_execution_started, before_retrieve_html, before_return_html")
 
-    # print("\n📚 Resources:")
-    # print("   • Docs: https://docs.crawl4ai.com")
-    # print("   • GitHub: https://github.com/unclecode/crawl4ai")
-    # print("   • Discord: https://discord.gg/jP8KfhDhyN")
+    print("\n📚 Resources:")
+    print("   • Docs: https://docs.crawl4ai.com")
+    print("   • GitHub: https://github.com/unclecode/crawl4ai")
+    print("   • Discord: https://discord.gg/jP8KfhDhyN")
 
-    # print("\n" + "=" * 70)
-    # print("  Happy Crawling with v0.7.5! 🕷️")
-    # print("=" * 70 + "\n")
+    print("\n" + "=" * 70)
+    print("  Happy Crawling with v0.7.5! 🕷️")
+    print("=" * 70 + "\n")
 
 
 if __name__ == "__main__":
