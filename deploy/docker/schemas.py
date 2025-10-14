@@ -240,3 +240,12 @@ class AdaptiveJobStatus(BaseModel):
     metrics: Optional[Dict[str, Any]] = None
     result: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
+
+
+class LinkAnalysisRequest(BaseModel):
+    """Request body for the /links/analyze endpoint."""
+    url: str = Field(..., description="URL to analyze for links")
+    config: Optional[Dict] = Field(
+        default_factory=dict,
+        description="Optional LinkPreviewConfig dictionary"
+    )

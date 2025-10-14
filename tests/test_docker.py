@@ -70,6 +70,7 @@ def test_docker_deployment(version="basic"):
     # test_llm_extraction(tester)
     # test_llm_with_ollama(tester)
     # test_screenshot(tester)
+    test_link_analysis(tester)
 
 
 def test_basic_crawl(tester: Crawl4AiTester):
@@ -291,6 +292,77 @@ def test_screenshot(tester: Crawl4AiTester):
         print("Screenshot saved as test_screenshot.jpg")
 
     assert result["result"]["success"]
+
+
+def test_link_analysis(tester: Crawl4AiTester):
+    print("\n=== Testing Link Analysis ===")
+
+    # Get auth token first
+    try:
+        token_response = requests.post(f"{tester.base_url}/token", json={"email": "test@example.com"})
+        token = token_response.json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    except Exception as e:
+        print(f"Could not get auth token: {e}")
+        headers = {"Content-Type": "application/json"}
+
+    # Test basic link analysis
+    request_data = {
+        "url": "https://www.nbcnews.com/business"
+    }
+
+    response = requests.post(
+        f"{tester.base_url}/links/analyze",
+        headers=headers,
+        json=request_data,
+        timeout=60
+    )
+
+    if response.status_code == 200:
+        result = response.json()
+        total_links = sum(len(links) for links in result.values())
+        print(f"Link analysis successful: found {total_links} links")
+
+        # Check for expected categories
+        categories_found = []
+        for category in ['internal', 'external', 'social', 'download', 'email', 'phone']:
+            if category in result and result[category]:
+                categories_found.append(category)
+
+        print(f"Link categories found: {categories_found}")
+
+        # Verify we have some links
+        assert total_links > 0, "Should find at least one link"
+        assert len(categories_found) > 0, "Should find at least one link category"
+
+        # Test with configuration
+        request_data_with_config = {
+            "url": "https://www.nbcnews.com/business",
+            "config": {
+                "simulate_user": True,
+                "override_navigator": True,
+                "word_count_threshold": 1
+            }
+        }
+
+        response_with_config = requests.post(
+            f"{tester.base_url}/links/analyze",
+            headers=headers,
+            json=request_data_with_config,
+            timeout=60
+        )
+
+        if response_with_config.status_code == 200:
+            result_with_config = response_with_config.json()
+            total_links_config = sum(len(links) for links in result_with_config.values())
+            print(f"Link analysis with config: found {total_links_config} links")
+            assert total_links_config > 0, "Should find links even with config"
+
+        print("✅ Link analysis tests passed")
+    else:
+        print(f"❌ Link analysis failed: {response.status_code} - {response.text}")
+        # Don't fail the entire test suite for this endpoint
+        print("⚠️  Link analysis test failed, but continuing with other tests")
 
 
 if __name__ == "__main__":

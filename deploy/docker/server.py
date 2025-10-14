@@ -7,9 +7,37 @@ Crawl4AI FastAPI entry‑point
 """
 
 # ── stdlib & 3rd‑party imports ───────────────────────────────
+from crawler_pool import get_crawler, close_all, janitor
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, LinkPreviewConfig
+from auth import create_access_token, get_token_dependency, TokenRequest
+from pydantic import BaseModel
+from typing import Optional, List, Dict
+from fastapi import Request, Depends
+from fastapi.responses import FileResponse
 import ast
 import asyncio
 import base64
+import re
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, LinkPreviewConfig
+from api import (
+    handle_markdown_request, handle_llm_qa,
+    handle_stream_crawl_request, handle_crawl_request,
+    stream_results
+)
+from schemas import (
+    CrawlRequestWithHooks,
+    MarkdownRequest,
+    RawCode,
+    HTMLRequest,
+    ScreenshotRequest,
+    PDFRequest,
+    JSEndpointRequest,
+    LinkAnalysisRequest,
+)
+
+from utils import (
+    FilterType, load_config, setup_logging, verify_email_domain
+)
 import os
 import pathlib
 import re
@@ -1043,6 +1071,57 @@ async def execute_js(
         return JSONResponse(data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/links/analyze")
+@limiter.limit(config["rate_limiting"]["default_limit"])
+@mcp_tool("links_analyze")
+async def analyze_links(
+    request: Request,
+    body: LinkAnalysisRequest,
+    _td: Dict = Depends(token_dep),
+):
+    """
+    Analyze and score links on a webpage.
+    Returns a dictionary of links with their scores and metadata.
+    """
+    try:
+        # Create AsyncWebCrawler instance
+        async with AsyncWebCrawler(config=BrowserConfig()) as crawler:
+            # Deserialize config dict to LinkPreviewConfig, use default if not provided
+            link_preview_config = LinkPreviewConfig.from_dict(body.config) if body.config else LinkPreviewConfig()
+
+            # Create CrawlerRunConfig with link analysis settings
+            run_config = CrawlerRunConfig(
+                link_preview_config=link_preview_config,
+                score_links=True,
+                screenshot=False,
+                pdf=False,
+                extraction_strategy=None
+            )
+
+            # Execute the crawl
+            result = await crawler.arun(url=body.url, config=run_config)
+
+            # Check if crawl was successful
+            if not result.success:
+                raise HTTPException(
+                    status_code=500,
+                    detail=result.error_message or "Crawl failed"
+                )
+
+            # Extract and return the links dictionary
+            return JSONResponse(result.links)
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        # Handle any other exceptions
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
 
 
 @app.get("/llm/{url:path}",
