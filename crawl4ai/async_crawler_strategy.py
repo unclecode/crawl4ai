@@ -1037,7 +1037,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 downloaded_files=(
                     self._downloaded_files if self._downloaded_files else None
                 ),
-                redirected_url=redirected_url,
+                redirected_url=page.url,  # Update to current URL in case of JavaScript navigation
                 # Include captured data if enabled
                 network_requests=captured_requests if config.capture_network_requests else None,
                 console_messages=captured_console if config.capture_console_messages else None,
