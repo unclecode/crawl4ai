@@ -28,6 +28,8 @@ Visit `http://localhost:11235/docs` for interactive Swagger UI documentation.
 ### Core Crawling
 - [POST /crawl](#post-crawl) - Main crawling endpoint
 - [POST /crawl/stream](#post-crawlstream) - Streaming crawl endpoint
+- [POST /crawl/http](#post-crawlhttp) - HTTP-only crawling endpoint
+- [POST /crawl/http/stream](#post-crawlhttpstream) - HTTP-only streaming crawl endpoint
 - [POST /seed](#post-seed) - URL discovery and seeding
 
 ### Content Extraction
@@ -373,6 +375,312 @@ Discover and seed URLs from a website.
           "filter_type": "domain"
         }
       }'
+    ```
+
+---
+
+### POST /crawl/http
+
+Fast HTTP-only crawling endpoint for static content and APIs.
+
+#### Request
+
+**Headers:**
+```
+Content-Type: application/json
+Authorization: Bearer <your_token>
+```
+
+**Body:**
+```json
+{
+  "urls": ["https://api.example.com/data"],
+  "http_config": {
+    "method": "GET",
+    "headers": {"Accept": "application/json"},
+    "timeout": 30,
+    "follow_redirects": true,
+    "verify_ssl": true
+  },
+  "crawler_config": {
+    "word_count_threshold": 10,
+    "extraction_strategy": "NoExtractionStrategy"
+  },
+  "dispatcher": "memory_adaptive"
+}
+```
+
+#### Response
+
+```json
+{
+  "success": true,
+  "results": [
+    {
+      "url": "https://api.example.com/data",
+      "html": "<html>...</html>",
+      "markdown": "# API Response\n\n...",
+      "cleaned_html": "<div>...</div>",
+      "success": true,
+      "status_code": 200,
+      "metadata": {
+        "title": "API Data",
+        "description": "JSON response data"
+      },
+      "links": {
+        "internal": [],
+        "external": []
+      },
+      "media": {
+        "images": []
+      }
+    }
+  ],
+  "server_processing_time_s": 0.15,
+  "server_memory_delta_mb": 1.2
+}
+```
+
+#### Configuration Options
+
+**HTTP Config:**
+```json
+{
+  "method": "GET",                    // HTTP method (GET, POST, PUT, etc.)
+  "headers": {                        // Custom HTTP headers
+    "User-Agent": "Crawl4AI/1.0",
+    "Accept": "application/json"
+  },
+  "data": "form=data",                // Form data for POST requests
+  "json": {"key": "value"},           // JSON data for POST requests
+  "timeout": 30,                      // Request timeout in seconds
+  "follow_redirects": true,           // Follow HTTP redirects
+  "verify_ssl": true,                 // Verify SSL certificates
+  "params": {"key": "value"}          // URL query parameters
+}
+```
+
+**Crawler Config:**
+```json
+{
+  "word_count_threshold": 10,         // Minimum words per block
+  "extraction_strategy": "NoExtractionStrategy", // Use lightweight extraction
+  "remove_overlay_elements": false,   // No overlays in HTTP responses
+  "css_selector": ".content",         // Extract specific elements
+  "excluded_tags": ["script", "style"] // Tags to exclude
+}
+```
+
+#### Examples
+
+=== "Python"
+    ```python
+    import requests
+    
+    # Get token first
+    token_response = requests.post(
+        "http://localhost:11235/token",
+        json={"email": "your@email.com"}
+    )
+    token = token_response.json()["access_token"]
+    
+    # Fast HTTP-only crawl
+    response = requests.post(
+        "http://localhost:11235/crawl/http",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        },
+        json={
+            "urls": ["https://httpbin.org/json"],
+            "http_config": {
+                "method": "GET",
+                "headers": {"Accept": "application/json"},
+                "timeout": 10
+            },
+            "crawler_config": {
+                "extraction_strategy": "NoExtractionStrategy"
+            }
+        }
+    )
+    
+    data = response.json()
+    if data["success"]:
+        result = data["results"][0]
+        print(f"Status: {result['status_code']}")
+        print(f"Response time: {data['server_processing_time_s']:.2f}s")
+        print(f"Content length: {len(result['html'])} chars")
+    ```
+
+=== "cURL"
+    ```bash
+    # Get token
+    TOKEN=$(curl -X POST http://localhost:11235/token \
+      -H "Content-Type: application/json" \
+      -d '{"email": "your@email.com"}' | jq -r '.access_token')
+    
+    # HTTP-only crawl
+    curl -X POST http://localhost:11235/crawl/http \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "urls": ["https://httpbin.org/json"],
+        "http_config": {
+          "method": "GET",
+          "headers": {"Accept": "application/json"},
+          "timeout": 10
+        },
+        "crawler_config": {
+          "extraction_strategy": "NoExtractionStrategy"
+        }
+      }'
+    ```
+
+=== "JavaScript"
+    ```javascript
+    // Get token
+    const tokenResponse = await fetch('http://localhost:11235/token', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({email: 'your@email.com'})
+    });
+    const {access_token} = await tokenResponse.json();
+    
+    // HTTP-only crawl
+    const response = await fetch('http://localhost:11235/crawl/http', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${access_token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        urls: ['https://httpbin.org/json'],
+        http_config: {
+          method: 'GET',
+          headers: {'Accept': 'application/json'},
+          timeout: 10
+        },
+        crawler_config: {
+          extraction_strategy: 'NoExtractionStrategy'
+        }
+      })
+    });
+    
+    const data = await response.json();
+    console.log('HTTP Crawl Results:', data.results);
+    console.log(`Processed in ${data.server_processing_time_s}s`);
+    ```
+
+#### Use Cases
+
+- **API Endpoints**: Crawl REST APIs and GraphQL endpoints
+- **Static Websites**: Fast crawling of HTML pages without JavaScript
+- **JSON/XML Feeds**: Extract data from RSS feeds and API responses
+- **Sitemaps**: Process XML sitemaps and structured data
+- **Headless CMS**: Crawl content management system APIs
+
+#### Performance Benefits
+
+- **1000x Faster**: No browser startup or JavaScript execution
+- **Lower Resource Usage**: Minimal memory and CPU overhead
+- **Higher Throughput**: Process thousands of URLs per minute
+- **Cost Effective**: Ideal for large-scale data collection
+
+---
+
+### POST /crawl/http/stream
+
+Streaming HTTP-only crawling with real-time progress updates.
+
+#### Request
+
+Same as `/crawl/http` endpoint.
+
+#### Response
+
+Server-Sent Events (SSE) stream:
+
+```
+data: {"type": "progress", "url": "https://api.example.com", "status": "started"}
+
+data: {"type": "progress", "url": "https://api.example.com", "status": "fetching"}
+
+data: {"type": "result", "url": "https://api.example.com", "data": {...}}
+
+data: {"type": "complete", "success": true, "total_urls": 1}
+```
+
+#### Examples
+
+=== "Python"
+    ```python
+    import requests
+    import json
+    
+    response = requests.post(
+        "http://localhost:11235/crawl/http/stream",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        },
+        json={
+            "urls": ["https://httpbin.org/json", "https://httpbin.org/uuid"],
+            "http_config": {"timeout": 5}
+        },
+        stream=True
+    )
+    
+    for line in response.iter_lines():
+        if line:
+            line = line.decode('utf-8')
+            if line.startswith('data: '):
+                data = json.loads(line[6:])
+                print(f"Event: {data.get('type')} - URL: {data.get('url', 'N/A')}")
+                
+                if data['type'] == 'result':
+                    result = data['data']
+                    print(f"  Status: {result['status_code']}")
+                elif data['type'] == 'complete':
+                    print(f"  Total processed: {data['total_urls']}")
+                    break
+    ```
+
+=== "JavaScript"
+    ```javascript
+    const eventSource = new EventSource(
+      'http://localhost:11235/crawl/http/stream'
+    );
+    
+    // Handle streaming events
+    eventSource.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      
+      switch(data.type) {
+        case 'progress':
+          console.log(`Progress: ${data.url} - ${data.status}`);
+          break;
+        case 'result':
+          console.log(`Result: ${data.url} - Status ${data.data.status_code}`);
+          break;
+        case 'complete':
+          console.log(`Complete: ${data.total_urls} URLs processed`);
+          eventSource.close();
+          break;
+      }
+    };
+    
+    // Send the request
+    fetch('http://localhost:11235/crawl/http/stream', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        urls: ['https://httpbin.org/json'],
+        http_config: {timeout: 5}
+      })
+    });
     ```
 
 ---

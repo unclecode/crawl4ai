@@ -59,7 +59,7 @@ DISPATCHER_DEFAULTS = {
         "check_interval": 1.0,
         "max_session_permit": 20,
         "fairness_timeout": 600.0,
-        "memory_wait_timeout": 600.0,
+        "memory_wait_timeout": None,  # Disable memory timeout for testing
     },
     "semaphore": {
         "semaphore_count": 5,

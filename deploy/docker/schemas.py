@@ -123,6 +123,34 @@ class CrawlRequestWithHooks(CrawlRequest):
     )
 
 
+class HTTPCrawlRequest(BaseModel):
+    """Request model for HTTP-only crawling endpoints."""
+    
+    urls: List[str] = Field(min_length=1, max_length=100, description="List of URLs to crawl")
+    http_config: Optional[Dict] = Field(
+        default_factory=dict, 
+        description="HTTP crawler configuration (method, headers, timeout, etc.)"
+    )
+    crawler_config: Optional[Dict] = Field(
+        default_factory=dict,
+        description="Crawler run configuration (extraction, filtering, etc.)"
+    )
+    
+    # Dispatcher selection (same as browser crawling)
+    dispatcher: Optional[DispatcherType] = Field(
+        None, 
+        description="Dispatcher type to use. Defaults to memory_adaptive if not specified."
+    )
+
+
+class HTTPCrawlRequestWithHooks(HTTPCrawlRequest):
+    """Extended HTTP crawl request with hooks support"""
+
+    hooks: Optional[HookConfig] = Field(
+        default=None, description="Optional user-provided hook functions"
+    )
+
+
 class MarkdownRequest(BaseModel):
     """Request body for the /md endpoint."""
 

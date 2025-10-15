@@ -25,7 +25,8 @@ from .extraction_strategy import (
     JsonCssExtractionStrategy,
     JsonXPathExtractionStrategy,
     JsonLxmlExtractionStrategy,
-    RegexExtractionStrategy
+    RegexExtractionStrategy,
+    NoExtractionStrategy,  # NEW: Import NoExtractionStrategy
 )
 from .chunking_strategy import ChunkingStrategy, RegexChunking
 from .markdown_generation_strategy import DefaultMarkdownGenerator
@@ -113,6 +114,7 @@ __all__ = [
     "BrowserProfiler",
     "LLMConfig",
     "GeolocationConfig",
+    "NoExtractionStrategy",
     # NEW: Add SeedingConfig and VirtualScrollConfig
     "SeedingConfig",
     "VirtualScrollConfig",

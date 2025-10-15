@@ -11,7 +11,7 @@ from crawler_pool import get_crawler, close_all, janitor
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, LinkPreviewConfig
 from auth import create_access_token, get_token_dependency, TokenRequest
 from pydantic import BaseModel
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, AsyncGenerator
 from fastapi import Request, Depends
 from fastapi.responses import FileResponse
 import ast
@@ -20,19 +20,30 @@ import base64
 import re
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, LinkPreviewConfig
 from api import (
-    handle_markdown_request, handle_llm_qa,
-    handle_stream_crawl_request, handle_crawl_request,
-    stream_results
+    handle_crawl_request,
+    handle_http_crawl_request,
+    handle_http_stream_crawl_request,
+    handle_llm_qa,
+    handle_markdown_request,
+    handle_seed,
+    handle_stream_crawl_request,
+    handle_url_discovery,
+    stream_results,
 )
 from schemas import (
+    CrawlRequest,
     CrawlRequestWithHooks,
-    MarkdownRequest,
-    RawCode,
     HTMLRequest,
-    ScreenshotRequest,
-    PDFRequest,
+    HTTPCrawlRequest,
+    HTTPCrawlRequestWithHooks,
     JSEndpointRequest,
     LinkAnalysisRequest,
+    MarkdownRequest,
+    PDFRequest,
+    RawCode,
+    ScreenshotRequest,
+    SeedRequest,
+    URLDiscoveryRequest,
 )
 
 from utils import (
@@ -1569,9 +1580,10 @@ async def crawl(
         dispatcher=dispatcher,
     )
     # check if all of the results are not successful
-    if all(not result["success"] for result in results["results"]):
+    if results["results"] and all(not result["success"] for result in results["results"]):
+        error_message = results['results'][0].get('error_message', 'Unknown error') if results['results'] else 'No results returned'
         raise HTTPException(
-            500, f"Crawl request failed: {results['results'][0]['error_message']}"
+            500, f"Crawl request failed: {error_message}"
         )
     return JSONResponse(results)
 
@@ -1737,8 +1749,223 @@ async def stream_process(crawl_request: CrawlRequestWithHooks):
     )
 
 
+# ============================================================================
+# HTTP Crawling Endpoints
+# ============================================================================
+
+@app.post("/crawl/http",
+    summary="Crawl URLs with HTTP-only strategy",
+    description="Crawl one or more URLs using a fast, lightweight HTTP-only strategy without browser rendering.",
+    response_description="Crawl results with extracted content, metadata, and media",
+    tags=["HTTP Crawling"]
+)
+@limiter.limit(config["rate_limiting"]["default_limit"])
+async def crawl_http(
+    request: Request,
+    crawl_request: HTTPCrawlRequest | HTTPCrawlRequestWithHooks,
+    _td: Dict = Depends(token_dep),
+):
+    """
+    Crawl one or more URLs using HTTP-only strategy.
+    
+    This endpoint provides fast, lightweight crawling without browser rendering.
+    Perfect for static websites, APIs, and content that doesn't require JavaScript execution.
+    
+    **Request Body:**
+    ```json
+    {
+        "urls": ["https://api.example.com/data"],
+        "http_config": {
+            "method": "GET",
+            "headers": {"Accept": "application/json"},
+            "timeout": 30
+        },
+        "crawler_config": {
+            "word_count_threshold": 10,
+            "extraction_strategy": "NoExtractionStrategy"
+        },
+        "dispatcher": "memory_adaptive"
+    }
+    ```
+    
+    **Response:**
+    ```json
+    {
+        "success": true,
+        "results": [
+            {
+                "url": "https://api.example.com/data",
+                "html": "<html>...</html>",
+                "markdown": "# API Response\\n\\n...",
+                "success": true,
+                "status_code": 200,
+                "metadata": {
+                    "title": "API Data",
+                    "description": "JSON response data"
+                }
+            }
+        ],
+        "server_processing_time_s": 0.85,
+        "server_memory_delta_mb": 2.1
+    }
+    ```
+    
+    **HTTP Config Options:**
+    - `method`: HTTP method ("GET", "POST", etc.) (default: "GET")
+    - `headers`: Custom HTTP headers
+    - `data`: Form data for POST requests
+    - `json`: JSON data for POST requests
+    - `follow_redirects`: Whether to follow redirects (default: true)
+    - `verify_ssl`: Whether to verify SSL certificates (default: true)
+    
+    **Notes:**
+    - Thousands of times faster than browser-based crawling
+    - No JavaScript execution or browser rendering
+    - Ideal for APIs, static sites, and sitemaps
+    - For streaming results, use `/crawl/http/stream`
+    """
+    if not crawl_request.urls:
+        raise HTTPException(400, "At least one URL required")
+
+    # Prepare hooks config if provided
+    hooks_config = None
+    if hasattr(crawl_request, 'hooks') and crawl_request.hooks:
+        hooks_config = {
+            "code": crawl_request.hooks.code,
+            "timeout": crawl_request.hooks.timeout,
+        }
+
+    # Get dispatcher from app state
+    dispatcher_type = crawl_request.dispatcher.value if crawl_request.dispatcher else app.state.default_dispatcher_type
+    dispatcher = app.state.dispatchers.get(dispatcher_type)
+    
+    if not dispatcher:
+        raise HTTPException(
+            500, 
+            f"Dispatcher '{dispatcher_type}' not available. Available dispatchers: {list(app.state.dispatchers.keys())}"
+        )
+    
+    results = await handle_http_crawl_request(
+        urls=crawl_request.urls,
+        http_config=crawl_request.http_config,
+        crawler_config=crawl_request.crawler_config,
+        config=config,
+        hooks_config=hooks_config,
+        dispatcher=dispatcher,
+    )
+    
+    return results
+
+
+@app.post("/crawl/http/stream",
+    summary="Crawl URLs with HTTP-only strategy (streaming)",
+    description="Stream HTTP-only crawl progress in real-time using Server-Sent Events (SSE).",
+    response_description="Server-Sent Events stream with progress updates and results",
+    tags=["HTTP Crawling"]
+)
+@limiter.limit(config["rate_limiting"]["default_limit"])
+async def crawl_http_stream(
+    request: Request,
+    crawl_request: HTTPCrawlRequestWithHooks,
+    _td: Dict = Depends(token_dep),
+):
+    """
+    Stream HTTP-only crawl progress in real-time.
+    
+    This endpoint returns Server-Sent Events (SSE) stream with real-time updates
+    for fast HTTP-based crawling operations.
+    
+    **Request Body:**
+    Same as `/crawl/http` endpoint.
+    
+    **Response Stream:**
+    Server-Sent Events with the following event types:
+    
+    ```
+    data: {"type": "progress", "url": "https://api.example.com", "status": "started"}
+    
+    data: {"type": "progress", "url": "https://api.example.com", "status": "fetching"}
+    
+    data: {"type": "result", "url": "https://api.example.com", "data": {...}}
+    
+    data: {"type": "complete", "success": true, "total_urls": 1}
+    ```
+    
+    **Benefits:**
+    - Real-time progress monitoring for HTTP crawls
+    - Immediate feedback on each URL
+    - Lightweight and fast streaming
+    - Can process results as they arrive
+    """
+    if not crawl_request.urls:
+        raise HTTPException(400, "At least one URL required")
+
+    return await http_stream_process(crawl_request=crawl_request)
+
+
+async def http_stream_process(crawl_request: HTTPCrawlRequestWithHooks):
+    # Prepare hooks config if provided
+    hooks_config = None
+    if hasattr(crawl_request, 'hooks') and crawl_request.hooks:
+        hooks_config = {
+            "code": crawl_request.hooks.code,
+            "timeout": crawl_request.hooks.timeout,
+        }
+
+    # Get dispatcher from app state
+    dispatcher_type = crawl_request.dispatcher.value if crawl_request.dispatcher else app.state.default_dispatcher_type
+    dispatcher = app.state.dispatchers.get(dispatcher_type)
+    
+    if not dispatcher:
+        raise HTTPException(
+            500, 
+            f"Dispatcher '{dispatcher_type}' not available. Available dispatchers: {list(app.state.dispatchers.keys())}"
+        )
+
+    crawler, gen, hooks_info = await handle_http_stream_crawl_request(
+        urls=crawl_request.urls,
+        http_config=crawl_request.http_config,
+        crawler_config=crawl_request.crawler_config,
+        config=config,
+        hooks_config=hooks_config,
+        dispatcher=dispatcher,
+    )
+
+    # Add hooks info to response headers if available
+    headers = {
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "X-Stream-Status": "active",
+    }
+    if hooks_info:
+        import json
+
+        headers["X-Hooks-Status"] = json.dumps(hooks_info["status"]["status"])
+
+    return StreamingResponse(
+        stream_http_results(gen),
+        media_type="application/x-ndjson",
+        headers=headers,
+    )
+
+
+async def stream_http_results(results_gen: AsyncGenerator) -> AsyncGenerator[bytes, None]:
+    """Stream HTTP results as NDJSON (dicts already)."""
+    import json
+
+    try:
+        async for result in results_gen:
+            try:
+                data = json.dumps(result) + "\n"
+                yield data.encode("utf-8")
+            except Exception as e:
+                error_response = {"error": str(e), "url": "unknown"}
+                yield (json.dumps(error_response) + "\n").encode("utf-8")
+    except asyncio.CancelledError:
+        pass
+
+
 def chunk_code_functions(code_md: str) -> List[str]:
-    """Extract each function/class from markdown code blocks per file."""
     pattern = re.compile(
         # match "## File: <path>" then a ```py fence, then capture until the closing ```
         r"##\s*File:\s*(?P<path>.+?)\s*?\r?\n"  # file header

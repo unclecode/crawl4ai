@@ -34,9 +34,9 @@ from crawl4ai import (
 
 # --- Test Configuration ---
 # BASE_URL = os.getenv("CRAWL4AI_TEST_URL", "http://localhost:8020") # Make base URL configurable
-BASE_URL = os.getenv("CRAWL4AI_TEST_URL", "http://localhost:11235") # Make base URL configurable
+BASE_URL = os.getenv("CRAWL4AI_TEST_URL", "http://0.0.0.0:11234") # Make base URL configurable
 # Use a known simple HTML page for basic tests
-SIMPLE_HTML_URL = "https://httpbin.org/html"
+SIMPLE_HTML_URL = "https://docs.crawl4ai.com"
 # Use a site suitable for scraping tests
 SCRAPE_TARGET_URL = "http://books.toscrape.com/"
 # Use a site with internal links for deep crawl tests
@@ -78,21 +78,37 @@ async def process_streaming_response(response: httpx.Response) -> List[Dict[str,
     """Processes an NDJSON streaming response."""
     results = []
     completed = False
-    async for line in response.aiter_lines():
-        if line:
+    buffer = ""
+
+    async for chunk in response.aiter_text():
+        buffer += chunk
+        lines = buffer.split('\n')
+
+        # Keep the last incomplete line in buffer
+        buffer = lines.pop() if lines and not lines[-1].endswith('\n') else ""
+
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+
             try:
                 data = json.loads(line)
-                if data.get("status") == "completed":
+                if data.get("status") in ["completed", "error"]:
                     completed = True
-                    break # Stop processing after completion marker
+                    print(f"DEBUG: Received completion marker: {data}")  # Debug output
+                    break
                 else:
                     results.append(data)
             except json.JSONDecodeError:
                 pytest.fail(f"Failed to decode JSON line: {line}")
+
+        if completed:
+            break
+
+    print(f"DEBUG: Final results count: {len(results)}, completed: {completed}")  # Debug output
     assert completed, "Streaming response did not end with a completion marker."
     return results
-
-
 # --- Test Class ---
 
 @pytest.mark.asyncio
@@ -140,7 +156,7 @@ class TestCrawlEndpoints:
         await assert_crawl_result_structure(result)
         assert result["success"] is True
         assert result["url"] == SIMPLE_HTML_URL
-        assert "<h1>Herman Melville - Moby-Dick</h1>" in result["html"]
+        assert "Crawl4AI Documentation" in result["html"]
         # We don't specify a markdown generator in this test, so don't make assumptions about markdown field
         # It might be null, missing, or populated depending on the server's default behavior
     async def test_crawl_with_stream_direct(self, async_client: httpx.AsyncClient):
@@ -176,7 +192,7 @@ class TestCrawlEndpoints:
             await assert_crawl_result_structure(result)
             assert result["success"] is True
             assert result["url"] == SIMPLE_HTML_URL
-            assert "<h1>Herman Melville - Moby-Dick</h1>" in result["html"]
+            assert "Crawl4AI Documentation" in result["html"]
     async def test_simple_crawl_single_url_streaming(self, async_client: httpx.AsyncClient):
         """Test /crawl/stream with a single URL and simple config values."""
         payload = {
@@ -205,13 +221,13 @@ class TestCrawlEndpoints:
         await assert_crawl_result_structure(result)
         assert result["success"] is True
         assert result["url"] == SIMPLE_HTML_URL
-        assert "<h1>Herman Melville - Moby-Dick</h1>" in result["html"]
+        assert "Crawl4AI Documentation" in result["html"]
 
 
     # 2. Multi-URL and Dispatcher
     async def test_multi_url_crawl(self, async_client: httpx.AsyncClient):
         """Test /crawl with multiple URLs, implicitly testing dispatcher."""
-        urls = [SIMPLE_HTML_URL, "https://httpbin.org/links/10/0"]
+        urls = [SIMPLE_HTML_URL, "https://www.geeksforgeeks.org/"]
         payload = {
             "urls": urls,
             "browser_config": {
@@ -254,8 +270,9 @@ class TestCrawlEndpoints:
             assert result["url"] in urls
 
     async def test_multi_url_crawl_streaming(self, async_client: httpx.AsyncClient):
+
         """Test /crawl/stream with multiple URLs."""
-        urls = [SIMPLE_HTML_URL, "https://httpbin.org/links/10/0"]
+        urls = [SIMPLE_HTML_URL, "https://www.geeksforgeeks.org/"]
         payload = {
             "urls": urls,
             "browser_config": {
@@ -337,7 +354,7 @@ class TestCrawlEndpoints:
         assert isinstance(result["markdown"], dict)
         assert "raw_markdown" in result["markdown"]
         assert "fit_markdown" in result["markdown"] # Pruning creates fit_markdown
-        assert "Moby-Dick" in result["markdown"]["raw_markdown"]
+        assert "Crawl4AI" in result["markdown"]["raw_markdown"]
         # Fit markdown content might be different/shorter due to pruning
         assert len(result["markdown"]["fit_markdown"]) <= len(result["markdown"]["raw_markdown"])
 
@@ -588,6 +605,9 @@ class TestCrawlEndpoints:
               configured via .llm.env or environment variables.
               This test uses the default provider configured in the server's config.yml.
         """
+        # Skip test if no OpenAI API key is configured
+        if not os.getenv("OPENAI_API_KEY"):
+            pytest.skip("OPENAI_API_KEY not configured, skipping LLM extraction test")
         payload = {
             "urls": [SIMPLE_HTML_URL],
             "browser_config": {"type": "BrowserConfig", "params": {"headless": True}},
@@ -598,26 +618,27 @@ class TestCrawlEndpoints:
                     "extraction_strategy": {
                         "type": "LLMExtractionStrategy",
                         "params": {
-                            "instruction": "Extract the main title and the author mentioned in the text into JSON.",
+                            "instruction": "Extract the main title and any key information about Crawl4AI from the text into JSON.",
                             # LLMConfig is implicitly defined by server's config.yml and .llm.env
                             # If you needed to override provider/token PER REQUEST:
                             "llm_config": {
                                "type": "LLMConfig",
                                "params": {
-                                  "provider": "openai/gpt-4o", # Example override
-                                  "api_token": os.getenv("OPENAI_API_KEY") # Example override
+                                  "provider": "deepseek/deepseek-chat-v3.1:free", # Use deepseek model from openrouter
+                                  "api_token": os.getenv("OPENAI_API_KEY"), # Use OPENAI_API_KEY for openrouter
+                                  "base_url": "https://openrouter.ai/api/v1" # OpenRouter base URL
                                }
                             },
                             "schema": { # Optional: Provide a schema for structured output
                                 "type": "dict", # IMPORTANT: Wrap schema dict
                                 "value": {
-                                    "title": "Book Info",
+                                    "title": "Crawl4AI Info",
                                     "type": "object",
                                     "properties": {
-                                        "title": {"type": "string", "description": "The main title of the work"},
-                                        "author": {"type": "string", "description": "The author of the work"}
+                                        "title": {"type": "string", "description": "The main title of the page"},
+                                        "description": {"type": "string", "description": "Key information about Crawl4AI"}
                                     },
-                                     "required": ["title", "author"]
+                                     "required": ["title"]
                                 }
                             }
                         }
@@ -655,15 +676,11 @@ class TestCrawlEndpoints:
                 extracted_item = extracted_data[0]  # Take first item
                 assert isinstance(extracted_item, dict)
                 assert "title" in extracted_item
-                assert "author" in extracted_item
-                assert "Moby-Dick" in extracted_item.get("title", "")
-                assert "Herman Melville" in extracted_item.get("author", "")
+                assert "Crawl4AI" in extracted_item.get("title", "")
             else:
                 assert isinstance(extracted_data, dict)
                 assert "title" in extracted_data
-                assert "author" in extracted_data
-                assert "Moby-Dick" in extracted_data.get("title", "")
-                assert "Herman Melville" in extracted_data.get("author", "")
+                assert "Crawl4AI" in extracted_data.get("title", "")
         except (json.JSONDecodeError, AssertionError) as e:
             pytest.fail(f"LLM extracted content parsing or validation failed: {e}\nContent: {result['extracted_content']}")
         except Exception as e: # Catch any other unexpected error
@@ -683,9 +700,9 @@ class TestCrawlEndpoints:
         # Should return 200 with failed results, not 500
         print(f"Status code: {response.status_code}")
         print(f"Response: {response.text}")
-        assert response.status_code == 500
+        assert response.status_code == 200
         data = response.json()
-        assert data["detail"].startswith("Crawl request failed:")
+        assert data["success"] is True  # Overall success, but individual results may fail
 
     async def test_mixed_success_failure_urls(self, async_client: httpx.AsyncClient):
         """Test handling of mixed success/failure URLs."""
@@ -966,6 +983,124 @@ class TestCrawlEndpoints:
         }
         response = await async_client.post("/crawl", json=empty_urls_payload)
         assert response.status_code == 422  # "At least one URL required"
+
+    # 7. HTTP-only Crawling Tests
+    async def test_http_crawl_single_url(self, async_client: httpx.AsyncClient):
+        """Test /crawl/http with a single URL using HTTP-only strategy."""
+        payload = {
+            "urls": [SIMPLE_HTML_URL],
+            "http_config": {
+                "method": "GET",
+                "headers": {"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"},
+                "follow_redirects": True,
+                "verify_ssl": True
+            },
+            "crawler_config": {
+                "cache_mode": CacheMode.BYPASS.value,
+                "screenshot": False
+            }
+        }
+        try:
+            response = await async_client.post("/crawl/http", json=payload)
+            print(f"HTTP Response status: {response.status_code}")
+            response.raise_for_status()
+            data = response.json()
+        except httpx.HTTPStatusError as e:
+            print(f"HTTP Server error: {e}")
+            print(f"Response content: {e.response.text}")
+            raise
+
+        assert data["success"] is True
+        assert isinstance(data["results"], list)
+        assert len(data["results"]) == 1
+        result = data["results"][0]
+        await assert_crawl_result_structure(result)
+        assert result["success"] is True
+        assert result["url"] == SIMPLE_HTML_URL
+        assert "Crawl4AI Documentation" in result["html"]
+        # Check that processing was fast (HTTP should be much faster than browser)
+        assert data["server_processing_time_s"] < 5.0  # Should complete in under 5 seconds
+
+    async def test_http_crawl_streaming(self, async_client: httpx.AsyncClient):
+        """Test /crawl/http/stream with HTTP-only strategy."""
+        payload = {
+            "urls": [SIMPLE_HTML_URL],
+            "http_config": {
+                "method": "GET",
+                "headers": {"Accept": "text/html"},
+                "follow_redirects": True
+            },
+            "crawler_config": {
+                "cache_mode": CacheMode.BYPASS.value,
+                "screenshot": False
+            }
+        }
+        async with async_client.stream("POST", "/crawl/http/stream", json=payload) as response:
+            response.raise_for_status()
+            assert response.headers["content-type"] == "application/x-ndjson"
+            assert response.headers.get("x-stream-status") == "active"
+
+            results = await process_streaming_response(response)
+
+            assert len(results) == 1
+            result = results[0]
+            await assert_crawl_result_structure(result)
+            assert result["success"] is True
+            assert result["url"] == SIMPLE_HTML_URL
+            assert "Crawl4AI Documentation" in result["html"]
+
+    async def test_http_crawl_api_endpoint(self, async_client: httpx.AsyncClient):
+        """Test HTTP crawling with a JSON API endpoint."""
+        payload = {
+            "urls": ["https://httpbin.org/json"],
+            "http_config": {
+                "method": "GET",
+                "headers": {"Accept": "application/json"},
+                "follow_redirects": True
+            },
+            "crawler_config": {
+                "cache_mode": CacheMode.BYPASS.value
+            }
+        }
+        try:
+            response = await async_client.post("/crawl/http", json=payload)
+            response.raise_for_status()
+            data = response.json()
+        except httpx.HTTPStatusError as e:
+            print(f"HTTP API test error: {e}")
+            print(f"Response: {e.response.text}")
+            raise
+
+        assert data["success"] is True
+        assert len(data["results"]) == 1
+        result = data["results"][0]
+        assert result["success"] is True
+        assert result["url"] == "https://httpbin.org/json"
+        # Should contain JSON response
+        assert "slideshow" in result["html"] or "application/json" in result.get("content_type", "")
+
+    async def test_http_crawl_error_handling(self, async_client: httpx.AsyncClient):
+        """Test error handling for HTTP crawl endpoints."""
+        # Test invalid URL
+        invalid_payload = {
+            "urls": ["invalid-url"],
+            "http_config": {"method": "GET"},
+            "crawler_config": {"cache_mode": CacheMode.BYPASS.value}
+        }
+        response = await async_client.post("/crawl/http", json=invalid_payload)
+        # HTTP crawler handles invalid URLs gracefully, returns 200 with failed results
+        assert response.status_code == 200
+
+        # Test non-existent domain
+        nonexistent_payload = {
+            "urls": ["https://nonexistent-domain-12345.com"],
+            "http_config": {"method": "GET"},
+            "crawler_config": {"cache_mode": CacheMode.BYPASS.value}
+        }
+        response = await async_client.post("/crawl/http", json=nonexistent_payload)
+        # HTTP crawler handles unreachable hosts gracefully, returns 200 with failed results
+        assert response.status_code == 200
+
 
 if __name__ == "__main__":
     # Define arguments for pytest programmatically

@@ -275,3 +275,5 @@ docs/**/data
 docs/apps/linkdin/debug*/
 docs/apps/linkdin/samples/insights/*
 .yoyo/
+.github/instructions/instructions.instructions.md
+.kilocode/mcp.json

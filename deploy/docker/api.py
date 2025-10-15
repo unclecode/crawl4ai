@@ -18,9 +18,11 @@ from crawl4ai import (
     BrowserConfig,
     CacheMode,
     CrawlerRunConfig,
+    HTTPCrawlerConfig,
     LLMConfig,
     LLMExtractionStrategy,
     MemoryAdaptiveDispatcher,
+    NoExtractionStrategy,
     PlaywrightAdapter,
     RateLimiter,
     SeedingConfig,
@@ -53,6 +55,7 @@ from crawl4ai.content_filter_strategy import (
 )
 from crawl4ai.content_scraping_strategy import LXMLWebScrapingStrategy
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
+from crawl4ai.async_crawler_strategy import AsyncHTTPCrawlerStrategy
 from crawl4ai.utils import perform_completion_with_backoff
 
 # Import missing utility functions and types
@@ -60,7 +63,7 @@ try:
     from utils import (
         FilterType, TaskStatus, get_base_url, is_task_id,
         get_llm_api_key, get_llm_temperature, get_llm_base_url,
-        validate_llm_provider, create_chunking_strategy
+        validate_llm_provider, create_chunking_strategy, decode_redis_hash
     )
 except ImportError:
     # Fallback definitions for development/testing
@@ -94,6 +97,12 @@ except ImportError:
     
     def validate_llm_provider(config, provider): 
         return True, None
+    
+    def decode_redis_hash(hash_data: Dict[bytes, bytes]) -> Dict[str, str]:
+        """Fallback decode_redis_hash function"""
+        return {k.decode('utf-8') if isinstance(k, bytes) else str(k): 
+                v.decode('utf-8') if isinstance(v, bytes) else str(v) 
+                for k, v in hash_data.items()}
 
 logger = logging.getLogger(__name__)
 
@@ -682,8 +691,11 @@ async def stream_results(
                 }
                 yield (json.dumps(error_response) + "\n").encode("utf-8")
 
-        yield json.dumps({"status": "completed"}).encode("utf-8")
+        yield (json.dumps({"status": "completed"}) + "\n").encode("utf-8")
 
+    except Exception as e:
+        logger.error(f"Streaming error: {e}")
+        yield (json.dumps({"status": "error", "message": str(e)}) + "\n").encode("utf-8")
     except asyncio.CancelledError:
         logger.warning("Client disconnected during streaming")
     finally:
@@ -748,6 +760,7 @@ async def handle_crawl_request(
             # Legacy fallback: create MemoryAdaptiveDispatcher with old config
             dispatcher = MemoryAdaptiveDispatcher(
                 memory_threshold_percent=config["crawler"]["memory_threshold_percent"],
+                memory_wait_timeout=None,  # Disable memory timeout for testing
                 rate_limiter=RateLimiter(
                     base_delay=tuple(config["crawler"]["rate_limiter"]["base_delay"])
                 )
@@ -965,6 +978,7 @@ async def handle_stream_crawl_request(
             # Legacy fallback: create MemoryAdaptiveDispatcher with old config
             dispatcher = MemoryAdaptiveDispatcher(
                 memory_threshold_percent=config["crawler"]["memory_threshold_percent"],
+                memory_wait_timeout=None,  # Disable memory timeout for testing
                 rate_limiter=RateLimiter(
                     base_delay=tuple(config["crawler"]["rate_limiter"]["base_delay"])
                 ),
@@ -1111,3 +1125,333 @@ async def handle_url_discovery(domain, seeding_config):
         return urls
     except Exception as e:
         return []
+
+
+# ============================================================================
+# HTTP Crawling Handlers
+# ============================================================================
+
+async def handle_http_crawl_request(
+    urls: List[str],
+    http_config: dict,
+    crawler_config: dict,
+    config: dict,
+    hooks_config: Optional[dict] = None,
+    dispatcher = None,
+) -> dict:
+    """Handle HTTP-only crawl requests with optional hooks."""
+    start_mem_mb = _get_memory_mb()  # <--- Get memory before
+    start_time = time.time()
+    mem_delta_mb = None
+    peak_mem_mb = start_mem_mb
+    hook_manager = None
+
+    try:
+        urls = [
+            ("https://" + url)
+            if not url.startswith(("http://", "https://"))
+            and not url.startswith(("raw:", "raw://"))
+            else url
+            for url in urls
+        ]
+        
+        # Load HTTP config instead of browser config
+        http_config = HTTPCrawlerConfig.from_kwargs(http_config)
+        crawler_config = CrawlerRunConfig.load(crawler_config)
+
+        # Create HTTP crawler strategy
+        http_strategy = AsyncHTTPCrawlerStrategy(browser_config=http_config)
+
+        # Use provided dispatcher or fallback to legacy behavior
+        if dispatcher is None:
+            # Legacy fallback: create MemoryAdaptiveDispatcher with old config
+            dispatcher = MemoryAdaptiveDispatcher(
+                memory_threshold_percent=config["crawler"]["memory_threshold_percent"],
+                memory_wait_timeout=None,  # Disable memory timeout for testing
+                rate_limiter=RateLimiter(
+                    base_delay=tuple(config["crawler"]["rate_limiter"]["base_delay"])
+                )
+                if config["crawler"]["rate_limiter"]["enabled"]
+                else None,
+            )
+
+        # Create crawler with HTTP strategy (no browser pooling needed)
+        crawler = AsyncWebCrawler(crawler_strategy=http_strategy)
+        await crawler.start()
+
+        # Attach hooks if provided
+        hooks_status = {}
+        if hooks_config:
+            from hook_manager import UserHookManager, attach_user_hooks_to_crawler
+
+            hook_manager = UserHookManager(timeout=hooks_config.get("timeout", 30))
+            hooks_status, hook_manager = await attach_user_hooks_to_crawler(
+                crawler,
+                hooks_config.get("code", {}),
+                timeout=hooks_config.get("timeout", 30),
+                hook_manager=hook_manager,
+            )
+            logger.info(f"Hooks attachment status: {hooks_status['status']}")
+
+        base_config = config["crawler"]["base_config"]
+        # Iterate on key-value pairs in global_config then use hasattr to set them
+        for key, value in base_config.items():
+            if hasattr(crawler_config, key):
+                current_value = getattr(crawler_config, key)
+                # Only set base config if user didn't provide a value
+                if current_value is None or current_value == "":
+                    setattr(crawler_config, key, value)
+
+        results = []
+        func = getattr(crawler, "arun" if len(urls) == 1 else "arun_many")
+        partial_func = partial(
+            func,
+            urls[0] if len(urls) == 1 else urls,
+            config=crawler_config,
+            dispatcher=dispatcher,
+        )
+        results = await partial_func()
+
+        # Ensure results is always a list
+        if not isinstance(results, list):
+            results = [results]
+
+        await crawler.close()  # Close HTTP crawler after use
+
+        # Process results to handle PDF bytes
+        processed_results = []
+        for result in results:
+            try:
+                # Check if result has model_dump method (is a proper CrawlResult)
+                if hasattr(result, "model_dump"):
+                    result_dict = result.model_dump()
+                elif isinstance(result, dict):
+                    result_dict = result
+                else:
+                    # Handle unexpected result type
+                    logger.warning(f"Unexpected result type: {type(result)}")
+                    result_dict = {
+                        "url": str(result) if hasattr(result, "__str__") else "unknown",
+                        "success": False,
+                        "error_message": f"Unexpected result type: {type(result).__name__}",
+                    }
+
+                # if fit_html is not a string, set it to None to avoid serialization errors
+                if "fit_html" in result_dict and not (
+                    result_dict["fit_html"] is None
+                    or isinstance(result_dict["fit_html"], str)
+                ):
+                    result_dict["fit_html"] = None
+
+                # If PDF exists, encode it to base64
+                if result_dict.get("pdf") is not None and isinstance(
+                    result_dict.get("pdf"), bytes
+                ):
+                    result_dict["pdf"] = b64encode(result_dict["pdf"]).decode("utf-8")
+
+                processed_results.append(result_dict)
+            except Exception as e:
+                logger.error(f"Error processing result: {e}")
+                processed_results.append(
+                    {"url": "unknown", "success": False, "error_message": str(e)}
+                )
+
+        end_mem_mb = _get_memory_mb()  # <--- Get memory after
+        end_time = time.time()
+
+        if start_mem_mb is not None and end_mem_mb is not None:
+            mem_delta_mb = end_mem_mb - start_mem_mb  # <--- Calculate delta
+            peak_mem_mb = max(
+                peak_mem_mb if peak_mem_mb else 0, end_mem_mb
+            )  # <--- Get peak memory
+        logger.info(
+            f"HTTP Memory usage: Start: {start_mem_mb} MB, End: {end_mem_mb} MB, Delta: {mem_delta_mb} MB, Peak: {peak_mem_mb} MB"
+        )
+
+        response = {
+            "success": True,
+            "results": processed_results,
+            "server_processing_time_s": end_time - start_time,
+            "server_memory_delta_mb": mem_delta_mb,
+            "server_peak_memory_mb": peak_mem_mb,
+        }
+
+        # Add hooks information if hooks were used
+        if hooks_config and hook_manager:
+            from hook_manager import UserHookManager
+
+            if isinstance(hook_manager, UserHookManager):
+                try:
+                    # Ensure all hook data is JSON serializable
+                    hook_data = {
+                        "status": hooks_status,
+                        "execution_log": hook_manager.execution_log,
+                        "errors": hook_manager.errors,
+                        "summary": hook_manager.get_summary(),
+                    }
+                    # Test that it's serializable
+                    json.dumps(hook_data)
+                    response["hooks"] = hook_data
+                except (TypeError, ValueError) as e:
+                    logger.error(f"Hook data not JSON serializable: {e}")
+                    response["hooks"] = {
+                        "status": {
+                            "status": "error",
+                            "message": "Hook data serialization failed",
+                        },
+                        "execution_log": [],
+                        "errors": [{"error": str(e)}],
+                        "summary": {},
+                    }
+
+        return response
+
+    except Exception as e:
+        logger.error(f"HTTP crawl error: {str(e)}", exc_info=True)
+        if (
+            "crawler" in locals() and crawler.ready
+        ):  # Check if crawler was initialized and started
+            try:
+                await crawler.close()
+            except Exception as close_e:
+                logger.error(f"Error closing HTTP crawler during exception handling: {close_e}")
+        
+        return {
+            "success": False,
+            "error": str(e),
+            "server_processing_time_s": time.time() - start_time,
+            "server_memory_delta_mb": mem_delta_mb,
+            "server_peak_memory_mb": peak_mem_mb,
+        }
+
+
+async def handle_http_stream_crawl_request(
+    urls: List[str],
+    http_config: dict,
+    crawler_config: dict,
+    config: dict,
+    hooks_config: Optional[dict] = None,
+    dispatcher = None,
+) -> Tuple[AsyncWebCrawler, AsyncGenerator, Optional[dict]]:
+    """Handle HTTP-only streaming crawl requests with optional hooks."""
+    
+    urls = [
+        ("https://" + url)
+        if not url.startswith(("http://", "https://"))
+        and not url.startswith(("raw:", "raw://"))
+        else url
+        for url in urls
+    ]
+    
+    # Load HTTP config instead of browser config
+    http_config = HTTPCrawlerConfig.from_kwargs(http_config)
+    crawler_config = CrawlerRunConfig.load(crawler_config)
+
+    # Create HTTP crawler strategy
+    http_strategy = AsyncHTTPCrawlerStrategy(browser_config=http_config)
+
+    # Use provided dispatcher or fallback to legacy behavior
+    if dispatcher is None:
+        # Legacy fallback: create MemoryAdaptiveDispatcher with old config
+        dispatcher = MemoryAdaptiveDispatcher(
+            memory_threshold_percent=config["crawler"]["memory_threshold_percent"],
+            memory_wait_timeout=None,  # Disable memory timeout for testing
+            rate_limiter=RateLimiter(
+                base_delay=tuple(config["crawler"]["rate_limiter"]["base_delay"])
+            )
+            if config["crawler"]["rate_limiter"]["enabled"]
+            else None,
+        )
+
+    # Create crawler with HTTP strategy (no browser pooling needed)
+    crawler = AsyncWebCrawler(crawler_strategy=http_strategy)
+    await crawler.start()
+
+    # Attach hooks if provided
+    hooks_info = None
+    if hooks_config:
+        from hook_manager import UserHookManager, attach_user_hooks_to_crawler
+
+        hook_manager = UserHookManager(timeout=hooks_config.get("timeout", 30))
+        hooks_status, hook_manager = await attach_user_hooks_to_crawler(
+            crawler,
+            hooks_config.get("code", {}),
+            timeout=hooks_config.get("timeout", 30),
+            hook_manager=hook_manager,
+        )
+        logger.info(f"HTTP Hooks attachment status: {hooks_status['status']}")
+        
+        hooks_info = {
+            "status": hooks_status,
+            "execution_log": hook_manager.execution_log,
+            "errors": hook_manager.errors,
+            "summary": hook_manager.get_summary(),
+        }
+
+    base_config = config["crawler"]["base_config"]
+    # Iterate on key-value pairs in global_config then use hasattr to set them
+    for key, value in base_config.items():
+        if hasattr(crawler_config, key):
+            current_value = getattr(crawler_config, key)
+            # Only set base config if user didn't provide a value
+            if current_value is None or current_value == "":
+                setattr(crawler_config, key, value)
+
+    # Create streaming generator
+    func = getattr(crawler, "arun" if len(urls) == 1 else "arun_many")
+    partial_func = partial(
+        func,
+        urls[0] if len(urls) == 1 else urls,
+        config=crawler_config,
+        dispatcher=dispatcher,
+    )
+    
+    async def stream_generator():
+        try:
+            results = await partial_func()
+            # Ensure results is always a list
+            if not isinstance(results, list):
+                results = [results]
+            
+            for result in results:
+                try:
+                    # Check if result has model_dump method (is a proper CrawlResult)
+                    if hasattr(result, "model_dump"):
+                        result_dict = result.model_dump()
+                    elif isinstance(result, dict):
+                        result_dict = result
+                    else:
+                        # Handle unexpected result type
+                        logger.warning(f"Unexpected result type: {type(result)}")
+                        result_dict = {
+                            "url": str(result) if hasattr(result, "__str__") else "unknown",
+                            "success": False,
+                            "error_message": f"Unexpected result type: {type(result).__name__}",
+                        }
+
+                    # if fit_html is not a string, set it to None to avoid serialization errors
+                    if "fit_html" in result_dict and not (
+                        result_dict["fit_html"] is None
+                        or isinstance(result_dict["fit_html"], str)
+                    ):
+                        result_dict["fit_html"] = None
+
+                    # If PDF exists, encode it to base64
+                    if result_dict.get("pdf") is not None and isinstance(
+                        result_dict.get("pdf"), bytes
+                    ):
+                        result_dict["pdf"] = b64encode(result_dict["pdf"]).decode("utf-8")
+
+                    yield result_dict
+                except Exception as e:
+                    logger.error(f"Error processing stream result: {e}")
+                    yield {"url": "unknown", "success": False, "error_message": str(e)}
+        except Exception as e:
+            logger.error(f"Error in HTTP streaming: {e}")
+            yield {"url": "unknown", "success": False, "error_message": f"Streaming error: {str(e)}"}
+        finally:
+            # Yield completion marker
+            yield {"status": "completed"}
+            await crawler.close()  # Close HTTP crawler after streaming
+
+    return crawler, stream_generator(), hooks_info
