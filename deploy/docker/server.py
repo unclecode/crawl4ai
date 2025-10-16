@@ -87,7 +87,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, Field
 from rank_bm25 import BM25Okapi
 from redis import asyncio as aioredis
-from routers import adaptive, dispatchers, scripts
+from routers import adaptive, dispatchers, scripts, monitoring
 from schemas import (
     CrawlRequest,
     CrawlRequestWithHooks,
@@ -297,6 +297,7 @@ app.include_router(init_job_router(redis, config, token_dep))
 app.include_router(adaptive.router)
 app.include_router(dispatchers.router)
 app.include_router(scripts.router)
+app.include_router(monitoring.router)
 
 
 # ──────────────────────── Endpoints ──────────────────────────

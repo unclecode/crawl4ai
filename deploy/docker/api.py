@@ -58,6 +58,9 @@ from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 from crawl4ai.async_crawler_strategy import AsyncHTTPCrawlerStrategy
 from crawl4ai.utils import perform_completion_with_backoff
 
+# Import monitoring/tracking functions
+from routers.monitoring import track_crawl_start, track_crawl_end
+
 # Import missing utility functions and types
 try:
     from utils import (
@@ -665,6 +668,8 @@ async def stream_results(
 
     from utils import datetime_handler
 
+    start_time = time.time()
+
     try:
         async for result in results_gen:
             try:
@@ -681,6 +686,14 @@ async def stream_results(
                 if result_dict.get("pdf") is not None:
                     result_dict["pdf"] = b64encode(result_dict["pdf"]).decode("utf-8")
                 logger.info(f"Streaming result for {result_dict.get('url', 'unknown')}")
+                
+                # Track each streamed result for monitoring
+                duration_ms = int((time.time() - start_time) * 1000)
+                url = result_dict.get('url', 'unknown')
+                success = result_dict.get('success', False)
+                bytes_processed = len(str(result_dict.get("markdown", ""))) + len(str(result_dict.get("html", "")))
+                track_crawl_end(url, success, duration_ms, bytes_processed)
+                
                 data = json.dumps(result_dict, default=datetime_handler) + "\n"
                 yield data.encode("utf-8")
             except Exception as e:
@@ -721,6 +734,9 @@ async def handle_crawl_request(
     dispatcher = None,
 ) -> dict:
     """Handle non-streaming crawl requests with optional hooks."""
+    # Track crawl start for monitoring
+    track_crawl_start()
+    
     start_mem_mb = _get_memory_mb()  # <--- Get memory before
     start_time = time.time()
     mem_delta_mb = None
@@ -872,6 +888,15 @@ async def handle_crawl_request(
             "server_peak_memory_mb": peak_mem_mb,
         }
 
+        # Track successful crawl completion for monitoring
+        duration_ms = int((end_time - start_time) * 1000)
+        for result in processed_results:
+            url = result.get("url", "unknown")
+            success = result.get("success", False)
+            # Estimate bytes processed (rough approximation based on content length)
+            bytes_processed = len(str(result.get("markdown", ""))) + len(str(result.get("html", "")))
+            track_crawl_end(url, success, duration_ms, bytes_processed)
+
         # Add hooks information if hooks were used
         if hooks_config and hook_manager:
             from hook_manager import UserHookManager
@@ -918,6 +943,11 @@ async def handle_crawl_request(
         if start_mem_mb is not None and end_mem_mb_error is not None:
             mem_delta_mb = end_mem_mb_error - start_mem_mb
 
+        # Track failed crawl for monitoring
+        duration_ms = int((time.time() - start_time) * 1000)
+        for url in urls:
+            track_crawl_end(url, success=False, duration_ms=duration_ms, bytes_processed=0)
+
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=json.dumps(
@@ -947,6 +977,9 @@ async def handle_stream_crawl_request(
     dispatcher = None,
 ) -> Tuple[AsyncWebCrawler, AsyncGenerator, Optional[Dict]]:
     """Handle streaming crawl requests with optional hooks."""
+    # Track crawl start for monitoring
+    track_crawl_start()
+    
     hooks_info = None
     try:
         browser_config = BrowserConfig.load(browser_config)

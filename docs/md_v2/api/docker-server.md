@@ -48,6 +48,18 @@ Visit `http://localhost:11235/docs` for interactive Swagger UI documentation.
 - [POST /adaptive/crawl](#post-adaptivecrawl) - Adaptive crawl with auto-discovery
 - [GET /adaptive/status/{task_id}](#get-adaptivestatustask_id) - Check adaptive crawl status
 
+### Monitoring & Profiling
+- [GET /monitoring/health](#get-monitoringhealth) - Health check endpoint
+- [GET /monitoring/stats](#get-monitoringstats) - Get current statistics
+- [GET /monitoring/stats/stream](#get-monitoringsstatsstream) - Real-time statistics stream (SSE)
+- [GET /monitoring/stats/urls](#get-monitoringstatssurls) - URL-specific statistics
+- [POST /monitoring/stats/reset](#post-monitoringsstatsreset) - Reset statistics
+- [POST /monitoring/profile/start](#post-monitoringprofilestart) - Start profiling session
+- [GET /monitoring/profile/{session_id}](#get-monitoringprofilesession_id) - Get profiling results
+- [GET /monitoring/profile](#get-monitoringprofile) - List profiling sessions
+- [DELETE /monitoring/profile/{session_id}](#delete-monitoringprofilesession_id) - Delete session
+- [POST /monitoring/profile/cleanup](#post-monitoringprofilecleanup) - Cleanup old sessions
+
 ### Utility Endpoints
 - [POST /token](#post-token) - Get authentication token
 - [GET /health](#get-health) - Health check
@@ -1010,6 +1022,487 @@ Check status of adaptive crawl task.
   "progress_percent": 46.0
 }
 ```
+
+---
+
+## Monitoring & Profiling
+
+The monitoring endpoints provide real-time statistics, profiling capabilities, and health monitoring for your Crawl4AI instance.
+
+### GET /monitoring/health
+
+Health check endpoint for monitoring integration.
+
+#### Response
+
+```json
+{
+  "status": "healthy",
+  "uptime_seconds": 3600,
+  "timestamp": "2025-01-07T12:00:00Z"
+}
+```
+
+#### Examples
+
+=== "Python"
+    ```python
+    response = requests.get("http://localhost:11235/monitoring/health")
+    health = response.json()
+    print(f"Status: {health['status']}")
+    print(f"Uptime: {health['uptime_seconds']}s")
+    ```
+
+=== "cURL"
+    ```bash
+    curl http://localhost:11235/monitoring/health
+    ```
+
+---
+
+### GET /monitoring/stats
+
+Get current crawler statistics and system metrics.
+
+#### Response
+
+```json
+{
+  "active_crawls": 2,
+  "total_crawls": 150,
+  "successful_crawls": 142,
+  "failed_crawls": 8,
+  "success_rate": 94.67,
+  "avg_duration_ms": 1250.5,
+  "total_bytes_processed": 15728640,
+  "system_stats": {
+    "cpu_percent": 45.2,
+    "memory_percent": 62.8,
+    "memory_used_mb": 2048,
+    "memory_available_mb": 8192,
+    "disk_usage_percent": 55.3,
+    "active_processes": 127
+  }
+}
+```
+
+#### Examples
+
+=== "Python"
+    ```python
+    response = requests.get("http://localhost:11235/monitoring/stats")
+    stats = response.json()
+    
+    print(f"Active crawls: {stats['active_crawls']}")
+    print(f"Success rate: {stats['success_rate']:.2f}%")
+    print(f"CPU usage: {stats['system_stats']['cpu_percent']:.1f}%")
+    print(f"Memory usage: {stats['system_stats']['memory_percent']:.1f}%")
+    ```
+
+=== "cURL"
+    ```bash
+    curl http://localhost:11235/monitoring/stats
+    ```
+
+---
+
+### GET /monitoring/stats/stream
+
+Server-Sent Events (SSE) stream of real-time statistics. Updates every 2 seconds.
+
+#### Response
+
+```
+data: {"active_crawls": 2, "total_crawls": 150, ...}
+
+data: {"active_crawls": 3, "total_crawls": 151, ...}
+
+data: {"active_crawls": 2, "total_crawls": 151, ...}
+```
+
+#### Examples
+
+=== "Python"
+    ```python
+    import requests
+    import json
+    
+    # Stream real-time stats
+    response = requests.get(
+        "http://localhost:11235/monitoring/stats/stream",
+        stream=True
+    )
+    
+    for line in response.iter_lines():
+        if line.startswith(b"data: "):
+            data = json.loads(line[6:])  # Remove "data: " prefix
+            print(f"Active: {data['active_crawls']}, "
+                  f"Total: {data['total_crawls']}, "
+                  f"CPU: {data['system_stats']['cpu_percent']:.1f}%")
+    ```
+
+=== "JavaScript"
+    ```javascript
+    const eventSource = new EventSource('http://localhost:11235/monitoring/stats/stream');
+    
+    eventSource.onmessage = (event) => {
+      const stats = JSON.parse(event.data);
+      console.log('Active crawls:', stats.active_crawls);
+      console.log('CPU:', stats.system_stats.cpu_percent);
+    };
+    ```
+
+---
+
+### GET /monitoring/stats/urls
+
+Get URL-specific statistics showing per-URL performance metrics.
+
+#### Response
+
+```json
+[
+  {
+    "url": "https://example.com",
+    "total_requests": 45,
+    "successful_requests": 42,
+    "failed_requests": 3,
+    "avg_duration_ms": 850.3,
+    "total_bytes_processed": 2621440,
+    "last_request_time": "2025-01-07T12:00:00Z"
+  },
+  {
+    "url": "https://python.org",
+    "total_requests": 32,
+    "successful_requests": 32,
+    "failed_requests": 0,
+    "avg_duration_ms": 1120.7,
+    "total_bytes_processed": 1835008,
+    "last_request_time": "2025-01-07T11:55:00Z"
+  }
+]
+```
+
+#### Examples
+
+=== "Python"
+    ```python
+    response = requests.get("http://localhost:11235/monitoring/stats/urls")
+    url_stats = response.json()
+    
+    for stat in url_stats:
+        success_rate = (stat['successful_requests'] / stat['total_requests']) * 100
+        print(f"\nURL: {stat['url']}")
+        print(f"  Requests: {stat['total_requests']}")
+        print(f"  Success rate: {success_rate:.1f}%")
+        print(f"  Avg time: {stat['avg_duration_ms']:.1f}ms")
+        print(f"  Data processed: {stat['total_bytes_processed'] / 1024:.1f}KB")
+    ```
+
+---
+
+### POST /monitoring/stats/reset
+
+Reset all statistics counters. Useful for testing or starting fresh monitoring sessions.
+
+#### Response
+
+```json
+{
+  "status": "reset",
+  "previous_stats": {
+    "total_crawls": 150,
+    "successful_crawls": 142,
+    "failed_crawls": 8
+  }
+}
+```
+
+#### Examples
+
+=== "Python"
+    ```python
+    response = requests.post("http://localhost:11235/monitoring/stats/reset")
+    result = response.json()
+    print(f"Stats reset. Previous total: {result['previous_stats']['total_crawls']}")
+    ```
+
+=== "cURL"
+    ```bash
+    curl -X POST http://localhost:11235/monitoring/stats/reset
+    ```
+
+---
+
+### POST /monitoring/profile/start
+
+Start a profiling session to monitor crawler performance over time.
+
+#### Request
+
+```json
+{
+  "urls": [
+    "https://example.com",
+    "https://python.org"
+  ],
+  "duration_seconds": 60,
+  "browser_config": {
+    "headless": true
+  },
+  "crawler_config": {
+    "word_count_threshold": 10
+  }
+}
+```
+
+#### Response
+
+```json
+{
+  "session_id": "prof_abc123xyz",
+  "status": "running",
+  "started_at": "2025-01-07T12:00:00Z",
+  "urls": [
+    "https://example.com",
+    "https://python.org"
+  ],
+  "duration_seconds": 60
+}
+```
+
+#### Examples
+
+=== "Python"
+    ```python
+    # Start a profiling session
+    response = requests.post(
+        "http://localhost:11235/monitoring/profile/start",
+        json={
+            "urls": ["https://example.com", "https://python.org"],
+            "duration_seconds": 60,
+            "crawler_config": {
+                "word_count_threshold": 10
+            }
+        }
+    )
+    
+    session = response.json()
+    session_id = session["session_id"]
+    print(f"Profiling session started: {session_id}")
+    print(f"Status: {session['status']}")
+    ```
+
+---
+
+### GET /monitoring/profile/{session_id}
+
+Get profiling session details and results.
+
+#### Response
+
+```json
+{
+  "session_id": "prof_abc123xyz",
+  "status": "completed",
+  "started_at": "2025-01-07T12:00:00Z",
+  "completed_at": "2025-01-07T12:01:00Z",
+  "duration_seconds": 60,
+  "urls": ["https://example.com", "https://python.org"],
+  "results": {
+    "total_requests": 120,
+    "successful_requests": 115,
+    "failed_requests": 5,
+    "avg_response_time_ms": 950.3,
+    "system_metrics": {
+      "avg_cpu_percent": 48.5,
+      "peak_cpu_percent": 72.3,
+      "avg_memory_percent": 55.2,
+      "peak_memory_percent": 68.9,
+      "total_bytes_processed": 5242880
+    }
+  }
+}
+```
+
+#### Examples
+
+=== "Python"
+    ```python
+    import time
+    
+    # Start session
+    start_response = requests.post(
+        "http://localhost:11235/monitoring/profile/start",
+        json={
+            "urls": ["https://example.com"],
+            "duration_seconds": 30
+        }
+    )
+    session_id = start_response.json()["session_id"]
+    
+    # Wait for completion
+    time.sleep(32)
+    
+    # Get results
+    result_response = requests.get(
+        f"http://localhost:11235/monitoring/profile/{session_id}"
+    )
+    session = result_response.json()
+    
+    print(f"Session: {session_id}")
+    print(f"Status: {session['status']}")
+    
+    if session['status'] == 'completed':
+        results = session['results']
+        print(f"\nResults:")
+        print(f"  Total requests: {results['total_requests']}")
+        print(f"  Success rate: {results['successful_requests'] / results['total_requests'] * 100:.1f}%")
+        print(f"  Avg response time: {results['avg_response_time_ms']:.1f}ms")
+        print(f"\nSystem Metrics:")
+        print(f"  Avg CPU: {results['system_metrics']['avg_cpu_percent']:.1f}%")
+        print(f"  Peak CPU: {results['system_metrics']['peak_cpu_percent']:.1f}%")
+        print(f"  Avg Memory: {results['system_metrics']['avg_memory_percent']:.1f}%")
+    ```
+
+---
+
+### GET /monitoring/profile
+
+List all profiling sessions.
+
+#### Response
+
+```json
+{
+  "sessions": [
+    {
+      "session_id": "prof_abc123xyz",
+      "status": "completed",
+      "started_at": "2025-01-07T12:00:00Z",
+      "completed_at": "2025-01-07T12:01:00Z",
+      "duration_seconds": 60,
+      "urls": ["https://example.com"]
+    },
+    {
+      "session_id": "prof_def456uvw",
+      "status": "running",
+      "started_at": "2025-01-07T12:05:00Z",
+      "duration_seconds": 120,
+      "urls": ["https://python.org", "https://github.com"]
+    }
+  ]
+}
+```
+
+#### Examples
+
+=== "Python"
+    ```python
+    response = requests.get("http://localhost:11235/monitoring/profile")
+    data = response.json()
+    
+    print(f"Total sessions: {len(data['sessions'])}")
+    
+    for session in data['sessions']:
+        print(f"\n{session['session_id']}")
+        print(f"  Status: {session['status']}")
+        print(f"  URLs: {', '.join(session['urls'])}")
+        print(f"  Duration: {session['duration_seconds']}s")
+    ```
+
+---
+
+### DELETE /monitoring/profile/{session_id}
+
+Delete a profiling session.
+
+#### Response
+
+```json
+{
+  "status": "deleted",
+  "session_id": "prof_abc123xyz"
+}
+```
+
+#### Examples
+
+=== "Python"
+    ```python
+    response = requests.delete(
+        f"http://localhost:11235/monitoring/profile/{session_id}"
+    )
+    
+    if response.status_code == 200:
+        print(f"Session {session_id} deleted")
+    ```
+
+---
+
+### POST /monitoring/profile/cleanup
+
+Clean up old profiling sessions.
+
+#### Request
+
+```json
+{
+  "max_age_seconds": 3600
+}
+```
+
+#### Response
+
+```json
+{
+  "deleted_count": 5,
+  "remaining_count": 3
+}
+```
+
+#### Examples
+
+=== "Python"
+    ```python
+    # Delete sessions older than 1 hour
+    response = requests.post(
+        "http://localhost:11235/monitoring/profile/cleanup",
+        json={"max_age_seconds": 3600}
+    )
+    
+    result = response.json()
+    print(f"Deleted {result['deleted_count']} old sessions")
+    print(f"Remaining: {result['remaining_count']}")
+    ```
+
+---
+
+### Monitoring Dashboard Demo
+
+We provide an interactive terminal-based dashboard for monitoring. Run it with:
+
+```bash
+python tests/docker/extended_features/demo_monitoring_dashboard.py --url http://localhost:11235
+```
+
+**Features:**
+- Real-time statistics with auto-refresh
+- System resource monitoring (CPU, Memory, Disk)
+- URL-specific performance metrics
+- Profiling session management
+- Interactive commands (view, create, delete sessions)
+- Color-coded status indicators
+
+**Dashboard Commands:**
+- `[D]` - Dashboard view (default)
+- `[S]` - Profiling sessions view
+- `[U]` - URL statistics view
+- `[R]` - Reset statistics
+- `[N]` - Create new profiling session (from sessions view)
+- `[V]` - View session details (from sessions view)
+- `[X]` - Delete session (from sessions view)
+- `[Q]` - Quit
 
 ---
 
