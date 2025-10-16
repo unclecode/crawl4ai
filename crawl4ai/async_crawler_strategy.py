@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import time
+import random
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, Any, List, Union
 from typing import Optional, AsyncGenerator, Final
@@ -900,12 +901,33 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 await self.execute_hook("on_execution_started", page, context=context, config=config)
                 await self.execute_hook("on_execution_ended", page, context=context, config=config, result=execution_result)
 
-            # Handle user simulation
+            # Handle user simulation with natural human-like behavior
             if config.simulate_user or config.magic:
-                await page.mouse.move(100, 100)
-                await page.mouse.down()
-                await page.mouse.up()
-                await page.keyboard.press("ArrowDown")
+                # Generate random start and end points for mouse movement
+                viewport = page.viewport_size
+                start_x = random.randint(50, viewport["width"] // 3)
+                start_y = random.randint(50, viewport["height"] // 3)
+                end_x = random.randint(viewport["width"] // 2, min(viewport["width"] - 50, viewport["width"]))
+                end_y = random.randint(viewport["height"] // 2, min(viewport["height"] - 50, viewport["height"]))
+
+                # Generate a curved trajectory using Bezier curve
+                # Control points for the curve
+                control_x = (start_x + end_x) / 2 + random.randint(-100, 100)
+                control_y = (start_y + end_y) / 2 + random.randint(-100, 100)
+
+                # Number of steps for smooth movement
+                steps = random.randint(15, 25)
+
+                # Move mouse along the curved path
+                for i in range(steps + 1):
+                    t = i / steps
+                    # Quadratic Bezier curve formula
+                    x = int((1 - t) ** 2 * start_x + 2 * (1 - t) * t * control_x + t ** 2 * end_x)
+                    y = int((1 - t) ** 2 * start_y + 2 * (1 - t) * t * control_y + t ** 2 * end_y)
+
+                    await page.mouse.move(x, y)
+                    # Random small delay between movements to simulate human behavior
+                    await asyncio.sleep(random.uniform(0.001, 0.003))
 
             # Handle wait_for condition
             # Todo: Decide how to handle this
