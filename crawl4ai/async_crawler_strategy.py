@@ -903,31 +903,41 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
             # Handle user simulation with natural human-like behavior
             if config.simulate_user or config.magic:
-                # Generate random start and end points for mouse movement
+                # Get viewport size with defensive check
                 viewport = page.viewport_size
-                start_x = random.randint(50, viewport["width"] // 3)
-                start_y = random.randint(50, viewport["height"] // 3)
-                end_x = random.randint(viewport["width"] // 2, min(viewport["width"] - 50, viewport["width"]))
-                end_y = random.randint(viewport["height"] // 2, min(viewport["height"] - 50, viewport["height"]))
+                if viewport is None:
+                    # Set default viewport if not already set
+                    await page.set_viewport_size(
+                        {"width": self.browser_config.viewport_width, "height": self.browser_config.viewport_height}
+                    )
+                    viewport = page.viewport_size
 
-                # Generate a curved trajectory using Bezier curve
-                # Control points for the curve
-                control_x = (start_x + end_x) / 2 + random.randint(-100, 100)
-                control_y = (start_y + end_y) / 2 + random.randint(-100, 100)
+                # Ensure viewport is valid before proceeding
+                if viewport and viewport.get("width") and viewport.get("height"):
+                    # Generate random start and end points for mouse movement
+                    start_x = random.randint(50, viewport["width"] // 3)
+                    start_y = random.randint(50, viewport["height"] // 3)
+                    end_x = random.randint(viewport["width"] // 2, min(viewport["width"] - 50, viewport["width"]))
+                    end_y = random.randint(viewport["height"] // 2, min(viewport["height"] - 50, viewport["height"]))
 
-                # Number of steps for smooth movement
-                steps = random.randint(15, 25)
+                    # Generate a curved trajectory using Bezier curve
+                    # Control points for the curve
+                    control_x = (start_x + end_x) / 2 + random.randint(-100, 100)
+                    control_y = (start_y + end_y) / 2 + random.randint(-100, 100)
 
-                # Move mouse along the curved path
-                for i in range(steps + 1):
-                    t = i / steps
-                    # Quadratic Bezier curve formula
-                    x = int((1 - t) ** 2 * start_x + 2 * (1 - t) * t * control_x + t ** 2 * end_x)
-                    y = int((1 - t) ** 2 * start_y + 2 * (1 - t) * t * control_y + t ** 2 * end_y)
+                    # Number of steps for smooth movement
+                    steps = random.randint(15, 25)
 
-                    await page.mouse.move(x, y)
-                    # Random small delay between movements to simulate human behavior
-                    await asyncio.sleep(random.uniform(0.001, 0.003))
+                    # Move mouse along the curved path
+                    for i in range(steps + 1):
+                        t = i / steps
+                        # Quadratic Bezier curve formula
+                        x = int((1 - t) ** 2 * start_x + 2 * (1 - t) * t * control_x + t ** 2 * end_x)
+                        y = int((1 - t) ** 2 * start_y + 2 * (1 - t) * t * control_y + t ** 2 * end_y)
+
+                        await page.mouse.move(x, y)
+                        # Random small delay between movements to simulate human behavior
+                        await asyncio.sleep(random.uniform(0.001, 0.003))
 
             # Handle wait_for condition
             # Todo: Decide how to handle this
