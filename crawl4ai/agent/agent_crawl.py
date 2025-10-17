@@ -5,6 +5,7 @@ import asyncio
 import sys
 import json
 import uuid
+import logging
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
@@ -17,6 +18,9 @@ from .c4ai_tools import CRAWL_TOOLS
 from .c4ai_prompts import SYSTEM_PROMPT
 from .terminal_ui import TerminalUI
 from .chat_mode import ChatMode
+
+# Suppress crawl4ai verbose logging in chat mode
+logging.getLogger("crawl4ai").setLevel(logging.ERROR)
 
 
 class SessionStorage:

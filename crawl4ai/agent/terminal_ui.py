@@ -100,9 +100,31 @@ class TerminalUI:
             border_style="green"
         ))
 
-    def print_tool_use(self, tool_name: str):
-        """Indicate tool usage."""
-        self.console.print(f"\n[dim]🔧 Using tool: {tool_name}[/dim]")
+    def print_tool_use(self, tool_name: str, tool_input: dict = None):
+        """Indicate tool usage with parameters."""
+        # Shorten crawl4ai tool names for readability
+        display_name = tool_name.replace("mcp__crawler__", "")
+
+        if tool_input:
+            # Show key parameters only
+            params = []
+            if "url" in tool_input:
+                url = tool_input["url"]
+                # Truncate long URLs
+                if len(url) > 50:
+                    url = url[:47] + "..."
+                params.append(f"[dim]url=[/dim]{url}")
+            if "session_id" in tool_input:
+                params.append(f"[dim]session=[/dim]{tool_input['session_id']}")
+            if "file_path" in tool_input:
+                params.append(f"[dim]file=[/dim]{tool_input['file_path']}")
+            if "output_format" in tool_input:
+                params.append(f"[dim]format=[/dim]{tool_input['output_format']}")
+
+            param_str = ", ".join(params) if params else ""
+            self.console.print(f"  [yellow]🔧 {display_name}[/yellow]({param_str})")
+        else:
+            self.console.print(f"  [yellow]🔧 {display_name}[/yellow]")
 
     def with_spinner(self, text: str = "Processing..."):
         """

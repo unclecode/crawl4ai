@@ -93,8 +93,9 @@ class ChatMode:
     async def run(self):
         """Run the interactive chat loop with streaming responses."""
         # Show header
+        session_id = self.storage.session_id if hasattr(self.storage, 'session_id') else "chat"
         self.ui.show_header(
-            session_id=str(self.options.session_id or "chat"),
+            session_id=session_id,
             log_path=self.storage.get_session_path() if hasattr(self.storage, 'get_session_path') else "N/A"
         )
         self.ui.show_commands()
@@ -106,13 +107,15 @@ class ChatMode:
 
                 # Process streaming responses
                 turn = 0
+                thinking_shown = False
                 async for message in client.receive_messages():
                     turn += 1
 
                     if isinstance(message, AssistantMessage):
-                        # Clear "thinking" line if we printed it
-                        if self._current_streaming_text:
-                            self.ui.console.print()  # New line after streaming
+                        # Clear "thinking" indicator
+                        if thinking_shown:
+                            self.ui.console.print()  # New line
+                            thinking_shown = False
 
                         self._current_streaming_text = ""
 
@@ -130,8 +133,11 @@ class ChatMode:
                                 })
 
                             elif isinstance(block, ToolUseBlock):
-                                # Show tool usage
-                                self.ui.print_tool_use(block.name)
+                                # Show tool usage clearly
+                                if not thinking_shown:
+                                    self.ui.print_thinking()
+                                    thinking_shown = True
+                                self.ui.print_tool_use(block.name, block.input)
 
                     elif isinstance(message, ResultMessage):
                         # Session completed (user exited or error)

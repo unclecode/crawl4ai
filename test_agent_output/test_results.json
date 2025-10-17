@@ -1,0 +1,241 @@
+[
+  {
+    "scenario": "Single quick crawl",
+    "category": "simple",
+    "status": "PASS",
+    "duration_seconds": 14.10268497467041,
+    "turns": [
+      {
+        "turn": 1,
+        "status": "PASS",
+        "reason": "All checks passed",
+        "tools_used": [
+          "mcp__crawler__quick_crawl"
+        ],
+        "agent_turns": 3
+      }
+    ]
+  },
+  {
+    "scenario": "Session lifecycle",
+    "category": "simple",
+    "status": "PASS",
+    "duration_seconds": 28.519093990325928,
+    "turns": [
+      {
+        "turn": 1,
+        "status": "PASS",
+        "reason": "All checks passed",
+        "tools_used": [
+          "mcp__crawler__start_session"
+        ],
+        "agent_turns": 3
+      },
+      {
+        "turn": 2,
+        "status": "PASS",
+        "reason": "All checks passed",
+        "tools_used": [
+          "mcp__crawler__navigate"
+        ],
+        "agent_turns": 3
+      },
+      {
+        "turn": 3,
+        "status": "PASS",
+        "reason": "All checks passed",
+        "tools_used": [
+          "mcp__crawler__close_session"
+        ],
+        "agent_turns": 3
+      }
+    ]
+  },
+  {
+    "scenario": "Multi-page crawl with file output",
+    "category": "medium",
+    "status": "PASS",
+    "duration_seconds": 25.359731912612915,
+    "turns": [
+      {
+        "turn": 1,
+        "status": "PASS",
+        "reason": "All checks passed",
+        "tools_used": [
+          "mcp__crawler__quick_crawl",
+          "mcp__crawler__quick_crawl"
+        ],
+        "agent_turns": 4
+      },
+      {
+        "turn": 2,
+        "status": "PASS",
+        "reason": "All checks passed",
+        "tools_used": [
+          "Write"
+        ],
+        "agent_turns": 2
+      }
+    ]
+  },
+  {
+    "scenario": "Session-based data extraction",
+    "category": "medium",
+    "status": "PASS",
+    "duration_seconds": 41.343281984329224,
+    "turns": [
+      {
+        "turn": 1,
+        "status": "PASS",
+        "reason": "All checks passed",
+        "tools_used": [
+          "mcp__crawler__start_session",
+          "mcp__crawler__navigate",
+          "mcp__crawler__extract_data"
+        ],
+        "agent_turns": 5
+      },
+      {
+        "turn": 2,
+        "status": "PASS",
+        "reason": "All checks passed",
+        "tools_used": [
+          "Write"
+        ],
+        "agent_turns": 2
+      },
+      {
+        "turn": 3,
+        "status": "PASS",
+        "reason": "All checks passed",
+        "tools_used": [
+          "mcp__crawler__close_session"
+        ],
+        "agent_turns": 2
+      }
+    ]
+  },
+  {
+    "scenario": "Context retention across turns",
+    "category": "medium",
+    "status": "PASS",
+    "duration_seconds": 17.36746382713318,
+    "turns": [
+      {
+        "turn": 1,
+        "status": "PASS",
+        "reason": "All checks passed",
+        "tools_used": [
+          "mcp__crawler__quick_crawl"
+        ],
+        "agent_turns": 3
+      },
+      {
+        "turn": 2,
+        "status": "PASS",
+        "reason": "All checks passed",
+        "tools_used": [],
+        "agent_turns": 1
+      }
+    ]
+  },
+  {
+    "scenario": "Multi-step task with planning",
+    "category": "complex",
+    "status": "PASS",
+    "duration_seconds": 41.23443412780762,
+    "turns": [
+      {
+        "turn": 1,
+        "status": "PASS",
+        "reason": "All checks passed",
+        "tools_used": [
+          "mcp__crawler__quick_crawl",
+          "mcp__crawler__quick_crawl",
+          "Write"
+        ],
+        "agent_turns": 6
+      },
+      {
+        "turn": 2,
+        "status": "PASS",
+        "reason": "All checks passed",
+        "tools_used": [
+          "Read"
+        ],
+        "agent_turns": 2
+      }
+    ]
+  },
+  {
+    "scenario": "Session with state manipulation",
+    "category": "complex",
+    "status": "PASS",
+    "duration_seconds": 48.59843707084656,
+    "turns": [
+      {
+        "turn": 1,
+        "status": "PASS",
+        "reason": "All checks passed",
+        "tools_used": [
+          "mcp__crawler__start_session",
+          "mcp__crawler__navigate"
+        ],
+        "agent_turns": 4
+      },
+      {
+        "turn": 2,
+        "status": "PASS",
+        "reason": "All checks passed",
+        "tools_used": [
+          "mcp__crawler__extract_data"
+        ],
+        "agent_turns": 3
+      },
+      {
+        "turn": 3,
+        "status": "PASS",
+        "reason": "All checks passed",
+        "tools_used": [
+          "mcp__crawler__screenshot"
+        ],
+        "agent_turns": 3
+      },
+      {
+        "turn": 4,
+        "status": "PASS",
+        "reason": "All checks passed",
+        "tools_used": [
+          "mcp__crawler__close_session"
+        ],
+        "agent_turns": 3
+      }
+    ]
+  },
+  {
+    "scenario": "Error recovery and continuation",
+    "category": "complex",
+    "status": "PASS",
+    "duration_seconds": 27.769640922546387,
+    "turns": [
+      {
+        "turn": 1,
+        "status": "PASS",
+        "reason": "All checks passed",
+        "tools_used": [
+          "mcp__crawler__quick_crawl"
+        ],
+        "agent_turns": 3
+      },
+      {
+        "turn": 2,
+        "status": "PASS",
+        "reason": "All checks passed",
+        "tools_used": [
+          "mcp__crawler__quick_crawl"
+        ],
+        "agent_turns": 3
+      }
+    ]
+  }
+]

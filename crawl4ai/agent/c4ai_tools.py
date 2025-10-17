@@ -28,7 +28,7 @@ async def quick_crawl(args: Dict[str, Any]) -> Dict[str, Any]:
     crawler_config = BrowserConfig(headless=True, verbose=False)
     crawler = await BrowserManager.get_browser(crawler_config)
 
-    run_config = CrawlerRunConfig(
+    run_config = CrawlerRunConfig(verbose=False, 
         cache_mode=CacheMode.BYPASS,
         js_code=args.get("js_code"),
         wait_for=args.get("wait_for"),
@@ -123,7 +123,7 @@ async def navigate(args: Dict[str, Any]) -> Dict[str, Any]:
         })}]}
 
     crawler = CRAWLER_SESSIONS[session_id]
-    run_config = CrawlerRunConfig(
+    run_config = CrawlerRunConfig(verbose=False, 
         cache_mode=CacheMode.BYPASS,
         wait_for=args.get("wait_for"),
         js_code=args.get("js_code"),
@@ -169,7 +169,7 @@ async def extract_data(args: Dict[str, Any]) -> Dict[str, Any]:
     crawler = CRAWLER_SESSIONS[session_id]
     current_url = CRAWLER_SESSION_URLS[session_id]
 
-    run_config = CrawlerRunConfig(
+    run_config = CrawlerRunConfig(verbose=False, 
         cache_mode=CacheMode.BYPASS,
         wait_for=args.get("wait_for"),
         js_code=args.get("js_code"),
@@ -231,7 +231,7 @@ async def execute_js(args: Dict[str, Any]) -> Dict[str, Any]:
     crawler = CRAWLER_SESSIONS[session_id]
     current_url = CRAWLER_SESSION_URLS[session_id]
 
-    run_config = CrawlerRunConfig(
+    run_config = CrawlerRunConfig(verbose=False, 
         cache_mode=CacheMode.BYPASS,
         js_code=args["js_code"],
         wait_for=args.get("wait_for"),
@@ -270,7 +270,7 @@ async def screenshot(args: Dict[str, Any]) -> Dict[str, Any]:
 
     result = await crawler.arun(
         url=current_url,
-        config=CrawlerRunConfig(cache_mode=CacheMode.BYPASS, screenshot=True)
+        config=CrawlerRunConfig(verbose=False, cache_mode=CacheMode.BYPASS, screenshot=True)
     )
 
     return {"content": [{"type": "text", "text": json.dumps({

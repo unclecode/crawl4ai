@@ -112,13 +112,13 @@ MEDIUM_SCENARIOS = [
                 timeout_seconds=45
             ),
             TurnExpectation(
-                user_message="Save the results to a JSON file called crawl_results.json",
+                user_message="Use the Write tool to save the titles you extracted to a file called crawl_results.txt",
                 expect_tools=["Write"],
-                expect_files_created=["crawl_results.json"],
-                timeout_seconds=20
+                expect_files_created=["crawl_results.txt"],
+                timeout_seconds=30
             )
         ],
-        cleanup_files=["crawl_results.json"]
+        cleanup_files=["crawl_results.txt"]
     ),
 
     Scenario(
@@ -133,10 +133,10 @@ MEDIUM_SCENARIOS = [
                 timeout_seconds=50
             ),
             TurnExpectation(
-                user_message="Now save that markdown to example_content.md",
+                user_message="Use the Write tool to save the extracted markdown to example_content.md",
                 expect_tools=["Write"],
                 expect_files_created=["example_content.md"],
-                timeout_seconds=20
+                timeout_seconds=30
             ),
             TurnExpectation(
                 user_message="Close the session",
@@ -304,7 +304,7 @@ class ScenarioRunner:
                     )
                     turn_results.append(turn_result)
 
-                    if turn_result["status"] != TurnResult.PASS:
+                    if turn_result["status"] != TurnResult.PASS.value:
                         print(f"  ✗ FAILED: {turn_result['reason']}")
                         break
                     else:
@@ -315,7 +315,7 @@ class ScenarioRunner:
                 self._cleanup_files(scenario.cleanup_files)
 
             # Overall result
-            all_passed = all(r["status"] == TurnResult.PASS for r in turn_results)
+            all_passed = all(r["status"] == TurnResult.PASS.value for r in turn_results)
             duration = time.time() - start_time
 
             result = {
@@ -364,7 +364,7 @@ class ScenarioRunner:
                 if time.time() - start_time > expectation.timeout_seconds:
                     return {
                         "turn": turn_number,
-                        "status": TurnResult.TIMEOUT,
+                        "status": TurnResult.TIMEOUT.value,
                         "reason": f"Exceeded {expectation.timeout_seconds}s timeout"
                     }
 
@@ -381,7 +381,7 @@ class ScenarioRunner:
                     if expectation.expect_success and message.is_error:
                         return {
                             "turn": turn_number,
-                            "status": TurnResult.FAIL,
+                            "status": TurnResult.FAIL.value,
                             "reason": f"Agent returned error: {message.result}"
                         }
                     break
@@ -402,7 +402,7 @@ class ScenarioRunner:
         except Exception as e:
             return {
                 "turn": turn_number,
-                "status": TurnResult.ERROR,
+                "status": TurnResult.ERROR.value,
                 "reason": f"Exception: {str(e)}"
             }
 
@@ -420,7 +420,7 @@ class ScenarioRunner:
             for tool in expectation.expect_tools:
                 if tool not in tools_used:
                     return {
-                        "status": TurnResult.FAIL,
+                        "status": TurnResult.FAIL.value,
                         "reason": f"Expected tool '{tool}' was not used"
                     }
 
@@ -430,7 +430,7 @@ class ScenarioRunner:
             for keyword in expectation.expect_keywords:
                 if keyword.lower() not in response_lower:
                     return {
-                        "status": TurnResult.FAIL,
+                        "status": TurnResult.FAIL.value,
                         "reason": f"Expected keyword '{keyword}' not found in response"
                     }
 
@@ -440,18 +440,18 @@ class ScenarioRunner:
                 matches = list(self.working_dir.glob(pattern))
                 if not matches:
                     return {
-                        "status": TurnResult.FAIL,
+                        "status": TurnResult.FAIL.value,
                         "reason": f"Expected file matching '{pattern}' was not created"
                     }
 
         # Check minimum turns
         if agent_turns < expectation.expect_min_turns:
             return {
-                "status": TurnResult.FAIL,
+                "status": TurnResult.FAIL.value,
                 "reason": f"Expected at least {expectation.expect_min_turns} agent turns, got {agent_turns}"
             }
 
-        return {"status": TurnResult.PASS}
+        return {"status": TurnResult.PASS.value}
 
     def _cleanup_files(self, patterns: List[str]):
         """Remove files created during test."""
