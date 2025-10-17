@@ -79,7 +79,8 @@
     <!-- Header -->
     <header class="border-b border-border px-4 py-2 flex items-center">
         <h1 class="text-lg font-medium flex items-center space-x-4">
-            <span>📊 <span class="text-primary">Crawl4AI</span> Monitor</span>
+            <img src="/static/assets/logo.png" alt="Crawl4AI" class="h-8">
+            <span class="text-secondary">Monitor</span>
             <a href="https://github.com/unclecode/crawl4ai" target="_blank" class="flex space-x-1">
                 <img src="https://img.shields.io/github/stars/unclecode/crawl4ai?style=social" alt="GitHub stars" class="h-5">
             </a>
@@ -90,7 +91,7 @@
             <div class="flex items-center space-x-2">
                 <label class="text-xs text-secondary">Auto-refresh:</label>
                 <button id="auto-refresh-toggle" class="px-2 py-1 rounded text-xs bg-primary text-dark">
-                    ON ⚡5s
+                    ON ⚡1s
                 </button>
             </div>
 
@@ -170,85 +171,78 @@
             </div>
         </section>
 
-        <!-- Live Activity (Tabbed) -->
-        <section class="bg-surface rounded-lg border border-border overflow-hidden flex flex-col" style="height: 400px;">
-            <div class="border-b border-border flex">
-                <button data-tab="requests" class="activity-tab px-4 py-2 border-r border-border bg-dark text-primary">Requests</button>
-                <button data-tab="browsers" class="activity-tab px-4 py-2 border-r border-border">Browsers</button>
-                <button data-tab="janitor" class="activity-tab px-4 py-2 border-r border-border">Janitor</button>
-                <button data-tab="errors" class="activity-tab px-4 py-2">Errors</button>
-            </div>
-
-            <div class="flex-1 overflow-auto p-3">
-                <!-- Requests Tab -->
-                <div id="tab-requests" class="activity-content">
-                    <div class="mb-3 flex items-center justify-between">
-                        <h3 class="text-sm font-medium">Active Requests (<span id="active-count">0</span>)</h3>
-                        <select id="filter-requests" class="bg-dark border border-border rounded px-2 py-1 text-xs">
-                            <option value="all">All</option>
-                            <option value="success">Success Only</option>
-                            <option value="error">Errors Only</option>
-                        </select>
+        <!-- Live Activity Grid (2x2) -->
+        <div class="grid grid-cols-2 gap-4">
+            <!-- Requests Section -->
+            <section class="bg-surface rounded-lg border border-border overflow-hidden flex flex-col" style="height: 350px;">
+                <div class="px-4 py-2 border-b border-border flex items-center justify-between">
+                    <h3 class="text-sm font-medium text-primary">📝 Requests (<span id="active-count">0</span> active)</h3>
+                    <select id="filter-requests" class="bg-dark border border-border rounded px-2 py-1 text-xs">
+                        <option value="all">All</option>
+                        <option value="success">Success</option>
+                        <option value="error">Errors</option>
+                    </select>
+                </div>
+                <div class="flex-1 overflow-auto p-3 space-y-2">
+                    <div id="active-requests-list" class="text-xs space-y-1 mb-3">
+                        <div class="text-secondary text-center py-2">No active requests</div>
                     </div>
-
-                    <div class="space-y-2">
-                        <div id="active-requests-list" class="text-xs space-y-1">
-                            <div class="text-secondary text-center py-4">No active requests</div>
-                        </div>
-
-                        <h4 class="text-xs font-medium text-secondary mt-4 mb-2">Recent Completed</h4>
-                        <div id="completed-requests-list" class="text-xs space-y-1">
-                            <div class="text-secondary text-center py-4">No completed requests</div>
-                        </div>
+                    <h4 class="text-xs font-medium text-secondary border-t border-border pt-2 mb-2">Recent Completed</h4>
+                    <div id="completed-requests-list" class="text-xs space-y-1">
+                        <div class="text-secondary text-center py-2">No completed requests</div>
                     </div>
                 </div>
+            </section>
 
-                <!-- Browsers Tab -->
-                <div id="tab-browsers" class="activity-content hidden">
-                    <div class="mb-3">
-                        <h3 class="text-sm font-medium mb-2">Browser Pool (<span id="browser-count">0</span> browsers, <span id="browser-mem">0</span> MB)</h3>
-                        <div class="text-xs text-secondary">
-                            Reuse rate: <span id="reuse-rate" class="text-primary">--%</span>
-                        </div>
-                    </div>
-
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-xs">
-                            <thead class="border-b border-border">
-                                <tr class="text-secondary text-left">
-                                    <th class="py-2 pr-4">Type</th>
-                                    <th class="py-2 pr-4">Signature</th>
-                                    <th class="py-2 pr-4">Age</th>
-                                    <th class="py-2 pr-4">Last Used</th>
-                                    <th class="py-2 pr-4">Memory</th>
-                                    <th class="py-2 pr-4">Hits</th>
-                                    <th class="py-2">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="browsers-table-body">
-                                <tr><td colspan="7" class="text-center py-4 text-secondary">No browsers</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
+            <!-- Browsers Section -->
+            <section class="bg-surface rounded-lg border border-border overflow-hidden flex flex-col" style="height: 350px;">
+                <div class="px-4 py-2 border-b border-border">
+                    <h3 class="text-sm font-medium text-primary">🌐 Browsers (<span id="browser-count">0</span>, <span id="browser-mem">0</span>MB)</h3>
+                    <div class="text-xs text-secondary">Reuse: <span id="reuse-rate" class="text-primary">--%</span></div>
                 </div>
+                <div class="flex-1 overflow-auto p-3">
+                    <table class="w-full text-xs">
+                        <thead class="border-b border-border">
+                            <tr class="text-secondary text-left">
+                                <th class="py-1 pr-2">Type</th>
+                                <th class="py-1 pr-2">Sig</th>
+                                <th class="py-1 pr-2">Age</th>
+                                <th class="py-1 pr-2">Used</th>
+                                <th class="py-1 pr-2">Hits</th>
+                                <th class="py-1">Act</th>
+                            </tr>
+                        </thead>
+                        <tbody id="browsers-table-body">
+                            <tr><td colspan="6" class="text-center py-4 text-secondary">No browsers</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
 
-                <!-- Janitor Tab -->
-                <div id="tab-janitor" class="activity-content hidden">
-                    <h3 class="text-sm font-medium mb-3">Cleanup Events (Last 100)</h3>
+            <!-- Janitor Section -->
+            <section class="bg-surface rounded-lg border border-border overflow-hidden flex flex-col" style="height: 300px;">
+                <div class="px-4 py-2 border-b border-border">
+                    <h3 class="text-sm font-medium text-primary">🧹 Janitor Events</h3>
+                </div>
+                <div class="flex-1 overflow-auto p-3">
                     <div id="janitor-log" class="text-xs space-y-1 font-mono">
                         <div class="text-secondary text-center py-4">No events yet</div>
                     </div>
                 </div>
+            </section>
 
-                <!-- Errors Tab -->
-                <div id="tab-errors" class="activity-content hidden">
-                    <h3 class="text-sm font-medium mb-3">Recent Errors (Last 100)</h3>
-                    <div id="errors-log" class="text-xs space-y-2">
+            <!-- Errors Section -->
+            <section class="bg-surface rounded-lg border border-border overflow-hidden flex flex-col" style="height: 300px;">
+                <div class="px-4 py-2 border-b border-border">
+                    <h3 class="text-sm font-medium text-primary">❌ Errors</h3>
+                </div>
+                <div class="flex-1 overflow-auto p-3">
+                    <div id="errors-log" class="text-xs space-y-1">
                         <div class="text-secondary text-center py-4">No errors</div>
                     </div>
                 </div>
-            </div>
-        </section>
+            </section>
+        </div>
 
         <!-- Endpoint Analytics & Timeline (Side by side) -->
         <div class="grid grid-cols-2 gap-4">
@@ -313,34 +307,14 @@
         // ========== State Management ==========
         let autoRefresh = true;
         let refreshInterval;
-        const REFRESH_RATE = 5000; // 5 seconds
+        const REFRESH_RATE = 1000; // 1 second
 
-        // ========== Tab Switching ==========
-        document.querySelectorAll('.activity-tab').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const tab = btn.dataset.tab;
-
-                // Update tabs
-                document.querySelectorAll('.activity-tab').forEach(b => {
-                    b.classList.remove('bg-dark', 'text-primary');
-                });
-                btn.classList.add('bg-dark', 'text-primary');
-
-                // Update content
-                document.querySelectorAll('.activity-content').forEach(c => c.classList.add('hidden'));
-                document.getElementById(`tab-${tab}`).classList.remove('hidden');
-
-                // Fetch specific data
-                if (tab === 'browsers') fetchBrowsers();
-                if (tab === 'janitor') fetchJanitorLog();
-                if (tab === 'errors') fetchErrors();
-            });
-        });
+        // No more tabs - all sections visible at once!
 
         // ========== Auto-refresh Toggle ==========
         document.getElementById('auto-refresh-toggle').addEventListener('click', function() {
             autoRefresh = !autoRefresh;
-            this.textContent = autoRefresh ? 'ON ⚡5s' : 'OFF';
+            this.textContent = autoRefresh ? 'ON ⚡1s' : 'OFF';
             this.classList.toggle('bg-primary');
             this.classList.toggle('bg-dark');
             this.classList.toggle('text-dark');
@@ -367,6 +341,9 @@
             await Promise.all([
                 fetchHealth(),
                 fetchRequests(),
+                fetchBrowsers(),
+                fetchJanitorLog(),
+                fetchErrors(),
                 fetchEndpointStats(),
                 fetchTimeline()
             ]);
@@ -475,29 +452,24 @@
 
                 const tbody = document.getElementById('browsers-table-body');
                 if (data.browsers.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-secondary">No browsers</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-2 text-secondary">No browsers</td></tr>';
                 } else {
                     tbody.innerHTML = data.browsers.map(b => {
                         const typeIcon = b.type === 'permanent' ? '🔥' : b.type === 'hot' ? '♨️' : '❄️';
                         const typeColor = b.type === 'permanent' ? 'text-primary' : b.type === 'hot' ? 'text-accent' : 'text-light';
 
                         return `
-                            <tr class="border-t border-border">
-                                <td class="py-2 pr-4"><span class="${typeColor}">${typeIcon} ${b.type.toUpperCase()}</span></td>
-                                <td class="py-2 pr-4 font-mono">${b.sig}</td>
-                                <td class="py-2 pr-4">${formatSeconds(b.age_seconds)}</td>
-                                <td class="py-2 pr-4">${formatSeconds(b.last_used_seconds)} ago</td>
-                                <td class="py-2 pr-4">${b.memory_mb} MB</td>
-                                <td class="py-2 pr-4">${b.hits}</td>
-                                <td class="py-2">
+                            <tr class="border-t border-border hover:bg-dark">
+                                <td class="py-1 pr-2"><span class="${typeColor}">${typeIcon}</span></td>
+                                <td class="py-1 pr-2 font-mono text-xs">${b.sig}</td>
+                                <td class="py-1 pr-2">${formatSeconds(b.age_seconds)}</td>
+                                <td class="py-1 pr-2">${formatSeconds(b.last_used_seconds)}</td>
+                                <td class="py-1 pr-2">${b.hits}</td>
+                                <td class="py-1">
                                     ${b.killable ? `
-                                        <button onclick="killBrowser('${b.sig}')"
-                                                class="text-red-500 hover:underline mr-2">Kill</button>
-                                        <button onclick="restartBrowser('${b.sig}')"
-                                                class="text-primary hover:underline">Restart</button>
+                                        <button onclick="killBrowser('${b.sig}')" class="text-red-500 hover:underline text-xs">X</button>
                                     ` : `
-                                        <button onclick="restartBrowser('permanent')"
-                                                class="text-primary hover:underline">Restart</button>
+                                        <button onclick="restartBrowser('permanent')" class="text-primary hover:underline text-xs">↻</button>
                                     `}
                                 </td>
                             </tr>

@@ -174,6 +174,15 @@ app.mount(
     name="monitor_ui",
 )
 
+# ── static assets (logo, etc) ────────────────────────────────
+ASSETS_DIR = pathlib.Path(__file__).parent / "static" / "assets"
+if ASSETS_DIR.exists():
+    app.mount(
+        "/static/assets",
+        StaticFiles(directory=ASSETS_DIR),
+        name="assets",
+    )
+
 
 @app.get("/")
 async def root():

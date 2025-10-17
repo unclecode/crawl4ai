@@ -460,12 +460,22 @@ async def handle_crawl_request(
     hooks_config: Optional[dict] = None
 ) -> dict:
     """Handle non-streaming crawl requests with optional hooks."""
+    # Track request start
+    request_id = f"req_{uuid4().hex[:8]}"
+    try:
+        from monitor import get_monitor
+        await get_monitor().track_request_start(
+            request_id, "/crawl", urls[0] if urls else "batch", browser_config
+        )
+    except:
+        pass  # Monitor not critical
+
     start_mem_mb = _get_memory_mb() # <--- Get memory before
     start_time = time.time()
     mem_delta_mb = None
     peak_mem_mb = start_mem_mb
     hook_manager = None
-    
+
     try:
         urls = [('https://' + url) if not url.startswith(('http://', 'https://')) and not url.startswith(("raw:", "raw://")) else url for url in urls]
         browser_config = BrowserConfig.load(browser_config)
@@ -570,7 +580,16 @@ async def handle_crawl_request(
             "server_memory_delta_mb": mem_delta_mb,
             "server_peak_memory_mb": peak_mem_mb
         }
-        
+
+        # Track request completion
+        try:
+            from monitor import get_monitor
+            await get_monitor().track_request_end(
+                request_id, success=True, pool_hit=True, status_code=200
+            )
+        except:
+            pass
+
         # Add hooks information if hooks were used
         if hooks_config and hook_manager:
             from hook_manager import UserHookManager
@@ -599,6 +618,16 @@ async def handle_crawl_request(
 
     except Exception as e:
         logger.error(f"Crawl error: {str(e)}", exc_info=True)
+
+        # Track request error
+        try:
+            from monitor import get_monitor
+            await get_monitor().track_request_end(
+                request_id, success=False, error=str(e), status_code=500
+            )
+        except:
+            pass
+
         if 'crawler' in locals() and crawler.ready: # Check if crawler was initialized and started
             #  try:
             #      await crawler.close()
