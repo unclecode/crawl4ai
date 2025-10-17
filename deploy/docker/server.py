@@ -78,6 +78,14 @@ __version__ = "0.5.1-d1"
 MAX_PAGES = config["crawler"]["pool"].get("max_pages", 30)
 GLOBAL_SEM = asyncio.Semaphore(MAX_PAGES)
 
+# ── default browser config helper ─────────────────────────────
+def get_default_browser_config() -> BrowserConfig:
+    """Get default BrowserConfig from config.yml."""
+    return BrowserConfig(
+        extra_args=config["crawler"]["browser"].get("extra_args", []),
+        **config["crawler"]["browser"].get("kwargs", {}),
+    )
+
 # import logging
 # page_log = logging.getLogger("page_cap")
 # orig_arun = AsyncWebCrawler.arun
@@ -103,11 +111,12 @@ AsyncWebCrawler.arun = capped_arun
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    await get_crawler(BrowserConfig(
+    from crawler_pool import init_permanent
+    await init_permanent(BrowserConfig(
         extra_args=config["crawler"]["browser"].get("extra_args", []),
         **config["crawler"]["browser"].get("kwargs", {}),
-    ))           # warm‑up
-    app.state.janitor = asyncio.create_task(janitor())        # idle GC
+    ))
+    app.state.janitor = asyncio.create_task(janitor())
     yield
     app.state.janitor.cancel()
     await close_all()
@@ -266,27 +275,20 @@ async def generate_html(
     Crawls the URL, preprocesses the raw HTML for schema extraction, and returns the processed HTML.
     Use when you need sanitized HTML structures for building schemas or further processing.
     """
+    from crawler_pool import get_crawler
     cfg = CrawlerRunConfig()
     try:
-        async with AsyncWebCrawler(config=BrowserConfig()) as crawler:
-            results = await crawler.arun(url=body.url, config=cfg)
-        # Check if the crawl was successful
+        crawler = await get_crawler(get_default_browser_config())
+        results = await crawler.arun(url=body.url, config=cfg)
         if not results[0].success:
-            raise HTTPException(
-                status_code=500,
-                detail=results[0].error_message or "Crawl failed"
-            )
-        
+            raise HTTPException(500, detail=results[0].error_message or "Crawl failed")
+
         raw_html = results[0].html
         from crawl4ai.utils import preprocess_html_for_schema
         processed_html = preprocess_html_for_schema(raw_html)
         return JSONResponse({"html": processed_html, "url": body.url, "success": True})
     except Exception as e:
-        # Log and raise as HTTP 500 for other exceptions
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
+        raise HTTPException(500, detail=str(e))
 
 # Screenshot endpoint
 
@@ -304,16 +306,13 @@ async def generate_screenshot(
     Use when you need an image snapshot of the rendered page. Its recommened to provide an output path to save the screenshot.
     Then in result instead of the screenshot you will get a path to the saved file.
     """
+    from crawler_pool import get_crawler
     try:
-        cfg = CrawlerRunConfig(
-            screenshot=True, screenshot_wait_for=body.screenshot_wait_for)
-        async with AsyncWebCrawler(config=BrowserConfig()) as crawler:
-            results = await crawler.arun(url=body.url, config=cfg)
+        cfg = CrawlerRunConfig(screenshot=True, screenshot_wait_for=body.screenshot_wait_for)
+        crawler = await get_crawler(get_default_browser_config())
+        results = await crawler.arun(url=body.url, config=cfg)
         if not results[0].success:
-            raise HTTPException(
-                status_code=500,
-                detail=results[0].error_message or "Crawl failed"
-            )
+            raise HTTPException(500, detail=results[0].error_message or "Crawl failed")
         screenshot_data = results[0].screenshot
         if body.output_path:
             abs_path = os.path.abspath(body.output_path)
@@ -323,10 +322,7 @@ async def generate_screenshot(
             return {"success": True, "path": abs_path}
         return {"success": True, "screenshot": screenshot_data}
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
+        raise HTTPException(500, detail=str(e))
 
 # PDF endpoint
 
@@ -344,15 +340,13 @@ async def generate_pdf(
     Use when you need a printable or archivable snapshot of the page. It is recommended to provide an output path to save the PDF.
     Then in result instead of the PDF you will get a path to the saved file.
     """
+    from crawler_pool import get_crawler
     try:
         cfg = CrawlerRunConfig(pdf=True)
-        async with AsyncWebCrawler(config=BrowserConfig()) as crawler:
-            results = await crawler.arun(url=body.url, config=cfg)
+        crawler = await get_crawler(get_default_browser_config())
+        results = await crawler.arun(url=body.url, config=cfg)
         if not results[0].success:
-            raise HTTPException(
-                status_code=500,
-                detail=results[0].error_message or "Crawl failed"
-            )
+            raise HTTPException(500, detail=results[0].error_message or "Crawl failed")
         pdf_data = results[0].pdf
         if body.output_path:
             abs_path = os.path.abspath(body.output_path)
@@ -362,10 +356,7 @@ async def generate_pdf(
             return {"success": True, "path": abs_path}
         return {"success": True, "pdf": base64.b64encode(pdf_data).decode()}
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
+        raise HTTPException(500, detail=str(e))
 
 
 @app.post("/execute_js")
@@ -421,23 +412,17 @@ async def execute_js(
         ```
 
     """
+    from crawler_pool import get_crawler
     try:
         cfg = CrawlerRunConfig(js_code=body.scripts)
-        async with AsyncWebCrawler(config=BrowserConfig()) as crawler:
-            results = await crawler.arun(url=body.url, config=cfg)
+        crawler = await get_crawler(get_default_browser_config())
+        results = await crawler.arun(url=body.url, config=cfg)
         if not results[0].success:
-            raise HTTPException(
-                status_code=500,
-                detail=results[0].error_message or "Crawl failed"
-            )
-        # Return JSON-serializable dict of the first CrawlResult
+            raise HTTPException(500, detail=results[0].error_message or "Crawl failed")
         data = results[0].model_dump()
         return JSONResponse(data)
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
+        raise HTTPException(500, detail=str(e))
 
 
 @app.get("/llm/{url:path}")

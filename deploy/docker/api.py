@@ -66,6 +66,7 @@ async def handle_llm_qa(
     config: dict
 ) -> str:
     """Process QA using LLM with crawled content as context."""
+    from crawler_pool import get_crawler
     try:
         if not url.startswith(('http://', 'https://')) and not url.startswith(("raw:", "raw://")):
             url = 'https://' + url
@@ -74,15 +75,21 @@ async def handle_llm_qa(
         if last_q_index != -1:
             url = url[:last_q_index]
 
-        # Get markdown content
-        async with AsyncWebCrawler() as crawler:
-            result = await crawler.arun(url)
-            if not result.success:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=result.error_message
-                )
-            content = result.markdown.fit_markdown or result.markdown.raw_markdown
+        # Get markdown content (use default config)
+        from utils import load_config
+        cfg = load_config()
+        browser_cfg = BrowserConfig(
+            extra_args=cfg["crawler"]["browser"].get("extra_args", []),
+            **cfg["crawler"]["browser"].get("kwargs", {}),
+        )
+        crawler = await get_crawler(browser_cfg)
+        result = await crawler.arun(url)
+        if not result.success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=result.error_message
+            )
+        content = result.markdown.fit_markdown or result.markdown.raw_markdown
 
         # Create prompt and get LLM response
         prompt = f"""Use the following content as context to answer the question.
@@ -224,25 +231,32 @@ async def handle_markdown_request(
 
         cache_mode = CacheMode.ENABLED if cache == "1" else CacheMode.WRITE_ONLY
 
-        async with AsyncWebCrawler() as crawler:
-            result = await crawler.arun(
-                url=decoded_url,
-                config=CrawlerRunConfig(
-                    markdown_generator=md_generator,
-                    scraping_strategy=LXMLWebScrapingStrategy(),
-                    cache_mode=cache_mode
-                )
+        from crawler_pool import get_crawler
+        from utils import load_config as _load_config
+        _cfg = _load_config()
+        browser_cfg = BrowserConfig(
+            extra_args=_cfg["crawler"]["browser"].get("extra_args", []),
+            **_cfg["crawler"]["browser"].get("kwargs", {}),
+        )
+        crawler = await get_crawler(browser_cfg)
+        result = await crawler.arun(
+            url=decoded_url,
+            config=CrawlerRunConfig(
+                markdown_generator=md_generator,
+                scraping_strategy=LXMLWebScrapingStrategy(),
+                cache_mode=cache_mode
             )
-            
-            if not result.success:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=result.error_message
-                )
+        )
 
-            return (result.markdown.raw_markdown 
-                   if filter_type == FilterType.RAW 
-                   else result.markdown.fit_markdown)
+        if not result.success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=result.error_message
+            )
+
+        return (result.markdown.raw_markdown
+               if filter_type == FilterType.RAW
+               else result.markdown.fit_markdown)
 
     except Exception as e:
         logger.error(f"Markdown error: {str(e)}", exc_info=True)
