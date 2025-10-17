@@ -614,11 +614,12 @@ class BrowserConfig:
 
     @staticmethod
     def load(data: dict) -> "BrowserConfig":
-        # Deserialize the object from a dictionary
+        if data is None:
+            return BrowserConfig()
         config = from_serializable_dict(data)
         if isinstance(config, BrowserConfig):
             return config
-        return BrowserConfig.from_kwargs(config)
+        return BrowserConfig.from_kwargs(config if config is not None else {})
 
 class VirtualScrollConfig:
     """Configuration for virtual scroll handling.
@@ -1426,6 +1427,9 @@ class CrawlerRunConfig():
         sig = inspect.signature(self.__init__)
         all_params = sig.parameters  # Dictionary of parameter names and their details
 
+        if name == 'wait_for' and value is not None and not isinstance(value, str):
+            raise ValueError("'wait_for' must be a string (e.g., a CSS selector or JS expression).")
+        
         if name in self._UNWANTED_PROPS and value is not all_params[name].default:
             raise AttributeError(f"Setting '{name}' is deprecated. {self._UNWANTED_PROPS[name]}")
         
@@ -1549,11 +1553,12 @@ class CrawlerRunConfig():
 
     @staticmethod
     def load(data: dict) -> "CrawlerRunConfig":
-        # Deserialize the object from a dictionary
+        if data is None:
+            return CrawlerRunConfig()
         config = from_serializable_dict(data)
         if isinstance(config, CrawlerRunConfig):
             return config
-        return CrawlerRunConfig.from_kwargs(config)
+        return CrawlerRunConfig.from_kwargs(config if config is not None else {})
 
     def to_dict(self):
         return {

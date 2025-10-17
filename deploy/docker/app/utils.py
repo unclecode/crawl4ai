@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from fastapi import Request
+from fastapi import Request, HTTPException
 from typing import Dict, Optional
 
 class TaskStatus(str, Enum):
@@ -21,7 +21,7 @@ class FilterType(str, Enum):
 
 def load_config() -> Dict:
     """Load and return application configuration with environment variable overrides."""
-    config_path = Path(__file__).parent / "config.yml"
+    config_path = Path(__file__).parent.parent / "config.yml"
     with open(config_path, "r") as config_file:
         config = yaml.safe_load(config_file)
     
@@ -68,7 +68,6 @@ def should_cleanup_task(created_at: str, ttl_seconds: int = 3600) -> bool:
 def decode_redis_hash(hash_data: Dict[bytes, bytes]) -> Dict[str, str]:
     """Decode Redis hash data from bytes to strings."""
     return {k.decode('utf-8'): v.decode('utf-8') for k, v in hash_data.items()}
-
 
 
 def get_llm_api_key(config: Dict, provider: Optional[str] = None) -> str:
@@ -125,3 +124,47 @@ def verify_email_domain(email: str) -> bool:
         return True if records else False
     except Exception as e:
         return False
+
+def _ensure_within_base_dir(path: str, base_dir: str) -> None:
+    """
+    Ensure path is within base directory using new error handling system.
+
+    Args:
+        path: Path to validate
+        base_dir: Base directory that path must be within
+
+    Raises:
+        HTTPException: If path is outside base directory
+    """
+    from core.error_context import ErrorContext
+
+    base_dir_real = os.path.realpath(os.path.abspath(base_dir))
+    path_real = os.path.realpath(os.path.abspath(path))
+
+    if not os.path.isabs(base_dir_real):
+        error_ctx = ErrorContext.security_error(
+            violation_type="invalid_base_directory",
+            attempted_action=f"Set base directory to: {base_dir}",
+            allowed_scope="absolute directory paths only",
+            message="Security restriction: base directory must be absolute."
+        )
+        raise error_ctx.to_http_exception(400)
+
+    try:
+        common = os.path.commonpath([base_dir_real, path_real])
+    except ValueError:
+        common = ""
+
+    if common != base_dir_real:
+        error_ctx = ErrorContext.security_error(
+            violation_type="path_traversal",
+            attempted_action=f"Access path: {path_real}",
+            allowed_scope=base_dir_real,
+            message=(
+                f"Security restriction: output_path must be within {base_dir_real}. "
+                f"Your path '{path_real}' is outside the allowed directory. "
+                f"Example valid path: {base_dir_real}/myfile.json"
+            )
+        )
+        raise error_ctx.to_http_exception(400)
+

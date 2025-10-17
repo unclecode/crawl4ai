@@ -168,7 +168,7 @@ RUN mkdir -p /home/appuser/.cache/ms-playwright \
 RUN crawl4ai-doctor
 
 # Copy application code
-COPY deploy/docker/* ${APP_HOME}/
+COPY deploy/docker/ ${APP_HOME}/
 
 # copy the playground + any future static assets
 COPY deploy/docker/static ${APP_HOME}/static
