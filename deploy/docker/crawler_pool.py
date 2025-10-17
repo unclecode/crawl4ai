@@ -57,6 +57,14 @@ async def get_crawler(cfg: BrowserConfig) -> AsyncWebCrawler:
             if USAGE_COUNT[sig] >= 3:
                 logger.info(f"⬆️  Promoting to hot pool (sig={sig[:8]}, count={USAGE_COUNT[sig]})")
                 HOT_POOL[sig] = COLD_POOL.pop(sig)
+
+                # Track promotion in monitor
+                try:
+                    from monitor import get_monitor
+                    get_monitor().track_janitor_event("promote", sig, {"count": USAGE_COUNT[sig]})
+                except:
+                    pass
+
                 return HOT_POOL[sig]
 
             logger.info(f"❄️  Using cold pool browser (sig={sig[:8]})")
@@ -124,22 +132,38 @@ async def janitor():
             # Clean cold pool
             for sig in list(COLD_POOL.keys()):
                 if now - LAST_USED.get(sig, now) > cold_ttl:
-                    logger.info(f"🧹 Closing cold browser (sig={sig[:8]}, idle={now - LAST_USED[sig]:.0f}s)")
+                    idle_time = now - LAST_USED[sig]
+                    logger.info(f"🧹 Closing cold browser (sig={sig[:8]}, idle={idle_time:.0f}s)")
                     with suppress(Exception):
                         await COLD_POOL[sig].close()
                     COLD_POOL.pop(sig, None)
                     LAST_USED.pop(sig, None)
                     USAGE_COUNT.pop(sig, None)
 
+                    # Track in monitor
+                    try:
+                        from monitor import get_monitor
+                        get_monitor().track_janitor_event("close_cold", sig, {"idle_seconds": int(idle_time), "ttl": cold_ttl})
+                    except:
+                        pass
+
             # Clean hot pool (more conservative)
             for sig in list(HOT_POOL.keys()):
                 if now - LAST_USED.get(sig, now) > hot_ttl:
-                    logger.info(f"🧹 Closing hot browser (sig={sig[:8]}, idle={now - LAST_USED[sig]:.0f}s)")
+                    idle_time = now - LAST_USED[sig]
+                    logger.info(f"🧹 Closing hot browser (sig={sig[:8]}, idle={idle_time:.0f}s)")
                     with suppress(Exception):
                         await HOT_POOL[sig].close()
                     HOT_POOL.pop(sig, None)
                     LAST_USED.pop(sig, None)
                     USAGE_COUNT.pop(sig, None)
+
+                    # Track in monitor
+                    try:
+                        from monitor import get_monitor
+                        get_monitor().track_janitor_event("close_hot", sig, {"idle_seconds": int(idle_time), "ttl": hot_ttl})
+                    except:
+                        pass
 
             # Log pool stats
             if mem_pct > 60:

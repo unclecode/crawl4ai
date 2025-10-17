@@ -16,6 +16,7 @@ from fastapi import Request, Depends
 from fastapi.responses import FileResponse
 import base64
 import re
+import logging
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
 from api import (
     handle_markdown_request, handle_llm_qa,
@@ -112,14 +113,39 @@ AsyncWebCrawler.arun = capped_arun
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     from crawler_pool import init_permanent
+    from monitor import MonitorStats
+    import monitor as monitor_module
+
+    # Initialize monitor
+    monitor_module.monitor_stats = MonitorStats(redis)
+    await monitor_module.monitor_stats.load_from_redis()
+
+    # Initialize browser pool
     await init_permanent(BrowserConfig(
         extra_args=config["crawler"]["browser"].get("extra_args", []),
         **config["crawler"]["browser"].get("kwargs", {}),
     ))
+
+    # Start background tasks
     app.state.janitor = asyncio.create_task(janitor())
+    app.state.timeline_updater = asyncio.create_task(_timeline_updater())
+
     yield
+
+    # Cleanup
     app.state.janitor.cancel()
+    app.state.timeline_updater.cancel()
     await close_all()
+
+async def _timeline_updater():
+    """Update timeline data every 5 seconds."""
+    from monitor import get_monitor
+    while True:
+        await asyncio.sleep(5)
+        try:
+            await get_monitor().update_timeline()
+        except Exception as e:
+            logger.warning(f"Timeline update error: {e}")
 
 # ───────────────────── FastAPI instance ──────────────────────
 app = FastAPI(
@@ -136,6 +162,16 @@ app.mount(
     "/playground",
     StaticFiles(directory=STATIC_DIR, html=True),
     name="play",
+)
+
+# ── static monitor dashboard ────────────────────────────────
+MONITOR_DIR = pathlib.Path(__file__).parent / "static" / "monitor"
+if not MONITOR_DIR.exists():
+    raise RuntimeError(f"Monitor assets not found at {MONITOR_DIR}")
+app.mount(
+    "/dashboard",
+    StaticFiles(directory=MONITOR_DIR, html=True),
+    name="monitor_ui",
 )
 
 
@@ -220,6 +256,12 @@ def _safe_eval_config(expr: str) -> dict:
 
 # ── job router ──────────────────────────────────────────────
 app.include_router(init_job_router(redis, config, token_dep))
+
+# ── monitor router ──────────────────────────────────────────
+from monitor_routes import router as monitor_router
+app.include_router(monitor_router)
+
+logger = logging.getLogger(__name__)
 
 # ──────────────────────── Endpoints ──────────────────────────
 @app.post("/token")
