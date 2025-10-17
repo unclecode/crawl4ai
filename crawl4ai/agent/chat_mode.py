@@ -1,45 +1,80 @@
-"""Chat mode implementation with streaming message generator for Claude SDK."""
+# chat_mode.py
+"""Interactive chat mode with streaming visibility for Crawl4AI Agent."""
 
 import asyncio
-from typing import AsyncGenerator, Dict, Any, Optional
-from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, AssistantMessage, TextBlock, ResultMessage, ToolUseBlock
+from typing import Optional
+from agents import Agent, Runner
 
 from .terminal_ui import TerminalUI
 from .browser_manager import BrowserManager
 
 
 class ChatMode:
-    """Interactive chat mode with streaming input/output."""
+    """Interactive chat mode with real-time status updates and tool visibility."""
 
-    def __init__(self, options: ClaudeAgentOptions, ui: TerminalUI, storage):
-        self.options = options
+    def __init__(self, agent: Agent, ui: TerminalUI):
+        self.agent = agent
         self.ui = ui
-        self.storage = storage
         self._exit_requested = False
-        self._current_streaming_text = ""
+        self.conversation_history = []  # Track full conversation for context
 
-    async def message_generator(self) -> AsyncGenerator[Dict[str, Any], None]:
-        """
-        Generate user messages as async generator (streaming input mode per cc_stream.md).
+        # Generate unique session ID
+        import time
+        self.session_id = f"session_{int(time.time())}"
 
-        Yields messages in the format:
-        {
-            "type": "user",
-            "message": {
-                "role": "user",
-                "content": "user input text"
-            }
-        }
+    async def _handle_command(self, command: str) -> bool:
+        """Handle special chat commands.
+
+        Returns:
+            True if command was /exit, False otherwise
         """
-        while not self._exit_requested:
-            try:
+        cmd = command.lower().strip()
+
+        if cmd == '/exit' or cmd == '/quit':
+            self._exit_requested = True
+            self.ui.print_info("Exiting chat mode...")
+            return True
+
+        elif cmd == '/clear':
+            self.ui.clear_screen()
+            self.ui.show_header(session_id=self.session_id)
+            return False
+
+        elif cmd == '/help':
+            self.ui.show_commands()
+            return False
+
+        elif cmd == '/browser':
+            # Show browser status
+            if BrowserManager.is_browser_active():
+                config = BrowserManager.get_current_config()
+                self.ui.print_info(f"Browser active: headless={config.headless if config else 'unknown'}")
+            else:
+                self.ui.print_info("No browser instance active")
+            return False
+
+        else:
+            self.ui.print_error(f"Unknown command: {command}")
+            self.ui.print_info("Available commands: /exit, /clear, /help, /browser")
+            return False
+
+    async def run(self):
+        """Run the interactive chat loop with streaming responses and visibility."""
+        # Show header with session ID (tips are now inside)
+        self.ui.show_header(session_id=self.session_id)
+
+        try:
+            while not self._exit_requested:
                 # Get user input
-                user_input = await asyncio.to_thread(self.ui.get_user_input)
+                try:
+                    user_input = await asyncio.to_thread(self.ui.get_user_input)
+                except EOFError:
+                    break
 
                 # Handle commands
                 if user_input.startswith('/'):
-                    await self._handle_command(user_input)
-                    if self._exit_requested:
+                    should_exit = await self._handle_command(user_input)
+                    if should_exit:
                         break
                     continue
 
@@ -47,126 +82,132 @@ class ChatMode:
                 if not user_input.strip():
                     continue
 
-                # Log user message
-                self.storage.log("user_message", {"text": user_input})
+                # Add user message to conversation history
+                self.conversation_history.append({
+                    "role": "user",
+                    "content": user_input
+                })
 
-                # Yield user message for agent
-                yield {
-                    "type": "user",
-                    "message": {
-                        "role": "user",
-                        "content": user_input
-                    }
-                }
+                # Show thinking indicator
+                self.ui.console.print("\n[cyan]Agent:[/cyan] [dim italic]thinking...[/dim italic]")
 
-            except KeyboardInterrupt:
-                self._exit_requested = True
-                break
-            except Exception as e:
-                self.ui.print_error(f"Input error: {e}")
+                try:
+                    # Run agent with streaming, passing conversation history for context
+                    result = Runner.run_streamed(
+                        self.agent,
+                        input=self.conversation_history,  # Pass full conversation history
+                        context=None,
+                        max_turns=100,  # Allow up to 100 turns for complex multi-step tasks
+                    )
 
-    async def _handle_command(self, command: str):
-        """Handle special chat commands."""
-        cmd = command.lower().strip()
+                    # Track what we've seen
+                    response_text = []
+                    tools_called = []
+                    current_tool = None
 
-        if cmd == '/exit' or cmd == '/quit':
-            self._exit_requested = True
-            self.ui.print_info("Exiting chat mode...")
+                    # Process streaming events
+                    async for event in result.stream_events():
+                        # DEBUG: Print all event types
+                        # self.ui.console.print(f"[dim]DEBUG: event type={event.type}[/dim]")
 
-        elif cmd == '/clear':
-            self.ui.clear_screen()
+                        # Agent switched
+                        if event.type == "agent_updated_stream_event":
+                            self.ui.console.print(f"\n[dim]→ Agent: {event.new_agent.name}[/dim]")
 
-        elif cmd == '/help':
-            self.ui.show_commands()
+                        # Items generated (tool calls, outputs, text)
+                        elif event.type == "run_item_stream_event":
+                            item = event.item
 
-        elif cmd == '/browser':
-            # Show browser status
-            if BrowserManager.is_browser_active():
-                config = BrowserManager.get_current_config()
-                self.ui.print_info(f"Browser active: {config}")
-            else:
-                self.ui.print_info("No browser instance active")
+                            # Tool call started
+                            if item.type == "tool_call_item":
+                                # Get tool name from raw_item
+                                current_tool = item.raw_item.name if hasattr(item.raw_item, 'name') else "unknown"
+                                tools_called.append(current_tool)
 
-        else:
-            self.ui.print_error(f"Unknown command: {command}")
+                                # Show tool name and args clearly
+                                tool_display = current_tool
+                                self.ui.console.print(f"\n[yellow]🔧 Calling:[/yellow] [bold]{tool_display}[/bold]")
 
-    async def run(self):
-        """Run the interactive chat loop with streaming responses."""
-        # Show header
-        session_id = self.storage.session_id if hasattr(self.storage, 'session_id') else "chat"
-        self.ui.show_header(
-            session_id=session_id,
-            log_path=self.storage.get_session_path() if hasattr(self.storage, 'get_session_path') else "N/A"
-        )
-        self.ui.show_commands()
+                                # Show tool arguments if present
+                                if hasattr(item.raw_item, 'arguments'):
+                                    try:
+                                        import json
+                                        args_str = item.raw_item.arguments
+                                        args = json.loads(args_str) if isinstance(args_str, str) else args_str
+                                        # Show key args only
+                                        key_args = {k: v for k, v in args.items() if k in ['url', 'session_id', 'output_format']}
+                                        if key_args:
+                                            params_str = ", ".join(f"{k}={v}" for k, v in key_args.items())
+                                            self.ui.console.print(f"  [dim]({params_str})[/dim]")
+                                    except:
+                                        pass
 
-        try:
-            async with ClaudeSDKClient(options=self.options) as client:
-                # Start streaming input mode
-                await client.query(self.message_generator())
+                            # Tool output received
+                            elif item.type == "tool_call_output_item":
+                                if current_tool:
+                                    self.ui.console.print(f"  [green]✓[/green] [dim]completed[/dim]")
+                                    current_tool = None
 
-                # Process streaming responses
-                turn = 0
-                thinking_shown = False
-                async for message in client.receive_messages():
-                    turn += 1
+                            # Agent text response (multiple types)
+                            elif item.type == "text_item":
+                                # Clear "thinking..." line if this is first text
+                                if not response_text:
+                                    self.ui.console.print("\r[cyan]Agent:[/cyan] ", end="")
 
-                    if isinstance(message, AssistantMessage):
-                        # Clear "thinking" indicator
-                        if thinking_shown:
-                            self.ui.console.print()  # New line
-                            thinking_shown = False
+                                # Stream the text
+                                self.ui.console.print(item.text, end="")
+                                response_text.append(item.text)
 
-                        self._current_streaming_text = ""
+                            # Message output (final response)
+                            elif item.type == "message_output_item":
+                                # This is the final formatted response
+                                if not response_text:
+                                    self.ui.console.print("\n[cyan]Agent:[/cyan] ", end="")
 
-                        # Process message content blocks
-                        for block in message.content:
-                            if isinstance(block, TextBlock):
-                                # Stream text as it arrives
-                                self.ui.print_agent_text(block.text)
-                                self._current_streaming_text += block.text
+                                # Extract text from content blocks
+                                if hasattr(item.raw_item, 'content') and item.raw_item.content:
+                                    for content_block in item.raw_item.content:
+                                        if hasattr(content_block, 'text'):
+                                            text = content_block.text
+                                            self.ui.console.print(text, end="")
+                                            response_text.append(text)
 
-                                # Log assistant message
-                                self.storage.log("assistant_message", {
-                                    "turn": turn,
-                                    "text": block.text
-                                })
+                        # Text deltas (real-time streaming)
+                        elif event.type == "text_delta_stream_event":
+                            # Clear "thinking..." if this is first delta
+                            if not response_text:
+                                self.ui.console.print("\r[cyan]Agent:[/cyan] ", end="")
 
-                            elif isinstance(block, ToolUseBlock):
-                                # Show tool usage clearly
-                                if not thinking_shown:
-                                    self.ui.print_thinking()
-                                    thinking_shown = True
-                                self.ui.print_tool_use(block.name, block.input)
+                            # Stream character by character for responsiveness
+                            self.ui.console.print(event.delta, end="", markup=False)
+                            response_text.append(event.delta)
 
-                    elif isinstance(message, ResultMessage):
-                        # Session completed (user exited or error)
-                        if message.is_error:
-                            self.ui.print_error(f"Agent error: {message.result}")
-                        else:
-                            self.ui.print_session_summary(
-                                duration_s=message.duration_ms / 1000 if message.duration_ms else 0,
-                                turns=message.num_turns,
-                                cost_usd=message.total_cost_usd
-                            )
+                    # Newline after response
+                    self.ui.console.print()
 
-                        # Log session end
-                        self.storage.log("session_end", {
-                            "duration_ms": message.duration_ms,
-                            "cost_usd": message.total_cost_usd,
-                            "turns": message.num_turns,
-                            "success": not message.is_error
+                    # Show summary after response
+                    if tools_called:
+                        self.ui.console.print(f"\n[dim]Tools used: {', '.join(set(tools_called))}[/dim]")
+
+                    # Add agent response to conversation history
+                    if response_text:
+                        agent_response = "".join(response_text)
+                        self.conversation_history.append({
+                            "role": "assistant",
+                            "content": agent_response
                         })
-                        break
+
+                except Exception as e:
+                    self.ui.print_error(f"Error during agent execution: {e}")
+                    import traceback
+                    traceback.print_exc()
 
         except KeyboardInterrupt:
-            self.ui.print_info("\nChat interrupted by user")
-
-        except Exception as e:
-            self.ui.print_error(f"Chat error: {e}")
-            raise
+            self.ui.print_info("\n\nChat interrupted by user")
 
         finally:
             # Cleanup browser on exit
+            self.ui.console.print("\n[dim]Cleaning up...[/dim]")
             await BrowserManager.close_browser()
             self.ui.print_info("Browser closed")
+            self.ui.console.print("[bold green]Goodbye![/bold green]\n")

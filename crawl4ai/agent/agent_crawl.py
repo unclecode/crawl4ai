@@ -1,161 +1,84 @@
 # agent_crawl.py
-"""Crawl4AI Agent CLI - Browser automation agent powered by Claude Code SDK."""
+"""Crawl4AI Agent CLI - Browser automation agent powered by OpenAI Agents SDK."""
 
 import asyncio
 import sys
-import json
-import uuid
-import logging
-from pathlib import Path
-from datetime import datetime
-from typing import Optional
+import os
 import argparse
+from pathlib import Path
 
-from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, create_sdk_mcp_server
-from claude_agent_sdk import AssistantMessage, TextBlock, ResultMessage
+from agents import Agent, Runner, set_default_openai_key
 
-from .c4ai_tools import CRAWL_TOOLS
-from .c4ai_prompts import SYSTEM_PROMPT
+from .crawl_tools import CRAWL_TOOLS
+from .crawl_prompts import SYSTEM_PROMPT
+from .browser_manager import BrowserManager
 from .terminal_ui import TerminalUI
-from .chat_mode import ChatMode
-
-# Suppress crawl4ai verbose logging in chat mode
-logging.getLogger("crawl4ai").setLevel(logging.ERROR)
-
-
-class SessionStorage:
-    """Manage session storage in ~/.crawl4ai/agents/projects/"""
-
-    def __init__(self, cwd: Optional[str] = None):
-        self.cwd = Path(cwd) if cwd else Path.cwd()
-        self.base_dir = Path.home() / ".crawl4ai" / "agents" / "projects"
-        self.project_dir = self.base_dir / self._sanitize_path(str(self.cwd.resolve()))
-        self.project_dir.mkdir(parents=True, exist_ok=True)
-        self.session_id = str(uuid.uuid4())
-        self.log_file = self.project_dir / f"{self.session_id}.jsonl"
-
-    @staticmethod
-    def _sanitize_path(path: str) -> str:
-        """Convert /Users/unclecode/devs/test to -Users-unclecode-devs-test"""
-        return path.replace("/", "-").replace("\\", "-")
-
-    def log(self, event_type: str, data: dict):
-        """Append event to JSONL log."""
-        entry = {
-            "timestamp": datetime.utcnow().isoformat(),
-            "event": event_type,
-            "session_id": self.session_id,
-            "data": data
-        }
-        with open(self.log_file, "a") as f:
-            f.write(json.dumps(entry) + "\n")
-
-    def get_session_path(self) -> str:
-        """Return path to current session log."""
-        return str(self.log_file)
 
 
 class CrawlAgent:
-    """Crawl4AI agent wrapper."""
+    """Crawl4AI agent wrapper using OpenAI Agents SDK."""
 
     def __init__(self, args: argparse.Namespace):
         self.args = args
-        self.storage = SessionStorage(args.add_dir[0] if args.add_dir else None)
-        self.client: Optional[ClaudeSDKClient] = None
+        self.ui = TerminalUI()
 
-        # Create MCP server with crawl tools
-        self.crawler_server = create_sdk_mcp_server(
-            name="crawl4ai",
-            version="1.0.0",
-            tools=CRAWL_TOOLS
+        # Set API key
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY environment variable not set")
+        set_default_openai_key(api_key)
+
+        # Create agent
+        self.agent = Agent(
+            name="Crawl4AI Agent",
+            instructions=SYSTEM_PROMPT,
+            model=args.model or "gpt-4.1",
+            tools=CRAWL_TOOLS,
+            tool_use_behavior="run_llm_again",  # CRITICAL: Run LLM again after tools to generate response
         )
 
-        # Build options
-        self.options = ClaudeAgentOptions(
-            mcp_servers={"crawler": self.crawler_server},
-            allowed_tools=[
-                # Crawl4AI tools
-                "mcp__crawler__quick_crawl",
-                "mcp__crawler__start_session",
-                "mcp__crawler__navigate",
-                "mcp__crawler__extract_data",
-                "mcp__crawler__execute_js",
-                "mcp__crawler__screenshot",
-                "mcp__crawler__close_session",
-                # Claude Code SDK built-in tools
-                "Read",
-                "Write",
-                "Edit",
-                "Glob",
-                "Grep",
-                "Bash",
-                "NotebookEdit"
-            ],
-            system_prompt=SYSTEM_PROMPT if not args.system_prompt else args.system_prompt,
-            permission_mode=args.permission_mode or "acceptEdits",
-            cwd=args.add_dir[0] if args.add_dir else str(Path.cwd()),
-            model=args.model,
-        )
+    async def run_single_shot(self, prompt: str):
+        """Execute a single crawl task."""
+        self.ui.console.print(f"\n🕷️  [bold cyan]Crawl4AI Agent[/bold cyan]")
+        self.ui.console.print(f"🎯 Task: {prompt}\n")
 
-    async def run(self, prompt: str):
-        """Execute crawl task."""
+        try:
+            result = await Runner.run(
+                starting_agent=self.agent,
+                input=prompt,
+                context=None,
+                max_turns=100,  # Allow up to 100 turns for complex tasks
+            )
 
-        self.storage.log("session_start", {
-            "prompt": prompt,
-            "cwd": self.options.cwd,
-            "model": self.options.model
-        })
+            self.ui.console.print(f"\n[bold green]Result:[/bold green]")
+            self.ui.console.print(result.final_output)
 
-        print(f"\n🕷️  Crawl4AI Agent")
-        print(f"📁 Session: {self.storage.session_id}")
-        print(f"💾 Log: {self.storage.get_session_path()}")
-        print(f"🎯 Task: {prompt}\n")
+            if hasattr(result, 'usage'):
+                self.ui.console.print(f"\n[dim]Tokens: {result.usage}[/dim]")
 
-        async with ClaudeSDKClient(options=self.options) as client:
-            self.client = client
-            await client.query(prompt)
+        except Exception as e:
+            self.ui.print_error(f"Error: {e}")
+            if self.args.debug:
+                raise
 
-            turn = 0
-            async for message in client.receive_messages():
-                turn += 1
+    async def run_chat_mode(self):
+        """Run interactive chat mode with streaming visibility."""
+        from .chat_mode import ChatMode
 
-                if isinstance(message, AssistantMessage):
-                    for block in message.content:
-                        if isinstance(block, TextBlock):
-                            print(f"\n💭 [{turn}] {block.text}")
-                            self.storage.log("assistant_message", {"turn": turn, "text": block.text})
-
-                elif isinstance(message, ResultMessage):
-                    print(f"\n✅ Completed in {message.duration_ms/1000:.2f}s")
-                    print(f"💰 Cost: ${message.total_cost_usd:.4f}" if message.total_cost_usd else "")
-                    print(f"🔄 Turns: {message.num_turns}")
-
-                    self.storage.log("session_end", {
-                        "duration_ms": message.duration_ms,
-                        "cost_usd": message.total_cost_usd,
-                        "turns": message.num_turns,
-                        "success": not message.is_error
-                    })
-                    break
-
-        print(f"\n📊 Session log: {self.storage.get_session_path()}\n")
+        chat = ChatMode(self.agent, self.ui)
+        await chat.run()
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Crawl4AI Agent - Browser automation powered by Claude Code SDK",
+        description="Crawl4AI Agent - Browser automation powered by OpenAI Agents SDK",
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
 
     parser.add_argument("prompt", nargs="?", help="Your crawling task prompt (not used in --chat mode)")
     parser.add_argument("--chat", action="store_true", help="Start interactive chat mode")
-    parser.add_argument("--system-prompt", help="Custom system prompt")
-    parser.add_argument("--permission-mode", choices=["acceptEdits", "bypassPermissions", "default", "plan"],
-                       help="Permission mode for tool execution")
-    parser.add_argument("--model", help="Model to use (e.g., 'sonnet', 'opus')")
-    parser.add_argument("--add-dir", nargs="+", help="Additional directories for file access")
-    parser.add_argument("--session-id", help="Use specific session ID (UUID)")
-    parser.add_argument("-v", "--version", action="version", version="Crawl4AI Agent 1.0.0")
+    parser.add_argument("--model", help="Model to use (e.g., 'gpt-4.1', 'gpt-5-nano')", default="gpt-4.1")
+    parser.add_argument("-v", "--version", action="version", version="Crawl4AI Agent 2.0.0")
     parser.add_argument("--debug", action="store_true", help="Enable debug mode")
 
     args = parser.parse_args()
@@ -164,9 +87,7 @@ def main():
     if args.chat:
         try:
             agent = CrawlAgent(args)
-            ui = TerminalUI()
-            chat = ChatMode(agent.options, ui, agent.storage)
-            asyncio.run(chat.run())
+            asyncio.run(agent.run_chat_mode())
         except KeyboardInterrupt:
             print("\n\n⚠️  Chat interrupted by user")
             sys.exit(0)
@@ -182,16 +103,15 @@ def main():
         parser.print_help()
         print("\nExample usage:")
         print('  # Single-shot mode:')
-        print('  crawl-agent "Scrape all products from example.com with price > $10"')
-        print('  crawl-agent --add-dir ~/projects "Find all Python files and analyze imports"')
+        print('  python -m crawl4ai.agent.agent_crawl "Scrape products from example.com"')
         print()
         print('  # Interactive chat mode:')
-        print('  crawl-agent --chat')
+        print('  python -m crawl4ai.agent.agent_crawl --chat')
         sys.exit(1)
 
     try:
         agent = CrawlAgent(args)
-        asyncio.run(agent.run(args.prompt))
+        asyncio.run(agent.run_single_shot(args.prompt))
     except KeyboardInterrupt:
         print("\n\n⚠️  Interrupted by user")
         sys.exit(0)
