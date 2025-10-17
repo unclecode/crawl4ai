@@ -919,11 +919,6 @@ We envision a future where AI is powered by real human knowledge, ensuring data 
 For more details, see our [full mission statement](./MISSION.md).
 </details>
 
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=unclecode/crawl4ai&type=Date)](https://star-history.com/#unclecode/crawl4ai&Date)
-
----
 ## 🌟 Current Sponsors
 
 ### 🏢 Enterprise Sponsors & Partners
@@ -954,4 +949,6 @@ A heartfelt thanks to our individual supporters! Every contribution helps us kee
 
 > Want to join them? [Sponsor Crawl4AI →](https://github.com/sponsors/unclecode)
 
----
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=unclecode/crawl4ai&type=Date)](https://star-history.com/#unclecode/crawl4ai&Date)
