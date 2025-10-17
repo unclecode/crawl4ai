@@ -731,6 +731,7 @@ async def handle_crawl_request(
     proxies: Optional[List[Dict[str, Any]]] = None,
     proxy_failure_threshold: int = 3,
     proxy_recovery_time: int = 300,
+    table_extraction: Optional[dict] = None,
     dispatcher = None,
 ) -> dict:
     """Handle non-streaming crawl requests with optional hooks."""
@@ -767,6 +768,19 @@ async def handle_crawl_request(
                 crawler_config.proxy_rotation_strategy = proxy_strategy
             except ValueError as e:
                 raise HTTPException(status_code=400, detail=str(e))
+
+        # Configure table extraction strategy if specified
+        if table_extraction:
+            try:
+                from schemas import TableExtractionConfig
+                from utils import create_table_extraction_strategy
+
+                table_config = TableExtractionConfig(**table_extraction)
+                table_strategy = create_table_extraction_strategy(table_config)
+                crawler_config.table_extraction_strategy = table_strategy
+            except Exception as e:
+                logger.error(f"Error creating table extraction strategy: {e}")
+                raise HTTPException(status_code=400, detail=f"Invalid table extraction config: {str(e)}")
 
         # Configure browser adapter based on anti_bot_strategy
         browser_adapter = _get_browser_adapter(anti_bot_strategy, browser_config)
@@ -974,6 +988,7 @@ async def handle_stream_crawl_request(
     proxies: Optional[List[Dict[str, Any]]] = None,
     proxy_failure_threshold: int = 3,
     proxy_recovery_time: int = 300,
+    table_extraction: Optional[dict] = None,
     dispatcher = None,
 ) -> Tuple[AsyncWebCrawler, AsyncGenerator, Optional[Dict]]:
     """Handle streaming crawl requests with optional hooks."""
@@ -1002,6 +1017,19 @@ async def handle_stream_crawl_request(
                 crawler_config.proxy_rotation_strategy = proxy_strategy
             except ValueError as e:
                 raise HTTPException(status_code=400, detail=str(e))
+
+        # Configure table extraction strategy if specified
+        if table_extraction:
+            try:
+                from schemas import TableExtractionConfig
+                from utils import create_table_extraction_strategy
+
+                table_config = TableExtractionConfig(**table_extraction)
+                table_strategy = create_table_extraction_strategy(table_config)
+                crawler_config.table_extraction_strategy = table_strategy
+            except Exception as e:
+                logger.error(f"Error creating table extraction strategy: {e}")
+                raise HTTPException(status_code=400, detail=f"Invalid table extraction config: {str(e)}")
 
         # Configure browser adapter based on anti_bot_strategy
         browser_adapter = _get_browser_adapter(anti_bot_strategy, browser_config)

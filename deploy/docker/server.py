@@ -87,7 +87,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, Field
 from rank_bm25 import BM25Okapi
 from redis import asyncio as aioredis
-from routers import adaptive, dispatchers, scripts, monitoring
+from routers import adaptive, dispatchers, scripts, monitoring, tables
 from schemas import (
     CrawlRequest,
     CrawlRequestWithHooks,
@@ -298,6 +298,7 @@ app.include_router(adaptive.router)
 app.include_router(dispatchers.router)
 app.include_router(scripts.router)
 app.include_router(monitoring.router)
+app.include_router(tables.router)
 
 
 # ──────────────────────── Endpoints ──────────────────────────
@@ -1578,6 +1579,7 @@ async def crawl(
         proxies=crawl_request.proxies,
         proxy_failure_threshold=crawl_request.proxy_failure_threshold,
         proxy_recovery_time=crawl_request.proxy_recovery_time,
+        table_extraction=crawl_request.table_extraction.model_dump() if crawl_request.table_extraction else None,
         dispatcher=dispatcher,
     )
     # check if all of the results are not successful
@@ -1729,6 +1731,7 @@ async def stream_process(crawl_request: CrawlRequestWithHooks):
         proxies=crawl_request.proxies,
         proxy_failure_threshold=crawl_request.proxy_failure_threshold,
         proxy_recovery_time=crawl_request.proxy_recovery_time,
+        table_extraction=crawl_request.table_extraction.model_dump() if crawl_request.table_extraction else None,
         dispatcher=dispatcher,
     )
 

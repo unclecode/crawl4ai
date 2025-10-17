@@ -48,6 +48,153 @@ class DispatcherSelection(BaseModel):
 # ============================================================================
 
 
+# ============================================================================
+# Table Extraction Schemas
+# ============================================================================
+
+class TableExtractionStrategy(str, Enum):
+    """Available table extraction strategies."""
+    NONE = "none"
+    DEFAULT = "default"
+    LLM = "llm"
+    FINANCIAL = "financial"
+
+
+class TableExtractionConfig(BaseModel):
+    """Configuration for table extraction."""
+    
+    strategy: TableExtractionStrategy = Field(
+        default=TableExtractionStrategy.DEFAULT,
+        description="Table extraction strategy to use"
+    )
+    
+    # Common configuration for all strategies
+    table_score_threshold: int = Field(
+        default=7,
+        ge=0,
+        le=100,
+        description="Minimum score for a table to be considered a data table (default strategy)"
+    )
+    min_rows: int = Field(
+        default=0,
+        ge=0,
+        description="Minimum number of rows for a valid table"
+    )
+    min_cols: int = Field(
+        default=0,
+        ge=0,
+        description="Minimum number of columns for a valid table"
+    )
+    
+    # LLM-specific configuration
+    llm_provider: Optional[str] = Field(
+        None,
+        description="LLM provider for LLM strategy (e.g., 'openai/gpt-4')"
+    )
+    llm_model: Optional[str] = Field(
+        None,
+        description="Specific LLM model to use"
+    )
+    llm_api_key: Optional[str] = Field(
+        None,
+        description="API key for LLM provider (if not in environment)"
+    )
+    llm_base_url: Optional[str] = Field(
+        None,
+        description="Custom base URL for LLM API"
+    )
+    extraction_prompt: Optional[str] = Field(
+        None,
+        description="Custom prompt for LLM table extraction"
+    )
+    
+    # Financial-specific configuration
+    decimal_separator: str = Field(
+        default=".",
+        description="Decimal separator for financial tables (e.g., '.' or ',')"
+    )
+    thousand_separator: str = Field(
+        default=",",
+        description="Thousand separator for financial tables (e.g., ',' or '.')"
+    )
+    
+    # General options
+    verbose: bool = Field(
+        default=False,
+        description="Enable verbose logging for table extraction"
+    )
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "strategy": "default",
+                "table_score_threshold": 7,
+                "min_rows": 2,
+                "min_cols": 2
+            }
+        }
+
+
+class TableExtractionRequest(BaseModel):
+    """Request for dedicated table extraction endpoint."""
+    
+    url: Optional[str] = Field(
+        None,
+        description="URL to crawl and extract tables from"
+    )
+    html: Optional[str] = Field(
+        None,
+        description="Raw HTML content to extract tables from"
+    )
+    config: TableExtractionConfig = Field(
+        default_factory=lambda: TableExtractionConfig(),
+        description="Table extraction configuration"
+    )
+    
+    # Browser config (only used if URL is provided)
+    browser_config: Optional[Dict] = Field(
+        default_factory=dict,
+        description="Browser configuration for URL crawling"
+    )
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "url": "https://example.com/data-table",
+                "config": {
+                    "strategy": "default",
+                    "min_rows": 2
+                }
+            }
+        }
+
+
+class TableExtractionBatchRequest(BaseModel):
+    """Request for batch table extraction."""
+    
+    html_list: Optional[List[str]] = Field(
+        None,
+        description="List of HTML contents to extract tables from"
+    )
+    url_list: Optional[List[str]] = Field(
+        None,
+        description="List of URLs to extract tables from"
+    )
+    config: TableExtractionConfig = Field(
+        default_factory=lambda: TableExtractionConfig(),
+        description="Table extraction configuration"
+    )
+    browser_config: Optional[Dict] = Field(
+        default_factory=dict,
+        description="Browser configuration"
+    )
+
+
+# ============================================================================
+# End Table Extraction Schemas
+# ============================================================================
+
+
 class CrawlRequest(BaseModel):
     urls: List[str] = Field(min_length=1, max_length=100)
     browser_config: Optional[Dict] = Field(default_factory=dict)
@@ -76,6 +223,11 @@ class CrawlRequest(BaseModel):
     )
     proxy_recovery_time: Optional[int] = Field(
         300, ge=60, le=3600, description="Recovery time in seconds for failure_aware strategy"
+    )
+    
+    # Table extraction configuration
+    table_extraction: Optional[TableExtractionConfig] = Field(
+        None, description="Optional table extraction configuration to extract tables during crawl"
     )
 
 

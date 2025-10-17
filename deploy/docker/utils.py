@@ -6,7 +6,7 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from fastapi import Request
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, List
 
 # Import dispatchers from crawl4ai
 from crawl4ai.async_dispatcher import (
@@ -374,3 +374,186 @@ def create_chunking_strategy(config: Optional[Dict[str, Any]] = None) -> Optiona
         return strategies[strategy_type](**params)
     except Exception as e:
         raise ValueError(f"Failed to create {strategy_type} with params {params}: {str(e)}")
+
+
+# ============================================================================
+# Table Extraction Utilities
+# ============================================================================
+
+def create_table_extraction_strategy(config):
+    """
+    Create a table extraction strategy from configuration.
+    
+    Args:
+        config: TableExtractionConfig instance or dict
+        
+    Returns:
+        TableExtractionStrategy instance
+        
+    Raises:
+        ValueError: If strategy type is unknown or configuration is invalid
+    """
+    from crawl4ai.table_extraction import (
+        NoTableExtraction,
+        DefaultTableExtraction,
+        LLMTableExtraction
+    )
+    from schemas import TableExtractionStrategy
+    
+    # Handle both Pydantic model and dict
+    if hasattr(config, 'strategy'):
+        strategy_type = config.strategy
+    elif isinstance(config, dict):
+        strategy_type = config.get('strategy', 'default')
+    else:
+        strategy_type = 'default'
+    
+    # Convert string to enum if needed
+    if isinstance(strategy_type, str):
+        strategy_type = strategy_type.lower()
+    
+    # Extract configuration values
+    def get_config_value(key, default=None):
+        if hasattr(config, key):
+            return getattr(config, key)
+        elif isinstance(config, dict):
+            return config.get(key, default)
+        return default
+    
+    # Create strategy based on type
+    if strategy_type in ['none', TableExtractionStrategy.NONE]:
+        return NoTableExtraction()
+    
+    elif strategy_type in ['default', TableExtractionStrategy.DEFAULT]:
+        return DefaultTableExtraction(
+            table_score_threshold=get_config_value('table_score_threshold', 7),
+            min_rows=get_config_value('min_rows', 0),
+            min_cols=get_config_value('min_cols', 0),
+            verbose=get_config_value('verbose', False)
+        )
+    
+    elif strategy_type in ['llm', TableExtractionStrategy.LLM]:
+        from crawl4ai.types import LLMConfig
+        
+        # Build LLM config
+        llm_config = None
+        llm_provider = get_config_value('llm_provider')
+        llm_api_key = get_config_value('llm_api_key')
+        llm_model = get_config_value('llm_model')
+        llm_base_url = get_config_value('llm_base_url')
+        
+        if llm_provider or llm_api_key:
+            llm_config = LLMConfig(
+                provider=llm_provider or "openai/gpt-4",
+                api_token=llm_api_key,
+                model=llm_model,
+                base_url=llm_base_url
+            )
+        
+        return LLMTableExtraction(
+            llm_config=llm_config,
+            extraction_prompt=get_config_value('extraction_prompt'),
+            table_score_threshold=get_config_value('table_score_threshold', 7),
+            min_rows=get_config_value('min_rows', 0),
+            min_cols=get_config_value('min_cols', 0),
+            verbose=get_config_value('verbose', False)
+        )
+    
+    elif strategy_type in ['financial', TableExtractionStrategy.FINANCIAL]:
+        # Financial strategy uses DefaultTableExtraction with specialized settings
+        # optimized for financial data (tables with currency, numbers, etc.)
+        return DefaultTableExtraction(
+            table_score_threshold=get_config_value('table_score_threshold', 10),  # Higher threshold for financial
+            min_rows=get_config_value('min_rows', 2),  # Financial tables usually have at least 2 rows
+            min_cols=get_config_value('min_cols', 2),  # Financial tables usually have at least 2 columns
+            verbose=get_config_value('verbose', False)
+        )
+    
+    else:
+        raise ValueError(f"Unknown table extraction strategy: {strategy_type}")
+
+
+def format_table_response(tables: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Format extracted tables for API response.
+    
+    Args:
+        tables: List of table dictionaries from table extraction strategy
+        
+    Returns:
+        List of formatted table dictionaries with consistent structure
+    """
+    if not tables:
+        return []
+    
+    formatted_tables = []
+    for idx, table in enumerate(tables):
+        formatted = {
+            "table_index": idx,
+            "headers": table.get("headers", []),
+            "rows": table.get("rows", []),
+            "caption": table.get("caption"),
+            "summary": table.get("summary"),
+            "metadata": table.get("metadata", {}),
+            "row_count": len(table.get("rows", [])),
+            "col_count": len(table.get("headers", [])),
+        }
+        
+        # Add score if available (from scoring strategies)
+        if "score" in table:
+            formatted["score"] = table["score"]
+        
+        # Add position information if available
+        if "position" in table:
+            formatted["position"] = table["position"]
+        
+        formatted_tables.append(formatted)
+    
+    return formatted_tables
+
+
+async def extract_tables_from_html(html: str, config = None):
+    """
+    Extract tables from HTML content (async wrapper for CPU-bound operation).
+    
+    Args:
+        html: HTML content as string
+        config: TableExtractionConfig instance or dict
+        
+    Returns:
+        List of formatted table dictionaries
+        
+    Raises:
+        ValueError: If HTML parsing fails
+    """
+    import asyncio
+    from functools import partial
+    from lxml import html as lxml_html
+    from schemas import TableExtractionConfig
+    
+    # Define sync extraction function
+    def _sync_extract():
+        try:
+            # Parse HTML
+            element = lxml_html.fromstring(html)
+        except Exception as e:
+            raise ValueError(f"Failed to parse HTML: {str(e)}")
+        
+        # Create strategy
+        cfg = config if config is not None else TableExtractionConfig()
+        strategy = create_table_extraction_strategy(cfg)
+        
+        # Extract tables
+        tables = strategy.extract_tables(element)
+        
+        # Format response
+        return format_table_response(tables)
+    
+    # Run in executor to avoid blocking the event loop
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _sync_extract)
+
+
+# ============================================================================
+# End Table Extraction Utilities
+# ============================================================================
