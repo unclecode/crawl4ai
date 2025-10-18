@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  # Browser Management Service
+  browser-service:
+    build:
+      context: .
+      dockerfile: docker/services/browser.Dockerfile
+    ports:
+      - "8001:8000"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=INFO
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - crawl4ai-network
+
+  # Content Scraping Service
+  content-scraping-service:
+    build:
+      context: .
+      dockerfile: docker/services/content-scraping.Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=INFO
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - crawl4ai-network
+
+  # Redis for caching and message queue
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      - crawl4ai-network
+
+  # RabbitMQ for async job processing
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    restart: unless-stopped
+    networks:
+      - crawl4ai-network
+
+volumes:
+  redis-data:
+  rabbitmq-data:
+
+networks:
+  crawl4ai-network:
+    driver: bridge

@@ -1,0 +1,19 @@
+[project]
+name = "crawl4ai-schemas"
+version = "0.1.0"
+description = "Shared API schemas and data models for Crawl4AI microservices"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.6.0",
+    "crawl4ai-core",
+]
+
+[tool.uv.sources]
+crawl4ai-core = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatchling.build.targets.wheel]
+packages = ["src/crawl4ai_schemas"]

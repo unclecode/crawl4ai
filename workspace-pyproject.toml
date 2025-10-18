@@ -1,0 +1,64 @@
+[project]
+name = "crawl4ai-workspace"
+version = "0.1.0"
+description = "Crawl4AI microservices workspace - composable web scraping services"
+requires-python = ">=3.11"
+readme = "README.md"
+license = {text = "Apache-2.0"}
+authors = [
+    {name = "Crawl4AI Team", email = "info@crawl4ai.com"}
+]
+dependencies = []
+
+[tool.uv.workspace]
+members = [
+    "services/browser-service",
+    "services/content-scraping-service",
+    "services/extraction-service",
+    "services/filtering-service",
+    "packages/crawl4ai-basic",
+    "packages/crawl4ai-advanced",
+    "shared/core",
+    "shared/client",
+    "shared/schemas",
+    "api-gateway",
+]
+
+# Global dependency sources for workspace
+[tool.uv.sources]
+crawl4ai-core = { workspace = true }
+crawl4ai-client = { workspace = true }
+crawl4ai-schemas = { workspace = true }
+
+# Shared development dependencies for entire workspace
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+    "httpx>=0.26.0",
+    "ruff>=0.3.0",
+    "mypy>=1.8.0",
+    "black>=24.0.0",
+    "isort>=5.13.0",
+]
+
+lint = [
+    "ruff>=0.3.0",
+    "mypy>=1.8.0",
+    "black>=24.0.0",
+    "isort>=5.13.0",
+]
+
+test = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+    "httpx>=0.26.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

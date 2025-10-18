@@ -1,0 +1,33 @@
+[project]
+name = "crawl4ai-content-scraping-service"
+version = "0.1.0"
+description = "Content scraping microservice for Crawl4AI"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.27.0",
+    "lxml>=5.1.0",
+    "beautifulsoup4>=4.12.0",
+    "crawl4ai-core",
+    "crawl4ai-schemas",
+    "pydantic>=2.6.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.26.0",
+]
+
+[project.scripts]
+content-scraping-service = "content_scraping_service.main:main"
+
+[tool.uv.sources]
+crawl4ai-core = { workspace = true }
+crawl4ai-schemas = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatchling.build.targets.wheel]
+packages = ["src/content_scraping_service"]

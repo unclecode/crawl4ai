@@ -1,0 +1,17 @@
+[project]
+name = "crawl4ai-core"
+version = "0.1.0"
+description = "Shared core models, utilities, and configuration for Crawl4AI microservices"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.6.0",
+    "pydantic-settings>=2.1.0",
+    "typing-extensions>=4.9.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatchling.build.targets.wheel]
+packages = ["src/crawl4ai_core"]

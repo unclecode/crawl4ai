@@ -1,0 +1,33 @@
+[project]
+name = "crawl4ai-browser-service"
+version = "0.1.0"
+description = "Browser management microservice for Crawl4AI"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.27.0",
+    "playwright>=1.41.0",
+    "crawl4ai-core",
+    "crawl4ai-schemas",
+    "pydantic>=2.6.0",
+    "redis>=5.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.26.0",
+]
+
+[project.scripts]
+browser-service = "browser_service.main:main"
+
+[tool.uv.sources]
+crawl4ai-core = { workspace = true }
+crawl4ai-schemas = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatchling.build.targets.wheel]
+packages = ["src/browser_service"]

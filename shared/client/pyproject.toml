@@ -1,0 +1,22 @@
+[project]
+name = "crawl4ai-client"
+version = "0.1.0"
+description = "Client SDK for Crawl4AI microservices"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.26.0",
+    "pydantic>=2.6.0",
+    "crawl4ai-core",
+    "crawl4ai-schemas",
+]
+
+[tool.uv.sources]
+crawl4ai-core = { workspace = true }
+crawl4ai-schemas = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatchling.build.targets.wheel]
+packages = ["src/crawl4ai_client"]
