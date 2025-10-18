@@ -119,6 +119,7 @@ async def lifespan(_: FastAPI):
     # Initialize monitor
     monitor_module.monitor_stats = MonitorStats(redis)
     await monitor_module.monitor_stats.load_from_redis()
+    monitor_module.monitor_stats.start_persistence_worker()
 
     # Initialize browser pool
     await init_permanent(BrowserConfig(
@@ -135,6 +136,14 @@ async def lifespan(_: FastAPI):
     # Cleanup
     app.state.janitor.cancel()
     app.state.timeline_updater.cancel()
+
+    # Monitor cleanup (persist stats and stop workers)
+    from monitor import get_monitor
+    try:
+        await get_monitor().cleanup()
+    except Exception as e:
+        logger.error(f"Monitor cleanup failed: {e}")
+
     await close_all()
 
 async def _timeline_updater():
@@ -143,7 +152,9 @@ async def _timeline_updater():
     while True:
         await asyncio.sleep(5)
         try:
-            await get_monitor().update_timeline()
+            await asyncio.wait_for(get_monitor().update_timeline(), timeout=4.0)
+        except asyncio.TimeoutError:
+            logger.warning("Timeline update timeout after 4s")
         except Exception as e:
             logger.warning(f"Timeline update error: {e}")
 

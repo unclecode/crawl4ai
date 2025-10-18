@@ -35,6 +35,12 @@
         }
         .pulse-slow { animation: pulse-slow 2s ease-in-out infinite; }
 
+        @keyframes pulse-fast {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.1); }
+        }
+        .pulse-fast { animation: pulse-fast 1s ease-in-out infinite; }
+
         @keyframes spin-slow {
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
@@ -87,6 +93,14 @@
         </h1>
 
         <div class="ml-auto flex items-center space-x-4">
+            <!-- Connection Status -->
+            <div class="flex items-center space-x-2">
+                <div id="ws-status" class="flex items-center space-x-1">
+                    <div class="w-2 h-2 rounded-full bg-gray-500" id="ws-indicator"></div>
+                    <span class="text-xs text-secondary" id="ws-text">Connecting...</span>
+                </div>
+            </div>
+
             <!-- Auto-refresh toggle -->
             <div class="flex items-center space-x-2">
                 <label class="text-xs text-secondary">Auto-refresh:</label>
@@ -196,7 +210,7 @@
 
             <!-- Browsers Section -->
             <section class="bg-surface rounded-lg border border-border overflow-hidden flex flex-col" style="height: 350px;">
-                <div class="px-4 py-2 border-b border-border">
+                <div class="px-4 py-2 border-b border-border flex items-center justify-between">
                     <h3 class="text-sm font-medium text-primary">🌐 Browsers (<span id="browser-count">0</span>, <span id="browser-mem">0</span>MB)</h3>
                     <div class="text-xs text-secondary">Reuse: <span id="reuse-rate" class="text-primary">--%</span></div>
                 </div>
@@ -308,8 +322,278 @@
         let autoRefresh = true;
         let refreshInterval;
         const REFRESH_RATE = 1000; // 1 second
+        let websocket = null;
+        let wsReconnectAttempts = 0;
+        const MAX_WS_RECONNECT = 5;
+        let useWebSocket = true; // Try WebSocket first, fallback to polling
 
         // No more tabs - all sections visible at once!
+
+        // ========== WebSocket Connection ==========
+        function updateConnectionStatus(status, message) {
+            const indicator = document.getElementById('ws-indicator');
+            const text = document.getElementById('ws-text');
+
+            indicator.className = 'w-2 h-2 rounded-full';
+
+            if (status === 'connected') {
+                indicator.classList.add('bg-green-500', 'pulse-fast');
+                text.textContent = 'Live';
+                text.className = 'text-xs text-green-400';
+            } else if (status === 'connecting') {
+                indicator.classList.add('bg-yellow-500', 'pulse-slow');
+                text.textContent = 'Connecting...';
+                text.className = 'text-xs text-yellow-400';
+            } else if (status === 'polling') {
+                indicator.classList.add('bg-blue-500', 'pulse-slow');
+                text.textContent = 'Polling';
+                text.className = 'text-xs text-blue-400';
+            } else {
+                indicator.classList.add('bg-red-500');
+                text.textContent = message || 'Disconnected';
+                text.className = 'text-xs text-red-400';
+            }
+        }
+
+        function connectWebSocket() {
+            if (wsReconnectAttempts >= MAX_WS_RECONNECT) {
+                console.log('Max WebSocket reconnect attempts reached, falling back to polling');
+                useWebSocket = false;
+                updateConnectionStatus('polling');
+                startAutoRefresh();
+                return;
+            }
+
+            updateConnectionStatus('connecting');
+            wsReconnectAttempts++;
+
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/monitor/ws`;
+
+            websocket = new WebSocket(wsUrl);
+
+            websocket.onopen = () => {
+                console.log('WebSocket connected');
+                wsReconnectAttempts = 0;
+                updateConnectionStatus('connected');
+                stopAutoRefresh(); // Stop polling if running
+            };
+
+            websocket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                updateDashboard(data);
+            };
+
+            websocket.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+
+            websocket.onclose = () => {
+                console.log('WebSocket closed');
+                updateConnectionStatus('disconnected', 'Reconnecting...');
+
+                if (useWebSocket) {
+                    setTimeout(connectWebSocket, 2000 * wsReconnectAttempts);
+                } else {
+                    startAutoRefresh();
+                }
+            };
+        }
+
+        function updateDashboard(data) {
+            // Update all dashboard sections with WebSocket data
+            try {
+                if (data.health) {
+                    updateHealthDisplay(data.health);
+                }
+                if (data.requests) {
+                    updateRequestsDisplay(data.requests);
+                }
+                if (data.browsers) {
+                    updateBrowsersDisplay(data.browsers);
+                }
+                if (data.janitor) {
+                    updateJanitorDisplay(data.janitor);
+                }
+                if (data.errors && data.errors.length > 0) {
+                    updateErrorsDisplay(data.errors);
+                }
+            } catch (e) {
+                console.error('Error updating dashboard:', e);
+            }
+        }
+
+        // Helper functions to update displays from WebSocket data
+        function updateHealthDisplay(health) {
+            const cpu = health.container.cpu_percent;
+            const mem = health.container.memory_percent;
+
+            document.getElementById('cpu-percent').textContent = cpu.toFixed(1) + '%';
+            document.getElementById('cpu-bar').style.width = Math.min(cpu, 100) + '%';
+            document.getElementById('cpu-bar').className = `progress-bar h-2 rounded-full ${cpu > 80 ? 'bg-red-500' : cpu > 60 ? 'bg-yellow-500' : 'bg-primary'}`;
+
+            document.getElementById('mem-percent').textContent = mem.toFixed(1) + '%';
+            document.getElementById('mem-bar').style.width = Math.min(mem, 100) + '%';
+            document.getElementById('mem-bar').className = `progress-bar h-2 rounded-full ${mem > 80 ? 'bg-red-500' : mem > 60 ? 'bg-yellow-500' : 'bg-accent'}`;
+
+            document.getElementById('net-sent').textContent = health.container.network_sent_mb.toFixed(1);
+            document.getElementById('net-recv').textContent = health.container.network_recv_mb.toFixed(1);
+
+            const uptime = formatUptime(health.container.uptime_seconds);
+            document.getElementById('uptime').textContent = uptime;
+
+            const perm = health.pool.permanent;
+            document.getElementById('pool-perm').textContent = `${perm.active ? 'ACTIVE' : 'INACTIVE'} (${perm.memory_mb}MB)`;
+            document.getElementById('pool-perm').className = perm.active ? 'text-primary ml-2' : 'text-secondary ml-2';
+
+            document.getElementById('pool-hot').textContent = `${health.pool.hot.count} (${health.pool.hot.memory_mb}MB)`;
+            document.getElementById('pool-cold').textContent = `${health.pool.cold.count} (${health.pool.cold.memory_mb}MB)`;
+
+            document.getElementById('janitor-status').textContent = health.janitor.next_cleanup_estimate;
+            const pressure = health.janitor.memory_pressure;
+            const pressureEl = document.getElementById('mem-pressure');
+            pressureEl.textContent = pressure;
+            pressureEl.className = pressure === 'HIGH' ? 'text-red-500' : pressure === 'MEDIUM' ? 'text-yellow-500' : 'text-green-500';
+
+            document.getElementById('last-update').textContent = 'Live: ' + new Date().toLocaleTimeString();
+        }
+
+        function updateRequestsDisplay(requests) {
+            // Update active requests count
+            const activeCount = document.getElementById('active-count');
+            if (activeCount) activeCount.textContent = requests.active.length;
+
+            // Update active requests list
+            const activeList = document.getElementById('active-requests-list');
+            if (activeList) {
+                if (requests.active.length === 0) {
+                    activeList.innerHTML = '<div class="text-secondary text-center py-2">No active requests</div>';
+                } else {
+                    activeList.innerHTML = requests.active.map(req => `
+                        <div class="flex items-center justify-between p-2 bg-dark rounded border border-border">
+                            <span class="text-primary">${req.id.substring(0, 8)}</span>
+                            <span class="text-secondary">${req.endpoint}</span>
+                            <span class="text-light truncate max-w-[200px]" title="${req.url}">${req.url}</span>
+                            <span class="text-accent">${req.elapsed.toFixed(1)}s</span>
+                            <span class="pulse-slow">⏳</span>
+                        </div>
+                    `).join('');
+                }
+            }
+
+            // Update completed requests
+            const completedList = document.getElementById('completed-requests-list');
+            if (completedList) {
+                if (requests.completed.length === 0) {
+                    completedList.innerHTML = '<div class="text-secondary text-center py-2">No completed requests</div>';
+                } else {
+                    completedList.innerHTML = requests.completed.map(req => `
+                        <div class="flex items-center gap-3 p-2 bg-dark rounded">
+                            <span class="text-secondary w-16 flex-shrink-0">${req.id.substring(0, 8)}</span>
+                            <span class="text-secondary w-16 flex-shrink-0">${req.endpoint}</span>
+                            <span class="text-light truncate flex-1" title="${req.url}">${req.url}</span>
+                            <span class="w-12 flex-shrink-0 text-right">${req.elapsed.toFixed(2)}s</span>
+                            <span class="text-secondary w-16 flex-shrink-0 text-right">${req.mem_delta > 0 ? '+' : ''}${req.mem_delta}MB</span>
+                            <span class="w-12 flex-shrink-0 text-right">${req.success ? '✅' : '❌'} ${req.status_code}</span>
+                        </div>
+                    `).join('');
+                }
+            }
+        }
+
+        function updateBrowsersDisplay(browsers) {
+            const tbody = document.getElementById('browsers-table-body');
+            if (tbody) {
+                if (browsers.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-2 text-secondary">No browsers</td></tr>';
+                } else {
+                    tbody.innerHTML = browsers.map(b => {
+                        const typeIcon = b.type === 'permanent' ? '🔥' : b.type === 'hot' ? '♨️' : '❄️';
+                        const typeColor = b.type === 'permanent' ? 'text-primary' : b.type === 'hot' ? 'text-accent' : 'text-light';
+
+                        return `
+                            <tr class="border-t border-border hover:bg-dark">
+                                <td class="py-1 pr-2"><span class="${typeColor}">${typeIcon} ${b.type}</span></td>
+                                <td class="py-1 pr-2 font-mono text-xs">${b.sig}</td>
+                                <td class="py-1 pr-2">${formatSeconds(b.age_seconds || 0)}</td>
+                                <td class="py-1 pr-2">${formatSeconds(b.last_used_seconds || 0)}</td>
+                                <td class="py-1 pr-2">${b.hits}</td>
+                                <td class="py-1">
+                                    ${b.killable ? `
+                                        <button onclick="killBrowser('${b.sig}')" class="text-red-500 hover:underline text-xs">X</button>
+                                    ` : `
+                                        <button onclick="restartBrowser('permanent')" class="text-primary hover:underline text-xs">↻</button>
+                                    `}
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+            }
+
+            // Update browser count and total memory
+            const countEl = document.getElementById('browser-count');
+            if (countEl) countEl.textContent = browsers.length;
+
+            const memEl = document.getElementById('browser-mem');
+            if (memEl) {
+                const totalMem = browsers.reduce((sum, b) => sum + (b.memory_mb || 0), 0);
+                memEl.textContent = totalMem;
+            }
+
+            // Update reuse rate (if available from summary data)
+            // Note: WebSocket sends just browsers array, not summary
+            // Reuse rate calculation would need to be added to monitor.py
+            const reuseEl = document.getElementById('reuse-rate');
+            if (reuseEl) {
+                reuseEl.textContent = '---%'; // Not available in real-time yet
+            }
+        }
+
+        function updateJanitorDisplay(events) {
+            const janitorLog = document.getElementById('janitor-log');
+            if (janitorLog) {
+                if (events.length === 0) {
+                    janitorLog.innerHTML = '<div class="text-secondary text-center py-4">No events yet</div>';
+                } else {
+                    janitorLog.innerHTML = events.slice(0, 10).reverse().map(evt => {
+                        const time = new Date(evt.timestamp * 1000).toLocaleTimeString();
+                        const icon = evt.type === 'close_cold' ? '🧹❄️' : evt.type === 'close_hot' ? '🧹♨️' : '⬆️';
+                        const details = JSON.stringify(evt.details);
+
+                        return `<div class="p-2 bg-dark rounded">
+                            <span class="text-secondary">${time}</span>
+                            <span>${icon}</span>
+                            <span class="text-primary">${evt.type}</span>
+                            <span class="text-secondary">sig=${evt.sig}</span>
+                            <span class="text-xs text-secondary ml-2">${details}</span>
+                        </div>`;
+                    }).join('');
+                }
+            }
+        }
+
+        function updateErrorsDisplay(errors) {
+            const errorLog = document.getElementById('errors-log');
+            if (errorLog) {
+                if (errors.length === 0) {
+                    errorLog.innerHTML = '<div class="text-secondary text-center py-4">No errors</div>';
+                } else {
+                    errorLog.innerHTML = errors.slice(0, 10).reverse().map(err => {
+                        const time = new Date(err.timestamp * 1000).toLocaleTimeString();
+
+                        return `<div class="p-2 bg-dark rounded border border-red-500">
+                            <div class="flex justify-between">
+                                <span class="text-secondary">${time}</span>
+                                <span class="text-red-500">${err.endpoint}</span>
+                            </div>
+                            <div class="text-xs text-light mt-1">${err.url}</div>
+                            <div class="text-xs text-red-400 mt-1 font-mono">${err.error}</div>
+                        </div>`;
+                    }).join('');
+                }
+            }
+        }
 
         // ========== Auto-refresh Toggle ==========
         document.getElementById('auto-refresh-toggle').addEventListener('click', function() {
@@ -426,13 +710,13 @@
                     completedList.innerHTML = '<div class="text-secondary text-center py-2">No completed requests</div>';
                 } else {
                     completedList.innerHTML = data.completed.map(req => `
-                        <div class="flex items-center justify-between p-2 bg-dark rounded">
-                            <span class="text-secondary">${req.id.substring(0, 8)}</span>
-                            <span class="text-secondary">${req.endpoint}</span>
-                            <span class="text-light truncate max-w-[180px]" title="${req.url}">${req.url}</span>
-                            <span>${req.elapsed.toFixed(2)}s</span>
-                            <span class="text-secondary">${req.mem_delta > 0 ? '+' : ''}${req.mem_delta}MB</span>
-                            <span>${req.success ? '✅' : '❌'} ${req.status_code}</span>
+                        <div class="flex items-center gap-3 p-2 bg-dark rounded">
+                            <span class="text-secondary w-16 flex-shrink-0">${req.id.substring(0, 8)}</span>
+                            <span class="text-secondary w-16 flex-shrink-0">${req.endpoint}</span>
+                            <span class="text-light truncate flex-1" title="${req.url}">${req.url}</span>
+                            <span class="w-12 flex-shrink-0 text-right">${req.elapsed.toFixed(2)}s</span>
+                            <span class="text-secondary w-16 flex-shrink-0 text-right">${req.mem_delta > 0 ? '+' : ''}${req.mem_delta}MB</span>
+                            <span class="w-12 flex-shrink-0 text-right">${req.success ? '✅' : '❌'} ${req.status_code}</span>
                         </div>
                     `).join('');
                 }
@@ -460,7 +744,7 @@
 
                         return `
                             <tr class="border-t border-border hover:bg-dark">
-                                <td class="py-1 pr-2"><span class="${typeColor}">${typeIcon}</span></td>
+                                <td class="py-1 pr-2"><span class="${typeColor}">${typeIcon} ${b.type}</span></td>
                                 <td class="py-1 pr-2 font-mono text-xs">${b.sig}</td>
                                 <td class="py-1 pr-2">${formatSeconds(b.age_seconds)}</td>
                                 <td class="py-1 pr-2">${formatSeconds(b.last_used_seconds)}</td>
@@ -779,7 +1063,8 @@
         document.getElementById('filter-requests')?.addEventListener('change', fetchRequests);
 
         // ========== Initialize ==========
-        startAutoRefresh();
+        // Try WebSocket first, fallback to polling on failure
+        connectWebSocket();
     </script>
 </body>
 </html>

@@ -1,9 +1,11 @@
 # monitor_routes.py - Monitor API endpoints
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 from typing import Optional
 from monitor import get_monitor
 import logging
+import asyncio
+import json
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/monitor", tags=["monitor"])
@@ -14,7 +16,7 @@ async def get_health():
     """Get current system health snapshot."""
     try:
         monitor = get_monitor()
-        return monitor.get_health_summary()
+        return await monitor.get_health_summary()
     except Exception as e:
         logger.error(f"Error getting health: {e}")
         raise HTTPException(500, str(e))
@@ -28,6 +30,12 @@ async def get_requests(status: str = "all", limit: int = 50):
         status: Filter by 'active', 'completed', 'success', 'error', or 'all'
         limit: Max number of completed requests to return (default 50)
     """
+    # Input validation
+    if status not in ["all", "active", "completed", "success", "error"]:
+        raise HTTPException(400, f"Invalid status: {status}. Must be one of: all, active, completed, success, error")
+    if limit < 1 or limit > 1000:
+        raise HTTPException(400, f"Invalid limit: {limit}. Must be between 1 and 1000")
+
     try:
         monitor = get_monitor()
 
@@ -52,7 +60,7 @@ async def get_browsers():
     """Get detailed browser pool information."""
     try:
         monitor = get_monitor()
-        browsers = monitor.get_browser_list()
+        browsers = await monitor.get_browser_list()
 
         # Calculate summary stats
         total_browsers = len(browsers)
@@ -95,6 +103,12 @@ async def get_timeline(metric: str = "memory", window: str = "5m"):
         metric: 'memory', 'requests', or 'browsers'
         window: Time window (only '5m' supported for now)
     """
+    # Input validation
+    if metric not in ["memory", "requests", "browsers"]:
+        raise HTTPException(400, f"Invalid metric: {metric}. Must be one of: memory, requests, browsers")
+    if window != "5m":
+        raise HTTPException(400, f"Invalid window: {window}. Only '5m' is currently supported")
+
     try:
         monitor = get_monitor()
         return monitor.get_timeline_data(metric, window)
@@ -106,6 +120,10 @@ async def get_timeline(metric: str = "memory", window: str = "5m"):
 @router.get("/logs/janitor")
 async def get_janitor_log(limit: int = 100):
     """Get recent janitor cleanup events."""
+    # Input validation
+    if limit < 1 or limit > 1000:
+        raise HTTPException(400, f"Invalid limit: {limit}. Must be between 1 and 1000")
+
     try:
         monitor = get_monitor()
         return {"events": monitor.get_janitor_log(limit)}
@@ -117,6 +135,10 @@ async def get_janitor_log(limit: int = 100):
 @router.get("/logs/errors")
 async def get_errors_log(limit: int = 100):
     """Get recent errors."""
+    # Input validation
+    if limit < 1 or limit > 1000:
+        raise HTTPException(400, f"Invalid limit: {limit}. Must be between 1 and 1000")
+
     try:
         monitor = get_monitor()
         return {"errors": monitor.get_errors_log(limit)}
@@ -154,7 +176,7 @@ async def force_cleanup():
                 killed_count += 1
 
         monitor = get_monitor()
-        monitor.track_janitor_event("force_cleanup", "manual", {"killed": killed_count})
+        await monitor.track_janitor_event("force_cleanup", "manual", {"killed": killed_count})
 
         return {"success": True, "killed_browsers": killed_count}
     except Exception as e:
@@ -200,6 +222,12 @@ async def kill_browser(req: KillBrowserRequest):
             if not target_sig:
                 raise HTTPException(404, f"Browser with sig={req.sig} not found")
 
+            # Warn if there are active requests (browser might be in use)
+            monitor = get_monitor()
+            active_count = len(monitor.get_active_requests())
+            if active_count > 0:
+                logger.warning(f"Killing browser {target_sig[:8]} while {active_count} requests are active - may cause failures")
+
             # Kill the browser
             if pool_type == "hot":
                 browser = HOT_POOL.pop(target_sig)
@@ -215,7 +243,7 @@ async def kill_browser(req: KillBrowserRequest):
         logger.info(f"🔪 Killed {pool_type} browser (sig={target_sig[:8]})")
 
         monitor = get_monitor()
-        monitor.track_janitor_event("kill_browser", target_sig, {"pool": pool_type, "manual": True})
+        await monitor.track_janitor_event("kill_browser", target_sig, {"pool": pool_type, "manual": True})
 
         return {"success": True, "killed_sig": target_sig[:8], "pool_type": pool_type}
     except HTTPException:
@@ -298,7 +326,7 @@ async def restart_browser(req: KillBrowserRequest):
         logger.info(f"🔄 Restarted {pool_type} browser (sig={target_sig[:8]})")
 
         monitor = get_monitor()
-        monitor.track_janitor_event("restart_browser", target_sig, {"pool": pool_type})
+        await monitor.track_janitor_event("restart_browser", target_sig, {"pool": pool_type})
 
         return {"success": True, "restarted_sig": target_sig[:8], "note": "Browser will be recreated on next request"}
     except HTTPException:
@@ -320,3 +348,58 @@ async def reset_stats():
     except Exception as e:
         logger.error(f"Error resetting stats: {e}")
         raise HTTPException(500, str(e))
+
+
+@router.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    """WebSocket endpoint for real-time monitoring updates.
+
+    Sends updates every 2 seconds with:
+    - Health stats
+    - Active/completed requests
+    - Browser pool status
+    - Timeline data
+    """
+    await websocket.accept()
+    logger.info("WebSocket client connected")
+
+    try:
+        while True:
+            try:
+                # Gather all monitoring data
+                monitor = get_monitor()
+
+                data = {
+                    "timestamp": asyncio.get_event_loop().time(),
+                    "health": await monitor.get_health_summary(),
+                    "requests": {
+                        "active": monitor.get_active_requests(),
+                        "completed": monitor.get_completed_requests(limit=10)
+                    },
+                    "browsers": await monitor.get_browser_list(),
+                    "timeline": {
+                        "memory": monitor.get_timeline_data("memory", "5m"),
+                        "requests": monitor.get_timeline_data("requests", "5m"),
+                        "browsers": monitor.get_timeline_data("browsers", "5m")
+                    },
+                    "janitor": monitor.get_janitor_log(limit=10),
+                    "errors": monitor.get_errors_log(limit=10)
+                }
+
+                # Send update to client
+                await websocket.send_json(data)
+
+                # Wait 2 seconds before next update
+                await asyncio.sleep(2)
+
+            except WebSocketDisconnect:
+                logger.info("WebSocket client disconnected")
+                break
+            except Exception as e:
+                logger.error(f"WebSocket error: {e}", exc_info=True)
+                await asyncio.sleep(2)  # Continue trying
+
+    except Exception as e:
+        logger.error(f"WebSocket connection error: {e}", exc_info=True)
+    finally:
+        logger.info("WebSocket connection closed")

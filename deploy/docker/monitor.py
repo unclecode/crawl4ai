@@ -28,6 +28,10 @@ class MonitorStats:
         # Endpoint stats (persisted in Redis)
         self.endpoint_stats: Dict[str, Dict] = {}  # endpoint -> {count, total_time, errors, ...}
 
+        # Background persistence queue (max 10 pending persist requests)
+        self._persist_queue: asyncio.Queue = asyncio.Queue(maxsize=10)
+        self._persist_worker_task: Optional[asyncio.Task] = None
+
         # Timeline data (5min window, 5s resolution = 60 points)
         self.memory_timeline: deque = deque(maxlen=60)
         self.requests_timeline: deque = deque(maxlen=60)
@@ -53,8 +57,11 @@ class MonitorStats:
             }
         self.endpoint_stats[endpoint]["count"] += 1
 
-        # Persist to Redis (fire and forget)
-        asyncio.create_task(self._persist_endpoint_stats())
+        # Queue persistence (handled by background worker)
+        try:
+            self._persist_queue.put_nowait(True)
+        except asyncio.QueueFull:
+            logger.warning("Persistence queue full, skipping")
 
     async def track_request_end(self, request_id: str, success: bool, error: str = None,
                                pool_hit: bool = True, status_code: int = 200):
@@ -104,7 +111,7 @@ class MonitorStats:
 
         await self._persist_endpoint_stats()
 
-    def track_janitor_event(self, event_type: str, sig: str, details: Dict):
+    async def track_janitor_event(self, event_type: str, sig: str, details: Dict):
         """Track janitor cleanup events."""
         self.janitor_events.append({
             "timestamp": time.time(),
@@ -113,22 +120,43 @@ class MonitorStats:
             "details": details
         })
 
+    def _cleanup_old_entries(self, max_age_seconds: int = 300):
+        """Remove entries older than max_age_seconds (default 5min)."""
+        now = time.time()
+        cutoff = now - max_age_seconds
+
+        # Clean completed requests
+        while self.completed_requests and self.completed_requests[0].get("end_time", 0) < cutoff:
+            self.completed_requests.popleft()
+
+        # Clean janitor events
+        while self.janitor_events and self.janitor_events[0].get("timestamp", 0) < cutoff:
+            self.janitor_events.popleft()
+
+        # Clean errors
+        while self.errors and self.errors[0].get("timestamp", 0) < cutoff:
+            self.errors.popleft()
+
     async def update_timeline(self):
         """Update timeline data points (called every 5s)."""
         now = time.time()
         mem_pct = get_container_memory_percent()
 
+        # Clean old entries (keep last 5 minutes)
+        self._cleanup_old_entries(max_age_seconds=300)
+
         # Count requests in last 5s
         recent_reqs = sum(1 for req in self.completed_requests
                          if now - req.get("end_time", 0) < 5)
 
-        # Browser counts (need to import from crawler_pool)
-        from crawler_pool import PERMANENT, HOT_POOL, COLD_POOL
-        browser_count = {
-            "permanent": 1 if PERMANENT else 0,
-            "hot": len(HOT_POOL),
-            "cold": len(COLD_POOL)
-        }
+        # Browser counts (acquire lock to prevent race conditions)
+        from crawler_pool import PERMANENT, HOT_POOL, COLD_POOL, LOCK
+        async with LOCK:
+            browser_count = {
+                "permanent": 1 if PERMANENT else 0,
+                "hot": len(HOT_POOL),
+                "cold": len(COLD_POOL)
+            }
 
         self.memory_timeline.append({"time": now, "value": mem_pct})
         self.requests_timeline.append({"time": now, "value": recent_reqs})
@@ -145,6 +173,47 @@ class MonitorStats:
         except Exception as e:
             logger.warning(f"Failed to persist endpoint stats: {e}")
 
+    async def _persistence_worker(self):
+        """Background worker to persist stats to Redis."""
+        while True:
+            try:
+                await self._persist_queue.get()
+                await self._persist_endpoint_stats()
+                self._persist_queue.task_done()
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Persistence worker error: {e}")
+
+    def start_persistence_worker(self):
+        """Start the background persistence worker."""
+        if not self._persist_worker_task:
+            self._persist_worker_task = asyncio.create_task(self._persistence_worker())
+            logger.info("Started persistence worker")
+
+    async def stop_persistence_worker(self):
+        """Stop the background persistence worker."""
+        if self._persist_worker_task:
+            self._persist_worker_task.cancel()
+            try:
+                await self._persist_worker_task
+            except asyncio.CancelledError:
+                pass
+            self._persist_worker_task = None
+            logger.info("Stopped persistence worker")
+
+    async def cleanup(self):
+        """Cleanup on shutdown - persist final stats and stop workers."""
+        logger.info("Monitor cleanup starting...")
+        try:
+            # Persist final stats before shutdown
+            await self._persist_endpoint_stats()
+            # Stop background worker
+            await self.stop_persistence_worker()
+            logger.info("Monitor cleanup completed")
+        except Exception as e:
+            logger.error(f"Monitor cleanup error: {e}")
+
     async def load_from_redis(self):
         """Load persisted stats from Redis."""
         try:
@@ -155,7 +224,7 @@ class MonitorStats:
         except Exception as e:
             logger.warning(f"Failed to load from Redis: {e}")
 
-    def get_health_summary(self) -> Dict:
+    async def get_health_summary(self) -> Dict:
         """Get current system health snapshot."""
         mem_pct = get_container_memory_percent()
         cpu_pct = psutil.cpu_percent(interval=0.1)
@@ -163,11 +232,17 @@ class MonitorStats:
         # Network I/O (delta since last call)
         net = psutil.net_io_counters()
 
-        # Pool status
-        from crawler_pool import PERMANENT, HOT_POOL, COLD_POOL, LAST_USED
-        permanent_mem = 270 if PERMANENT else 0  # Estimate
-        hot_mem = len(HOT_POOL) * 180  # Estimate 180MB per browser
-        cold_mem = len(COLD_POOL) * 180
+        # Pool status (acquire lock to prevent race conditions)
+        from crawler_pool import PERMANENT, HOT_POOL, COLD_POOL, LOCK
+        async with LOCK:
+            # TODO: Track actual browser process memory instead of estimates
+            # These are conservative estimates based on typical Chromium usage
+            permanent_mem = 270 if PERMANENT else 0  # Estimate: ~270MB for permanent browser
+            hot_mem = len(HOT_POOL) * 180  # Estimate: ~180MB per hot pool browser
+            cold_mem = len(COLD_POOL) * 180  # Estimate: ~180MB per cold pool browser
+            permanent_active = PERMANENT is not None
+            hot_count = len(HOT_POOL)
+            cold_count = len(COLD_POOL)
 
         return {
             "container": {
@@ -178,9 +253,9 @@ class MonitorStats:
                 "uptime_seconds": int(time.time() - self.start_time)
             },
             "pool": {
-                "permanent": {"active": PERMANENT is not None, "memory_mb": permanent_mem},
-                "hot": {"count": len(HOT_POOL), "memory_mb": hot_mem},
-                "cold": {"count": len(COLD_POOL), "memory_mb": cold_mem},
+                "permanent": {"active": permanent_active, "memory_mb": permanent_mem},
+                "hot": {"count": hot_count, "memory_mb": hot_mem},
+                "cold": {"count": cold_count, "memory_mb": cold_mem},
                 "total_memory_mb": permanent_mem + hot_mem + cold_mem
             },
             "janitor": {
@@ -210,45 +285,47 @@ class MonitorStats:
             requests = [r for r in requests if not r.get("success")]
         return requests
 
-    def get_browser_list(self) -> List[Dict]:
+    async def get_browser_list(self) -> List[Dict]:
         """Get detailed browser pool information."""
-        from crawler_pool import PERMANENT, HOT_POOL, COLD_POOL, LAST_USED, USAGE_COUNT, DEFAULT_CONFIG_SIG
+        from crawler_pool import PERMANENT, HOT_POOL, COLD_POOL, LAST_USED, USAGE_COUNT, DEFAULT_CONFIG_SIG, LOCK
 
         browsers = []
         now = time.time()
 
-        if PERMANENT:
-            browsers.append({
-                "type": "permanent",
-                "sig": DEFAULT_CONFIG_SIG[:8] if DEFAULT_CONFIG_SIG else "unknown",
-                "age_seconds": int(now - self.start_time),
-                "last_used_seconds": int(now - LAST_USED.get(DEFAULT_CONFIG_SIG, now)),
-                "memory_mb": 270,
-                "hits": USAGE_COUNT.get(DEFAULT_CONFIG_SIG, 0),
-                "killable": False
-            })
+        # Acquire lock to prevent race conditions during iteration
+        async with LOCK:
+            if PERMANENT:
+                browsers.append({
+                    "type": "permanent",
+                    "sig": DEFAULT_CONFIG_SIG[:8] if DEFAULT_CONFIG_SIG else "unknown",
+                    "age_seconds": int(now - self.start_time),
+                    "last_used_seconds": int(now - LAST_USED.get(DEFAULT_CONFIG_SIG, now)),
+                    "memory_mb": 270,
+                    "hits": USAGE_COUNT.get(DEFAULT_CONFIG_SIG, 0),
+                    "killable": False
+                })
 
-        for sig, crawler in HOT_POOL.items():
-            browsers.append({
-                "type": "hot",
-                "sig": sig[:8],
-                "age_seconds": int(now - self.start_time),  # Approximation
-                "last_used_seconds": int(now - LAST_USED.get(sig, now)),
-                "memory_mb": 180,  # Estimate
-                "hits": USAGE_COUNT.get(sig, 0),
-                "killable": True
-            })
+            for sig, crawler in HOT_POOL.items():
+                browsers.append({
+                    "type": "hot",
+                    "sig": sig[:8],
+                    "age_seconds": int(now - self.start_time),  # Approximation
+                    "last_used_seconds": int(now - LAST_USED.get(sig, now)),
+                    "memory_mb": 180,  # Estimate
+                    "hits": USAGE_COUNT.get(sig, 0),
+                    "killable": True
+                })
 
-        for sig, crawler in COLD_POOL.items():
-            browsers.append({
-                "type": "cold",
-                "sig": sig[:8],
-                "age_seconds": int(now - self.start_time),
-                "last_used_seconds": int(now - LAST_USED.get(sig, now)),
-                "memory_mb": 180,
-                "hits": USAGE_COUNT.get(sig, 0),
-                "killable": True
-            })
+            for sig, crawler in COLD_POOL.items():
+                browsers.append({
+                    "type": "cold",
+                    "sig": sig[:8],
+                    "age_seconds": int(now - self.start_time),
+                    "last_used_seconds": int(now - LAST_USED.get(sig, now)),
+                    "memory_mb": 180,
+                    "hits": USAGE_COUNT.get(sig, 0),
+                    "killable": True
+                })
 
         return browsers
 

@@ -61,7 +61,7 @@ async def get_crawler(cfg: BrowserConfig) -> AsyncWebCrawler:
                 # Track promotion in monitor
                 try:
                     from monitor import get_monitor
-                    get_monitor().track_janitor_event("promote", sig, {"count": USAGE_COUNT[sig]})
+                    await get_monitor().track_janitor_event("promote", sig, {"count": USAGE_COUNT[sig]})
                 except:
                     pass
 
@@ -143,7 +143,7 @@ async def janitor():
                     # Track in monitor
                     try:
                         from monitor import get_monitor
-                        get_monitor().track_janitor_event("close_cold", sig, {"idle_seconds": int(idle_time), "ttl": cold_ttl})
+                        await get_monitor().track_janitor_event("close_cold", sig, {"idle_seconds": int(idle_time), "ttl": cold_ttl})
                     except:
                         pass
 
@@ -161,7 +161,7 @@ async def janitor():
                     # Track in monitor
                     try:
                         from monitor import get_monitor
-                        get_monitor().track_janitor_event("close_hot", sig, {"idle_seconds": int(idle_time), "ttl": hot_ttl})
+                        await get_monitor().track_janitor_event("close_hot", sig, {"idle_seconds": int(idle_time), "ttl": hot_ttl})
                     except:
                         pass
 
