@@ -76,8 +76,7 @@ Crawl4AI is the #1 trending GitHub repository, actively maintained by a vibrant 
     </a>
   </div>
   <p style="color: white; margin: 15px 0 0 0; font-size: 0.9em; text-align: center;">
-    Works with Claude, Cursor, Windsurf, and other AI coding assistants.
-    <a href="https://github.com/unclecode/crawl4ai/wiki/AI-Skills" style="color: #ffd700;">Learn more →</a>
+    Works with Claude, Cursor, Windsurf, and other AI coding assistants. Import the .zip file into your AI assistant's skill/knowledge system.
   </p>
 </div>
 
