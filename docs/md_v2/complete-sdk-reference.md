@@ -1,8 +1,8 @@
 # Crawl4AI Complete SDK Documentation
 
-**Generated:** 2025-10-19 10:23
+**Generated:** 2025-10-19 12:56
 **Format:** Ultra-Dense Reference (Optimized for AI Assistants)
-**Version:** 0.7.x
+**Crawl4AI Version:** 0.7.4
 
 ---
 
