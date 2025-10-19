@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - crawl4ai_net
+    restart: unless-stopped
+
+  crawl4ai:
+    image: ${IMAGE}
+    deploy:
+      replicas: ${REPLICAS}
+      resources:
+        limits:
+          memory: 4G
+    shm_size: 1g
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11235/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    depends_on:
+      - redis
+    networks:
+      - crawl4ai_net
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "${PORT}:80"
+    volumes:
+      - ${NGINX_CONF}:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - crawl4ai
+    networks:
+      - crawl4ai_net
+    restart: unless-stopped
+
+networks:
+  crawl4ai_net:
+    driver: bridge
+
+volumes:
+  redis_data:

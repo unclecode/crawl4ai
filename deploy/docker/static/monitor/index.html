@@ -116,74 +116,107 @@
 
     <!-- Main Content -->
     <main class="flex-1 overflow-auto p-4 space-y-4">
-        <!-- System Health Bar -->
-        <section class="bg-surface rounded-lg border border-border p-4">
-            <h2 class="text-sm font-medium mb-3 text-primary">System Health</h2>
+        <!-- System Health & Infrastructure (side by side) -->
+        <div class="grid grid-cols-2 gap-4">
+            <!-- System Health -->
+            <section class="bg-surface rounded-lg border border-border p-3">
+                <h2 class="text-sm font-medium mb-2 text-primary">System Health</h2>
 
-            <div class="grid grid-cols-4 gap-4 mb-4">
-                <!-- CPU -->
-                <div>
-                    <div class="flex justify-between text-xs mb-1">
-                        <span class="text-secondary">CPU</span>
-                        <span id="cpu-percent" class="text-light">--%</span>
+                <!-- Row 1: CPU and Memory -->
+                <div class="grid grid-cols-2 gap-3 mb-2">
+                    <!-- CPU -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-secondary">CPU</span>
+                            <span id="cpu-percent" class="text-light">--%</span>
+                        </div>
+                        <div class="w-full bg-dark rounded-full h-2">
+                            <div id="cpu-bar" class="progress-bar h-2 rounded-full bg-primary" style="width: 0%"></div>
+                        </div>
                     </div>
-                    <div class="w-full bg-dark rounded-full h-2">
-                        <div id="cpu-bar" class="progress-bar h-2 rounded-full bg-primary" style="width: 0%"></div>
+
+                    <!-- Memory -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-secondary">Memory</span>
+                            <span id="mem-percent" class="text-light">--%</span>
+                        </div>
+                        <div class="w-full bg-dark rounded-full h-2">
+                            <div id="mem-bar" class="progress-bar h-2 rounded-full bg-accent" style="width: 0%"></div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Memory -->
-                <div>
-                    <div class="flex justify-between text-xs mb-1">
-                        <span class="text-secondary">Memory</span>
-                        <span id="mem-percent" class="text-light">--%</span>
+                <!-- Row 2: Network and Uptime -->
+                <div class="grid grid-cols-2 gap-3 mb-2">
+                    <!-- Network -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-secondary">Network</span>
+                            <span id="net-io" class="text-light">--</span>
+                        </div>
+                        <div class="text-xs text-secondary">⬆<span id="net-sent">0</span> / ⬇<span id="net-recv">0</span> MB</div>
                     </div>
-                    <div class="w-full bg-dark rounded-full h-2">
-                        <div id="mem-bar" class="progress-bar h-2 rounded-full bg-accent" style="width: 0%"></div>
+
+                    <!-- Uptime -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-secondary">Uptime</span>
+                            <span id="uptime" class="text-light">--</span>
+                        </div>
+                        <div class="text-xs text-secondary" id="last-update">Live: --:--:--</div>
                     </div>
                 </div>
 
-                <!-- Network -->
-                <div>
-                    <div class="flex justify-between text-xs mb-1">
-                        <span class="text-secondary">Network</span>
-                        <span id="net-io" class="text-light">--</span>
+                <!-- Pool Status -->
+                <div class="border-t border-border pt-2">
+                    <div class="grid grid-cols-3 gap-3 text-xs">
+                        <div>
+                            <span class="text-secondary">🔥 Permanent:</span>
+                            <span id="pool-perm" class="text-primary ml-1">INACTIVE (0MB)</span>
+                        </div>
+                        <div>
+                            <span class="text-secondary">♨️ Hot:</span>
+                            <span id="pool-hot" class="text-accent ml-1">0 (0MB)</span>
+                        </div>
+                        <div>
+                            <span class="text-secondary">❄️ Cold:</span>
+                            <span id="pool-cold" class="text-light ml-1">0 (0MB)</span>
+                        </div>
                     </div>
-                    <div class="text-xs text-secondary">⬆<span id="net-sent">0</span> MB / ⬇<span id="net-recv">0</span> MB</div>
+                    <div class="mt-1 text-xs text-secondary">
+                        <span>Janitor: </span><span id="janitor-status">adaptive</span> |
+                        <span>Memory pressure: </span><span id="mem-pressure">LOW</span>
+                    </div>
                 </div>
+            </section>
 
-                <!-- Uptime -->
-                <div>
-                    <div class="flex justify-between text-xs mb-1">
-                        <span class="text-secondary">Uptime</span>
-                        <span id="uptime" class="text-light">--</span>
-                    </div>
-                    <div class="text-xs text-secondary" id="last-update">Updated: never</div>
+            <!-- Infrastructure Section -->
+            <section id="containers-section" class="bg-surface rounded-lg border border-border p-3" style="display: none;">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-sm font-medium text-primary">📦 Infrastructure</h2>
+                <div class="flex items-center space-x-2">
+                    <span class="text-xs text-secondary">Mode:</span>
+                    <span id="deployment-mode" class="text-xs text-primary font-medium">single</span>
+                    <span class="text-xs text-secondary">|</span>
+                    <span class="text-xs text-secondary">Containers:</span>
+                    <span id="container-count" class="text-xs text-accent font-medium">1</span>
                 </div>
             </div>
 
-            <!-- Pool Status -->
-            <div class="border-t border-border pt-3">
-                <div class="grid grid-cols-3 gap-4 text-xs">
-                    <div>
-                        <span class="text-secondary">🔥 Permanent:</span>
-                        <span id="pool-perm" class="text-primary ml-2">INACTIVE (0MB)</span>
-                    </div>
-                    <div>
-                        <span class="text-secondary">♨️ Hot:</span>
-                        <span id="pool-hot" class="text-accent ml-2">0 (0MB)</span>
-                    </div>
-                    <div>
-                        <span class="text-secondary">❄️ Cold:</span>
-                        <span id="pool-cold" class="text-light ml-2">0 (0MB)</span>
-                    </div>
-                </div>
-                <div class="mt-2 text-xs text-secondary">
-                    <span>Janitor: </span><span id="janitor-status">adaptive</span> |
-                    <span>Memory pressure: </span><span id="mem-pressure">LOW</span>
-                </div>
+            <!-- Container Filter Buttons -->
+            <div id="container-filters" class="flex flex-wrap gap-2 mb-3">
+                <button class="container-filter-btn px-3 py-1 rounded text-xs bg-primary text-dark font-medium" data-container="all">
+                    All
+                </button>
+            </div>
+
+            <!-- Container Grid -->
+            <div id="containers-grid" class="grid grid-cols-3 gap-3 text-xs">
+                <!-- Containers will be populated here -->
             </div>
         </section>
+        </div>
 
         <!-- Live Activity Grid (2x2) -->
         <div class="grid grid-cols-2 gap-4">
@@ -223,11 +256,12 @@
                                 <th class="py-1 pr-2">Age</th>
                                 <th class="py-1 pr-2">Used</th>
                                 <th class="py-1 pr-2">Hits</th>
+                                <th class="py-1 pr-2">Container</th>
                                 <th class="py-1">Act</th>
                             </tr>
                         </thead>
                         <tbody id="browsers-table-body">
-                            <tr><td colspan="6" class="text-center py-4 text-secondary">No browsers</td></tr>
+                            <tr><td colspan="7" class="text-center py-4 text-secondary">No browsers</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -356,6 +390,16 @@
         }
 
         function connectWebSocket() {
+            // Clean up existing connection first to prevent resource leaks
+            if (websocket) {
+                try {
+                    websocket.close();
+                } catch (e) {
+                    console.error('Error closing old WebSocket:', e);
+                }
+                websocket = null;
+            }
+
             if (wsReconnectAttempts >= MAX_WS_RECONNECT) {
                 console.log('Max WebSocket reconnect attempts reached, falling back to polling');
                 useWebSocket = false;
@@ -370,9 +414,24 @@
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const wsUrl = `${protocol}//${window.location.host}/monitor/ws`;
 
-            websocket = new WebSocket(wsUrl);
+            try {
+                websocket = new WebSocket(wsUrl);
+            } catch (e) {
+                console.error('Failed to create WebSocket:', e);
+                setTimeout(() => connectWebSocket(), 2000 * wsReconnectAttempts);
+                return;
+            }
+
+            // Set connection timeout to prevent indefinite connection attempts
+            const connectionTimeout = setTimeout(() => {
+                if (websocket && websocket.readyState === WebSocket.CONNECTING) {
+                    console.log('WebSocket connection timeout');
+                    websocket.close();
+                }
+            }, 5000);
 
             websocket.onopen = () => {
+                clearTimeout(connectionTimeout);
                 console.log('WebSocket connected');
                 wsReconnectAttempts = 0;
                 updateConnectionStatus('connected');
@@ -385,15 +444,19 @@
             };
 
             websocket.onerror = (error) => {
+                clearTimeout(connectionTimeout);
                 console.error('WebSocket error:', error);
             };
 
-            websocket.onclose = () => {
-                console.log('WebSocket closed');
+            websocket.onclose = (event) => {
+                clearTimeout(connectionTimeout);
+                console.log(`WebSocket closed: code=${event.code}, reason=${event.reason}`);
                 updateConnectionStatus('disconnected', 'Reconnecting...');
 
-                if (useWebSocket) {
-                    setTimeout(connectWebSocket, 2000 * wsReconnectAttempts);
+                websocket = null;  // Clear reference
+
+                if (useWebSocket && wsReconnectAttempts < MAX_WS_RECONNECT) {
+                    setTimeout(() => connectWebSocket(), 2000 * wsReconnectAttempts);
                 } else {
                     startAutoRefresh();
                 }
@@ -459,18 +522,28 @@
         }
 
         function updateRequestsDisplay(requests) {
+            // Filter requests based on current container filter
+            const filteredActive = currentContainerFilter === 'all'
+                ? requests.active
+                : requests.active.filter(r => r.container_id === currentContainerFilter);
+
+            const filteredCompleted = currentContainerFilter === 'all'
+                ? requests.completed
+                : requests.completed.filter(r => r.container_id === currentContainerFilter);
+
             // Update active requests count
             const activeCount = document.getElementById('active-count');
-            if (activeCount) activeCount.textContent = requests.active.length;
+            if (activeCount) activeCount.textContent = filteredActive.length;
 
             // Update active requests list
             const activeList = document.getElementById('active-requests-list');
             if (activeList) {
-                if (requests.active.length === 0) {
+                if (filteredActive.length === 0) {
                     activeList.innerHTML = '<div class="text-secondary text-center py-2">No active requests</div>';
                 } else {
-                    activeList.innerHTML = requests.active.map(req => `
+                    activeList.innerHTML = filteredActive.map(req => `
                         <div class="flex items-center justify-between p-2 bg-dark rounded border border-border">
+                            <span class="text-accent text-xs">${getContainerLabel(req.container_id)}</span>
                             <span class="text-primary">${req.id.substring(0, 8)}</span>
                             <span class="text-secondary">${req.endpoint}</span>
                             <span class="text-light truncate max-w-[200px]" title="${req.url}">${req.url}</span>
@@ -484,11 +557,12 @@
             // Update completed requests
             const completedList = document.getElementById('completed-requests-list');
             if (completedList) {
-                if (requests.completed.length === 0) {
+                if (filteredCompleted.length === 0) {
                     completedList.innerHTML = '<div class="text-secondary text-center py-2">No completed requests</div>';
                 } else {
-                    completedList.innerHTML = requests.completed.map(req => `
+                    completedList.innerHTML = filteredCompleted.map(req => `
                         <div class="flex items-center gap-3 p-2 bg-dark rounded">
+                            <span class="text-accent text-xs w-12 flex-shrink-0">${getContainerLabel(req.container_id)}</span>
                             <span class="text-secondary w-16 flex-shrink-0">${req.id.substring(0, 8)}</span>
                             <span class="text-secondary w-16 flex-shrink-0">${req.endpoint}</span>
                             <span class="text-light truncate flex-1" title="${req.url}">${req.url}</span>
@@ -511,6 +585,14 @@
                         const typeIcon = b.type === 'permanent' ? '🔥' : b.type === 'hot' ? '♨️' : '❄️';
                         const typeColor = b.type === 'permanent' ? 'text-primary' : b.type === 'hot' ? 'text-accent' : 'text-light';
 
+                        // Check if should display based on filter
+                        const shouldDisplay = currentContainerFilter === 'all' ||
+                                            b.container_id === currentContainerFilter;
+                        if (!shouldDisplay) return '';
+
+                        // Find container label (C-1, C-2, etc)
+                        const containerLabel = getContainerLabel(b.container_id);
+
                         return `
                             <tr class="border-t border-border hover:bg-dark">
                                 <td class="py-1 pr-2"><span class="${typeColor}">${typeIcon} ${b.type}</span></td>
@@ -518,6 +600,7 @@
                                 <td class="py-1 pr-2">${formatSeconds(b.age_seconds || 0)}</td>
                                 <td class="py-1 pr-2">${formatSeconds(b.last_used_seconds || 0)}</td>
                                 <td class="py-1 pr-2">${b.hits}</td>
+                                <td class="py-1 pr-2 text-accent text-xs">${containerLabel}</td>
                                 <td class="py-1">
                                     ${b.killable ? `
                                         <button onclick="killBrowser('${b.sig}')" class="text-red-500 hover:underline text-xs">X</button>
@@ -553,16 +636,23 @@
         function updateJanitorDisplay(events) {
             const janitorLog = document.getElementById('janitor-log');
             if (janitorLog) {
-                if (events.length === 0) {
+                // Filter events based on current container filter
+                const filtered = currentContainerFilter === 'all'
+                    ? events
+                    : events.filter(e => e.container_id === currentContainerFilter);
+
+                if (filtered.length === 0) {
                     janitorLog.innerHTML = '<div class="text-secondary text-center py-4">No events yet</div>';
                 } else {
-                    janitorLog.innerHTML = events.slice(0, 10).reverse().map(evt => {
+                    janitorLog.innerHTML = filtered.slice(0, 10).reverse().map(evt => {
                         const time = new Date(evt.timestamp * 1000).toLocaleTimeString();
                         const icon = evt.type === 'close_cold' ? '🧹❄️' : evt.type === 'close_hot' ? '🧹♨️' : '⬆️';
                         const details = JSON.stringify(evt.details);
+                        const containerLabel = getContainerLabel(evt.container_id);
 
                         return `<div class="p-2 bg-dark rounded">
-                            <span class="text-secondary">${time}</span>
+                            <span class="text-accent text-xs">${containerLabel}</span>
+                            <span class="text-secondary ml-2">${time}</span>
                             <span>${icon}</span>
                             <span class="text-primary">${evt.type}</span>
                             <span class="text-secondary">sig=${evt.sig}</span>
@@ -1059,10 +1149,90 @@
             return `${m}m ${s}s`;
         }
 
+        // ========== Containers Management ==========
+        let currentContainerFilter = 'all';
+        let containerMapping = {}; // Maps container_id to label (C-1, C-2, etc)
+
+        // Helper to get container label from ID or hostname
+        function getContainerLabel(containerId) {
+            // Try direct lookup first (works for both hostname and id)
+            if (containerMapping[containerId]) {
+                return containerMapping[containerId];
+            }
+            // Fallback: show first 8 chars of container ID
+            return containerId?.substring(0, 8) || 'unknown';
+        }
+
+        async function fetchContainers() {
+            try {
+                const res = await fetch('/monitor/containers');
+                const data = await res.json();
+
+                document.getElementById('deployment-mode').textContent = data.mode;
+                document.getElementById('container-count').textContent = data.count;
+
+                // Build container ID to label mapping
+                // Use hostname as primary key (friendly name like "crawl4ai-1")
+                // Also map id for backwards compatibility
+                containerMapping = {};
+                data.containers.forEach((c, i) => {
+                    const label = `C-${i+1}`;
+                    containerMapping[c.hostname] = label;  // Map hostname
+                    containerMapping[c.id] = label;  // Also map id
+                });
+
+                // Show section only if multi-container
+                const section = document.getElementById('containers-section');
+                if (data.count > 1) {
+                    section.style.display = 'block';
+
+                    // Update filter buttons
+                    const filtersDiv = document.getElementById('container-filters');
+                    filtersDiv.innerHTML = `
+                        <button class="container-filter-btn px-3 py-1 rounded text-xs ${currentContainerFilter === 'all' ? 'bg-primary text-dark' : 'bg-dark text-secondary'} font-medium" data-container="all">All</button>
+                        ${data.containers.map((c, i) => `
+                            <button class="container-filter-btn px-3 py-1 rounded text-xs ${currentContainerFilter === c.id ? 'bg-primary text-dark' : 'bg-dark text-secondary'}" data-container="${c.id}">C-${i+1}</button>
+                        `).join('')}
+                    `;
+
+                    // Add click handlers to filter buttons
+                    document.querySelectorAll('.container-filter-btn').forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            currentContainerFilter = btn.dataset.container;
+                            fetchContainers(); // Refresh to update button styles
+                            // Re-fetch all data with filter applied
+                            fetchRequests();
+                            fetchBrowsers();
+                            fetchJanitorLogs();
+                            fetchErrorLogs();
+                        });
+                    });
+
+                    // Update containers grid
+                    const grid = document.getElementById('containers-grid');
+                    grid.innerHTML = data.containers.map((c, i) => `
+                        <div class="p-3 bg-dark rounded border ${currentContainerFilter === c.id || currentContainerFilter === 'all' ? 'border-primary' : 'border-border'}">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-primary font-medium">C-${i+1}</span>
+                                <span class="text-xs ${c.healthy ? 'text-accent' : 'text-red-500'}">${c.healthy ? '🟢' : '🔴'}</span>
+                            </div>
+                            <div class="text-xs text-secondary truncate" title="${c.hostname}">${c.hostname}</div>
+                        </div>
+                    `).join('');
+                } else {
+                    section.style.display = 'none';
+                }
+            } catch (e) {
+                console.error('Failed to fetch containers:', e);
+            }
+        }
+
         // ========== Filter change handler ==========
         document.getElementById('filter-requests')?.addEventListener('change', fetchRequests);
 
         // ========== Initialize ==========
+        // Fetch containers info on load
+        fetchContainers();
         // Try WebSocket first, fallback to polling on failure
         connectWebSocket();
     </script>

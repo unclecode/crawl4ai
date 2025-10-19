@@ -204,3 +204,50 @@ def get_container_memory_percent() -> float:
         # Non-container or unsupported: fallback to host
         import psutil
         return psutil.virtual_memory().percent
+
+
+def get_container_id() -> str:
+    """Get current container ID (hostname in Docker)."""
+    import socket
+    return socket.gethostname()
+
+
+def detect_deployment_mode() -> tuple[str, list[dict]]:
+    """Detect if running in single/swarm/compose mode and get container list.
+
+    Returns:
+        (mode, containers) where mode is "single"|"swarm"|"compose"
+        containers is list of {id, hostname, healthy}
+    """
+    import socket
+    my_hostname = socket.gethostname()
+
+    # Check if we're behind nginx (Compose mode indicator)
+    # In Compose, service name resolves to multiple IPs
+    try:
+        import socket as sock
+        # Try to resolve "crawl4ai" service name (Compose service)
+        try:
+            addrs = sock.getaddrinfo("crawl4ai", None)
+            unique_ips = set(addr[4][0] for addr in addrs)
+            if len(unique_ips) > 1:
+                # Multiple IPs = Compose with replicas
+                containers = [
+                    {"id": f"container-{i+1}", "hostname": f"crawl4ai-{i+1}", "healthy": True}
+                    for i in range(len(unique_ips))
+                ]
+                return "compose", containers
+        except:
+            pass
+
+        # Check for Swarm mode (TODO: needs swarm-specific detection)
+        # For now, if hostname pattern matches swarm, detect it
+        if "." in my_hostname and len(my_hostname.split(".")) > 2:
+            # Swarm hostname format: service.slot.task_id
+            return "swarm", [{"id": my_hostname, "hostname": my_hostname, "healthy": True}]
+
+    except:
+        pass
+
+    # Default: single container
+    return "single", [{"id": my_hostname, "hostname": my_hostname, "healthy": True}]

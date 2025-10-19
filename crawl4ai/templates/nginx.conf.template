@@ -1,0 +1,75 @@
+events {
+    worker_connections 1024;
+}
+
+http {
+    upstream crawl4ai_backend {
+        # DNS-based load balancing to Docker Compose service
+        # Docker Compose provides DNS resolution for service name
+        server crawl4ai:11235 max_fails=3 fail_timeout=30s;
+
+        # Keep connections alive
+        keepalive 32;
+    }
+
+    # Sticky sessions for monitoring (same IP always goes to same container)
+    upstream crawl4ai_monitor {
+        ip_hash;  # Sticky sessions based on client IP
+        server crawl4ai:11235 max_fails=3 fail_timeout=30s;
+        keepalive 32;
+    }
+
+    server {
+        listen 80;
+        server_name _;
+
+        # Increase timeouts for long-running crawl operations
+        proxy_connect_timeout 300;
+        proxy_send_timeout 300;
+        proxy_read_timeout 300;
+        send_timeout 300;
+
+        # WebSocket endpoint for real-time monitoring (exact match)
+        location = /monitor/ws {
+            proxy_pass http://crawl4ai_monitor/monitor/ws;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+            # WebSocket timeouts
+            proxy_connect_timeout 7d;
+            proxy_send_timeout 7d;
+            proxy_read_timeout 7d;
+        }
+
+        # Monitor and dashboard with sticky sessions (regex location)
+        location ~ ^/(monitor|dashboard) {
+            proxy_pass http://crawl4ai_monitor;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # HTTP endpoints (load balanced)
+        location / {
+            proxy_pass http://crawl4ai_backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+
+            # Support large request bodies (for batch operations)
+            client_max_body_size 10M;
+        }
+
+        # Health check endpoint (bypass load balancer)
+        location /health {
+            proxy_pass http://crawl4ai_backend/health;
+            access_log off;
+        }
+    }
+}

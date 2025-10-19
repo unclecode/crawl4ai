@@ -3,12 +3,138 @@ from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 from typing import Optional
 from monitor import get_monitor
+from utils import detect_deployment_mode, get_container_id
 import logging
 import asyncio
 import json
+import re
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/monitor", tags=["monitor"])
+
+
+# ========== Security & Validation ==========
+
+def validate_container_id(cid: str) -> bool:
+    """Validate container ID format to prevent Redis key injection.
+
+    Docker container IDs are 12-64 character hexadecimal strings.
+    Hostnames are alphanumeric with dashes and underscores.
+
+    Args:
+        cid: Container ID to validate
+
+    Returns:
+        True if valid, False otherwise
+    """
+    if not cid or not isinstance(cid, str):
+        return False
+
+    # Allow alphanumeric, dashes, and underscores only (1-64 chars)
+    # This prevents path traversal (../../), wildcards (**), and other injection attempts
+    return bool(re.match(r'^[a-zA-Z0-9_-]{1,64}$', cid))
+
+
+# ========== Redis Aggregation Helpers ==========
+
+async def _get_active_containers():
+    """Get list of active container IDs from Redis with validation."""
+    try:
+        monitor = get_monitor()
+        container_ids = await monitor.redis.smembers("monitor:active_containers")
+
+        # Decode and validate each container ID
+        validated = []
+        for cid in container_ids:
+            cid_str = cid.decode() if isinstance(cid, bytes) else cid
+
+            if validate_container_id(cid_str):
+                validated.append(cid_str)
+            else:
+                logger.warning(f"Invalid container ID format rejected: {cid_str}")
+
+        return validated
+    except Exception as e:
+        logger.error(f"Failed to get active containers: {e}")
+        return []
+
+
+async def _aggregate_active_requests():
+    """Aggregate active requests from all containers."""
+    container_ids = await _get_active_containers()
+    all_requests = []
+
+    monitor = get_monitor()
+    for container_id in container_ids:
+        try:
+            data = await monitor.redis.get(f"monitor:{container_id}:active_requests")
+            if data:
+                requests = json.loads(data)
+                all_requests.extend(requests)
+        except Exception as e:
+            logger.warning(f"Failed to get active requests from {container_id}: {e}")
+
+    return all_requests
+
+
+async def _aggregate_completed_requests(limit=100):
+    """Aggregate completed requests from all containers."""
+    container_ids = await _get_active_containers()
+    all_requests = []
+
+    monitor = get_monitor()
+    for container_id in container_ids:
+        try:
+            data = await monitor.redis.get(f"monitor:{container_id}:completed")
+            if data:
+                requests = json.loads(data)
+                all_requests.extend(requests)
+        except Exception as e:
+            logger.warning(f"Failed to get completed requests from {container_id}: {e}")
+
+    # Sort by end_time (most recent first) and limit
+    all_requests.sort(key=lambda x: x.get("end_time", 0), reverse=True)
+    return all_requests[:limit]
+
+
+async def _aggregate_janitor_events(limit=100):
+    """Aggregate janitor events from all containers."""
+    container_ids = await _get_active_containers()
+    all_events = []
+
+    monitor = get_monitor()
+    for container_id in container_ids:
+        try:
+            data = await monitor.redis.get(f"monitor:{container_id}:janitor")
+            if data:
+                events = json.loads(data)
+                all_events.extend(events)
+        except Exception as e:
+            logger.warning(f"Failed to get janitor events from {container_id}: {e}")
+
+    # Sort by timestamp (most recent first) and limit
+    all_events.sort(key=lambda x: x.get("timestamp", 0), reverse=True)
+    return all_events[:limit]
+
+
+async def _aggregate_errors(limit=100):
+    """Aggregate errors from all containers."""
+    container_ids = await _get_active_containers()
+    all_errors = []
+
+    monitor = get_monitor()
+    for container_id in container_ids:
+        try:
+            data = await monitor.redis.get(f"monitor:{container_id}:errors")
+            if data:
+                errors = json.loads(data)
+                all_errors.extend(errors)
+        except Exception as e:
+            logger.warning(f"Failed to get errors from {container_id}: {e}")
+
+    # Sort by timestamp (most recent first) and limit
+    all_errors.sort(key=lambda x: x.get("timestamp", 0), reverse=True)
+    return all_errors[:limit]
 
 
 @router.get("/health")
@@ -37,18 +163,23 @@ async def get_requests(status: str = "all", limit: int = 50):
         raise HTTPException(400, f"Invalid limit: {limit}. Must be between 1 and 1000")
 
     try:
-        monitor = get_monitor()
+        # Aggregate from all containers via Redis
+        active_requests = await _aggregate_active_requests()
+        completed_requests = await _aggregate_completed_requests(limit)
+
+        # Filter by status if needed
+        if status in ["success", "error"]:
+            is_success = (status == "success")
+            completed_requests = [r for r in completed_requests if r.get("success") == is_success]
 
         if status == "active":
-            return {"active": monitor.get_active_requests(), "completed": []}
+            return {"active": active_requests, "completed": []}
         elif status == "completed":
-            return {"active": [], "completed": monitor.get_completed_requests(limit)}
-        elif status in ["success", "error"]:
-            return {"active": [], "completed": monitor.get_completed_requests(limit, status)}
-        else:  # "all"
+            return {"active": [], "completed": completed_requests}
+        else:  # "all" or success/error
             return {
-                "active": monitor.get_active_requests(),
-                "completed": monitor.get_completed_requests(limit)
+                "active": active_requests,
+                "completed": completed_requests
             }
     except Exception as e:
         logger.error(f"Error getting requests: {e}")
@@ -60,7 +191,12 @@ async def get_browsers():
     """Get detailed browser pool information."""
     try:
         monitor = get_monitor()
+        container_id = get_container_id()
         browsers = await monitor.get_browser_list()
+
+        # Add container_id to each browser
+        for browser in browsers:
+            browser["container_id"] = container_id
 
         # Calculate summary stats
         total_browsers = len(browsers)
@@ -77,7 +213,8 @@ async def get_browsers():
                 "total_count": total_browsers,
                 "total_memory_mb": total_memory,
                 "reuse_rate_percent": round(reuse_rate, 1)
-            }
+            },
+            "container_id": container_id
         }
     except Exception as e:
         logger.error(f"Error getting browsers: {e}")
@@ -125,8 +262,9 @@ async def get_janitor_log(limit: int = 100):
         raise HTTPException(400, f"Invalid limit: {limit}. Must be between 1 and 1000")
 
     try:
-        monitor = get_monitor()
-        return {"events": monitor.get_janitor_log(limit)}
+        # Aggregate from all containers via Redis
+        events = await _aggregate_janitor_events(limit)
+        return {"events": events}
     except Exception as e:
         logger.error(f"Error getting janitor log: {e}")
         raise HTTPException(500, str(e))
@@ -140,8 +278,9 @@ async def get_errors_log(limit: int = 100):
         raise HTTPException(400, f"Invalid limit: {limit}. Must be between 1 and 1000")
 
     try:
-        monitor = get_monitor()
-        return {"errors": monitor.get_errors_log(limit)}
+        # Aggregate from all containers via Redis
+        errors = await _aggregate_errors(limit)
+        return {"errors": errors}
     except Exception as e:
         logger.error(f"Error getting errors log: {e}")
         raise HTTPException(500, str(e))
@@ -350,15 +489,57 @@ async def reset_stats():
         raise HTTPException(500, str(e))
 
 
+@router.get("/containers")
+async def get_containers():
+    """Get container deployment info from Redis heartbeats."""
+    try:
+        monitor = get_monitor()
+        container_ids = await _get_active_containers()
+
+        containers = []
+        for cid in container_ids:
+            try:
+                # Get heartbeat data
+                data = await monitor.redis.get(f"monitor:heartbeat:{cid}")
+                if data:
+                    info = json.loads(data)
+                    containers.append({
+                        "id": info.get("id", cid),
+                        "hostname": info.get("hostname", cid),
+                        "healthy": True  # If heartbeat exists, it's healthy
+                    })
+            except Exception as e:
+                logger.warning(f"Failed to get heartbeat for {cid}: {e}")
+
+        # Determine mode
+        mode = "single" if len(containers) == 1 else "compose"
+        if len(containers) > 1:
+            # Check if any hostname has swarm pattern (service.slot.task_id)
+            if any("." in c["hostname"] and len(c["hostname"].split(".")) > 2 for c in containers):
+                mode = "swarm"
+
+        return {
+            "mode": mode,
+            "container_id": get_container_id(),
+            "containers": containers,
+            "count": len(containers)
+        }
+    except Exception as e:
+        logger.error(f"Error getting containers: {e}")
+        raise HTTPException(500, str(e))
+
+
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time monitoring updates.
 
-    Sends updates every 2 seconds with:
-    - Health stats
-    - Active/completed requests
-    - Browser pool status
-    - Timeline data
+    Sends aggregated updates every 2 seconds from all containers with:
+    - Health stats (local container)
+    - Active/completed requests (aggregated from all containers)
+    - Browser pool status (local container only - not in Redis)
+    - Timeline data (local container - TODO: aggregate from Redis)
+    - Janitor events (aggregated from all containers)
+    - Errors (aggregated from all containers)
     """
     await websocket.accept()
     logger.info("WebSocket client connected")
@@ -366,24 +547,46 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             try:
-                # Gather all monitoring data
+                # Gather aggregated monitoring data from Redis
                 monitor = get_monitor()
+                container_id = get_container_id()
+
+                # Get container info
+                containers_info = await get_containers()
+
+                # AGGREGATE data from all containers via Redis
+                active_reqs = await _aggregate_active_requests()
+                completed_reqs = await _aggregate_completed_requests(limit=10)
+                janitor_events = await _aggregate_janitor_events(limit=10)
+                errors_log = await _aggregate_errors(limit=10)
+
+                # Local container data (not aggregated)
+                local_health = await monitor.get_health_summary()
+                browsers = await monitor.get_browser_list()  # Browser list is local only
+
+                # Add container_id to browsers (they're local)
+                for browser in browsers:
+                    browser["container_id"] = container_id
 
                 data = {
                     "timestamp": asyncio.get_event_loop().time(),
-                    "health": await monitor.get_health_summary(),
+                    "container_id": container_id,  # This container handling the WebSocket
+                    "is_aggregated": True,  # Flag to indicate aggregated data
+                    "local_health": local_health,  # This container's health
+                    "containers": containers_info.get("containers", []),  # All containers
                     "requests": {
-                        "active": monitor.get_active_requests(),
-                        "completed": monitor.get_completed_requests(limit=10)
+                        "active": active_reqs,  # Aggregated from all containers
+                        "completed": completed_reqs  # Aggregated from all containers
                     },
-                    "browsers": await monitor.get_browser_list(),
+                    "browsers": browsers,  # Local only (not in Redis)
                     "timeline": {
+                        # TODO: Aggregate timeline from Redis (currently local only)
                         "memory": monitor.get_timeline_data("memory", "5m"),
                         "requests": monitor.get_timeline_data("requests", "5m"),
                         "browsers": monitor.get_timeline_data("browsers", "5m")
                     },
-                    "janitor": monitor.get_janitor_log(limit=10),
-                    "errors": monitor.get_errors_log(limit=10)
+                    "janitor": janitor_events,  # Aggregated from all containers
+                    "errors": errors_log  # Aggregated from all containers
                 }
 
                 # Send update to client

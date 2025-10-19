@@ -1,43 +1,18 @@
 version: '3.8'
 
-# Shared configuration for all environments
-x-base-config: &base-config
-  ports:
-    - "11235:11235"  # Gunicorn port
-  env_file:
-    - .llm.env       # API keys (create from .llm.env.example)
-  environment:
-    - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-    - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
-    - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-    - GROQ_API_KEY=${GROQ_API_KEY:-}
-    - TOGETHER_API_KEY=${TOGETHER_API_KEY:-}
-    - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
-    - GEMINI_API_TOKEN=${GEMINI_API_TOKEN:-}
-    - LLM_PROVIDER=${LLM_PROVIDER:-}  # Optional: Override default provider (e.g., "anthropic/claude-3-opus")
-  volumes:
-    - /dev/shm:/dev/shm  # Chromium performance
-  deploy:
-    resources:
-      limits:
-        memory: 4G
-      reservations:
-        memory: 1G
-  restart: unless-stopped
-  healthcheck:
-    test: ["CMD", "curl", "-f", "http://localhost:11235/health"]
-    interval: 30s
-    timeout: 10s
-    retries: 3
-    start_period: 40s
-  user: "appuser"
-
 services:
+  redis:
+    image: redis:alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - crawl4ai_net
+    restart: unless-stopped
+
   crawl4ai:
-    # 1. Default: Pull multi-platform test image from Docker Hub
-    # 2. Override with local image via: IMAGE=local-test docker compose up
     image: ${IMAGE:-unclecode/crawl4ai:${TAG:-latest}}
-    
+
     # Local build config (used with --build)
     build:
       context: .
@@ -45,6 +20,58 @@ services:
       args:
         INSTALL_TYPE: ${INSTALL_TYPE:-default}
         ENABLE_GPU: ${ENABLE_GPU:-false}
-    
-    # Inherit shared config
-    <<: *base-config
+
+    # No ports exposed - access via nginx only
+    env_file:
+      - .llm.env
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - TOGETHER_API_KEY=${TOGETHER_API_KEY:-}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
+      - GEMINI_API_TOKEN=${GEMINI_API_TOKEN:-}
+      - LLM_PROVIDER=${LLM_PROVIDER:-}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - /dev/shm:/dev/shm  # Chromium performance
+    deploy:
+      replicas: 3  # Default to 3 replicas (can override with --scale)
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 1G
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11235/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    user: "appuser"
+    depends_on:
+      - redis
+    networks:
+      - crawl4ai_net
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "11235:80"  # Expose port 11235 to host
+    volumes:
+      - ./crawl4ai/templates/nginx.conf.template:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - crawl4ai
+    networks:
+      - crawl4ai_net
+    restart: unless-stopped
+
+networks:
+  crawl4ai_net:
+    driver: bridge
+
+volumes:
+  redis_data:

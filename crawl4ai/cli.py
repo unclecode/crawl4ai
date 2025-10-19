@@ -625,6 +625,11 @@ def cli():
     pass
 
 
+# Register server command group (Docker orchestration)
+from crawl4ai.server_cli import server_cmd
+cli.add_command(server_cmd)
+
+
 @cli.group("browser")
 def browser_cmd():
     """Manage browser instances for Crawl4AI
