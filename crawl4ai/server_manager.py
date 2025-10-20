@@ -271,6 +271,130 @@ class ServerManager:
                 "error": str(e)
             }
 
+    async def cleanup(self, force: bool = False) -> Dict:
+        """Force cleanup of all Crawl4AI Docker resources.
+
+        Args:
+            force: Force cleanup even if state file doesn't exist
+
+        Returns:
+            Dict with cleanup status
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+
+        removed_count = 0
+        messages = []
+
+        try:
+            # Try to stop via state file first
+            if not force:
+                state = self._load_state()
+                if state:
+                    stop_result = await self.stop(remove_volumes=True)
+                    if stop_result["success"]:
+                        return {
+                            "success": True,
+                            "removed": 1,
+                            "message": "Stopped via state file"
+                        }
+
+            # Force cleanup - find and remove all Crawl4AI resources
+            logger.info("Force cleanup: removing all Crawl4AI Docker resources")
+
+            # Remove all crawl4ai containers
+            try:
+                result = subprocess.run(
+                    ["docker", "ps", "-a", "--filter", "name=crawl4ai", "--format", "{{.ID}}"],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                container_ids = result.stdout.strip().split('\n')
+                container_ids = [cid for cid in container_ids if cid]
+
+                for cid in container_ids:
+                    subprocess.run(["docker", "rm", "-f", cid], capture_output=True, timeout=10)
+                    removed_count += 1
+                messages.append(f"Removed {len(container_ids)} crawl4ai containers")
+            except Exception as e:
+                logger.warning(f"Error removing containers: {e}")
+
+            # Remove nginx containers
+            try:
+                result = subprocess.run(
+                    ["docker", "ps", "-a", "--filter", "name=nginx", "--format", "{{.ID}}"],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                nginx_ids = result.stdout.strip().split('\n')
+                nginx_ids = [nid for nid in nginx_ids if nid]
+
+                for nid in nginx_ids:
+                    subprocess.run(["docker", "rm", "-f", nid], capture_output=True, timeout=10)
+                    removed_count += len(nginx_ids)
+                if nginx_ids:
+                    messages.append(f"Removed {len(nginx_ids)} nginx containers")
+            except Exception as e:
+                logger.warning(f"Error removing nginx: {e}")
+
+            # Remove redis containers
+            try:
+                result = subprocess.run(
+                    ["docker", "ps", "-a", "--filter", "name=redis", "--format", "{{.ID}}"],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                redis_ids = result.stdout.strip().split('\n')
+                redis_ids = [rid for rid in redis_ids if rid]
+
+                for rid in redis_ids:
+                    subprocess.run(["docker", "rm", "-f", rid], capture_output=True, timeout=10)
+                    removed_count += len(redis_ids)
+                if redis_ids:
+                    messages.append(f"Removed {len(redis_ids)} redis containers")
+            except Exception as e:
+                logger.warning(f"Error removing redis: {e}")
+
+            # Clean up compose projects
+            for project in ["crawl4ai", "fix-docker"]:
+                try:
+                    subprocess.run(
+                        ["docker", "compose", "-p", project, "down", "-v"],
+                        capture_output=True,
+                        timeout=30,
+                        cwd=str(self.state_dir)
+                    )
+                    messages.append(f"Cleaned compose project: {project}")
+                except Exception:
+                    pass
+
+            # Remove networks
+            try:
+                subprocess.run(["docker", "network", "prune", "-f"], capture_output=True, timeout=10)
+                messages.append("Pruned networks")
+            except Exception as e:
+                logger.warning(f"Error pruning networks: {e}")
+
+            # Clear state file
+            self._clear_state()
+            messages.append("Cleared state file")
+
+            return {
+                "success": True,
+                "removed": removed_count,
+                "message": "; ".join(messages)
+            }
+
+        except Exception as e:
+            logger.error(f"Cleanup error: {e}")
+            return {
+                "success": False,
+                "message": f"Cleanup failed: {str(e)}"
+            }
+
     async def scale(self, replicas: int) -> Dict:
         """Scale server to specified replica count.
 

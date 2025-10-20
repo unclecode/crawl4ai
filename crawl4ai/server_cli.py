@@ -335,6 +335,65 @@ def logs_cmd(follow: bool, tail: int):
     console.print(output)
 
 
+@server_cmd.command("cleanup")
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Force cleanup even if state file doesn't exist"
+)
+def cleanup_cmd(force: bool):
+    """Force cleanup of all Crawl4AI Docker resources.
+
+    Stops and removes all containers, networks, and optionally volumes.
+    Useful when server is stuck or state is corrupted.
+
+    Examples:
+        # Clean up everything
+        crwl server cleanup
+
+        # Force cleanup (ignore state file)
+        crwl server cleanup --force
+    """
+    manager = ServerManager()
+
+    console.print(Panel(
+        f"[yellow]⚠️  Cleaning up Crawl4AI Docker resources[/yellow]\n\n"
+        f"This will stop and remove:\n"
+        f"- All Crawl4AI containers\n"
+        f"- Nginx load balancer\n"
+        f"- Redis instance\n"
+        f"- Docker networks\n"
+        f"- State files",
+        title="Cleanup",
+        border_style="yellow"
+    ))
+
+    if not force and not Confirm.ask("[yellow]Continue with cleanup?[/yellow]"):
+        console.print("[yellow]Cancelled[/yellow]")
+        return
+
+    with console.status("[cyan]Cleaning up resources..."):
+        async def _cleanup():
+            return await manager.cleanup(force=force)
+        result = anyio.run(_cleanup)
+
+    if result["success"]:
+        console.print(Panel(
+            f"[green]✓ Cleanup completed successfully[/green]\n\n"
+            f"Removed: {result.get('removed', 0)} containers\n"
+            f"{result.get('message', 'All resources cleaned up')}",
+            title="Cleanup Complete",
+            border_style="green"
+        ))
+    else:
+        console.print(Panel(
+            f"[yellow]⚠️  Partial cleanup[/yellow]\n\n"
+            f"{result.get('message', 'Some resources may still exist')}",
+            title="Cleanup Status",
+            border_style="yellow"
+        ))
+
+
 @server_cmd.command("restart")
 @click.option(
     "--replicas", "-r",
