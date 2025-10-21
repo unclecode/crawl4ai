@@ -1,0 +1,81 @@
+name: Docker Release
+on:
+  release:
+    types: [published]
+  push:
+    tags:
+      - 'docker-rebuild-v*'  # Allow manual Docker rebuilds via tags
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract version from release or tag
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" == "release" ]; then
+            # Triggered by release event
+            VERSION="${{ github.event.release.tag_name }}"
+            VERSION=${VERSION#v}  # Remove 'v' prefix
+          else
+            # Triggered by docker-rebuild-v* tag
+            VERSION=${GITHUB_REF#refs/tags/docker-rebuild-v}
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building Docker images for version: $VERSION"
+
+      - name: Extract major and minor versions
+        id: versions
+        run: |
+          VERSION=${{ steps.get_version.outputs.VERSION }}
+          MAJOR=$(echo $VERSION | cut -d. -f1)
+          MINOR=$(echo $VERSION | cut -d. -f1-2)
+          echo "MAJOR=$MAJOR" >> $GITHUB_OUTPUT
+          echo "MINOR=$MINOR" >> $GITHUB_OUTPUT
+          echo "Semantic versions - Major: $MAJOR, Minor: $MINOR"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Build and push Docker images
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            unclecode/crawl4ai:${{ steps.get_version.outputs.VERSION }}
+            unclecode/crawl4ai:${{ steps.versions.outputs.MINOR }}
+            unclecode/crawl4ai:${{ steps.versions.outputs.MAJOR }}
+            unclecode/crawl4ai:latest
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Summary
+        run: |
+          echo "## 🐳 Docker Release Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Published Images" >> $GITHUB_STEP_SUMMARY
+          echo "- \`unclecode/crawl4ai:${{ steps.get_version.outputs.VERSION }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`unclecode/crawl4ai:${{ steps.versions.outputs.MINOR }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`unclecode/crawl4ai:${{ steps.versions.outputs.MAJOR }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`unclecode/crawl4ai:latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Platforms" >> $GITHUB_STEP_SUMMARY
+          echo "- linux/amd64" >> $GITHUB_STEP_SUMMARY
+          echo "- linux/arm64" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚀 Pull Command" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull unclecode/crawl4ai:${{ steps.get_version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
