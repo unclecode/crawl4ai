@@ -46,6 +46,32 @@ from bs4 import BeautifulSoup
 from lxml import html, etree
 
 
+def extract_response_content(response):
+    """
+    Extract content from LLM response with fallback options.
+
+    Args:
+        response: The LLM response object
+
+    Returns:
+        str: The content from the response, trying multiple sources in order:
+             1. message.content
+             2. message.reasoning_content
+             3. message.provider_specific_fields.refusal
+             4. None if all fail
+    """
+    msg = response.choices[0].message
+
+    content = (
+        msg.content
+        or getattr(msg, "reasoning_content", None)
+        or (getattr(msg, "provider_specific_fields", {}) or {}).get("refusal")
+        or None
+    )
+
+    return content
+
+
 class ExtractionStrategy(ABC):
     """
     Abstract base class for all extraction strategies.
@@ -656,7 +682,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
             self.total_usage.total_tokens += usage.total_tokens
 
             try:
-                content = response.choices[0].message.content
+                content = extract_response_content(response)
                 blocks = None
 
                 if self.force_json_response:
@@ -680,7 +706,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
                     block["error"] = False
             except Exception:
                 parsed, unparsed = split_and_parse_json_objects(
-                    response.choices[0].message.content
+                    extract_response_content(response)
                 )
                 blocks = parsed
                 if unparsed:
@@ -1189,8 +1215,8 @@ In this scenario, use your best judgment to generate the schema. You need to exa
             )
             
             # Extract and return schema
-            return json.loads(response.choices[0].message.content)
-            
+            return json.loads(extract_response_content(response))
+
         except Exception as e:
             raise Exception(f"Failed to generate schema: {str(e)}")
 
