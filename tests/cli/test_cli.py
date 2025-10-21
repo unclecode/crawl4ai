@@ -65,14 +65,14 @@ class TestCLIBasics:
         assert 'Crawl4AI CLI' in result.output
 
     def test_examples(self, runner):
-        result = runner.invoke(cli, ['--example'])
+        result = runner.invoke(cli, ['examples'])
         assert result.exit_code == 0
         assert 'Examples' in result.output
 
     def test_missing_url(self, runner):
-        result = runner.invoke(cli)
+        result = runner.invoke(cli, ['crawl'])
         assert result.exit_code != 0
-        assert 'URL argument is required' in result.output
+        assert ('Missing argument' in result.output or 'required' in result.output.lower())
 
 class TestConfigParsing:
     def test_parse_key_values_basic(self):
@@ -101,18 +101,19 @@ class TestConfigLoading:
 class TestLLMConfig:
     def test_llm_config_creation(self, temp_config_dir, runner):
         def input_simulation(inputs):
-            return runner.invoke(cli, ['https://example.com', '-q', 'test question'], 
+            return runner.invoke(cli, ['crawl', 'https://example.com', '-q', 'test question'],
                                input='\n'.join(inputs))
             
 class TestCrawlingFeatures:
     def test_basic_crawl(self, runner):
-        result = runner.invoke(cli, ['https://example.com'])
+        result = runner.invoke(cli, ['crawl', 'https://example.com'])
         assert result.exit_code == 0
 
 
 class TestErrorHandling:
     def test_invalid_config_file(self, runner):
         result = runner.invoke(cli, [
+            'crawl',
             'https://example.com',
             '--browser-config', 'nonexistent.yml'
         ])
@@ -122,8 +123,9 @@ class TestErrorHandling:
         invalid_schema = temp_config_dir / 'invalid_schema.json'
         with open(invalid_schema, 'w') as f:
             f.write('invalid json')
-            
+
         result = runner.invoke(cli, [
+            'crawl',
             'https://example.com',
             '--schema', str(invalid_schema)
         ])

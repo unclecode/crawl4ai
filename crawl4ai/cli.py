@@ -2,6 +2,8 @@ import click
 import os
 import sys
 import time
+import subprocess
+import shutil
 
 import humanize
 from typing import Dict, Any, Optional, List
@@ -626,8 +628,73 @@ def cli():
 
 
 # Register server command group (Docker orchestration)
-from crawl4ai.server_cli import server_cmd
-cli.add_command(server_cmd)
+# Redirect to standalone 'cnode' CLI
+@cli.command("server", context_settings=dict(
+    ignore_unknown_options=True,
+    allow_extra_args=True,
+    allow_interspersed_args=False
+))
+@click.pass_context
+def server_cmd(ctx):
+    """Manage Crawl4AI Docker server instances (deprecated - use 'cnode')
+
+    This command has been moved to a standalone CLI called 'cnode'.
+    For new installations, use:
+        curl -sSL https://crawl4ai.com/deploy.sh | bash
+
+    This redirect allows existing scripts to continue working.
+
+    Available commands: start, stop, status, scale, logs
+    Use 'crwl server <command> --help' for command-specific help.
+    """
+    # Check if cnode is installed
+    cnode_path = shutil.which("cnode")
+
+    # Get all the args (subcommand + options)
+    args = ctx.args
+
+    if not cnode_path:
+        console.print(Panel(
+            "[yellow]The 'crwl server' command has been moved to a standalone CLI.[/yellow]\n\n"
+            "Please install 'cnode' (Crawl4AI Node Manager):\n"
+            "[cyan]curl -sSL https://crawl4ai.com/deploy.sh | bash[/cyan]\n\n"
+            "After installation, use:\n"
+            "[green]cnode <command>[/green] instead of [dim]crwl server <command>[/dim]\n\n"
+            "For backward compatibility, we're using the local version for now.",
+            title="Server Command Moved",
+            border_style="yellow"
+        ))
+        # Try to use local version
+        try:
+            import sys
+            # Add deploy/docker to path
+            deploy_path = str(Path(__file__).parent.parent / 'deploy' / 'docker')
+            if deploy_path not in sys.path:
+                sys.path.insert(0, deploy_path)
+
+            from cnode_cli import cli as cnode_cli
+
+            # Forward to cnode with the args
+            sys.argv = ['cnode'] + args
+            cnode_cli(standalone_mode=False)
+            sys.exit(0)
+        except SystemExit as e:
+            # Normal exit from click
+            sys.exit(e.code if hasattr(e, 'code') else 0)
+        except Exception as e:
+            console.print(f"[red]Error: Could not find cnode or local server CLI: {e}[/red]")
+            console.print(f"[dim]Details: {e}[/dim]")
+            import traceback
+            console.print(f"[dim]{traceback.format_exc()}[/dim]")
+            sys.exit(1)
+
+    # cnode is installed - forward everything to it
+    try:
+        result = subprocess.run([cnode_path] + args, check=False)
+        sys.exit(result.returncode)
+    except Exception as e:
+        console.print(f"[red]Error running cnode: {e}[/red]")
+        sys.exit(1)
 
 
 @cli.group("browser")
@@ -1467,9 +1534,15 @@ def default(url: str, example: bool, browser_config: str, crawler_config: str, f
 
 def main():
     import sys
-    if len(sys.argv) < 2 or sys.argv[1] not in cli.commands:
+    # Don't auto-insert 'crawl' if the command is recognized
+    if len(sys.argv) >= 2 and sys.argv[1] in cli.commands:
+        cli()
+    elif len(sys.argv) < 2:
+        cli()
+    else:
+        # Unknown command - insert 'crawl' for backward compat
         sys.argv.insert(1, "crawl")
-    cli()
+        cli()
 
 if __name__ == "__main__":
     main()

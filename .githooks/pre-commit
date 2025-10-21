@@ -1,0 +1,31 @@
+#!/bin/bash
+# Pre-commit hook: Auto-sync cnode files when cnode source is modified
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+# Check if cnode source files are being committed
+CNODE_FILES_CHANGED=$(git diff --cached --name-only | grep -E "deploy/docker/(cnode_cli|server_manager)\.py")
+
+if [ -n "$CNODE_FILES_CHANGED" ]; then
+    echo -e "${YELLOW}🔄 cnode source files modified, auto-syncing to package...${NC}"
+
+    # Run sync script
+    if [ -f "deploy/installer/sync-cnode.sh" ]; then
+        bash deploy/installer/sync-cnode.sh
+
+        # Stage the synced files
+        git add deploy/installer/cnode_pkg/cli.py
+        git add deploy/installer/cnode_pkg/server_manager.py
+
+        echo -e "${GREEN}✅ cnode package synced and staged${NC}"
+    else
+        echo -e "${RED}❌ Error: sync-cnode.sh not found${NC}"
+        exit 1
+    fi
+fi
+
+exit 0
