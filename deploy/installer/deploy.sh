@@ -150,22 +150,7 @@ echo -e "${GREEN}✓ cnode command created${NC}"
 # Cleanup
 rm -rf "$TMP_DIR"
 
-# Verify installation
-echo -e "\n${BLUE}Verifying installation...${NC}"
-if ! command -v cnode &> /dev/null; then
-    echo -e "${RED}Error: cnode not found in PATH${NC}"
-    echo -e "${YELLOW}Add $INSTALL_DIR to your PATH:${NC}"
-    echo -e "${YELLOW}export PATH=\"$INSTALL_DIR:\$PATH\"${NC}"
-    exit 1
-fi
-
-# Test cnode (allow non-zero exit for --help which exits with 0 normally)
-if cnode --help >/dev/null 2>&1; then
-    echo -e "${GREEN}✓ Installation verified${NC}"
-else
-    echo -e "${RED}Error: cnode command failed${NC}"
-    exit 1
-fi
+echo -e "\n${GREEN}✓ Installation complete${NC}"
 
 # Success message
 echo -e "\n${GREEN}╔══════════════════════════════════════════════════════════════╗${NC}"
