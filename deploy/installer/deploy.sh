@@ -159,12 +159,13 @@ if ! command -v cnode &> /dev/null; then
     exit 1
 fi
 
-if ! cnode --help &> /dev/null; then
+# Test cnode (allow non-zero exit for --help which exits with 0 normally)
+if cnode --help >/dev/null 2>&1; then
+    echo -e "${GREEN}✓ Installation verified${NC}"
+else
     echo -e "${RED}Error: cnode command failed${NC}"
     exit 1
 fi
-
-echo -e "${GREEN}✓ Installation verified${NC}"
 
 # Success message
 echo -e "\n${GREEN}╔══════════════════════════════════════════════════════════════╗${NC}"
