@@ -72,25 +72,29 @@ That's it! Your server is running at **http://localhost:11235** 🎉
 ### Method 1: Quick Install (Recommended)
 
 ```bash
+# From crawl4ai.com (when hosted)
 curl -sSL https://crawl4ai.com/install-cnode.sh | bash
+
+# Or directly from GitHub
+curl -sSL https://raw.githubusercontent.com/unclecode/crawl4ai/main/deploy/installer/install-cnode.sh | bash
 ```
 
-### Method 2: From GitHub
+### Method 2: Clone Repository (For Development)
 
 ```bash
 # Clone the repository
 git clone https://github.com/unclecode/crawl4ai.git
 cd crawl4ai/deploy/installer
 
-# Run local installer
+# Run installer
 ./install-cnode.sh
 ```
 
 ### Method 3: Custom Location
 
 ```bash
-# Install to custom directory
-INSTALL_DIR=$HOME/.local/bin curl -sSL https://crawl4ai.com/install-cnode.sh | bash
+# Install to custom directory (using GitHub raw URL)
+INSTALL_DIR=$HOME/.local/bin curl -sSL https://raw.githubusercontent.com/unclecode/crawl4ai/main/deploy/installer/install-cnode.sh | bash
 
 # Add to PATH
 export PATH="$HOME/.local/bin:$PATH"
