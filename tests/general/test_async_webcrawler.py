@@ -9,6 +9,21 @@ from crawl4ai import (
     RateLimiter,
     CacheMode
 )
+from crawl4ai.extraction_strategy import ExtractionStrategy
+
+class MockExtractionStrategy(ExtractionStrategy):
+    """Mock extraction strategy for testing URL parameter handling"""
+
+    def __init__(self):
+        super().__init__()
+        self.run_calls = []
+
+    def extract(self, url: str, html: str, *args, **kwargs):
+        return [{"test": "data"}]
+
+    def run(self, url: str, sections: List[str], *args, **kwargs):
+        self.run_calls.append(url)
+        return super().run(url, sections, *args, **kwargs)
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("viewport", [
@@ -142,8 +157,72 @@ async def test_error_handling(error_url):
         assert not result.success
         assert result.error_message is not None
 
+@pytest.mark.asyncio
+async def test_extraction_strategy_run_with_regular_url():
+    """
+    Regression test for extraction_strategy.run URL parameter handling with regular URLs.
+
+    This test verifies that when is_raw_html=False (regular URL),
+    extraction_strategy.run is called with the actual URL.
+    """
+    browser_config = BrowserConfig(
+        browser_type="chromium",
+        headless=True
+    )
+
+    async with AsyncWebCrawler(config=browser_config) as crawler:
+        mock_strategy = MockExtractionStrategy()
+
+        # Test regular URL (is_raw_html=False)
+        regular_url = "https://example.com"
+        result = await crawler.arun(
+            url=regular_url,
+            config=CrawlerRunConfig(
+                page_timeout=30000,
+                extraction_strategy=mock_strategy,
+                cache_mode=CacheMode.BYPASS
+            )
+        )
+
+        assert result.success
+        assert len(mock_strategy.run_calls) == 1
+        assert mock_strategy.run_calls[0] == regular_url, f"Expected '{regular_url}', got '{mock_strategy.run_calls[0]}'"
+
+@pytest.mark.asyncio
+async def test_extraction_strategy_run_with_raw_html():
+    """
+    Regression test for extraction_strategy.run URL parameter handling with raw HTML.
+
+    This test verifies that when is_raw_html=True (URL starts with "raw:"),
+    extraction_strategy.run is called with "Raw HTML" instead of the actual URL.
+    """
+    browser_config = BrowserConfig(
+        browser_type="chromium",
+        headless=True
+    )
+
+    async with AsyncWebCrawler(config=browser_config) as crawler:
+        mock_strategy = MockExtractionStrategy()
+
+        # Test raw HTML URL (is_raw_html=True automatically set)
+        raw_html_url = "raw:<html><body><h1>Test HTML</h1><p>This is a test.</p></body></html>"
+        result = await crawler.arun(
+            url=raw_html_url,
+            config=CrawlerRunConfig(
+                page_timeout=30000,
+                extraction_strategy=mock_strategy,
+                cache_mode=CacheMode.BYPASS
+            )
+        )
+
+        assert result.success
+        assert len(mock_strategy.run_calls) == 1
+        assert mock_strategy.run_calls[0] == "Raw HTML", f"Expected 'Raw HTML', got '{mock_strategy.run_calls[0]}'"
+
 if __name__ == "__main__":
     asyncio.run(test_viewport_config((1024, 768)))
     asyncio.run(test_memory_management())
     asyncio.run(test_rate_limiting())
     asyncio.run(test_javascript_execution())
+    asyncio.run(test_extraction_strategy_run_with_regular_url())
+    asyncio.run(test_extraction_strategy_run_with_raw_html())
