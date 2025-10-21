@@ -123,144 +123,99 @@ class AppDetailPage {
         document.getElementById('sidebar-pricing').textContent = this.appData.pricing || 'Free';
         document.getElementById('sidebar-contact').textContent = this.appData.contact_email || 'contact@example.com';
 
-        // Integration guide
-        this.renderIntegrationGuide();
+        // Render tab contents from database fields
+        this.renderTabContents();
     }
 
-    renderIntegrationGuide() {
-        // Installation code
+    renderTabContents() {
+        // Overview tab - use long_description from database
+        const overviewDiv = document.getElementById('app-overview');
+        if (overviewDiv) {
+            if (this.appData.long_description) {
+                overviewDiv.innerHTML = this.renderMarkdown(this.appData.long_description);
+            } else {
+                overviewDiv.innerHTML = `<p>${this.appData.description || 'No overview available.'}</p>`;
+            }
+        }
+
+        // Documentation tab - use documentation field from database
+        const docsDiv = document.getElementById('app-docs');
+        if (docsDiv) {
+            if (this.appData.documentation) {
+                docsDiv.innerHTML = this.renderMarkdown(this.appData.documentation);
+            } else {
+                docsDiv.innerHTML = '<p>Documentation coming soon.</p>';
+            }
+        }
+
+        // Integration tab - use integration_guide, installation_command, examples from database
+        this.renderIntegrationTab();
+    }
+
+    renderIntegrationTab() {
+        // Installation code - use installation_command from database
         const installCode = document.getElementById('install-code');
         if (installCode) {
-            if (this.appData.type === 'Open Source' && this.appData.github_url) {
-                installCode.textContent = `# Clone from GitHub
-git clone ${this.appData.github_url}
-
-# Install dependencies
-pip install -r requirements.txt`;
-            } else if (this.appData.name.toLowerCase().includes('api')) {
-                installCode.textContent = `# Install via pip
-pip install ${this.appData.slug}
-
-# Or install from source
-pip install git+${this.appData.github_url || 'https://github.com/example/repo'}`;
+            if (this.appData.installation_command) {
+                installCode.textContent = this.appData.installation_command;
+            } else {
+                // Fallback to generic installation
+                installCode.textContent = `# Installation instructions not yet available\n# Please check ${this.appData.website_url || 'the official website'} for details`;
             }
         }
 
-        // Usage code - customize based on category
+        // Usage code - use examples field from database
         const usageCode = document.getElementById('usage-code');
-        if (usageCode) {
-            if (this.appData.category === 'Browser Automation') {
-                usageCode.textContent = `from crawl4ai import AsyncWebCrawler
-from ${this.appData.slug.replace(/-/g, '_')} import ${this.appData.name.replace(/\s+/g, '')}
-
-async def main():
-    # Initialize ${this.appData.name}
-    automation = ${this.appData.name.replace(/\s+/g, '')}()
-
-    async with AsyncWebCrawler() as crawler:
-        result = await crawler.arun(
-            url="https://example.com",
-            browser_config=automation.config,
-            wait_for="css:body"
-        )
-        print(result.markdown)`;
-        } else if (this.appData.category === 'Proxy Services') {
-            usageCode.textContent = `from crawl4ai import AsyncWebCrawler
-import ${this.appData.slug.replace(/-/g, '_')}
-
-# Configure proxy
-proxy_config = {
-    "server": "${this.appData.website_url || 'https://proxy.example.com'}",
-    "username": "your_username",
-    "password": "your_password"
-}
-
-async with AsyncWebCrawler(proxy=proxy_config) as crawler:
-    result = await crawler.arun(
-        url="https://example.com",
-        bypass_cache=True
-    )
-    print(result.status_code)`;
-        } else if (this.appData.category === 'LLM Integration') {
-            usageCode.textContent = `from crawl4ai import AsyncWebCrawler
-from crawl4ai.extraction_strategy import LLMExtractionStrategy
-
-# Configure LLM extraction
-strategy = LLMExtractionStrategy(
-    provider="${this.appData.name.toLowerCase().includes('gpt') ? 'openai' : 'anthropic'}",
-    api_key="your-api-key",
-    model="${this.appData.name.toLowerCase().includes('gpt') ? 'gpt-4' : 'claude-3'}",
-    instruction="Extract structured data"
-)
-
-async with AsyncWebCrawler() as crawler:
-    result = await crawler.arun(
-        url="https://example.com",
-        extraction_strategy=strategy
-    )
-    print(result.extracted_content)`;
+        if (usageCode && this.appData.examples) {
+            // Extract first code block from examples if it contains multiple
+            const codeMatch = this.appData.examples.match(/```[\s\S]*?```/);
+            if (codeMatch) {
+                usageCode.textContent = codeMatch[0].replace(/```(\w+)?\n?/g, '').trim();
+            } else {
+                usageCode.textContent = this.appData.examples;
             }
         }
 
-        // Integration example
+        // Complete integration - use integration_guide field from database
         const integrationCode = document.getElementById('integration-code');
         if (integrationCode) {
-            integrationCode.textContent = this.appData.integration_guide ||
-`# Complete ${this.appData.name} Integration Example
-
-from crawl4ai import AsyncWebCrawler
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
-import json
-
-async def crawl_with_${this.appData.slug.replace(/-/g, '_')}():
-    """
-    Complete example showing how to use ${this.appData.name}
-    with Crawl4AI for production web scraping
-    """
-
-    # Define extraction schema
-    schema = {
-        "name": "ProductList",
-        "baseSelector": "div.product",
-        "fields": [
-            {"name": "title", "selector": "h2", "type": "text"},
-            {"name": "price", "selector": ".price", "type": "text"},
-            {"name": "image", "selector": "img", "type": "attribute", "attribute": "src"},
-            {"name": "link", "selector": "a", "type": "attribute", "attribute": "href"}
-        ]
+            if (this.appData.integration_guide) {
+                integrationCode.textContent = this.appData.integration_guide;
+            } else {
+                // Fallback message
+                integrationCode.textContent = `# Integration guide not yet available for ${this.appData.name}\n\n# Please visit the admin panel to add integration instructions\n# Or check ${this.appData.website_url || 'the official website'} for integration details`;
+            }
+        }
     }
 
-    # Initialize crawler with ${this.appData.name}
-    async with AsyncWebCrawler(
-        browser_type="chromium",
-        headless=True,
-        verbose=True
-    ) as crawler:
+    renderMarkdown(text) {
+        if (!text) return '';
 
-        # Crawl with extraction
-        result = await crawler.arun(
-            url="https://example.com/products",
-            extraction_strategy=JsonCssExtractionStrategy(schema),
-            cache_mode="bypass",
-            wait_for="css:.product",
-            screenshot=True
-        )
-
-        # Process results
-        if result.success:
-            products = json.loads(result.extracted_content)
-            print(f"Found {len(products)} products")
-
-            for product in products[:5]:
-                print(f"- {product['title']}: {product['price']}")
-
-        return products
-
-# Run the crawler
-if __name__ == "__main__":
-    import asyncio
-    asyncio.run(crawl_with_${this.appData.slug.replace(/-/g, '_')}())`;
-        }
+        // Simple markdown rendering (convert to HTML)
+        return text
+            // Headers
+            .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+            .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+            .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+            // Bold
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            // Italic
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            // Links
+            .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
+            // Code blocks
+            .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre><code class="language-$1">$2</code></pre>')
+            // Inline code
+            .replace(/`([^`]+)`/g, '<code>$1</code>')
+            // Line breaks
+            .replace(/\n\n/g, '</p><p>')
+            .replace(/\n/g, '<br>')
+            // Lists
+            .replace(/^\* (.*)$/gim, '<li>$1</li>')
+            .replace(/^- (.*)$/gim, '<li>$1</li>')
+            // Wrap in paragraphs
+            .replace(/^(?!<[h|p|pre|ul|ol|li])/gim, '<p>')
+            .replace(/(?<![>])$/gim, '</p>');
     }
 
     formatNumber(num) {
