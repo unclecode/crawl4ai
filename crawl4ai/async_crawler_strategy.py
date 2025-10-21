@@ -914,19 +914,35 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
                 # Ensure viewport is valid before proceeding
                 if viewport and viewport.get("width") and viewport.get("height"):
-                    # Generate random start and end points for mouse movement
-                    start_x = random.randint(50, viewport["width"] // 3)
-                    start_y = random.randint(50, viewport["height"] // 3)
-                    end_x = random.randint(viewport["width"] // 2, min(viewport["width"] - 50, viewport["width"]))
-                    end_y = random.randint(viewport["height"] // 2, min(viewport["height"] - 50, viewport["height"]))
+                    # RNG: use SystemRandom to avoid Ruff S311 (non-crypto use, still fine)
+                    rng = random.SystemRandom()
+                    w = max(1, int(viewport["width"]))
+                    h = max(1, int(viewport["height"]))
+                    # Margin scaled to viewport, capped [5, 50]
+                    margin = min(50, max(5, min(w, h) // 10))
+
+                    # Generate random start and end points for mouse movement (safe bounds)
+                    sx_low = min(margin, w - 1)
+                    sx_high = max(sx_low, w // 3)
+                    sy_low = min(margin, h - 1)
+                    sy_high = max(sy_low, h // 3)
+                    start_x = rng.randint(sx_low, sx_high)
+                    start_y = rng.randint(sy_low, sy_high)
+
+                    ex_low = max(w // 2, margin)
+                    ex_high = max(ex_low, w - margin)
+                    ey_low = max(h // 2, margin)
+                    ey_high = max(ey_low, h - margin)
+                    end_x = rng.randint(ex_low, ex_high)
+                    end_y = rng.randint(ey_low, ey_high)
 
                     # Generate a curved trajectory using Bezier curve
                     # Control points for the curve
-                    control_x = (start_x + end_x) / 2 + random.randint(-100, 100)
-                    control_y = (start_y + end_y) / 2 + random.randint(-100, 100)
+                    control_x = (start_x + end_x) / 2 + rng.randint(-100, 100)
+                    control_y = (start_y + end_y) / 2 + rng.randint(-100, 100)
 
                     # Number of steps for smooth movement
-                    steps = random.randint(15, 25)
+                    steps = rng.randint(15, 25)
 
                     # Move mouse along the curved path
                     for i in range(steps + 1):
@@ -934,10 +950,13 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         # Quadratic Bezier curve formula
                         x = int((1 - t) ** 2 * start_x + 2 * (1 - t) * t * control_x + t ** 2 * end_x)
                         y = int((1 - t) ** 2 * start_y + 2 * (1 - t) * t * control_y + t ** 2 * end_y)
+                        # Clamp to viewport
+                        x = max(0, min(w - 1, x))
+                        y = max(0, min(h - 1, y))
 
                         await page.mouse.move(x, y)
                         # Random small delay between movements to simulate human behavior
-                        await asyncio.sleep(random.uniform(0.001, 0.003))
+                        await asyncio.sleep(rng.uniform(0.001, 0.003))
 
             # Handle wait_for condition
             # Todo: Decide how to handle this
