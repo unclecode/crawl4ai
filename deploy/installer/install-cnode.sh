@@ -1,6 +1,7 @@
 #!/bin/bash
-# Crawl4AI Node Manager (cnode) - Fast Installation Script
-# This installs cnode as a Python package with a wrapper script
+# Crawl4AI Node Manager (cnode) Remote Installation Script
+# Usage: curl -sSL https://crawl4ai.com/install-cnode.sh | bash
+# Or: wget -qO- https://crawl4ai.com/install-cnode.sh | bash
 
 set -e
 
@@ -11,13 +12,15 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-echo -e "${GREEN}╔══════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║   Crawl4AI Node Manager (cnode) - Fast Installer            ║${NC}"
-echo -e "${GREEN}╚══════════════════════════════════════════════════════════════╝${NC}\n"
-
 # Configuration
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 LIB_DIR="${LIB_DIR:-/usr/local/lib/cnode}"
+GITHUB_REPO="unclecode/crawl4ai"
+BRANCH="${CNODE_BRANCH:-main}"
+
+echo -e "${GREEN}╔══════════════════════════════════════════════════════════════╗${NC}"
+echo -e "${GREEN}║   Crawl4AI Node Manager (cnode) Installation Script         ║${NC}"
+echo -e "${GREEN}╚══════════════════════════════════════════════════════════════╝${NC}\n"
 
 # Check Python
 echo -e "${BLUE}Checking Python installation...${NC}"
@@ -46,7 +49,6 @@ if ! $PYTHON_CMD -m pip --version &> /dev/null; then
     echo -e "${YELLOW}Install pip: $PYTHON_CMD -m ensurepip${NC}"
     exit 1
 fi
-
 echo -e "${GREEN}✓ pip is available${NC}"
 
 # Check Docker
@@ -65,22 +67,58 @@ if [ ! -w "$INSTALL_DIR" ] || [ ! -w "/usr/local" ]; then
     USE_SUDO="sudo"
 fi
 
-# Get script directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Create temp directory
+TMP_DIR="$(mktemp -d)"
+cd "$TMP_DIR"
+
+# Download only cnode_pkg from GitHub using sparse checkout
+echo -e "\n${BLUE}Downloading cnode package from GitHub...${NC}"
+
+if ! command -v git &> /dev/null; then
+    echo -e "${RED}Error: git is required but not found${NC}"
+    echo -e "${YELLOW}Install git and try again${NC}"
+    rm -rf "$TMP_DIR"
+    exit 1
+fi
+
+# Initialize sparse checkout
+git init -q
+git remote add origin "https://github.com/$GITHUB_REPO.git"
+git config core.sparseCheckout true
+
+# Only checkout the cnode_pkg directory
+echo "deploy/installer/cnode_pkg/*" > .git/info/sparse-checkout
+
+# Pull only the needed files
+if ! git pull -q --depth=1 origin "$BRANCH"; then
+    echo -e "${RED}Error: Failed to download package${NC}"
+    rm -rf "$TMP_DIR"
+    exit 1
+fi
+
+if [ ! -d "deploy/installer/cnode_pkg" ]; then
+    echo -e "${RED}Error: Package directory not found${NC}"
+    rm -rf "$TMP_DIR"
+    exit 1
+fi
+
+echo -e "${GREEN}✓ Package downloaded${NC}"
+
+REPO_DIR="."
 
 # Install Python dependencies
 echo -e "\n${BLUE}Installing Python dependencies...${NC}"
-$PYTHON_CMD -m pip install --quiet --user -r "$SCRIPT_DIR/cnode_pkg/requirements.txt" 2>/dev/null || \
-$PYTHON_CMD -m pip install --quiet --user --break-system-packages -r "$SCRIPT_DIR/cnode_pkg/requirements.txt" 2>/dev/null || {
+$PYTHON_CMD -m pip install --quiet --user -r "$REPO_DIR/deploy/installer/cnode_pkg/requirements.txt" 2>/dev/null || \
+$PYTHON_CMD -m pip install --quiet --user --break-system-packages -r "$REPO_DIR/deploy/installer/cnode_pkg/requirements.txt" 2>/dev/null || {
     echo -e "${YELLOW}⚠️  Could not install dependencies with pip${NC}"
     echo -e "${YELLOW}Trying to continue anyway (dependencies may already be installed)${NC}"
 }
 echo -e "${GREEN}✓ Dependencies check complete${NC}"
 
-# Create lib directory
+# Install cnode package
 echo -e "\n${BLUE}Installing cnode package...${NC}"
 $USE_SUDO mkdir -p "$LIB_DIR"
-$USE_SUDO cp -r "$SCRIPT_DIR/cnode_pkg" "$LIB_DIR/"
+$USE_SUDO cp -r "$REPO_DIR/deploy/installer/cnode_pkg" "$LIB_DIR/"
 echo -e "${GREEN}✓ Package installed to $LIB_DIR${NC}"
 
 # Create wrapper script
@@ -109,20 +147,10 @@ EOF
 $USE_SUDO chmod +x "$INSTALL_DIR/cnode"
 echo -e "${GREEN}✓ cnode command created${NC}"
 
-# Verify installation
-echo -e "\n${BLUE}Verifying installation...${NC}"
-if ! command -v cnode &> /dev/null; then
-    echo -e "${RED}Error: cnode not found in PATH${NC}"
-    echo -e "${YELLOW}Add $INSTALL_DIR to your PATH${NC}"
-    exit 1
-fi
+# Cleanup
+rm -rf "$TMP_DIR"
 
-if ! cnode --help &> /dev/null; then
-    echo -e "${RED}Error: cnode command failed${NC}"
-    exit 1
-fi
-
-echo -e "${GREEN}✓ Installation verified${NC}"
+echo -e "\n${GREEN}✓ Installation complete${NC}"
 
 # Success message
 echo -e "\n${GREEN}╔══════════════════════════════════════════════════════════════╗${NC}"
@@ -139,4 +167,5 @@ echo -e "  ${GREEN}cnode logs -f${NC}                  # Follow logs"
 echo -e "  ${GREEN}cnode stop${NC}                     # Stop server"
 
 echo -e "\n${YELLOW}More help:${NC}"
-echo -e "  ${BLUE}cnode --help${NC}\n"
+echo -e "  ${BLUE}cnode --help${NC}"
+echo -e "  ${BLUE}https://github.com/$GITHUB_REPO${NC}\n"

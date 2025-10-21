@@ -21,7 +21,7 @@ deploy/installer/
 │   ├── server_manager.py     # Docker orchestration logic
 │   └── requirements.txt      # Python dependencies
 ├── install-cnode.sh          # Local installation script
-├── deploy.sh                 # Remote installation script (for users)
+├── install-cnode.sh                 # Remote installation script (for users)
 └── releases/                 # Release artifacts for distribution
 ```
 
@@ -189,21 +189,21 @@ cnode start --help
    ```
 
 4. **Update deployment script** (if needed):
-   - Update `deploy.sh` with new version/URL
+   - Update `install-cnode.sh` with new version/URL
    - Upload to hosting (e.g., `https://crawl4ai.com/install-cnode.sh`)
 
 ## Deployment
 
 ### Remote Installation Script
 
-The `deploy.sh` script is meant to be hosted at a public URL for user installation:
+The `install-cnode.sh` script is meant to be hosted at a public URL for user installation:
 
 ```bash
 # Upload to your server
-scp deploy.sh user@crawl4ai.com:/var/www/html/install-cnode.sh
+scp install-cnode.sh user@crawl4ai.com:/var/www/html/install-cnode.sh
 
 # Or use GitHub raw URL
-https://raw.githubusercontent.com/unclecode/crawl4ai/main/deploy/installer/deploy.sh
+https://raw.githubusercontent.com/unclecode/crawl4ai/main/deploy/installer/install-cnode.sh
 ```
 
 Users can then install with:
