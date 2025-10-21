@@ -1,217 +1,187 @@
 #!/bin/bash
-# Crawl4AI Node Manager (cnode) Installation Script
-# Usage: curl -sSL https://crawl4ai.com/deploy.sh | bash
-# Or: wget -qO- https://crawl4ai.com/deploy.sh | bash
+# Crawl4AI Node Manager (cnode) Remote Installation Script
+# Usage: curl -sSL https://crawl4ai.com/install-cnode.sh | bash
+# Or: wget -qO- https://crawl4ai.com/install-cnode.sh | bash
 
 set -e
 
-# Colors for output
+# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 # Configuration
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
-BINARY_NAME="cnode"
+LIB_DIR="${LIB_DIR:-/usr/local/lib/cnode}"
 GITHUB_REPO="unclecode/crawl4ai"
-RELEASE_TAG="${CNODE_VERSION:-latest}"
+BRANCH="${CNODE_BRANCH:-main}"
 
 echo -e "${GREEN}╔══════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${GREEN}║   Crawl4AI Node Manager (cnode) Installation Script         ║${NC}"
 echo -e "${GREEN}╚══════════════════════════════════════════════════════════════╝${NC}\n"
 
-# Detect OS and architecture
-detect_platform() {
-    OS="$(uname -s)"
-    ARCH="$(uname -m)"
+# Check Python
+echo -e "${BLUE}Checking Python installation...${NC}"
+if command -v python3 &> /dev/null; then
+    PYTHON_CMD="python3"
+elif command -v python &> /dev/null; then
+    PYTHON_CMD="python"
+else
+    echo -e "${RED}Error: Python 3.8+ is required but not found${NC}"
+    echo -e "${YELLOW}Install from: https://www.python.org/downloads/${NC}"
+    exit 1
+fi
 
-    case "$OS" in
-        Linux*)
-            OS_TYPE="linux"
-            ;;
-        Darwin*)
-            OS_TYPE="macos"
-            ;;
-        *)
-            echo -e "${RED}Error: Unsupported operating system: $OS${NC}"
-            exit 1
-            ;;
-    esac
+# Check Python version
+PYTHON_VERSION=$($PYTHON_CMD -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+echo -e "${GREEN}✓ Found Python $PYTHON_VERSION${NC}"
 
-    case "$ARCH" in
-        x86_64|amd64)
-            ARCH_TYPE="amd64"
-            ;;
-        aarch64|arm64)
-            ARCH_TYPE="arm64"
-            ;;
-        *)
-            echo -e "${RED}Error: Unsupported architecture: $ARCH${NC}"
-            exit 1
-            ;;
-    esac
+if [ "$(printf '%s\n' "3.8" "$PYTHON_VERSION" | sort -V | head -n1)" != "3.8" ]; then
+    echo -e "${RED}Error: Python 3.8+ required, found $PYTHON_VERSION${NC}"
+    exit 1
+fi
 
-    echo -e "${BLUE}Detected platform: ${YELLOW}$OS_TYPE-$ARCH_TYPE${NC}"
-}
+# Check pip
+if ! $PYTHON_CMD -m pip --version &> /dev/null; then
+    echo -e "${RED}Error: pip is required${NC}"
+    echo -e "${YELLOW}Install pip: $PYTHON_CMD -m ensurepip${NC}"
+    exit 1
+fi
+echo -e "${GREEN}✓ pip is available${NC}"
 
-# Check if Docker is installed
-check_docker() {
-    if ! command -v docker &> /dev/null; then
-        echo -e "${YELLOW}⚠️  Docker not found. cnode requires Docker to manage server instances.${NC}"
-        echo -e "${YELLOW}Install Docker from: https://docs.docker.com/get-docker/${NC}\n"
-        read -p "Continue installation anyway? (y/N) " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            exit 1
-        fi
-    else
-        echo -e "${GREEN}✓ Docker is installed${NC}"
-    fi
-}
+# Check Docker
+echo -e "\n${BLUE}Checking Docker...${NC}"
+if ! command -v docker &> /dev/null; then
+    echo -e "${YELLOW}⚠️  Docker not found (required for running servers)${NC}"
+    echo -e "${YELLOW}Install from: https://docs.docker.com/get-docker/${NC}\n"
+else
+    echo -e "${GREEN}✓ Docker is installed${NC}"
+fi
 
-# Check write permissions
-check_permissions() {
-    if [ ! -w "$INSTALL_DIR" ]; then
-        echo -e "${YELLOW}⚠️  No write permission for $INSTALL_DIR${NC}"
-        echo -e "${YELLOW}The script will attempt to use sudo for installation.${NC}\n"
-        USE_SUDO="sudo"
-    else
-        USE_SUDO=""
-    fi
-}
+# Check permissions
+USE_SUDO=""
+if [ ! -w "$INSTALL_DIR" ] || [ ! -w "/usr/local" ]; then
+    echo -e "\n${YELLOW}⚠️  Root permission required for installation${NC}"
+    USE_SUDO="sudo"
+fi
 
-# Download binary
-download_binary() {
-    BINARY_URL="https://github.com/$GITHUB_REPO/releases/download/$RELEASE_TAG/cnode-$OS_TYPE-$ARCH_TYPE"
+# Create temp directory
+TMP_DIR="$(mktemp -d)"
+cd "$TMP_DIR"
 
-    echo -e "${BLUE}Downloading cnode from GitHub...${NC}"
-    echo -e "${YELLOW}URL: $BINARY_URL${NC}\n"
+# Download cnode package from GitHub
+echo -e "\n${BLUE}Downloading cnode package from GitHub...${NC}"
+PACKAGE_URL="https://github.com/$GITHUB_REPO/archive/refs/heads/$BRANCH.tar.gz"
 
-    # Create temp directory
-    TMP_DIR="$(mktemp -d)"
-    TMP_FILE="$TMP_DIR/$BINARY_NAME"
-
-    # Download with curl or wget
-    if command -v curl &> /dev/null; then
-        if ! curl -fSL "$BINARY_URL" -o "$TMP_FILE"; then
-            echo -e "${RED}Error: Failed to download binary${NC}"
-            echo -e "${YELLOW}URL: $BINARY_URL${NC}"
-            rm -rf "$TMP_DIR"
-            exit 1
-        fi
-    elif command -v wget &> /dev/null; then
-        if ! wget -q "$BINARY_URL" -O "$TMP_FILE"; then
-            echo -e "${RED}Error: Failed to download binary${NC}"
-            echo -e "${YELLOW}URL: $BINARY_URL${NC}"
-            rm -rf "$TMP_DIR"
-            exit 1
-        fi
-    else
-        echo -e "${RED}Error: Neither curl nor wget found${NC}"
-        echo -e "${YELLOW}Please install curl or wget and try again${NC}"
+if command -v curl &> /dev/null; then
+    if ! curl -fsSL "$PACKAGE_URL" -o cnode.tar.gz; then
+        echo -e "${RED}Error: Failed to download package${NC}"
         rm -rf "$TMP_DIR"
         exit 1
     fi
-
-    # Make executable
-    chmod +x "$TMP_FILE"
-
-    echo "$TMP_FILE"
-}
-
-# Install binary
-install_binary() {
-    local tmp_file="$1"
-    local install_path="$INSTALL_DIR/$BINARY_NAME"
-
-    echo -e "\n${BLUE}Installing cnode to $install_path...${NC}"
-
-    # Check if already installed
-    if [ -f "$install_path" ]; then
-        echo -e "${YELLOW}⚠️  cnode is already installed${NC}"
-        read -p "Overwrite existing installation? (y/N) " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            echo -e "${YELLOW}Installation cancelled${NC}"
-            rm -rf "$(dirname "$tmp_file")"
-            exit 0
-        fi
-    fi
-
-    # Install
-    if ! $USE_SUDO mv "$tmp_file" "$install_path"; then
-        echo -e "${RED}Error: Failed to install binary${NC}"
-        rm -rf "$(dirname "$tmp_file")"
+elif command -v wget &> /dev/null; then
+    if ! wget -q "$PACKAGE_URL" -O cnode.tar.gz; then
+        echo -e "${RED}Error: Failed to download package${NC}"
+        rm -rf "$TMP_DIR"
         exit 1
     fi
+else
+    echo -e "${RED}Error: Neither curl nor wget found${NC}"
+    rm -rf "$TMP_DIR"
+    exit 1
+fi
 
-    # Cleanup temp directory
-    rm -rf "$(dirname "$tmp_file")"
+echo -e "${GREEN}✓ Package downloaded${NC}"
 
-    echo -e "${GREEN}✓ Installation successful${NC}"
+# Extract package
+echo -e "${BLUE}Extracting package...${NC}"
+tar -xzf cnode.tar.gz
+REPO_DIR=$(find . -maxdepth 1 -type d -name "crawl4ai-*" | head -1)
+
+if [ -z "$REPO_DIR" ] || [ ! -d "$REPO_DIR/deploy/installer/cnode_pkg" ]; then
+    echo -e "${RED}Error: Invalid package structure${NC}"
+    rm -rf "$TMP_DIR"
+    exit 1
+fi
+
+echo -e "${GREEN}✓ Package extracted${NC}"
+
+# Install Python dependencies
+echo -e "\n${BLUE}Installing Python dependencies...${NC}"
+$PYTHON_CMD -m pip install --quiet --user -r "$REPO_DIR/deploy/installer/cnode_pkg/requirements.txt" 2>/dev/null || \
+$PYTHON_CMD -m pip install --quiet --user --break-system-packages -r "$REPO_DIR/deploy/installer/cnode_pkg/requirements.txt" 2>/dev/null || {
+    echo -e "${YELLOW}⚠️  Could not install dependencies with pip${NC}"
+    echo -e "${YELLOW}Trying to continue anyway (dependencies may already be installed)${NC}"
 }
+echo -e "${GREEN}✓ Dependencies check complete${NC}"
+
+# Install cnode package
+echo -e "\n${BLUE}Installing cnode package...${NC}"
+$USE_SUDO mkdir -p "$LIB_DIR"
+$USE_SUDO cp -r "$REPO_DIR/deploy/installer/cnode_pkg" "$LIB_DIR/"
+echo -e "${GREEN}✓ Package installed to $LIB_DIR${NC}"
+
+# Create wrapper script
+echo -e "\n${BLUE}Creating cnode command...${NC}"
+$USE_SUDO tee "$INSTALL_DIR/cnode" > /dev/null << 'EOF'
+#!/usr/bin/env bash
+# Crawl4AI Node Manager (cnode) wrapper
+
+set -e
+
+# Find Python
+if command -v python3 &> /dev/null; then
+    PYTHON_CMD="python3"
+elif command -v python &> /dev/null; then
+    PYTHON_CMD="python"
+else
+    echo "Error: Python 3.8+ required" >&2
+    exit 1
+fi
+
+# Add cnode to Python path and run
+export PYTHONPATH="/usr/local/lib/cnode:$PYTHONPATH"
+exec $PYTHON_CMD -m cnode_pkg.cli "$@"
+EOF
+
+$USE_SUDO chmod +x "$INSTALL_DIR/cnode"
+echo -e "${GREEN}✓ cnode command created${NC}"
+
+# Cleanup
+rm -rf "$TMP_DIR"
 
 # Verify installation
-verify_installation() {
-    echo -e "\n${BLUE}Verifying installation...${NC}"
+echo -e "\n${BLUE}Verifying installation...${NC}"
+if ! command -v cnode &> /dev/null; then
+    echo -e "${RED}Error: cnode not found in PATH${NC}"
+    echo -e "${YELLOW}Add $INSTALL_DIR to your PATH:${NC}"
+    echo -e "${YELLOW}export PATH=\"$INSTALL_DIR:\$PATH\"${NC}"
+    exit 1
+fi
 
-    if ! command -v $BINARY_NAME &> /dev/null; then
-        echo -e "${RED}Error: $BINARY_NAME not found in PATH${NC}"
-        echo -e "${YELLOW}You may need to add $INSTALL_DIR to your PATH${NC}"
-        echo -e "${YELLOW}Add this to your ~/.bashrc or ~/.zshrc:${NC}"
-        echo -e "${YELLOW}export PATH=\"$INSTALL_DIR:\$PATH\"${NC}\n"
-        exit 1
-    fi
+if ! cnode --help &> /dev/null; then
+    echo -e "${RED}Error: cnode command failed${NC}"
+    exit 1
+fi
 
-    # Test version
-    if $BINARY_NAME --help &> /dev/null; then
-        echo -e "${GREEN}✓ $BINARY_NAME is working correctly${NC}"
-    else
-        echo -e "${RED}Error: $BINARY_NAME failed to execute${NC}"
-        exit 1
-    fi
-}
+echo -e "${GREEN}✓ Installation verified${NC}"
 
-# Show completion message
-show_completion() {
-    local version
-    version=$($BINARY_NAME --help | head -1 || echo "unknown")
+# Success message
+echo -e "\n${GREEN}╔══════════════════════════════════════════════════════════════╗${NC}"
+echo -e "${GREEN}║              Installation Complete!                          ║${NC}"
+echo -e "${GREEN}╚══════════════════════════════════════════════════════════════╝${NC}\n"
 
-    echo -e "\n${GREEN}╔══════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║              Installation Complete!                          ║${NC}"
-    echo -e "${GREEN}╚══════════════════════════════════════════════════════════════╝${NC}\n"
+echo -e "${BLUE}cnode is now installed and ready!${NC}\n"
 
-    echo -e "${BLUE}cnode is now installed and ready to use!${NC}\n"
+echo -e "${YELLOW}Quick Start:${NC}"
+echo -e "  ${GREEN}cnode start${NC}                    # Start single server"
+echo -e "  ${GREEN}cnode start --replicas 5${NC}       # Start 5-replica cluster"
+echo -e "  ${GREEN}cnode status${NC}                   # Check status"
+echo -e "  ${GREEN}cnode logs -f${NC}                  # Follow logs"
+echo -e "  ${GREEN}cnode stop${NC}                     # Stop server"
 
-    echo -e "${YELLOW}Quick Start:${NC}"
-    echo -e "  ${GREEN}cnode start${NC}                    # Start single server instance"
-    echo -e "  ${GREEN}cnode start --replicas 5${NC}       # Start 5-replica cluster"
-    echo -e "  ${GREEN}cnode status${NC}                   # Check server status"
-    echo -e "  ${GREEN}cnode logs -f${NC}                  # Follow server logs"
-    echo -e "  ${GREEN}cnode scale 10${NC}                 # Scale to 10 replicas"
-    echo -e "  ${GREEN}cnode stop${NC}                     # Stop server"
-
-    echo -e "\n${YELLOW}For more information:${NC}"
-    echo -e "  ${BLUE}cnode --help${NC}"
-    echo -e "  ${BLUE}https://github.com/$GITHUB_REPO${NC}\n"
-}
-
-# Main installation flow
-main() {
-    detect_platform
-    check_docker
-    check_permissions
-
-    # Download and install
-    TMP_FILE=$(download_binary)
-    install_binary "$TMP_FILE"
-
-    # Verify
-    verify_installation
-    show_completion
-}
-
-# Run installation
-main
+echo -e "\n${YELLOW}More help:${NC}"
+echo -e "  ${BLUE}cnode --help${NC}"
+echo -e "  ${BLUE}https://github.com/$GITHUB_REPO${NC}\n"
