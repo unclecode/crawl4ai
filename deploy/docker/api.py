@@ -44,6 +44,7 @@ from utils import (
     get_llm_api_key,
     validate_llm_provider
 )
+from webhook import WebhookDeliveryService
 
 import psutil, time
 
@@ -567,6 +568,7 @@ async def handle_crawl_job(
     browser_config: Dict,
     crawler_config: Dict,
     config: Dict,
+    webhook_config: Optional[Dict] = None,
 ) -> Dict:
     """
     Fire-and-forget version of handle_crawl_request.
@@ -574,13 +576,24 @@ async def handle_crawl_job(
     lets /crawl/job/{task_id} polling fetch the result.
     """
     task_id = f"crawl_{uuid4().hex[:8]}"
-    await redis.hset(f"task:{task_id}", mapping={
+
+    # Store task data in Redis
+    task_data = {
         "status": TaskStatus.PROCESSING,         # <-- keep enum values consistent
         "created_at": datetime.utcnow().isoformat(),
         "url": json.dumps(urls),                 # store list as JSON string
         "result": "",
         "error": "",
-    })
+    }
+
+    # Store webhook config if provided
+    if webhook_config:
+        task_data["webhook_config"] = json.dumps(webhook_config)
+
+    await redis.hset(f"task:{task_id}", mapping=task_data)
+
+    # Initialize webhook service
+    webhook_service = WebhookDeliveryService(config)
 
     async def _runner():
         try:
@@ -594,12 +607,33 @@ async def handle_crawl_job(
                 "status": TaskStatus.COMPLETED,
                 "result": json.dumps(result),
             })
+
+            # Send webhook notification on successful completion
+            await webhook_service.notify_job_completion(
+                task_id=task_id,
+                task_type="crawl",
+                status="completed",
+                urls=urls,
+                webhook_config=webhook_config,
+                result=result
+            )
+
             await asyncio.sleep(5)  # Give Redis time to process the update
         except Exception as exc:
             await redis.hset(f"task:{task_id}", mapping={
                 "status": TaskStatus.FAILED,
                 "error": str(exc),
             })
+
+            # Send webhook notification on failure
+            await webhook_service.notify_job_completion(
+                task_id=task_id,
+                task_type="crawl",
+                status="failed",
+                urls=urls,
+                webhook_config=webhook_config,
+                error=str(exc)
+            )
 
     background_tasks.add_task(_runner)
     return {"task_id": task_id}

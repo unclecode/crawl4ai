@@ -12,6 +12,7 @@ from api import (
     handle_crawl_job,
     handle_task_status,
 )
+from schemas import WebhookConfig
 
 # ------------- dependency placeholders -------------
 _redis = None        # will be injected from server.py
@@ -43,6 +44,7 @@ class CrawlJobPayload(BaseModel):
     urls:           list[HttpUrl]
     browser_config: Dict = {}
     crawler_config: Dict = {}
+    webhook_config: Optional[WebhookConfig] = None
 
 
 # ---------- LL​M job ---------------------------------------------------------
@@ -82,6 +84,10 @@ async def crawl_job_enqueue(
         background_tasks: BackgroundTasks,
         _td: Dict = Depends(lambda: _token_dep()),
 ):
+    webhook_config = None
+    if payload.webhook_config:
+        webhook_config = payload.webhook_config.dict()
+
     return await handle_crawl_job(
         _redis,
         background_tasks,
@@ -89,6 +95,7 @@ async def crawl_job_enqueue(
         payload.browser_config,
         payload.crawler_config,
         config=_config,
+        webhook_config=webhook_config,
     )
 
 
