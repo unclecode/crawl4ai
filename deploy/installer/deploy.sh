@@ -71,42 +71,40 @@ fi
 TMP_DIR="$(mktemp -d)"
 cd "$TMP_DIR"
 
-# Download cnode package from GitHub
+# Download only cnode_pkg from GitHub using sparse checkout
 echo -e "\n${BLUE}Downloading cnode package from GitHub...${NC}"
-PACKAGE_URL="https://github.com/$GITHUB_REPO/archive/refs/heads/$BRANCH.tar.gz"
 
-if command -v curl &> /dev/null; then
-    if ! curl -fsSL "$PACKAGE_URL" -o cnode.tar.gz; then
-        echo -e "${RED}Error: Failed to download package${NC}"
-        rm -rf "$TMP_DIR"
-        exit 1
-    fi
-elif command -v wget &> /dev/null; then
-    if ! wget -q "$PACKAGE_URL" -O cnode.tar.gz; then
-        echo -e "${RED}Error: Failed to download package${NC}"
-        rm -rf "$TMP_DIR"
-        exit 1
-    fi
-else
-    echo -e "${RED}Error: Neither curl nor wget found${NC}"
+if ! command -v git &> /dev/null; then
+    echo -e "${RED}Error: git is required but not found${NC}"
+    echo -e "${YELLOW}Install git and try again${NC}"
+    rm -rf "$TMP_DIR"
+    exit 1
+fi
+
+# Initialize sparse checkout
+git init -q
+git remote add origin "https://github.com/$GITHUB_REPO.git"
+git config core.sparseCheckout true
+
+# Only checkout the cnode_pkg directory
+echo "deploy/installer/cnode_pkg/*" > .git/info/sparse-checkout
+
+# Pull only the needed files
+if ! git pull -q --depth=1 origin "$BRANCH"; then
+    echo -e "${RED}Error: Failed to download package${NC}"
+    rm -rf "$TMP_DIR"
+    exit 1
+fi
+
+if [ ! -d "deploy/installer/cnode_pkg" ]; then
+    echo -e "${RED}Error: Package directory not found${NC}"
     rm -rf "$TMP_DIR"
     exit 1
 fi
 
 echo -e "${GREEN}✓ Package downloaded${NC}"
 
-# Extract package
-echo -e "${BLUE}Extracting package...${NC}"
-tar -xzf cnode.tar.gz
-REPO_DIR=$(find . -maxdepth 1 -type d -name "crawl4ai-*" | head -1)
-
-if [ -z "$REPO_DIR" ] || [ ! -d "$REPO_DIR/deploy/installer/cnode_pkg" ]; then
-    echo -e "${RED}Error: Invalid package structure${NC}"
-    rm -rf "$TMP_DIR"
-    exit 1
-fi
-
-echo -e "${GREEN}✓ Package extracted${NC}"
+REPO_DIR="."
 
 # Install Python dependencies
 echo -e "\n${BLUE}Installing Python dependencies...${NC}"
