@@ -18,15 +18,14 @@ load_dotenv()  # Load environment variables from .env file
 console = Console()
 
 # --- Configuration ---
-BASE_URL = os.getenv("CRAWL4AI_TEST_URL", "http://localhost:8020")
 BASE_URL = os.getenv("CRAWL4AI_TEST_URL", "http://localhost:11235")
 # Target URLs
-SIMPLE_URL = "https://example.com"  # For demo purposes
 SIMPLE_URL = "https://httpbin.org/html"
 LINKS_URL = "https://httpbin.org/links/10/0"
 FORMS_URL = "https://httpbin.org/forms/post"  # For JS demo
 BOOKS_URL = "http://books.toscrape.com/"  # For CSS extraction
 PYTHON_URL = "https://python.org"  # For deeper crawl
+PDF_URL = "https://arxiv.org/pdf/2310.06825" # For PDF demo
 # Use the same sample site as deep crawl tests for consistency
 DEEP_CRAWL_BASE_URL = os.getenv(
     "DEEP_CRAWL_TEST_SITE", "https://docs.crawl4ai.com/samples/deepcrawl/")
@@ -1261,6 +1260,73 @@ async def demo_config_dump_invalid(client: httpx.AsyncClient):
         console.print(
             f"[bold red]Unexpected error during invalid test:[/] {e}")
 
+# 10. Crawl PDF
+
+async def demo_pdf_crawl(client: httpx.AsyncClient):
+    payload = {
+        "urls": [PDF_URL],
+        "browser_config": {"type": "BrowserConfig", "params": {"headless": True}},
+        "crawler_config": {
+            "type": "CrawlerRunConfig",
+            "params": {
+                "cache_mode": "BYPASS",
+                "scraping_strategy": {
+                    "type": "PDFContentScrapingStrategy",
+                    "params": {
+                        "extract_images": False,
+                        "save_images_locally": False,
+                        "batch_size": 2
+                    }
+                }
+            }
+        }
+    }
+
+    resp = await client.post("/crawl", json=payload)
+    resp.raise_for_status()
+    data = resp.json()
+    print("=== Demo: PDF Crawl ===")
+    print("Success:", data.get("success"))
+    print("Number of results:", len(data.get("results", [])))
+    if data.get("results"):
+        first = data["results"][0]
+        text_snippet = (first.get("text") or "")[:500]
+        print("Extracted text (first 500 chars):")
+        print(text_snippet)
+        
+# 11. Crawl PDF stream
+
+async def demo_pdf_crawl_stream(client: httpx.AsyncClient):
+    """
+    Demo: Crawl a PDF and stream the extracted text content.
+    """
+    payload = {
+        "urls": [PDF_URL],
+        "browser_config": {"type": "BrowserConfig", "params": {"headless": True}},
+        "crawler_config": {
+            "type": "CrawlerRunConfig",
+            "params": {
+                "stream": True,
+                "cache_mode": "BYPASS",
+                "scraping_strategy": {  # <-- Default strategy if not set
+                    "type": "PDFContentScrapingStrategy",
+                    "params": {
+                        "extract_images": False,     
+                        "save_images_locally": False,
+                        "batch_size": 2              
+                    }
+                }
+            }
+        }
+    }
+
+    await stream_request(
+        client,
+        "/crawl/stream",
+        payload,
+        "Demo PDF: Streaming PDF Crawl"
+    )
+
 
 # --- Update Main Runner to include new demo ---
 async def main_demo():
@@ -1294,6 +1360,9 @@ async def main_demo():
         # await demo_deep_with_llm_extraction(client)
         # await demo_deep_with_proxy(client)  # Skips if no PROXIES env var
         # await demo_deep_with_ssl(client)   # Added the new demo
+        
+        # await demo_pdf_crawl_stream(client)
+        # await demo_pdf_crawl(client)
 
         # --- Helper endpoints ---
         await demo_markdown_endpoint(client)

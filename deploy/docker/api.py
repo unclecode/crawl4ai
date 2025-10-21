@@ -13,7 +13,11 @@ from urllib.parse import unquote
 from fastapi import HTTPException, Request, status
 from fastapi.background import BackgroundTasks
 from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
+
 from redis import asyncio as aioredis
+
+from utils import is_pdf_url
 
 from crawl4ai import (
     AsyncWebCrawler,
@@ -31,6 +35,10 @@ from crawl4ai.content_filter_strategy import (
     BM25ContentFilter,
     LLMContentFilter
 )
+
+from crawl4ai.processors.pdf import PDFCrawlerStrategy, PDFContentScrapingStrategy
+# from crawl4ai.async_configs import to_serializable_dict
+
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 from crawl4ai.content_scraping_strategy import LXMLWebScrapingStrategy
 
@@ -431,6 +439,23 @@ async def handle_crawl_request(
         urls = [('https://' + url) if not url.startswith(('http://', 'https://')) and not url.startswith(("raw:", "raw://")) else url for url in urls]
         browser_config = BrowserConfig.load(browser_config)
         crawler_config = CrawlerRunConfig.load(crawler_config)
+        
+        is_pdf_flags = await asyncio.gather(*(is_pdf_url(url) for url in urls))
+        is_pdf = any(is_pdf_flags)
+        if any(is_pdf_flags) and not all(is_pdf_flags):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Mix of PDF and non-PDF URLs in a single request is not supported yet."
+            )
+            
+        crawler_strategy = PDFCrawlerStrategy() if is_pdf else None
+
+        if is_pdf and crawler_config.scraping_strategy is None:
+            crawler_config.scraping_strategy = PDFContentScrapingStrategy(
+                extract_images=False,
+                save_images_locally=False,
+                batch_size=2
+            )
 
         dispatcher = MemoryAdaptiveDispatcher(
             memory_threshold_percent=config["crawler"]["memory_threshold_percent"],
@@ -440,7 +465,7 @@ async def handle_crawl_request(
         )
         
         from crawler_pool import get_crawler
-        crawler = await get_crawler(browser_config)
+        crawler = await get_crawler(browser_config, crawler_strategy)
 
         # crawler: AsyncWebCrawler = AsyncWebCrawler(config=browser_config)
         # await crawler.start()
@@ -458,6 +483,7 @@ async def handle_crawl_request(
                                 config=crawler_config, 
                                 dispatcher=dispatcher)
         results = await partial_func()
+        results_list = results if isinstance(results, list) else [results]
 
         # await crawler.close()
         
@@ -471,12 +497,14 @@ async def handle_crawl_request(
 
         # Process results to handle PDF bytes
         processed_results = []
-        for result in results:
+        for result in results_list:
             result_dict = result.model_dump()
             # If PDF exists, encode it to base64
             if result_dict.get('pdf') is not None:
                 result_dict['pdf'] = b64encode(result_dict['pdf']).decode('utf-8')
-            processed_results.append(result_dict)
+
+            # Keep response shape consistent with streaming (plain JSON-serializable dict)
+            processed_results.append(jsonable_encoder(result_dict))
             
         return {
             "success": True,
@@ -521,18 +549,37 @@ async def handle_stream_crawl_request(
         # browser_config.verbose = True # Set to False or remove for production stress testing
         browser_config.verbose = False
         crawler_config = CrawlerRunConfig.load(crawler_config)
-        crawler_config.scraping_strategy = LXMLWebScrapingStrategy()
         crawler_config.stream = True
+        
+        # Normalize URLs to include scheme (match non-streaming behavior)
+        urls = [('https://' + url) if not url.startswith(('http://', 'https://')) and not url.startswith(("raw:", "raw://")) else url for url in urls]
+        
+        is_pdf_flags = await asyncio.gather(*(is_pdf_url(url) for url in urls))
+        is_pdf = any(is_pdf_flags)
+        if any(is_pdf_flags) and not all(is_pdf_flags):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Mix of PDF and non-PDF URLs in a single request is not supported yet."
+            )
+            
+        crawler_strategy = PDFCrawlerStrategy() if is_pdf else None
+
+        if is_pdf and crawler_config.scraping_strategy is None:
+            crawler_config.scraping_strategy = PDFContentScrapingStrategy(
+                extract_images=False,
+                save_images_locally=False,
+                batch_size=2
+            )
 
         dispatcher = MemoryAdaptiveDispatcher(
             memory_threshold_percent=config["crawler"]["memory_threshold_percent"],
             rate_limiter=RateLimiter(
                 base_delay=tuple(config["crawler"]["rate_limiter"]["base_delay"])
-            )
+            ) if config["crawler"]["rate_limiter"]["enabled"] else None
         )
 
         from crawler_pool import get_crawler
-        crawler = await get_crawler(browser_config)
+        crawler = await get_crawler(browser_config, crawler_strategy)
 
         # crawler = AsyncWebCrawler(config=browser_config)
         # await crawler.start()
