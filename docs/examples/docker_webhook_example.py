@@ -9,7 +9,7 @@ Supports both:
 - /llm/job - LLM-powered content extraction
 
 Prerequisites:
-1. Crawl4AI Docker container running on localhost:11234
+1. Crawl4AI Docker container running on localhost:11235
 2. Flask installed: pip install flask requests
 3. LLM API key configured in .llm.env (for LLM extraction examples)
 
@@ -26,7 +26,7 @@ from flask import Flask, request, jsonify
 from threading import Thread
 
 # Configuration
-CRAWL4AI_BASE_URL = "http://localhost:11234"
+CRAWL4AI_BASE_URL = "http://localhost:11235"
 WEBHOOK_BASE_URL = "http://localhost:8080"  # Your webhook receiver URL
 
 # Initialize Flask app for webhook receiver
@@ -344,7 +344,7 @@ def main():
     except:
         print(f"❌ Cannot connect to Crawl4AI at {CRAWL4AI_BASE_URL}")
         print("   Please make sure Docker container is running:")
-        print("   docker run -d -p 11234:11234 --name crawl4ai unclecode/crawl4ai:latest")
+        print("   docker run -d -p 11235:11235 --name crawl4ai unclecode/crawl4ai:latest")
         return
 
     # Start webhook server in background thread
