@@ -658,7 +658,7 @@ class BrowserManager:
         if self.config.cdp_url or self.config.use_managed_browser:
             self.config.use_managed_browser = True
             cdp_url = await self.managed_browser.start() if not self.config.cdp_url else self.config.cdp_url
-            self.browser = await self.playwright.chromium.connect_over_cdp(cdp_url)
+            self.browser = await self.playwright.chromium.connect_over_cdp(cdp_url, headers=self.config.cdp_headers)
             contexts = self.browser.contexts
             if contexts:
                 self.default_context = contexts[0]
