@@ -309,7 +309,7 @@ async def handle_llm_request(
     cache: str = "0",
     config: Optional[dict] = None,
     provider: Optional[str] = None,
-    webhook_config: Optional[Dict] = None,,
+    webhook_config: Optional[Dict] = None,
     temperature: Optional[float] = None,
     api_base_url: Optional[str] = None
 ) -> JSONResponse:
