@@ -785,6 +785,54 @@ curl http://localhost:11235/crawl/job/crawl_xyz
 
 The response includes `status` field: `"processing"`, `"completed"`, or `"failed"`.
 
+#### LLM Extraction Jobs with Webhooks
+
+The same webhook system works for LLM extraction jobs via `/llm/job`:
+
+```bash
+# Submit LLM extraction job with webhook
+curl -X POST http://localhost:11235/llm/job \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://example.com/article",
+    "q": "Extract the article title, author, and main points",
+    "provider": "openai/gpt-4o-mini",
+    "webhook_config": {
+      "webhook_url": "https://myapp.com/webhooks/llm-complete",
+      "webhook_data_in_payload": true,
+      "webhook_headers": {
+        "X-Webhook-Secret": "your-secret-token"
+      }
+    }
+  }'
+
+# Response: {"task_id": "llm_1234567890"}
+```
+
+**Your webhook receives:**
+```json
+{
+  "task_id": "llm_1234567890",
+  "task_type": "llm_extraction",
+  "status": "completed",
+  "timestamp": "2025-10-22T12:30:00.000000+00:00",
+  "urls": ["https://example.com/article"],
+  "data": {
+    "extracted_content": {
+      "title": "Understanding Web Scraping",
+      "author": "John Doe",
+      "main_points": ["Point 1", "Point 2", "Point 3"]
+    }
+  }
+}
+```
+
+**Key Differences for LLM Jobs:**
+- Task type is `"llm_extraction"` instead of `"crawl"`
+- Extracted data is in `data.extracted_content`
+- Single URL only (not an array)
+- Supports schema-based extraction with `schema` parameter
+
 > 💡 **Pro tip**: See [WEBHOOK_EXAMPLES.md](./WEBHOOK_EXAMPLES.md) for detailed examples including TypeScript client code, Flask webhook handlers, and failure handling.
 
 ---
