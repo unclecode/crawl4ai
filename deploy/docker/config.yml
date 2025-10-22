@@ -11,8 +11,7 @@ app:
 # Default LLM Configuration
 llm:
   provider: "openai/gpt-4o-mini"
-  api_key_env: "OPENAI_API_KEY"
-  # api_key: sk-...  # If you pass the API key directly then api_key_env will be ignored
+  # api_key: sk-...  # If you pass the API key directly (not recommended)
 
 # Redis Configuration
 redis:
@@ -39,8 +38,8 @@ rate_limiting:
 
 # Security Configuration
 security:
-  enabled: false 
-  jwt_enabled: false 
+  enabled: false
+  jwt_enabled: false
   https_redirect: false
   trusted_hosts: ["*"]
   headers:
@@ -89,3 +88,16 @@ observability:
     endpoint: "/metrics"
   health_check:
     endpoint: "/health"
+
+# Webhook Configuration
+webhooks:
+  enabled: true
+  default_url: null  # Optional: default webhook URL for all jobs
+  data_in_payload: false  # Optional: default behavior for including data
+  retry:
+    max_attempts: 5
+    initial_delay_ms: 1000  # 1s, 2s, 4s, 8s, 16s exponential backoff
+    max_delay_ms: 32000
+    timeout_ms: 30000  # 30s timeout per webhook call
+  headers:  # Optional: default headers to include
+    User-Agent: "Crawl4AI-Webhook/1.0"

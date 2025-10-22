@@ -5,6 +5,16 @@ All notable changes to Crawl4AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **🔒 HTTPS Preservation for Internal Links**: New `preserve_https_for_internal_links` configuration flag
+  - Maintains HTTPS scheme for internal links even when servers redirect to HTTP
+  - Prevents security downgrades during deep crawling
+  - Useful for security-conscious crawling and sites supporting both protocols
+  - Fully backward compatible with opt-in flag (default: `False`)
+  - Fixes issue #1410 where HTTPS URLs were being downgraded to HTTP
+
 ## [0.7.3] - 2025-08-09
 
 ### Added

@@ -2241,7 +2241,7 @@ docker build -t crawl4ai
 
 | Argument | Description | Default | Options |
 |----------|-------------|---------|----------|
-| PYTHON_VERSION | Python version | 3.10 | 3.8, 3.9, 3.10 |
+| PYTHON_VERSION | Python version | 3.10 | 3.10, 3.11, 3.12, 3.13 |
 | INSTALL_TYPE | Feature set | default | default, all, torch, transformer |
 | ENABLE_GPU | GPU support | false | true, false |
 | APP_HOME | Install path | /app | any valid path |

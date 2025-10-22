@@ -15,6 +15,7 @@ from .js_snippet import load_js_script
 from .config import DOWNLOAD_PAGE_TIMEOUT
 from .async_configs import BrowserConfig, CrawlerRunConfig
 from .utils import get_chromium_path
+import warnings
 
 
 BROWSER_DISABLE_OPTIONS = [
@@ -613,9 +614,11 @@ class BrowserManager:
         # for all racers). Prevents 'Target page/context closed' errors.
         self._page_lock = asyncio.Lock()
         
-        # Stealth-related attributes
-        self._stealth_instance = None
-        self._stealth_cm = None 
+        # Stealth adapter for stealth mode
+        self._stealth_adapter = None
+        if self.config.enable_stealth and not self.use_undetected:
+            from .browser_adapter import StealthAdapter
+            self._stealth_adapter = StealthAdapter()
 
         # Initialize ManagedBrowser if needed
         if self.config.use_managed_browser:
@@ -649,16 +652,8 @@ class BrowserManager:
         else:
             from playwright.async_api import async_playwright
 
-        # Initialize playwright with or without stealth
-        if self.config.enable_stealth and not self.use_undetected:
-            # Import stealth only when needed
-            from playwright_stealth import Stealth
-            # Use the recommended stealth wrapper approach
-            self._stealth_instance = Stealth()
-            self._stealth_cm = self._stealth_instance.use_async(async_playwright())
-            self.playwright = await self._stealth_cm.__aenter__()
-        else:
-            self.playwright = await async_playwright().start()
+        # Initialize playwright
+        self.playwright = await async_playwright().start()
 
         if self.config.cdp_url or self.config.use_managed_browser:
             self.config.use_managed_browser = True
@@ -741,17 +736,18 @@ class BrowserManager:
             )
             os.makedirs(browser_args["downloads_path"], exist_ok=True)
 
-        if self.config.proxy or self.config.proxy_config:
+        if self.config.proxy:
+            warnings.warn(
+                "BrowserConfig.proxy is deprecated and ignored. Use proxy_config instead.",
+                DeprecationWarning,
+            )
+        if self.config.proxy_config:
             from playwright.async_api import ProxySettings
 
-            proxy_settings = (
-                ProxySettings(server=self.config.proxy)
-                if self.config.proxy
-                else ProxySettings(
-                    server=self.config.proxy_config.server,
-                    username=self.config.proxy_config.username,
-                    password=self.config.proxy_config.password,
-                )
+            proxy_settings = ProxySettings(
+                server=self.config.proxy_config.server,
+                username=self.config.proxy_config.username,
+                password=self.config.proxy_config.password,
             )
             browser_args["proxy"] = proxy_settings
 
@@ -1007,6 +1003,19 @@ class BrowserManager:
         signature_hash = hashlib.sha256(signature_json.encode("utf-8")).hexdigest()
         return signature_hash
 
+    async def _apply_stealth_to_page(self, page):
+        """Apply stealth to a page if stealth mode is enabled"""
+        if self._stealth_adapter:
+            try:
+                await self._stealth_adapter.apply_stealth(page)
+            except Exception as e:
+                if self.logger:
+                    self.logger.warning(
+                        message="Failed to apply stealth to page: {error}",
+                        tag="STEALTH",
+                        params={"error": str(e)}
+                    )
+
     async def get_page(self, crawlerRunConfig: CrawlerRunConfig):
         """
         Get a page for the given session ID, creating a new one if needed.
@@ -1036,6 +1045,7 @@ class BrowserManager:
                 # See GH-1198: context.pages can be empty under races
                 async with self._page_lock:
                     page = await ctx.new_page()
+                await self._apply_stealth_to_page(page)
             else:
                 context = self.default_context
                 pages = context.pages
@@ -1052,6 +1062,7 @@ class BrowserManager:
                                 page = pages[0]
                             else:
                                 page = await context.new_page()
+                                await self._apply_stealth_to_page(page)
         else:
             # Otherwise, check if we have an existing context for this config
             config_signature = self._make_config_signature(crawlerRunConfig)
@@ -1067,6 +1078,7 @@ class BrowserManager:
 
             # Create a new page from the chosen context
             page = await context.new_page()
+            await self._apply_stealth_to_page(page)
 
         # If a session_id is specified, store this session so we can reuse later
         if crawlerRunConfig.session_id:
@@ -1133,19 +1145,5 @@ class BrowserManager:
             self.managed_browser = None
 
         if self.playwright:
-            # Handle stealth context manager cleanup if it exists
-            if hasattr(self, '_stealth_cm') and self._stealth_cm is not None:
-                try:
-                    await self._stealth_cm.__aexit__(None, None, None)
-                except Exception as e:
-                    if self.logger:
-                        self.logger.error(
-                            message="Error closing stealth context: {error}",
-                            tag="ERROR", 
-                            params={"error": str(e)}
-                        )
-                self._stealth_cm = None
-                self._stealth_instance = None
-            else:
-                await self.playwright.stop()
+            await self.playwright.stop()
             self.playwright = None
