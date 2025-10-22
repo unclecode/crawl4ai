@@ -17,7 +17,7 @@ dependencies = [
     "aiohttp>=3.11.11",
     "aiosqlite~=0.20",
     "anyio>=4.0.0",
-    "lxml~=5.3",
+    "lxml~=6.0",
     "litellm>=1.53.1",
     "numpy>=1.26.0,<3",
     "pillow>=10.4",
@@ -46,7 +46,7 @@ dependencies = [
     "humanize>=4.10.0",
     "lark>=1.2.2",
     "alphashape>=1.3.1",
-    "shapely>=2.0.0"
+    "shapely>=2.0.0",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
