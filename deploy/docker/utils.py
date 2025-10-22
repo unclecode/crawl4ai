@@ -1,3 +1,4 @@
+import contextlib
 import dns.resolver
 import logging
 import yaml
@@ -179,3 +180,21 @@ def verify_email_domain(email: str) -> bool:
         return True if records else False
     except Exception as e:
         return False
+
+   
+def combine_lifespans(*lifespans):
+    @contextlib.asynccontextmanager
+    async def combined(app):
+        # Nest the lifespans like contextlib.ExitStack does for async
+        stack = contextlib.AsyncExitStack()
+        await stack.__aenter__()
+
+        try:
+            for lifespan in lifespans:
+
+                await stack.enter_async_context(lifespan(app))
+            yield
+        finally:
+            await stack.__aexit__(None, None, None)
+
+    return combined

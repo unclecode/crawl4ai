@@ -281,10 +281,11 @@ MCP is an open protocol that standardizes how applications provide context to LL
 
 ### Connecting via MCP
 
-The Crawl4AI server exposes two MCP endpoints:
+The Crawl4AI server exposes three MCP endpoints:
 
 - **Server-Sent Events (SSE)**: `http://localhost:11235/mcp/sse`
 - **WebSocket**: `ws://localhost:11235/mcp/ws`
+- **Streamable_http**: `http://localhost:11235/mcp/http`
 
 ### Using with Claude Code
 
@@ -319,6 +320,13 @@ You can test the MCP WebSocket connection using the test file included in the re
 ```bash
 # From the repository root
 python tests/mcp/test_mcp_socket.py
+```
+
+You can test the MCP streamable_http connection using the test file included in the repository:
+
+```bash
+# From the repository root
+python tests/mcp/test_mcp_http.py
 ```
 
 ### MCP Schemas
