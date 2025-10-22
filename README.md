@@ -27,11 +27,13 @@
 
 Crawl4AI turns the web into clean, LLM ready Markdown for RAG, agents, and data pipelines. Fast, controllable, battle tested by a 50k+ star community.
 
-[✨ Check out latest update v0.7.4](#-recent-updates)
+[✨ Check out latest update v0.7.5](#-recent-updates)
 
-✨ New in v0.7.4: Revolutionary LLM Table Extraction with intelligent chunking, enhanced concurrency fixes, memory management refactor, and critical stability improvements. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.4.md)
+✨ New in v0.7.5: Docker Hooks System with function-based API for pipeline customization, Enhanced LLM Integration with custom providers, HTTPS Preservation, and multiple community-reported bug fixes. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.5.md)
 
-✨ Recent v0.7.3: Undetected Browser Support, Multi-URL Configurations, Memory Monitoring, Enhanced Table Extraction, GitHub Sponsors. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.3.md)
+✨ Recent v0.7.4: Revolutionary LLM Table Extraction with intelligent chunking, enhanced concurrency fixes, memory management refactor, and critical stability improvements. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.4.md)
+
+✨ Previous v0.7.3: Undetected Browser Support, Multi-URL Configurations, Memory Monitoring, Enhanced Table Extraction, GitHub Sponsors. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.3.md)
 
 <details>
   <summary>🤓 <strong>My Personal Story</strong></summary>
@@ -177,7 +179,7 @@ No rate-limited APIs. No lock-in. Build and own your data pipeline with direct g
 - 📸 **Screenshots**: Capture page screenshots during crawling for debugging or analysis.
 - 📂 **Raw Data Crawling**: Directly process raw HTML (`raw:`) or local files (`file://`).
 - 🔗 **Comprehensive Link Extraction**: Extracts internal, external links, and embedded iframe content.
-- 🛠️ **Customizable Hooks**: Define hooks at every step to customize crawling behavior.
+- 🛠️ **Customizable Hooks**: Define hooks at every step to customize crawling behavior (supports both string and function-based APIs).
 - 💾 **Caching**: Cache data for improved speed and to avoid redundant fetches.
 - 📄 **Metadata Extraction**: Retrieve structured metadata from web pages.
 - 📡 **IFrame Content Extraction**: Seamless extraction from embedded iframe content.
@@ -543,6 +545,54 @@ async def test_news_crawl():
 </details>
 
 ## ✨ Recent Updates
+
+<details>
+<summary><strong>Version 0.7.5 Release Highlights - The Docker Hooks & Security Update</strong></summary>
+
+- **🔧 Docker Hooks System**: Complete pipeline customization with user-provided Python functions at 8 key points
+- **✨ Function-Based Hooks API (NEW)**: Write hooks as regular Python functions with full IDE support:
+  ```python
+  from crawl4ai import hooks_to_string
+  from crawl4ai.docker_client import Crawl4aiDockerClient
+
+  # Define hooks as regular Python functions
+  async def on_page_context_created(page, context, **kwargs):
+      """Block images to speed up crawling"""
+      await context.route("**/*.{png,jpg,jpeg,gif,webp}", lambda route: route.abort())
+      await page.set_viewport_size({"width": 1920, "height": 1080})
+      return page
+
+  async def before_goto(page, context, url, **kwargs):
+      """Add custom headers"""
+      await page.set_extra_http_headers({'X-Crawl4AI': 'v0.7.5'})
+      return page
+
+  # Option 1: Use hooks_to_string() utility for REST API
+  hooks_code = hooks_to_string({
+      "on_page_context_created": on_page_context_created,
+      "before_goto": before_goto
+  })
+
+  # Option 2: Docker client with automatic conversion (Recommended)
+  client = Crawl4aiDockerClient(base_url="http://localhost:11235")
+  results = await client.crawl(
+      urls=["https://httpbin.org/html"],
+      hooks={
+          "on_page_context_created": on_page_context_created,
+          "before_goto": before_goto
+      }
+  )
+  # ✓ Full IDE support, type checking, and reusability!
+  ```
+
+- **🤖 Enhanced LLM Integration**: Custom providers with temperature control and base_url configuration
+- **🔒 HTTPS Preservation**: Secure internal link handling with `preserve_https_for_internal_links=True`
+- **🐍 Python 3.10+ Support**: Modern language features and enhanced performance
+- **🛠️ Bug Fixes**: Resolved multiple community-reported issues including URL processing, JWT authentication, and proxy configuration
+
+[Full v0.7.5 Release Notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.5.md)
+
+</details>
 
 <details>
 <summary><strong>Version 0.7.4 Release Highlights - The Intelligent Table Extraction & Performance Update</strong></summary>
