@@ -86,7 +86,7 @@ async def crawl_job_enqueue(
 ):
     webhook_config = None
     if payload.webhook_config:
-        webhook_config = payload.webhook_config.dict()
+        webhook_config = payload.webhook_config.model_dump(mode='json')
 
     return await handle_crawl_job(
         _redis,
