@@ -12,6 +12,7 @@
   - [Python SDK](#python-sdk)
   - [Understanding Request Schema](#understanding-request-schema)
   - [REST API Examples](#rest-api-examples)
+  - [Asynchronous Jobs with Webhooks](#asynchronous-jobs-with-webhooks)
 - [Additional API Endpoints](#additional-api-endpoints)
   - [HTML Extraction Endpoint](#html-extraction-endpoint)
   - [Screenshot Endpoint](#screenshot-endpoint)
@@ -648,6 +649,146 @@ async def test_stream_crawl(token: str = None): # Made token optional
 # asyncio.run(test_stream_crawl())
 ```
 
+### Asynchronous Jobs with Webhooks
+
+For long-running crawls or when you want to avoid keeping connections open, use the job queue endpoints. Instead of polling for results, configure a webhook to receive notifications when jobs complete.
+
+#### Why Use Jobs & Webhooks?
+
+- **No Polling Required** - Get notified when crawls complete instead of constantly checking status
+- **Better Resource Usage** - Free up client connections while jobs run in the background
+- **Scalable Architecture** - Ideal for high-volume crawling with TypeScript/Node.js clients or microservices
+- **Reliable Delivery** - Automatic retry with exponential backoff (5 attempts: 1s → 2s → 4s → 8s → 16s)
+
+#### How It Works
+
+1. **Submit Job** → POST to `/crawl/job` with optional `webhook_config`
+2. **Get Task ID** → Receive a `task_id` immediately
+3. **Job Runs** → Crawl executes in the background
+4. **Webhook Fired** → Server POSTs completion notification to your webhook URL
+5. **Fetch Results** → If data wasn't included in webhook, GET `/crawl/job/{task_id}`
+
+#### Quick Example
+
+```bash
+# Submit a crawl job with webhook notification
+curl -X POST http://localhost:11235/crawl/job \
+  -H "Content-Type: application/json" \
+  -d '{
+    "urls": ["https://example.com"],
+    "webhook_config": {
+      "webhook_url": "https://myapp.com/webhooks/crawl-complete",
+      "webhook_data_in_payload": false
+    }
+  }'
+
+# Response: {"task_id": "crawl_a1b2c3d4"}
+```
+
+**Your webhook receives:**
+```json
+{
+  "task_id": "crawl_a1b2c3d4",
+  "task_type": "crawl",
+  "status": "completed",
+  "timestamp": "2025-10-21T10:30:00.000000+00:00",
+  "urls": ["https://example.com"]
+}
+```
+
+Then fetch the results:
+```bash
+curl http://localhost:11235/crawl/job/crawl_a1b2c3d4
+```
+
+#### Include Data in Webhook
+
+Set `webhook_data_in_payload: true` to receive the full crawl results directly in the webhook:
+
+```bash
+curl -X POST http://localhost:11235/crawl/job \
+  -H "Content-Type: application/json" \
+  -d '{
+    "urls": ["https://example.com"],
+    "webhook_config": {
+      "webhook_url": "https://myapp.com/webhooks/crawl-complete",
+      "webhook_data_in_payload": true
+    }
+  }'
+```
+
+**Your webhook receives the complete data:**
+```json
+{
+  "task_id": "crawl_a1b2c3d4",
+  "task_type": "crawl",
+  "status": "completed",
+  "timestamp": "2025-10-21T10:30:00.000000+00:00",
+  "urls": ["https://example.com"],
+  "data": {
+    "markdown": "...",
+    "html": "...",
+    "links": {...},
+    "metadata": {...}
+  }
+}
+```
+
+#### Webhook Authentication
+
+Add custom headers for authentication:
+
+```json
+{
+  "urls": ["https://example.com"],
+  "webhook_config": {
+    "webhook_url": "https://myapp.com/webhooks/crawl",
+    "webhook_data_in_payload": false,
+    "webhook_headers": {
+      "X-Webhook-Secret": "your-secret-token",
+      "X-Service-ID": "crawl4ai-prod"
+    }
+  }
+}
+```
+
+#### Global Default Webhook
+
+Configure a default webhook URL in `config.yml` for all jobs:
+
+```yaml
+webhooks:
+  enabled: true
+  default_url: "https://myapp.com/webhooks/default"
+  data_in_payload: false
+  retry:
+    max_attempts: 5
+    initial_delay_ms: 1000
+    max_delay_ms: 32000
+    timeout_ms: 30000
+```
+
+Now jobs without `webhook_config` automatically use the default webhook.
+
+#### Job Status Polling (Without Webhooks)
+
+If you prefer polling instead of webhooks, just omit `webhook_config`:
+
+```bash
+# Submit job
+curl -X POST http://localhost:11235/crawl/job \
+  -H "Content-Type: application/json" \
+  -d '{"urls": ["https://example.com"]}'
+# Response: {"task_id": "crawl_xyz"}
+
+# Poll for status
+curl http://localhost:11235/crawl/job/crawl_xyz
+```
+
+The response includes `status` field: `"processing"`, `"completed"`, or `"failed"`.
+
+> 💡 **Pro tip**: See [WEBHOOK_EXAMPLES.md](./WEBHOOK_EXAMPLES.md) for detailed examples including TypeScript client code, Flask webhook handlers, and failure handling.
+
 ---
 
 ## Metrics & Monitoring
@@ -826,10 +967,11 @@ We're here to help you succeed with Crawl4AI! Here's how to get support:
 
 In this guide, we've covered everything you need to get started with Crawl4AI's Docker deployment:
 - Building and running the Docker container
-- Configuring the environment  
+- Configuring the environment
 - Using the interactive playground for testing
 - Making API requests with proper typing
 - Using the Python SDK
+- Asynchronous job queues with webhook notifications
 - Leveraging specialized endpoints for screenshots, PDFs, and JavaScript execution
 - Connecting via the Model Context Protocol (MCP)
 - Monitoring your deployment

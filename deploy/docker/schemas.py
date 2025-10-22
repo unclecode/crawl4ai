@@ -1,6 +1,6 @@
 from typing import List, Optional, Dict
 from enum import Enum
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, HttpUrl
 from utils import FilterType
 
 
@@ -86,3 +86,21 @@ class JSEndpointRequest(BaseModel):
         ...,
         description="List of separated JavaScript snippets to execute"
     )
+
+
+class WebhookConfig(BaseModel):
+    """Configuration for webhook notifications."""
+    webhook_url: HttpUrl
+    webhook_data_in_payload: bool = False
+    webhook_headers: Optional[Dict[str, str]] = None
+
+
+class WebhookPayload(BaseModel):
+    """Payload sent to webhook endpoints."""
+    task_id: str
+    task_type: str  # "crawl", "llm_extraction", etc.
+    status: str  # "completed" or "failed"
+    timestamp: str  # ISO 8601 format
+    urls: List[str]
+    error: Optional[str] = None
+    data: Optional[Dict] = None  # Included only if webhook_data_in_payload=True

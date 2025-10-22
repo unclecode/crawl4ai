@@ -12,6 +12,7 @@ from api import (
     handle_crawl_job,
     handle_task_status,
 )
+from schemas import WebhookConfig
 
 # ------------- dependency placeholders -------------
 _redis = None        # will be injected from server.py
@@ -37,6 +38,7 @@ class LlmJobPayload(BaseModel):
     schema: Optional[str] = None
     cache:  bool = False
     provider: Optional[str] = None
+    webhook_config: Optional[WebhookConfig] = None
     temperature: Optional[float] = None
     base_url: Optional[str] = None
 
@@ -45,6 +47,7 @@ class CrawlJobPayload(BaseModel):
     urls:           list[HttpUrl]
     browser_config: Dict = {}
     crawler_config: Dict = {}
+    webhook_config: Optional[WebhookConfig] = None
 
 
 # ---------- LL​M job ---------------------------------------------------------
@@ -55,6 +58,10 @@ async def llm_job_enqueue(
         request: Request,
         _td: Dict = Depends(lambda: _token_dep()),   # late-bound dep
 ):
+    webhook_config = None
+    if payload.webhook_config:
+        webhook_config = payload.webhook_config.model_dump(mode='json')
+
     return await handle_llm_request(
         _redis,
         background_tasks,
@@ -65,6 +72,7 @@ async def llm_job_enqueue(
         cache=payload.cache,
         config=_config,
         provider=payload.provider,
+        webhook_config=webhook_config,
         temperature=payload.temperature,
         api_base_url=payload.base_url,
     )
@@ -86,6 +94,10 @@ async def crawl_job_enqueue(
         background_tasks: BackgroundTasks,
         _td: Dict = Depends(lambda: _token_dep()),
 ):
+    webhook_config = None
+    if payload.webhook_config:
+        webhook_config = payload.webhook_config.model_dump(mode='json')
+
     return await handle_crawl_job(
         _redis,
         background_tasks,
@@ -93,6 +105,7 @@ async def crawl_job_enqueue(
         payload.browser_config,
         payload.crawler_config,
         config=_config,
+        webhook_config=webhook_config,
     )
 
 
