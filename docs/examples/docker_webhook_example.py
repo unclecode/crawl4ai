@@ -2,11 +2,16 @@
 Docker Webhook Example for Crawl4AI
 
 This example demonstrates how to use webhooks with the Crawl4AI job queue API.
-Instead of polling for results, webhooks notify your application when crawls complete.
+Instead of polling for results, webhooks notify your application when jobs complete.
+
+Supports both:
+- /crawl/job - Raw crawling with markdown extraction
+- /llm/job - LLM-powered content extraction
 
 Prerequisites:
-1. Crawl4AI Docker container running on localhost:11235
+1. Crawl4AI Docker container running on localhost:11234
 2. Flask installed: pip install flask requests
+3. LLM API key configured in .llm.env (for LLM extraction examples)
 
 Usage:
 1. Run this script: python docker_webhook_example.py
@@ -21,7 +26,7 @@ from flask import Flask, request, jsonify
 from threading import Thread
 
 # Configuration
-CRAWL4AI_BASE_URL = "http://localhost:11235"
+CRAWL4AI_BASE_URL = "http://localhost:11234"
 WEBHOOK_BASE_URL = "http://localhost:8080"  # Your webhook receiver URL
 
 # Initialize Flask app for webhook receiver
@@ -88,6 +93,64 @@ def handle_crawl_webhook():
     return jsonify({"status": "received"}), 200
 
 
+@app.route('/webhooks/llm-complete', methods=['POST'])
+def handle_llm_webhook():
+    """
+    Webhook handler that receives notifications when LLM extraction jobs complete.
+
+    Payload structure:
+    {
+        "task_id": "llm_1698765432_12345",
+        "task_type": "llm_extraction",
+        "status": "completed" or "failed",
+        "timestamp": "2025-10-21T10:30:00.000000+00:00",
+        "urls": ["https://example.com/article"],
+        "error": "error message" (only if failed),
+        "data": {"extracted_content": {...}} (only if webhook_data_in_payload=True)
+    }
+    """
+    payload = request.json
+    print(f"\n{'='*60}")
+    print(f"🤖 LLM Webhook received for task: {payload['task_id']}")
+    print(f"   Task Type: {payload['task_type']}")
+    print(f"   Status: {payload['status']}")
+    print(f"   Timestamp: {payload['timestamp']}")
+    print(f"   URL: {payload['urls'][0]}")
+
+    if payload['status'] == 'completed':
+        # If data is in payload, process it directly
+        if 'data' in payload:
+            print(f"   ✅ Data included in webhook")
+            data = payload['data']
+            # Webhook wraps extracted content in 'extracted_content' field
+            extracted = data.get('extracted_content', {})
+            print(f"      - Extracted content:")
+            print(f"        {json.dumps(extracted, indent=8)}")
+        else:
+            # Fetch results from API if not included
+            print(f"   📥 Fetching results from API...")
+            task_id = payload['task_id']
+            result_response = requests.get(f"{CRAWL4AI_BASE_URL}/llm/job/{task_id}")
+            if result_response.ok:
+                data = result_response.json()
+                print(f"   ✅ Results fetched successfully")
+                # API returns unwrapped content in 'result' field
+                extracted = data['result']
+                print(f"      - Extracted content:")
+                print(f"        {json.dumps(extracted, indent=8)}")
+
+    elif payload['status'] == 'failed':
+        print(f"   ❌ Job failed: {payload.get('error', 'Unknown error')}")
+
+    print(f"{'='*60}\n")
+
+    # Store webhook for demonstration
+    received_webhooks.append(payload)
+
+    # Return 200 OK to acknowledge receipt
+    return jsonify({"status": "received"}), 200
+
+
 def start_webhook_server():
     """Start the Flask webhook server in a separate thread"""
     app.run(host='0.0.0.0', port=8080, debug=False, use_reloader=False)
@@ -126,6 +189,66 @@ def submit_crawl_job_with_webhook(urls, webhook_url, include_data=False):
 
     response = requests.post(
         f"{CRAWL4AI_BASE_URL}/crawl/job",
+        json=payload,
+        headers={"Content-Type": "application/json"}
+    )
+
+    if response.ok:
+        data = response.json()
+        task_id = data['task_id']
+        print(f"   ✅ Job submitted successfully")
+        print(f"   Task ID: {task_id}")
+        return task_id
+    else:
+        print(f"   ❌ Failed to submit job: {response.text}")
+        return None
+
+
+def submit_llm_job_with_webhook(url, query, webhook_url, include_data=False, schema=None, provider=None):
+    """
+    Submit an LLM extraction job with webhook notification.
+
+    Args:
+        url: URL to extract content from
+        query: Instruction for the LLM (e.g., "Extract article title and author")
+        webhook_url: URL to receive webhook notifications
+        include_data: Whether to include full results in webhook payload
+        schema: Optional JSON schema for structured extraction
+        provider: Optional LLM provider (e.g., "openai/gpt-4o-mini")
+
+    Returns:
+        task_id: The job's task identifier
+    """
+    payload = {
+        "url": url,
+        "q": query,
+        "cache": False,
+        "webhook_config": {
+            "webhook_url": webhook_url,
+            "webhook_data_in_payload": include_data,
+            # Optional: Add custom headers for authentication
+            # "webhook_headers": {
+            #     "X-Webhook-Secret": "your-secret-token"
+            # }
+        }
+    }
+
+    if schema:
+        payload["schema"] = schema
+
+    if provider:
+        payload["provider"] = provider
+
+    print(f"\n🤖 Submitting LLM extraction job...")
+    print(f"   URL: {url}")
+    print(f"   Query: {query}")
+    print(f"   Webhook: {webhook_url}")
+    print(f"   Include data: {include_data}")
+    if provider:
+        print(f"   Provider: {provider}")
+
+    response = requests.post(
+        f"{CRAWL4AI_BASE_URL}/llm/job",
         json=payload,
         headers={"Content-Type": "application/json"}
     )
@@ -221,7 +344,7 @@ def main():
     except:
         print(f"❌ Cannot connect to Crawl4AI at {CRAWL4AI_BASE_URL}")
         print("   Please make sure Docker container is running:")
-        print("   docker run -d -p 11235:11235 --name crawl4ai unclecode/crawl4ai:latest")
+        print("   docker run -d -p 11234:11234 --name crawl4ai unclecode/crawl4ai:latest")
         return
 
     # Start webhook server in background thread
@@ -251,34 +374,87 @@ def main():
         include_data=True
     )
 
-    # Example 3: Traditional polling (no webhook)
+    # Example 3: LLM extraction with webhook (notification only)
     time.sleep(5)  # Wait a bit between requests
     print(f"\n{'='*60}")
-    print("Example 3: Traditional Polling (No Webhook)")
+    print("Example 3: LLM Extraction with Webhook (Notification Only)")
     print(f"{'='*60}")
-    task_id_3 = submit_job_without_webhook(
+    task_id_3 = submit_llm_job_with_webhook(
+        url="https://www.example.com",
+        query="Extract the main heading and description from this page.",
+        webhook_url=f"{WEBHOOK_BASE_URL}/webhooks/llm-complete",
+        include_data=False,
+        provider="openai/gpt-4o-mini"
+    )
+
+    # Example 4: LLM extraction with webhook (data included + schema)
+    time.sleep(5)  # Wait a bit between requests
+    print(f"\n{'='*60}")
+    print("Example 4: LLM Extraction with Schema and Full Data")
+    print(f"{'='*60}")
+
+    # Define a schema for structured extraction
+    schema = json.dumps({
+        "type": "object",
+        "properties": {
+            "title": {"type": "string", "description": "Page title"},
+            "description": {"type": "string", "description": "Page description"}
+        },
+        "required": ["title"]
+    })
+
+    task_id_4 = submit_llm_job_with_webhook(
+        url="https://www.python.org",
+        query="Extract the title and description of this website",
+        webhook_url=f"{WEBHOOK_BASE_URL}/webhooks/llm-complete",
+        include_data=True,
+        schema=schema,
+        provider="openai/gpt-4o-mini"
+    )
+
+    # Example 5: Traditional polling (no webhook)
+    time.sleep(5)  # Wait a bit between requests
+    print(f"\n{'='*60}")
+    print("Example 5: Traditional Polling (No Webhook)")
+    print(f"{'='*60}")
+    task_id_5 = submit_job_without_webhook(
         urls=["https://github.com"]
     )
-    if task_id_3:
-        result = poll_job_status(task_id_3)
+    if task_id_5:
+        result = poll_job_status(task_id_5)
         if result and result.get('status') == 'completed':
             print(f"   ✅ Results retrieved via polling")
 
     # Wait for webhooks to arrive
     print(f"\n⏳ Waiting for webhooks to be received...")
-    time.sleep(20)  # Give jobs time to complete and webhooks to arrive
+    time.sleep(30)  # Give jobs time to complete and webhooks to arrive (longer for LLM)
 
     # Summary
     print(f"\n{'='*60}")
     print("Summary")
     print(f"{'='*60}")
     print(f"Total webhooks received: {len(received_webhooks)}")
+
+    crawl_webhooks = [w for w in received_webhooks if w['task_type'] == 'crawl']
+    llm_webhooks = [w for w in received_webhooks if w['task_type'] == 'llm_extraction']
+
+    print(f"\n📊 Breakdown:")
+    print(f"   - Crawl webhooks: {len(crawl_webhooks)}")
+    print(f"   - LLM extraction webhooks: {len(llm_webhooks)}")
+
+    print(f"\n📋 Details:")
     for i, webhook in enumerate(received_webhooks, 1):
-        print(f"{i}. Task {webhook['task_id']}: {webhook['status']}")
+        task_type = webhook['task_type']
+        icon = "🕷️" if task_type == "crawl" else "🤖"
+        print(f"{i}. {icon} Task {webhook['task_id']}: {webhook['status']} ({task_type})")
 
     print(f"\n✅ Demo completed!")
-    print(f"\n💡 Pro tip: In production, your webhook URL should be publicly accessible")
-    print(f"   (e.g., https://myapp.com/webhooks/crawl) or use a service like ngrok for testing.")
+    print(f"\n💡 Pro tips:")
+    print(f"   - In production, your webhook URL should be publicly accessible")
+    print(f"     (e.g., https://myapp.com/webhooks) or use ngrok for testing")
+    print(f"   - Both /crawl/job and /llm/job support the same webhook configuration")
+    print(f"   - Use webhook_data_in_payload=true to get results directly in the webhook")
+    print(f"   - LLM jobs may take longer, adjust timeouts accordingly")
 
 
 if __name__ == "__main__":

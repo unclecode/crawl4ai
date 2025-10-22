@@ -38,6 +38,7 @@ class LlmJobPayload(BaseModel):
     schema: Optional[str] = None
     cache:  bool = False
     provider: Optional[str] = None
+    webhook_config: Optional[WebhookConfig] = None
 
 
 class CrawlJobPayload(BaseModel):
@@ -55,6 +56,10 @@ async def llm_job_enqueue(
         request: Request,
         _td: Dict = Depends(lambda: _token_dep()),   # late-bound dep
 ):
+    webhook_config = None
+    if payload.webhook_config:
+        webhook_config = payload.webhook_config.model_dump(mode='json')
+
     return await handle_llm_request(
         _redis,
         background_tasks,
@@ -65,6 +70,7 @@ async def llm_job_enqueue(
         cache=payload.cache,
         config=_config,
         provider=payload.provider,
+        webhook_config=webhook_config,
     )
 
 
@@ -74,7 +80,7 @@ async def llm_job_status(
     task_id: str,
     _td: Dict = Depends(lambda: _token_dep())
 ):
-    return await handle_task_status(_redis, task_id)
+    return await handle_task_status(_redis, task_id, base_url=str(request.base_url))
 
 
 # ---------- CRAWL job -------------------------------------------------------

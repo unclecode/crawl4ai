@@ -116,9 +116,13 @@ async def process_llm_extraction(
     instruction: str,
     schema: Optional[str] = None,
     cache: str = "0",
-    provider: Optional[str] = None
+    provider: Optional[str] = None,
+    webhook_config: Optional[Dict] = None
 ) -> None:
     """Process LLM extraction in background."""
+    # Initialize webhook service
+    webhook_service = WebhookDeliveryService(config)
+
     try:
         # Validate provider
         is_valid, error_msg = validate_llm_provider(config, provider)
@@ -127,6 +131,16 @@ async def process_llm_extraction(
                 "status": TaskStatus.FAILED,
                 "error": error_msg
             })
+
+            # Send webhook notification on failure
+            await webhook_service.notify_job_completion(
+                task_id=task_id,
+                task_type="llm_extraction",
+                status="failed",
+                urls=[url],
+                webhook_config=webhook_config,
+                error=error_msg
+            )
             return
         api_key = get_llm_api_key(config, provider)
         llm_strategy = LLMExtractionStrategy(
@@ -155,16 +169,39 @@ async def process_llm_extraction(
                 "status": TaskStatus.FAILED,
                 "error": result.error_message
             })
+
+            # Send webhook notification on failure
+            await webhook_service.notify_job_completion(
+                task_id=task_id,
+                task_type="llm_extraction",
+                status="failed",
+                urls=[url],
+                webhook_config=webhook_config,
+                error=result.error_message
+            )
             return
 
         try:
             content = json.loads(result.extracted_content)
         except json.JSONDecodeError:
             content = result.extracted_content
+
+        result_data = {"extracted_content": content}
+
         await redis.hset(f"task:{task_id}", mapping={
             "status": TaskStatus.COMPLETED,
             "result": json.dumps(content)
         })
+
+        # Send webhook notification on successful completion
+        await webhook_service.notify_job_completion(
+            task_id=task_id,
+            task_type="llm_extraction",
+            status="completed",
+            urls=[url],
+            webhook_config=webhook_config,
+            result=result_data
+        )
 
     except Exception as e:
         logger.error(f"LLM extraction error: {str(e)}", exc_info=True)
@@ -172,6 +209,16 @@ async def process_llm_extraction(
             "status": TaskStatus.FAILED,
             "error": str(e)
         })
+
+        # Send webhook notification on failure
+        await webhook_service.notify_job_completion(
+            task_id=task_id,
+            task_type="llm_extraction",
+            status="failed",
+            urls=[url],
+            webhook_config=webhook_config,
+            error=str(e)
+        )
 
 async def handle_markdown_request(
     url: str,
@@ -249,7 +296,8 @@ async def handle_llm_request(
     schema: Optional[str] = None,
     cache: str = "0",
     config: Optional[dict] = None,
-    provider: Optional[str] = None
+    provider: Optional[str] = None,
+    webhook_config: Optional[Dict] = None,
 ) -> JSONResponse:
     """Handle LLM extraction requests."""
     base_url = get_base_url(request)
@@ -280,7 +328,8 @@ async def handle_llm_request(
             cache,
             base_url,
             config,
-            provider
+            provider,
+            webhook_config
         )
 
     except Exception as e:
@@ -325,7 +374,8 @@ async def create_new_task(
     cache: str,
     base_url: str,
     config: dict,
-    provider: Optional[str] = None
+    provider: Optional[str] = None,
+    webhook_config: Optional[Dict] = None
 ) -> JSONResponse:
     """Create and initialize a new task."""
     decoded_url = unquote(input_path)
@@ -334,12 +384,18 @@ async def create_new_task(
 
     from datetime import datetime
     task_id = f"llm_{int(datetime.now().timestamp())}_{id(background_tasks)}"
-    
-    await redis.hset(f"task:{task_id}", mapping={
+
+    task_data = {
         "status": TaskStatus.PROCESSING,
         "created_at": datetime.now().isoformat(),
         "url": decoded_url
-    })
+    }
+
+    # Store webhook config if provided
+    if webhook_config:
+        task_data["webhook_config"] = json.dumps(webhook_config)
+
+    await redis.hset(f"task:{task_id}", mapping=task_data)
 
     background_tasks.add_task(
         process_llm_extraction,
@@ -350,7 +406,8 @@ async def create_new_task(
         query,
         schema,
         cache,
-        provider
+        provider,
+        webhook_config
     )
 
     return JSONResponse({

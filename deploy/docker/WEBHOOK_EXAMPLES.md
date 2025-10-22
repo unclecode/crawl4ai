@@ -164,9 +164,55 @@ curl -X POST http://localhost:11235/crawl/job \
 
 The webhook will be sent to the default URL configured in config.yml.
 
+### Example 6: LLM Extraction Job with Webhook
+
+Use webhooks with the LLM extraction endpoint for asynchronous processing.
+
+**Request:**
+```bash
+curl -X POST http://localhost:11235/llm/job \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://example.com/article",
+    "q": "Extract the article title, author, and publication date",
+    "schema": "{\"type\": \"object\", \"properties\": {\"title\": {\"type\": \"string\"}, \"author\": {\"type\": \"string\"}, \"date\": {\"type\": \"string\"}}}",
+    "cache": false,
+    "provider": "openai/gpt-4o-mini",
+    "webhook_config": {
+      "webhook_url": "https://myapp.com/webhooks/llm-complete",
+      "webhook_data_in_payload": true
+    }
+  }'
+```
+
+**Response:**
+```json
+{
+  "task_id": "llm_1698765432_12345"
+}
+```
+
+**Webhook Payload Received:**
+```json
+{
+  "task_id": "llm_1698765432_12345",
+  "task_type": "llm_extraction",
+  "status": "completed",
+  "timestamp": "2025-10-21T10:30:00.000000+00:00",
+  "urls": ["https://example.com/article"],
+  "data": {
+    "extracted_content": {
+      "title": "Understanding Web Scraping",
+      "author": "John Doe",
+      "date": "2025-10-21"
+    }
+  }
+}
+```
+
 ## Webhook Handler Example
 
-Here's a simple Python Flask webhook handler:
+Here's a simple Python Flask webhook handler that supports both crawl and LLM extraction jobs:
 
 ```python
 from flask import Flask, request, jsonify
@@ -179,23 +225,39 @@ def handle_crawl_webhook():
     payload = request.json
 
     task_id = payload['task_id']
+    task_type = payload['task_type']
     status = payload['status']
 
     if status == 'completed':
         # If data not in payload, fetch it
         if 'data' not in payload:
-            response = requests.get(f'http://localhost:11235/crawl/job/{task_id}')
+            # Determine endpoint based on task type
+            endpoint = 'crawl' if task_type == 'crawl' else 'llm'
+            response = requests.get(f'http://localhost:11235/{endpoint}/job/{task_id}')
             data = response.json()
         else:
             data = payload['data']
 
-        # Process the crawl data
-        print(f"Processing crawl results for {task_id}")
+        # Process based on task type
+        if task_type == 'crawl':
+            print(f"Processing crawl results for {task_id}")
+            # Handle crawl results
+            results = data.get('results', [])
+            for result in results:
+                print(f"  - {result.get('url')}: {len(result.get('markdown', ''))} chars")
+
+        elif task_type == 'llm_extraction':
+            print(f"Processing LLM extraction for {task_id}")
+            # Handle LLM extraction
+            # Note: Webhook sends 'extracted_content', API returns 'result'
+            extracted = data.get('extracted_content', data.get('result', {}))
+            print(f"  - Extracted: {extracted}")
+
         # Your business logic here...
 
     elif status == 'failed':
         error = payload.get('error', 'Unknown error')
-        print(f"Crawl job {task_id} failed: {error}")
+        print(f"{task_type} job {task_id} failed: {error}")
         # Handle failure...
 
     return jsonify({"status": "received"}), 200
@@ -227,6 +289,7 @@ The webhook delivery service uses exponential backoff retry logic:
 4. **Flexible** - Choose between notification-only or full data delivery
 5. **Secure** - Support for custom headers for authentication
 6. **Configurable** - Global defaults or per-job configuration
+7. **Universal Support** - Works with both `/crawl/job` and `/llm/job` endpoints
 
 ## TypeScript Client Example
 
@@ -244,6 +307,15 @@ interface CrawlJobRequest {
   webhook_config?: WebhookConfig;
 }
 
+interface LLMJobRequest {
+  url: string;
+  q: string;
+  schema?: string;
+  cache?: boolean;
+  provider?: string;
+  webhook_config?: WebhookConfig;
+}
+
 async function createCrawlJob(request: CrawlJobRequest) {
   const response = await fetch('http://localhost:11235/crawl/job', {
     method: 'POST',
@@ -255,12 +327,37 @@ async function createCrawlJob(request: CrawlJobRequest) {
   return task_id;
 }
 
-// Usage
-const taskId = await createCrawlJob({
+async function createLLMJob(request: LLMJobRequest) {
+  const response = await fetch('http://localhost:11235/llm/job', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request)
+  });
+
+  const { task_id } = await response.json();
+  return task_id;
+}
+
+// Usage - Crawl Job
+const crawlTaskId = await createCrawlJob({
   urls: ['https://example.com'],
   webhook_config: {
     webhook_url: 'https://myapp.com/webhooks/crawl-complete',
     webhook_data_in_payload: false,
+    webhook_headers: {
+      'X-Webhook-Secret': 'my-secret'
+    }
+  }
+});
+
+// Usage - LLM Extraction Job
+const llmTaskId = await createLLMJob({
+  url: 'https://example.com/article',
+  q: 'Extract the main points from this article',
+  provider: 'openai/gpt-4o-mini',
+  webhook_config: {
+    webhook_url: 'https://myapp.com/webhooks/llm-complete',
+    webhook_data_in_payload: true,
     webhook_headers: {
       'X-Webhook-Secret': 'my-secret'
     }

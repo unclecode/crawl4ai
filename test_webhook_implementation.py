@@ -14,7 +14,8 @@ import json
 from datetime import datetime, timezone
 
 # Add deploy/docker to path to import modules
-sys.path.insert(0, '/home/user/crawl4ai/deploy/docker')
+# sys.path.insert(0, '/home/user/crawl4ai/deploy/docker')
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'deploy', 'docker'))
 
 def test_imports():
     """Test that all webhook-related modules can be imported"""
@@ -237,7 +238,8 @@ def test_api_integration():
 
     try:
         # Check if api.py can import webhook module
-        with open('/home/user/crawl4ai/deploy/docker/api.py', 'r') as f:
+        api_path = os.path.join(os.path.dirname(__file__), 'deploy', 'docker', 'api.py')
+        with open(api_path, 'r') as f:
             api_content = f.read()
 
         if 'from webhook import WebhookDeliveryService' in api_content:
