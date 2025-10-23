@@ -138,61 +138,80 @@ class AppDetailPage {
             }
         }
 
+        // Integration tab - use integration_guide field from database
+        const integrationDiv = document.getElementById('app-integration');
+        if (integrationDiv) {
+            if (this.appData.integration_guide) {
+                integrationDiv.innerHTML = this.renderMarkdown(this.appData.integration_guide);
+                // Add copy buttons to all code blocks
+                this.addCopyButtonsToCodeBlocks(integrationDiv);
+            } else {
+                integrationDiv.innerHTML = '<p>Integration guide not yet available. Please check the official website for details.</p>';
+            }
+        }
+
         // Documentation tab - use documentation field from database
         const docsDiv = document.getElementById('app-docs');
         if (docsDiv) {
             if (this.appData.documentation) {
                 docsDiv.innerHTML = this.renderMarkdown(this.appData.documentation);
+                // Add copy buttons to all code blocks
+                this.addCopyButtonsToCodeBlocks(docsDiv);
             } else {
                 docsDiv.innerHTML = '<p>Documentation coming soon.</p>';
             }
         }
-
-        // Integration tab - use integration_guide, installation_command, examples from database
-        this.renderIntegrationTab();
     }
 
-    renderIntegrationTab() {
-        // Installation code - use installation_command from database
-        const installCode = document.getElementById('install-code');
-        if (installCode) {
-            if (this.appData.installation_command) {
-                installCode.textContent = this.appData.installation_command;
-            } else {
-                // Fallback to generic installation
-                installCode.textContent = `# Installation instructions not yet available\n# Please check ${this.appData.website_url || 'the official website'} for details`;
-            }
-        }
+    addCopyButtonsToCodeBlocks(container) {
+        // Find all code blocks and add copy buttons
+        const codeBlocks = container.querySelectorAll('pre code');
+        codeBlocks.forEach(codeBlock => {
+            const pre = codeBlock.parentElement;
 
-        // Usage code - use examples field from database
-        const usageCode = document.getElementById('usage-code');
-        if (usageCode && this.appData.examples) {
-            // Extract first code block from examples if it contains multiple
-            const codeMatch = this.appData.examples.match(/```[\s\S]*?```/);
-            if (codeMatch) {
-                usageCode.textContent = codeMatch[0].replace(/```(\w+)?\n?/g, '').trim();
-            } else {
-                usageCode.textContent = this.appData.examples;
-            }
-        }
+            // Skip if already has a copy button
+            if (pre.querySelector('.copy-btn')) return;
 
-        // Complete integration - use integration_guide field from database
-        const integrationCode = document.getElementById('integration-code');
-        if (integrationCode) {
-            if (this.appData.integration_guide) {
-                integrationCode.textContent = this.appData.integration_guide;
-            } else {
-                // Fallback message
-                integrationCode.textContent = `# Integration guide not yet available for ${this.appData.name}\n\n# Please visit the admin panel to add integration instructions\n# Or check ${this.appData.website_url || 'the official website'} for integration details`;
-            }
-        }
+            // Create copy button
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'copy-btn';
+            copyBtn.textContent = 'Copy';
+            copyBtn.onclick = () => {
+                navigator.clipboard.writeText(codeBlock.textContent).then(() => {
+                    copyBtn.textContent = '✓ Copied!';
+                    setTimeout(() => {
+                        copyBtn.textContent = 'Copy';
+                    }, 2000);
+                });
+            };
+
+            // Add button to pre element
+            pre.style.position = 'relative';
+            pre.insertBefore(copyBtn, codeBlock);
+        });
     }
 
     renderMarkdown(text) {
         if (!text) return '';
 
-        // Simple markdown rendering (convert to HTML)
-        return text
+        // Store code blocks temporarily to protect them from processing
+        const codeBlocks = [];
+        let processed = text.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
+            const placeholder = `___CODE_BLOCK_${codeBlocks.length}___`;
+            codeBlocks.push(`<pre><code class="language-${lang || ''}">${this.escapeHtml(code)}</code></pre>`);
+            return placeholder;
+        });
+
+        // Store inline code temporarily
+        const inlineCodes = [];
+        processed = processed.replace(/`([^`]+)`/g, (match, code) => {
+            const placeholder = `___INLINE_CODE_${inlineCodes.length}___`;
+            inlineCodes.push(`<code>${this.escapeHtml(code)}</code>`);
+            return placeholder;
+        });
+
+        // Now process the rest of the markdown
+        processed = processed
             // Headers
             .replace(/^### (.*$)/gim, '<h3>$1</h3>')
             .replace(/^## (.*$)/gim, '<h2>$1</h2>')
@@ -203,10 +222,6 @@ class AppDetailPage {
             .replace(/\*(.*?)\*/g, '<em>$1</em>')
             // Links
             .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
-            // Code blocks
-            .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre><code class="language-$1">$2</code></pre>')
-            // Inline code
-            .replace(/`([^`]+)`/g, '<code>$1</code>')
             // Line breaks
             .replace(/\n\n/g, '</p><p>')
             .replace(/\n/g, '<br>')
@@ -216,6 +231,24 @@ class AppDetailPage {
             // Wrap in paragraphs
             .replace(/^(?!<[h|p|pre|ul|ol|li])/gim, '<p>')
             .replace(/(?<![>])$/gim, '</p>');
+
+        // Restore inline code
+        inlineCodes.forEach((code, i) => {
+            processed = processed.replace(`___INLINE_CODE_${i}___`, code);
+        });
+
+        // Restore code blocks
+        codeBlocks.forEach((block, i) => {
+            processed = processed.replace(`___CODE_BLOCK_${i}___`, block);
+        });
+
+        return processed;
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     formatNumber(num) {
@@ -242,33 +275,6 @@ class AppDetailPage {
                     content.classList.remove('active');
                 });
                 document.getElementById(`${tabName}-tab`).classList.add('active');
-            });
-        });
-
-        // Copy integration code
-        document.getElementById('copy-integration').addEventListener('click', () => {
-            const code = document.getElementById('integration-code').textContent;
-            navigator.clipboard.writeText(code).then(() => {
-                const btn = document.getElementById('copy-integration');
-                const originalText = btn.innerHTML;
-                btn.innerHTML = '<span>✓</span> Copied!';
-                setTimeout(() => {
-                    btn.innerHTML = originalText;
-                }, 2000);
-            });
-        });
-
-        // Copy code buttons
-        document.querySelectorAll('.copy-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const codeBlock = e.target.closest('.code-block');
-                const code = codeBlock.querySelector('code').textContent;
-                navigator.clipboard.writeText(code).then(() => {
-                    btn.textContent = 'Copied!';
-                    setTimeout(() => {
-                        btn.textContent = 'Copy';
-                    }, 2000);
-                });
             });
         });
     }

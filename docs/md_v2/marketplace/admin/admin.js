@@ -529,29 +529,19 @@ class AdminDashboard {
                     </label>
                 </div>
                 <div class="form-group full-width">
-                    <label>Long Description (Markdown - shown in Overview tab)</label>
-                    <textarea id="form-long-description" rows="8" placeholder="Detailed description with markdown formatting...">${app?.long_description || ''}</textarea>
-                    <small>Supports markdown: **bold**, *italic*, [links](url), # headers, etc.</small>
+                    <label>Long Description (Markdown - Overview tab)</label>
+                    <textarea id="form-long-description" rows="10" placeholder="Enter detailed description with markdown formatting...">${app?.long_description || ''}</textarea>
+                    <small>Markdown support: **bold**, *italic*, [links](url), # headers, code blocks, lists</small>
                 </div>
                 <div class="form-group full-width">
-                    <label>Installation Command (shown in Integration tab)</label>
-                    <textarea id="form-installation" rows="5" placeholder="pip install package-name\n# or installation steps...">${app?.installation_command || ''}</textarea>
+                    <label>Integration Guide (Markdown - Integration tab)</label>
+                    <textarea id="form-integration" rows="20" placeholder="Enter integration guide with installation, examples, and code snippets using markdown...">${app?.integration_guide || ''}</textarea>
+                    <small>Single markdown field with installation, examples, and complete guide. Code blocks get auto copy buttons.</small>
                 </div>
                 <div class="form-group full-width">
-                    <label>Examples (Code examples - shown in Integration tab)</label>
-                    <textarea id="form-examples" rows="10" placeholder="from package import module\n\n# Example usage\nresult = module.run()">${app?.examples || ''}</textarea>
-                </div>
-                <div class="form-group full-width">
-                    <label>Integration Guide (Complete guide - shown in Integration tab)</label>
-                    <textarea id="form-integration" rows="15" placeholder="# Complete integration guide with Crawl4AI\n\nfrom crawl4ai import AsyncWebCrawler\n...">${app?.integration_guide || ''}</textarea>
-                </div>
-                <div class="form-group full-width">
-                    <label>Documentation (Markdown - shown in Documentation tab)</label>
-                    <textarea id="form-documentation" rows="15" placeholder="# Documentation\n\n## Getting Started\n...">${app?.documentation || ''}</textarea>
-                </div>
-                <div class="form-group full-width">
-                    <label>Requirements</label>
-                    <textarea id="form-requirements" rows="4" placeholder="Python >= 3.8\ncrawl4ai >= 0.4.0">${app?.requirements || ''}</textarea>
+                    <label>Documentation (Markdown - Documentation tab)</label>
+                    <textarea id="form-documentation" rows="20" placeholder="Enter documentation with API reference, examples, and best practices using markdown...">${app?.documentation || ''}</textarea>
+                    <small>Full documentation with API reference, examples, best practices, etc.</small>
                 </div>
             </div>
         `;
@@ -734,11 +724,8 @@ class AdminDashboard {
             data.featured = document.getElementById('form-featured').checked ? 1 : 0;
             data.sponsored = document.getElementById('form-sponsored').checked ? 1 : 0;
             data.long_description = document.getElementById('form-long-description').value;
-            data.installation_command = document.getElementById('form-installation').value;
-            data.examples = document.getElementById('form-examples').value;
             data.integration_guide = document.getElementById('form-integration').value;
             data.documentation = document.getElementById('form-documentation').value;
-            data.requirements = document.getElementById('form-requirements').value;
         } else if (type === 'articles') {
             data.title = document.getElementById('form-title').value;
             data.slug = this.generateSlug(data.title);
