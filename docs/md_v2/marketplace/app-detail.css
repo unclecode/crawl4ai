@@ -510,6 +510,31 @@
     line-height: 1.5;
 }
 
+/* Markdown rendered code blocks */
+.integration-content pre,
+.docs-content pre {
+    background: var(--bg-dark);
+    border: 1px solid var(--border-color);
+    margin: 1rem 0;
+    padding: 1rem;
+    padding-top: 2.5rem; /* Space for copy button */
+    overflow-x: auto;
+    position: relative;
+    max-height: none; /* Remove any height restrictions */
+    height: auto; /* Allow content to expand */
+}
+
+.integration-content pre code,
+.docs-content pre code {
+    background: transparent;
+    padding: 0;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    line-height: 1.5;
+    white-space: pre; /* Preserve whitespace and line breaks */
+    display: block;
+}
+
 /* Feature Grid */
 .feature-grid {
     display: grid;
