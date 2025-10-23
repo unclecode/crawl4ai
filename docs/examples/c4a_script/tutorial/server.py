@@ -216,7 +216,7 @@ def get_examples():
             'name': 'Handle Cookie Banner',
             'description': 'Accept cookies and close newsletter popup',
             'script': '''# Handle cookie banner and newsletter
-GO http://127.0.0.1:8080/playground/
+GO http://127.0.0.1:8000/playground/
 WAIT `body` 2
 IF (EXISTS `.cookie-banner`) THEN CLICK `.accept`
 IF (EXISTS `.newsletter-popup`) THEN CLICK `.close`'''

@@ -57,7 +57,7 @@
 
 Crawl4AI is the #1 trending GitHub repository, actively maintained by a vibrant community. It delivers blazing-fast, AI-ready web crawling tailored for large language models, AI agents, and data pipelines. Fully open source, flexible, and built for real-time performance, **Crawl4AI** empowers developers with unmatched speed, precision, and deployment ease.
 
-> **Note**: If you're looking for the old documentation, you can access it [here](https://old.docs.crawl4ai.com).
+> Enjoy using Crawl4AI? Consider **[becoming a sponsor](https://github.com/sponsors/unclecode)** to support ongoing development and community growth!
 
 ## 🆕 AI Assistant Skill Now Available!
 
