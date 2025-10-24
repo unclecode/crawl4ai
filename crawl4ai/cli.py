@@ -36,6 +36,7 @@ from crawl4ai.config import USER_SETTINGS
 from litellm import completion
 from pathlib import Path
 
+from crawl4ai.firecrawl_backend import FirecrawlBackend
 
 # Initialize rich console
 console = Console()
@@ -1003,6 +1004,12 @@ def cdp_cmd(user_data_dir: Optional[str], port: int, browser_type: str, headless
 
 @cli.command("crawl")
 @click.argument("url", required=True)
+@click.option(
+    "--backend",
+    type=click.Choice(["default", "firecrawl"]),
+    default="default",
+    help="Choose crawling backend"
+)
 @click.option("--browser-config", "-B", type=click.Path(exists=True), help="Browser config file (YAML/JSON)")
 @click.option("--crawler-config", "-C", type=click.Path(exists=True), help="Crawler config file (YAML/JSON)")
 @click.option("--filter-config", "-f", type=click.Path(exists=True), help="Content filter config file")
@@ -1021,12 +1028,54 @@ def cdp_cmd(user_data_dir: Optional[str], port: int, browser_type: str, headless
 @click.option("--max-pages", type=int, default=10, help="Maximum number of pages to crawl in deep crawl mode")
 def crawl_cmd(url: str, browser_config: str, crawler_config: str, filter_config: str, 
            extraction_config: str, json_extract: str, schema: str, browser: Dict, crawler: Dict,
-           output: str, output_file: str, bypass_cache: bool, question: str, verbose: bool, profile: str, deep_crawl: str, max_pages: int):
+           output: str, output_file: str, bypass_cache: bool, question: str, verbose: bool, profile: str, deep_crawl: str, max_pages: int,  backend: str,):
     """Crawl a website and extract content
     
     Simple Usage:
         crwl crawl https://example.com
     """
+
+ # Firecrawl
+    if  backend == "firecrawl":
+       firecrawl_client = FirecrawlBackend(api_key="fc-fa43e06d8c1348b58200a39911a4ae9c")
+    docs = firecrawl_client.crawl(url)
+
+    if not docs:
+        click.echo("No documents returned by Firecrawl")
+        return
+
+    def extract_item(item):
+        if isinstance(item, dict):
+            return item.get("title", ""), item.get("content", "")
+        elif isinstance(item, (tuple, list)) and len(item) == 2:
+            return item[0], item[1]
+        else:
+            return "", str(item)
+
+    if output in ["all", "json"]:
+        import json
+        click.echo(json.dumps(docs, indent=2))
+
+    elif output in ["markdown", "md"]:
+        markdown_text = ""
+        for item in docs:
+            title, content = extract_item(item)
+            markdown_text += f"# {title}\n\n{content}\n\n"
+        click.echo(markdown_text)
+
+    elif output in ["markdown-fit", "md-fit"]:
+        markdown_text = ""
+        max_chars = 2000
+        for item in docs:
+            title, content = extract_item(item)
+            combined = f"# {title}\n\n{content}\n\n"
+            if len(markdown_text) + len(combined) > max_chars:
+                break
+            markdown_text += combined
+        click.echo(markdown_text)
+
+        return
+
     
     # Handle profile option
     if profile:
@@ -1405,7 +1454,7 @@ def profiles_cmd():
 @click.option("--max-pages", type=int, default=10, help="Maximum number of pages to crawl in deep crawl mode")
 def default(url: str, example: bool, browser_config: str, crawler_config: str, filter_config: str, 
         extraction_config: str, json_extract: str, schema: str, browser: Dict, crawler: Dict,
-        output: str, bypass_cache: bool, question: str, verbose: bool, profile: str, deep_crawl: str, max_pages: int):
+        output: str, bypass_cache: bool, question: str, verbose: bool, profile: str, deep_crawl: str, max_pages: int,  backend: str = "default",):
     """Crawl4AI CLI - Web content extraction tool
 
     Simple Usage:
@@ -1457,7 +1506,8 @@ def default(url: str, example: bool, browser_config: str, crawler_config: str, f
         verbose=verbose,
         profile=profile,
         deep_crawl=deep_crawl,
-        max_pages=max_pages
+        max_pages=max_pages,
+        backend=backend,
     )
 
 def main():
