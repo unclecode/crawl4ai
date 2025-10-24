@@ -369,6 +369,9 @@ class ManagedBrowser:
             ]
             if self.headless:
                 flags.append("--headless=new")
+            # Add viewport flag if specified in config
+            if self.browser_config.viewport_height and self.browser_config.viewport_width:
+                flags.append(f"--window-size={self.browser_config.viewport_width},{self.browser_config.viewport_height}")
             # merge common launch flags
             flags.extend(self.build_browser_flags(self.browser_config))
         elif self.browser_type == "firefox":
