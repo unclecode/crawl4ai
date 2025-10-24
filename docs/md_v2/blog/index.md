@@ -20,17 +20,43 @@ Ever wondered why your AI coding assistant struggles with your library despite c
 
 ## Latest Release
 
+### [Crawl4AI v0.7.6 – The Webhook Infrastructure Update](../blog/release-v0.7.6.md)
+*October 22, 2025*
+
+Crawl4AI v0.7.6 introduces comprehensive webhook support for the Docker job queue API, bringing real-time notifications to both crawling and LLM extraction workflows. No more polling!
+
+Key highlights:
+- **🪝 Complete Webhook Support**: Real-time notifications for both `/crawl/job` and `/llm/job` endpoints
+- **🔄 Reliable Delivery**: Exponential backoff retry mechanism (5 attempts: 1s → 2s → 4s → 8s → 16s)
+- **🔐 Custom Authentication**: Add custom headers for webhook authentication
+- **📊 Flexible Delivery**: Choose notification-only or include full data in payload
+- **⚙️ Global Configuration**: Set default webhook URL in config.yml for all jobs
+- **🎯 Zero Breaking Changes**: Fully backward compatible, webhooks are opt-in
+
+[Read full release notes →](../blog/release-v0.7.6.md)
+
+## Recent Releases
+
+### [Crawl4AI v0.7.5 – The Docker Hooks & Security Update](../blog/release-v0.7.5.md)
+*September 29, 2025*
+
+Crawl4AI v0.7.5 introduces the powerful Docker Hooks System for complete pipeline customization, enhanced LLM integration with custom providers, HTTPS preservation for modern web security, and resolves multiple community-reported issues.
+
+Key highlights:
+- **🔧 Docker Hooks System**: Custom Python functions at 8 key pipeline points for unprecedented customization
+- **🤖 Enhanced LLM Integration**: Custom providers with temperature control and base_url configuration
+- **🔒 HTTPS Preservation**: Secure internal link handling for modern web applications
+- **🐍 Python 3.10+ Support**: Modern language features and enhanced performance
+- **🛠️ Bug Fixes**: Resolved multiple community-reported issues including URL processing, JWT authentication, and proxy configuration
+
+[Read full release notes →](../blog/release-v0.7.5.md)
+
+## Recent Releases
+
 ### [Crawl4AI v0.7.4 – The Intelligent Table Extraction & Performance Update](../blog/release-v0.7.4.md)
 *August 17, 2025*
 
-Crawl4AI v0.7.4 introduces revolutionary LLM-powered table extraction with intelligent chunking, performance improvements for concurrent crawling, enhanced browser management, and critical stability fixes that make Crawl4AI more robust for production workloads.
-
-Key highlights:
-- **🚀 LLMTableExtraction**: Revolutionary table extraction with intelligent chunking for massive tables
-- **⚡ Dispatcher Bug Fix**: Fixed sequential processing issue in arun_many for fast-completing tasks
-- **🧹 Memory Management Refactor**: Streamlined memory utilities and better resource management
-- **🔧 Browser Manager Fixes**: Resolved race conditions in concurrent page creation
-- **🔗 Advanced URL Processing**: Better handling of raw URLs and base tag link resolution
+Revolutionary LLM-powered table extraction with intelligent chunking, performance improvements for concurrent crawling, enhanced browser management, and critical stability fixes.
 
 [Read full release notes →](../blog/release-v0.7.4.md)
 

@@ -1,17 +1,24 @@
 #!/usr/bin/env python3
 """
-🚀 Crawl4AI Docker Hooks System - Complete Examples
-====================================================
+🚀 Crawl4AI v0.7.5 - Docker Hooks System Complete Demonstration
+================================================================
 
-This file demonstrates the Docker Hooks System with three different approaches:
+This file demonstrates the NEW Docker Hooks System introduced in v0.7.5.
+
+The Docker Hooks System is a completely NEW feature that provides pipeline
+customization through user-provided Python functions. It offers three approaches:
 
 1. String-based hooks for REST API
 2. hooks_to_string() utility to convert functions
 3. Docker Client with automatic conversion (most convenient)
 
+All three approaches are part of this NEW v0.7.5 feature!
+
+Perfect for video recording and demonstration purposes.
+
 Requirements:
 - Docker container running: docker run -p 11235:11235 unclecode/crawl4ai:latest
-- crawl4ai installed: pip install crawl4ai
+- crawl4ai v0.7.5 installed: pip install crawl4ai==0.7.5
 """
 
 import asyncio
@@ -26,10 +33,11 @@ from crawl4ai.docker_client import Crawl4aiDockerClient
 
 # Configuration
 DOCKER_URL = "http://localhost:11235"
+# DOCKER_URL = "http://localhost:11234"
 TEST_URLS = [
+    # "https://httpbin.org/html",
     "https://www.kidocode.com",
     "https://quotes.toscrape.com",
-    "https://httpbin.org/html",
 ]
 
 
@@ -52,7 +60,7 @@ def check_docker_service() -> bool:
 
 
 # ============================================================================
-# REUSABLE HOOK LIBRARY
+# REUSABLE HOOK LIBRARY (NEW in v0.7.5)
 # ============================================================================
 
 async def performance_optimization_hook(page, context, **kwargs):
@@ -93,9 +101,10 @@ async def authentication_headers_hook(page, context, url, **kwargs):
     print(f"  [Hook] 🔐 Adding custom headers for {url[:50]}...")
 
     await page.set_extra_http_headers({
-        'X-Crawl4AI': 'docker-hooks',
-        'X-Custom-Hook': 'function-based',
+        'X-Crawl4AI-Version': '0.7.5',
+        'X-Custom-Hook': 'function-based-demo',
         'Accept-Language': 'en-US,en;q=0.9',
+        'User-Agent': 'Crawl4AI/0.7.5 (Educational Demo)'
     })
 
     print("  [Hook] ✓ Custom headers added")
@@ -149,17 +158,16 @@ async def page_analytics_hook(page, context, **kwargs):
 
 
 # ============================================================================
-# APPROACH 1: String-Based Hooks (REST API)
+# DEMO 1: String-Based Hooks (NEW Docker Hooks System)
 # ============================================================================
 
-def example_1_string_based_hooks():
+def demo_1_string_based_hooks():
     """
-    Demonstrate string-based hooks with REST API
-    Use this when working with REST API directly or non-Python clients
+    Demonstrate string-based hooks with REST API (part of NEW Docker Hooks System)
     """
     print_section(
-        "APPROACH 1: String-Based Hooks (REST API)",
-        "Define hooks as strings for REST API requests"
+        "DEMO 1: String-Based Hooks (REST API)",
+        "Part of the NEW Docker Hooks System - hooks as strings"
     )
 
     # Define hooks as strings
@@ -178,6 +186,7 @@ async def hook(page, context, url, **kwargs):
     print(f"  [String Hook] Navigating to {url[:50]}...")
     await page.set_extra_http_headers({
         'X-Crawl4AI': 'string-based-hooks',
+        'X-Demo': 'v0.7.5'
     })
     return page
 """,
@@ -193,7 +202,7 @@ async def hook(page, context, **kwargs):
 
     # Prepare request payload
     payload = {
-        "urls": [TEST_URLS[2]],  # httpbin.org
+        "urls": [TEST_URLS[0]],
         "hooks": {
             "code": hooks_config,
             "timeout": 30
@@ -203,7 +212,7 @@ async def hook(page, context, **kwargs):
         }
     }
 
-    print(f"🎯 Target URL: {TEST_URLS[2]}")
+    print(f"🎯 Target URL: {TEST_URLS[0]}")
     print(f"🔧 Configured {len(hooks_config)} string-based hooks")
     print(f"📡 Sending request to Docker API...\n")
 
@@ -253,29 +262,29 @@ async def hook(page, context, **kwargs):
         print(f"❌ Error: {str(e)}")
 
     print("\n" + "─" * 70)
-    print("✓ String-based hooks example complete\n")
+    print("✓ String-based hooks demo complete\n")
 
 
 # ============================================================================
-# APPROACH 2: Function-Based Hooks with hooks_to_string() Utility
+# DEMO 2: Function-Based Hooks with hooks_to_string() Utility
 # ============================================================================
 
-def example_2_hooks_to_string_utility():
+def demo_2_hooks_to_string_utility():
     """
-    Demonstrate the hooks_to_string() utility for converting functions
-    Use this when you want to write hooks as functions but use REST API
+    Demonstrate the new hooks_to_string() utility for converting functions
     """
     print_section(
-        "APPROACH 2: hooks_to_string() Utility",
+        "DEMO 2: hooks_to_string() Utility (NEW! ✨)",
         "Convert Python functions to strings for REST API"
     )
 
     print("📦 Creating hook functions...")
     print("   • performance_optimization_hook")
+    print("   • viewport_setup_hook")
     print("   • authentication_headers_hook")
     print("   • lazy_loading_handler_hook")
 
-    # Convert function objects to strings using the utility
+    # Convert function objects to strings using the NEW utility
     print("\n🔄 Converting functions to strings with hooks_to_string()...")
 
     hooks_dict = {
@@ -289,17 +298,17 @@ def example_2_hooks_to_string_utility():
     print(f"✅ Successfully converted {len(hooks_as_strings)} functions to strings")
 
     # Show a preview
-    print("\n📝 Sample converted hook (first 200 characters):")
+    print("\n📝 Sample converted hook (first 250 characters):")
     print("─" * 70)
     sample_hook = list(hooks_as_strings.values())[0]
-    print(sample_hook[:200] + "...")
+    print(sample_hook[:250] + "...")
     print("─" * 70)
 
     # Use the converted hooks with REST API
     print("\n📡 Using converted hooks with REST API...")
 
     payload = {
-        "urls": [TEST_URLS[2]],
+        "urls": [TEST_URLS[0]],
         "hooks": {
             "code": hooks_as_strings,
             "timeout": 30
@@ -334,20 +343,19 @@ def example_2_hooks_to_string_utility():
     print("   ✓ Works with any REST API client")
 
     print("\n" + "─" * 70)
-    print("✓ hooks_to_string() utility example complete\n")
+    print("✓ hooks_to_string() utility demo complete\n")
 
 
 # ============================================================================
-# APPROACH 3: Docker Client with Automatic Conversion (RECOMMENDED)
+# DEMO 3: Docker Client with Automatic Conversion (RECOMMENDED! 🌟)
 # ============================================================================
 
-async def example_3_docker_client_auto_conversion():
+async def demo_3_docker_client_auto_conversion():
     """
     Demonstrate Docker Client with automatic hook conversion (RECOMMENDED)
-    Use this for the best developer experience with Python
     """
     print_section(
-        "APPROACH 3: Docker Client with Auto-Conversion (RECOMMENDED)",
+        "DEMO 3: Docker Client with Auto-Conversion (RECOMMENDED! 🌟)",
         "Pass function objects directly - conversion happens automatically!"
     )
 
@@ -359,11 +367,12 @@ async def example_3_docker_client_auto_conversion():
     # Use our reusable hook library - just pass the function objects!
     print("📚 Using reusable hook library:")
     print("   • performance_optimization_hook")
+    print("   • viewport_setup_hook")
     print("   • authentication_headers_hook")
     print("   • lazy_loading_handler_hook")
     print("   • page_analytics_hook")
 
-    print("\n🎯 Target URL: " + TEST_URLS[0])
+    print("\n🎯 Target URL: " + TEST_URLS[1])
     print("🚀 Starting crawl with automatic hook conversion...\n")
 
     try:
@@ -397,7 +406,8 @@ async def example_3_docker_client_auto_conversion():
             # Show metadata
             if result.metadata:
                 print(f"\n📋 Metadata:")
-                print(f"   • Title: {result.metadata.get('title', 'N/A')[:50]}...")
+                print(f"   • Title: {result.metadata.get('title', 'N/A')}")
+                print(f"   • Description: {result.metadata.get('description', 'N/A')}")
 
             # Show links
             if result.links:
@@ -425,91 +435,114 @@ async def example_3_docker_client_auto_conversion():
     print("   ✓ Async/await support")
 
     print("\n" + "─" * 70)
-    print("✓ Docker Client auto-conversion example complete\n")
+    print("✓ Docker Client auto-conversion demo complete\n")
 
 
 # ============================================================================
-# APPROACH 4: Authentication Example
+# DEMO 4: Advanced Use Case - Complete Hook Pipeline
 # ============================================================================
 
-def example_4_authentication_flow():
+async def demo_4_complete_hook_pipeline():
     """
-    Demonstrate authentication flow with multiple hooks
+    Demonstrate a complete hook pipeline using all 8 hook points
     """
     print_section(
-        "EXAMPLE 4: Authentication Flow",
-        "Using hooks for authentication with cookies and headers"
+        "DEMO 4: Complete Hook Pipeline",
+        "Using all 8 available hook points for comprehensive control"
     )
 
-    hooks_code = {
-        "on_page_context_created": """
-async def hook(page, context, **kwargs):
-    print("[HOOK] Setting up authentication context")
+    # Define all 8 hooks
+    async def on_browser_created_hook(browser, **kwargs):
+        """Hook 1: Called after browser is created"""
+        print("  [Pipeline] 1/8 Browser created")
+        return browser
 
-    # Add authentication cookies
-    await context.add_cookies([
-        {
-            "name": "auth_token",
-            "value": "fake_jwt_token_here",
-            "domain": ".httpbin.org",
-            "path": "/",
-            "httpOnly": True,
-            "secure": True
-        }
-    ])
+    async def on_page_context_created_hook(page, context, **kwargs):
+        """Hook 2: Called after page context is created"""
+        print("  [Pipeline] 2/8 Page context created - setting up...")
+        await page.set_viewport_size({"width": 1920, "height": 1080})
+        return page
 
-    return page
-""",
+    async def on_user_agent_updated_hook(page, context, user_agent, **kwargs):
+        """Hook 3: Called when user agent is updated"""
+        print(f"  [Pipeline] 3/8 User agent updated: {user_agent[:50]}...")
+        return page
 
-        "before_goto": """
-async def hook(page, context, url, **kwargs):
-    print(f"[HOOK] Adding auth headers for {url}")
+    async def before_goto_hook(page, context, url, **kwargs):
+        """Hook 4: Called before navigating to URL"""
+        print(f"  [Pipeline] 4/8 Before navigation to: {url[:60]}...")
+        return page
 
-    # Add Authorization header
-    import base64
-    credentials = base64.b64encode(b"user:passwd").decode('ascii')
+    async def after_goto_hook(page, context, url, response, **kwargs):
+        """Hook 5: Called after navigation completes"""
+        print(f"  [Pipeline] 5/8 After navigation - Status: {response.status if response else 'N/A'}")
+        await page.wait_for_timeout(1000)
+        return page
 
-    await page.set_extra_http_headers({
-        'Authorization': f'Basic {credentials}',
-        'X-API-Key': 'test-api-key-123'
-    })
+    async def on_execution_started_hook(page, context, **kwargs):
+        """Hook 6: Called when JavaScript execution starts"""
+        print("  [Pipeline] 6/8 JavaScript execution started")
+        return page
 
-    return page
-"""
-    }
+    async def before_retrieve_html_hook(page, context, **kwargs):
+        """Hook 7: Called before retrieving HTML"""
+        print("  [Pipeline] 7/8 Before HTML retrieval - scrolling...")
+        await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+        return page
 
-    payload = {
-        "urls": ["https://httpbin.org/basic-auth/user/passwd"],
-        "hooks": {
-            "code": hooks_code,
-            "timeout": 15
-        }
-    }
+    async def before_return_html_hook(page, context, html, **kwargs):
+        """Hook 8: Called before returning HTML"""
+        print(f"  [Pipeline] 8/8 Before return - HTML length: {len(html):,} chars")
+        return page
 
-    print("\nTesting authentication with httpbin endpoints...")
-    response = requests.post(f"{DOCKER_URL}/crawl", json=payload)
+    print("🎯 Target URL: " + TEST_URLS[0])
+    print("🔧 Configured ALL 8 hook points for complete pipeline control\n")
 
-    if response.status_code == 200:
-        data = response.json()
-        print("✅ Authentication test completed")
+    client = Crawl4aiDockerClient(base_url=DOCKER_URL)
 
-        if 'results' in data:
-            for i, result in enumerate(data['results']):
-                print(f"\n  URL {i+1}: {result['url']}")
-                if result.get('success'):
-                    # Check for authentication success indicators
-                    html_content = result.get('html', '')
-                    if '"authenticated"' in html_content and 'true' in html_content:
-                        print("    ✅ Authentication successful! Basic auth worked.")
-                    else:
-                        print("    ⚠️ Page loaded but auth status unclear")
-                else:
-                    print(f"    ❌ Failed: {result.get('error_message', 'Unknown error')}")
-    else:
-        print(f"❌ Error: {response.status_code}")
+    try:
+        print("🚀 Starting complete pipeline crawl...\n")
+        start_time = time.time()
+
+        results = await client.crawl(
+            urls=[TEST_URLS[0]],
+            hooks={
+                "on_browser_created": on_browser_created_hook,
+                "on_page_context_created": on_page_context_created_hook,
+                "on_user_agent_updated": on_user_agent_updated_hook,
+                "before_goto": before_goto_hook,
+                "after_goto": after_goto_hook,
+                "on_execution_started": on_execution_started_hook,
+                "before_retrieve_html": before_retrieve_html_hook,
+                "before_return_html": before_return_html_hook,
+            },
+            hooks_timeout=45
+        )
+
+        execution_time = time.time() - start_time
+
+        if results and results.success:
+            print(f"\n✅ Complete pipeline executed successfully! (took {execution_time:.2f}s)")
+            print(f"   • All 8 hooks executed in sequence")
+            print(f"   • HTML length: {len(results.html):,} characters")
+        else:
+            print(f"⚠️ Pipeline completed with warnings")
+
+    except Exception as e:
+        print(f"❌ Error: {str(e)}")
+
+    print("\n📚 Available Hook Points:")
+    print("   1. on_browser_created - Browser initialization")
+    print("   2. on_page_context_created - Page context setup")
+    print("   3. on_user_agent_updated - User agent configuration")
+    print("   4. before_goto - Pre-navigation setup")
+    print("   5. after_goto - Post-navigation processing")
+    print("   6. on_execution_started - JavaScript execution start")
+    print("   7. before_retrieve_html - Pre-extraction processing")
+    print("   8. before_return_html - Final HTML processing")
 
     print("\n" + "─" * 70)
-    print("✓ Authentication example complete\n")
+    print("✓ Complete hook pipeline demo complete\n")
 
 
 # ============================================================================
@@ -518,10 +551,10 @@ async def hook(page, context, url, **kwargs):
 
 async def main():
     """
-    Run all example demonstrations
+    Run all demonstrations
     """
     print("\n" + "=" * 70)
-    print("  🚀 Crawl4AI - Docker Hooks System Examples")
+    print("  🚀 Crawl4AI v0.7.5 - Docker Hooks Complete Demonstration")
     print("=" * 70)
 
     # Check Docker service
@@ -530,73 +563,68 @@ async def main():
         print("❌ Docker service is not running!")
         print("\n📋 To start the Docker service:")
         print("   docker run -p 11235:11235 unclecode/crawl4ai:latest")
-        print("\nPlease start the service and run this example again.")
+        print("\nPlease start the service and run this demo again.")
         return
 
     print("✅ Docker service is running!\n")
 
-    # Run all examples
-    examples = [
-        ("String-Based Hooks (REST API)", example_1_string_based_hooks, False),
-        ("hooks_to_string() Utility", example_2_hooks_to_string_utility, False),
-        ("Docker Client Auto-Conversion (Recommended)", example_3_docker_client_auto_conversion, True),
-        ("Authentication Flow", example_4_authentication_flow, False),
+    # Run all demos
+    demos = [
+        ("String-Based Hooks (REST API)", demo_1_string_based_hooks, False),
+        ("hooks_to_string() Utility", demo_2_hooks_to_string_utility, False),
+        ("Docker Client Auto-Conversion", demo_3_docker_client_auto_conversion, True),
+        # ("Complete Hook Pipeline", demo_4_complete_hook_pipeline, True),
     ]
 
-    for i, (name, example_func, is_async) in enumerate(examples, 1):
+    for i, (name, demo_func, is_async) in enumerate(demos, 1):
         print(f"\n{'🔷' * 35}")
-        print(f"Example {i}/{len(examples)}: {name}")
+        print(f"Starting Demo {i}/{len(demos)}: {name}")
         print(f"{'🔷' * 35}\n")
 
         try:
             if is_async:
-                await example_func()
+                await demo_func()
             else:
-                example_func()
+                demo_func()
 
-            print(f"✅ Example {i} completed successfully!")
+            print(f"✅ Demo {i} completed successfully!")
 
-            # Pause between examples (except the last one)
-            if i < len(examples):
-                print("\n⏸️  Press Enter to continue to next example...")
-                input()
+            # Pause between demos (except the last one)
+            if i < len(demos):
+                print("\n⏸️  Press Enter to continue to next demo...")
+                # input()
 
         except KeyboardInterrupt:
-            print(f"\n⏹️  Examples interrupted by user")
+            print(f"\n⏹️  Demo interrupted by user")
             break
         except Exception as e:
-            print(f"\n❌ Example {i} failed: {str(e)}")
+            print(f"\n❌ Demo {i} failed: {str(e)}")
             import traceback
             traceback.print_exc()
-            print("\nContinuing to next example...\n")
+            print("\nContinuing to next demo...\n")
             continue
 
     # Final summary
     print("\n" + "=" * 70)
-    print("  🎉 All Examples Complete!")
+    print("  🎉 All Demonstrations Complete!")
     print("=" * 70)
 
-    print("\n📊 Summary - Three Approaches to Docker Hooks:")
+    print("\n📊 Summary of v0.7.5 Docker Hooks System:")
+    print("\n🆕 COMPLETELY NEW FEATURE in v0.7.5:")
+    print("   The Docker Hooks System lets you customize the crawling pipeline")
+    print("   with user-provided Python functions at 8 strategic points.")
 
-    print("\n✨ 1. String-Based Hooks:")
-    print("   • Write hooks as strings directly in JSON")
-    print("   • Best for: REST API, non-Python clients, simple use cases")
-    print("   • Cons: No IDE support, harder to debug")
+    print("\n✨ Three Ways to Use Docker Hooks (All NEW!):")
+    print("   1. String-based - Write hooks as strings for REST API")
+    print("   2. hooks_to_string() - Convert Python functions to strings")
+    print("   3. Docker Client - Automatic conversion (RECOMMENDED)")
 
-    print("\n✨ 2. hooks_to_string() Utility:")
-    print("   • Write hooks as Python functions, convert to strings")
-    print("   • Best for: Python with REST API, reusable hook libraries")
-    print("   • Pros: IDE support, type checking, easy debugging")
-
-    print("\n✨ 3. Docker Client (RECOMMENDED):")
-    print("   • Pass function objects directly, automatic conversion")
-    print("   • Best for: Python applications, best developer experience")
-    print("   • Pros: All benefits of #2 + cleaner code, no manual conversion")
-
-    print("\n💡 Recommendation:")
-    print("   Use Docker Client (#3) for Python applications")
-    print("   Use hooks_to_string() (#2) when you need REST API flexibility")
-    print("   Use string-based (#1) for non-Python clients or simple scripts")
+    print("\n💡 Key Benefits:")
+    print("   ✓ Full IDE support (autocomplete, syntax highlighting)")
+    print("   ✓ Type checking and linting")
+    print("   ✓ Easy to test and debug")
+    print("   ✓ Reusable across projects")
+    print("   ✓ Complete pipeline control")
 
     print("\n🎯 8 Hook Points Available:")
     print("   • on_browser_created, on_page_context_created")
@@ -604,24 +632,24 @@ async def main():
     print("   • on_execution_started, before_retrieve_html, before_return_html")
 
     print("\n📚 Resources:")
-    print("   • Docs: https://docs.crawl4ai.com/core/docker-deployment")
+    print("   • Docs: https://docs.crawl4ai.com")
     print("   • GitHub: https://github.com/unclecode/crawl4ai")
     print("   • Discord: https://discord.gg/jP8KfhDhyN")
 
     print("\n" + "=" * 70)
-    print("  Happy Crawling! 🕷️")
+    print("  Happy Crawling with v0.7.5! 🕷️")
     print("=" * 70 + "\n")
 
 
 if __name__ == "__main__":
-    print("\n🎬 Starting Crawl4AI Docker Hooks Examples...")
+    print("\n🎬 Starting Crawl4AI v0.7.5 Docker Hooks Demonstration...")
     print("Press Ctrl+C anytime to exit\n")
 
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\n\n👋 Examples stopped by user. Thanks for exploring Crawl4AI!")
+        print("\n\n👋 Demo stopped by user. Thanks for exploring Crawl4AI v0.7.5!")
     except Exception as e:
-        print(f"\n\n❌ Error: {str(e)}")
+        print(f"\n\n❌ Demo error: {str(e)}")
         import traceback
         traceback.print_exc()

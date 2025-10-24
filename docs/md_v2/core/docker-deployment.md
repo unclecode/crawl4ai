@@ -6,18 +6,6 @@
   - [Option 1: Using Pre-built Docker Hub Images (Recommended)](#option-1-using-pre-built-docker-hub-images-recommended)
   - [Option 2: Using Docker Compose](#option-2-using-docker-compose)
   - [Option 3: Manual Local Build & Run](#option-3-manual-local-build--run)
-- [Dockerfile Parameters](#dockerfile-parameters)
-- [Using the API](#using-the-api)
-  - [Playground Interface](#playground-interface)
-  - [Python SDK](#python-sdk)
-  - [Understanding Request Schema](#understanding-request-schema)
-  - [REST API Examples](#rest-api-examples)
-- [Additional API Endpoints](#additional-api-endpoints)
-  - [HTML Extraction Endpoint](#html-extraction-endpoint)
-  - [Screenshot Endpoint](#screenshot-endpoint)
-  - [PDF Export Endpoint](#pdf-export-endpoint)
-  - [JavaScript Execution Endpoint](#javascript-execution-endpoint)
-  - [Library Context Endpoint](#library-context-endpoint)
 - [MCP (Model Context Protocol) Support](#mcp-model-context-protocol-support)
   - [What is MCP?](#what-is-mcp)
   - [Connecting via MCP](#connecting-via-mcp)
@@ -25,9 +13,36 @@
   - [Available MCP Tools](#available-mcp-tools)
   - [Testing MCP Connections](#testing-mcp-connections)
   - [MCP Schemas](#mcp-schemas)
+- [Additional API Endpoints](#additional-api-endpoints)
+  - [HTML Extraction Endpoint](#html-extraction-endpoint)
+  - [Screenshot Endpoint](#screenshot-endpoint)
+  - [PDF Export Endpoint](#pdf-export-endpoint)
+  - [JavaScript Execution Endpoint](#javascript-execution-endpoint)
+- [User-Provided Hooks API](#user-provided-hooks-api)
+  - [Hook Information Endpoint](#hook-information-endpoint)
+  - [Available Hook Points](#available-hook-points)
+  - [Using Hooks in Requests](#using-hooks-in-requests)
+  - [Hook Examples with Real URLs](#hook-examples-with-real-urls)
+  - [Security Best Practices](#security-best-practices)
+  - [Hook Response Information](#hook-response-information)
+  - [Error Handling](#error-handling)
+  - [Hooks Utility: Function-Based Approach (Python)](#hooks-utility-function-based-approach-python)
+- [Job Queue & Webhook API](#job-queue-webhook-api)
+  - [Why Use the Job Queue API?](#why-use-the-job-queue-api)
+  - [Available Endpoints](#available-endpoints)
+  - [Webhook Configuration](#webhook-configuration)
+  - [Usage Examples](#usage-examples)
+  - [Webhook Best Practices](#webhook-best-practices)
+  - [Use Cases](#use-cases)
+  - [Troubleshooting](#troubleshooting)
+- [Dockerfile Parameters](#dockerfile-parameters)
+- [Using the API](#using-the-api)
+  - [Playground Interface](#playground-interface)
+  - [Python SDK](#python-sdk)
+  - [Understanding Request Schema](#understanding-request-schema)
+  - [REST API Examples](#rest-api-examples)
+  - [LLM Configuration Examples](#llm-configuration-examples)
 - [Metrics & Monitoring](#metrics--monitoring)
-- [Deployment Scenarios](#deployment-scenarios)
-- [Complete Examples](#complete-examples)
 - [Server Configuration](#server-configuration)
   - [Understanding config.yml](#understanding-configyml)
   - [JWT Authentication](#jwt-authentication)
@@ -58,13 +73,13 @@ Pull and run images directly from Docker Hub without building locally.
 
 #### 1. Pull the Image
 
-Our latest release is `0.7.3`. Images are built with multi-arch manifests, so Docker automatically pulls the correct version for your system.
+Our latest release is `0.7.6`. Images are built with multi-arch manifests, so Docker automatically pulls the correct version for your system.
 
-> 💡 **Note**: The `latest` tag points to the stable `0.7.3` version.
+> 💡 **Note**: The `latest` tag points to the stable `0.7.6` version.
 
 ```bash
 # Pull the latest version
-docker pull unclecode/crawl4ai:0.7.3
+docker pull unclecode/crawl4ai:0.7.6
 
 # Or pull using the latest tag
 docker pull unclecode/crawl4ai:latest
@@ -136,7 +151,7 @@ docker stop crawl4ai && docker rm crawl4ai
 #### Docker Hub Versioning Explained
 
 *   **Image Name:** `unclecode/crawl4ai`
-*   **Tag Format:** `LIBRARY_VERSION[-SUFFIX]` (e.g., `0.7.3`)
+*   **Tag Format:** `LIBRARY_VERSION[-SUFFIX]` (e.g., `0.7.6`)
     *   `LIBRARY_VERSION`: The semantic version of the core `crawl4ai` Python library
     *   `SUFFIX`: Optional tag for release candidates (``) and revisions (`r1`)
 *   **`latest` Tag:** Points to the most recent stable version
@@ -832,6 +847,733 @@ else:
 
 > 💡 **Remember**: Always test your hooks on safe, known websites first before using them on production sites. Never crawl sites that you don't have permission to access or that might be malicious.
 
+### Hooks Utility: Function-Based Approach (Python)
+
+For Python developers, Crawl4AI provides a more convenient way to work with hooks using the `hooks_to_string()` utility function and Docker client integration.
+
+#### Why Use Function-Based Hooks?
+
+**String-Based Approach (shown above)**:
+```python
+hooks_code = {
+    "on_page_context_created": """
+async def hook(page, context, **kwargs):
+    await page.set_viewport_size({"width": 1920, "height": 1080})
+    return page
+"""
+}
+```
+
+**Function-Based Approach (recommended for Python)**:
+```python
+from crawl4ai import Crawl4aiDockerClient
+
+async def my_hook(page, context, **kwargs):
+    await page.set_viewport_size({"width": 1920, "height": 1080})
+    return page
+
+async with Crawl4aiDockerClient(base_url="http://localhost:11235") as client:
+    result = await client.crawl(
+        ["https://example.com"],
+        hooks={"on_page_context_created": my_hook}
+    )
+```
+
+**Benefits**:
+- ✅ Write hooks as regular Python functions
+- ✅ Full IDE support (autocomplete, syntax highlighting, type checking)
+- ✅ Easy to test and debug
+- ✅ Reusable hook libraries
+- ✅ Automatic conversion to API format
+
+#### Using the Hooks Utility
+
+The `hooks_to_string()` utility converts Python function objects to the string format required by the API:
+
+```python
+from crawl4ai import hooks_to_string
+
+# Define your hooks as functions
+async def setup_hook(page, context, **kwargs):
+    await page.set_viewport_size({"width": 1920, "height": 1080})
+    await context.add_cookies([{
+        "name": "session",
+        "value": "token",
+        "domain": ".example.com"
+    }])
+    return page
+
+async def scroll_hook(page, context, **kwargs):
+    await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+    return page
+
+# Convert to string format
+hooks_dict = {
+    "on_page_context_created": setup_hook,
+    "before_retrieve_html": scroll_hook
+}
+hooks_string = hooks_to_string(hooks_dict)
+
+# Now use with REST API or Docker client
+# hooks_string contains the string representations
+```
+
+#### Docker Client with Automatic Conversion
+
+The Docker client automatically detects and converts function objects:
+
+```python
+from crawl4ai import Crawl4aiDockerClient
+
+async def auth_hook(page, context, **kwargs):
+    """Add authentication cookies"""
+    await context.add_cookies([{
+        "name": "auth_token",
+        "value": "your_token",
+        "domain": ".example.com"
+    }])
+    return page
+
+async def performance_hook(page, context, **kwargs):
+    """Block unnecessary resources"""
+    await context.route("**/*.{png,jpg,gif}", lambda r: r.abort())
+    await context.route("**/analytics/*", lambda r: r.abort())
+    return page
+
+async with Crawl4aiDockerClient(base_url="http://localhost:11235") as client:
+    # Pass functions directly - automatic conversion!
+    result = await client.crawl(
+        ["https://example.com"],
+        hooks={
+            "on_page_context_created": performance_hook,
+            "before_goto": auth_hook
+        },
+        hooks_timeout=30  # Optional timeout in seconds (1-120)
+    )
+
+    print(f"Success: {result.success}")
+    print(f"HTML: {len(result.html)} chars")
+```
+
+#### Creating Reusable Hook Libraries
+
+Build collections of reusable hooks:
+
+```python
+# hooks_library.py
+class CrawlHooks:
+    """Reusable hook collection for common crawling tasks"""
+
+    @staticmethod
+    async def block_images(page, context, **kwargs):
+        """Block all images to speed up crawling"""
+        await context.route("**/*.{png,jpg,jpeg,gif,webp}", lambda r: r.abort())
+        return page
+
+    @staticmethod
+    async def block_analytics(page, context, **kwargs):
+        """Block analytics and tracking scripts"""
+        tracking_domains = [
+            "**/google-analytics.com/*",
+            "**/googletagmanager.com/*",
+            "**/facebook.com/tr/*",
+            "**/doubleclick.net/*"
+        ]
+        for domain in tracking_domains:
+            await context.route(domain, lambda r: r.abort())
+        return page
+
+    @staticmethod
+    async def scroll_infinite(page, context, **kwargs):
+        """Handle infinite scroll to load more content"""
+        previous_height = 0
+        for i in range(5):  # Max 5 scrolls
+            current_height = await page.evaluate("document.body.scrollHeight")
+            if current_height == previous_height:
+                break
+            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            await page.wait_for_timeout(1000)
+            previous_height = current_height
+        return page
+
+    @staticmethod
+    async def wait_for_dynamic_content(page, context, url, response, **kwargs):
+        """Wait for dynamic content to load"""
+        await page.wait_for_timeout(2000)
+        try:
+            # Click "Load More" if present
+            load_more = await page.query_selector('[class*="load-more"]')
+            if load_more:
+                await load_more.click()
+                await page.wait_for_timeout(1000)
+        except:
+            pass
+        return page
+
+# Use in your application
+from hooks_library import CrawlHooks
+from crawl4ai import Crawl4aiDockerClient
+
+async def crawl_with_optimizations(url):
+    async with Crawl4aiDockerClient() as client:
+        result = await client.crawl(
+            [url],
+            hooks={
+                "on_page_context_created": CrawlHooks.block_images,
+                "before_retrieve_html": CrawlHooks.scroll_infinite
+            }
+        )
+        return result
+```
+
+#### Choosing the Right Approach
+
+| Approach | Best For | IDE Support | Language |
+|----------|----------|-------------|----------|
+| **String-based** | Non-Python clients, REST APIs, other languages | ❌ None | Any |
+| **Function-based** | Python applications, local development | ✅ Full | Python only |
+| **Docker Client** | Python apps with automatic conversion | ✅ Full | Python only |
+
+**Recommendation**:
+- **Python applications**: Use Docker client with function objects (easiest)
+- **Non-Python or REST API**: Use string-based hooks (most flexible)
+- **Manual control**: Use `hooks_to_string()` utility (middle ground)
+
+#### Complete Example with Function Hooks
+
+```python
+from crawl4ai import Crawl4aiDockerClient, BrowserConfig, CrawlerRunConfig, CacheMode
+
+# Define hooks as regular Python functions
+async def setup_environment(page, context, **kwargs):
+    """Setup crawling environment"""
+    # Set viewport
+    await page.set_viewport_size({"width": 1920, "height": 1080})
+
+    # Block resources for speed
+    await context.route("**/*.{png,jpg,gif}", lambda r: r.abort())
+
+    # Add custom headers
+    await page.set_extra_http_headers({
+        "Accept-Language": "en-US",
+        "X-Custom-Header": "Crawl4AI"
+    })
+
+    print("[HOOK] Environment configured")
+    return page
+
+async def extract_content(page, context, **kwargs):
+    """Extract and prepare content"""
+    # Scroll to load lazy content
+    await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+    await page.wait_for_timeout(1000)
+
+    # Extract metadata
+    metadata = await page.evaluate('''() => ({
+        title: document.title,
+        links: document.links.length,
+        images: document.images.length
+    })''')
+
+    print(f"[HOOK] Page metadata: {metadata}")
+    return page
+
+async def main():
+    async with Crawl4aiDockerClient(base_url="http://localhost:11235", verbose=True) as client:
+        # Configure crawl
+        browser_config = BrowserConfig(headless=True)
+        crawler_config = CrawlerRunConfig(cache_mode=CacheMode.BYPASS)
+
+        # Crawl with hooks
+        result = await client.crawl(
+            ["https://httpbin.org/html"],
+            browser_config=browser_config,
+            crawler_config=crawler_config,
+            hooks={
+                "on_page_context_created": setup_environment,
+                "before_retrieve_html": extract_content
+            },
+            hooks_timeout=30
+        )
+
+        if result.success:
+            print(f"✅ Crawl successful!")
+            print(f"   URL: {result.url}")
+            print(f"   HTML: {len(result.html)} chars")
+            print(f"   Markdown: {len(result.markdown)} chars")
+        else:
+            print(f"❌ Crawl failed: {result.error_message}")
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(main())
+```
+
+#### Additional Resources
+
+- **Comprehensive Examples**: See `/docs/examples/hooks_docker_client_example.py` for Python function-based examples
+- **REST API Examples**: See `/docs/examples/hooks_rest_api_example.py` for string-based examples
+- **Comparison Guide**: See `/docs/examples/README_HOOKS.md` for detailed comparison
+- **Utility Documentation**: See `/docs/hooks-utility-guide.md` for complete guide
+
+---
+
+## Job Queue & Webhook API
+
+The Docker deployment includes a powerful asynchronous job queue system with webhook support for both crawling and LLM extraction tasks. Instead of waiting for long-running operations to complete, submit jobs and receive real-time notifications via webhooks when they finish.
+
+### Why Use the Job Queue API?
+
+**Traditional Synchronous API (`/crawl`):**
+- Client waits for entire crawl to complete
+- Timeout issues with long-running crawls
+- Resource blocking during execution
+- Constant polling required for status updates
+
+**Asynchronous Job Queue API (`/crawl/job`, `/llm/job`):**
+- ✅ Submit job and continue immediately
+- ✅ No timeout concerns for long operations
+- ✅ Real-time webhook notifications on completion
+- ✅ Better resource utilization
+- ✅ Perfect for batch processing
+- ✅ Ideal for microservice architectures
+
+### Available Endpoints
+
+#### 1. Crawl Job Endpoint
+
+```
+POST /crawl/job
+```
+
+Submit an asynchronous crawl job with optional webhook notification.
+
+**Request Body:**
+```json
+{
+  "urls": ["https://example.com"],
+  "cache_mode": "bypass",
+  "extraction_strategy": {
+    "type": "JsonCssExtractionStrategy",
+    "schema": {
+      "title": "h1",
+      "content": ".article-body"
+    }
+  },
+  "webhook_config": {
+    "webhook_url": "https://your-app.com/webhook/crawl-complete",
+    "webhook_data_in_payload": true,
+    "webhook_headers": {
+      "X-Webhook-Secret": "your-secret-token",
+      "X-Custom-Header": "value"
+    }
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "task_id": "crawl_1698765432",
+  "message": "Crawl job submitted"
+}
+```
+
+#### 2. LLM Extraction Job Endpoint
+
+```
+POST /llm/job
+```
+
+Submit an asynchronous LLM extraction job with optional webhook notification.
+
+**Request Body:**
+```json
+{
+  "url": "https://example.com/article",
+  "q": "Extract the article title, author, publication date, and main points",
+  "provider": "openai/gpt-4o-mini",
+  "schema": "{\"title\": \"string\", \"author\": \"string\", \"date\": \"string\", \"points\": [\"string\"]}",
+  "cache": false,
+  "webhook_config": {
+    "webhook_url": "https://your-app.com/webhook/llm-complete",
+    "webhook_data_in_payload": true,
+    "webhook_headers": {
+      "X-Webhook-Secret": "your-secret-token"
+    }
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "task_id": "llm_1698765432",
+  "message": "LLM job submitted"
+}
+```
+
+#### 3. Job Status Endpoint
+
+```
+GET /job/{task_id}
+```
+
+Check the status and retrieve results of a submitted job.
+
+**Response (In Progress):**
+```json
+{
+  "task_id": "crawl_1698765432",
+  "status": "processing",
+  "message": "Job is being processed"
+}
+```
+
+**Response (Completed):**
+```json
+{
+  "task_id": "crawl_1698765432",
+  "status": "completed",
+  "result": {
+    "markdown": "# Page Title\n\nContent...",
+    "extracted_content": {...},
+    "links": {...}
+  }
+}
+```
+
+### Webhook Configuration
+
+Webhooks provide real-time notifications when your jobs complete, eliminating the need for constant polling.
+
+#### Webhook Config Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `webhook_url` | string | Yes | Your HTTP(S) endpoint to receive notifications |
+| `webhook_data_in_payload` | boolean | No | Include full result data in webhook payload (default: false) |
+| `webhook_headers` | object | No | Custom headers for authentication/identification |
+
+#### Webhook Payload Format
+
+**Success Notification (Crawl Job):**
+```json
+{
+  "task_id": "crawl_1698765432",
+  "task_type": "crawl",
+  "status": "completed",
+  "timestamp": "2025-10-22T12:30:00.000000+00:00",
+  "urls": ["https://example.com"],
+  "data": {
+    "markdown": "# Page content...",
+    "extracted_content": {...},
+    "links": {...}
+  }
+}
+```
+
+**Success Notification (LLM Job):**
+```json
+{
+  "task_id": "llm_1698765432",
+  "task_type": "llm_extraction",
+  "status": "completed",
+  "timestamp": "2025-10-22T12:30:00.000000+00:00",
+  "urls": ["https://example.com/article"],
+  "data": {
+    "extracted_content": {
+      "title": "Understanding Web Scraping",
+      "author": "John Doe",
+      "date": "2025-10-22",
+      "points": ["Point 1", "Point 2"]
+    }
+  }
+}
+```
+
+**Failure Notification:**
+```json
+{
+  "task_id": "crawl_1698765432",
+  "task_type": "crawl",
+  "status": "failed",
+  "timestamp": "2025-10-22T12:30:00.000000+00:00",
+  "urls": ["https://example.com"],
+  "error": "Connection timeout after 30 seconds"
+}
+```
+
+#### Webhook Delivery & Retry
+
+- **Delivery Method:** HTTP POST to your `webhook_url`
+- **Content-Type:** `application/json`
+- **Retry Policy:** Exponential backoff with 5 attempts
+  - Attempt 1: Immediate
+  - Attempt 2: 1 second delay
+  - Attempt 3: 2 seconds delay
+  - Attempt 4: 4 seconds delay
+  - Attempt 5: 8 seconds delay
+- **Success Status Codes:** 200-299
+- **Custom Headers:** Your `webhook_headers` are included in every request
+
+### Usage Examples
+
+#### Example 1: Python with Webhook Handler (Flask)
+
+```python
+from flask import Flask, request, jsonify
+import requests
+
+app = Flask(__name__)
+
+# Webhook handler
+@app.route('/webhook/crawl-complete', methods=['POST'])
+def handle_crawl_webhook():
+    payload = request.json
+
+    if payload['status'] == 'completed':
+        print(f"✅ Job {payload['task_id']} completed!")
+        print(f"Task type: {payload['task_type']}")
+
+        # Access the crawl results
+        if 'data' in payload:
+            markdown = payload['data'].get('markdown', '')
+            extracted = payload['data'].get('extracted_content', {})
+            print(f"Extracted {len(markdown)} characters")
+            print(f"Structured data: {extracted}")
+    else:
+        print(f"❌ Job {payload['task_id']} failed: {payload.get('error')}")
+
+    return jsonify({"status": "received"}), 200
+
+# Submit a crawl job with webhook
+def submit_crawl_job():
+    response = requests.post(
+        "http://localhost:11235/crawl/job",
+        json={
+            "urls": ["https://example.com"],
+            "extraction_strategy": {
+                "type": "JsonCssExtractionStrategy",
+                "schema": {
+                    "name": "Example Schema",
+                    "baseSelector": "body",
+                    "fields": [
+                        {"name": "title", "selector": "h1", "type": "text"},
+                        {"name": "description", "selector": "meta[name='description']", "type": "attribute", "attribute": "content"}
+                    ]
+                }
+            },
+            "webhook_config": {
+                "webhook_url": "https://your-app.com/webhook/crawl-complete",
+                "webhook_data_in_payload": True,
+                "webhook_headers": {
+                    "X-Webhook-Secret": "your-secret-token"
+                }
+            }
+        }
+    )
+
+    task_id = response.json()['task_id']
+    print(f"Job submitted: {task_id}")
+    return task_id
+
+if __name__ == '__main__':
+    app.run(port=5000)
+```
+
+#### Example 2: LLM Extraction with Webhooks
+
+```python
+import requests
+
+def submit_llm_job_with_webhook():
+    response = requests.post(
+        "http://localhost:11235/llm/job",
+        json={
+            "url": "https://example.com/article",
+            "q": "Extract the article title, author, and main points",
+            "provider": "openai/gpt-4o-mini",
+            "webhook_config": {
+                "webhook_url": "https://your-app.com/webhook/llm-complete",
+                "webhook_data_in_payload": True,
+                "webhook_headers": {
+                    "X-Webhook-Secret": "your-secret-token"
+                }
+            }
+        }
+    )
+
+    task_id = response.json()['task_id']
+    print(f"LLM job submitted: {task_id}")
+    return task_id
+
+# Webhook handler for LLM jobs
+@app.route('/webhook/llm-complete', methods=['POST'])
+def handle_llm_webhook():
+    payload = request.json
+
+    if payload['status'] == 'completed':
+        extracted = payload['data']['extracted_content']
+        print(f"✅ LLM extraction completed!")
+        print(f"Results: {extracted}")
+    else:
+        print(f"❌ LLM extraction failed: {payload.get('error')}")
+
+    return jsonify({"status": "received"}), 200
+```
+
+#### Example 3: Without Webhooks (Polling)
+
+If you don't use webhooks, you can poll for results:
+
+```python
+import requests
+import time
+
+# Submit job
+response = requests.post(
+    "http://localhost:11235/crawl/job",
+    json={"urls": ["https://example.com"]}
+)
+task_id = response.json()['task_id']
+
+# Poll for results
+while True:
+    result = requests.get(f"http://localhost:11235/job/{task_id}")
+    data = result.json()
+
+    if data['status'] == 'completed':
+        print("Job completed!")
+        print(data['result'])
+        break
+    elif data['status'] == 'failed':
+        print(f"Job failed: {data.get('error')}")
+        break
+
+    print("Still processing...")
+    time.sleep(2)
+```
+
+#### Example 4: Global Webhook Configuration
+
+Set a default webhook URL in your `config.yml` to avoid repeating it in every request:
+
+```yaml
+# config.yml
+api:
+  crawler:
+    # ... other settings ...
+    webhook:
+      default_url: "https://your-app.com/webhook/default"
+      default_headers:
+        X-Webhook-Secret: "your-secret-token"
+```
+
+Then submit jobs without webhook config:
+
+```python
+# Uses the global webhook configuration
+response = requests.post(
+    "http://localhost:11235/crawl/job",
+    json={"urls": ["https://example.com"]}
+)
+```
+
+### Webhook Best Practices
+
+1. **Authentication:** Always use custom headers for webhook authentication
+   ```json
+   "webhook_headers": {
+     "X-Webhook-Secret": "your-secret-token"
+   }
+   ```
+
+2. **Idempotency:** Design your webhook handler to be idempotent (safe to receive duplicate notifications)
+
+3. **Fast Response:** Return HTTP 200 quickly; process data asynchronously if needed
+   ```python
+   @app.route('/webhook', methods=['POST'])
+   def webhook():
+       payload = request.json
+       # Queue for background processing
+       queue.enqueue(process_webhook, payload)
+       return jsonify({"status": "received"}), 200
+   ```
+
+4. **Error Handling:** Handle both success and failure notifications
+   ```python
+   if payload['status'] == 'completed':
+       # Process success
+   elif payload['status'] == 'failed':
+       # Log error, retry, or alert
+   ```
+
+5. **Validation:** Verify webhook authenticity using custom headers
+   ```python
+   secret = request.headers.get('X-Webhook-Secret')
+   if secret != os.environ['EXPECTED_SECRET']:
+       return jsonify({"error": "Unauthorized"}), 401
+   ```
+
+6. **Logging:** Log webhook deliveries for debugging
+   ```python
+   logger.info(f"Webhook received: {payload['task_id']} - {payload['status']}")
+   ```
+
+### Use Cases
+
+**1. Batch Processing**
+Submit hundreds of URLs and get notified as each completes:
+```python
+urls = ["https://site1.com", "https://site2.com", ...]
+for url in urls:
+    submit_crawl_job(url, webhook_url="https://app.com/webhook")
+```
+
+**2. Microservice Integration**
+Integrate with event-driven architectures:
+```python
+# Service A submits job
+task_id = submit_crawl_job(url)
+
+# Service B receives webhook and triggers next step
+@app.route('/webhook')
+def webhook():
+    process_result(request.json)
+    trigger_next_service()
+    return "OK", 200
+```
+
+**3. Long-Running Extractions**
+Handle complex LLM extractions without timeouts:
+```python
+submit_llm_job(
+    url="https://long-article.com",
+    q="Comprehensive summary with key points and analysis",
+    webhook_url="https://app.com/webhook/llm"
+)
+```
+
+### Troubleshooting
+
+**Webhook not receiving notifications?**
+- Check your webhook URL is publicly accessible
+- Verify firewall/security group settings
+- Use webhook testing tools like webhook.site for debugging
+- Check server logs for delivery attempts
+- Ensure your handler returns 200-299 status code
+
+**Job stuck in processing?**
+- Check Redis connection: `docker logs <container_name> | grep redis`
+- Verify worker processes: `docker exec <container_name> ps aux | grep worker`
+- Check server logs: `docker logs <container_name>`
+
+**Need to cancel a job?**
+Jobs are processed asynchronously. If you need to cancel:
+- Delete the task from Redis (requires Redis CLI access)
+- Or implement a cancellation endpoint in your webhook handler
+
 ---
 
 ## Dockerfile Parameters
@@ -892,10 +1634,12 @@ This is the easiest way to translate Python configuration to JSON requests when 
 
 Install the SDK: `pip install crawl4ai`
 
+The Python SDK provides a convenient way to interact with the Docker API, including **automatic hook conversion** when using function objects.
+
 ```python
 import asyncio
 from crawl4ai.docker_client import Crawl4aiDockerClient
-from crawl4ai import BrowserConfig, CrawlerRunConfig, CacheMode # Assuming you have crawl4ai installed
+from crawl4ai import BrowserConfig, CrawlerRunConfig, CacheMode
 
 async def main():
     # Point to the correct server port
@@ -907,23 +1651,22 @@ async def main():
         print("--- Running Non-Streaming Crawl ---")
         results = await client.crawl(
             ["https://httpbin.org/html"],
-            browser_config=BrowserConfig(headless=True), # Use library classes for config aid
+            browser_config=BrowserConfig(headless=True),
             crawler_config=CrawlerRunConfig(cache_mode=CacheMode.BYPASS)
         )
-        if results: # client.crawl returns None on failure
-          print(f"Non-streaming results success: {results.success}")
-          if results.success:
-              for result in results: # Iterate through the CrawlResultContainer
-                  print(f"URL: {result.url}, Success: {result.success}")
+        if results:
+            print(f"Non-streaming results success: {results.success}")
+            if results.success:
+                for result in results:
+                    print(f"URL: {result.url}, Success: {result.success}")
         else:
             print("Non-streaming crawl failed.")
-
 
         # Example Streaming crawl
         print("\n--- Running Streaming Crawl ---")
         stream_config = CrawlerRunConfig(stream=True, cache_mode=CacheMode.BYPASS)
         try:
-            async for result in await client.crawl( # client.crawl returns an async generator for streaming
+            async for result in await client.crawl(
                 ["https://httpbin.org/html", "https://httpbin.org/links/5/0"],
                 browser_config=BrowserConfig(headless=True),
                 crawler_config=stream_config
@@ -932,17 +1675,56 @@ async def main():
         except Exception as e:
             print(f"Streaming crawl failed: {e}")
 
+        # Example with hooks (Python function objects)
+        print("\n--- Crawl with Hooks ---")
+
+        async def my_hook(page, context, **kwargs):
+            """Custom hook to optimize performance"""
+            await page.set_viewport_size({"width": 1920, "height": 1080})
+            await context.route("**/*.{png,jpg}", lambda r: r.abort())
+            print("[HOOK] Page optimized")
+            return page
+
+        result = await client.crawl(
+            ["https://httpbin.org/html"],
+            browser_config=BrowserConfig(headless=True),
+            crawler_config=CrawlerRunConfig(cache_mode=CacheMode.BYPASS),
+            hooks={"on_page_context_created": my_hook},  # Pass function directly!
+            hooks_timeout=30
+        )
+        print(f"Crawl with hooks success: {result.success}")
 
         # Example Get schema
         print("\n--- Getting Schema ---")
         schema = await client.get_schema()
-        print(f"Schema received: {bool(schema)}") # Print whether schema was received
+        print(f"Schema received: {bool(schema)}")
 
 if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-*(SDK parameters like timeout, verify_ssl etc. remain the same)*
+#### SDK Parameters
+
+The Docker client supports the following parameters:
+
+**Client Initialization**:
+- `base_url` (str): URL of the Docker server (default: `http://localhost:8000`)
+- `timeout` (float): Request timeout in seconds (default: 30.0)
+- `verify_ssl` (bool): Verify SSL certificates (default: True)
+- `verbose` (bool): Enable verbose logging (default: True)
+- `log_file` (Optional[str]): Path to log file (default: None)
+
+**crawl() Method**:
+- `urls` (List[str]): List of URLs to crawl
+- `browser_config` (Optional[BrowserConfig]): Browser configuration
+- `crawler_config` (Optional[CrawlerRunConfig]): Crawler configuration
+- `hooks` (Optional[Dict]): Hook functions or strings - **automatically converts function objects!**
+- `hooks_timeout` (int): Timeout for each hook execution in seconds (default: 30)
+
+**Returns**:
+- Single URL: `CrawlResult` object
+- Multiple URLs: `List[CrawlResult]`
+- Streaming: `AsyncGenerator[CrawlResult]`
 
 ### Second Approach: Direct API Calls
 
@@ -1352,19 +2134,40 @@ We're here to help you succeed with Crawl4AI! Here's how to get support:
 
 In this guide, we've covered everything you need to get started with Crawl4AI's Docker deployment:
 - Building and running the Docker container
-- Configuring the environment  
+- Configuring the environment
 - Using the interactive playground for testing
 - Making API requests with proper typing
-- Using the Python SDK
+- Using the Python SDK with **automatic hook conversion**
+- **Working with hooks** - both string-based (REST API) and function-based (Python SDK)
 - Leveraging specialized endpoints for screenshots, PDFs, and JavaScript execution
 - Connecting via the Model Context Protocol (MCP)
 - Monitoring your deployment
 
-The new playground interface at `http://localhost:11235/playground` makes it much easier to test configurations and generate the corresponding JSON for API requests.
+### Key Features
 
-For AI application developers, the MCP integration allows tools like Claude Code to directly access Crawl4AI's capabilities without complex API handling.
+**Hooks Support**: Crawl4AI offers two approaches for working with hooks:
+- **String-based** (REST API): Works with any language, requires manual string formatting
+- **Function-based** (Python SDK): Write hooks as regular Python functions with full IDE support and automatic conversion
 
-Remember, the examples in the `examples` folder are your friends - they show real-world usage patterns that you can adapt for your needs.
+**Playground Interface**: The built-in playground at `http://localhost:11235/playground` makes it easy to test configurations and generate corresponding JSON for API requests.
+
+**MCP Integration**: For AI application developers, the MCP integration allows tools like Claude Code to directly access Crawl4AI's capabilities without complex API handling.
+
+### Next Steps
+
+1. **Explore Examples**: Check out the comprehensive examples in:
+   - `/docs/examples/hooks_docker_client_example.py` - Python function-based hooks
+   - `/docs/examples/hooks_rest_api_example.py` - REST API string-based hooks
+   - `/docs/examples/README_HOOKS.md` - Comparison and guide
+
+2. **Read Documentation**:
+   - `/docs/hooks-utility-guide.md` - Complete hooks utility guide
+   - API documentation for detailed configuration options
+
+3. **Join the Community**:
+   - GitHub: Report issues and contribute
+   - Discord: Get help and share your experiences
+   - Documentation: Comprehensive guides and tutorials
 
 Keep exploring, and don't hesitate to reach out if you need help! We're building something amazing together. 🚀
 

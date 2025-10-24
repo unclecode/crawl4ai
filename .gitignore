@@ -267,6 +267,8 @@ continue_config.json
 .llm.env
 .private/
 
+.claude/
+
 CLAUDE_MONITOR.md
 CLAUDE.md
 

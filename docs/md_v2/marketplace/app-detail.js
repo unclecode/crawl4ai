@@ -123,144 +123,132 @@ class AppDetailPage {
         document.getElementById('sidebar-pricing').textContent = this.appData.pricing || 'Free';
         document.getElementById('sidebar-contact').textContent = this.appData.contact_email || 'contact@example.com';
 
-        // Integration guide
-        this.renderIntegrationGuide();
+        // Render tab contents from database fields
+        this.renderTabContents();
     }
 
-    renderIntegrationGuide() {
-        // Installation code
-        const installCode = document.getElementById('install-code');
-        if (installCode) {
-            if (this.appData.type === 'Open Source' && this.appData.github_url) {
-                installCode.textContent = `# Clone from GitHub
-git clone ${this.appData.github_url}
-
-# Install dependencies
-pip install -r requirements.txt`;
-            } else if (this.appData.name.toLowerCase().includes('api')) {
-                installCode.textContent = `# Install via pip
-pip install ${this.appData.slug}
-
-# Or install from source
-pip install git+${this.appData.github_url || 'https://github.com/example/repo'}`;
+    renderTabContents() {
+        // Overview tab - use long_description from database
+        const overviewDiv = document.getElementById('app-overview');
+        if (overviewDiv) {
+            if (this.appData.long_description) {
+                overviewDiv.innerHTML = this.renderMarkdown(this.appData.long_description);
+            } else {
+                overviewDiv.innerHTML = `<p>${this.appData.description || 'No overview available.'}</p>`;
             }
         }
 
-        // Usage code - customize based on category
-        const usageCode = document.getElementById('usage-code');
-        if (usageCode) {
-            if (this.appData.category === 'Browser Automation') {
-                usageCode.textContent = `from crawl4ai import AsyncWebCrawler
-from ${this.appData.slug.replace(/-/g, '_')} import ${this.appData.name.replace(/\s+/g, '')}
-
-async def main():
-    # Initialize ${this.appData.name}
-    automation = ${this.appData.name.replace(/\s+/g, '')}()
-
-    async with AsyncWebCrawler() as crawler:
-        result = await crawler.arun(
-            url="https://example.com",
-            browser_config=automation.config,
-            wait_for="css:body"
-        )
-        print(result.markdown)`;
-        } else if (this.appData.category === 'Proxy Services') {
-            usageCode.textContent = `from crawl4ai import AsyncWebCrawler
-import ${this.appData.slug.replace(/-/g, '_')}
-
-# Configure proxy
-proxy_config = {
-    "server": "${this.appData.website_url || 'https://proxy.example.com'}",
-    "username": "your_username",
-    "password": "your_password"
-}
-
-async with AsyncWebCrawler(proxy=proxy_config) as crawler:
-    result = await crawler.arun(
-        url="https://example.com",
-        bypass_cache=True
-    )
-    print(result.status_code)`;
-        } else if (this.appData.category === 'LLM Integration') {
-            usageCode.textContent = `from crawl4ai import AsyncWebCrawler
-from crawl4ai.extraction_strategy import LLMExtractionStrategy
-
-# Configure LLM extraction
-strategy = LLMExtractionStrategy(
-    provider="${this.appData.name.toLowerCase().includes('gpt') ? 'openai' : 'anthropic'}",
-    api_key="your-api-key",
-    model="${this.appData.name.toLowerCase().includes('gpt') ? 'gpt-4' : 'claude-3'}",
-    instruction="Extract structured data"
-)
-
-async with AsyncWebCrawler() as crawler:
-    result = await crawler.arun(
-        url="https://example.com",
-        extraction_strategy=strategy
-    )
-    print(result.extracted_content)`;
+        // Integration tab - use integration_guide field from database
+        const integrationDiv = document.getElementById('app-integration');
+        if (integrationDiv) {
+            if (this.appData.integration_guide) {
+                integrationDiv.innerHTML = this.renderMarkdown(this.appData.integration_guide);
+                // Add copy buttons to all code blocks
+                this.addCopyButtonsToCodeBlocks(integrationDiv);
+            } else {
+                integrationDiv.innerHTML = '<p>Integration guide not yet available. Please check the official website for details.</p>';
             }
         }
 
-        // Integration example
-        const integrationCode = document.getElementById('integration-code');
-        if (integrationCode) {
-            integrationCode.textContent = this.appData.integration_guide ||
-`# Complete ${this.appData.name} Integration Example
-
-from crawl4ai import AsyncWebCrawler
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
-import json
-
-async def crawl_with_${this.appData.slug.replace(/-/g, '_')}():
-    """
-    Complete example showing how to use ${this.appData.name}
-    with Crawl4AI for production web scraping
-    """
-
-    # Define extraction schema
-    schema = {
-        "name": "ProductList",
-        "baseSelector": "div.product",
-        "fields": [
-            {"name": "title", "selector": "h2", "type": "text"},
-            {"name": "price", "selector": ".price", "type": "text"},
-            {"name": "image", "selector": "img", "type": "attribute", "attribute": "src"},
-            {"name": "link", "selector": "a", "type": "attribute", "attribute": "href"}
-        ]
+        // Documentation tab - use documentation field from database
+        const docsDiv = document.getElementById('app-docs');
+        if (docsDiv) {
+            if (this.appData.documentation) {
+                docsDiv.innerHTML = this.renderMarkdown(this.appData.documentation);
+                // Add copy buttons to all code blocks
+                this.addCopyButtonsToCodeBlocks(docsDiv);
+            } else {
+                docsDiv.innerHTML = '<p>Documentation coming soon.</p>';
+            }
+        }
     }
 
-    # Initialize crawler with ${this.appData.name}
-    async with AsyncWebCrawler(
-        browser_type="chromium",
-        headless=True,
-        verbose=True
-    ) as crawler:
+    addCopyButtonsToCodeBlocks(container) {
+        // Find all code blocks and add copy buttons
+        const codeBlocks = container.querySelectorAll('pre code');
+        codeBlocks.forEach(codeBlock => {
+            const pre = codeBlock.parentElement;
 
-        # Crawl with extraction
-        result = await crawler.arun(
-            url="https://example.com/products",
-            extraction_strategy=JsonCssExtractionStrategy(schema),
-            cache_mode="bypass",
-            wait_for="css:.product",
-            screenshot=True
-        )
+            // Skip if already has a copy button
+            if (pre.querySelector('.copy-btn')) return;
 
-        # Process results
-        if result.success:
-            products = json.loads(result.extracted_content)
-            print(f"Found {len(products)} products")
+            // Create copy button
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'copy-btn';
+            copyBtn.textContent = 'Copy';
+            copyBtn.onclick = () => {
+                navigator.clipboard.writeText(codeBlock.textContent).then(() => {
+                    copyBtn.textContent = '✓ Copied!';
+                    setTimeout(() => {
+                        copyBtn.textContent = 'Copy';
+                    }, 2000);
+                });
+            };
 
-            for product in products[:5]:
-                print(f"- {product['title']}: {product['price']}")
+            // Add button to pre element
+            pre.style.position = 'relative';
+            pre.insertBefore(copyBtn, codeBlock);
+        });
+    }
 
-        return products
+    renderMarkdown(text) {
+        if (!text) return '';
 
-# Run the crawler
-if __name__ == "__main__":
-    import asyncio
-    asyncio.run(crawl_with_${this.appData.slug.replace(/-/g, '_')}())`;
-        }
+        // Store code blocks temporarily to protect them from processing
+        const codeBlocks = [];
+        let processed = text.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
+            const placeholder = `___CODE_BLOCK_${codeBlocks.length}___`;
+            codeBlocks.push(`<pre><code class="language-${lang || ''}">${this.escapeHtml(code)}</code></pre>`);
+            return placeholder;
+        });
+
+        // Store inline code temporarily
+        const inlineCodes = [];
+        processed = processed.replace(/`([^`]+)`/g, (match, code) => {
+            const placeholder = `___INLINE_CODE_${inlineCodes.length}___`;
+            inlineCodes.push(`<code>${this.escapeHtml(code)}</code>`);
+            return placeholder;
+        });
+
+        // Now process the rest of the markdown
+        processed = processed
+            // Headers
+            .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+            .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+            .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+            // Bold
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            // Italic
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            // Links
+            .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
+            // Line breaks
+            .replace(/\n\n/g, '</p><p>')
+            .replace(/\n/g, '<br>')
+            // Lists
+            .replace(/^\* (.*)$/gim, '<li>$1</li>')
+            .replace(/^- (.*)$/gim, '<li>$1</li>')
+            // Wrap in paragraphs
+            .replace(/^(?!<[h|p|pre|ul|ol|li])/gim, '<p>')
+            .replace(/(?<![>])$/gim, '</p>');
+
+        // Restore inline code
+        inlineCodes.forEach((code, i) => {
+            processed = processed.replace(`___INLINE_CODE_${i}___`, code);
+        });
+
+        // Restore code blocks
+        codeBlocks.forEach((block, i) => {
+            processed = processed.replace(`___CODE_BLOCK_${i}___`, block);
+        });
+
+        return processed;
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     formatNumber(num) {
@@ -287,33 +275,6 @@ if __name__ == "__main__":
                     content.classList.remove('active');
                 });
                 document.getElementById(`${tabName}-tab`).classList.add('active');
-            });
-        });
-
-        // Copy integration code
-        document.getElementById('copy-integration').addEventListener('click', () => {
-            const code = document.getElementById('integration-code').textContent;
-            navigator.clipboard.writeText(code).then(() => {
-                const btn = document.getElementById('copy-integration');
-                const originalText = btn.innerHTML;
-                btn.innerHTML = '<span>✓</span> Copied!';
-                setTimeout(() => {
-                    btn.innerHTML = originalText;
-                }, 2000);
-            });
-        });
-
-        // Copy code buttons
-        document.querySelectorAll('.copy-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const codeBlock = e.target.closest('.code-block');
-                const code = codeBlock.querySelector('code').textContent;
-                navigator.clipboard.writeText(code).then(() => {
-                    btn.textContent = 'Copied!';
-                    setTimeout(() => {
-                        btn.textContent = 'Copy';
-                    }, 2000);
-                });
             });
         });
     }
