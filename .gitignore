@@ -292,3 +292,4 @@ scripts/
 *.db
 *.rdb
 *.ldb
+.context/
