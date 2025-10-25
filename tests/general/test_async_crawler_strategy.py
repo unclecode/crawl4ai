@@ -364,5 +364,19 @@ async def test_network_error_handling():
         async with AsyncPlaywrightCrawlerStrategy() as strategy:
             await strategy.crawl("https://invalid.example.com", config)
 
+@pytest.mark.asyncio
+async def test_remove_overlay_elements(crawler_strategy):
+    config = CrawlerRunConfig(
+        remove_overlay_elements=True,
+        delay_before_return_html=5,
+    )
+    
+    response = await crawler_strategy.crawl(
+        "https://www2.hm.com/en_us/index.html",
+        config
+    )
+    assert response.status_code == 200
+    assert "Accept all cookies" not in response.html
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
