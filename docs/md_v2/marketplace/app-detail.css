@@ -278,12 +278,12 @@
 }
 
 .tab-content {
-    display: none;
+    display: none !important;
     padding: 2rem;
 }
 
 .tab-content.active {
-    display: block;
+    display: block !important;
 }
 
 /* Overview Layout */

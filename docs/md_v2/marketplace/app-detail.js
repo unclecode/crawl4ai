@@ -112,7 +112,7 @@ class AppDetailPage {
         }
 
         // Contact
-        document.getElementById('app-contact').textContent = this.appData.contact_email || 'Not available';
+        document.getElementById('app-contact') && (document.getElementById('app-contact').textContent = this.appData.contact_email || 'Not available');
 
         // Sidebar info
         document.getElementById('sidebar-downloads').textContent = this.formatNumber(this.appData.downloads || 0);
@@ -263,18 +263,27 @@ class AppDetailPage {
     setupEventListeners() {
         // Tab switching
         const tabs = document.querySelectorAll('.tab-btn');
+
         tabs.forEach(tab => {
             tab.addEventListener('click', () => {
-                // Update active tab
+                // Update active tab button
                 tabs.forEach(t => t.classList.remove('active'));
                 tab.classList.add('active');
 
                 // Show corresponding content
                 const tabName = tab.dataset.tab;
-                document.querySelectorAll('.tab-content').forEach(content => {
+
+                // Hide all tab contents
+                const allTabContents = document.querySelectorAll('.tab-content');
+                allTabContents.forEach(content => {
                     content.classList.remove('active');
                 });
-                document.getElementById(`${tabName}-tab`).classList.add('active');
+
+                // Show the selected tab content
+                const targetTab = document.getElementById(`${tabName}-tab`);
+                if (targetTab) {
+                    targetTab.classList.add('active');
+                }
             });
         });
     }
