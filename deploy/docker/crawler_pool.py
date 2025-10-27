@@ -15,11 +15,22 @@ LOCK = asyncio.Lock()
 MEM_LIMIT  = CONFIG.get("crawler", {}).get("memory_threshold_percent", 95.0)   # % RAM – refuse new browsers above this
 IDLE_TTL  = CONFIG.get("crawler", {}).get("pool", {}).get("idle_ttl_sec", 1800)   # close if unused for 30 min
 
-def _sig(cfg: BrowserConfig) -> str:
-    payload = json.dumps(cfg.to_dict(), sort_keys=True, separators=(",",":"))
+
+def _sig(cfg: BrowserConfig, adapter: Optional[BrowserAdapter] = None) -> str:
+    try:
+        config_payload = json.dumps(cfg.to_dict(), sort_keys=True, separators=(",", ":"))
+    except (TypeError, ValueError):
+        # Fallback to string representation if JSON serialization fails
+        config_payload = str(cfg.to_dict())
+    adapter_name = adapter.__class__.__name__ if adapter else "PlaywrightAdapter"
+    payload = f"{config_payload}:{adapter_name}"
     return hashlib.sha1(payload.encode()).hexdigest()
 
-async def get_crawler(cfg: BrowserConfig) -> AsyncWebCrawler:
+
+async def get_crawler(
+    cfg: BrowserConfig, adapter: Optional[BrowserAdapter] = None
+) -> AsyncWebCrawler:
+    sig = None
     try:
         sig = _sig(cfg)
         async with LOCK:
@@ -37,12 +48,13 @@ async def get_crawler(cfg: BrowserConfig) -> AsyncWebCrawler:
     except Exception as e:
         raise RuntimeError(f"Failed to start browser: {e}")
     finally:
-        if sig in POOL:
-            LAST_USED[sig] = time.time()
-        else:
-            # If we failed to start the browser, we should remove it from the pool
-            POOL.pop(sig, None)
-            LAST_USED.pop(sig, None)
+        if sig:
+            if sig in POOL:
+                LAST_USED[sig] = time.time()
+            else:
+                # If we failed to start the browser, we should remove it from the pool
+                POOL.pop(sig, None)
+                LAST_USED.pop(sig, None)
         # If we failed to start the browser, we should remove it from the pool
 async def close_all():
     async with LOCK:
