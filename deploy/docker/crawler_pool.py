@@ -38,7 +38,11 @@ IDLE_TTL = (
 
 
 def _sig(cfg: BrowserConfig, adapter: Optional[BrowserAdapter] = None) -> str:
-    config_payload = json.dumps(cfg.to_dict(), sort_keys=True, separators=(",", ":"))
+    try:
+        config_payload = json.dumps(cfg.to_dict(), sort_keys=True, separators=(",", ":"))
+    except (TypeError, ValueError):
+        # Fallback to string representation if JSON serialization fails
+        config_payload = str(cfg.to_dict())
     adapter_name = adapter.__class__.__name__ if adapter else "PlaywrightAdapter"
     payload = f"{config_payload}:{adapter_name}"
     return hashlib.sha1(payload.encode()).hexdigest()
@@ -47,6 +51,7 @@ def _sig(cfg: BrowserConfig, adapter: Optional[BrowserAdapter] = None) -> str:
 async def get_crawler(
     cfg: BrowserConfig, adapter: Optional[BrowserAdapter] = None
 ) -> AsyncWebCrawler:
+    sig = None
     try:
         sig = _sig(cfg, adapter)
         async with LOCK:
@@ -82,12 +87,13 @@ async def get_crawler(
     except Exception as e:
         raise RuntimeError(f"Failed to start browser: {e}")
     finally:
-        if sig in POOL:
-            LAST_USED[sig] = time.time()
-        else:
-            # If we failed to start the browser, we should remove it from the pool
-            POOL.pop(sig, None)
-            LAST_USED.pop(sig, None)
+        if sig:
+            if sig in POOL:
+                LAST_USED[sig] = time.time()
+            else:
+                # If we failed to start the browser, we should remove it from the pool
+                POOL.pop(sig, None)
+                LAST_USED.pop(sig, None)
         # If we failed to start the browser, we should remove it from the pool
 
 
