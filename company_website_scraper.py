@@ -153,16 +153,49 @@ class CompanyWebsiteScraper:
             "products", "services", "solutions", "offerings",
             "industries", "markets", "sectors", "customers",
             "technology", "platform", "manufacturing", "process",
-            "what we do", "our work", "portfolio", "capabilities"
+            "what we do", "our work", "portfolio", "capabilities",
+            "features", "integrations", "use case", "methodology"
         ]
 
         # URL patterns to prioritize (HIGH VALUE PAGES)
         self.url_patterns = [
+            # Company overview
             "*about*", "*company*",
-            "*products*", "*services*", "*solutions*", "*offerings*",
-            "*industries*", "*markets*", "*sectors*",
-            "*technology*", "*platform*", "*manufacturing*",
-            "*portfolio*", "*capabilities*"
+
+            # Core offerings - Products & Services
+            "*products*", "*product/*", "*product-line/*",
+            "*services*", "*service/*", "*professional-services*", "*consulting*",
+            "*solutions*", "*solution/*", "*offerings*",
+
+            # Platform & Technology
+            "*platform*", "*suite*", "*software*", "*cloud*", "*saas*",
+            "*app*", "*apps*",
+
+            # Features & Capabilities
+            "*features*", "*capabilities*", "*modules*",
+            "*addon*", "*add-on*", "*extension*",
+
+            # Use Cases & Applications
+            "*use-case*", "*usecase*", "*by-need*",
+
+            # How It Works (especially valuable for manufacturers!)
+            "*how-it-works*", "*how-we-work*",
+            "*methodology*", "*approach*", "*process*", "*framework*",
+
+            # Markets & Industries
+            "*industries*", "*industry/*", "*markets*", "*sectors*",
+            "*segments*", "*vertical*",
+
+            # Integrations & Technical
+            "*integration*", "*integrations*", "*connector*",
+            "*api*", "*developer*",
+
+            # Competitive & Value
+            "*compare*", "*vs/*", "*alternative*",
+            "*outcome*", "*benefit*", "*result*",
+
+            # Manufacturing specific
+            "*manufacturing*", "*portfolio*"
         ]
 
         # HONEYPOT/LOW-VALUE URL patterns to AVOID
@@ -172,6 +205,15 @@ class CompanyWebsiteScraper:
             "*/leadership/*", "*/team/*", "*/executives/*",
             "*/management/*", "*/board/*", "*/people/*",
             "*/employee/*", "*/staff/*", "*/bio/*",
+
+            # Lead generation forms (MAJOR HONEYPOTS!)
+            "*/demo*", "*/trial*", "*/get-started*",
+            "*/request-*", "*/talk-to-*", "*/book-*",
+            "*/contact-sales*", "*/speak-*", "*/schedule-*",
+
+            # Campaign landing pages (HONEYPOTS!)
+            "*/lp/*", "*/campaign/*", "*/go/*", "*/promo/*",
+            "*/pages/*",  # Often campaign-specific pages
 
             # Blog/news (low value, often traps)
             "*/blog/*", "*/news/*", "*/press/*", "*/media/*",
@@ -194,10 +236,22 @@ class CompanyWebsiteScraper:
 
             # Case studies of individual clients (often honeypots)
             "*/case-study/*", "*/customer/*", "*/client/*",
+            "*/customer-story/*", "*/success-story/*",
+            "*/testimonial/*",
 
-            # Resources/downloads (low value)
+            # Partner pages (can be honeypots)
+            "*/partner/*",  # Individual partner pages
+            "*/find-a-partner*", "*/partner-directory*",
+            "*/partner-locator*",
+
+            # Community/forums (low value)
+            "*/community*", "*/forum*", "*/discuss*",
+            "*/slack*", "*/discord*",
+
+            # Resources/downloads (gated content)
             "*/download/*", "*/resources/*", "*/whitepaper/*",
-            "*/ebook/*", "*/pdf/*"
+            "*/ebook/*", "*/pdf/*", "*/guide/*",
+            "*/datasheet/*", "*/brochure/*"
         ]
 
     def _create_browser_config(self) -> BrowserConfig:
