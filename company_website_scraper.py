@@ -117,8 +117,8 @@ class CompanyWebsiteScraper:
         self,
         llm_provider: str = "openai/gpt-4o",
         llm_api_key: Optional[str] = None,
-        max_depth: int = 3,
-        max_pages: int = 20,
+        max_depth: int = 2,  # Reduced from 3 - less aggressive
+        max_pages: int = 10,  # Reduced from 20 - avoid rate limits
         output_dir: str = "./scraped_companies",
         use_stealth: bool = True,
         headless: bool = True,
@@ -147,22 +147,57 @@ class CompanyWebsiteScraper:
         self.headless = headless
         self.verbose = verbose
 
-        # Relevant keywords for company information pages
+        # Relevant keywords for company information pages (HIGH VALUE)
         self.relevant_keywords = [
-            "about", "company", "team", "mission", "vision",
+            "about", "company", "mission", "vision",
             "products", "services", "solutions", "offerings",
             "industries", "markets", "sectors", "customers",
             "technology", "platform", "manufacturing", "process",
-            "what we do", "our work", "portfolio"
+            "what we do", "our work", "portfolio", "capabilities"
         ]
 
-        # URL patterns to prioritize
+        # URL patterns to prioritize (HIGH VALUE PAGES)
         self.url_patterns = [
-            "*about*", "*company*", "*team*",
-            "*products*", "*services*", "*solutions*",
+            "*about*", "*company*",
+            "*products*", "*services*", "*solutions*", "*offerings*",
             "*industries*", "*markets*", "*sectors*",
             "*technology*", "*platform*", "*manufacturing*",
-            "*portfolio*", "*work*", "*case-studies*"
+            "*portfolio*", "*capabilities*"
+        ]
+
+        # HONEYPOT/LOW-VALUE URL patterns to AVOID
+        # These are common traps that catch scrapers and provide little value
+        self.blocked_patterns = [
+            # Individual people (honeypot!)
+            "*/leadership/*", "*/team/*", "*/executives/*",
+            "*/management/*", "*/board/*", "*/people/*",
+            "*/employee/*", "*/staff/*", "*/bio/*",
+
+            # Blog/news (low value, often traps)
+            "*/blog/*", "*/news/*", "*/press/*", "*/media/*",
+            "*/article/*", "*/post/*", "*/story/*",
+
+            # Careers/jobs (not relevant)
+            "*/careers/*", "*/jobs/*", "*/hiring/*",
+            "*/positions/*", "*/openings/*", "*/apply/*",
+
+            # Events (low value)
+            "*/events/*", "*/webinar/*", "*/conference/*",
+
+            # Legal/policies (not relevant)
+            "*/privacy*", "*/terms*", "*/legal*",
+            "*/cookie*", "*/disclaimer*",
+
+            # Support/help (not relevant for company info)
+            "*/support/*", "*/help/*", "*/faq/*",
+            "*/contact/*", "*/login/*", "*/signup/*",
+
+            # Case studies of individual clients (often honeypots)
+            "*/case-study/*", "*/customer/*", "*/client/*",
+
+            # Resources/downloads (low value)
+            "*/download/*", "*/resources/*", "*/whitepaper/*",
+            "*/ebook/*", "*/pdf/*"
         ]
 
     def _create_browser_config(self) -> BrowserConfig:
@@ -191,10 +226,25 @@ class CompanyWebsiteScraper:
 
     def _create_deep_crawl_strategy(self) -> BestFirstCrawlingStrategy:
         """Create deep crawling strategy for intelligent page discovery"""
-        # URL filter to focus on relevant pages
-        url_filter = FilterChain([
-            URLPatternFilter(patterns=self.url_patterns)
-        ])
+        # Create filter chain with both inclusion and exclusion filters
+        filters = []
+
+        # 1. BLOCK honeypot and low-value pages (reverse=True means block these patterns)
+        if self.blocked_patterns:
+            filters.append(
+                URLPatternFilter(
+                    patterns=self.blocked_patterns,
+                    reverse=True  # This means: reject URLs matching these patterns
+                )
+            )
+
+        # 2. ALLOW only high-value pages (if specified)
+        if self.url_patterns:
+            filters.append(
+                URLPatternFilter(patterns=self.url_patterns)
+            )
+
+        url_filter = FilterChain(filters)
 
         # Keyword scorer to prioritize relevant pages
         keyword_scorer = KeywordRelevanceScorer(
@@ -281,14 +331,14 @@ class CompanyWebsiteScraper:
                     # Extraction strategy
                     extraction_strategy=self._create_extraction_strategy(),
 
-                    # Page handling
-                    wait_until="networkidle",  # Wait for network to be idle
-                    page_timeout=60000,  # 60 second timeout
-                    delay_before_return_html=2.0,  # Wait 2s before capturing
+                    # Page handling - LESS STRICT to avoid timeouts
+                    wait_until="domcontentloaded",  # Don't wait for networkidle (too strict)
+                    page_timeout=30000,  # 30 second timeout (reduced from 60s)
+                    delay_before_return_html=3.0,  # Wait 3s for JS to load (increased)
 
                     # User simulation to appear more human
                     scan_full_page=True,  # Scroll through the page
-                    scroll_delay=0.3,
+                    scroll_delay=0.5,  # Slower scrolling (more human-like)
                     simulate_user=True,
                     override_navigator=True,
 
