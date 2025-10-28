@@ -208,8 +208,7 @@ class CompanyWebsiteScraper:
             max_pages=self.max_pages,
             include_external=False,  # Stay within the company domain
             filter_chain=url_filter,
-            url_scorer=keyword_scorer,
-            score_threshold=0.3
+            url_scorer=keyword_scorer
         )
 
     def _create_extraction_strategy(self) -> LLMExtractionStrategy:
