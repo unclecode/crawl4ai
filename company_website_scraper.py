@@ -393,13 +393,43 @@ class CompanyWebsiteScraper:
                 url=url
             )
 
+        # Helper function to normalize extracted data
+        def normalize_data(data: Any) -> Dict[str, Any]:
+            """Convert various data formats to a consistent dictionary"""
+            if isinstance(data, dict):
+                return data
+            elif isinstance(data, list) and len(data) > 0:
+                # If it's a list, take the first item
+                return normalize_data(data[0])
+            elif isinstance(data, str):
+                # If it's a string, try to parse it as JSON
+                try:
+                    parsed = json.loads(data)
+                    return normalize_data(parsed)
+                except:
+                    return {}
+            else:
+                return {}
+
         # Start with the first result (usually homepage)
-        merged = results[0]['data'].copy()
+        first_data = normalize_data(results[0]['data'])
+        if not first_data:
+            return CompanyInformation(
+                company_name="Unknown",
+                description="Failed to parse extracted data",
+                url=url
+            )
+
+        merged = first_data.copy()
         merged['pages_analyzed'] = [results[0]['url']]
+        merged['url'] = url
 
         # Merge additional results
         for result in results[1:]:
-            data = result['data']
+            data = normalize_data(result['data'])
+            if not data:
+                continue
+
             merged['pages_analyzed'].append(result['url'])
 
             # Merge lists (products, industries, etc.)
@@ -411,20 +441,46 @@ class CompanyWebsiteScraper:
                     # Add unique items
                     if isinstance(data[key], list):
                         for item in data[key]:
-                            if item not in merged[key]:
-                                merged[key].append(item)
+                            # Handle both dict and string items
+                            if isinstance(item, dict):
+                                # Check if this dict is already in the list
+                                if item not in merged[key]:
+                                    merged[key].append(item)
+                            else:
+                                if item not in merged[key]:
+                                    merged[key].append(item)
 
             # Update if more detailed
-            if 'description' in data and data['description']:
-                if len(data['description']) > len(merged.get('description', '')):
-                    merged['description'] = data['description']
+            if 'description' in data and data.get('description'):
+                current_desc = merged.get('description', '')
+                if isinstance(current_desc, str) and isinstance(data['description'], str):
+                    if len(data['description']) > len(current_desc):
+                        merged['description'] = data['description']
 
             # Fill in missing fields
             for key in ['company_name', 'tagline', 'headquarters', 'year_founded', 'company_size']:
-                if key in data and data[key] and (key not in merged or not merged[key]):
+                if key in data and data.get(key) and not merged.get(key):
                     merged[key] = data[key]
 
-        return CompanyInformation(**merged)
+        # Ensure required fields are present
+        if 'company_name' not in merged or not merged['company_name']:
+            merged['company_name'] = "Unknown"
+        if 'description' not in merged or not merged['description']:
+            merged['description'] = "No description available"
+
+        try:
+            return CompanyInformation(**merged)
+        except Exception as e:
+            # If validation fails, return a minimal valid object
+            if self.verbose:
+                print(f"Warning: Failed to create CompanyInformation: {e}")
+                print(f"Merged data keys: {merged.keys()}")
+            return CompanyInformation(
+                company_name=merged.get('company_name', 'Unknown'),
+                description=merged.get('description', 'Failed to merge data'),
+                url=url,
+                pages_analyzed=merged.get('pages_analyzed', [url])
+            )
 
     def save_results(
         self,
