@@ -17,6 +17,7 @@ Features:
 import asyncio
 import json
 import os
+import random
 import time
 from datetime import datetime
 from pathlib import Path
@@ -161,7 +162,10 @@ class CompanyWebsiteScraper:
         output_dir: str = "./scraped_companies",
         use_stealth: bool = True,
         headless: bool = True,
-        verbose: bool = True
+        verbose: bool = True,
+        max_retries: int = 1,  # Retry failed pages once
+        base_delay: float = 2.0,  # Base delay between pages (randomized)
+        retry_delay: float = 5.0  # Initial retry delay (exponential backoff)
     ):
         """
         Initialize the company website scraper
@@ -175,6 +179,9 @@ class CompanyWebsiteScraper:
             use_stealth: Enable stealth mode to bypass bot detection
             headless: Run browser in headless mode
             verbose: Enable verbose logging
+            max_retries: Maximum number of retries for failed pages
+            base_delay: Base delay between pages in seconds (will be randomized)
+            retry_delay: Initial retry delay in seconds (uses exponential backoff)
         """
         self.llm_provider = llm_provider
         self.llm_api_key = llm_api_key or os.getenv('OPENAI_API_KEY')
@@ -185,6 +192,9 @@ class CompanyWebsiteScraper:
         self.use_stealth = use_stealth
         self.headless = headless
         self.verbose = verbose
+        self.max_retries = max_retries
+        self.base_delay = base_delay
+        self.retry_delay = retry_delay
 
         # Relevant keywords for company information pages (HIGH VALUE)
         self.relevant_keywords = [
@@ -315,6 +325,49 @@ class CompanyWebsiteScraper:
         # Checkpoint file for batch processing
         self.checkpoint_file = self.output_dir / ".scraping_checkpoint.json"
 
+        # Realistic user agents for rotation (Chrome, Firefox, Edge on Windows/Mac)
+        self.user_agents = [
+            # Chrome on Windows
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            # Chrome on Mac
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            # Firefox on Windows
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
+            # Firefox on Mac
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:122.0) Gecko/20100101 Firefox/122.0",
+            # Edge on Windows
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36 Edg/121.0.0.0",
+        ]
+
+    def _get_random_user_agent(self) -> str:
+        """Get a random realistic user agent"""
+        return random.choice(self.user_agents)
+
+    def _get_random_viewport(self) -> tuple[int, int]:
+        """
+        Get randomized viewport dimensions to avoid fingerprinting
+
+        Returns common desktop resolutions with slight variations
+        """
+        common_resolutions = [
+            (1920, 1080),  # Full HD
+            (1366, 768),   # Common laptop
+            (1536, 864),   # Surface laptop
+            (1440, 900),   # MacBook Pro 13"
+            (2560, 1440),  # QHD
+            (1600, 900),   # HD+
+        ]
+
+        # Pick a base resolution and add small random offset (±10 pixels)
+        width, height = random.choice(common_resolutions)
+        width += random.randint(-10, 10)
+        height += random.randint(-10, 10)
+
+        return width, height
+
     def _categorize_error(self, error_message: str) -> str:
         """
         Categorize error type for smart handling
@@ -324,14 +377,30 @@ class CompanyWebsiteScraper:
         """
         error_lower = error_message.lower()
 
-        if "timeout" in error_lower or "timed out" in error_lower:
-            return "timeout"
-        elif "rate" in error_lower or "quota" in error_lower or "429" in error_lower:
-            return "rate_limit"
-        elif "aborted" in error_lower or "blocked" in error_lower or "403" in error_lower:
+        # Check for bot detection first (most specific)
+        if "err_aborted" in error_lower or "aborted" in error_lower:
             return "bot_detection"
+        elif "blocked" in error_lower or "403" in error_lower or "forbidden" in error_lower:
+            return "bot_detection"
+        elif "cloudflare" in error_lower or "captcha" in error_lower:
+            return "bot_detection"
+
+        # Rate limiting (after bot detection to avoid conflicts)
+        elif "rate limit" in error_lower or "quota" in error_lower or "429" in error_lower:
+            return "rate_limit"
+        elif "too many requests" in error_lower:
+            return "rate_limit"
+
+        # Timeouts
+        elif "timeout" in error_lower or "timed out" in error_lower:
+            return "timeout"
+
+        # Network issues
         elif "network" in error_lower or "connection" in error_lower or "dns" in error_lower:
             return "network"
+        elif "err_connection" in error_lower or "econnrefused" in error_lower:
+            return "network"
+
         else:
             return "other"
 
@@ -361,6 +430,42 @@ class CompanyWebsiteScraper:
             return True, "Too many errors overall - scraping may not be viable for this site"
 
         return False, ""
+
+    def _get_random_delay(self, base: Optional[float] = None) -> float:
+        """
+        Get a randomized delay to make scraping less predictable
+
+        Args:
+            base: Base delay in seconds (uses self.base_delay if not provided)
+
+        Returns:
+            Randomized delay in seconds (50-150% of base)
+        """
+        if base is None:
+            base = self.base_delay
+
+        # Random delay between 50% and 150% of base
+        min_delay = base * 0.5
+        max_delay = base * 1.5
+        return random.uniform(min_delay, max_delay)
+
+    def _get_retry_delay(self, attempt: int) -> float:
+        """
+        Get exponential backoff delay for retries
+
+        Args:
+            attempt: Retry attempt number (0-indexed)
+
+        Returns:
+            Delay in seconds with exponential backoff
+        """
+        # Exponential backoff: retry_delay * (2 ^ attempt)
+        # attempt 0: 5s, attempt 1: 10s, attempt 2: 20s
+        delay = self.retry_delay * (2 ** attempt)
+
+        # Add some randomization (±20%)
+        jitter = delay * 0.2
+        return delay + random.uniform(-jitter, jitter)
 
     def save_checkpoint(self, completed_urls: List[str], remaining_urls: List[str]):
         """Save checkpoint for batch processing"""
@@ -442,28 +547,48 @@ class CompanyWebsiteScraper:
             if self.verbose:
                 console.print(f"\n[bold cyan]Company {i}/{len(remaining_urls)}[/bold cyan]\n")
 
-            try:
-                result = await self.scrape_company(url)
-                results.append(result)
-                completed_urls.append(url)
+            # Try scraping with retries
+            result = None
+            for attempt in range(self.max_retries + 1):
+                try:
+                    result = await self.scrape_company(url)
 
-                # Update checkpoint after each successful scrape
-                still_remaining = remaining_urls[i:]
-                self.save_checkpoint(completed_urls, still_remaining)
+                    # Success!
+                    results.append(result)
+                    completed_urls.append(url)
 
-                # Small delay between companies to be respectful
-                if i < len(remaining_urls):
-                    await asyncio.sleep(2)
+                    # Update checkpoint after each successful scrape
+                    still_remaining = remaining_urls[i:]
+                    self.save_checkpoint(completed_urls, still_remaining)
 
-            except KeyboardInterrupt:
+                    break  # Exit retry loop on success
+
+                except KeyboardInterrupt:
+                    if self.verbose:
+                        console.print("\n[yellow]⚠️  Interrupted by user[/yellow]")
+                        console.print(f"[cyan]Progress saved. Resume later with --resume flag[/cyan]\n")
+                    raise  # Re-raise to break outer loop
+
+                except Exception as e:
+                    if attempt < self.max_retries:
+                        # Retry with exponential backoff
+                        retry_delay = self._get_retry_delay(attempt)
+                        if self.verbose:
+                            console.print(f"[yellow]⚠️  Scrape failed:[/yellow] {str(e)[:100]}")
+                            console.print(f"[cyan]Retrying in {retry_delay:.1f}s... (attempt {attempt + 2}/{self.max_retries + 1})[/cyan]\n")
+                        await asyncio.sleep(retry_delay)
+                    else:
+                        # Final attempt failed
+                        if self.verbose:
+                            console.print(f"[red]✗ Failed after {self.max_retries + 1} attempts:[/red] {str(e)[:100]}\n")
+                        # Continue with next company
+
+            # Randomized delay between companies (if not last company)
+            if i < len(remaining_urls):
+                delay = self._get_random_delay()
                 if self.verbose:
-                    console.print("\n[yellow]⚠️  Interrupted by user[/yellow]")
-                    console.print(f"[cyan]Progress saved. Resume later with --resume flag[/cyan]\n")
-                break
-            except Exception as e:
-                if self.verbose:
-                    console.print(f"[red]Error scraping {url}: {e}[/red]")
-                # Continue with next company
+                    console.print(f"[dim]Waiting {delay:.1f}s before next company...[/dim]\n")
+                await asyncio.sleep(delay)
 
         # Clear checkpoint if all completed
         if len(completed_urls) == len(urls):
@@ -687,13 +812,16 @@ class CompanyWebsiteScraper:
 
     def _create_browser_config(self) -> BrowserConfig:
         """Create browser configuration with anti-scraping measures"""
+        # Get randomized viewport to avoid fingerprinting
+        viewport_width, viewport_height = self._get_random_viewport()
+
         return BrowserConfig(
             browser_type="chromium",
             headless=self.headless,
             enable_stealth=self.use_stealth,
-            viewport_width=1920,
-            viewport_height=1080,
-            user_agent_mode="random",  # Rotate user agents
+            viewport_width=viewport_width,
+            viewport_height=viewport_height,
+            user_agent=self._get_random_user_agent(),  # Use our curated list
             extra_args=[
                 "--disable-blink-features=AutomationControlled",
                 "--disable-web-security"
@@ -1284,6 +1412,24 @@ Examples:
         action='store_true',
         help='Resume from checkpoint if batch scraping was interrupted'
     )
+    parser.add_argument(
+        '--max-retries',
+        type=int,
+        default=1,
+        help='Maximum retries for failed scrapes (default: 1)'
+    )
+    parser.add_argument(
+        '--base-delay',
+        type=float,
+        default=2.0,
+        help='Base delay between companies in seconds, randomized ±50%% (default: 2.0)'
+    )
+    parser.add_argument(
+        '--retry-delay',
+        type=float,
+        default=5.0,
+        help='Initial retry delay in seconds with exponential backoff (default: 5.0)'
+    )
 
     args = parser.parse_args()
 
@@ -1296,7 +1442,10 @@ Examples:
         output_dir=args.output_dir,
         use_stealth=not args.no_stealth,
         headless=not args.no_headless,
-        verbose=not args.quiet
+        verbose=not args.quiet,
+        max_retries=args.max_retries,
+        base_delay=args.base_delay,
+        retry_delay=args.retry_delay
     )
 
     # Use batch processing if multiple URLs
