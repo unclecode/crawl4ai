@@ -6,5 +6,11 @@ crawl4ai>=0.7.0
 # Data validation and serialization
 pydantic>=2.0.0
 
+# Environment variables
+python-dotenv>=1.0.0
+
+# Rich terminal output and progress tracking
+rich>=13.0.0
+
 # Optional: For data export and analysis
 pandas>=2.0.0
