@@ -12,5 +12,6 @@ python-dotenv>=1.0.0
 # Rich terminal output and progress tracking
 rich>=13.0.0
 
-# Optional: For data export and analysis
+# Data processing and export
 pandas>=2.0.0
+openpyxl>=3.0.0  # For Excel file support

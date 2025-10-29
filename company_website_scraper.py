@@ -33,6 +33,9 @@ from rich.table import Table
 from rich.text import Text
 from rich import box
 
+# Data processing and export
+import pandas as pd
+
 # Load environment variables from .env file
 load_dotenv()
 
@@ -1328,6 +1331,326 @@ class CompanyWebsiteScraper:
 
         return filepath
 
+    # ===========================
+    # Phase 2: Batch Processing & Export
+    # ===========================
+
+    @staticmethod
+    def read_batch_input(file_path: str) -> List[Dict[str, str]]:
+        """
+        Read company URLs from CSV or Excel file
+
+        Args:
+            file_path: Path to CSV or Excel file
+
+        Returns:
+            List of dicts with 'url' and optional 'company_name'
+
+        Expected CSV format:
+            url,company_name (optional)
+            https://example.com,Example Inc
+            https://test.com
+
+        Expected Excel format:
+            Same as CSV, first sheet will be used
+        """
+        file_path = Path(file_path)
+
+        if not file_path.exists():
+            raise FileNotFoundError(f"Batch input file not found: {file_path}")
+
+        # Read file based on extension
+        if file_path.suffix.lower() in ['.xlsx', '.xls']:
+            df = pd.read_excel(file_path)
+        elif file_path.suffix.lower() == '.csv':
+            df = pd.read_csv(file_path)
+        else:
+            raise ValueError(f"Unsupported file format: {file_path.suffix}. Use .csv, .xlsx, or .xls")
+
+        # Validate required columns
+        if 'url' not in df.columns and 'URL' not in df.columns:
+            raise ValueError("Input file must have a 'url' or 'URL' column")
+
+        # Normalize column names
+        df.columns = df.columns.str.lower()
+
+        # Extract URLs and optional company names
+        companies = []
+        for _, row in df.iterrows():
+            url = str(row['url']).strip()
+            if url and url != 'nan':
+                company_data = {'url': url}
+                if 'company_name' in df.columns and pd.notna(row.get('company_name')):
+                    company_data['company_name'] = str(row['company_name']).strip()
+                companies.append(company_data)
+
+        console.print(f"[cyan]Loaded {len(companies)} companies from {file_path}[/cyan]")
+        return companies
+
+    def export_to_excel(
+        self,
+        results: List[ScraperResult],
+        output_file: Optional[str] = None
+    ) -> Path:
+        """
+        Export scraping results to Excel with multiple sheets
+
+        Args:
+            results: List of ScraperResult objects
+            output_file: Optional output filename
+
+        Returns:
+            Path to Excel file
+
+        Sheets created:
+            - Summary: High-level overview of all companies
+            - Details: Full data for each company
+            - Products: All products across companies
+            - Industries: All industries across companies
+            - Statistics: Scraping statistics
+        """
+        if not results:
+            raise ValueError("No results to export")
+
+        # Generate filename if not provided
+        if output_file is None:
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            output_file = f"batch_results_{timestamp}.xlsx"
+
+        filepath = self.output_dir / output_file
+
+        # Create Excel writer
+        with pd.ExcelWriter(filepath, engine='openpyxl') as writer:
+            # Sheet 1: Summary
+            summary_data = []
+            for result in results:
+                company = result.company_info
+                stats = result.stats
+                quality = result.quality_score
+
+                summary_data.append({
+                    'Company Name': company.company_name,
+                    'URL': company.url,
+                    'Products/Services': len(company.products_services),
+                    'Industries': len(company.target_industries),
+                    'Pages Scraped': stats.total_pages_succeeded,
+                    'Success Rate (%)': round(stats.success_rate, 1),
+                    'Cost ($)': round(stats.estimated_cost, 4),
+                    'Completeness (%)': quality.completeness,
+                    'Confidence (%)': quality.confidence,
+                    'Headquarters': company.headquarters or 'N/A',
+                    'Founded': company.year_founded or 'N/A',
+                })
+
+            df_summary = pd.DataFrame(summary_data)
+            df_summary.to_excel(writer, sheet_name='Summary', index=False)
+
+            # Sheet 2: Products
+            products_data = []
+            for result in results:
+                company_name = result.company_info.company_name
+                for product in result.company_info.products_services:
+                    products_data.append({
+                        'Company': company_name,
+                        'Product/Service': product.name,
+                        'Description': product.description,
+                        'Category': product.category or 'N/A',
+                        'Target Market': product.target_market or 'N/A',
+                    })
+
+            if products_data:
+                df_products = pd.DataFrame(products_data)
+                df_products.to_excel(writer, sheet_name='Products', index=False)
+
+            # Sheet 3: Industries
+            industries_data = []
+            for result in results:
+                company_name = result.company_info.company_name
+                for industry in result.company_info.target_industries:
+                    industries_data.append({
+                        'Company': company_name,
+                        'Industry': industry.name,
+                        'Description': industry.description or 'N/A',
+                    })
+
+            if industries_data:
+                df_industries = pd.DataFrame(industries_data)
+                df_industries.to_excel(writer, sheet_name='Industries', index=False)
+
+            # Sheet 4: Statistics
+            stats_data = []
+            for result in results:
+                stats = result.stats
+                stats_data.append({
+                    'Company': result.company_info.company_name,
+                    'Pages Attempted': stats.total_pages_attempted,
+                    'Pages Succeeded': stats.total_pages_succeeded,
+                    'Pages Failed': stats.total_pages_failed,
+                    'Success Rate (%)': round(stats.success_rate, 1),
+                    'Time (seconds)': round(stats.total_time_seconds, 1),
+                    'Speed (pages/min)': round(stats.pages_per_minute, 1),
+                    'LLM Calls': stats.llm_api_calls,
+                    'Cost ($)': round(stats.estimated_cost, 4),
+                })
+
+            df_stats = pd.DataFrame(stats_data)
+            df_stats.to_excel(writer, sheet_name='Statistics', index=False)
+
+        if self.verbose:
+            console.print(f"[green]✓[/green] Excel export saved to: [yellow]{filepath}[/yellow]")
+
+        return filepath
+
+    def export_to_csv(
+        self,
+        results: List[ScraperResult],
+        output_file: Optional[str] = None
+    ) -> Path:
+        """
+        Export scraping results to CSV (flat format)
+
+        Args:
+            results: List of ScraperResult objects
+            output_file: Optional output filename
+
+        Returns:
+            Path to CSV file
+        """
+        if not results:
+            raise ValueError("No results to export")
+
+        # Generate filename if not provided
+        if output_file is None:
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            output_file = f"batch_results_{timestamp}.csv"
+
+        filepath = self.output_dir / output_file
+
+        # Flatten data for CSV
+        csv_data = []
+        for result in results:
+            company = result.company_info
+            stats = result.stats
+            quality = result.quality_score
+
+            # Join lists into comma-separated strings
+            products_list = '; '.join([p.name for p in company.products_services])
+            industries_list = '; '.join([i.name for i in company.target_industries])
+            techs_list = '; '.join(company.technologies_used) if company.technologies_used else 'N/A'
+            production_list = '; '.join(company.production_methods) if company.production_methods else 'N/A'
+
+            csv_data.append({
+                'Company Name': company.company_name,
+                'Tagline': company.tagline or 'N/A',
+                'Description': company.description,
+                'URL': company.url,
+                'Headquarters': company.headquarters or 'N/A',
+                'Founded': company.year_founded or 'N/A',
+                'Company Size': company.company_size or 'N/A',
+                'Products/Services': products_list,
+                'Target Industries': industries_list,
+                'Technologies': techs_list,
+                'Production Methods': production_list,
+                'Pages Scraped': stats.total_pages_succeeded,
+                'Success Rate (%)': round(stats.success_rate, 1),
+                'Scraping Time (s)': round(stats.total_time_seconds, 1),
+                'Cost ($)': round(stats.estimated_cost, 4),
+                'Completeness (%)': quality.completeness,
+                'Confidence (%)': quality.confidence,
+                'Page Coverage (%)': quality.page_coverage,
+            })
+
+        df = pd.DataFrame(csv_data)
+        df.to_csv(filepath, index=False, encoding='utf-8')
+
+        if self.verbose:
+            console.print(f"[green]✓[/green] CSV export saved to: [yellow]{filepath}[/yellow]")
+
+        return filepath
+
+    def generate_batch_summary(self, results: List[ScraperResult]) -> Dict[str, Any]:
+        """
+        Generate overall statistics for a batch of scrapes
+
+        Args:
+            results: List of ScraperResult objects
+
+        Returns:
+            Dictionary with batch statistics
+        """
+        if not results:
+            return {}
+
+        total_companies = len(results)
+        successful_scrapes = sum(1 for r in results if r.success)
+        total_pages_attempted = sum(r.stats.total_pages_attempted for r in results)
+        total_pages_succeeded = sum(r.stats.total_pages_succeeded for r in results)
+        total_pages_failed = sum(r.stats.total_pages_failed for r in results)
+        total_cost = sum(r.stats.estimated_cost for r in results)
+        total_time = sum(r.stats.total_time_seconds for r in results)
+        total_products = sum(len(r.company_info.products_services) for r in results)
+        total_industries = sum(len(r.company_info.target_industries) for r in results)
+
+        avg_completeness = sum(r.quality_score.completeness for r in results) / total_companies
+        avg_confidence = sum(r.quality_score.confidence for r in results) / total_companies
+        avg_page_coverage = sum(r.quality_score.page_coverage for r in results) / total_companies
+
+        overall_success_rate = (total_pages_succeeded / total_pages_attempted * 100) if total_pages_attempted > 0 else 0
+
+        return {
+            'total_companies': total_companies,
+            'successful_scrapes': successful_scrapes,
+            'failed_scrapes': total_companies - successful_scrapes,
+            'total_pages_attempted': total_pages_attempted,
+            'total_pages_succeeded': total_pages_succeeded,
+            'total_pages_failed': total_pages_failed,
+            'overall_success_rate': round(overall_success_rate, 1),
+            'total_cost': round(total_cost, 4),
+            'total_time_seconds': round(total_time, 1),
+            'total_time_minutes': round(total_time / 60, 1),
+            'avg_time_per_company': round(total_time / total_companies, 1),
+            'total_products_found': total_products,
+            'total_industries_found': total_industries,
+            'avg_products_per_company': round(total_products / total_companies, 1),
+            'avg_industries_per_company': round(total_industries / total_companies, 1),
+            'avg_completeness': round(avg_completeness, 1),
+            'avg_confidence': round(avg_confidence, 1),
+            'avg_page_coverage': round(avg_page_coverage, 1),
+        }
+
+    def print_batch_summary(self, results: List[ScraperResult]):
+        """
+        Print a beautiful summary of batch scraping results
+
+        Args:
+            results: List of ScraperResult objects
+        """
+        summary = self.generate_batch_summary(results)
+
+        if not summary:
+            console.print("[yellow]No results to summarize[/yellow]")
+            return
+
+        # Create summary panel
+        panel = Panel(
+            f"[bold cyan]Batch Scraping Complete![/bold cyan]\n\n"
+            f"[white]Total Companies:[/white] {summary['total_companies']}\n"
+            f"[white]Successful:[/white] [green]{summary['successful_scrapes']}[/green]\n"
+            f"[white]Failed:[/white] [red]{summary['failed_scrapes']}[/red]\n\n"
+            f"[white]Pages Scraped:[/white] {summary['total_pages_succeeded']}/{summary['total_pages_attempted']}\n"
+            f"[white]Overall Success Rate:[/white] {summary['overall_success_rate']}%\n\n"
+            f"[white]Total Time:[/white] {summary['total_time_minutes']}m ({summary['avg_time_per_company']}s per company)\n"
+            f"[white]Total Cost:[/white] [green]${summary['total_cost']}[/green]\n\n"
+            f"[white]Products Found:[/white] {summary['total_products_found']} ({summary['avg_products_per_company']} avg)\n"
+            f"[white]Industries Found:[/white] {summary['total_industries_found']} ({summary['avg_industries_per_company']} avg)\n\n"
+            f"[white]Avg Completeness:[/white] {summary['avg_completeness']}%\n"
+            f"[white]Avg Confidence:[/white] {summary['avg_confidence']}%",
+            title="[bold]Batch Summary[/bold]",
+            border_style="green",
+            box=box.ROUNDED
+        )
+        console.print(panel)
+
 
 # ===========================
 # CLI Interface
@@ -1353,13 +1676,24 @@ Examples:
 
   # Scrape multiple companies
   python company_website_scraper.py https://company1.com https://company2.com
+
+  # Scrape from CSV/Excel file
+  python company_website_scraper.py --batch-file companies.csv --export-excel
+
+  # Batch scraping with Excel and CSV export
+  python company_website_scraper.py --batch-file companies.xlsx --export-excel --export-csv
         """
     )
 
     parser.add_argument(
         'urls',
-        nargs='+',
+        nargs='*',
         help='Company website URL(s) to scrape'
+    )
+    parser.add_argument(
+        '--batch-file',
+        type=str,
+        help='CSV or Excel file containing company URLs (requires "url" column)'
     )
     parser.add_argument(
         '--llm-provider',
@@ -1430,8 +1764,30 @@ Examples:
         default=5.0,
         help='Initial retry delay in seconds with exponential backoff (default: 5.0)'
     )
+    parser.add_argument(
+        '--export-excel',
+        action='store_true',
+        help='Export batch results to Excel (multiple sheets)'
+    )
+    parser.add_argument(
+        '--export-csv',
+        action='store_true',
+        help='Export batch results to CSV (flat format)'
+    )
+    parser.add_argument(
+        '--export-file',
+        type=str,
+        help='Custom filename for exports (without extension)'
+    )
 
     args = parser.parse_args()
+
+    # Validate arguments
+    if not args.urls and not args.batch_file:
+        parser.error("Must provide either URLs or --batch-file")
+
+    if args.urls and args.batch_file:
+        parser.error("Cannot use both URLs and --batch-file. Choose one.")
 
     # Create scraper instance
     scraper = CompanyWebsiteScraper(
@@ -1448,20 +1804,47 @@ Examples:
         retry_delay=args.retry_delay
     )
 
-    # Use batch processing if multiple URLs
-    if len(args.urls) > 1:
-        # Batch mode
-        results = await scraper.scrape_companies_batch(args.urls, resume=args.resume)
+    # Determine URLs to scrape
+    if args.batch_file:
+        # Read from batch file
+        companies = scraper.read_batch_input(args.batch_file)
+        urls_to_scrape = [c['url'] for c in companies]
+    else:
+        # Use command-line URLs
+        urls_to_scrape = args.urls
+        companies = [{'url': url} for url in urls_to_scrape]
 
-        # Save all results
+    # Scrape companies
+    if len(urls_to_scrape) > 1:
+        # Batch mode
+        results = await scraper.scrape_companies_batch(urls_to_scrape, resume=args.resume)
+
+        # Save individual JSON results
         for result in results:
             if result.success:
                 json_path = scraper.save_results(result)
                 if args.save_markdown:
                     scraper.save_markdown_summary(result)
+
+        # Print batch summary
+        if not args.quiet and results:
+            scraper.print_batch_summary(results)
+
+        # Export to Excel if requested
+        if args.export_excel and results:
+            excel_file = args.export_file + '.xlsx' if args.export_file else None
+            excel_path = scraper.export_to_excel(results, excel_file)
+            console.print(f"\n[green]✓[/green] Excel export: [yellow]{excel_path}[/yellow]")
+
+        # Export to CSV if requested
+        if args.export_csv and results:
+            csv_file = args.export_file + '.csv' if args.export_file else None
+            csv_path = scraper.export_to_csv(results, csv_file)
+            console.print(f"[green]✓[/green] CSV export: [yellow]{csv_path}[/yellow]\n")
+
     else:
         # Single company mode
-        result = await scraper.scrape_company(args.urls[0])
+        result = await scraper.scrape_company(urls_to_scrape[0])
 
         if result.success:
             # Save JSON results
@@ -1477,7 +1860,7 @@ Examples:
                 console.print(f"  Results saved to: [yellow]{json_path}[/yellow]\n")
             # In verbose mode, the summary was already printed by scrape_company()
         else:
-            console.print(f"\n[red]✗ Failed to scrape {args.urls[0]}:[/red] {result.error_message}\n")
+            console.print(f"\n[red]✗ Failed to scrape {urls_to_scrape[0]}:[/red] {result.error_message}\n")
 
 
 if __name__ == "__main__":
