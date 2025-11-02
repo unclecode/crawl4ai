@@ -60,25 +60,35 @@ def setup_llm_config() -> tuple[str, str]:
     config = get_global_config()
     provider = config.get("DEFAULT_LLM_PROVIDER")
     token = config.get("DEFAULT_LLM_PROVIDER_TOKEN")
-    
+
     if not provider:
         click.echo("\nNo default LLM provider configured.")
         click.echo("Provider format: 'company/model' (e.g., 'openai/gpt-4o', 'anthropic/claude-3-sonnet')")
         click.echo("See available providers at: https://docs.litellm.ai/docs/providers")
         provider = click.prompt("Enter provider")
-        
+
     if not provider.startswith("ollama/"):
         if not token:
             token = click.prompt("Enter API token for " + provider, hide_input=True)
     else:
         token = "no-token"
-    
+
     if not config.get("DEFAULT_LLM_PROVIDER") or not config.get("DEFAULT_LLM_PROVIDER_TOKEN"):
         config["DEFAULT_LLM_PROVIDER"] = provider
         config["DEFAULT_LLM_PROVIDER_TOKEN"] = token
         save_global_config(config)
         click.echo("\nConfiguration saved to ~/.crawl4ai/global.yml")
-    
+
+    # Export Azure-specific environment variables if configured
+    # This allows Azure OpenAI to work without requiring env vars to be set manually
+    azure_api_base = config.get("AZURE_API_BASE")
+    azure_api_version = config.get("AZURE_API_VERSION")
+
+    if azure_api_base:
+        os.environ["AZURE_API_BASE"] = azure_api_base
+    if azure_api_version:
+        os.environ["AZURE_API_VERSION"] = azure_api_version
+
     return provider, token
 
 async def stream_llm_response(url: str, markdown: str, query: str, provider: str, token: str):
