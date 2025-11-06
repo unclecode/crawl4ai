@@ -8,15 +8,19 @@ in managed browsers (CDP mode) work correctly, particularly:
 3. Multiple concurrent arun_many calls work correctly
 """
 
+# Standard library imports
 import asyncio
-import pytest
-import sys
 import os
+import sys
+
+# Third-party imports
+import pytest
 
 # Add the project root to Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
+# Local imports
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CacheMode, CrawlerRunConfig
 
 
 @pytest.mark.asyncio

@@ -5,22 +5,26 @@ This module provides a dedicated class for managing browser profiles
 that can be used for identity-based crawling with Crawl4AI.
 """
 
-import os
+# Standard library imports
 import asyncio
-import signal
-import sys
 import datetime
-import uuid
-import shutil
 import json
+import os
+import shutil
+import signal
 import subprocess
+import sys
 import time
-from typing import List, Dict, Optional, Any
+import uuid
+from typing import Any, Dict, List, Optional
+
+# Third-party imports
 from rich.console import Console
 
+# Local imports
 from .async_configs import BrowserConfig
-from .browser_manager import ManagedBrowser
 from .async_logger import AsyncLogger, AsyncLoggerBase, LogColor
+from .browser_manager import ManagedBrowser
 from .utils import get_home_folder
 
 

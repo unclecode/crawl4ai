@@ -1,21 +1,26 @@
+# Standard library imports
 import asyncio
-import time
-from typing import List, Optional
+import hashlib
 import os
-import sys
+import shlex
 import shutil
-import tempfile
-import psutil  
 import signal
 import subprocess
-import shlex
-from playwright.async_api import BrowserContext
-import hashlib
-from .js_snippet import load_js_script
-from .config import DOWNLOAD_PAGE_TIMEOUT
-from .async_configs import BrowserConfig, CrawlerRunConfig
-from .utils import get_chromium_path
+import sys
+import tempfile
+import time
 import warnings
+from typing import List, Optional
+
+# Third-party imports
+import psutil
+from playwright.async_api import BrowserContext
+
+# Local imports
+from .async_configs import BrowserConfig, CrawlerRunConfig
+from .config import DOWNLOAD_PAGE_TIMEOUT
+from .js_snippet import load_js_script
+from .utils import get_chromium_path
 
 
 BROWSER_DISABLE_OPTIONS = [
