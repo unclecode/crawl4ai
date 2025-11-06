@@ -104,10 +104,9 @@ class ManagedBrowser:
         if config.proxy:
             flags.append(f"--proxy-server={config.proxy}")
         elif config.proxy_config:
-            creds = ""
-            if config.proxy_config.username and config.proxy_config.password:
-                creds = f"{config.proxy_config.username}:{config.proxy_config.password}@"
-            flags.append(f"--proxy-server={creds}{config.proxy_config.server}")
+            # Note: For CDP/managed browsers, proxy credentials should be handled
+            # via authentication, not in the URL. Only pass the server address.
+            flags.append(f"--proxy-server={config.proxy_config.server}")
         # dedupe
         return list(dict.fromkeys(flags))
 
@@ -219,11 +218,27 @@ class ManagedBrowser:
                         os.remove(fp)
         except Exception as _e:
             # non-fatal — we'll try to start anyway, but log what happened
-            self.logger.warning(f"pre-launch cleanup failed: {_e}", tag="BROWSER")            
-            
+            if self.logger:
+                self.logger.warning(
+                    "Pre-launch cleanup failed: {error} | Will attempt to start browser anyway",
+                    tag="BROWSER",
+                    params={"error": str(_e)}
+                )
 
         # Start browser process
         try:
+            # Log browser launch intent
+            if self.logger and self.browser_config.verbose:
+                self.logger.debug(
+                    "Launching browser: {browser_type} | Port: {port} | Headless: {headless}",
+                    tag="BROWSER",
+                    params={
+                        "browser_type": self.browser_type,
+                        "port": self.debugging_port,
+                        "headless": self.headless
+                    }
+                )
+                
             # Use DETACHED_PROCESS flag on Windows to fully detach the process
             # On Unix, we'll use preexec_fn=os.setpgrp to start the process in a new process group
             if sys.platform == "win32":
@@ -241,19 +256,36 @@ class ManagedBrowser:
                     preexec_fn=os.setpgrp  # Start in a new process group
                 )
                 
-            # If verbose is True print args used to run the process
+            # Log full command if verbose logging is enabled
             if self.logger and self.browser_config.verbose:
+                # Format args for better readability - escape and join
+                formatted_args = ' '.join(shlex.quote(str(arg)) for arg in args)
                 self.logger.debug(
-                    f"Starting browser with args: {' '.join(args)}",
-                    tag="BROWSER"
-                )    
+                    "Browser launch command: {command}",
+                    tag="BROWSER",
+                    params={"command": formatted_args}
+                )
                 
-            # We'll monitor for a short time to make sure it starts properly, but won't keep monitoring
-            await asyncio.sleep(0.5)  # Give browser time to start
+            # Perform startup health checks
+            await asyncio.sleep(0.5)  # Initial delay for process startup
             await self._initial_startup_check()
-            await asyncio.sleep(2)  # Give browser time to start
-            return f"http://{self.host}:{self.debugging_port}"
+            await asyncio.sleep(2)  # Additional time for browser initialization
+            
+            cdp_url = f"http://{self.host}:{self.debugging_port}"
+            if self.logger:
+                self.logger.info(
+                    "Browser started successfully | CDP URL: {cdp_url}",
+                    tag="BROWSER",
+                    params={"cdp_url": cdp_url}
+                )
+            return cdp_url
         except Exception as e:
+            if self.logger:
+                self.logger.error(
+                    "Failed to start browser: {error}",
+                    tag="BROWSER",
+                    params={"error": str(e)}
+                )
             await self.cleanup()
             raise Exception(f"Failed to start browser: {e}")
 
@@ -266,23 +298,41 @@ class ManagedBrowser:
             return
             
         # Check that process started without immediate termination
-        await asyncio.sleep(0.5)
-        if self.browser_process.poll() is not None:
-            # Process already terminated
-            stdout, stderr = b"", b""
-            try:
-                stdout, stderr = self.browser_process.communicate(timeout=0.5)
-            except subprocess.TimeoutExpired:
-                pass
+        # Perform multiple checks with increasing delays to catch early failures
+        check_intervals = [0.1, 0.2, 0.3]  # Total 0.6s
+        
+        for delay in check_intervals:
+            await asyncio.sleep(delay)
+            if self.browser_process.poll() is not None:
+                # Process already terminated - capture output for debugging
+                stdout, stderr = b"", b""
+                try:
+                    stdout, stderr = self.browser_process.communicate(timeout=0.5)
+                except subprocess.TimeoutExpired:
+                    pass
+                    
+                error_msg = "Browser process terminated during startup"
+                if stderr:
+                    error_msg += f" | STDERR: {stderr.decode()[:200]}"  # Limit output length
+                if stdout:
+                    error_msg += f" | STDOUT: {stdout.decode()[:200]}"
+                    
+                self.logger.error(
+                    message="{error_msg} | Exit code: {code}",
+                    tag="BROWSER",
+                    params={
+                        "error_msg": error_msg,
+                        "code": self.browser_process.returncode,
+                    },
+                )
+                raise RuntimeError(f"Browser failed to start: {error_msg}")
                 
-            self.logger.error(
-                message="Browser process terminated during startup | Code: {code} | STDOUT: {stdout} | STDERR: {stderr}",
-                tag="ERROR",
-                params={
-                    "code": self.browser_process.returncode,
-                    "stdout": stdout.decode() if stdout else "",
-                    "stderr": stderr.decode() if stderr else "",
-                },
+        # Process is still running after checks - log success
+        if self.logger and self.browser_config.verbose:
+            self.logger.debug(
+                "Browser process startup check passed | PID: {pid}",
+                tag="BROWSER",
+                params={"pid": self.browser_process.pid}
             )
     
     async def _monitor_browser_process(self):
@@ -371,6 +421,8 @@ class ManagedBrowser:
                 flags.append("--headless=new")
             # merge common launch flags
             flags.extend(self.build_browser_flags(self.browser_config))
+            # Deduplicate flags - use dict.fromkeys to preserve order while removing duplicates
+            flags = list(dict.fromkeys(flags))
         elif self.browser_type == "firefox":
             flags = [
                 "--remote-debugging-port",
@@ -1048,21 +1100,12 @@ class BrowserManager:
                 await self._apply_stealth_to_page(page)
             else:
                 context = self.default_context
-                pages = context.pages
-                page = next((p for p in pages if p.url == crawlerRunConfig.url), None)
-                if not page:
-                    if pages:
-                        page = pages[0]
-                    else:
-                        # Double-check under lock to avoid TOCTOU and ensure only
-                        # one task calls new_page when pages=[] concurrently
-                        async with self._page_lock:
-                            pages = context.pages
-                            if pages:
-                                page = pages[0]
-                            else:
-                                page = await context.new_page()
-                                await self._apply_stealth_to_page(page)
+                # Always create new pages instead of reusing existing ones
+                # This prevents race conditions in concurrent scenarios (arun_many with CDP)
+                # Serialize page creation to avoid 'Target page/context closed' errors
+                async with self._page_lock:
+                    page = await context.new_page()
+                await self._apply_stealth_to_page(page)
         else:
             # Otherwise, check if we have an existing context for this config
             config_signature = self._make_config_signature(crawlerRunConfig)
