@@ -1035,34 +1035,20 @@ class BrowserManager:
             self.sessions[crawlerRunConfig.session_id] = (context, page, time.time())
             return page, context
 
-        # If using a managed browser, just grab the shared default_context
+        # If using a managed browser, reuse the default context and create new pages
         if self.config.use_managed_browser:
+            context = self.default_context
             if self.config.storage_state:
-                context = await self.create_browser_context(crawlerRunConfig)
-                ctx = self.default_context        # default context, one window only
+                # Clone runtime state from storage to the shared context
+                ctx = self.default_context
                 ctx = await clone_runtime_state(context, ctx, crawlerRunConfig, self.config)
-                # Avoid concurrent new_page on shared persistent context
-                # See GH-1198: context.pages can be empty under races
-                async with self._page_lock:
-                    page = await ctx.new_page()
-                await self._apply_stealth_to_page(page)
-            else:
-                context = self.default_context
-                pages = context.pages
-                page = next((p for p in pages if p.url == crawlerRunConfig.url), None)
-                if not page:
-                    if pages:
-                        page = pages[0]
-                    else:
-                        # Double-check under lock to avoid TOCTOU and ensure only
-                        # one task calls new_page when pages=[] concurrently
-                        async with self._page_lock:
-                            pages = context.pages
-                            if pages:
-                                page = pages[0]
-                            else:
-                                page = await context.new_page()
-                                await self._apply_stealth_to_page(page)
+            
+            # Always create a new page for concurrent safety
+            # The page-level isolation prevents race conditions while sharing the same context
+            async with self._page_lock:
+                page = await context.new_page()
+            
+            await self._apply_stealth_to_page(page)
         else:
             # Otherwise, check if we have an existing context for this config
             config_signature = self._make_config_signature(crawlerRunConfig)

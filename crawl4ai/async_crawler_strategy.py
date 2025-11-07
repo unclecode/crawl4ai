@@ -1047,14 +1047,28 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             raise e
 
         finally:
-            # If no session_id is given we should close the page
+            # Clean up page after crawl completes
+            # For managed CDP browsers, close pages that are not part of a session to prevent memory leaks
             all_contexts = page.context.browser.contexts
-            total_pages = sum(len(context.pages) for context in all_contexts)                
+            total_pages = sum(len(context.pages) for context in all_contexts)
+            
+            should_close_page = False
+            
             if config.session_id:
+                # Session pages are kept alive for reuse
                 pass
-            elif total_pages <= 1 and (self.browser_config.use_managed_browser or self.browser_config.headless):
+            elif self.browser_config.use_managed_browser:
+                # For managed browsers (CDP), close non-session pages to prevent tab accumulation
+                # This is especially important for arun_many() with multiple concurrent crawls
+                should_close_page = True
+            elif total_pages <= 1 and self.browser_config.headless:
+                # Keep the last page in headless mode to avoid closing the browser
                 pass
             else:
+                # For non-managed browsers, close the page
+                should_close_page = True
+            
+            if should_close_page:
                 # Detach listeners before closing to prevent potential errors during close
                 if config.capture_network_requests:
                     page.remove_listener("request", handle_request_capture)
