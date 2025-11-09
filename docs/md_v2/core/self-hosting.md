@@ -1,4 +1,20 @@
-# Crawl4AI Docker Guide 🐳
+# Self-Hosting Crawl4AI 🚀
+
+**Take Control of Your Web Crawling Infrastructure**
+
+Self-hosting Crawl4AI gives you complete control over your web crawling and data extraction pipeline. Unlike cloud-based solutions, you own your data, infrastructure, and destiny.
+
+## Why Self-Host?
+
+- **🔒 Data Privacy**: Your crawled data never leaves your infrastructure
+- **💰 Cost Control**: No per-request pricing - scale within your own resources
+- **🎯 Customization**: Full control over browser configurations, extraction strategies, and performance tuning
+- **📊 Transparency**: Real-time monitoring dashboard shows exactly what's happening
+- **⚡ Performance**: Direct access without API rate limits or geographic restrictions
+- **🛡️ Security**: Keep sensitive data extraction workflows behind your firewall
+- **🔧 Flexibility**: Customize, extend, and integrate with your existing infrastructure
+
+When you self-host, you can scale from a single container to a full browser infrastructure, all while maintaining complete control and visibility.
 
 ## Table of Contents
 - [Prerequisites](#prerequisites)
@@ -25,7 +41,12 @@
   - [Available MCP Tools](#available-mcp-tools)
   - [Testing MCP Connections](#testing-mcp-connections)
   - [MCP Schemas](#mcp-schemas)
-- [Metrics & Monitoring](#metrics--monitoring)
+- [Real-time Monitoring & Operations](#real-time-monitoring--operations)
+  - [Monitoring Dashboard](#monitoring-dashboard)
+  - [Monitor API Endpoints](#monitor-api-endpoints)
+  - [WebSocket Streaming](#websocket-streaming)
+  - [Control Actions](#control-actions)
+  - [Production Integration](#production-integration)
 - [Deployment Scenarios](#deployment-scenarios)
 - [Complete Examples](#complete-examples)
 - [Server Configuration](#server-configuration)
@@ -1175,22 +1196,469 @@ async def test_stream_crawl(token: str = None): # Made token optional
 
 ---
 
-## Metrics & Monitoring
+## Real-time Monitoring & Operations
 
-Keep an eye on your crawler with these endpoints:
+One of the key advantages of self-hosting is complete visibility into your infrastructure. Crawl4AI includes a comprehensive real-time monitoring system that gives you full transparency and control.
 
-- `/health` - Quick health check
-- `/metrics` - Detailed Prometheus metrics
-- `/schema` - Full API schema
+### Monitoring Dashboard
 
-Example health check:
+Access the **built-in real-time monitoring dashboard** for complete operational visibility:
+
+```
+http://localhost:11235/monitor
+```
+
+![Monitoring Dashboard](https://via.placeholder.com/800x400?text=Crawl4AI+Monitoring+Dashboard)
+
+**Dashboard Features:**
+
+#### 1. System Health Overview
+- **CPU & Memory**: Live usage with progress bars and percentage indicators
+- **Network I/O**: Total bytes sent/received since startup
+- **Server Uptime**: How long your server has been running
+- **Browser Pool Status**:
+  - 🔥 Permanent browser (always-on default config, ~270MB)
+  - ♨️ Hot pool (frequently used configs, ~180MB each)
+  - ❄️ Cold pool (idle browsers awaiting cleanup, ~180MB each)
+- **Memory Pressure**: LOW/MEDIUM/HIGH indicator for janitor behavior
+
+#### 2. Live Request Tracking
+- **Active Requests**: Currently running crawls with:
+  - Request ID for tracking
+  - Target URL (truncated for display)
+  - Endpoint being used
+  - Elapsed time (updates in real-time)
+  - Memory usage from start
+- **Completed Requests**: Last 10 finished requests showing:
+  - Success/failure status (color-coded)
+  - Total execution time
+  - Memory delta (how much memory changed)
+  - Pool hit (was browser reused?)
+  - HTTP status code
+- **Filtering**: View all, success only, or errors only
+
+#### 3. Browser Pool Management
+Interactive table showing all active browsers:
+
+| Type | Signature | Age | Last Used | Hits | Actions |
+|------|-----------|-----|-----------|------|---------|
+| permanent | abc12345 | 2h | 5s ago | 1,247 | Restart |
+| hot | def67890 | 45m | 2m ago | 89 | Kill / Restart |
+| cold | ghi11213 | 30m | 15m ago | 3 | Kill / Restart |
+
+- **Reuse Rate**: Percentage of requests that reused existing browsers
+- **Memory Estimates**: Total memory used by browser pool
+- **Manual Control**: Kill or restart individual browsers
+
+#### 4. Janitor Events Log
+Real-time log of browser pool cleanup events:
+- When cold browsers are closed due to memory pressure
+- When browsers are promoted from cold to hot pool
+- Forced cleanups triggered manually
+- Detailed cleanup reasons and browser signatures
+
+#### 5. Error Monitoring
+Recent errors with full context:
+- Timestamp
+- Endpoint where error occurred
+- Target URL
+- Error message
+- Request ID for correlation
+
+**Live Updates:**
+The dashboard connects via WebSocket and refreshes every **2 seconds** with the latest data. Connection status indicator shows when you're connected/disconnected.
+
+---
+
+### Monitor API Endpoints
+
+For programmatic monitoring, automation, and integration with your existing infrastructure:
+
+#### Health & Statistics
+
+**Get System Health**
 ```bash
-curl http://localhost:11235/health
+GET /monitor/health
+```
+
+Returns current system snapshot:
+```json
+{
+  "container": {
+    "memory_percent": 45.2,
+    "cpu_percent": 23.1,
+    "network_sent_mb": 1250.45,
+    "network_recv_mb": 3421.12,
+    "uptime_seconds": 7234
+  },
+  "pool": {
+    "permanent": {"active": true, "memory_mb": 270},
+    "hot": {"count": 3, "memory_mb": 540},
+    "cold": {"count": 1, "memory_mb": 180},
+    "total_memory_mb": 990
+  },
+  "janitor": {
+    "next_cleanup_estimate": "adaptive",
+    "memory_pressure": "MEDIUM"
+  }
+}
+```
+
+**Get Request Statistics**
+```bash
+GET /monitor/requests?status=all&limit=50
+```
+
+Query parameters:
+- `status`: Filter by `all`, `active`, `completed`, `success`, or `error`
+- `limit`: Number of completed requests to return (1-1000)
+
+**Get Browser Pool Details**
+```bash
+GET /monitor/browsers
+```
+
+Returns detailed information about all active browsers:
+```json
+{
+  "browsers": [
+    {
+      "type": "permanent",
+      "sig": "abc12345",
+      "age_seconds": 7234,
+      "last_used_seconds": 5,
+      "memory_mb": 270,
+      "hits": 1247,
+      "killable": false
+    },
+    {
+      "type": "hot",
+      "sig": "def67890",
+      "age_seconds": 2701,
+      "last_used_seconds": 120,
+      "memory_mb": 180,
+      "hits": 89,
+      "killable": true
+    }
+  ],
+  "summary": {
+    "total_count": 5,
+    "total_memory_mb": 990,
+    "reuse_rate_percent": 87.3
+  }
+}
+```
+
+**Get Endpoint Performance Statistics**
+```bash
+GET /monitor/endpoints/stats
+```
+
+Returns aggregated metrics per endpoint:
+```json
+{
+  "/crawl": {
+    "count": 1523,
+    "avg_latency_ms": 2341.5,
+    "success_rate_percent": 98.2,
+    "pool_hit_rate_percent": 89.1,
+    "errors": 27
+  },
+  "/md": {
+    "count": 891,
+    "avg_latency_ms": 1823.7,
+    "success_rate_percent": 99.4,
+    "pool_hit_rate_percent": 92.3,
+    "errors": 5
+  }
+}
+```
+
+**Get Timeline Data**
+```bash
+GET /monitor/timeline?metric=memory&window=5m
+```
+
+Parameters:
+- `metric`: `memory`, `requests`, or `browsers`
+- `window`: Currently only `5m` (5-minute window, 5-second resolution)
+
+Returns time-series data for charts:
+```json
+{
+  "timestamps": [1699564800, 1699564805, 1699564810, ...],
+  "values": [42.1, 43.5, 41.8, ...]
+}
+```
+
+#### Logs
+
+**Get Janitor Events**
+```bash
+GET /monitor/logs/janitor?limit=100
+```
+
+**Get Error Log**
+```bash
+GET /monitor/logs/errors?limit=100
 ```
 
 ---
 
-*(Deployment Scenarios and Complete Examples sections remain the same, maybe update links if examples moved)*
+### WebSocket Streaming
+
+For real-time monitoring in your own dashboards or applications:
+
+```bash
+WS /monitor/ws
+```
+
+**Connection Example (Python):**
+```python
+import asyncio
+import websockets
+import json
+
+async def monitor_server():
+    uri = "ws://localhost:11235/monitor/ws"
+
+    async with websockets.connect(uri) as websocket:
+        print("Connected to Crawl4AI monitor")
+
+        while True:
+            # Receive update every 2 seconds
+            data = await websocket.recv()
+            update = json.loads(data)
+
+            # Extract key metrics
+            health = update['health']
+            active_requests = len(update['requests']['active'])
+            browsers = len(update['browsers'])
+
+            print(f"Memory: {health['container']['memory_percent']:.1f}% | "
+                  f"Active: {active_requests} | "
+                  f"Browsers: {browsers}")
+
+            # Check for high memory pressure
+            if health['janitor']['memory_pressure'] == 'HIGH':
+                print("⚠️  HIGH MEMORY PRESSURE - Consider cleanup")
+
+asyncio.run(monitor_server())
+```
+
+**Update Payload Structure:**
+```json
+{
+  "timestamp": 1699564823.456,
+  "health": { /* System health snapshot */ },
+  "requests": {
+    "active": [ /* Currently running */ ],
+    "completed": [ /* Last 10 completed */ ]
+  },
+  "browsers": [ /* All active browsers */ ],
+  "timeline": {
+    "memory": { /* Last 5 minutes */ },
+    "requests": { /* Request rate */ },
+    "browsers": { /* Pool composition */ }
+  },
+  "janitor": [ /* Last 10 cleanup events */ ],
+  "errors": [ /* Last 10 errors */ ]
+}
+```
+
+---
+
+### Control Actions
+
+Take manual control when needed:
+
+**Force Immediate Cleanup**
+```bash
+POST /monitor/actions/cleanup
+```
+
+Kills all cold pool browsers immediately (useful when memory is tight):
+```json
+{
+  "success": true,
+  "killed_browsers": 3
+}
+```
+
+**Kill Specific Browser**
+```bash
+POST /monitor/actions/kill_browser
+Content-Type: application/json
+
+{
+  "sig": "abc12345"  // First 8 chars of browser signature
+}
+```
+
+Response:
+```json
+{
+  "success": true,
+  "killed_sig": "abc12345",
+  "pool_type": "hot"
+}
+```
+
+**Restart Browser**
+```bash
+POST /monitor/actions/restart_browser
+Content-Type: application/json
+
+{
+  "sig": "permanent"  // Or first 8 chars of signature
+}
+```
+
+For permanent browser, this will close and reinitialize it. For hot/cold browsers, it kills them and lets new requests create fresh ones.
+
+**Reset Statistics**
+```bash
+POST /monitor/stats/reset
+```
+
+Clears endpoint counters (useful for starting fresh after testing).
+
+---
+
+### Production Integration
+
+#### Integration with Existing Monitoring Systems
+
+**Prometheus Integration:**
+```bash
+# Scrape metrics endpoint
+curl http://localhost:11235/metrics
+```
+
+**Custom Dashboard Integration:**
+```python
+# Example: Push metrics to your monitoring system
+import asyncio
+import websockets
+import json
+from your_monitoring import push_metric
+
+async def integrate_monitoring():
+    async with websockets.connect("ws://localhost:11235/monitor/ws") as ws:
+        while True:
+            data = json.loads(await ws.recv())
+
+            # Push to your monitoring system
+            push_metric("crawl4ai.memory.percent",
+                       data['health']['container']['memory_percent'])
+            push_metric("crawl4ai.active_requests",
+                       len(data['requests']['active']))
+            push_metric("crawl4ai.browser_count",
+                       len(data['browsers']))
+```
+
+**Alerting Example:**
+```python
+import requests
+import time
+
+def check_health():
+    """Poll health endpoint and alert on issues"""
+    response = requests.get("http://localhost:11235/monitor/health")
+    health = response.json()
+
+    # Alert on high memory
+    if health['container']['memory_percent'] > 85:
+        send_alert(f"High memory: {health['container']['memory_percent']}%")
+
+    # Alert on high error rate
+    stats = requests.get("http://localhost:11235/monitor/endpoints/stats").json()
+    for endpoint, metrics in stats.items():
+        if metrics['success_rate_percent'] < 95:
+            send_alert(f"{endpoint} success rate: {metrics['success_rate_percent']}%")
+
+# Run every minute
+while True:
+    check_health()
+    time.sleep(60)
+```
+
+**Log Aggregation:**
+```python
+import requests
+from datetime import datetime
+
+def aggregate_errors():
+    """Fetch and aggregate errors for logging system"""
+    response = requests.get("http://localhost:11235/monitor/logs/errors?limit=100")
+    errors = response.json()['errors']
+
+    for error in errors:
+        log_to_system({
+            'timestamp': datetime.fromtimestamp(error['timestamp']),
+            'service': 'crawl4ai',
+            'endpoint': error['endpoint'],
+            'url': error['url'],
+            'message': error['error'],
+            'request_id': error['request_id']
+        })
+```
+
+#### Key Metrics to Track
+
+For production self-hosted deployments, monitor these metrics:
+
+1. **Memory Usage Trends**
+   - Track `container.memory_percent` over time
+   - Alert when consistently above 80%
+   - Prevents OOM kills
+
+2. **Request Success Rates**
+   - Monitor per-endpoint success rates
+   - Alert when below 95%
+   - Indicates crawling issues
+
+3. **Average Latency**
+   - Track `avg_latency_ms` per endpoint
+   - Detect performance degradation
+   - Optimize slow endpoints
+
+4. **Browser Pool Efficiency**
+   - Monitor `reuse_rate_percent`
+   - Should be >80% for good efficiency
+   - Low rates indicate pool churn
+
+5. **Error Frequency**
+   - Count errors per time window
+   - Alert on sudden spikes
+   - Track error patterns
+
+6. **Janitor Activity**
+   - Monitor cleanup frequency
+   - Excessive cleanup indicates memory pressure
+   - Adjust pool settings if needed
+
+---
+
+### Quick Health Check
+
+For simple uptime monitoring:
+
+```bash
+curl http://localhost:11235/health
+```
+
+Returns:
+```json
+{
+  "status": "healthy",
+  "version": "0.7.4"
+}
+```
+
+Other useful endpoints:
+- `/metrics` - Prometheus metrics
+- `/schema` - Full API schema
 
 ---
 
@@ -1350,22 +1818,46 @@ We're here to help you succeed with Crawl4AI! Here's how to get support:
 
 ## Summary
 
-In this guide, we've covered everything you need to get started with Crawl4AI's Docker deployment:
-- Building and running the Docker container
-- Configuring the environment  
-- Using the interactive playground for testing
-- Making API requests with proper typing
-- Using the Python SDK
-- Leveraging specialized endpoints for screenshots, PDFs, and JavaScript execution
-- Connecting via the Model Context Protocol (MCP)
-- Monitoring your deployment
+Congratulations! You now have everything you need to self-host your own Crawl4AI infrastructure with complete control and visibility.
 
-The new playground interface at `http://localhost:11235/playground` makes it much easier to test configurations and generate the corresponding JSON for API requests.
+**What You've Learned:**
+- ✅ Multiple deployment options (Docker Hub, Docker Compose, manual builds)
+- ✅ Environment configuration and LLM integration
+- ✅ Using the interactive playground for testing
+- ✅ Making API requests with proper typing (SDK and REST)
+- ✅ Specialized endpoints (screenshots, PDFs, JavaScript execution)
+- ✅ MCP integration for AI-assisted development
+- ✅ **Real-time monitoring dashboard** for operational transparency
+- ✅ **Monitor API** for programmatic control and integration
+- ✅ Production deployment best practices
 
-For AI application developers, the MCP integration allows tools like Claude Code to directly access Crawl4AI's capabilities without complex API handling.
+**Why This Matters:**
 
-Remember, the examples in the `examples` folder are your friends - they show real-world usage patterns that you can adapt for your needs.
+By self-hosting Crawl4AI, you:
+- 🔒 **Own Your Data**: Everything stays in your infrastructure
+- 📊 **See Everything**: Real-time dashboard shows exactly what's happening
+- 💰 **Control Costs**: Scale within your resources, no per-request fees
+- ⚡ **Maximize Performance**: Direct access with smart browser pooling (10x memory efficiency)
+- 🛡️ **Stay Secure**: Keep sensitive workflows behind your firewall
+- 🔧 **Customize Freely**: Full control over configs, strategies, and optimizations
 
-Keep exploring, and don't hesitate to reach out if you need help! We're building something amazing together. 🚀
+**Next Steps:**
+
+1. **Start Simple**: Deploy with Docker Hub image and test with the playground
+2. **Monitor Everything**: Open `http://localhost:11235/monitor` to watch your server
+3. **Integrate**: Connect your applications using the Python SDK or REST API
+4. **Scale Smart**: Use the monitoring data to optimize your deployment
+5. **Go Production**: Set up alerting, log aggregation, and automated cleanup
+
+**Key Resources:**
+- 🎮 **Playground**: `http://localhost:11235/playground` - Interactive testing
+- 📊 **Monitor Dashboard**: `http://localhost:11235/monitor` - Real-time visibility
+- 📖 **Architecture Docs**: `deploy/docker/ARCHITECTURE.md` - Deep technical dive
+- 💬 **Discord Community**: Get help and share experiences
+- ⭐ **GitHub**: Report issues, contribute, show support
+
+Remember: The monitoring dashboard is your window into your infrastructure. Use it to understand performance, troubleshoot issues, and optimize your deployment. The examples in the `examples` folder show real-world usage patterns you can adapt.
+
+**You're now in control of your web crawling destiny!** 🚀
 
 Happy crawling! 🕷️
