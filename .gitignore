@@ -1,13 +1,6 @@
 # Scripts folder (private tools)
 .scripts/
 
-# Database files
-*.db
-
-# Environment files
-.env
-.env.local
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -268,15 +261,18 @@ continue_config.json
 
 CLAUDE_MONITOR.md
 CLAUDE.md
+.claude/
+
+scripts/
 
 tests/**/test_site
 tests/**/reports
 tests/**/benchmark_reports
-test_scripts/
+
 docs/**/data
 .codecat/
 
 docs/apps/linkdin/debug*/
 docs/apps/linkdin/samples/insights/*
-
-scripts/
+docs/md_v2/marketplace/backend/uploads/
+docs/md_v2/marketplace/backend/marketplace.db
