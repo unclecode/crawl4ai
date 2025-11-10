@@ -95,8 +95,6 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-If you encounter Captcha during your workflow, follow the [integration guide](https://www.capsolver.com/blog/Partners/crawl4ai-capsolver/?utm_source=crawl4ai&utm_medium=github_pr&utm_campaign=crawl4ai_integration) to integrate CapSolver. It supports reCAPTCHA v2/v3, Cloudflare Turnstile, Challenge, AWS WAF, and more.
-
 3. Or use the new command-line interface:
 ```bash
 # Basic crawl with markdown output
@@ -545,6 +543,10 @@ async def test_news_crawl():
 ```
 
 </details>
+
+---
+
+> **💡 Tip:** Some websites may use **CAPTCHA** based verification mechanisms to prevent automated access. If your workflow encounters such challenges, you may optionally integrate a third-party CAPTCHA-handling service such as <strong>[CapSolver](https://www.capsolver.com/blog/Partners/crawl4ai-capsolver/?utm_source=crawl4ai&utm_medium=github_pr&utm_campaign=crawl4ai_integration)</strong>. They support reCAPTCHA v2/v3, Cloudflare Turnstile, Challenge, AWS WAF, and more. Please ensure that your usage complies with the target website’s terms of service and applicable laws.
 
 ## ✨ Recent Updates
 
