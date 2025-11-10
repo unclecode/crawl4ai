@@ -845,6 +845,15 @@ class AsyncUrlSeeder:
             return
 
         data = gzip.decompress(r.content) if url.endswith(".gz") else r.content
+        base_url = str(r.url)
+
+        def _normalize_loc(raw: Optional[str]) -> Optional[str]:
+            if not raw:
+                return None
+            normalized = urljoin(base_url, raw.strip())
+            if not normalized:
+                return None
+            return normalized
 
         # Detect if this is a sitemap index by checking for <sitemapindex> or presence of <sitemap> elements
         is_sitemap_index = False
@@ -857,25 +866,42 @@ class AsyncUrlSeeder:
                 # Use XML parser for sitemaps, not HTML parser
                 parser = etree.XMLParser(recover=True)
                 root = etree.fromstring(data, parser=parser)
+                # Namespace-agnostic lookups using local-name() so we honor custom or missing namespaces
+                sitemap_loc_nodes = root.xpath("//*[local-name()='sitemap']/*[local-name()='loc']")
+                url_loc_nodes = root.xpath("//*[local-name()='url']/*[local-name()='loc']")
 
-                # Define namespace for sitemap
-                ns = {'s': 'http://www.sitemaps.org/schemas/sitemap/0.9'}
+                self._log(
+                    "debug",
+                    "Parsed sitemap {url}: {sitemap_count} sitemap entries, {url_count} url entries discovered",
+                    params={
+                        "url": url,
+                        "sitemap_count": len(sitemap_loc_nodes),
+                        "url_count": len(url_loc_nodes),
+                    },
+                    tag="URL_SEED",
+                )
 
                 # Check for sitemap index entries
-                sitemap_locs = root.xpath('//s:sitemap/s:loc', namespaces=ns)
-                if sitemap_locs:
+                if sitemap_loc_nodes:
                     is_sitemap_index = True
-                    for sitemap_elem in sitemap_locs:
-                        loc = sitemap_elem.text.strip() if sitemap_elem.text else ""
+                    for sitemap_elem in sitemap_loc_nodes:
+                        loc = _normalize_loc(sitemap_elem.text)
                         if loc:
                             sub_sitemaps.append(loc)
 
                 # If not a sitemap index, get regular URLs
                 if not is_sitemap_index:
-                    for loc_elem in root.xpath('//s:url/s:loc', namespaces=ns):
-                        loc = loc_elem.text.strip() if loc_elem.text else ""
+                    for loc_elem in url_loc_nodes:
+                        loc = _normalize_loc(loc_elem.text)
                         if loc:
                             regular_urls.append(loc)
+                    if not regular_urls:
+                        self._log(
+                            "warning",
+                            "No <loc> entries found inside <url> tags for sitemap {url}. The sitemap might be empty or use an unexpected structure.",
+                            params={"url": url},
+                            tag="URL_SEED",
+                        )
             except Exception as e:
                 self._log("error", "LXML parsing error for sitemap {url}: {error}",
                           params={"url": url, "error": str(e)}, tag="URL_SEED")
@@ -892,19 +918,39 @@ class AsyncUrlSeeder:
 
                 # Check for sitemap index entries
                 sitemaps = root.findall('.//sitemap')
+                url_entries = root.findall('.//url')
+                self._log(
+                    "debug",
+                    "ElementTree parsed sitemap {url}: {sitemap_count} sitemap entries, {url_count} url entries discovered",
+                    params={
+                        "url": url,
+                        "sitemap_count": len(sitemaps),
+                        "url_count": len(url_entries),
+                    },
+                    tag="URL_SEED",
+                )
                 if sitemaps:
                     is_sitemap_index = True
                     for sitemap in sitemaps:
                         loc_elem = sitemap.find('loc')
-                        if loc_elem is not None and loc_elem.text:
-                            sub_sitemaps.append(loc_elem.text.strip())
+                        loc = _normalize_loc(loc_elem.text if loc_elem is not None else None)
+                        if loc:
+                            sub_sitemaps.append(loc)
 
                 # If not a sitemap index, get regular URLs
                 if not is_sitemap_index:
-                    for url_elem in root.findall('.//url'):
+                    for url_elem in url_entries:
                         loc_elem = url_elem.find('loc')
-                        if loc_elem is not None and loc_elem.text:
-                            regular_urls.append(loc_elem.text.strip())
+                        loc = _normalize_loc(loc_elem.text if loc_elem is not None else None)
+                        if loc:
+                            regular_urls.append(loc)
+                    if not regular_urls:
+                        self._log(
+                            "warning",
+                            "No <loc> entries found inside <url> tags for sitemap {url}. The sitemap might be empty or use an unexpected structure.",
+                            params={"url": url},
+                            tag="URL_SEED",
+                        )
             except Exception as e:
                 self._log("error", "ElementTree parsing error for sitemap {url}: {error}",
                           params={"url": url, "error": str(e)}, tag="URL_SEED")
