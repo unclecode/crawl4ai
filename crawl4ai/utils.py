@@ -2383,7 +2383,8 @@ def is_external_url(url: str, base_domain: str) -> bool:
     Returns:
         str: The extracted base domain or an empty string if parsing fails.
     """
-    special = {"mailto:", "tel:", "ftp:", "file:", "data:", "javascript:"}
+    # special = {"mailto:", "tel:", "ftp:", "file:", "data:", "javascript:"}
+    special = {"ftp:", "data:", "javascript:"}
     if any(url.lower().startswith(p) for p in special):
         return True
 
