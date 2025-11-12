@@ -22,6 +22,7 @@ This page provides a comprehensive list of example scripts that demonstrate vari
 | Page Interaction | Guide on interacting with dynamic elements through clicks. | [View Guide](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/tutorial_dynamic_clicks.md) |
 | Crawler Monitor | Shows how to monitor the crawler's activities and status. | [View Code](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/crawler_monitor_example.py) |
 | Full Page Screenshot & PDF | Guide on capturing full-page screenshots and PDFs from massive webpages. | [View Guide](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/full_page_screenshot_and_pdf_export.md) |
+| Remote Browser (with Amazon Bedrock AgentCore Browser) | Shows how to integrate with Amazon Bedrock Agentcore Browser for remote browser sessions. | [View Code](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/amazon_bedrock_agentcore_browser_integration.py) |
 
 ## Advanced Crawling & Deep Crawling
 
