@@ -4,73 +4,34 @@ This guide covers proxy configuration and security features in Crawl4AI, includi
 
 ## Understanding Proxy Configuration
 
-Crawl4AI supports proxy configuration at two levels:
-
-### BrowserConfig.proxy_config
-Sets proxy at the **browser level** - affects all pages/tabs in that browser instance. Use this when:
-- You want all crawls from this browser to use the same proxy
-- You're using a single proxy for the entire session
-- You need persistent proxy settings across multiple crawls
-
-### CrawlerRunConfig.proxy_config
-Sets proxy at the **request level** - can be different for each crawl operation. Use this when:
-- You want per-request proxy control
-- You're implementing proxy rotation
-- Different URLs need different proxies
+Crawl4AI recommends configuring proxies per request through `CrawlerRunConfig.proxy_config`. This gives you precise control, enables rotation strategies, and keeps examples simple enough to copy, paste, and run.
 
 ## Basic Proxy Setup
 
-### Browser-Level Proxy (BrowserConfig)
-
-Configure proxies that apply to the entire browser session:
+Configure proxies that apply to each crawl operation:
 
 ```python
-from crawl4ai import AsyncWebCrawler, BrowserConfig
+import asyncio
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, ProxyConfig
 
-# Using dictionary configuration
-browser_config = BrowserConfig(proxy_config={
-    "server": "http://proxy.example.com:8080"
-})
+run_config = CrawlerRunConfig(proxy_config=ProxyConfig(server="http://proxy.example.com:8080"))
+# run_config = CrawlerRunConfig(proxy_config={"server": "http://proxy.example.com:8080"})
+# run_config = CrawlerRunConfig(proxy_config="http://proxy.example.com:8080")
 
-# Using ProxyConfig object
-from crawl4ai import ProxyConfig
-proxy = ProxyConfig(server="http://proxy.example.com:8080")
-browser_config = BrowserConfig(proxy_config=proxy)
 
-# Using string (auto-parsed)
-browser_config = BrowserConfig(proxy_config="http://proxy.example.com:8080")
+async def main():
+    browser_config = BrowserConfig()
+    async with AsyncWebCrawler(config=browser_config) as crawler:
+        result = await crawler.arun(url="https://example.com", config=run_config)
+        print(f"Success: {result.success} -> {result.url}")
 
-async with AsyncWebCrawler(config=browser_config) as crawler:
-    result = await crawler.arun(url="https://example.com")
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
-### Request-Level Proxy (CrawlerRunConfig)
-
-Configure proxies that can be customized per crawl operation:
-
-```python
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
-
-# Using dictionary configuration
-run_config = CrawlerRunConfig(proxy_config={
-    "server": "http://proxy.example.com:8080"
-})
-
-# Using ProxyConfig object
-from crawl4ai import ProxyConfig
-proxy = ProxyConfig(server="http://proxy.example.com:8080")
-run_config = CrawlerRunConfig(proxy_config=proxy)
-
-# Using string (auto-parsed)
-run_config = CrawlerRunConfig(proxy_config="http://proxy.example.com:8080")
-
-browser_config = BrowserConfig()
-async with AsyncWebCrawler(config=browser_config) as crawler:
-    result = await crawler.arun(url="https://example.com", config=run_config)
-```
-
-!!! note "Priority Order"
-    When both `BrowserConfig.proxy_config` and `CrawlerRunConfig.proxy_config` are set, `CrawlerRunConfig.proxy_config` takes precedence for that specific crawl operation.
+!!! note "Why request-level?"
+    `CrawlerRunConfig.proxy_config` keeps each request self-contained, so swapping proxies or rotation strategies is just a matter of building a new run configuration.
 
 ## Supported Proxy Formats
 
@@ -100,27 +61,33 @@ proxy5 = ProxyConfig.from_string("192.168.1.1:8080:user:pass")
 For proxies requiring authentication:
 
 ```python
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
+import asyncio
+from crawl4ai import AsyncWebCrawler,BrowserConfig, CrawlerRunConfig, ProxyConfig
 
-# Using dictionary
-run_config = CrawlerRunConfig(proxy_config={
-    "server": "http://proxy.example.com:8080",
-    "username": "your_username",
-    "password": "your_password"
-})
-
-# Using ProxyConfig object
-from crawl4ai import ProxyConfig
-proxy = ProxyConfig(
-    server="http://proxy.example.com:8080",
-    username="your_username",
-    password="your_password"
+run_config = CrawlerRunConfig(
+    proxy_config=ProxyConfig(
+        server="http://proxy.example.com:8080",
+        username="your_username",
+        password="your_password",
+    )
 )
-run_config = CrawlerRunConfig(proxy_config=proxy)
+# Or dictionary style:
+# run_config = CrawlerRunConfig(proxy_config={
+#     "server": "http://proxy.example.com:8080",
+#     "username": "your_username",
+#     "password": "your_password",
+# })
 
-browser_config = BrowserConfig()
-async with AsyncWebCrawler(config=browser_config) as crawler:
-    result = await crawler.arun(url="https://example.com", config=run_config)
+
+async def main():
+    browser_config = BrowserConfig()
+    async with AsyncWebCrawler(config=browser_config) as crawler:
+        result = await crawler.arun(url="https://example.com", config=run_config)
+        print(f"Success: {result.success} -> {result.url}")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ## Environment Variable Configuration
@@ -149,9 +116,10 @@ Crawl4AI supports automatic proxy rotation to distribute requests across multipl
 
 ### Proxy Rotation (recommended)
 ```python
+import asyncio
+import re
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, ProxyConfig
 from crawl4ai.proxy_strategy import RoundRobinProxyStrategy
-import re
 
 async def main():
     # Load proxies from environment
@@ -195,7 +163,8 @@ async def main():
             else:
                 print(f"❌ Request {i+1}: Failed - {result.error_message}")
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ## SSL Certificate Analysis
@@ -204,45 +173,54 @@ Combine proxy usage with SSL certificate inspection for enhanced security analys
 
 ### Per-Request SSL Certificate Analysis
 ```python
+import asyncio
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
 
-# Configure proxy with SSL certificate fetching per request
 run_config = CrawlerRunConfig(
     proxy_config={
         "server": "http://proxy.example.com:8080",
         "username": "user",
-        "password": "pass"
+        "password": "pass",
     },
-    fetch_ssl_certificate=True  # Enable SSL certificate analysis for this request
+    fetch_ssl_certificate=True,  # Enable SSL certificate analysis for this request
 )
 
-browser_config = BrowserConfig()
-async with AsyncWebCrawler(config=browser_config) as crawler:
-    result = await crawler.arun(url="https://example.com", config=run_config)
 
-    if result.success:
-        print(f"✅ Crawled via proxy: {result.url}")
+async def main():
+    browser_config = BrowserConfig()
+    async with AsyncWebCrawler(config=browser_config) as crawler:
+        result = await crawler.arun(url="https://example.com", config=run_config)
 
-        # Analyze SSL certificate
-        if result.ssl_certificate:
-            cert = result.ssl_certificate
-            print("🔒 SSL Certificate Info:")
-            print(f"   Issuer: {cert.issuer}")
-            print(f"   Subject: {cert.subject}")
-            print(f"   Valid until: {cert.valid_until}")
-            print(f"   Fingerprint: {cert.fingerprint}")
+        if result.success:
+            print(f"✅ Crawled via proxy: {result.url}")
 
-            # Export certificate
-            cert.to_json("certificate.json")
-            print("💾 Certificate exported to certificate.json")
-        else:
-            print("⚠️  No SSL certificate information available")
+            # Analyze SSL certificate
+            if result.ssl_certificate:
+                cert = result.ssl_certificate
+                print("🔒 SSL Certificate Info:")
+                print(f"   Issuer: {cert.issuer}")
+                print(f"   Subject: {cert.subject}")
+                print(f"   Valid until: {cert.valid_until}")
+                print(f"   Fingerprint: {cert.fingerprint}")
+
+                # Export certificate
+                cert.to_json("certificate.json")
+                print("💾 Certificate exported to certificate.json")
+            else:
+                print("⚠️  No SSL certificate information available")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ## Security Best Practices
 
 ### 1. Proxy Rotation for Anonymity
 ```python
+from crawl4ai import CrawlerRunConfig, ProxyConfig
+from crawl4ai.proxy_strategy import RoundRobinProxyStrategy
+
 # Use multiple proxies to avoid IP blocking
 proxies = ProxyConfig.from_env("PROXIES")
 strategy = RoundRobinProxyStrategy(proxies)
@@ -250,12 +228,14 @@ strategy = RoundRobinProxyStrategy(proxies)
 # Configure rotation per request (recommended)
 run_config = CrawlerRunConfig(proxy_rotation_strategy=strategy)
 
-# If you want a single static proxy across all requests, set a fixed ProxyConfig at browser-level:
-# browser_config = BrowserConfig(proxy_config=proxies[0])
+# For a fixed proxy across all requests, just reuse the same run_config instance
+static_run_config = run_config
 ```
 
 ### 2. SSL Certificate Verification
 ```python
+from crawl4ai import CrawlerRunConfig
+
 # Always verify SSL certificates when possible
 # Per-request (affects specific requests)
 run_config = CrawlerRunConfig(fetch_ssl_certificate=True)
@@ -270,30 +250,24 @@ export PROXIES="ip1:port1:user1:pass1,ip2:port2:user2:pass2"
 
 ### 4. SOCKS5 for Enhanced Security
 ```python
-# Prefer SOCKS5 proxies for better protocol support
-# Browser-level
-browser_config = BrowserConfig(proxy_config="socks5://proxy.example.com:1080")
+from crawl4ai import CrawlerRunConfig
 
-# Or request-level
+# Prefer SOCKS5 proxies for better protocol support
 run_config = CrawlerRunConfig(proxy_config="socks5://proxy.example.com:1080")
 ```
 
 ## Migration from Deprecated `proxy` Parameter
 
 !!! warning "Deprecation Notice"
-    The `proxy` parameter in `BrowserConfig` is deprecated. Use `proxy_config` in either `BrowserConfig` or `CrawlerRunConfig` instead.
+    The legacy `proxy` argument on `BrowserConfig` is deprecated. Configure proxies through `CrawlerRunConfig.proxy_config` so each request fully describes its network settings.
 
 ```python
-# Old (deprecated)
-browser_config = BrowserConfig(proxy="http://proxy.example.com:8080")
+# Old (deprecated) approach
+# from crawl4ai import BrowserConfig
+# browser_config = BrowserConfig(proxy="http://proxy.example.com:8080")
 
-# You will see a warning similar to:
-# DeprecationWarning: BrowserConfig.proxy is deprecated and ignored. Use proxy_config instead.
-
-# New (recommended) - Browser-level default
-browser_config = BrowserConfig(proxy_config="http://proxy.example.com:8080")
-
-# Or request-level override (takes precedence per request)
+# New (preferred) approach
+from crawl4ai import CrawlerRunConfig
 run_config = CrawlerRunConfig(proxy_config="http://proxy.example.com:8080")
 ```
 
@@ -311,23 +285,20 @@ def safe_proxy_repr(proxy: ProxyConfig):
 
 ### Common Issues
 
-1. **Proxy Connection Failed**
-   - Verify proxy server is accessible
-   - Check authentication credentials
-   - Ensure correct protocol (http/https/socks5)
+???+ question "Proxy connection failed"
+    - Verify the proxy server is reachable from your network.
+    - Double-check authentication credentials.
+    - Ensure the protocol matches (`http`, `https`, or `socks5`).
 
-2. **SSL Certificate Errors**
-   - Some proxies may interfere with SSL inspection
-   - Try different proxy or disable SSL verification if necessary
+???+ question "SSL certificate errors"
+    - Some proxies break SSL inspection; switch proxies if you see repeated failures.
+    - Consider temporarily disabling certificate fetching to isolate the issue.
 
-3. **Environment Variables Not Loading**
-   - Ensure PROXIES variable is set correctly
-   - Check comma separation and format: `ip:port:user:pass,ip:port:user:pass`
+???+ question "Environment variables not loading"
+    - Confirm `PROXIES` (or your custom env var) is set before running the script.
+    - Check formatting: `ip:port:user:pass,ip:port:user:pass`.
 
-4. **Proxy Rotation Not Working**
-   - Verify proxies are loaded: `len(proxies) > 0`
-    - Check proxy strategy is set on `CrawlerRunConfig` via `proxy_rotation_strategy`
-    - Ensure `proxy_config` is a valid `ProxyConfig` (when using a static proxy)
-
-<!-- Removed duplicate Supported Proxy Formats section (already covered above) -->
-
+???+ question "Proxy rotation not working"
+    - Ensure `ProxyConfig.from_env()` actually loaded entries (`len(proxies) > 0`).
+    - Attach `proxy_rotation_strategy` to `CrawlerRunConfig`.
+    - Validate the proxy definitions you pass into the strategy.
