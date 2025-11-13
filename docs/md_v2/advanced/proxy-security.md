@@ -258,7 +258,7 @@ run_config = CrawlerRunConfig(proxy_config="socks5://proxy.example.com:1080")
 
 ## Migration from Deprecated `proxy` Parameter
 
-!!! warning "Deprecation Notice"
+- "Deprecation Notice"
     The legacy `proxy` argument on `BrowserConfig` is deprecated. Configure proxies through `CrawlerRunConfig.proxy_config` so each request fully describes its network settings.
 
 ```python
@@ -285,20 +285,20 @@ def safe_proxy_repr(proxy: ProxyConfig):
 
 ### Common Issues
 
-???+ question "Proxy connection failed"
+- "Proxy connection failed"
     - Verify the proxy server is reachable from your network.
     - Double-check authentication credentials.
     - Ensure the protocol matches (`http`, `https`, or `socks5`).
 
-???+ question "SSL certificate errors"
+- "SSL certificate errors"
     - Some proxies break SSL inspection; switch proxies if you see repeated failures.
     - Consider temporarily disabling certificate fetching to isolate the issue.
 
-???+ question "Environment variables not loading"
+- "Environment variables not loading"
     - Confirm `PROXIES` (or your custom env var) is set before running the script.
     - Check formatting: `ip:port:user:pass,ip:port:user:pass`.
 
-???+ question "Proxy rotation not working"
+- "Proxy rotation not working"
     - Ensure `ProxyConfig.from_env()` actually loaded entries (`len(proxies) > 0`).
     - Attach `proxy_rotation_strategy` to `CrawlerRunConfig`.
     - Validate the proxy definitions you pass into the strategy.
