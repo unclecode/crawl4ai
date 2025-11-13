@@ -143,7 +143,40 @@ class TestCrawlEndpoints:
         assert "<h1>Herman Melville - Moby-Dick</h1>" in result["html"]
         # We don't specify a markdown generator in this test, so don't make assumptions about markdown field
         # It might be null, missing, or populated depending on the server's default behavior
+    async def test_crawl_with_stream_direct(self, async_client: httpx.AsyncClient):
+        """Test that /crawl endpoint handles stream=True directly without redirect."""
+        payload = {
+            "urls": [SIMPLE_HTML_URL],
+            "browser_config": {
+                "type": "BrowserConfig",
+                "params": {
+                    "headless": True,
+                }
+            },
+            "crawler_config": {
+                "type": "CrawlerRunConfig", 
+                "params": {
+                    "stream": True,  # Set stream to True for direct streaming
+                    "screenshot": False,
+                    "cache_mode": CacheMode.BYPASS.value
+                }
+            }
+        }
 
+        # Send a request to the /crawl endpoint - should handle streaming directly
+        async with async_client.stream("POST", "/crawl", json=payload) as response:
+            assert response.status_code == 200
+            assert response.headers["content-type"] == "application/x-ndjson"
+            assert response.headers.get("x-stream-status") == "active"
+
+            results = await process_streaming_response(response)
+
+            assert len(results) == 1
+            result = results[0]
+            await assert_crawl_result_structure(result)
+            assert result["success"] is True
+            assert result["url"] == SIMPLE_HTML_URL
+            assert "<h1>Herman Melville - Moby-Dick</h1>" in result["html"]
     async def test_simple_crawl_single_url_streaming(self, async_client: httpx.AsyncClient):
         """Test /crawl/stream with a single URL and simple config values."""
         payload = {
@@ -635,7 +668,209 @@ class TestCrawlEndpoints:
             pytest.fail(f"LLM extracted content parsing or validation failed: {e}\nContent: {result['extracted_content']}")
         except Exception as e: # Catch any other unexpected error
             pytest.fail(f"An unexpected error occurred during LLM result processing: {e}\nContent: {result['extracted_content']}")
-            
+
+
+    # 7. Error Handling Tests
+    async def test_invalid_url_handling(self, async_client: httpx.AsyncClient):
+        """Test error handling for invalid URLs."""
+        payload = {
+            "urls": ["invalid-url", "https://nonexistent-domain-12345.com"],
+            "browser_config": {"type": "BrowserConfig", "params": {"headless": True}},
+            "crawler_config": {"type": "CrawlerRunConfig", "params": {"cache_mode": CacheMode.BYPASS.value}}
+        }
+        
+        response = await async_client.post("/crawl", json=payload)
+        # Should return 200 with failed results, not 500
+        print(f"Status code: {response.status_code}")
+        print(f"Response: {response.text}")
+        assert response.status_code == 500
+        data = response.json()
+        assert data["detail"].startswith("Crawl request failed:")
+
+    async def test_mixed_success_failure_urls(self, async_client: httpx.AsyncClient):
+        """Test handling of mixed success/failure URLs."""
+        payload = {
+            "urls": [
+                SIMPLE_HTML_URL,  # Should succeed
+                "https://nonexistent-domain-12345.com",  # Should fail
+                "https://invalid-url-with-special-chars-!@#$%^&*()",  # Should fail
+            ],
+            "browser_config": {"type": "BrowserConfig", "params": {"headless": True}},
+            "crawler_config": {
+                "type": "CrawlerRunConfig", 
+                "params": {
+                    "cache_mode": CacheMode.BYPASS.value,
+                    "markdown_generator": {
+                        "type": "DefaultMarkdownGenerator",
+                        "params": {
+                            "content_filter": {
+                                "type": "PruningContentFilter",
+                                "params": {"threshold": 0.5}
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        response = await async_client.post("/crawl", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert len(data["results"]) == 3
+        
+        success_count = 0
+        failure_count = 0
+        
+        for result in data["results"]:
+            if result["success"]:
+                success_count += 1
+            else:
+                failure_count += 1
+                assert "error_message" in result
+                assert len(result["error_message"]) > 0
+                
+        assert success_count >= 1  # At least one should succeed
+        assert failure_count >= 1  # At least one should fail
+
+    async def test_streaming_mixed_urls(self, async_client: httpx.AsyncClient):
+        """Test streaming with mixed success/failure URLs."""
+        payload = {
+            "urls": [
+                SIMPLE_HTML_URL,  # Should succeed
+                "https://nonexistent-domain-12345.com",  # Should fail
+            ],
+            "browser_config": {"type": "BrowserConfig", "params": {"headless": True}},
+            "crawler_config": {
+                "type": "CrawlerRunConfig", 
+                "params": {
+                    "stream": True,
+                    "cache_mode": CacheMode.BYPASS.value
+                }
+            }
+        }
+        
+        async with async_client.stream("POST", "/crawl/stream", json=payload) as response:
+            response.raise_for_status()
+            results = await process_streaming_response(response)
+        
+        assert len(results) == 2
+        
+        success_count = 0
+        failure_count = 0
+        
+        for result in results:
+            if result["success"]:
+                success_count += 1
+                assert result["url"] == SIMPLE_HTML_URL
+            else:
+                failure_count += 1
+                assert "error_message" in result
+                assert result["error_message"] is not None
+        
+        assert success_count == 1
+        assert failure_count == 1
+
+    async def test_markdown_endpoint_error_handling(self, async_client: httpx.AsyncClient):
+        """Test error handling for markdown endpoint."""
+        # Test invalid URL
+        invalid_payload = {"url": "invalid-url", "f": "fit"}
+        response = await async_client.post("/md", json=invalid_payload)
+        # Should return 400 for invalid URL format
+        assert response.status_code == 400
+        
+        # Test non-existent URL
+        nonexistent_payload = {"url": "https://nonexistent-domain-12345.com", "f": "fit"}
+        response = await async_client.post("/md", json=nonexistent_payload)
+        # Should return 500 for crawl failure
+        assert response.status_code == 500
+
+    async def test_html_endpoint_error_handling(self, async_client: httpx.AsyncClient):
+        """Test error handling for HTML endpoint."""
+        # Test invalid URL
+        invalid_payload = {"url": "invalid-url"}
+        response = await async_client.post("/html", json=invalid_payload)
+        # Should return 500 for crawl failure
+        assert response.status_code == 500
+
+    async def test_screenshot_endpoint_error_handling(self, async_client: httpx.AsyncClient):
+        """Test error handling for screenshot endpoint."""
+        # Test invalid URL
+        invalid_payload = {"url": "invalid-url"}
+        response = await async_client.post("/screenshot", json=invalid_payload)
+        # Should return 500 for crawl failure
+        assert response.status_code == 500
+
+    async def test_pdf_endpoint_error_handling(self, async_client: httpx.AsyncClient):
+        """Test error handling for PDF endpoint."""
+        # Test invalid URL
+        invalid_payload = {"url": "invalid-url"}
+        response = await async_client.post("/pdf", json=invalid_payload)
+        # Should return 500 for crawl failure
+        assert response.status_code == 500
+
+    async def test_execute_js_endpoint_error_handling(self, async_client: httpx.AsyncClient):
+        """Test error handling for execute_js endpoint."""
+        # Test invalid URL
+        invalid_payload = {"url": "invalid-url", "scripts": ["return document.title;"]}
+        response = await async_client.post("/execute_js", json=invalid_payload)
+        # Should return 500 for crawl failure
+        assert response.status_code == 500
+
+    async def test_llm_endpoint_error_handling(self, async_client: httpx.AsyncClient):
+        """Test error handling for LLM endpoint."""
+        # Test missing query parameter
+        response = await async_client.get("/llm/https://example.com")
+        assert response.status_code == 422  # FastAPI validation error, not 400
+        
+        # Test invalid URL
+        response = await async_client.get("/llm/invalid-url?q=test")
+        # Should return 500 for crawl failure
+        assert response.status_code == 500
+
+    async def test_ask_endpoint_error_handling(self, async_client: httpx.AsyncClient):
+        """Test error handling for ask endpoint."""
+        # Test invalid context_type
+        response = await async_client.get("/ask?context_type=invalid")
+        assert response.status_code == 422  # Validation error
+        
+        # Test invalid score_ratio
+        response = await async_client.get("/ask?score_ratio=2.0")  # > 1.0
+        assert response.status_code == 422  # Validation error
+        
+        # Test invalid max_results
+        response = await async_client.get("/ask?max_results=0")  # < 1
+        assert response.status_code == 422  # Validation error
+
+    async def test_config_dump_error_handling(self, async_client: httpx.AsyncClient):
+        """Test error handling for config dump endpoint."""
+        # Test invalid code
+        invalid_payload = {"code": "invalid_code"}
+        response = await async_client.post("/config/dump", json=invalid_payload)
+        assert response.status_code == 400
+        
+        # Test nested function calls (not allowed)
+        nested_payload = {"code": "CrawlerRunConfig(BrowserConfig())"}
+        response = await async_client.post("/config/dump", json=nested_payload)
+        assert response.status_code == 400
+
+    async def test_malformed_request_handling(self, async_client: httpx.AsyncClient):
+        """Test handling of malformed requests."""
+        # Test missing required fields
+        malformed_payload = {"urls": []}  # Missing browser_config and crawler_config
+        response = await async_client.post("/crawl", json=malformed_payload)
+        print(f"Response: {response.text}")
+        assert response.status_code == 422  # Validation error
+        
+        # Test empty URLs list
+        empty_urls_payload = {
+            "urls": [],
+            "browser_config": {"type": "BrowserConfig", "params": {}},
+            "crawler_config": {"type": "CrawlerRunConfig", "params": {}}
+        }
+        response = await async_client.post("/crawl", json=empty_urls_payload)
+        assert response.status_code == 422  # "At least one URL required"
+
 if __name__ == "__main__":
     # Define arguments for pytest programmatically
     # -v: verbose output

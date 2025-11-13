@@ -7,13 +7,13 @@ Simple proxy configuration with `BrowserConfig`:
 ```python
 from crawl4ai.async_configs import BrowserConfig
 
-# Using proxy URL
-browser_config = BrowserConfig(proxy="http://proxy.example.com:8080")
+# Using HTTP proxy
+browser_config = BrowserConfig(proxy_config={"server": "http://proxy.example.com:8080"})
 async with AsyncWebCrawler(config=browser_config) as crawler:
     result = await crawler.arun(url="https://example.com")
 
 # Using SOCKS proxy
-browser_config = BrowserConfig(proxy="socks5://proxy.example.com:1080")
+browser_config = BrowserConfig(proxy_config={"server": "socks5://proxy.example.com:1080"})
 async with AsyncWebCrawler(config=browser_config) as crawler:
     result = await crawler.arun(url="https://example.com")
 ```
@@ -25,7 +25,11 @@ Use an authenticated proxy with `BrowserConfig`:
 ```python
 from crawl4ai.async_configs import BrowserConfig
 
-browser_config = BrowserConfig(proxy="http://[username]:[password]@[host]:[port]")
+browser_config = BrowserConfig(proxy_config={
+    "server": "http://[host]:[port]",
+    "username": "[username]",
+    "password": "[password]",
+})
 async with AsyncWebCrawler(config=browser_config) as crawler:
     result = await crawler.arun(url="https://example.com")
 ```

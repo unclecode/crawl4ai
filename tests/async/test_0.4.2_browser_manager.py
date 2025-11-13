@@ -112,7 +112,7 @@ async def test_proxy_settings():
         headless=True,
         verbose=False,
         user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
-        proxy="http://127.0.0.1:8080",  # Assuming local proxy server for test
+        proxy_config={"server": "http://127.0.0.1:8080"},  # Assuming local proxy server for test
         use_managed_browser=False,
         use_persistent_context=False,
     ) as crawler:

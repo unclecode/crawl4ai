@@ -12,6 +12,6 @@ pydantic>=2.11
 rank-bm25==0.2.2
 anyio==4.9.0
 PyJWT==2.10.1
-mcp>=1.6.0
+mcp>=1.18.0
 websockets>=15.0.1
 httpx[http2]>=0.27.2

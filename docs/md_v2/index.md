@@ -59,6 +59,27 @@ Crawl4AI is the #1 trending GitHub repository, actively maintained by a vibrant 
 
 > **Note**: If you're looking for the old documentation, you can access it [here](https://old.docs.crawl4ai.com).
 
+## 🆕 AI Assistant Skill Now Available!
+
+<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 10px; margin: 20px 0; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+  <h3 style="color: white; margin: 0 0 10px 0;">🤖 Crawl4AI Skill for Claude & AI Assistants</h3>
+  <p style="color: white; margin: 10px 0;">Supercharge your AI coding assistant with complete Crawl4AI knowledge! Download our comprehensive skill package that includes:</p>
+  <ul style="color: white; margin: 10px 0;">
+    <li>📚 Complete SDK reference (23K+ words)</li>
+    <li>🚀 Ready-to-use extraction scripts</li>
+    <li>⚡ Schema generation for efficient scraping</li>
+    <li>🔧 Version 0.7.4 compatible</li>
+  </ul>
+  <div style="text-align: center; margin-top: 15px;">
+    <a href="assets/crawl4ai-skill.zip" download style="background: white; color: #667eea; padding: 12px 30px; border-radius: 5px; text-decoration: none; font-weight: bold; display: inline-block; transition: transform 0.2s;">
+      📦 Download Skill Package
+    </a>
+  </div>
+  <p style="color: white; margin: 15px 0 0 0; font-size: 0.9em; text-align: center;">
+    Works with Claude, Cursor, Windsurf, and other AI coding assistants. Import the .zip file into your AI assistant's skill/knowledge system.
+  </p>
+</div>
+
 ## 🎯 New: Adaptive Web Crawling
 
 Crawl4AI now features intelligent adaptive crawling that knows when to stop! Using advanced information foraging algorithms, it determines when sufficient information has been gathered to answer your query.

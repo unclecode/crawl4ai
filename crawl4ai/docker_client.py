@@ -1,4 +1,4 @@
-from typing import List, Optional, Union, AsyncGenerator, Dict, Any
+from typing import List, Optional, Union, AsyncGenerator, Dict, Any, Callable
 import httpx
 import json
 from urllib.parse import urljoin
@@ -7,6 +7,7 @@ import asyncio
 from .async_configs import BrowserConfig, CrawlerRunConfig
 from .models import CrawlResult
 from .async_logger import AsyncLogger, LogLevel
+from .utils import hooks_to_string
 
 
 class Crawl4aiClientError(Exception):
@@ -70,16 +71,40 @@ class Crawl4aiDockerClient:
             self.logger.error(f"Server unreachable: {str(e)}", tag="ERROR")
             raise ConnectionError(f"Cannot connect to server: {str(e)}")
 
-    def _prepare_request(self, urls: List[str], browser_config: Optional[BrowserConfig] = None, 
-                       crawler_config: Optional[CrawlerRunConfig] = None) -> Dict[str, Any]:
+    def _prepare_request(
+        self,
+        urls: List[str],
+        browser_config: Optional[BrowserConfig] = None,
+        crawler_config: Optional[CrawlerRunConfig] = None,
+        hooks: Optional[Union[Dict[str, Callable], Dict[str, str]]] = None,
+        hooks_timeout: int = 30
+    ) -> Dict[str, Any]:
         """Prepare request data from configs."""
         if self._token:
             self._http_client.headers["Authorization"] = f"Bearer {self._token}"
-        return {
+
+        request_data = {
             "urls": urls,
             "browser_config": browser_config.dump() if browser_config else {},
             "crawler_config": crawler_config.dump() if crawler_config else {}
         }
+
+        # Handle hooks if provided
+        if hooks:
+            # Check if hooks are already strings or need conversion
+            if any(callable(v) for v in hooks.values()):
+                # Convert function objects to strings
+                hooks_code = hooks_to_string(hooks)
+            else:
+                # Already in string format
+                hooks_code = hooks
+
+            request_data["hooks"] = {
+                "code": hooks_code,
+                "timeout": hooks_timeout
+            }
+
+        return request_data
 
     async def _request(self, method: str, endpoint: str, **kwargs) -> httpx.Response:
         """Make an HTTP request with error handling."""
@@ -102,16 +127,42 @@ class Crawl4aiDockerClient:
         self,
         urls: List[str],
         browser_config: Optional[BrowserConfig] = None,
-        crawler_config: Optional[CrawlerRunConfig] = None
+        crawler_config: Optional[CrawlerRunConfig] = None,
+        hooks: Optional[Union[Dict[str, Callable], Dict[str, str]]] = None,
+        hooks_timeout: int = 30
     ) -> Union[CrawlResult, List[CrawlResult], AsyncGenerator[CrawlResult, None]]:
-        """Execute a crawl operation."""
+        """
+        Execute a crawl operation.
+
+        Args:
+            urls: List of URLs to crawl
+            browser_config: Browser configuration
+            crawler_config: Crawler configuration
+            hooks: Optional hooks - can be either:
+                   - Dict[str, Callable]: Function objects that will be converted to strings
+                   - Dict[str, str]: Already stringified hook code
+            hooks_timeout: Timeout in seconds for each hook execution (1-120)
+
+        Returns:
+            Single CrawlResult, list of results, or async generator for streaming
+
+        Example with function hooks:
+            >>> async def my_hook(page, context, **kwargs):
+            ...     await page.set_viewport_size({"width": 1920, "height": 1080})
+            ...     return page
+            >>>
+            >>> result = await client.crawl(
+            ...     ["https://example.com"],
+            ...     hooks={"on_page_context_created": my_hook}
+            ... )
+        """
         await self._check_server()
-        
-        data = self._prepare_request(urls, browser_config, crawler_config)
+
+        data = self._prepare_request(urls, browser_config, crawler_config, hooks, hooks_timeout)
         is_streaming = crawler_config and crawler_config.stream
-        
+
         self.logger.info(f"Crawling {len(urls)} URLs {'(streaming)' if is_streaming else ''}", tag="CRAWL")
-        
+
         if is_streaming:
             async def stream_results() -> AsyncGenerator[CrawlResult, None]:
                 async with self._http_client.stream("POST", f"{self.base_url}/crawl/stream", json=data) as response:
@@ -128,12 +179,12 @@ class Crawl4aiDockerClient:
                             else:
                                 yield CrawlResult(**result)
             return stream_results()
-        
+
         response = await self._request("POST", "/crawl", json=data)
         result_data = response.json()
         if not result_data.get("success", False):
             raise RequestError(f"Crawl failed: {result_data.get('msg', 'Unknown error')}")
-        
+
         results = [CrawlResult(**r) for r in result_data.get("results", [])]
         self.logger.success(f"Crawl completed with {len(results)} results", tag="CRAWL")
         return results[0] if len(results) == 1 else results
