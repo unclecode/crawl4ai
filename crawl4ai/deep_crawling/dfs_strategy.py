@@ -8,10 +8,12 @@ from ..utils import normalize_url_for_deep_crawl
 
 class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
     """
-    Depth-First Search (DFS) deep crawling strategy.
+    Depth-first deep crawling with familiar BFS rules.
 
-    Inherits URL validation and link discovery from BFSDeepCrawlStrategy.
-    Overrides _arun_batch and _arun_stream to use a stack (LIFO) for DFS traversal.
+    We reuse the same filters, scoring, and page limits from :class:`BFSDeepCrawlStrategy`,
+    but walk the graph with a stack so we fully explore one branch before hopping to the
+    next. DFS also keeps its own ``_dfs_seen`` set so we can drop duplicate links at
+    discovery time without accidentally marking them as “already crawled”.
     """
 
     def __init__(self, *args, **kwargs):
@@ -19,6 +21,7 @@ class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
         self._dfs_seen: Set[str] = set()
 
     def _reset_seen(self, start_url: str) -> None:
+        """Start each crawl with a clean dedupe set seeded with the root URL."""
         self._dfs_seen = {start_url}
 
     async def _arun_batch(
@@ -28,8 +31,12 @@ class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
         config: CrawlerRunConfig,
     ) -> List[CrawlResult]:
         """
-        Batch (non-streaming) DFS mode.
-        Uses a stack to traverse URLs in DFS order, aggregating CrawlResults into a list.
+        Crawl level-by-level but emit results at the end.
+
+        We keep a stack of ``(url, parent, depth)`` tuples, pop one at a time, and
+        hand it to ``crawler.arun_many`` with deep crawling disabled so we remain
+        in control of traversal. Every successful page bumps ``_pages_crawled`` and
+        seeds new stack items discovered via :meth:`link_discovery`.
         """
         visited: Set[str] = set()
         # Stack items: (url, parent_url, depth)
@@ -81,8 +88,11 @@ class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
         config: CrawlerRunConfig,
     ) -> AsyncGenerator[CrawlResult, None]:
         """
-        Streaming DFS mode.
-        Uses a stack to traverse URLs in DFS order and yields CrawlResults as they become available.
+        Same traversal as :meth:`_arun_batch`, but yield pages immediately.
+
+        Each popped URL is crawled, its metadata annotated, then the result gets
+        yielded before we even look at the next stack entry. Successful crawls
+        still feed :meth:`link_discovery`, keeping DFS order intact.
         """
         visited: Set[str] = set()
         stack: List[Tuple[str, Optional[str], int]] = [(start_url, None, 0)]
@@ -130,8 +140,27 @@ class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
         depths: Dict[str, int],
     ) -> None:
         """
-        DFS-specific link discovery that avoids mutating the traversal
-        'visited' set, preventing premature skips.
+        Find the next URLs we should push onto the DFS stack.
+
+        Parameters
+        ----------
+        result : CrawlResult
+            Output of the page we just crawled; its ``links`` block is our raw material.
+        source_url : str
+            URL of the parent page; stored so callers can track ancestry.
+        current_depth : int
+            Depth of the parent; children naturally sit at ``current_depth + 1``.
+        _visited : Set[str]
+            Present to match the BFS signature, but we rely on ``_dfs_seen`` instead.
+        next_level : list of tuples
+            The stack buffer supplied by the caller; we append new ``(url, parent)`` items here.
+        depths : dict
+            Shared depth map so future metadata tagging knows how deep each URL lives.
+
+        Notes
+        -----
+        - ``_dfs_seen`` keeps us from pushing duplicates without touching the traversal guard.
+        - Validation, scoring, and capacity trimming mirror the BFS version so behaviour stays consistent.
         """
         next_depth = current_depth + 1
         if next_depth > self.max_depth:
