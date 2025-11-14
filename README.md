@@ -27,13 +27,13 @@
 
 Crawl4AI turns the web into clean, LLM ready Markdown for RAG, agents, and data pipelines. Fast, controllable, battle tested by a 50k+ star community.
 
-[✨ Check out latest update v0.7.6](#-recent-updates)
+[✨ Check out latest update v0.7.7](#-recent-updates)
 
-✨ **New in v0.7.6**: Complete Webhook Infrastructure for Docker Job Queue API! Real-time notifications for both `/crawl/job` and `/llm/job` endpoints with exponential backoff retry, custom headers, and flexible delivery modes. No more polling! [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.6.md)
+✨ **New in v0.7.7**: Complete Self-Hosting Platform with Real-time Monitoring! Enterprise-grade monitoring dashboard, comprehensive REST API, WebSocket streaming, smart browser pool management, and production-ready observability. Full visibility and control over your crawling infrastructure. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.7.md)
 
-✨ Recent v0.7.5: Docker Hooks System with function-based API for pipeline customization, Enhanced LLM Integration with custom providers, HTTPS Preservation, and multiple community-reported bug fixes. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.5.md)
+✨ Recent v0.7.6: Complete Webhook Infrastructure for Docker Job Queue API! Real-time notifications for both `/crawl/job` and `/llm/job` endpoints with exponential backoff retry, custom headers, and flexible delivery modes. No more polling! [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.6.md)
 
-✨ Previous v0.7.4: Revolutionary LLM Table Extraction with intelligent chunking, enhanced concurrency fixes, memory management refactor, and critical stability improvements. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.4.md)
+✨ Previous v0.7.5: Docker Hooks System with function-based API for pipeline customization, Enhanced LLM Integration with custom providers, HTTPS Preservation, and multiple community-reported bug fixes. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.5.md)
 
 <details>
   <summary>🤓 <strong>My Personal Story</strong></summary>
@@ -296,6 +296,7 @@ pip install -e ".[all]"             # Install all optional features
 ### New Docker Features
 
 The new Docker implementation includes:
+- **Real-time Monitoring Dashboard** with live system metrics and browser pool visibility
 - **Browser pooling** with page pre-warming for faster response times
 - **Interactive playground** to test and generate request code
 - **MCP integration** for direct connection to AI tools like Claude Code
@@ -310,7 +311,8 @@ The new Docker implementation includes:
 docker pull unclecode/crawl4ai:latest
 docker run -d -p 11235:11235 --name crawl4ai --shm-size=1g unclecode/crawl4ai:latest
 
-# Visit the playground at http://localhost:11235/playground
+# Visit the monitoring dashboard at http://localhost:11235/dashboard
+# Or the playground at http://localhost:11235/playground
 ```
 
 ### Quick Test
@@ -339,7 +341,7 @@ else:
     result = requests.get(f"http://localhost:11235/task/{task_id}")
 ```
 
-For more examples, see our [Docker Examples](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/docker_example.py). For advanced configuration, environment variables, and usage examples, see our [Docker Deployment Guide](https://docs.crawl4ai.com/basic/docker-deployment/).
+For more examples, see our [Docker Examples](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/docker_example.py). For advanced configuration, monitoring features, and production deployment, see our [Self-Hosting Guide](https://docs.crawl4ai.com/core/self-hosting/).
 
 </details>
 
@@ -549,6 +551,57 @@ async def test_news_crawl():
 > **💡 Tip:** Some websites may use **CAPTCHA** based verification mechanisms to prevent automated access. If your workflow encounters such challenges, you may optionally integrate a third-party CAPTCHA-handling service such as <strong>[CapSolver](https://www.capsolver.com/blog/Partners/crawl4ai-capsolver/?utm_source=crawl4ai&utm_medium=github_pr&utm_campaign=crawl4ai_integration)</strong>. They support reCAPTCHA v2/v3, Cloudflare Turnstile, Challenge, AWS WAF, and more. Please ensure that your usage complies with the target website’s terms of service and applicable laws.
 
 ## ✨ Recent Updates
+
+<details>
+<summary><strong>Version 0.7.7 Release Highlights - The Self-Hosting & Monitoring Update</strong></summary>
+
+- **📊 Real-time Monitoring Dashboard**: Interactive web UI with live system metrics and browser pool visibility
+  ```python
+  # Access the monitoring dashboard
+  # Visit: http://localhost:11235/dashboard
+
+  # Real-time metrics include:
+  # - System health (CPU, memory, network, uptime)
+  # - Active and completed request tracking
+  # - Browser pool management (permanent/hot/cold)
+  # - Janitor cleanup events
+  # - Error monitoring with full context
+  ```
+
+- **🔌 Comprehensive Monitor API**: Complete REST API for programmatic access to all monitoring data
+  ```python
+  import httpx
+
+  async with httpx.AsyncClient() as client:
+      # System health
+      health = await client.get("http://localhost:11235/monitor/health")
+
+      # Request tracking
+      requests = await client.get("http://localhost:11235/monitor/requests")
+
+      # Browser pool status
+      browsers = await client.get("http://localhost:11235/monitor/browsers")
+
+      # Endpoint statistics
+      stats = await client.get("http://localhost:11235/monitor/endpoints/stats")
+  ```
+
+- **⚡ WebSocket Streaming**: Real-time updates every 2 seconds for custom dashboards
+- **🔥 Smart Browser Pool**: 3-tier architecture (permanent/hot/cold) with automatic promotion and cleanup
+- **🧹 Janitor System**: Automatic resource management with event logging
+- **🎮 Control Actions**: Manual browser management (kill, restart, cleanup) via API
+- **📈 Production Metrics**: 6 critical metrics for operational excellence with Prometheus integration
+- **🐛 Critical Bug Fixes**:
+  - Fixed async LLM extraction blocking issue (#1055)
+  - Enhanced DFS deep crawl strategy (#1607)
+  - Fixed sitemap parsing in AsyncUrlSeeder (#1598)
+  - Resolved browser viewport configuration (#1495)
+  - Fixed CDP timing with exponential backoff (#1528)
+  - Security update for pyOpenSSL (>=25.3.0)
+
+[Full v0.7.7 Release Notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.7.md)
+
+</details>
 
 <details>
 <summary><strong>Version 0.7.5 Release Highlights - The Docker Hooks & Security Update</strong></summary>

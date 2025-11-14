@@ -1383,9 +1383,10 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         try:
             await self.adapter.evaluate(page,
                 f"""
-                (() => {{
+                (async () => {{
                     try {{
-                        {remove_overlays_js}
+                        const removeOverlays = {remove_overlays_js};
+                        await removeOverlays();
                         return {{ success: true }};
                     }} catch (error) {{
                         return {{

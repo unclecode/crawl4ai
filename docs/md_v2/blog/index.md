@@ -20,6 +20,25 @@ Ever wondered why your AI coding assistant struggles with your library despite c
 
 ## Latest Release
 
+### [Crawl4AI v0.7.7 – The Self-Hosting & Monitoring Update](../blog/release-v0.7.7.md)
+*November 14, 2025*
+
+Crawl4AI v0.7.7 transforms Docker into a complete self-hosting platform with enterprise-grade real-time monitoring, comprehensive observability, and full operational control. Experience complete visibility into your crawling infrastructure!
+
+Key highlights:
+- **📊 Real-time Monitoring Dashboard**: Interactive web UI with live system metrics and browser pool visibility
+- **🔌 Comprehensive Monitor API**: Complete REST API for programmatic access to all monitoring data
+- **⚡ WebSocket Streaming**: Real-time updates every 2 seconds for custom dashboards
+- **🔥 Smart Browser Pool**: 3-tier architecture (permanent/hot/cold) with automatic promotion and cleanup
+- **🧹 Janitor System**: Automatic resource management with event logging
+- **🎮 Control Actions**: Manual browser management (kill, restart, cleanup) via API
+- **📈 Production Ready**: Prometheus integration, alerting patterns, and 6 critical metrics for ops excellence
+- **🐛 Critical Fixes**: Async LLM extraction (#1055), DFS crawling (#1607), viewport config, and security updates
+
+[Read full release notes →](../blog/release-v0.7.7.md)
+
+## Recent Releases
+
 ### [Crawl4AI v0.7.6 – The Webhook Infrastructure Update](../blog/release-v0.7.6.md)
 *October 22, 2025*
 
@@ -31,11 +50,8 @@ Key highlights:
 - **🔐 Custom Authentication**: Add custom headers for webhook authentication
 - **📊 Flexible Delivery**: Choose notification-only or include full data in payload
 - **⚙️ Global Configuration**: Set default webhook URL in config.yml for all jobs
-- **🎯 Zero Breaking Changes**: Fully backward compatible, webhooks are opt-in
 
 [Read full release notes →](../blog/release-v0.7.6.md)
-
-## Recent Releases
 
 ### [Crawl4AI v0.7.5 – The Docker Hooks & Security Update](../blog/release-v0.7.5.md)
 *September 29, 2025*
@@ -47,11 +63,8 @@ Key highlights:
 - **🤖 Enhanced LLM Integration**: Custom providers with temperature control and base_url configuration
 - **🔒 HTTPS Preservation**: Secure internal link handling for modern web applications
 - **🐍 Python 3.10+ Support**: Modern language features and enhanced performance
-- **🛠️ Bug Fixes**: Resolved multiple community-reported issues including URL processing, JWT authentication, and proxy configuration
 
 [Read full release notes →](../blog/release-v0.7.5.md)
-
-## Recent Releases
 
 ### [Crawl4AI v0.7.4 – The Intelligent Table Extraction & Performance Update](../blog/release-v0.7.4.md)
 *August 17, 2025*

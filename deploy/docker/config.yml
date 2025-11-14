@@ -3,7 +3,7 @@ app:
   title: "Crawl4AI API"
   version: "1.0.0"
   host: "0.0.0.0"
-  port: 11234
+  port: 11235
   reload: False
   workers: 1
   timeout_keep_alive: 300
@@ -61,7 +61,7 @@ crawler:
     batch_process: 300.0  # Timeout for batch processing
   pool:
     max_pages: 40                          # ← GLOBAL_SEM permits
-    idle_ttl_sec: 1800                     # ← 30 min janitor cutoff
+    idle_ttl_sec: 300                     # ← 30 min janitor cutoff
   browser:
     kwargs:
       headless: true

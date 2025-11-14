@@ -67,6 +67,7 @@ async def handle_llm_qa(
     config: dict
 ) -> str:
     """Process QA using LLM with crawled content as context."""
+    from crawler_pool import get_crawler
     try:
         if not url.startswith(('http://', 'https://')) and not url.startswith(("raw:", "raw://")):
             url = 'https://' + url
@@ -75,15 +76,21 @@ async def handle_llm_qa(
         if last_q_index != -1:
             url = url[:last_q_index]
 
-        # Get markdown content
-        async with AsyncWebCrawler() as crawler:
-            result = await crawler.arun(url)
-            if not result.success:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=result.error_message
-                )
-            content = result.markdown.fit_markdown or result.markdown.raw_markdown
+        # Get markdown content (use default config)
+        from utils import load_config
+        cfg = load_config()
+        browser_cfg = BrowserConfig(
+            extra_args=cfg["crawler"]["browser"].get("extra_args", []),
+            **cfg["crawler"]["browser"].get("kwargs", {}),
+        )
+        crawler = await get_crawler(browser_cfg)
+        result = await crawler.arun(url)
+        if not result.success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=result.error_message
+            )
+        content = result.markdown.fit_markdown or result.markdown.raw_markdown
 
         # Create prompt and get LLM response
         prompt = f"""Use the following content as context to answer the question.
@@ -272,25 +279,32 @@ async def handle_markdown_request(
 
         cache_mode = CacheMode.ENABLED if cache == "1" else CacheMode.WRITE_ONLY
 
-        async with AsyncWebCrawler() as crawler:
-            result = await crawler.arun(
-                url=decoded_url,
-                config=CrawlerRunConfig(
-                    markdown_generator=md_generator,
-                    scraping_strategy=LXMLWebScrapingStrategy(),
-                    cache_mode=cache_mode
-                )
+        from crawler_pool import get_crawler
+        from utils import load_config as _load_config
+        _cfg = _load_config()
+        browser_cfg = BrowserConfig(
+            extra_args=_cfg["crawler"]["browser"].get("extra_args", []),
+            **_cfg["crawler"]["browser"].get("kwargs", {}),
+        )
+        crawler = await get_crawler(browser_cfg)
+        result = await crawler.arun(
+            url=decoded_url,
+            config=CrawlerRunConfig(
+                markdown_generator=md_generator,
+                scraping_strategy=LXMLWebScrapingStrategy(),
+                cache_mode=cache_mode
             )
-            
-            if not result.success:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=result.error_message
-                )
+        )
 
-            return (result.markdown.raw_markdown 
-                   if filter_type == FilterType.RAW 
-                   else result.markdown.fit_markdown)
+        if not result.success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=result.error_message
+            )
+
+        return (result.markdown.raw_markdown
+               if filter_type == FilterType.RAW
+               else result.markdown.fit_markdown)
 
     except Exception as e:
         logger.error(f"Markdown error: {str(e)}", exc_info=True)
@@ -504,12 +518,22 @@ async def handle_crawl_request(
     hooks_config: Optional[dict] = None
 ) -> dict:
     """Handle non-streaming crawl requests with optional hooks."""
+    # Track request start
+    request_id = f"req_{uuid4().hex[:8]}"
+    try:
+        from monitor import get_monitor
+        await get_monitor().track_request_start(
+            request_id, "/crawl", urls[0] if urls else "batch", browser_config
+        )
+    except:
+        pass  # Monitor not critical
+
     start_mem_mb = _get_memory_mb() # <--- Get memory before
     start_time = time.time()
     mem_delta_mb = None
     peak_mem_mb = start_mem_mb
     hook_manager = None
-    
+
     try:
         urls = [('https://' + url) if not url.startswith(('http://', 'https://')) and not url.startswith(("raw:", "raw://")) else url for url in urls]
         browser_config = BrowserConfig.load(browser_config)
@@ -614,7 +638,16 @@ async def handle_crawl_request(
             "server_memory_delta_mb": mem_delta_mb,
             "server_peak_memory_mb": peak_mem_mb
         }
-        
+
+        # Track request completion
+        try:
+            from monitor import get_monitor
+            await get_monitor().track_request_end(
+                request_id, success=True, pool_hit=True, status_code=200
+            )
+        except:
+            pass
+
         # Add hooks information if hooks were used
         if hooks_config and hook_manager:
             from hook_manager import UserHookManager
@@ -643,6 +676,16 @@ async def handle_crawl_request(
 
     except Exception as e:
         logger.error(f"Crawl error: {str(e)}", exc_info=True)
+
+        # Track request error
+        try:
+            from monitor import get_monitor
+            await get_monitor().track_request_end(
+                request_id, success=False, error=str(e), status_code=500
+            )
+        except:
+            pass
+
         if 'crawler' in locals() and crawler.ready: # Check if crawler was initialized and started
             #  try:
             #      await crawler.close()

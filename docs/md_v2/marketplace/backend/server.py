@@ -471,13 +471,17 @@ async def delete_sponsor(sponsor_id: int):
 
 app.include_router(router)
 
+# Version info
+VERSION = "1.1.0"
+BUILD_DATE = "2025-10-26"
 
 @app.get("/")
 async def root():
     """API info"""
     return {
         "name": "Crawl4AI Marketplace API",
-        "version": "1.0.0",
+        "version": VERSION,
+        "build_date": BUILD_DATE,
         "endpoints": [
             "/marketplace/api/apps",
             "/marketplace/api/articles",

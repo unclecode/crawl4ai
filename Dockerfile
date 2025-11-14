@@ -1,7 +1,7 @@
 FROM python:3.12-slim-bookworm AS build
 
 # C4ai version
-ARG C4AI_VER=0.7.6
+ARG C4AI_VER=0.7.7
 ENV C4AI_VERSION=$C4AI_VER
 LABEL c4ai.version=$C4AI_VER
 

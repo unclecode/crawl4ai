@@ -94,6 +94,20 @@ class ExtractionStrategy(ABC):
                 extracted_content.extend(future.result())
         return extracted_content
 
+    async def arun(self, url: str, sections: List[str], *q, **kwargs) -> List[Dict[str, Any]]:
+        """
+        Async version: Process sections of text in parallel using asyncio.
+
+        Default implementation runs the sync version in a thread pool.
+        Subclasses can override this for true async processing.
+
+        :param url: The URL of the webpage.
+        :param sections: List of sections (strings) to process.
+        :return: A list of processed JSON blocks.
+        """
+        import asyncio
+        return await asyncio.to_thread(self.run, url, sections, *q, **kwargs)
+
 
 class NoExtractionStrategy(ExtractionStrategy):
     """
@@ -777,6 +791,177 @@ class LLMExtractionStrategy(ExtractionStrategy):
                                 "content": str(e),
                             }
                         )
+
+        return extracted_content
+
+    async def aextract(self, url: str, ix: int, html: str) -> List[Dict[str, Any]]:
+        """
+        Async version: Extract meaningful blocks or chunks from the given HTML using an LLM.
+
+        How it works:
+        1. Construct a prompt with variables.
+        2. Make an async request to the LLM using the prompt.
+        3. Parse the response and extract blocks or chunks.
+
+        Args:
+            url: The URL of the webpage.
+            ix: Index of the block.
+            html: The HTML content of the webpage.
+
+        Returns:
+            A list of extracted blocks or chunks.
+        """
+        from .utils import aperform_completion_with_backoff
+
+        if self.verbose:
+            print(f"[LOG] Call LLM for {url} - block index: {ix}")
+
+        variable_values = {
+            "URL": url,
+            "HTML": escape_json_string(sanitize_html(html)),
+        }
+
+        prompt_with_variables = PROMPT_EXTRACT_BLOCKS
+        if self.instruction:
+            variable_values["REQUEST"] = self.instruction
+            prompt_with_variables = PROMPT_EXTRACT_BLOCKS_WITH_INSTRUCTION
+
+        if self.extract_type == "schema" and self.schema:
+            variable_values["SCHEMA"] = json.dumps(self.schema, indent=2)
+            prompt_with_variables = PROMPT_EXTRACT_SCHEMA_WITH_INSTRUCTION
+
+        if self.extract_type == "schema" and not self.schema:
+            prompt_with_variables = PROMPT_EXTRACT_INFERRED_SCHEMA
+
+        for variable in variable_values:
+            prompt_with_variables = prompt_with_variables.replace(
+                "{" + variable + "}", variable_values[variable]
+            )
+
+        try:
+            response = await aperform_completion_with_backoff(
+                self.llm_config.provider,
+                prompt_with_variables,
+                self.llm_config.api_token,
+                base_url=self.llm_config.base_url,
+                json_response=self.force_json_response,
+                extra_args=self.extra_args,
+            )
+            # Track usage
+            usage = TokenUsage(
+                completion_tokens=response.usage.completion_tokens,
+                prompt_tokens=response.usage.prompt_tokens,
+                total_tokens=response.usage.total_tokens,
+                completion_tokens_details=response.usage.completion_tokens_details.__dict__
+                if response.usage.completion_tokens_details
+                else {},
+                prompt_tokens_details=response.usage.prompt_tokens_details.__dict__
+                if response.usage.prompt_tokens_details
+                else {},
+            )
+            self.usages.append(usage)
+
+            # Update totals
+            self.total_usage.completion_tokens += usage.completion_tokens
+            self.total_usage.prompt_tokens += usage.prompt_tokens
+            self.total_usage.total_tokens += usage.total_tokens
+
+            try:
+                content = response.choices[0].message.content
+                blocks = None
+
+                if self.force_json_response:
+                    blocks = json.loads(content)
+                    if isinstance(blocks, dict):
+                        if len(blocks) == 1 and isinstance(list(blocks.values())[0], list):
+                            blocks = list(blocks.values())[0]
+                        else:
+                            blocks = [blocks]
+                    elif isinstance(blocks, list):
+                        blocks = blocks
+                else:
+                    blocks = extract_xml_data(["blocks"], content)["blocks"]
+                    blocks = json.loads(blocks)
+
+                for block in blocks:
+                    block["error"] = False
+            except Exception:
+                parsed, unparsed = split_and_parse_json_objects(
+                    response.choices[0].message.content
+                )
+                blocks = parsed
+                if unparsed:
+                    blocks.append(
+                        {"index": 0, "error": True, "tags": ["error"], "content": unparsed}
+                    )
+
+            if self.verbose:
+                print(
+                    "[LOG] Extracted",
+                    len(blocks),
+                    "blocks from URL:",
+                    url,
+                    "block index:",
+                    ix,
+                )
+            return blocks
+        except Exception as e:
+            if self.verbose:
+                print(f"[LOG] Error in LLM extraction: {e}")
+            return [
+                {
+                    "index": ix,
+                    "error": True,
+                    "tags": ["error"],
+                    "content": str(e),
+                }
+            ]
+
+    async def arun(self, url: str, sections: List[str]) -> List[Dict[str, Any]]:
+        """
+        Async version: Process sections with true parallelism using asyncio.gather.
+
+        Args:
+            url: The URL of the webpage.
+            sections: List of sections (strings) to process.
+
+        Returns:
+            A list of extracted blocks or chunks.
+        """
+        import asyncio
+
+        merged_sections = self._merge(
+            sections,
+            self.chunk_token_threshold,
+            overlap=int(self.chunk_token_threshold * self.overlap_rate),
+        )
+
+        extracted_content = []
+
+        # Create tasks for all sections to run in parallel
+        tasks = [
+            self.aextract(url, ix, sanitize_input_encode(section))
+            for ix, section in enumerate(merged_sections)
+        ]
+
+        # Execute all tasks concurrently
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Process results
+        for result in results:
+            if isinstance(result, Exception):
+                if self.verbose:
+                    print(f"Error in async extraction: {result}")
+                extracted_content.append(
+                    {
+                        "index": 0,
+                        "error": True,
+                        "tags": ["error"],
+                        "content": str(result),
+                    }
+                )
+            else:
+                extracted_content.extend(result)
 
         return extracted_content
 
