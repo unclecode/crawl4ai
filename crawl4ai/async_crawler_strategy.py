@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import time
+import random
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, Any, List, Union
 from typing import Optional, AsyncGenerator, Final
@@ -900,12 +901,62 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 await self.execute_hook("on_execution_started", page, context=context, config=config)
                 await self.execute_hook("on_execution_ended", page, context=context, config=config, result=execution_result)
 
-            # Handle user simulation
+            # Handle user simulation with natural human-like behavior
             if config.simulate_user or config.magic:
-                await page.mouse.move(100, 100)
-                await page.mouse.down()
-                await page.mouse.up()
-                await page.keyboard.press("ArrowDown")
+                # Get viewport size with defensive check
+                viewport = page.viewport_size
+                if viewport is None:
+                    # Set default viewport if not already set
+                    await page.set_viewport_size(
+                        {"width": self.browser_config.viewport_width, "height": self.browser_config.viewport_height}
+                    )
+                    viewport = page.viewport_size
+
+                # Ensure viewport is valid before proceeding
+                if viewport and viewport.get("width") and viewport.get("height"):
+                    # RNG: use SystemRandom to avoid Ruff S311 (non-crypto use, still fine)
+                    rng = random.SystemRandom()
+                    w = max(1, int(viewport["width"]))
+                    h = max(1, int(viewport["height"]))
+                    # Margin scaled to viewport, capped [5, 50]
+                    margin = min(50, max(5, min(w, h) // 10))
+
+                    # Generate random start and end points for mouse movement (safe bounds)
+                    sx_low = min(margin, w - 1)
+                    sx_high = max(sx_low, w // 3)
+                    sy_low = min(margin, h - 1)
+                    sy_high = max(sy_low, h // 3)
+                    start_x = rng.randint(sx_low, sx_high)
+                    start_y = rng.randint(sy_low, sy_high)
+
+                    ex_low = max(w // 2, margin)
+                    ex_high = max(ex_low, w - margin)
+                    ey_low = max(h // 2, margin)
+                    ey_high = max(ey_low, h - margin)
+                    end_x = rng.randint(ex_low, ex_high)
+                    end_y = rng.randint(ey_low, ey_high)
+
+                    # Generate a curved trajectory using Bezier curve
+                    # Control points for the curve
+                    control_x = (start_x + end_x) / 2 + rng.randint(-100, 100)
+                    control_y = (start_y + end_y) / 2 + rng.randint(-100, 100)
+
+                    # Number of steps for smooth movement
+                    steps = rng.randint(15, 25)
+
+                    # Move mouse along the curved path
+                    for i in range(steps + 1):
+                        t = i / steps
+                        # Quadratic Bezier curve formula
+                        x = int((1 - t) ** 2 * start_x + 2 * (1 - t) * t * control_x + t ** 2 * end_x)
+                        y = int((1 - t) ** 2 * start_y + 2 * (1 - t) * t * control_y + t ** 2 * end_y)
+                        # Clamp to viewport
+                        x = max(0, min(w - 1, x))
+                        y = max(0, min(h - 1, y))
+
+                        await page.mouse.move(x, y)
+                        # Random small delay between movements to simulate human behavior
+                        await asyncio.sleep(rng.uniform(0.001, 0.003))
 
             # Handle wait_for condition
             # Todo: Decide how to handle this
