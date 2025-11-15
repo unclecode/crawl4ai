@@ -225,11 +225,11 @@ class AsyncWebCrawler:
                 screenshot=True,
                 ...
             )
-            result = await crawler.arun(url="https://example.com", crawler_config=config)
+            result = await crawler.arun(url="https://example.com", config=config)
 
         Args:
             url: The URL to crawl (http://, https://, file://, or raw:)
-            crawler_config: Configuration object controlling crawl behavior
+            config: Configuration object controlling crawl behavior
             [other parameters maintained for backwards compatibility]
 
         Returns:
