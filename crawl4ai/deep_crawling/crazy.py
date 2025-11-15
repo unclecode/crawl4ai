@@ -334,7 +334,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
         ctx.depths[start_url] = 0
 
         while not ctx.frontier.is_empty() and not self._cancel.is_set():
-            # Use the best algorith, to find top_n value
+            # Use the best algorithm, to find top_n value
             top_n = calculate_quantum_batch_size(
                 depth=ctx.current_depth,
                 max_depth=self.max_depth,
