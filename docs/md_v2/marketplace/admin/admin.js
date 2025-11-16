@@ -529,8 +529,19 @@ class AdminDashboard {
                     </label>
                 </div>
                 <div class="form-group full-width">
-                    <label>Integration Guide</label>
-                    <textarea id="form-integration" rows="10">${app?.integration_guide || ''}</textarea>
+                    <label>Long Description (Markdown - Overview tab)</label>
+                    <textarea id="form-long-description" rows="10" placeholder="Enter detailed description with markdown formatting...">${app?.long_description || ''}</textarea>
+                    <small>Markdown support: **bold**, *italic*, [links](url), # headers, code blocks, lists</small>
+                </div>
+                <div class="form-group full-width">
+                    <label>Integration Guide (Markdown - Integration tab)</label>
+                    <textarea id="form-integration" rows="20" placeholder="Enter integration guide with installation, examples, and code snippets using markdown...">${app?.integration_guide || ''}</textarea>
+                    <small>Single markdown field with installation, examples, and complete guide. Code blocks get auto copy buttons.</small>
+                </div>
+                <div class="form-group full-width">
+                    <label>Documentation (Markdown - Documentation tab)</label>
+                    <textarea id="form-documentation" rows="20" placeholder="Enter documentation with API reference, examples, and best practices using markdown...">${app?.documentation || ''}</textarea>
+                    <small>Full documentation with API reference, examples, best practices, etc.</small>
                 </div>
             </div>
         `;
@@ -712,7 +723,9 @@ class AdminDashboard {
             data.contact_email = document.getElementById('form-email').value;
             data.featured = document.getElementById('form-featured').checked ? 1 : 0;
             data.sponsored = document.getElementById('form-sponsored').checked ? 1 : 0;
+            data.long_description = document.getElementById('form-long-description').value;
             data.integration_guide = document.getElementById('form-integration').value;
+            data.documentation = document.getElementById('form-documentation').value;
         } else if (type === 'articles') {
             data.title = document.getElementById('form-title').value;
             data.slug = this.generateSlug(data.title);

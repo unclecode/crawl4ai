@@ -69,12 +69,12 @@ The tutorial includes a Flask-based web interface with:
 cd docs/examples/c4a_script/tutorial/
 
 # Install dependencies
-pip install flask
+pip install -r requirements.txt
 
 # Launch the tutorial server
-python app.py
+python server.py
 
-# Open http://localhost:5000 in your browser
+# Open http://localhost:8000 in your browser
 ```
 
 ## Core Concepts
@@ -111,8 +111,8 @@ CLICK `.submit-btn`
 # By attribute
 CLICK `button[type="submit"]`
 
-# By text content
-CLICK `button:contains("Sign In")`
+# By accessible attributes
+CLICK `button[aria-label="Search"][title="Search"]`
 
 # Complex selectors
 CLICK `.form-container input[name="email"]`
