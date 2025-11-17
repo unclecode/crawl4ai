@@ -683,12 +683,13 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     )
                     redirected_url = page.url
                 except Error as e:
-                    error_str = str(e)
+                    error_str = str(e).lower()
                     # Allow navigation to be aborted when downloading files
                     # This is expected behavior for downloads in some browser engines
                     is_download_error = (
-                        'net::ERR_ABORTED' in error_str or 
-                        'Download is starting' in error_str
+                        'net::err_aborted' in error_str or 
+                        'download is starting' in error_str or
+                        ('download' in error_str and 'starting' in error_str)
                     )
                     
                     if is_download_error and self.browser_config.accept_downloads:
