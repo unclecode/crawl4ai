@@ -271,6 +271,8 @@ continue_config.json
 CLAUDE_MONITOR.md
 CLAUDE.md
 
+.claude/
+
 tests/**/test_site
 tests/**/reports
 tests/**/benchmark_reports
@@ -282,3 +284,14 @@ docs/apps/linkdin/debug*/
 docs/apps/linkdin/samples/insights/*
 
 scripts/
+
+
+# Databse files
+*.sqlite3
+*.sqlite3-journal
+*.db-journal
+*.db-wal
+*.db-shm
+*.db
+*.rdb
+*.ldb

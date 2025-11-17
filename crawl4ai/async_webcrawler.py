@@ -617,7 +617,17 @@ class AsyncWebCrawler:
                 else config.chunking_strategy
             )
             sections = chunking.chunk(content)
-            extracted_content = config.extraction_strategy.run(url, sections)
+            # extracted_content = config.extraction_strategy.run(url, sections)
+
+            # Use async version if available for better parallelism
+            if hasattr(config.extraction_strategy, 'arun'):
+                extracted_content = await config.extraction_strategy.arun(url, sections)
+            else:
+                # Fallback to sync version run in thread pool to avoid blocking
+                extracted_content = await asyncio.to_thread(
+                    config.extraction_strategy.run, url, sections
+                )
+
             extracted_content = json.dumps(
                 extracted_content, indent=4, default=str, ensure_ascii=False
             )

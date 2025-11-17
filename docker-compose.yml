@@ -6,15 +6,16 @@ x-base-config: &base-config
     - "11235:11235"  # Gunicorn port
   env_file:
     - .llm.env       # API keys (create from .llm.env.example)
-  environment:
-    - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-    - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
-    - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-    - GROQ_API_KEY=${GROQ_API_KEY:-}
-    - TOGETHER_API_KEY=${TOGETHER_API_KEY:-}
-    - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
-    - GEMINI_API_TOKEN=${GEMINI_API_TOKEN:-}
-    - LLM_PROVIDER=${LLM_PROVIDER:-}  # Optional: Override default provider (e.g., "anthropic/claude-3-opus")
+  # Uncomment to set default environment variables (will overwrite .llm.env)
+  # environment:
+  #   - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+  #   - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+  #   - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+  #   - GROQ_API_KEY=${GROQ_API_KEY:-}
+  #   - TOGETHER_API_KEY=${TOGETHER_API_KEY:-}
+  #   - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
+  #   - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+  #   - LLM_PROVIDER=${LLM_PROVIDER:-}  # Optional: Override default provider (e.g., "anthropic/claude-3-opus")
   volumes:
     - /dev/shm:/dev/shm  # Chromium performance
   deploy:
