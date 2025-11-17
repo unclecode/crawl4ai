@@ -20,7 +20,8 @@ ENV PYTHONFAULTHANDLER=1 \
     PIP_DEFAULT_TIMEOUT=100 \
     DEBIAN_FRONTEND=noninteractive \
     REDIS_HOST=localhost \
-    REDIS_PORT=6379
+    REDIS_PORT=6379 \
+    DISPLAY=:99
 
 ARG PYTHON_VERSION=3.12
 ARG INSTALL_TYPE=default
@@ -68,6 +69,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcairo2 \
     libasound2 \
     libatspi2.0-0 \
+    xvfb \
+    xauth \
+    x11-utils \
     && apt-get clean \ 
     && rm -rf /var/lib/apt/lists/*
 
