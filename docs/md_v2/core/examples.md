@@ -11,6 +11,12 @@ This page provides a comprehensive list of example scripts that demonstrate vari
 | Quickstart Set 1 | Basic examples for getting started with Crawl4AI. | [View Code](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/quickstart_examples_set_1.py) |
 | Quickstart Set 2 | More advanced examples for working with Crawl4AI. | [View Code](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/quickstart_examples_set_2.py) |
 
+## Proxies
+
+| Example  | Description | Link |
+|----------|--------------|------|
+| **NSTProxy** | [NSTProxy](https://www.nstproxy.com/?utm_source=crawl4ai) Seamlessly integrates with crawl4ai — no setup required. Access high-performance residential, datacenter, ISP, and IPv6 proxies with smart rotation and anti-blocking technology. Starts from $0.1/GB. Use code crawl4ai for 10% off. | [View Code](https://github.com/unclecode/crawl4ai/tree/main/docs/examples/proxy) |
+
 ## Browser & Crawling Features
 
 | Example | Description | Link |
@@ -56,13 +62,14 @@ This page provides a comprehensive list of example scripts that demonstrate vari
 
 ## Anti-Bot & Stealth Features
 
-| Example | Description | Link |
-|---------|-------------|------|
-| Stealth Mode Quick Start | Five practical examples showing how to use stealth mode for bypassing basic bot detection. | [View Code](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/stealth_mode_quick_start.py) |
+| Example                    | Description | Link |
+|----------------------------|-------------|------|
+| Stealth Mode Quick Start   | Five practical examples showing how to use stealth mode for bypassing basic bot detection. | [View Code](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/stealth_mode_quick_start.py) |
 | Stealth Mode Comprehensive | Comprehensive demonstration of stealth mode features with bot detection testing and comparisons. | [View Code](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/stealth_mode_example.py) |
-| Undetected Browser | Simple example showing how to use the undetected browser adapter. | [View Code](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/hello_world_undetected.py) |
-| Undetected Browser Demo | Basic demo comparing regular and undetected browser modes. | [View Code](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/undetected_simple_demo.py) |
-| Undetected Tests | Advanced tests comparing regular vs undetected browsers on various bot detection services. | [View Folder](https://github.com/unclecode/crawl4ai/tree/main/docs/examples/undetectability/) |
+| Undetected Browser         | Simple example showing how to use the undetected browser adapter. | [View Code](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/hello_world_undetected.py) |
+| Undetected Browser Demo    | Basic demo comparing regular and undetected browser modes. | [View Code](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/undetected_simple_demo.py) |
+| Undetected Tests           | Advanced tests comparing regular vs undetected browsers on various bot detection services. | [View Folder](https://github.com/unclecode/crawl4ai/tree/main/docs/examples/undetectability/) |
+| CapSolver Captcha Solver   | Seamlessly integrate with [CapSolver](https://www.capsolver.com/?utm_source=crawl4ai&utm_medium=github_pr&utm_campaign=crawl4ai_integration) to automatically solve reCAPTCHA v2/v3, Cloudflare Turnstile / Challenges, AWS WAF and more for uninterrupted scraping and automation. | [View Folder](https://github.com/unclecode/crawl4ai/tree/main/docs/examples/capsolver_captcha_solver/) |
 
 ## Customization & Security
 

@@ -374,6 +374,9 @@ class ManagedBrowser:
             ]
             if self.headless:
                 flags.append("--headless=new")
+            # Add viewport flag if specified in config
+            if self.browser_config.viewport_height and self.browser_config.viewport_width:
+                flags.append(f"--window-size={self.browser_config.viewport_width},{self.browser_config.viewport_height}")
             # merge common launch flags
             flags.extend(self.build_browser_flags(self.browser_config))
         elif self.browser_type == "firefox":
@@ -678,6 +681,11 @@ class BrowserManager:
                 if not self.config.cdp_url
                 else self.config.cdp_url
             )
+            
+            # Add CDP endpoint verification before connecting
+            if not await self._verify_cdp_ready(cdp_url):
+                raise Exception(f"CDP endpoint at {cdp_url} is not ready after startup")
+            
             self.browser = await self.playwright.chromium.connect_over_cdp(cdp_url)
             contexts = self.browser.contexts
             if contexts:
@@ -697,6 +705,36 @@ class BrowserManager:
                 self.browser = await self.playwright.chromium.launch(**browser_args)
 
             self.default_context = self.browser
+
+    async def _verify_cdp_ready(self, cdp_url: str) -> bool:
+        """Verify CDP endpoint is ready with exponential backoff"""
+        import aiohttp
+
+        self.logger.debug(f"Starting CDP verification for {cdp_url}", tag="BROWSER")
+        for attempt in range(5):
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(
+                        f"{cdp_url}/json/version",
+                        timeout=aiohttp.ClientTimeout(total=2),
+                    ) as response:
+                        if response.status == 200:
+                            self.logger.debug(
+                                f"CDP endpoint ready after {attempt + 1} attempts",
+                                tag="BROWSER",
+                            )
+                            return True
+            except Exception as e:
+                self.logger.debug(
+                    f"CDP check attempt {attempt + 1} failed: {e}", tag="BROWSER"
+                )
+            delay = 0.5 * (1.4**attempt)
+            self.logger.debug(
+                f"Waiting {delay:.2f}s before next CDP check...", tag="BROWSER"
+            )
+            await asyncio.sleep(delay)
+        self.logger.debug(f"CDP verification failed after 5 attempts", tag="BROWSER")
+        return False
 
     def _build_browser_args(self) -> dict:
         """Build browser launch arguments from config."""
