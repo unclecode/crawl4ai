@@ -674,6 +674,11 @@ class BrowserManager:
                 self.default_context = await self.create_browser_context()
             await self.setup_context(self.default_context)
         else:
+            # Handle --disable-web-security requiring a separate user data directory
+            if "--disable-web-security" in (self.config.extra_args or []) and not self.config.user_data_dir:
+                import tempfile
+                self.config.user_data_dir = tempfile.mkdtemp()
+            
             browser_args = self._build_browser_args()
 
             # Launch appropriate browser type
@@ -682,9 +687,15 @@ class BrowserManager:
             elif self.config.browser_type == "webkit":
                 self.browser = await self.playwright.webkit.launch(**browser_args)
             else:
-                self.browser = await self.playwright.chromium.launch(**browser_args)
-
-            self.default_context = self.browser
+                if "--disable-web-security" in (self.config.extra_args or []):
+                    # Use persistent context for --disable-web-security
+                    browser_args["args"] = [arg for arg in browser_args["args"] if not arg.startswith("--user-data-dir")]
+                    self.default_context = await self.playwright.chromium.launch_persistent_context(self.config.user_data_dir, **browser_args)
+                    self.browser = self.default_context
+                    self.config.use_managed_browser = True  # Treat as managed for get_page logic
+                else:
+                    self.browser = await self.playwright.chromium.launch(**browser_args)
+                    self.default_context = self.browser
 
     async def _verify_cdp_ready(self, cdp_url: str) -> bool:
         """Verify CDP endpoint is ready with exponential backoff"""
@@ -747,6 +758,9 @@ class BrowserManager:
 
         if self.config.extra_args:
             args.extend(self.config.extra_args)
+
+        if self.config.user_data_dir:
+            args.append(f"--user-data-dir={self.config.user_data_dir}")
 
         # Deduplicate args
         args = list(dict.fromkeys(args))
