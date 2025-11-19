@@ -131,7 +131,7 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
         Returns:
             ScrapingResult: A structured result containing the scraped content.
         """
-        actual_url = kwargs.get("redirected_url", url)
+        actual_url = kwargs.get("redirected_url", url) or url
         raw_result = self._scrap(actual_url, html, **kwargs)
         if raw_result is None:
             return ScrapingResult(
