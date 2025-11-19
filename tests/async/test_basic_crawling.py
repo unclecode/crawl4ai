@@ -1,7 +1,12 @@
 import os
 import sys
-import pytest
 import time
+
+import pytest
+
+from crawl4ai.async_configs import CrawlerRunConfig
+from crawl4ai.async_webcrawler import AsyncWebCrawler
+from crawl4ai.cache_context import CacheMode
 
 # Add the parent directory to the Python path
 parent_dir = os.path.dirname(
@@ -9,14 +14,14 @@ parent_dir = os.path.dirname(
 )
 sys.path.append(parent_dir)
 
-from crawl4ai.async_webcrawler import AsyncWebCrawler
-
 
 @pytest.mark.asyncio
 async def test_successful_crawl():
     async with AsyncWebCrawler(verbose=True) as crawler:
         url = "https://www.nbcnews.com/business"
-        result = await crawler.arun(url=url, bypass_cache=True)
+        result = await crawler.arun(url=url, config=CrawlerRunConfig(
+            cache_mode=CacheMode.BYPASS
+        ))
         assert result.success
         assert result.url == url
         assert result.html
@@ -41,7 +46,9 @@ async def test_multiple_urls():
             "https://www.example.com",
             "https://www.python.org",
         ]
-        results = await crawler.arun_many(urls=urls, bypass_cache=True)
+        results = await crawler.arun_many(urls=urls, config=CrawlerRunConfig(
+            cache_mode=CacheMode.BYPASS
+        ))
         assert len(results) == len(urls)
         assert all(result.success for result in results)
         assert all(result.html for result in results)
@@ -52,7 +59,7 @@ async def test_javascript_execution():
     async with AsyncWebCrawler(verbose=True) as crawler:
         js_code = "document.body.innerHTML = '<h1>Modified by JS</h1>';"
         url = "https://www.example.com"
-        result = await crawler.arun(url=url, bypass_cache=True, js_code=js_code)
+        result = await crawler.arun(url=url, config=CrawlerRunConfig(js_code=js_code, cache_mode=CacheMode.BYPASS))
         assert result.success
         assert "<h1>Modified by JS</h1>" in result.html
 
@@ -69,7 +76,9 @@ async def test_concurrent_crawling_performance():
         ]
 
         start_time = time.time()
-        results = await crawler.arun_many(urls=urls, bypass_cache=True)
+        results = await crawler.arun_many(urls=urls, config=CrawlerRunConfig(
+            cache_mode=CacheMode.BYPASS
+        ))
         end_time = time.time()
 
         total_time = end_time - start_time

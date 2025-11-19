@@ -378,10 +378,6 @@ class AsyncWebCrawler:
                     crawl_result.network_requests = async_response.network_requests
                     crawl_result.console_messages = async_response.console_messages
 
-                    crawl_result.success = bool(html)
-                    crawl_result.session_id = getattr(
-                        config, "session_id", None)
-
                     self.logger.url_status(
                         url=cache_context.display_url,
                         success=crawl_result.success,
@@ -395,18 +391,26 @@ class AsyncWebCrawler:
 
                     return CrawlResultContainer(crawl_result)
 
-                else:
-                    self.logger.url_status(
-                        url=cache_context.display_url,
-                        success=True,
-                        timing=time.perf_counter() - start_time,
-                        tag="COMPLETE"
-                    )
-                    cached_result.success = bool(html)
-                    cached_result.session_id = getattr(
-                        config, "session_id", None)
-                    cached_result.redirected_url = cached_result.redirected_url or url
-                    return CrawlResultContainer(cached_result)
+                # Use cached content
+                self.logger.url_status(
+                    url=cache_context.display_url,
+                    success=True,
+                    timing=time.perf_counter() - start_time,
+                    tag="COMPLETE"
+                )
+                crawl_result: CrawlResult = await self.aprocess_html(
+                    url=url,
+                    html=html,
+                    extracted_content=extracted_content,
+                    config=config,
+                    screenshot_data=screenshot_data,
+                    pdf_data=pdf_data,
+                    verbose=config.verbose,
+                    is_raw_html=True if url.startswith("raw:") else False,
+                    redirected_url=cached_result.redirected_url,
+                    **kwargs,
+                )
+                return CrawlResultContainer(crawl_result)
 
             except Exception as e:
                 error_context = get_error_context(sys.exc_info())
@@ -502,9 +506,6 @@ class AsyncWebCrawler:
             metadata = result.get("metadata", {})
         else:
             cleaned_html = sanitize_input_encode(result.cleaned_html)
-            # media = result.media.model_dump()
-            # tables = media.pop("tables", [])
-            # links = result.links.model_dump()
             media = result.media.model_dump() if hasattr(result.media, 'model_dump') else result.media
             tables = media.pop("tables", []) if isinstance(media, dict) else []
             links = result.links.model_dump() if hasattr(result.links, 'model_dump') else result.links
@@ -573,11 +574,6 @@ class AsyncWebCrawler:
             timing=int((time.perf_counter() - t1) * 1000) / 1000,
             tag="SCRAPE"
         )
-        # self.logger.info(
-        #     message="{url:.50}... | Time: {timing}s",
-        #     tag="SCRAPE",
-        #     params={"url": _url, "timing": int((time.perf_counter() - t1) * 1000) / 1000},
-        # )
 
         ################################
         # Structured Content Extraction           #
@@ -648,6 +644,7 @@ class AsyncWebCrawler:
             extracted_content=extracted_content,
             success=True,
             error_message="",
+            session_id=getattr(config, "session_id", None)
         )
 
     async def arun_many(
