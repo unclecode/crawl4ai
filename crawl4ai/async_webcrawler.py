@@ -248,6 +248,17 @@ class AsyncWebCrawler:
             try:
                 self.logger.verbose = config.verbose
 
+                # Update proxy configuration from rotation strategy if available
+                if config.proxy_rotation_strategy:
+                    next_proxy: ProxyConfig = await config.proxy_rotation_strategy.get_next_proxy()
+                    if next_proxy:
+                        self.logger.info(
+                            message="Switch proxy: {proxy}",
+                            tag="PROXY",
+                            params={"proxy": next_proxy.server}
+                        )
+                        config.proxy_config = next_proxy
+
                 # Default to ENABLED if no cache mode specified
                 if config.cache_mode is None:
                     config.cache_mode = CacheMode.ENABLED
@@ -294,119 +305,110 @@ class AsyncWebCrawler:
                         tag="FETCH",
                     )
 
-                # Update proxy configuration from rotation strategy if available
-                if config and config.proxy_rotation_strategy:
-                    next_proxy: ProxyConfig = await config.proxy_rotation_strategy.get_next_proxy()
-                    if next_proxy:
-                        self.logger.info(
-                            message="Switch proxy: {proxy}",
-                            tag="PROXY",
-                            params={"proxy": next_proxy.server}
-                        )
-                        config.proxy_config = next_proxy
-                        # config = config.clone(proxy_config=next_proxy)
-
-                # Fetch fresh content if needed
-                if not cached_result or not html:
-                    t1 = time.perf_counter()
-
-                    if config.user_agent:
-                        self.crawler_strategy.update_user_agent(
-                            config.user_agent)
-
-                    # Check robots.txt if enabled
-                    if config and config.check_robots_txt:
-                        if not await self.robots_parser.can_fetch(
-                            url, self.browser_config.user_agent
-                        ):
-                            return CrawlResult(
-                                url=url,
-                                html="",
-                                success=False,
-                                status_code=403,
-                                error_message="Access denied by robots.txt",
-                                response_headers={
-                                    "X-Robots-Status": "Blocked by robots.txt"
-                                },
-                            )
-
-                    ##############################
-                    # Call CrawlerStrategy.crawl #
-                    ##############################
-                    async_response = await self.crawler_strategy.crawl(
-                        url,
-                        config=config,  # Pass the entire config object
-                    )
-
-                    html = sanitize_input_encode(async_response.html)
-                    screenshot_data = async_response.screenshot
-                    pdf_data = async_response.pdf_data
-                    js_execution_result = async_response.js_execution_result
-
-                    t2 = time.perf_counter()
-                    self.logger.url_status(
-                        url=cache_context.display_url,
-                        success=bool(html),
-                        timing=t2 - t1,
-                        tag="FETCH",
-                    )
-
-                    ###############################################################
-                    # Process the HTML content, Call CrawlerStrategy.process_html #
-                    ###############################################################
-                    crawl_result: CrawlResult = await self.aprocess_html(
-                        url=url,
-                        html=html,
-                        extracted_content=extracted_content,
-                        config=config,  # Pass the config object instead of individual parameters
-                        screenshot_data=screenshot_data,
-                        pdf_data=pdf_data,
-                        verbose=config.verbose,
-                        is_raw_html=True if url.startswith("raw:") else False,
-                        redirected_url=async_response.redirected_url,
-                        **kwargs,
-                    )
-
-                    crawl_result.status_code = async_response.status_code
-                    crawl_result.redirected_url = async_response.redirected_url or url
-                    crawl_result.response_headers = async_response.response_headers
-                    crawl_result.downloaded_files = async_response.downloaded_files
-                    crawl_result.js_execution_result = js_execution_result
-                    crawl_result.mhtml = async_response.mhtml_data
-                    crawl_result.ssl_certificate = async_response.ssl_certificate
-                    # Add captured network and console data if available
-                    crawl_result.network_requests = async_response.network_requests
-                    crawl_result.console_messages = async_response.console_messages
-
-                    crawl_result.success = bool(html)
-                    crawl_result.session_id = getattr(
-                        config, "session_id", None)
-
-                    self.logger.url_status(
-                        url=cache_context.display_url,
-                        success=crawl_result.success,
-                        timing=time.perf_counter() - start_time,
-                        tag="COMPLETE",
-                    )
-
-                    # Update cache if appropriate
-                    if cache_context.should_write() and not bool(cached_result):
-                        await async_db_manager.acache_url(crawl_result)
-
-                    return CrawlResultContainer(crawl_result)
-
-                else:
+                if cached_result and html: # Valid cache hit
                     self.logger.url_status(
                         url=cache_context.display_url,
                         success=True,
                         timing=time.perf_counter() - start_time,
                         tag="COMPLETE"
                     )
-                    cached_result.success = bool(html)
-                    cached_result.session_id = getattr(
-                        config, "session_id", None)
-                    cached_result.redirected_url = cached_result.redirected_url or url
-                    return CrawlResultContainer(cached_result)
+                    crawl_result: CrawlResult = await self.aprocess_html(
+                        url=url,
+                        html=html,
+                        extracted_content=extracted_content,
+                        config=config,
+                        screenshot_data=screenshot_data,
+                        pdf_data=pdf_data,
+                        verbose=config.verbose,
+                        is_raw_html=True if url.startswith("raw:") else False,
+                        redirected_url=cached_result.redirected_url,
+                        **kwargs,
+                    )
+                    return CrawlResultContainer(crawl_result)
+
+                # Fetch fresh content if needed
+                t1 = time.perf_counter()
+
+                if config.user_agent:
+                    self.crawler_strategy.update_user_agent(
+                        config.user_agent)
+
+                # Check robots.txt if enabled
+                if config and config.check_robots_txt:
+                    if not await self.robots_parser.can_fetch(
+                        url, self.browser_config.user_agent
+                    ):
+                        return CrawlResult(
+                            url=url,
+                            html="",
+                            success=False,
+                            status_code=403,
+                            error_message="Access denied by robots.txt",
+                            response_headers={
+                                "X-Robots-Status": "Blocked by robots.txt"
+                            },
+                        )
+
+                ##############################
+                # Call CrawlerStrategy.crawl #
+                ##############################
+                async_response = await self.crawler_strategy.crawl(
+                    url,
+                    config=config,  # Pass the entire config object
+                )
+
+                html = sanitize_input_encode(async_response.html)
+                screenshot_data = async_response.screenshot
+                pdf_data = async_response.pdf_data
+                js_execution_result = async_response.js_execution_result
+
+                t2 = time.perf_counter()
+                self.logger.url_status(
+                    url=cache_context.display_url,
+                    success=bool(html),
+                    timing=t2 - t1,
+                    tag="FETCH",
+                )
+
+                ###############################################################
+                # Process the HTML content, Call CrawlerStrategy.process_html #
+                ###############################################################
+                crawl_result: CrawlResult = await self.aprocess_html(
+                    url=url,
+                    html=html,
+                    extracted_content=extracted_content,
+                    config=config,  # Pass the config object instead of individual parameters
+                    screenshot_data=screenshot_data,
+                    pdf_data=pdf_data,
+                    verbose=config.verbose,
+                    is_raw_html=True if url.startswith("raw:") else False,
+                    redirected_url=async_response.redirected_url,
+                    **kwargs,
+                )
+
+                crawl_result.status_code = async_response.status_code
+                crawl_result.redirected_url = async_response.redirected_url or url
+                crawl_result.response_headers = async_response.response_headers
+                crawl_result.downloaded_files = async_response.downloaded_files
+                crawl_result.js_execution_result = js_execution_result
+                crawl_result.mhtml = async_response.mhtml_data
+                crawl_result.ssl_certificate = async_response.ssl_certificate
+                # Add captured network and console data if available
+                crawl_result.network_requests = async_response.network_requests
+                crawl_result.console_messages = async_response.console_messages
+
+                self.logger.url_status(
+                    url=cache_context.display_url,
+                    success=crawl_result.success,
+                    timing=time.perf_counter() - start_time,
+                    tag="COMPLETE",
+                )
+
+                # Update cache if appropriate
+                if cache_context.should_write() and not bool(cached_result):
+                    await async_db_manager.acache_url(crawl_result)
+
+                return CrawlResultContainer(crawl_result)
 
             except Exception as e:
                 error_context = get_error_context(sys.exc_info())
@@ -502,9 +504,6 @@ class AsyncWebCrawler:
             metadata = result.get("metadata", {})
         else:
             cleaned_html = sanitize_input_encode(result.cleaned_html)
-            # media = result.media.model_dump()
-            # tables = media.pop("tables", [])
-            # links = result.links.model_dump()
             media = result.media.model_dump() if hasattr(result.media, 'model_dump') else result.media
             tables = media.pop("tables", []) if isinstance(media, dict) else []
             links = result.links.model_dump() if hasattr(result.links, 'model_dump') else result.links
@@ -573,11 +572,6 @@ class AsyncWebCrawler:
             timing=int((time.perf_counter() - t1) * 1000) / 1000,
             tag="SCRAPE"
         )
-        # self.logger.info(
-        #     message="{url:.50}... | Time: {timing}s",
-        #     tag="SCRAPE",
-        #     params={"url": _url, "timing": int((time.perf_counter() - t1) * 1000) / 1000},
-        # )
 
         ################################
         # Structured Content Extraction           #
@@ -648,6 +642,7 @@ class AsyncWebCrawler:
             extracted_content=extracted_content,
             success=True,
             error_message="",
+            session_id=getattr(config, "session_id", None)
         )
 
     async def arun_many(

@@ -96,5 +96,6 @@ crawl4ai = { workspace = true }
 
 [dependency-groups]
 dev = [
-    "crawl4ai",
+    "pytest>=8.4.2",
+    "pytest-asyncio>=1.2.0",
 ]
