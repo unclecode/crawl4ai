@@ -256,6 +256,7 @@ class AsyncWebCrawler:
                 cache_context = CacheContext(url, config.cache_mode, False)
 
                 # Initialize processing variables
+                html = None
                 async_response: AsyncCrawlResponse = None
                 cached_result: CrawlResult = None
                 screenshot_data = None
@@ -304,112 +305,110 @@ class AsyncWebCrawler:
                             params={"proxy": next_proxy.server}
                         )
                         config.proxy_config = next_proxy
-                        # config = config.clone(proxy_config=next_proxy)
 
-                # Fetch fresh content if needed
-                if not cached_result or not html:
-                    t1 = time.perf_counter()
-
-                    if config.user_agent:
-                        self.crawler_strategy.update_user_agent(
-                            config.user_agent)
-
-                    # Check robots.txt if enabled
-                    if config and config.check_robots_txt:
-                        if not await self.robots_parser.can_fetch(
-                            url, self.browser_config.user_agent
-                        ):
-                            return CrawlResult(
-                                url=url,
-                                html="",
-                                success=False,
-                                status_code=403,
-                                error_message="Access denied by robots.txt",
-                                response_headers={
-                                    "X-Robots-Status": "Blocked by robots.txt"
-                                },
-                            )
-
-                    ##############################
-                    # Call CrawlerStrategy.crawl #
-                    ##############################
-                    async_response = await self.crawler_strategy.crawl(
-                        url,
-                        config=config,  # Pass the entire config object
-                    )
-
-                    html = sanitize_input_encode(async_response.html)
-                    screenshot_data = async_response.screenshot
-                    pdf_data = async_response.pdf_data
-                    js_execution_result = async_response.js_execution_result
-
-                    t2 = time.perf_counter()
+                if html: # Valid cache hit
                     self.logger.url_status(
                         url=cache_context.display_url,
-                        success=bool(html),
-                        timing=t2 - t1,
-                        tag="FETCH",
+                        success=True,
+                        timing=time.perf_counter() - start_time,
+                        tag="COMPLETE"
                     )
-
-                    ###############################################################
-                    # Process the HTML content, Call CrawlerStrategy.process_html #
-                    ###############################################################
                     crawl_result: CrawlResult = await self.aprocess_html(
                         url=url,
                         html=html,
                         extracted_content=extracted_content,
-                        config=config,  # Pass the config object instead of individual parameters
+                        config=config,
                         screenshot_data=screenshot_data,
                         pdf_data=pdf_data,
                         verbose=config.verbose,
                         is_raw_html=True if url.startswith("raw:") else False,
-                        redirected_url=async_response.redirected_url,
+                        redirected_url=cached_result.redirected_url,
                         **kwargs,
                     )
-
-                    crawl_result.status_code = async_response.status_code
-                    crawl_result.redirected_url = async_response.redirected_url or url
-                    crawl_result.response_headers = async_response.response_headers
-                    crawl_result.downloaded_files = async_response.downloaded_files
-                    crawl_result.js_execution_result = js_execution_result
-                    crawl_result.mhtml = async_response.mhtml_data
-                    crawl_result.ssl_certificate = async_response.ssl_certificate
-                    # Add captured network and console data if available
-                    crawl_result.network_requests = async_response.network_requests
-                    crawl_result.console_messages = async_response.console_messages
-
-                    self.logger.url_status(
-                        url=cache_context.display_url,
-                        success=crawl_result.success,
-                        timing=time.perf_counter() - start_time,
-                        tag="COMPLETE",
-                    )
-
-                    # Update cache if appropriate
-                    if cache_context.should_write() and not bool(cached_result):
-                        await async_db_manager.acache_url(crawl_result)
-
                     return CrawlResultContainer(crawl_result)
 
-                # Use cached content
+                # Fetch fresh content if needed
+                t1 = time.perf_counter()
+
+                if config.user_agent:
+                    self.crawler_strategy.update_user_agent(
+                        config.user_agent)
+
+                # Check robots.txt if enabled
+                if config and config.check_robots_txt:
+                    if not await self.robots_parser.can_fetch(
+                        url, self.browser_config.user_agent
+                    ):
+                        return CrawlResult(
+                            url=url,
+                            html="",
+                            success=False,
+                            status_code=403,
+                            error_message="Access denied by robots.txt",
+                            response_headers={
+                                "X-Robots-Status": "Blocked by robots.txt"
+                            },
+                        )
+
+                ##############################
+                # Call CrawlerStrategy.crawl #
+                ##############################
+                async_response = await self.crawler_strategy.crawl(
+                    url,
+                    config=config,  # Pass the entire config object
+                )
+
+                html = sanitize_input_encode(async_response.html)
+                screenshot_data = async_response.screenshot
+                pdf_data = async_response.pdf_data
+                js_execution_result = async_response.js_execution_result
+
+                t2 = time.perf_counter()
                 self.logger.url_status(
                     url=cache_context.display_url,
-                    success=True,
-                    timing=time.perf_counter() - start_time,
-                    tag="COMPLETE"
+                    success=bool(html),
+                    timing=t2 - t1,
+                    tag="FETCH",
                 )
+
+                ###############################################################
+                # Process the HTML content, Call CrawlerStrategy.process_html #
+                ###############################################################
                 crawl_result: CrawlResult = await self.aprocess_html(
                     url=url,
                     html=html,
                     extracted_content=extracted_content,
-                    config=config,
+                    config=config,  # Pass the config object instead of individual parameters
                     screenshot_data=screenshot_data,
                     pdf_data=pdf_data,
                     verbose=config.verbose,
                     is_raw_html=True if url.startswith("raw:") else False,
-                    redirected_url=cached_result.redirected_url,
+                    redirected_url=async_response.redirected_url,
                     **kwargs,
                 )
+
+                crawl_result.status_code = async_response.status_code
+                crawl_result.redirected_url = async_response.redirected_url or url
+                crawl_result.response_headers = async_response.response_headers
+                crawl_result.downloaded_files = async_response.downloaded_files
+                crawl_result.js_execution_result = js_execution_result
+                crawl_result.mhtml = async_response.mhtml_data
+                crawl_result.ssl_certificate = async_response.ssl_certificate
+                # Add captured network and console data if available
+                crawl_result.network_requests = async_response.network_requests
+                crawl_result.console_messages = async_response.console_messages
+
+                self.logger.url_status(
+                    url=cache_context.display_url,
+                    success=crawl_result.success,
+                    timing=time.perf_counter() - start_time,
+                    tag="COMPLETE",
+                )
+
+                # Update cache if appropriate
+                if cache_context.should_write() and not bool(cached_result):
+                    await async_db_manager.acache_url(crawl_result)
+
                 return CrawlResultContainer(crawl_result)
 
             except Exception as e:

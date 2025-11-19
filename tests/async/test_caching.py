@@ -113,7 +113,7 @@ async def test_cache_excluded_tags(mock_async_crawl_response):
 
 
 @pytest.mark.asyncio
-async def test_bypass_cache(mock_async_crawl_response):
+async def test_bypass_cache():
     aget_cached_url_spy = AsyncMock(wraps=async_db_manager.aget_cached_url)
 
     with patch.object(async_db_manager, 'aget_cached_url', aget_cached_url_spy):
