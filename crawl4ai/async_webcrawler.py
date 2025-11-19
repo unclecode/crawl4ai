@@ -248,6 +248,17 @@ class AsyncWebCrawler:
             try:
                 self.logger.verbose = config.verbose
 
+                # Update proxy configuration from rotation strategy if available
+                if config.proxy_rotation_strategy:
+                    next_proxy: ProxyConfig = await config.proxy_rotation_strategy.get_next_proxy()
+                    if next_proxy:
+                        self.logger.info(
+                            message="Switch proxy: {proxy}",
+                            tag="PROXY",
+                            params={"proxy": next_proxy.server}
+                        )
+                        config.proxy_config = next_proxy
+
                 # Default to ENABLED if no cache mode specified
                 if config.cache_mode is None:
                     config.cache_mode = CacheMode.ENABLED
@@ -256,7 +267,6 @@ class AsyncWebCrawler:
                 cache_context = CacheContext(url, config.cache_mode, False)
 
                 # Initialize processing variables
-                html = None
                 async_response: AsyncCrawlResponse = None
                 cached_result: CrawlResult = None
                 screenshot_data = None
@@ -295,18 +305,7 @@ class AsyncWebCrawler:
                         tag="FETCH",
                     )
 
-                # Update proxy configuration from rotation strategy if available
-                if config and config.proxy_rotation_strategy:
-                    next_proxy: ProxyConfig = await config.proxy_rotation_strategy.get_next_proxy()
-                    if next_proxy:
-                        self.logger.info(
-                            message="Switch proxy: {proxy}",
-                            tag="PROXY",
-                            params={"proxy": next_proxy.server}
-                        )
-                        config.proxy_config = next_proxy
-
-                if html: # Valid cache hit
+                if cached_result and html: # Valid cache hit
                     self.logger.url_status(
                         url=cache_context.display_url,
                         success=True,
