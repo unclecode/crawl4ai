@@ -22,7 +22,29 @@ EXAMPLE_URL = "https://example.com"
 
 @pytest_asyncio.fixture
 async def mock_async_crawl_response(monkeypatch):
-    mock_crawl_response = AsyncCrawlResponse(html=EXAMPLE_RAW_HTML, response_headers={'accept-ranges': 'bytes', 'alt-svc': 'h3=":443"; ma=93600', 'cache-control': 'max-age=86000', 'content-length': '513', 'content-type': 'text/html', 'date': 'Wed, 19 Nov 2025 20:09:52 GMT', 'etag': '"bc2473a18e003bdb249eba5ce893033f:1760028122.592274"', 'last-modified': 'Thu, 09 Oct 2025 16:42:02 GMT'}, js_execution_result=None, status_code=200, screenshot=None, pdf_data=None, mhtml_data=None, downloaded_files=None, ssl_certificate=None, redirected_url=EXAMPLE_URL, network_requests=None, console_messages=None)
+    mock_crawl_response = AsyncCrawlResponse(
+        html=EXAMPLE_RAW_HTML,
+        response_headers={
+            'accept-ranges': 'bytes',
+            'alt-svc': 'h3=":443"; ma=93600',
+            'cache-control': 'max-age=86000',
+            'content-length': '513',
+            'content-type': 'text/html',
+            'date': 'Wed, 19 Nov 2025 20:09:52 GMT',
+            'etag': '"bc2473a18e003bdb249eba5ce893033f:1760028122.592274"',
+            'last-modified': 'Thu, 09 Oct 2025 16:42:02 GMT'
+        },
+        js_execution_result=None,
+        status_code=200,
+        screenshot=None,
+        pdf_data=None,
+        mhtml_data=None,
+        downloaded_files=None,
+        ssl_certificate=None,
+        redirected_url=EXAMPLE_URL,
+        network_requests=None,
+        console_messages=None
+    )
     async def mock_crawl(self, url, **kwargs):
         return mock_crawl_response
     monkeypatch.setattr("crawl4ai.async_crawler_strategy.AsyncPlaywrightCrawlerStrategy.crawl", mock_crawl)
