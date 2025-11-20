@@ -1,57 +1,72 @@
-import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from bs4 import BeautifulSoup, Comment, element, Tag, NavigableString
-import json
-import html
-import lxml
-import re
-import os
-import subprocess
-import platform
-from .prompts import PROMPT_EXTRACT_BLOCKS
-from array import array
-from .html2text import html2text, CustomHTML2Text
-# from .config import *
-from .config import MIN_WORD_THRESHOLD, IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD, IMAGE_SCORE_THRESHOLD, DEFAULT_PROVIDER, PROVIDER_MODELS
-import httpx
-from socket import gaierror
-from pathlib import Path
-from typing import Dict, Any, List, Optional, Callable, Generator, Tuple, Iterable
-from urllib.parse import urljoin
-import requests
-from requests.exceptions import InvalidSchema
-import xxhash
-import textwrap
-import cProfile
-import pstats
-from functools import wraps
 import asyncio
-from lxml import etree, html as lhtml
-import sqlite3
+import cProfile
 import hashlib
-
-from urllib.robotparser import RobotFileParser
-import aiohttp
-from functools import lru_cache
-
-from packaging import version
-from . import __version__
-from typing import Sequence
-
-from itertools import chain
+import html
+import json
+import os
+import platform
+import pstats
+import re
+import sqlite3
+import subprocess
+import textwrap
+import time
+from array import array
 from collections import deque
-import psutil
-import numpy as np
-
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from functools import lru_cache, wraps
+from itertools import chain
+from pathlib import Path
+from socket import gaierror
+from typing import (
+   Any,
+   Callable,
+   Dict,
+   Generator,
+   Iterable,
+   List,
+   Optional,
+   Sequence,
+   Tuple,
+)
 from urllib.parse import (
-    urljoin, urlparse, urlunparse,
-    parse_qsl, urlencode, quote, unquote
+   parse_qsl,
+   quote,
+   unquote,
+   urlencode,
+   urljoin,
+   urlparse,
+   urlunparse,
 )
 
-
 # Monkey patch to fix wildcard handling in urllib.robotparser
-from urllib.robotparser import RuleLine
-import re
+from urllib.robotparser import RobotFileParser, RuleLine
+
+import aiohttp
+import httpx
+import lxml
+import numpy as np
+import psutil
+import requests
+import xxhash
+from bs4 import BeautifulSoup, Comment, NavigableString, Tag, element
+from lxml import etree
+from lxml import html as lhtml
+from packaging import version
+from requests.exceptions import InvalidSchema
+
+from . import __version__
+
+# from .config import *
+from .config import (
+   DEFAULT_PROVIDER,
+   IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
+   IMAGE_SCORE_THRESHOLD,
+   MIN_WORD_THRESHOLD,
+   PROVIDER_MODELS,
+)
+from .html2text import CustomHTML2Text, html2text
+from .prompts import PROMPT_EXTRACT_BLOCKS
 
 original_applies_to = RuleLine.applies_to
 
@@ -225,8 +240,7 @@ def merge_chunks(
 
 class VersionManager:
     def __init__(self):
-        self.home_dir = Path.home() / ".crawl4ai"
-        self.version_file = self.home_dir / "version.txt"
+        self.version_file = Path(get_home_folder()) / "version.txt"
 
     def get_installed_version(self):
         """Get the version recorded in home directory"""
@@ -253,7 +267,7 @@ class RobotsParser:
     CACHE_TTL = 7 * 24 * 60 * 60
 
     def __init__(self, cache_dir=None, cache_ttl=None):
-        self.cache_dir = cache_dir or os.path.join(get_home_folder(), ".crawl4ai", "robots")
+        self.cache_dir = cache_dir or os.path.join(get_home_folder(), "robots")
         self.cache_ttl = cache_ttl or self.CACHE_TTL
         os.makedirs(self.cache_dir, exist_ok=True)
         self.db_path = os.path.join(self.cache_dir, "robots_cache.db")
@@ -2227,7 +2241,7 @@ def normalize_url(
 
 def normalize_url_for_deep_crawl(href, base_url):
     """Normalize URLs to ensure consistent format"""
-    from urllib.parse import urljoin, urlparse, urlunparse, parse_qs, urlencode
+    from urllib.parse import parse_qs, urlencode, urljoin, urlparse, urlunparse
 
     # Handle None or empty values
     if not href:
@@ -2755,9 +2769,9 @@ def get_error_context(exc_info, context_lines: int = 5):
     Returns:
         dict: Error context information
     """
-    import traceback
     import linecache
     import os
+    import traceback
 
     # Get the full traceback
     tb = traceback.extract_tb(exc_info[2])
@@ -3021,7 +3035,7 @@ def preprocess_html_for_schema(html_content, text_threshold=100, attr_value_thre
             
         return result
     
-    except Exception as e:
+    except Exception:
         # Fallback for parsing errors
         return html_content[:max_size] if len(html_content) > max_size else html_content    
 
@@ -3038,7 +3052,9 @@ def start_colab_display_server():
     except ImportError:
         raise RuntimeError("This function must be run in Google Colab environment.")
     
-    import os, time, subprocess
+    import os
+    import subprocess
+    import time
     
     os.environ["DISPLAY"] = ":99"
     
@@ -3397,7 +3413,6 @@ def get_text_embeddings_sync(
     batch_size: int = 32
 ) -> np.ndarray:
     """Synchronous wrapper for get_text_embeddings"""
-    import numpy as np
     return asyncio.run(get_text_embeddings(texts, llm_config, model_name, batch_size))
 
 

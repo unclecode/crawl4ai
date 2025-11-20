@@ -1,7 +1,8 @@
-from setuptools import setup, find_packages
 import os
-from pathlib import Path
 import shutil
+from pathlib import Path
+
+from setuptools import find_packages, setup
 
 # Note: Most configuration is now in pyproject.toml
 # This setup.py is kept for backwards compatibility

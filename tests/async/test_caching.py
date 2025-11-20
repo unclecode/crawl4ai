@@ -7,7 +7,7 @@ import pytest
 import pytest_asyncio
 
 from crawl4ai.async_configs import CrawlerRunConfig
-from crawl4ai.async_database import async_db_manager
+from crawl4ai.async_database import AsyncDatabaseManager, async_db_manager
 from crawl4ai.async_webcrawler import AsyncWebCrawler
 from crawl4ai.cache_context import CacheMode
 from crawl4ai.models import AsyncCrawlResponse
@@ -77,6 +77,37 @@ async def test_caching():
         assert result2.success
         assert time_taken2 < time_taken1  # Cached result should be faster
         assert final_cache_size == cache_size
+
+
+@pytest.mark.asyncio
+async def test_cache_base_directory(mock_async_crawl_response, tmp_path):
+    custom_base_dir = tmp_path / "test_crawl4ai_base"
+    custom_db_path = custom_base_dir / ".crawl4ai" / "crawl4ai.db"
+
+    with patch("crawl4ai.async_database.DB_PATH", str(custom_db_path)):
+        test_db_manager = AsyncDatabaseManager()
+        assert str(custom_db_path) == test_db_manager.db_path
+
+        with patch('crawl4ai.async_webcrawler.async_db_manager', test_db_manager):
+            await test_db_manager.initialize()
+            assert os.path.exists(test_db_manager.db_path)
+
+            cache_size = await test_db_manager.aget_total_count()
+            assert cache_size == 0
+        
+            async with AsyncWebCrawler(base_directory=str(custom_base_dir), verbose=True) as crawler:
+                result = await crawler.arun(url=EXAMPLE_URL, config=CrawlerRunConfig(
+                    cache_mode=CacheMode.ENABLED
+                ))
+                
+                assert result.success
+                assert result.html == EXAMPLE_RAW_HTML
+                
+                cache_size = await test_db_manager.aget_total_count()
+                assert cache_size == 1
+    
+    # Clean up the custom database
+    await test_db_manager.cleanup()
 
 
 @pytest.mark.asyncio
