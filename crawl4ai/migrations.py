@@ -1,12 +1,15 @@
-import os
 import asyncio
-from pathlib import Path
-import aiosqlite
-from typing import Optional
-import xxhash
-import aiofiles
+import os
 import shutil
 from datetime import datetime
+from typing import Optional
+
+import aiofiles
+import aiosqlite
+import xxhash
+
+from crawl4ai.utils import get_home_folder
+
 from .async_logger import AsyncLogger, LogLevel
 
 # Initialize logger
@@ -162,7 +165,7 @@ async def backup_database(db_path: str) -> str:
 async def run_migration(db_path: Optional[str] = None):
     """Run database migration"""
     if db_path is None:
-        db_path = os.path.join(Path.home(), ".crawl4ai", "crawl4ai.db")
+        db_path = os.path.join(get_home_folder(), "crawl4ai.db")
 
     if not os.path.exists(db_path):
         logger.info("No existing database found. Skipping migration.", tag="INIT")

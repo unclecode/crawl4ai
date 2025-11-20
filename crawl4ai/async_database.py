@@ -1,21 +1,23 @@
-import os
-from pathlib import Path
-import aiosqlite
 import asyncio
-from typing import Optional, Dict
+import json
+import os
 from contextlib import asynccontextmanager
-import json  
-from .models import CrawlResult, MarkdownGenerationResult, StringCompatibleMarkdown
+from typing import Dict, Optional
+
 import aiofiles
+import aiosqlite
+
 from .async_logger import AsyncLogger
-
-from .utils import ensure_content_dirs, generate_content_hash
-from .utils import VersionManager
-from .utils import get_error_context, create_box_message
-
-base_directory = DB_PATH = os.path.join(
-    os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home()), ".crawl4ai"
+from .models import CrawlResult, MarkdownGenerationResult, StringCompatibleMarkdown
+from .utils import (
+    VersionManager,
+    ensure_content_dirs,
+    generate_content_hash,
+    get_error_context,
+    get_home_folder,
 )
+
+base_directory = DB_PATH = get_home_folder()
 os.makedirs(DB_PATH, exist_ok=True)
 DB_PATH = os.path.join(base_directory, "crawl4ai.db")
 
@@ -33,7 +35,7 @@ class AsyncDatabaseManager:
         self._initialized = False
         self.version_manager = VersionManager()
         self.logger = AsyncLogger(
-            log_file=os.path.join(base_directory, ".crawl4ai", "crawler_db.log"),
+            log_file=os.path.join(base_directory, "crawler_db.log"),
             verbose=False,
             tag_width=10,
         )
