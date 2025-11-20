@@ -22,7 +22,6 @@ class TestResult:
     images: int
     internal_links: int
     external_links: int
-    markdown_length: int
     execution_time: float
 
 
@@ -38,18 +37,17 @@ class StrategyTester:
         results = []
         for scraper in [self.new_scraper, self.current_scraper]:
             start_time = time.time()
-            result = scraper._get_content_of_website_optimized(
+            result = scraper.scrap(
                 url="https://en.wikipedia.org/wiki/Test", html=self.WIKI_HTML, **kwargs
             )
             execution_time = time.time() - start_time
 
             test_result = TestResult(
                 name=name,
-                success=result["success"],
-                images=len(result["media"]["images"]),
-                internal_links=len(result["links"]["internal"]),
-                external_links=len(result["links"]["external"]),
-                markdown_length=len(result["markdown"]),
+                success=result.success,
+                images=len(result.media.images),
+                internal_links=len(result.links.internal),
+                external_links=len(result.links.external),
                 execution_time=execution_time,
             )
             results.append(test_result)
@@ -100,3 +98,26 @@ class StrategyTester:
 def test_content_scraper_strategy():
     tester = StrategyTester()
     tester.run_all_tests()
+
+
+def test_resolve_relative_paths():
+    html_content = """<html>
+    <head>
+        <base href="/">
+    </head>
+    <body>
+        <img src="/images/sample.png" />
+        <a href="/products">Products</a>        
+    </body>
+</html>"""
+    strategy = LXMLWebScrapingStrategy()
+
+    result = strategy.scrap(
+        url="https://example.com/shop",
+        html=html_content,
+        redirected_url=None,
+        image_score_threshold=0,
+    )
+
+    assert result.media.images[0].src == "https://example.com/images/sample.png"
+    assert result.links.internal[0].href == "https://example.com/products"

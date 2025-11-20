@@ -1,36 +1,33 @@
-import re
-from itertools import chain
-from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
-from bs4 import BeautifulSoup
 import asyncio
-import requests
-from .config import (
-    MIN_WORD_THRESHOLD,
-    IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
-    IMAGE_SCORE_THRESHOLD,
-    ONLY_TEXT_ELIGIBLE_TAGS,
-    IMPORTANT_ATTRS,
-    SOCIAL_MEDIA_DOMAINS,
-)
-from bs4 import NavigableString, Comment
-from bs4 import PageElement, Tag
+import copy
+import re
+from abc import ABC, abstractmethod
+from itertools import chain
+from typing import Any
 from urllib.parse import urljoin
-from requests.exceptions import InvalidSchema
-from .utils import (
-    extract_metadata,
-    normalize_url,
-    is_external_url,
-    get_base_domain,
-    extract_metadata_using_lxml,
-    extract_page_context,
-    calculate_link_intrinsic_score,
-)
+
+import requests
 from lxml import etree
 from lxml import html as lhtml
-from typing import List
-from .models import ScrapingResult, MediaItem, Link, Media, Links
-import copy
+from requests.exceptions import InvalidSchema
+
+from .config import (
+    IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
+    IMAGE_SCORE_THRESHOLD,
+    IMPORTANT_ATTRS,
+    MIN_WORD_THRESHOLD,
+    ONLY_TEXT_ELIGIBLE_TAGS,
+    SOCIAL_MEDIA_DOMAINS,
+)
+from .models import Link, Links, Media, MediaItem, ScrapingResult
+from .utils import (
+    calculate_link_intrinsic_score,
+    extract_metadata_using_lxml,
+    extract_page_context,
+    get_base_domain,
+    is_external_url,
+    normalize_url,
+)
 
 # Pre-compile regular expressions for Open Graph and Twitter metadata
 OG_REGEX = re.compile(r"^og:")
@@ -39,7 +36,7 @@ DIMENSION_REGEX = re.compile(r"(\d+)(\D*)")
 
 
 # Function to parse srcset
-def parse_srcset(s: str) -> List[Dict]:
+def parse_srcset(s: str) -> list[dict]:
     if not s:
         return []
     variants = []
@@ -51,7 +48,7 @@ def parse_srcset(s: str) -> List[Dict]:
         if len(parts) >= 1:
             url = parts[0]
             width = (
-                parts[1].rstrip("w").split('.')[0]
+                parts[1].rstrip("w").split(".")[0]
                 if len(parts) > 1 and parts[1].endswith("w")
                 else None
             )
@@ -79,13 +76,11 @@ def fetch_image_file_size(img, base_url):
         response = requests.head(img_url)
         if response.status_code == 200:
             return response.headers.get("Content-Length", None)
-        else:
-            print(f"Failed to retrieve file size for {img_url}")
-            return None
+        return None
     except InvalidSchema:
         return None
     finally:
-        return
+        return None
 
 
 class ContentScrapingStrategy(ABC):
@@ -101,13 +96,14 @@ class ContentScrapingStrategy(ABC):
 class LXMLWebScrapingStrategy(ContentScrapingStrategy):
     """
     LXML-based implementation for fast web content scraping.
-    
+
     This is the primary scraping strategy in Crawl4AI, providing high-performance
     HTML parsing and content extraction using the lxml library.
-    
+
     Note: WebScrapingStrategy is now an alias for this class to maintain
     backward compatibility.
     """
+
     def __init__(self, logger=None):
         self.logger = logger
         self.DIMENSION_REGEX = re.compile(r"(\d+)(\D*)")
@@ -159,7 +155,7 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                 for aud in raw_result.get("media", {}).get("audios", [])
                 if aud
             ],
-            tables=raw_result.get("media", {}).get("tables", [])
+            tables=raw_result.get("media", {}).get("tables", []),
         )
 
         # Convert links
@@ -198,7 +194,9 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
         """
         return await asyncio.to_thread(self.scrap, url, html, **kwargs)
 
-    def process_element(self, url, element: lhtml.HtmlElement, **kwargs) -> Dict[str, Any]:
+    def process_element(
+        self, url, element: lhtml.HtmlElement, **kwargs
+    ) -> dict[str, Any]:
         """
         Process an HTML element.
 
@@ -232,9 +230,9 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
         self,
         url: str,
         element: lhtml.HtmlElement,
-        media: Dict[str, List],
-        internal_links_dict: Dict[str, Any],
-        external_links_dict: Dict[str, Any],
+        media: dict[str, list],
+        internal_links_dict: dict[str, Any],
+        external_links_dict: dict[str, Any],
         page_context: dict = None,
         **kwargs,
     ) -> bool:
@@ -265,7 +263,7 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                     "title": link.get("title", "").strip(),
                     "base_domain": base_domain,
                 }
-                
+
                 # Add intrinsic scoring if enabled
                 if kwargs.get("score_links", False) and page_context is not None:
                     try:
@@ -275,7 +273,7 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                             title_attr=link_data["title"],
                             class_attr=link.get("class", ""),
                             rel_attr=link.get("rel", ""),
-                            page_context=page_context
+                            page_context=page_context,
                         )
                         link_data["intrinsic_score"] = intrinsic_score
                     except Exception:
@@ -340,7 +338,7 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
         for media_type in ["video", "audio"]:
             for elem in element.xpath(f".//{media_type}"):
                 media_info = {
-                    "src": elem.get("src"),
+                    "src": normalize_url(elem.get("src"), url),
                     "alt": elem.get("alt"),
                     "type": media_type,
                     "description": self.find_closest_parent_with_useful_text(
@@ -352,7 +350,9 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                 # Process source tags within media elements
                 for source in elem.xpath(".//source"):
                     if src := source.get("src"):
-                        media[f"{media_type}s"].append({**media_info, "src": src})
+                        media[f"{media_type}s"].append(
+                            {**media_info, "src": normalize_url(src, url)}
+                        )
 
         # Clean up unwanted elements
         if kwargs.get("remove_forms", False):
@@ -375,7 +375,7 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
 
     def find_closest_parent_with_useful_text(
         self, element: lhtml.HtmlElement, **kwargs
-    ) -> Optional[str]:
+    ) -> str | None:
         image_description_min_word_threshold = kwargs.get(
             "image_description_min_word_threshold", IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD
         )
@@ -405,7 +405,7 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
 
     def process_image(
         self, img: lhtml.HtmlElement, url: str, index: int, total_images: int, **kwargs
-    ) -> Optional[List[Dict]]:
+    ) -> list[dict] | None:
         # Quick validation checks
         style = img.get("style", "")
         alt = img.get("alt", "")
@@ -423,7 +423,8 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
 
         parent_classes = parent.get("class", "").split()
         if any(
-            "button" in cls or "icon" in cls or "logo" in cls for cls in parent_classes
+            "button" in parent_class or "icon" in parent_class or "logo" in parent_class
+            for parent_class in parent_classes
         ):
             return None
 
@@ -446,13 +447,15 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
         # Check formats in all possible sources
         image_formats = {"jpg", "jpeg", "png", "webp", "avif", "gif"}
         detected_format = None
-        for url in [src, data_src, srcset, data_srcset]:
-            if url:
-                format_matches = [fmt for fmt in image_formats if fmt in url.lower()]
-                if format_matches:
-                    detected_format = format_matches[0]
-                    score += 1
-                    break
+        for parts in [src, data_src, srcset, data_srcset]:
+            if not parts:
+                continue
+            format_matches = [fmt for fmt in image_formats if fmt in url.lower()]
+            if not format_matches:
+                continue
+            detected_format = format_matches[0]
+            score += 1
+            break
 
         if srcset or data_srcset:
             score += 1
@@ -475,10 +478,10 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
             "format": detected_format,
         }
 
-        def add_variant(src: str, width: Optional[str] = None):
+        def add_variant(src: str, width: str | None = None):
             if src and not src.startswith("data:") and src not in unique_urls:
                 unique_urls.add(src)
-                variant = {**base_info, "src": src}
+                variant = {**base_info, "src": normalize_url(src, url)}
                 if width:
                     variant["width"] = width
                 image_variants.append(variant)
@@ -586,16 +589,15 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
 
         return root
 
-
     def _scrap(
         self,
         url: str,
         html: str,
         word_count_threshold: int = MIN_WORD_THRESHOLD,
         css_selector: str = None,
-        target_elements: List[str] = None,
+        target_elements: list[str] = None,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         if not html:
             return None
 
@@ -607,38 +609,46 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
             body = doc
 
             base_domain = get_base_domain(url)
-            
+
             # Extract page context for link scoring (if enabled) - do this BEFORE any removals
             page_context = None
             if kwargs.get("score_links", False):
                 try:
                     # Extract title
-                    title_elements = doc.xpath('//title')
-                    page_title = title_elements[0].text_content() if title_elements else ""
-                    
+                    title_elements = doc.xpath("//title")
+                    page_title = (
+                        title_elements[0].text_content() if title_elements else ""
+                    )
+
                     # Extract headlines
                     headlines = []
-                    for tag in ['h1', 'h2', 'h3']:
-                        elements = doc.xpath(f'//{tag}')
+                    for tag in ["h1", "h2", "h3"]:
+                        elements = doc.xpath(f"//{tag}")
                         for el in elements:
                             text = el.text_content().strip()
                             if text:
                                 headlines.append(text)
-                    headlines_text = ' '.join(headlines)
-                    
+                    headlines_text = " ".join(headlines)
+
                     # Extract meta description
-                    meta_desc_elements = doc.xpath('//meta[@name="description"]/@content')
-                    meta_description = meta_desc_elements[0] if meta_desc_elements else ""
-                    
+                    meta_desc_elements = doc.xpath(
+                        '//meta[@name="description"]/@content'
+                    )
+                    meta_description = (
+                        meta_desc_elements[0] if meta_desc_elements else ""
+                    )
+
                     # Create page context
-                    page_context = extract_page_context(page_title, headlines_text, meta_description, url)
+                    page_context = extract_page_context(
+                        page_title, headlines_text, meta_description, url
+                    )
                 except Exception:
                     page_context = {}  # Fail gracefully
-            
+
             # Early removal of all images if exclude_all_images is set
             # This is more efficient in lxml as we remove elements before any processing
             if kwargs.get("exclude_all_images", False):
-                for img in body.xpath('//img'):
+                for img in body.xpath("//img"):
                     if img.getparent() is not None:
                         img.getparent().remove(img)
 
@@ -682,11 +692,17 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                 try:
                     for_content_targeted_element = []
                     for target_element in target_elements:
-                        for_content_targeted_element.extend(body.cssselect(target_element))
+                        for_content_targeted_element.extend(
+                            body.cssselect(target_element)
+                        )
                     content_element = lhtml.Element("div")
                     content_element.extend(copy.deepcopy(for_content_targeted_element))
                 except Exception as e:
-                    self._log("error", f"Error with target element detection: {str(e)}", "SCRAPE")
+                    self._log(
+                        "error",
+                        f"Error with target element detection: {str(e)}",
+                        "SCRAPE",
+                    )
                     return None
             else:
                 content_element = body
@@ -729,8 +745,8 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
             )
 
             # Extract tables using the table extraction strategy if provided
-            if 'table' not in excluded_tags:
-                table_extraction = kwargs.get('table_extraction')
+            if "table" not in excluded_tags:
+                table_extraction = kwargs.get("table_extraction")
                 if table_extraction:
                     # Pass logger to the strategy if it doesn't have one
                     if not table_extraction.logger:
@@ -765,86 +781,125 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
 
             # Generate output HTML
             cleaned_html = lhtml.tostring(
-                # body,   
+                # body,
                 content_element,
                 encoding="unicode",
                 pretty_print=True,
                 method="html",
                 with_tail=False,
             ).strip()
-            
+
             # Create links dictionary in the format expected by LinkPreview
             links = {
                 "internal": list(internal_links_dict.values()),
                 "external": list(external_links_dict.values()),
             }
-            
+
             # Extract head content for links if configured
             link_preview_config = kwargs.get("link_preview_config")
             if link_preview_config is not None:
                 try:
                     import asyncio
+
                     from .link_preview import LinkPreview
-                    from .models import Links, Link
-                    
+                    from .models import Link, Links
+
                     verbose = link_preview_config.verbose
-                    
+
                     if verbose:
-                        self._log("info", "Starting link head extraction for {internal} internal and {external} external links",
-                                  params={"internal": len(links["internal"]), "external": len(links["external"])}, tag="LINK_EXTRACT")
-                    
+                        self._log(
+                            "info",
+                            "Starting link head extraction for {internal} internal and {external} external links",
+                            params={
+                                "internal": len(links["internal"]),
+                                "external": len(links["external"]),
+                            },
+                            tag="LINK_EXTRACT",
+                        )
+
                     # Convert dict links to Link objects
-                    internal_links = [Link(**link_data) for link_data in links["internal"]]
-                    external_links = [Link(**link_data) for link_data in links["external"]]
+                    internal_links = [
+                        Link(**link_data) for link_data in links["internal"]
+                    ]
+                    external_links = [
+                        Link(**link_data) for link_data in links["external"]
+                    ]
                     links_obj = Links(internal=internal_links, external=external_links)
-                    
+
                     # Create a config object for LinkPreview
                     class TempCrawlerRunConfig:
                         def __init__(self, link_config, score_links):
                             self.link_preview_config = link_config
                             self.score_links = score_links
-                    
-                    config = TempCrawlerRunConfig(link_preview_config, kwargs.get("score_links", False))
-                    
+
+                    config = TempCrawlerRunConfig(
+                        link_preview_config, kwargs.get("score_links", False)
+                    )
+
                     # Extract head content (run async operation in sync context)
                     async def extract_links():
                         async with LinkPreview(self.logger) as extractor:
                             return await extractor.extract_link_heads(links_obj, config)
-                    
+
                     # Run the async operation
                     try:
                         # Check if we're already in an async context
                         loop = asyncio.get_running_loop()
                         # If we're in an async context, we need to run in a thread
                         import concurrent.futures
+
                         with concurrent.futures.ThreadPoolExecutor() as executor:
                             future = executor.submit(asyncio.run, extract_links())
                             updated_links = future.result()
                     except RuntimeError:
                         # No running loop, we can use asyncio.run directly
                         updated_links = asyncio.run(extract_links())
-                    
+
                     # Convert back to dict format
                     links["internal"] = [link.dict() for link in updated_links.internal]
                     links["external"] = [link.dict() for link in updated_links.external]
-                    
+
                     if verbose:
-                        successful_internal = len([l for l in updated_links.internal if l.head_extraction_status == "valid"])
-                        successful_external = len([l for l in updated_links.external if l.head_extraction_status == "valid"])
-                        self._log("info", "Link head extraction completed: {internal_success}/{internal_total} internal, {external_success}/{external_total} external",
-                                  params={
-                                      "internal_success": successful_internal,
-                                      "internal_total": len(updated_links.internal),
-                                      "external_success": successful_external,
-                                      "external_total": len(updated_links.external)
-                                  }, tag="LINK_EXTRACT")
+                        successful_internal = len(
+                            [
+                                l
+                                for l in updated_links.internal
+                                if l.head_extraction_status == "valid"
+                            ]
+                        )
+                        successful_external = len(
+                            [
+                                l
+                                for l in updated_links.external
+                                if l.head_extraction_status == "valid"
+                            ]
+                        )
+                        self._log(
+                            "info",
+                            "Link head extraction completed: {internal_success}/{internal_total} internal, {external_success}/{external_total} external",
+                            params={
+                                "internal_success": successful_internal,
+                                "internal_total": len(updated_links.internal),
+                                "external_success": successful_external,
+                                "external_total": len(updated_links.external),
+                            },
+                            tag="LINK_EXTRACT",
+                        )
                     else:
-                        self._log("info", "Link head extraction completed successfully", tag="LINK_EXTRACT")
-                        
+                        self._log(
+                            "info",
+                            "Link head extraction completed successfully",
+                            tag="LINK_EXTRACT",
+                        )
+
                 except Exception as e:
-                    self._log("error", f"Error during link head extraction: {str(e)}", tag="LINK_EXTRACT")
+                    self._log(
+                        "error",
+                        f"Error during link head extraction: {str(e)}",
+                        tag="LINK_EXTRACT",
+                    )
                     # Continue with original links if head extraction fails
-            
+
             return {
                 "cleaned_html": cleaned_html,
                 "success": success,
@@ -881,12 +936,7 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
             return {
                 "cleaned_html": cleaned_html,
                 "success": False,
-                "media": {
-                    "images": [],
-                    "videos": [],
-                    "audios": [],
-                    "tables": []
-                },
+                "media": {"images": [], "videos": [], "audios": [], "tables": []},
                 "links": {"internal": [], "external": []},
                 "metadata": {},
             }
