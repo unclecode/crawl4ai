@@ -7,7 +7,7 @@ name = "Crawl4AI"
 dynamic = ["version"]
 description = "🚀🤖 Crawl4AI: Open-source LLM Friendly Web Crawler & scraper"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 license = "Apache-2.0"
 authors = [
     {name = "Unclecode", email = "unclecode@kidocode.com"}
@@ -19,7 +19,7 @@ dependencies = [
     "anyio>=4.0.0",
     "lxml~=6.0",
     "litellm>=1.53.1",
-    "numpy>=1.26.0,<3",
+    "numpy==2.3.5",
     "pillow>=10.4",
     "playwright>=1.49.0",
     "patchright>=1.49.0",
@@ -44,15 +44,12 @@ dependencies = [
     "brotli>=1.1.0",
     "humanize>=4.10.0",
     "lark>=1.2.2",
-    "alphashape>=1.3.1",
     "shapely>=2.0.0",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -98,4 +95,5 @@ crawl4ai = { workspace = true }
 dev = [
     "pytest>=8.4.2",
     "pytest-asyncio>=1.2.0",
+    "ruff==0.14.3",
 ]

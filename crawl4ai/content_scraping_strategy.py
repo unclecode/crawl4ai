@@ -247,7 +247,7 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
             if base_element:
                 base_href = base_element[0].get("href", "").strip()
                 if base_href:
-                    url = base_href
+                    url = normalize_url(base_href, url)
         except Exception as e:
             self._log("error", f"Error extracting base URL: {str(e)}", "SCRAPE")
             pass

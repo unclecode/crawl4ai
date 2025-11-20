@@ -1,7 +1,8 @@
-from setuptools import setup, find_packages
 import os
-from pathlib import Path
 import shutil
+from pathlib import Path
+
+from setuptools import find_packages, setup
 
 # Note: Most configuration is now in pyproject.toml
 # This setup.py is kept for backwards compatibility
@@ -56,8 +57,6 @@ setup(
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.9",
-        "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: 3.13",
