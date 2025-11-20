@@ -27,7 +27,6 @@ rich>=13.9.4
 chardet>=5.2.0
 brotli>=1.1.0
 httpx[http2]>=0.27.2
-alphashape>=1.3.1
 shapely>=2.0.0
 
 fake-useragent>=2.2.0
