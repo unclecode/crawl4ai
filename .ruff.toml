@@ -1,0 +1,55 @@
+target-version = "py313"
+
+[lint]
+# Specific lint rules can be found at https://docs.astral.sh/ruff/rules
+select = [
+  # Pyflakes
+  "F",
+  # isort
+  "I",
+  "T20",
+  # ruff's default subset of codestyle rules that don't overlap with formatting.
+  "E4",
+  "E7",
+  "E9",
+  "PERF",
+  "SLF",
+  "NPY201",
+  # Enforce consistent rules when using "from __future__ import annotations"
+  "FA",
+  "UP",
+  # Enforce consistent, common imports, like `import pandas as pd` along with custom 
+  # imports like `import brochure.models as app`.
+  "ICN",
+  # Enforce consistent return statements.
+  "RET"  
+]
+
+[lint.per-file-ignores]
+# Ignore unused import amd import * for init files
+"__init__.py" = ["F401", "F403"]
+# Ignore print statements for commands and private access
+"brochure/management/commands/*" = ["T20", "SLF"]
+"settings.py" = ["T20"]
+# Ignore perf linting in tests.
+"tests/*" = ["PERF", "SLF"]
+
+[lint.extend-per-file-ignores]
+"brochure/models/__init__.py" = ["I"]
+"brochure/migrations/*" = ["I"]
+
+[lint.isort]
+known-first-party = ["brochure"]
+known-third-party = ["newrelic"]
+section-order = ["future","pytest","standard-library","django","third-party","first-party","local-folder"]
+
+[lint.isort.sections]
+"django" = ["django"]
+"pytest" = ["pytest"]
+
+[lint.flake8-self]
+# Ignore a few accesses of private django internals.
+ignore-names = ["_prefetched_objects_cache", "_meta"]
+
+[lint.flake8-import-conventions.extend-aliases]
+"brochure.models" = "app"
