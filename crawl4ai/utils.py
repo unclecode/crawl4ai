@@ -3,6 +3,7 @@ import cProfile
 import hashlib
 import html
 import json
+import linecache
 import os
 import platform
 import pstats
@@ -11,6 +12,7 @@ import sqlite3
 import subprocess
 import textwrap
 import time
+import traceback
 from array import array
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -30,6 +32,7 @@ from typing import (
    Tuple,
 )
 from urllib.parse import (
+   parse_qs,
    parse_qsl,
    quote,
    unquote,
@@ -56,8 +59,6 @@ from packaging import version
 from requests.exceptions import InvalidSchema
 
 from . import __version__
-
-# from .config import *
 from .config import (
    DEFAULT_PROVIDER,
    IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
@@ -2241,8 +2242,6 @@ def normalize_url(
 
 def normalize_url_for_deep_crawl(href, base_url):
     """Normalize URLs to ensure consistent format"""
-    from urllib.parse import parse_qs, urlencode, urljoin, urlparse, urlunparse
-
     # Handle None or empty values
     if not href:
         return None
@@ -2769,10 +2768,6 @@ def get_error_context(exc_info, context_lines: int = 5):
     Returns:
         dict: Error context information
     """
-    import linecache
-    import os
-    import traceback
-
     # Get the full traceback
     tb = traceback.extract_tb(exc_info[2])
 
@@ -3051,10 +3046,6 @@ def start_colab_display_server():
         from IPython.display import IFrame, display
     except ImportError:
         raise RuntimeError("This function must be run in Google Colab environment.")
-    
-    import os
-    import subprocess
-    import time
     
     os.environ["DISPLAY"] = ":99"
     
