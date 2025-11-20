@@ -106,8 +106,7 @@ async def test_cache_base_directory(mock_async_crawl_response, tmp_path):
                 cache_size = await test_db_manager.aget_total_count()
                 assert cache_size == 1
     
-    # Clean up the custom database
-    await test_db_manager.cleanup()
+        await test_db_manager.cleanup()
 
 
 @pytest.mark.asyncio
