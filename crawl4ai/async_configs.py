@@ -1,37 +1,35 @@
+import inspect
 import os
-from typing import Union
+from collections.abc import Callable
+from enum import Enum
+from typing import Any, Union
+
+from .cache_context import CacheMode
+from .chunking_strategy import ChunkingStrategy, RegexChunking
 from .config import (
     DEFAULT_PROVIDER,
     DEFAULT_PROVIDER_API_KEY,
-    MIN_WORD_THRESHOLD,
     IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
-    PROVIDER_MODELS,
+    IMAGE_SCORE_THRESHOLD,
+    MIN_WORD_THRESHOLD,
+    PAGE_TIMEOUT,
     PROVIDER_MODELS_PREFIXES,
     SCREENSHOT_HEIGHT_TRESHOLD,
-    PAGE_TIMEOUT,
-    IMAGE_SCORE_THRESHOLD,
     SOCIAL_MEDIA_DOMAINS,
 )
-
-from .user_agent_generator import UAGen, ValidUAGenerator  # , OnlineUAGenerator
-from .extraction_strategy import ExtractionStrategy, LLMExtractionStrategy
-from .chunking_strategy import ChunkingStrategy, RegexChunking
-
-from .markdown_generation_strategy import MarkdownGenerationStrategy, DefaultMarkdownGenerator
 from .content_scraping_strategy import ContentScrapingStrategy, LXMLWebScrapingStrategy
 from .deep_crawling import DeepCrawlStrategy
-from .table_extraction import TableExtractionStrategy, DefaultTableExtraction
-
-from .cache_context import CacheMode
+from .extraction_strategy import ExtractionStrategy
+from .markdown_generation_strategy import (
+    DefaultMarkdownGenerator,
+    MarkdownGenerationStrategy,
+)
 from .proxy_strategy import ProxyRotationStrategy
-
-from typing import Union, List, Callable
-import inspect
-from typing import Any, Dict, Optional
-from enum import Enum
+from .table_extraction import DefaultTableExtraction, TableExtractionStrategy
+from .user_agent_generator import UAGen, ValidUAGenerator  # , OnlineUAGenerator
 
 # Type alias for URL matching
-UrlMatcher = Union[str, Callable[[str], bool], List[Union[str, Callable[[str], bool]]]]
+UrlMatcher = Union[str, Callable[[str], bool], list[str | Callable[[str], bool]]]
 
 class MatchMode(Enum):
     OR = "or"
@@ -41,7 +39,7 @@ class MatchMode(Enum):
 
 
 
-def to_serializable_dict(obj: Any, ignore_default_value : bool = False) -> Dict:
+def to_serializable_dict(obj: Any, ignore_default_value : bool = False) -> dict:
     """
     Recursively convert an object to a serializable dictionary using {type, params} structure
     for complex objects.
@@ -173,7 +171,7 @@ class GeolocationConfig:
         self,
         latitude: float,
         longitude: float,
-        accuracy: Optional[float] = 0.0
+        accuracy: float | None = 0.0
     ):
         """Configuration class for geolocation settings.
         
@@ -187,7 +185,7 @@ class GeolocationConfig:
         self.accuracy = accuracy
     
     @staticmethod
-    def from_dict(geo_dict: Dict) -> "GeolocationConfig":
+    def from_dict(geo_dict: dict) -> "GeolocationConfig":
         """Create a GeolocationConfig from a dictionary."""
         return GeolocationConfig(
             latitude=geo_dict.get("latitude"),
@@ -195,7 +193,7 @@ class GeolocationConfig:
             accuracy=geo_dict.get("accuracy", 0.0)
         )
     
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convert to dictionary representation."""
         return {
             "latitude": self.latitude,
@@ -220,9 +218,9 @@ class ProxyConfig:
     def __init__(
         self,
         server: str,
-        username: Optional[str] = None,
-        password: Optional[str] = None,
-        ip: Optional[str] = None,
+        username: str | None = None,
+        password: str | None = None,
+        ip: str | None = None,
     ):
         """Configuration class for a single proxy.
         
@@ -239,16 +237,15 @@ class ProxyConfig:
         # Extract IP from server if not explicitly provided
         self.ip = ip or self._extract_ip_from_server()
     
-    def _extract_ip_from_server(self) -> Optional[str]:
+    def _extract_ip_from_server(self) -> str | None:
         """Extract IP address from server URL."""
         try:
             # Simple extraction assuming http://ip:port format
             if "://" in self.server:
                 parts = self.server.split("://")[1].split(":")
                 return parts[0]
-            else:
-                parts = self.server.split(":")
-                return parts[0]
+            parts = self.server.split(":")
+            return parts[0]
         except Exception:
             return None
     
@@ -264,17 +261,16 @@ class ProxyConfig:
                 password=password,
                 ip=ip
             )
-        elif len(parts) == 2:  # ip:port only
+        if len(parts) == 2:  # ip:port only
             ip, port = parts
             return ProxyConfig(
                 server=f"http://{ip}:{port}",
                 ip=ip
             )
-        else:
-            raise ValueError(f"Invalid proxy string format: {proxy_str}")
+        raise ValueError(f"Invalid proxy string format: {proxy_str}")
     
     @staticmethod
-    def from_dict(proxy_dict: Dict) -> "ProxyConfig":
+    def from_dict(proxy_dict: dict) -> "ProxyConfig":
         """Create a ProxyConfig from a dictionary."""
         return ProxyConfig(
             server=proxy_dict.get("server"),
@@ -284,7 +280,7 @@ class ProxyConfig:
         )
     
     @staticmethod
-    def from_env(env_var: str = "PROXIES") -> List["ProxyConfig"]:
+    def from_env(env_var: str = "PROXIES") -> list["ProxyConfig"]:
         """Load proxies from environment variable.
         
         Args:
@@ -304,7 +300,7 @@ class ProxyConfig:
             print(f"Error loading proxies from environment: {e}")
         return proxies
     
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convert to dictionary representation."""
         return {
             "server": self.server,
@@ -407,13 +403,13 @@ class BrowserConfig:
         chrome_channel: str = "chromium",
         channel: str = "chromium",
         proxy: str = None,
-        proxy_config: Union[ProxyConfig, dict, None] = None,
+        proxy_config: ProxyConfig | dict | None = None,
         viewport_width: int = 1080,
         viewport_height: int = 600,
         viewport: dict = None,
         accept_downloads: bool = False,
         downloads_path: str = None,
-        storage_state: Union[str, dict, None] = None,
+        storage_state: str | dict | None = None,
         ignore_https_errors: bool = True,
         java_script_enabled: bool = True,
         sleep_on_close: bool = False,
@@ -631,7 +627,7 @@ class VirtualScrollConfig:
         self,
         container_selector: str,
         scroll_count: int = 10,
-        scroll_by: Union[str, int] = "container_height",
+        scroll_by: str | int = "container_height",
         wait_after_scroll: float = 0.5,
     ):
         """
@@ -672,13 +668,13 @@ class LinkPreviewConfig:
         self,
         include_internal: bool = True,
         include_external: bool = False,
-        include_patterns: Optional[List[str]] = None,
-        exclude_patterns: Optional[List[str]] = None,
+        include_patterns: list[str] | None = None,
+        exclude_patterns: list[str] | None = None,
         concurrency: int = 10,
         timeout: int = 5,
         max_links: int = 100,
-        query: Optional[str] = None,
-        score_threshold: Optional[float] = None,
+        query: str | None = None,
+        score_threshold: float | None = None,
         verbose: bool = False
     ):
         """
@@ -720,7 +716,7 @@ class LinkPreviewConfig:
             raise ValueError("At least one of include_internal or include_external must be True")
     
     @staticmethod
-    def from_dict(config_dict: Dict[str, Any]) -> "LinkPreviewConfig":
+    def from_dict(config_dict: dict[str, Any]) -> "LinkPreviewConfig":
         """Create LinkPreviewConfig from dictionary (for backward compatibility)."""
         if not config_dict:
             return None
@@ -738,7 +734,7 @@ class LinkPreviewConfig:
             verbose=config_dict.get("verbose", False)
         )
     
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary format."""
         return {
             "include_internal": self.include_internal,
@@ -764,18 +760,18 @@ class HTTPCrawlerConfig:
     """HTTP-specific crawler configuration"""
 
     method: str = "GET"
-    headers: Optional[Dict[str, str]] = None
-    data: Optional[Dict[str, Any]] = None
-    json: Optional[Dict[str, Any]] = None
+    headers: dict[str, str] | None = None
+    data: dict[str, Any] | None = None
+    json: dict[str, Any] | None = None
     follow_redirects: bool = True
     verify_ssl: bool = True
 
     def __init__(
         self,
         method: str = "GET",
-        headers: Optional[Dict[str, str]] = None,
-        data: Optional[Dict[str, Any]] = None,
-        json: Optional[Dict[str, Any]] = None,
+        headers: dict[str, str] | None = None,
+        data: dict[str, Any] | None = None,
+        json: dict[str, Any] | None = None,
         follow_redirects: bool = True,
         verify_ssl: bool = True,
     ):
@@ -830,7 +826,7 @@ class HTTPCrawlerConfig:
             return config
         return HTTPCrawlerConfig.from_kwargs(config)
 
-class CrawlerRunConfig():
+class CrawlerRunConfig:
     _UNWANTED_PROPS = {
         'disable_cache' : 'Instead, use cache_mode=CacheMode.DISABLED',
         'bypass_cache' : 'Instead, use cache_mode=CacheMode.BYPASS',
@@ -903,7 +899,7 @@ class CrawlerRunConfig():
         fetch_ssl_certificate: bool = False,
         # Caching Parameters
         cache_mode (CacheMode or None): Defines how caching is handled.
-                                        If None, defaults to CacheMode.ENABLED internally.
+                                        If None, defaults to CacheMode.BYPASS internally.
                                         Default: CacheMode.BYPASS.
         session_id (str or None): Optional session ID to persist the browser context and the created
                                   page instance. If the ID already exists, the crawler does not
@@ -1053,7 +1049,7 @@ class CrawlerRunConfig():
         markdown_generator: MarkdownGenerationStrategy = DefaultMarkdownGenerator(),
         only_text: bool = False,
         css_selector: str = None,
-        target_elements: List[str] = None,
+        target_elements: list[str] = None,
         excluded_tags: list = None,
         excluded_selector: str = None,
         keep_data_attributes: bool = False,
@@ -1062,12 +1058,12 @@ class CrawlerRunConfig():
         prettiify: bool = False,
         parser_type: str = "lxml",
         scraping_strategy: ContentScrapingStrategy = None,
-        proxy_config: Union[ProxyConfig, dict, None] = None,
-        proxy_rotation_strategy: Optional[ProxyRotationStrategy] = None,
+        proxy_config: ProxyConfig | dict | None = None,
+        proxy_rotation_strategy: ProxyRotationStrategy | None = None,
         # Browser Location and Identity Parameters
-        locale: Optional[str] = None,
-        timezone_id: Optional[str] = None,
-        geolocation: Optional[GeolocationConfig] = None,
+        locale: str | None = None,
+        timezone_id: str | None = None,
+        geolocation: GeolocationConfig | None = None,
         # SSL Parameters
         fetch_ssl_certificate: bool = False,
         # Caching Parameters
@@ -1089,13 +1085,13 @@ class CrawlerRunConfig():
         max_range: float = 0.3,
         semaphore_count: int = 5,
         # Page Interaction Parameters
-        js_code: Union[str, List[str]] = None,
-        c4a_script: Union[str, List[str]] = None,
+        js_code: str | list[str] = None,
+        c4a_script: str | list[str] = None,
         js_only: bool = False,
         ignore_body_visibility: bool = True,
         scan_full_page: bool = False,
         scroll_delay: float = 0.2,
-        max_scroll_steps: Optional[int] = None,
+        max_scroll_steps: int | None = None,
         process_iframes: bool = False,
         remove_overlay_elements: bool = False,
         simulate_user: bool = False,
@@ -1136,16 +1132,16 @@ class CrawlerRunConfig():
         user_agent_mode: str = None,
         user_agent_generator_config: dict = {},
         # Deep Crawl Parameters
-        deep_crawl_strategy: Optional[DeepCrawlStrategy] = None,
+        deep_crawl_strategy: DeepCrawlStrategy | None = None,
         # Link Extraction Parameters
-        link_preview_config: Union[LinkPreviewConfig, Dict[str, Any]] = None,
+        link_preview_config: LinkPreviewConfig | dict[str, Any] = None,
         # Virtual Scroll Parameters
-        virtual_scroll_config: Union[VirtualScrollConfig, Dict[str, Any]] = None,
+        virtual_scroll_config: VirtualScrollConfig | dict[str, Any] = None,
         # URL Matching Parameters
-        url_matcher: Optional[UrlMatcher] = None,
+        url_matcher: UrlMatcher | None = None,
         match_mode: MatchMode = MatchMode.OR,
         # Experimental Parameters
-        experimental: Dict[str, Any] = None,
+        experimental: dict[str, Any] = None,
     ):
         # TODO: Planning to set properties dynamically based on the __init__ signature
         self.url = url
@@ -1384,12 +1380,12 @@ class CrawlerRunConfig():
             # Single function matcher
             return self.url_matcher(url)
         
-        elif isinstance(self.url_matcher, str):
+        if isinstance(self.url_matcher, str):
             # Single pattern string
             from fnmatch import fnmatch
             return fnmatch(url, self.url_matcher)
         
-        elif isinstance(self.url_matcher, list):
+        if isinstance(self.url_matcher, list):
             # List of mixed matchers
             if not self.url_matcher:  # Empty list
                 return False
@@ -1408,8 +1404,8 @@ class CrawlerRunConfig():
             # Apply match mode logic
             if self.match_mode == MatchMode.OR:
                 return any(results) if results else False
-            else:  # AND mode
-                return all(results) if results else False
+            # AND mode
+            return all(results) if results else False
         
         return False
 
@@ -1671,15 +1667,15 @@ class LLMConfig:
     def __init__(
         self,
         provider: str = DEFAULT_PROVIDER,
-        api_token: Optional[str] = None,
-        base_url: Optional[str] = None,
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
-        top_p: Optional[float] = None,
-        frequency_penalty: Optional[float] = None,
-        presence_penalty: Optional[float] = None,
-        stop: Optional[List[str]] = None,
-        n: Optional[int] = None,    
+        api_token: str | None = None,
+        base_url: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        top_p: float | None = None,
+        frequency_penalty: float | None = None,
+        presence_penalty: float | None = None,
+        stop: list[str] | None = None,
+        n: int | None = None,    
     ):
         """Configuaration class for LLM provider and API token."""
         self.provider = provider
@@ -1758,18 +1754,18 @@ class SeedingConfig:
     def __init__(
         self,
         source: str = "sitemap+cc",
-        pattern: Optional[str] = "*",
+        pattern: str | None = "*",
         live_check: bool = False,
         extract_head: bool = False,
         max_urls: int = -1,
         concurrency: int = 1000,
         hits_per_sec: int = 5,
         force: bool = False,
-        base_directory: Optional[str] = None,
-        llm_config: Optional[LLMConfig] = None,
-        verbose: Optional[bool] = None,
-        query: Optional[str] = None,
-        score_threshold: Optional[float] = None,
+        base_directory: str | None = None,
+        llm_config: LLMConfig | None = None,
+        verbose: bool | None = None,
+        query: str | None = None,
+        score_threshold: float | None = None,
         scoring_method: str = "bm25",
         filter_nonsense_urls: bool = True,
     ):
@@ -1825,11 +1821,11 @@ class SeedingConfig:
         self.filter_nonsense_urls = filter_nonsense_urls
 
     # Add to_dict, from_kwargs, and clone methods for consistency
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {k: v for k, v in self.__dict__.items() if k != 'llm_config' or v is not None}
 
     @staticmethod
-    def from_kwargs(kwargs: Dict[str, Any]) -> 'SeedingConfig':
+    def from_kwargs(kwargs: dict[str, Any]) -> 'SeedingConfig':
         return SeedingConfig(**kwargs)
 
     def clone(self, **kwargs: Any) -> 'SeedingConfig':

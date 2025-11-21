@@ -1,9 +1,10 @@
+import pytest
+
 import asyncio
 import os
 import sys
 from unittest.mock import AsyncMock, patch
 
-import pytest
 import pytest_asyncio
 
 from crawl4ai.async_configs import CrawlerRunConfig
