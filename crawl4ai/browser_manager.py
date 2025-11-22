@@ -89,7 +89,7 @@ class ManagedBrowser:
             "--mute-audio",
             "--disable-background-timer-throttling",
         ]
-        if config.light_mode:
+        if config.performance_mode:
             flags.extend(BROWSER_DISABLE_OPTIONS)
         if config.text_mode:
             flags.extend([
@@ -730,7 +730,7 @@ class BrowserManager:
             f"--window-size={self.config.viewport_width},{self.config.viewport_height}",
         ]
 
-        if self.config.light_mode:
+        if self.config.performance_mode:
             args.extend(BROWSER_DISABLE_OPTIONS)
 
         if self.config.text_mode:
@@ -944,6 +944,8 @@ class BrowserManager:
             "device_scale_factor": 1.0,
             "java_script_enabled": self.config.java_script_enabled,
         }
+        if self.config.dark_mode:
+            context_settings["color_scheme"] = "dark"
         
         if crawlerRunConfig:
             # Check if there is value for crawlerRunConfig.proxy_config set add that to context

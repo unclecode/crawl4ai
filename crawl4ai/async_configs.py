@@ -449,11 +449,13 @@ class BrowserConfig:
         user_agent_mode: str = "",
         user_agent_generator_config: dict = {},
         text_mode: bool = False,
-        light_mode: bool = False,
+        performance_mode: bool = False,
+        dark_mode: bool = False,
         extra_args: list = None,
         debugging_port: int = 9222,
         host: str = "localhost",
         enable_stealth: bool = False,
+        **kwargs,
     ):
         
         self.browser_type = browser_type
@@ -502,7 +504,19 @@ class BrowserConfig:
         self.user_agent_mode = user_agent_mode
         self.user_agent_generator_config = user_agent_generator_config
         self.text_mode = text_mode
-        self.light_mode = light_mode
+        
+        # Handle light_mode for backward compatibility
+        if "light_mode" in kwargs:
+            warnings.warn(
+                "The 'light_mode' parameter is deprecated and will be removed in a future version. "
+                "Use 'performance_mode' instead.",
+                DeprecationWarning
+            )
+            self.performance_mode = kwargs.get("light_mode", performance_mode)
+        else:
+            self.performance_mode = performance_mode
+        self.dark_mode = dark_mode
+        
         self.extra_args = extra_args if extra_args is not None else []
         self.sleep_on_close = sleep_on_close
         self.verbose = verbose
@@ -550,6 +564,18 @@ class BrowserConfig:
 
     @staticmethod
     def from_kwargs(kwargs: dict) -> "BrowserConfig":
+        
+        # Handle light_mode for backward compatibility
+        if "light_mode" in kwargs:
+            warnings.warn(
+                "The 'light_mode' parameter is deprecated and will be removed in a future version. "
+                "Use 'performance_mode' instead.",
+                DeprecationWarning
+            )
+            performance_mode = kwargs.pop("light_mode", False)
+        else:
+            performance_mode = kwargs.get("performance_mode", False)
+
         return BrowserConfig(
             browser_type=kwargs.get("browser_type", "chromium"),
             headless=kwargs.get("headless", True),
@@ -579,7 +605,8 @@ class BrowserConfig:
             user_agent_mode=kwargs.get("user_agent_mode"),
             user_agent_generator_config=kwargs.get("user_agent_generator_config"),
             text_mode=kwargs.get("text_mode", False),
-            light_mode=kwargs.get("light_mode", False),
+            performance_mode=performance_mode,
+            dark_mode=kwargs.get("dark_mode", False),
             extra_args=kwargs.get("extra_args", []),
             debugging_port=kwargs.get("debugging_port", 9222),
             host=kwargs.get("host", "localhost"),
@@ -612,7 +639,8 @@ class BrowserConfig:
             "user_agent_mode": self.user_agent_mode,
             "user_agent_generator_config": self.user_agent_generator_config,
             "text_mode": self.text_mode,
-            "light_mode": self.light_mode,
+            "performance_mode": self.performance_mode,
+            "dark_mode": self.dark_mode,
             "extra_args": self.extra_args,
             "sleep_on_close": self.sleep_on_close,
             "verbose": self.verbose,
