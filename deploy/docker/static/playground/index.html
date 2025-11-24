@@ -167,11 +167,14 @@
             </a>
         </h1>
 
-        <div class="ml-auto flex space-x-2">
-            <button id="play-tab"
-                class="px-3 py-1 rounded-t bg-surface border border-b-0 border-border text-primary">Playground</button>
-            <button id="stress-tab" class="px-3 py-1 rounded-t border border-border hover:bg-surface">Stress
-                Test</button>
+        <div class="ml-auto flex items-center space-x-4">
+            <a href="/dashboard" class="text-xs text-secondary hover:text-primary underline">Monitor</a>
+            <div class="flex space-x-2">
+                <button id="play-tab"
+                    class="px-3 py-1 rounded-t bg-surface border border-b-0 border-border text-primary">Playground</button>
+                <button id="stress-tab" class="px-3 py-1 rounded-t border border-border hover:bg-surface">Stress
+                    Test</button>
+            </div>
         </div>
     </header>
 
@@ -371,7 +374,7 @@
 
                 <div class="flex items-center">
                     <input id="st-stream" type="checkbox" class="mr-2">
-                    <label for="st-stream" class="text-sm">Use /crawl/stream</label>
+                    <label for="st-stream" class="text-sm">Enable streaming mode</label>
                     <button id="st-run"
                         class="ml-auto bg-accent text-dark px-4 py-2 rounded hover:bg-opacity-90 font-medium">
                         Run Stress Test
@@ -596,6 +599,14 @@
             forceHighlightElement(curlCodeEl);
         }
 
+        // Detect if stream is requested inside payload
+        function shouldUseStream(payload) {
+            const toBool = (v) => v === true || (typeof v === 'string' && v.toLowerCase() === 'true');
+            const fromCrawler = payload && payload.crawler_config && payload.crawler_config.params && payload.crawler_config.params.stream;
+            const direct = payload && payload.stream;
+            return toBool(fromCrawler) || toBool(direct);
+        }
+
         // Main run function
         async function runCrawl() {
             const endpoint = document.getElementById('endpoint').value;
@@ -611,16 +622,24 @@
                         : { browser_config: cfgJson };
                 }
             } catch (err) {
-                updateStatus('error');
-                document.querySelector('#response-content code').textContent =
-                    JSON.stringify({ error: err.message }, null, 2);
-                forceHighlightElement(document.querySelector('#response-content code'));
-                return; // stop run
+                const codeText = cm.getValue();
+                const streamFlag = /stream\s*=\s*True/i.test(codeText);
+                const isCrawlEndpoint = document.getElementById('endpoint').value === 'crawl';
+                if (isCrawlEndpoint && streamFlag) {
+                    // Fallback: proceed with minimal config only for stream
+                    advConfig = { crawler_config: { stream: true } };
+                } else {
+                    updateStatus('error');
+                    document.querySelector('#response-content code').textContent =
+                        JSON.stringify({ error: err.message }, null, 2);
+                    forceHighlightElement(document.querySelector('#response-content code'));
+                    return; // stop run
+                }
             }
 
             const endpointMap = {
                 crawl: '/crawl',
-                // crawl_stream: '/crawl/stream',
+                crawl_stream: '/crawl/stream', // Keep for backward compatibility
                 md: '/md',
                 llm: '/llm'
             };
@@ -647,7 +666,7 @@
                 // This will be handled directly in the fetch below
                 payload = null;
             } else {
-                // Default payload for /crawl and /crawl/stream
+                // Default payload for /crawl (supports both streaming and batch modes)
                 payload = {
                     urls,
                     ...advConfig
@@ -659,6 +678,7 @@
             try {
                 const startTime = performance.now();
                 let response, responseData;
+                const useStreamOverride = (endpoint === 'crawl') && shouldUseStream(payload);
 
                 if (endpoint === 'llm') {
                     // Special handling for LLM endpoint which uses URL pattern: /llm/{encoded_url}?q={query}
@@ -681,8 +701,8 @@
                     document.querySelector('#response-content code').textContent = JSON.stringify(responseData, null, 2);
                     document.querySelector('#response-content code').className = 'json hljs';
                     forceHighlightElement(document.querySelector('#response-content code'));
-                } else if (endpoint === 'crawl_stream') {
-                    // Stream processing
+                } else if (endpoint === 'crawl_stream' || useStreamOverride) {
+                    // Stream processing - now handled directly by /crawl endpoint
                     response = await fetch(api, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -757,6 +777,7 @@
                     const question = document.getElementById('llm-question').value.trim() || "What is this page about?";
                     generateSnippets(`${api}/${encodedUrl}?q=${encodeURIComponent(question)}`, null, 'GET');
                 } else {
+                    // Use the same API endpoint for both streaming and non-streaming
                     generateSnippets(api, payload);
                 }
             } catch (error) {
@@ -786,7 +807,7 @@
             document.getElementById('stress-avg-time').textContent = '0';
             document.getElementById('stress-peak-mem').textContent = '0';
 
-            const api = useStream ? '/crawl/stream' : '/crawl';
+            const api = '/crawl'; // Always use /crawl - backend handles streaming internally
             const urls = Array.from({ length: total }, (_, i) => `https://httpbin.org/anything/stress-${i}-${Date.now()}`);
             const chunks = [];
 

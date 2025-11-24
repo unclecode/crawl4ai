@@ -16,6 +16,7 @@ from fastapi import Request, Depends
 from fastapi.responses import FileResponse
 import base64
 import re
+import logging
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
 from api import (
     handle_markdown_request, handle_llm_qa,
@@ -23,7 +24,7 @@ from api import (
     stream_results
 )
 from schemas import (
-    CrawlRequest,
+    CrawlRequestWithHooks,
     MarkdownRequest,
     RawCode,
     HTMLRequest,
@@ -78,6 +79,14 @@ __version__ = "0.5.1-d1"
 MAX_PAGES = config["crawler"]["pool"].get("max_pages", 30)
 GLOBAL_SEM = asyncio.Semaphore(MAX_PAGES)
 
+# ── default browser config helper ─────────────────────────────
+def get_default_browser_config() -> BrowserConfig:
+    """Get default BrowserConfig from config.yml."""
+    return BrowserConfig(
+        extra_args=config["crawler"]["browser"].get("extra_args", []),
+        **config["crawler"]["browser"].get("kwargs", {}),
+    )
+
 # import logging
 # page_log = logging.getLogger("page_cap")
 # orig_arun = AsyncWebCrawler.arun
@@ -103,14 +112,51 @@ AsyncWebCrawler.arun = capped_arun
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    await get_crawler(BrowserConfig(
+    from crawler_pool import init_permanent
+    from monitor import MonitorStats
+    import monitor as monitor_module
+
+    # Initialize monitor
+    monitor_module.monitor_stats = MonitorStats(redis)
+    await monitor_module.monitor_stats.load_from_redis()
+    monitor_module.monitor_stats.start_persistence_worker()
+
+    # Initialize browser pool
+    await init_permanent(BrowserConfig(
         extra_args=config["crawler"]["browser"].get("extra_args", []),
         **config["crawler"]["browser"].get("kwargs", {}),
-    ))           # warm‑up
-    app.state.janitor = asyncio.create_task(janitor())        # idle GC
+    ))
+
+    # Start background tasks
+    app.state.janitor = asyncio.create_task(janitor())
+    app.state.timeline_updater = asyncio.create_task(_timeline_updater())
+
     yield
+
+    # Cleanup
     app.state.janitor.cancel()
+    app.state.timeline_updater.cancel()
+
+    # Monitor cleanup (persist stats and stop workers)
+    from monitor import get_monitor
+    try:
+        await get_monitor().cleanup()
+    except Exception as e:
+        logger.error(f"Monitor cleanup failed: {e}")
+
     await close_all()
+
+async def _timeline_updater():
+    """Update timeline data every 5 seconds."""
+    from monitor import get_monitor
+    while True:
+        await asyncio.sleep(5)
+        try:
+            await asyncio.wait_for(get_monitor().update_timeline(), timeout=4.0)
+        except asyncio.TimeoutError:
+            logger.warning("Timeline update timeout after 4s")
+        except Exception as e:
+            logger.warning(f"Timeline update error: {e}")
 
 # ───────────────────── FastAPI instance ──────────────────────
 app = FastAPI(
@@ -128,6 +174,25 @@ app.mount(
     StaticFiles(directory=STATIC_DIR, html=True),
     name="play",
 )
+
+# ── static monitor dashboard ────────────────────────────────
+MONITOR_DIR = pathlib.Path(__file__).parent / "static" / "monitor"
+if not MONITOR_DIR.exists():
+    raise RuntimeError(f"Monitor assets not found at {MONITOR_DIR}")
+app.mount(
+    "/dashboard",
+    StaticFiles(directory=MONITOR_DIR, html=True),
+    name="monitor_ui",
+)
+
+# ── static assets (logo, etc) ────────────────────────────────
+ASSETS_DIR = pathlib.Path(__file__).parent / "static" / "assets"
+if ASSETS_DIR.exists():
+    app.mount(
+        "/static/assets",
+        StaticFiles(directory=ASSETS_DIR),
+        name="assets",
+    )
 
 
 @app.get("/")
@@ -212,6 +277,12 @@ def _safe_eval_config(expr: str) -> dict:
 # ── job router ──────────────────────────────────────────────
 app.include_router(init_job_router(redis, config, token_dep))
 
+# ── monitor router ──────────────────────────────────────────
+from monitor_routes import router as monitor_router
+app.include_router(monitor_router)
+
+logger = logging.getLogger(__name__)
+
 # ──────────────────────── Endpoints ──────────────────────────
 @app.post("/token")
 async def get_token(req: TokenRequest):
@@ -241,7 +312,8 @@ async def get_markdown(
         raise HTTPException(
             400, "Invalid URL format. Must start with http://, https://, or for raw HTML (raw:, raw://)")
     markdown = await handle_markdown_request(
-        body.url, body.f, body.q, body.c, config, body.provider
+        body.url, body.f, body.q, body.c, config, body.provider,
+        body.temperature, body.base_url
     )
     return JSONResponse({
         "url": body.url,
@@ -265,13 +337,20 @@ async def generate_html(
     Crawls the URL, preprocesses the raw HTML for schema extraction, and returns the processed HTML.
     Use when you need sanitized HTML structures for building schemas or further processing.
     """
+    from crawler_pool import get_crawler
     cfg = CrawlerRunConfig()
-    async with AsyncWebCrawler(config=BrowserConfig()) as crawler:
+    try:
+        crawler = await get_crawler(get_default_browser_config())
         results = await crawler.arun(url=body.url, config=cfg)
-    raw_html = results[0].html
-    from crawl4ai.utils import preprocess_html_for_schema
-    processed_html = preprocess_html_for_schema(raw_html)
-    return JSONResponse({"html": processed_html, "url": body.url, "success": True})
+        if not results[0].success:
+            raise HTTPException(500, detail=results[0].error_message or "Crawl failed")
+
+        raw_html = results[0].html
+        from crawl4ai.utils import preprocess_html_for_schema
+        processed_html = preprocess_html_for_schema(raw_html)
+        return JSONResponse({"html": processed_html, "url": body.url, "success": True})
+    except Exception as e:
+        raise HTTPException(500, detail=str(e))
 
 # Screenshot endpoint
 
@@ -289,18 +368,23 @@ async def generate_screenshot(
     Use when you need an image snapshot of the rendered page. Its recommened to provide an output path to save the screenshot.
     Then in result instead of the screenshot you will get a path to the saved file.
     """
-    cfg = CrawlerRunConfig(
-        screenshot=True, screenshot_wait_for=body.screenshot_wait_for)
-    async with AsyncWebCrawler(config=BrowserConfig()) as crawler:
+    from crawler_pool import get_crawler
+    try:
+        cfg = CrawlerRunConfig(screenshot=True, screenshot_wait_for=body.screenshot_wait_for)
+        crawler = await get_crawler(get_default_browser_config())
         results = await crawler.arun(url=body.url, config=cfg)
-    screenshot_data = results[0].screenshot
-    if body.output_path:
-        abs_path = os.path.abspath(body.output_path)
-        os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-        with open(abs_path, "wb") as f:
-            f.write(base64.b64decode(screenshot_data))
-        return {"success": True, "path": abs_path}
-    return {"success": True, "screenshot": screenshot_data}
+        if not results[0].success:
+            raise HTTPException(500, detail=results[0].error_message or "Crawl failed")
+        screenshot_data = results[0].screenshot
+        if body.output_path:
+            abs_path = os.path.abspath(body.output_path)
+            os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+            with open(abs_path, "wb") as f:
+                f.write(base64.b64decode(screenshot_data))
+            return {"success": True, "path": abs_path}
+        return {"success": True, "screenshot": screenshot_data}
+    except Exception as e:
+        raise HTTPException(500, detail=str(e))
 
 # PDF endpoint
 
@@ -318,17 +402,23 @@ async def generate_pdf(
     Use when you need a printable or archivable snapshot of the page. It is recommended to provide an output path to save the PDF.
     Then in result instead of the PDF you will get a path to the saved file.
     """
-    cfg = CrawlerRunConfig(pdf=True)
-    async with AsyncWebCrawler(config=BrowserConfig()) as crawler:
+    from crawler_pool import get_crawler
+    try:
+        cfg = CrawlerRunConfig(pdf=True)
+        crawler = await get_crawler(get_default_browser_config())
         results = await crawler.arun(url=body.url, config=cfg)
-    pdf_data = results[0].pdf
-    if body.output_path:
-        abs_path = os.path.abspath(body.output_path)
-        os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-        with open(abs_path, "wb") as f:
-            f.write(pdf_data)
-        return {"success": True, "path": abs_path}
-    return {"success": True, "pdf": base64.b64encode(pdf_data).decode()}
+        if not results[0].success:
+            raise HTTPException(500, detail=results[0].error_message or "Crawl failed")
+        pdf_data = results[0].pdf
+        if body.output_path:
+            abs_path = os.path.abspath(body.output_path)
+            os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+            with open(abs_path, "wb") as f:
+                f.write(pdf_data)
+            return {"success": True, "path": abs_path}
+        return {"success": True, "pdf": base64.b64encode(pdf_data).decode()}
+    except Exception as e:
+        raise HTTPException(500, detail=str(e))
 
 
 @app.post("/execute_js")
@@ -384,12 +474,17 @@ async def execute_js(
         ```
 
     """
-    cfg = CrawlerRunConfig(js_code=body.scripts)
-    async with AsyncWebCrawler(config=BrowserConfig()) as crawler:
+    from crawler_pool import get_crawler
+    try:
+        cfg = CrawlerRunConfig(js_code=body.scripts)
+        crawler = await get_crawler(get_default_browser_config())
         results = await crawler.arun(url=body.url, config=cfg)
-    # Return JSON-serializable dict of the first CrawlResult
-    data = results[0].model_dump()
-    return JSONResponse(data)
+        if not results[0].success:
+            raise HTTPException(500, detail=results[0].error_message or "Crawl failed")
+        data = results[0].model_dump()
+        return JSONResponse(data)
+    except Exception as e:
+        raise HTTPException(500, detail=str(e))
 
 
 @app.get("/llm/{url:path}")
@@ -414,6 +509,72 @@ async def get_schema():
             "crawler": CrawlerRunConfig().dump()}
 
 
+@app.get("/hooks/info")
+async def get_hooks_info():
+    """Get information about available hook points and their signatures"""
+    from hook_manager import UserHookManager
+    
+    hook_info = {}
+    for hook_point, params in UserHookManager.HOOK_SIGNATURES.items():
+        hook_info[hook_point] = {
+            "parameters": params,
+            "description": get_hook_description(hook_point),
+            "example": get_hook_example(hook_point)
+        }
+    
+    return JSONResponse({
+        "available_hooks": hook_info,
+        "timeout_limits": {
+            "min": 1,
+            "max": 120,
+            "default": 30
+        }
+    })
+
+
+def get_hook_description(hook_point: str) -> str:
+    """Get description for each hook point"""
+    descriptions = {
+        "on_browser_created": "Called after browser instance is created",
+        "on_page_context_created": "Called after page and context are created - ideal for authentication",
+        "before_goto": "Called before navigating to the target URL",
+        "after_goto": "Called after navigation is complete",
+        "on_user_agent_updated": "Called when user agent is updated",
+        "on_execution_started": "Called when custom JavaScript execution begins",
+        "before_retrieve_html": "Called before retrieving the final HTML - ideal for scrolling",
+        "before_return_html": "Called just before returning the HTML content"
+    }
+    return descriptions.get(hook_point, "")
+
+
+def get_hook_example(hook_point: str) -> str:
+    """Get example code for each hook point"""
+    examples = {
+        "on_page_context_created": """async def hook(page, context, **kwargs):
+    # Add authentication cookie
+    await context.add_cookies([{
+        'name': 'session',
+        'value': 'my-session-id',
+        'domain': '.example.com'
+    }])
+    return page""",
+        
+        "before_retrieve_html": """async def hook(page, context, **kwargs):
+    # Scroll to load lazy content
+    await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+    await page.wait_for_timeout(2000)
+    return page""",
+        
+        "before_goto": """async def hook(page, context, url, **kwargs):
+    # Set custom headers
+    await page.set_extra_http_headers({
+        'X-Custom-Header': 'value'
+    })
+    return page"""
+    }
+    return examples.get(hook_point, "# Implement your hook logic here\nreturn page")
+
+
 @app.get(config["observability"]["health_check"]["endpoint"])
 async def health():
     return {"status": "ok", "timestamp": time.time(), "version": __version__}
@@ -429,46 +590,86 @@ async def metrics():
 @mcp_tool("crawl")
 async def crawl(
     request: Request,
-    crawl_request: CrawlRequest,
+    crawl_request: CrawlRequestWithHooks,
     _td: Dict = Depends(token_dep),
 ):
     """
     Crawl a list of URLs and return the results as JSON.
+    For streaming responses, use /crawl/stream endpoint.
+    Supports optional user-provided hook functions for customization.
     """
     if not crawl_request.urls:
         raise HTTPException(400, "At least one URL required")
-    res = await handle_crawl_request(
+    # Check whether it is a redirection for a streaming request
+    crawler_config = CrawlerRunConfig.load(crawl_request.crawler_config)
+    if crawler_config.stream:
+        return await stream_process(crawl_request=crawl_request)
+    
+    # Prepare hooks config if provided
+    hooks_config = None
+    if crawl_request.hooks:
+        hooks_config = {
+            'code': crawl_request.hooks.code,
+            'timeout': crawl_request.hooks.timeout
+        }
+    
+    results = await handle_crawl_request(
         urls=crawl_request.urls,
         browser_config=crawl_request.browser_config,
         crawler_config=crawl_request.crawler_config,
         config=config,
+        hooks_config=hooks_config
     )
-    return JSONResponse(res)
+    # check if all of the results are not successful
+    if all(not result["success"] for result in results["results"]):
+        raise HTTPException(500, f"Crawl request failed: {results['results'][0]['error_message']}")
+    return JSONResponse(results)
 
 
 @app.post("/crawl/stream")
 @limiter.limit(config["rate_limiting"]["default_limit"])
 async def crawl_stream(
     request: Request,
-    crawl_request: CrawlRequest,
+    crawl_request: CrawlRequestWithHooks,
     _td: Dict = Depends(token_dep),
 ):
     if not crawl_request.urls:
         raise HTTPException(400, "At least one URL required")
-    crawler, gen = await handle_stream_crawl_request(
+
+    return await stream_process(crawl_request=crawl_request)
+
+async def stream_process(crawl_request: CrawlRequestWithHooks):
+    
+    # Prepare hooks config if provided# Prepare hooks config if provided
+    hooks_config = None
+    if crawl_request.hooks:
+        hooks_config = {
+            'code': crawl_request.hooks.code,
+            'timeout': crawl_request.hooks.timeout
+        }
+    
+    crawler, gen, hooks_info = await handle_stream_crawl_request(
         urls=crawl_request.urls,
         browser_config=crawl_request.browser_config,
         crawler_config=crawl_request.crawler_config,
         config=config,
+        hooks_config=hooks_config
     )
+    
+    # Add hooks info to response headers if available
+    headers = {
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "X-Stream-Status": "active",
+    }
+    if hooks_info:
+        import json
+        headers["X-Hooks-Status"] = json.dumps(hooks_info['status']['status'])
+    
     return StreamingResponse(
         stream_results(crawler, gen),
         media_type="application/x-ndjson",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Stream-Status": "active",
-        },
+        headers=headers,
     )
 
 

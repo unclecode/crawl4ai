@@ -148,6 +148,134 @@ class PlaywrightAdapter(BrowserAdapter):
         return Page, Error, PlaywrightTimeoutError
 
 
+class StealthAdapter(BrowserAdapter):
+    """Adapter for Playwright with stealth features using playwright_stealth"""
+
+    def __init__(self):
+        self._console_script_injected = {}
+        self._stealth_available = self._check_stealth_availability()
+
+    def _check_stealth_availability(self) -> bool:
+        """Check if playwright_stealth is available and get the correct function"""
+        try:
+            from playwright_stealth import stealth_async
+            self._stealth_function = stealth_async
+            return True
+        except ImportError:
+            try:
+                from playwright_stealth import stealth_sync
+                self._stealth_function = stealth_sync
+                return True
+            except ImportError:
+                self._stealth_function = None
+                return False
+
+    async def apply_stealth(self, page: Page):
+        """Apply stealth to a page if available"""
+        if self._stealth_available and self._stealth_function:
+            try:
+                if hasattr(self._stealth_function, '__call__'):
+                    if 'async' in getattr(self._stealth_function, '__name__', ''):
+                        await self._stealth_function(page)
+                    else:
+                        self._stealth_function(page)
+            except Exception as e:
+                # Fail silently or log error depending on requirements
+                pass
+
+    async def evaluate(self, page: Page, expression: str, arg: Any = None) -> Any:
+        """Standard Playwright evaluate with stealth applied"""
+        if arg is not None:
+            return await page.evaluate(expression, arg)
+        return await page.evaluate(expression)
+
+    async def setup_console_capture(self, page: Page, captured_console: List[Dict]) -> Optional[Callable]:
+        """Setup console capture using Playwright's event system with stealth"""
+        # Apply stealth to the page first
+        await self.apply_stealth(page)
+
+        def handle_console_capture(msg):
+            try:
+                message_type = "unknown"
+                try:
+                    message_type = msg.type
+                except:
+                    pass
+
+                message_text = "unknown"
+                try:
+                    message_text = msg.text
+                except:
+                    pass
+
+                entry = {
+                    "type": message_type,
+                    "text": message_text,
+                    "timestamp": time.time()
+                }
+
+                captured_console.append(entry)
+
+            except Exception as e:
+                captured_console.append({
+                    "type": "console_capture_error",
+                    "error": str(e),
+                    "timestamp": time.time()
+                })
+
+        page.on("console", handle_console_capture)
+        return handle_console_capture
+
+    async def setup_error_capture(self, page: Page, captured_console: List[Dict]) -> Optional[Callable]:
+        """Setup error capture using Playwright's event system"""
+        def handle_pageerror_capture(err):
+            try:
+                error_message = "Unknown error"
+                try:
+                    error_message = err.message
+                except:
+                    pass
+
+                error_stack = ""
+                try:
+                    error_stack = err.stack
+                except:
+                    pass
+
+                captured_console.append({
+                    "type": "error",
+                    "text": error_message,
+                    "stack": error_stack,
+                    "timestamp": time.time()
+                })
+            except Exception as e:
+                captured_console.append({
+                    "type": "pageerror_capture_error",
+                    "error": str(e),
+                    "timestamp": time.time()
+                })
+
+        page.on("pageerror", handle_pageerror_capture)
+        return handle_pageerror_capture
+
+    async def retrieve_console_messages(self, page: Page) -> List[Dict]:
+        """Not needed for Playwright - messages are captured via events"""
+        return []
+
+    async def cleanup_console_capture(self, page: Page, handle_console: Optional[Callable], handle_error: Optional[Callable]):
+        """Remove event listeners"""
+        if handle_console:
+            page.remove_listener("console", handle_console)
+        if handle_error:
+            page.remove_listener("pageerror", handle_error)
+
+    def get_imports(self) -> tuple:
+        """Return Playwright imports"""
+        from playwright.async_api import Page, Error
+        from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+        return Page, Error, PlaywrightTimeoutError
+
+
 class UndetectedAdapter(BrowserAdapter):
     """Adapter for undetected browser automation with stealth features"""
     

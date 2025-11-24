@@ -10,7 +10,6 @@ Today I'm releasing Crawl4AI v0.7.4—the Intelligent Table Extraction & Perform
 
 - **🚀 LLMTableExtraction**: Revolutionary table extraction with intelligent chunking for massive tables
 - **⚡ Enhanced Concurrency**: True concurrency improvements for fast-completing tasks in batch operations
-- **🧹 Memory Management Refactor**: Streamlined memory utilities and better resource management
 - **🔧 Browser Manager Fixes**: Resolved race conditions in concurrent page creation
 - **⌨️ Cross-Platform Browser Profiler**: Improved keyboard handling and quit mechanisms
 - **🔗 Advanced URL Processing**: Better handling of raw URLs and base tag link resolution
@@ -157,40 +156,6 @@ async with AsyncWebCrawler() as crawler:
 - **Batch URL Processing**: Significant speedup for large URL lists
 - **Monitoring Systems**: Faster health checks and status page monitoring
 - **Data Aggregation**: Improved performance for real-time data collection
-
-## 🧹 Memory Management Refactor: Cleaner Architecture
-
-**The Problem:** Memory utilities were scattered and difficult to maintain, with potential import conflicts and unclear organization.
-
-**My Solution:** I consolidated all memory-related utilities into the main `utils.py` module, creating a cleaner, more maintainable architecture.
-
-### Improved Memory Handling
-
-```python
-# All memory utilities now consolidated
-from crawl4ai.utils import get_true_memory_usage_percent, MemoryMonitor
-
-# Enhanced memory monitoring
-monitor = MemoryMonitor()
-monitor.start_monitoring()
-
-async with AsyncWebCrawler() as crawler:
-    # Memory-efficient batch processing
-    results = await crawler.arun_many(large_url_list)
-    
-    # Get accurate memory metrics
-    memory_usage = get_true_memory_usage_percent()
-    memory_report = monitor.get_report()
-    
-    print(f"Memory efficiency: {memory_report['efficiency']:.1f}%")
-    print(f"Peak usage: {memory_report['peak_mb']:.1f} MB")
-```
-
-**Expected Real-World Impact:**
-- **Production Stability**: More reliable memory tracking and management
-- **Code Maintainability**: Cleaner architecture for easier debugging
-- **Import Clarity**: Resolved potential conflicts and import issues
-- **Developer Experience**: Simpler API for memory monitoring
 
 ## 🔧 Critical Stability Fixes
 

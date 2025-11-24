@@ -354,6 +354,7 @@ class AsyncWebCrawler:
                     ###############################################################
                     # Process the HTML content, Call CrawlerStrategy.process_html #
                     ###############################################################
+                    from urllib.parse import urlparse
                     crawl_result: CrawlResult = await self.aprocess_html(
                         url=url,
                         html=html,
@@ -364,6 +365,7 @@ class AsyncWebCrawler:
                         verbose=config.verbose,
                         is_raw_html=True if url.startswith("raw:") else False,
                         redirected_url=async_response.redirected_url,
+                        original_scheme=urlparse(url).scheme,
                         **kwargs,
                     )
 
@@ -615,7 +617,17 @@ class AsyncWebCrawler:
                 else config.chunking_strategy
             )
             sections = chunking.chunk(content)
-            extracted_content = config.extraction_strategy.run(_url, sections)
+            # extracted_content = config.extraction_strategy.run(_url, sections)
+
+            # Use async version if available for better parallelism
+            if hasattr(config.extraction_strategy, 'arun'):
+                extracted_content = await config.extraction_strategy.arun(_url, sections)
+            else:
+                # Fallback to sync version run in thread pool to avoid blocking
+                extracted_content = await asyncio.to_thread(
+                    config.extraction_strategy.run, url, sections
+                )
+                
             extracted_content = json.dumps(
                 extracted_content, indent=4, default=str, ensure_ascii=False
             )

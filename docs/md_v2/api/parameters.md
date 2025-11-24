@@ -21,21 +21,35 @@ browser_cfg = BrowserConfig(
 |-----------------------|----------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
 | **`browser_type`**    | `"chromium"`, `"firefox"`, `"webkit"`<br/>*(default: `"chromium"`)* | Which browser engine to use. `"chromium"` is typical for many sites, `"firefox"` or `"webkit"` for specialized tests.                 |
 | **`headless`**        | `bool` (default: `True`)               | Headless means no visible UI. `False` is handy for debugging.                                                                         |
+| **`browser_mode`**    | `str` (default: `"dedicated"`)         | How browser is initialized: `"dedicated"` (new instance), `"builtin"` (CDP background), `"custom"` (explicit CDP), `"docker"` (container). |
+| **`use_managed_browser`** | `bool` (default: `False`)          | Launch browser via CDP for advanced control. Set automatically based on `browser_mode`.                  |
+| **`cdp_url`**         | `str` (default: `None`)                | Chrome DevTools Protocol endpoint URL (e.g., `"ws://localhost:9222/devtools/browser/"`). Set automatically based on `browser_mode`.   |
+| **`debugging_port`**  | `int` (default: `9222`)                | Port for browser debugging protocol.                                                                                                   |
+| **`host`**            | `str` (default: `"localhost"`)         | Host for browser connection.                                                                                                           |
 | **`viewport_width`**  | `int` (default: `1080`)                | Initial page width (in px). Useful for testing responsive layouts.                                                                    |
 | **`viewport_height`** | `int` (default: `600`)                 | Initial page height (in px).                                                                                                          |
-| **`proxy`**           | `str` (default: `None`)                | Single-proxy URL if you want all traffic to go through it, e.g. `"http://user:pass@proxy:8080"`.                                      |
-| **`proxy_config`**    | `dict` (default: `None`)               | For advanced or multi-proxy needs, specify details like `{"server": "...", "username": "...", ...}`.                                  |
+| **`viewport`**        | `dict` (default: `None`)               | Viewport dimensions dict. If set, overrides `viewport_width` and `viewport_height`.                                                   |
+| **`proxy`**           | `str` (deprecated)                      | Deprecated. Use `proxy_config` instead. If set, it will be auto-converted internally. |
+| **`proxy_config`**    | `ProxyConfig or dict` (default: `None`)| For advanced or multi-proxy needs, specify `ProxyConfig` object or dict like `{"server": "...", "username": "...", "password": "..."}`.  |
 | **`use_persistent_context`** | `bool` (default: `False`)       | If `True`, uses a **persistent** browser context (keep cookies, sessions across runs). Also sets `use_managed_browser=True`.          |
 | **`user_data_dir`**   | `str or None` (default: `None`)        | Directory to store user data (profiles, cookies). Must be set if you want permanent sessions.                                         |
+| **`chrome_channel`**  | `str` (default: `"chromium"`)          | Chrome channel to launch (e.g., "chrome", "msedge"). Only for `browser_type="chromium"`. Auto-set to empty for Firefox/WebKit.       |
+| **`channel`**         | `str` (default: `"chromium"`)          | Alias for `chrome_channel`.                                                                                                           |
+| **`accept_downloads`** | `bool` (default: `False`)             | Whether to allow file downloads. Requires `downloads_path` if `True`.                                                                 |
+| **`downloads_path`**  | `str or None` (default: `None`)        | Directory to store downloaded files.                                                                                                  |
+| **`storage_state`**   | `str or dict or None` (default: `None`)| In-memory storage state (cookies, localStorage) to restore browser state.                                                             |
 | **`ignore_https_errors`** | `bool` (default: `True`)           | If `True`, continues despite invalid certificates (common in dev/staging).                                                            |
 | **`java_script_enabled`** | `bool` (default: `True`)           | Disable if you want no JS overhead, or if only static content is needed.                                                              |
+| **`sleep_on_close`**  | `bool` (default: `False`)              | Add a small delay when closing browser (can help with cleanup issues).                                                                |
 | **`cookies`**         | `list` (default: `[]`)                 | Pre-set cookies, each a dict like `{"name": "session", "value": "...", "url": "..."}`.                                                |
 | **`headers`**         | `dict` (default: `{}`)                 | Extra HTTP headers for every request, e.g. `{"Accept-Language": "en-US"}`.                                                            |
-| **`user_agent`**      | `str` (default: Chrome-based UA)       | Your custom or random user agent. `user_agent_mode="random"` can shuffle it.                                                          |
-| **`light_mode`**      | `bool` (default: `False`)              | Disables some background features for performance gains.                                                                              |
+| **`user_agent`**      | `str` (default: Chrome-based UA)       | Your custom user agent string.                                                                                                        |
+| **`user_agent_mode`** | `str` (default: `""`)                  | Set to `"random"` to randomize user agent from a pool (helps with bot detection).                                                     |
+| **`user_agent_generator_config`** | `dict` (default: `{}`)     | Configuration dict for user agent generation when `user_agent_mode="random"`.                                                         |
 | **`text_mode`**       | `bool` (default: `False`)              | If `True`, tries to disable images/other heavy content for speed.                                                                     |
-| **`use_managed_browser`** | `bool` (default: `False`)          | For advanced “managed” interactions (debugging, CDP usage). Typically set automatically if persistent context is on.                  |
+| **`light_mode`**      | `bool` (default: `False`)              | Disables some background features for performance gains.                                                                              |
 | **`extra_args`**      | `list` (default: `[]`)                 | Additional flags for the underlying browser process, e.g. `["--disable-extensions"]`.                                                |
+| **`enable_stealth`**  | `bool` (default: `False`)              | Enable playwright-stealth mode to bypass bot detection. Cannot be used with `browser_mode="builtin"`.                                |
 
 **Tips**:
 - Set `headless=False` to visually **debug** how pages load or how interactions proceed.  
@@ -70,6 +84,7 @@ We group them by category.
 |------------------------------|--------------------------------------|-------------------------------------------------------------------------------------------------|
 | **`word_count_threshold`**   | `int` (default: ~200)                | Skips text blocks below X words. Helps ignore trivial sections.                                 |
 | **`extraction_strategy`**    | `ExtractionStrategy` (default: None) | If set, extracts structured data (CSS-based, LLM-based, etc.).                                  |
+| **`chunking_strategy`**      | `ChunkingStrategy` (default: RegexChunking()) | Strategy to chunk content before extraction. Can be customized for different chunking approaches. |
 | **`markdown_generator`**     | `MarkdownGenerationStrategy` (None)  | If you want specialized markdown output (citations, filtering, chunking, etc.). Can be customized with options such as `content_source` parameter to select the HTML input source ('cleaned_html', 'raw_html', or 'fit_html').                 |
 | **`css_selector`**           | `str` (None)                         | Retains only the part of the page matching this selector. Affects the entire extraction process. |
 | **`target_elements`**        | `List[str]` (None)                   | List of CSS selectors for elements to focus on for markdown generation and data extraction, while still processing the entire page for links, media, etc. Provides more flexibility than `css_selector`. |
@@ -78,32 +93,50 @@ We group them by category.
 | **`only_text`**              | `bool` (False)                       | If `True`, tries to extract text-only content.                                                  |
 | **`prettiify`**              | `bool` (False)                       | If `True`, beautifies final HTML (slower, purely cosmetic).                                      |
 | **`keep_data_attributes`**   | `bool` (False)                       | If `True`, preserve `data-*` attributes in cleaned HTML.                                         |
+| **`keep_attrs`**             | `list` (default: [])                 | List of HTML attributes to keep during processing (e.g., `["id", "class", "data-value"]`).      |
 | **`remove_forms`**           | `bool` (False)                       | If `True`, remove all `<form>` elements.                                                        |
+| **`parser_type`**            | `str` (default: "lxml")              | HTML parser to use (e.g., "lxml", "html.parser").                                               |
+| **`scraping_strategy`**      | `ContentScrapingStrategy` (default: LXMLWebScrapingStrategy()) | Strategy to use for content scraping. Can be customized for different scraping needs (e.g., PDF extraction). |
 
 ---
 
-### B) **Caching & Session**
+### B) **Browser Location and Identity**
+
+| **Parameter**          | **Type / Default**        | **What It Does**                                                                                       |
+|------------------------|---------------------------|--------------------------------------------------------------------------------------------------------|
+| **`locale`**           | `str or None` (None)      | Browser's locale (e.g., "en-US", "fr-FR") for language preferences.                                   |
+| **`timezone_id`**      | `str or None` (None)      | Browser's timezone (e.g., "America/New_York", "Europe/Paris").                                         |
+| **`geolocation`**      | `GeolocationConfig or None` (None) | GPS coordinates configuration. Use `GeolocationConfig(latitude=..., longitude=..., accuracy=...)`. |
+| **`fetch_ssl_certificate`** | `bool` (False)       | If `True`, fetches and includes SSL certificate information in the result.                             |
+| **`proxy_config`**           | `ProxyConfig or dict or None` (None) | Proxy configuration for this specific crawl. Can override browser-level proxy settings.          |
+| **`proxy_rotation_strategy`** | `ProxyRotationStrategy` (None)      | Strategy for rotating proxies during crawl operations.                                           |
+
+---
+
+### C) **Caching & Session**
 
 | **Parameter**           | **Type / Default**     | **What It Does**                                                                                                              |
 |-------------------------|------------------------|------------------------------------------------------------------------------------------------------------------------------|
 | **`cache_mode`**        | `CacheMode or None`    | Controls how caching is handled (`ENABLED`, `BYPASS`, `DISABLED`, etc.). If `None`, typically defaults to `ENABLED`.          |
 | **`session_id`**        | `str or None`          | Assign a unique ID to reuse a single browser session across multiple `arun()` calls.                                          |
-| **`bypass_cache`**      | `bool` (False)         | If `True`, acts like `CacheMode.BYPASS`.                                                                                     |
-| **`disable_cache`**     | `bool` (False)         | If `True`, acts like `CacheMode.DISABLED`.                                                                                   |
-| **`no_cache_read`**     | `bool` (False)         | If `True`, acts like `CacheMode.WRITE_ONLY` (writes cache but never reads).                                                  |
-| **`no_cache_write`**    | `bool` (False)         | If `True`, acts like `CacheMode.READ_ONLY` (reads cache but never writes).                                                   |
+| **`bypass_cache`**      | `bool` (False)         | **Deprecated.** If `True`, acts like `CacheMode.BYPASS`. Use `cache_mode` instead.                                           |
+| **`disable_cache`**     | `bool` (False)         | **Deprecated.** If `True`, acts like `CacheMode.DISABLED`. Use `cache_mode` instead.                                         |
+| **`no_cache_read`**     | `bool` (False)         | **Deprecated.** If `True`, acts like `CacheMode.WRITE_ONLY` (writes cache but never reads). Use `cache_mode` instead.        |
+| **`no_cache_write`**    | `bool` (False)         | **Deprecated.** If `True`, acts like `CacheMode.READ_ONLY` (reads cache but never writes). Use `cache_mode` instead.         |
+| **`shared_data`**       | `dict or None` (None)  | Shared data to be passed between hooks and accessible across crawl operations.                                                |
 
 Use these for controlling whether you read or write from a local content cache. Handy for large batch crawls or repeated site visits.
 
 ---
 
-### C) **Page Navigation & Timing**
+### D) **Page Navigation & Timing**
 
 | **Parameter**              | **Type / Default**      | **What It Does**                                                                                                    |
 |----------------------------|-------------------------|----------------------------------------------------------------------------------------------------------------------|
-| **`wait_until`**           | `str` (domcontentloaded)| Condition for navigation to “complete”. Often `"networkidle"` or `"domcontentloaded"`.                               |
+| **`wait_until`**           | `str` (domcontentloaded)| Condition for navigation to "complete". Often `"networkidle"` or `"domcontentloaded"`.                               |
 | **`page_timeout`**         | `int` (60000 ms)        | Timeout for page navigation or JS steps. Increase for slow sites.                                                    |
 | **`wait_for`**             | `str or None`           | Wait for a CSS (`"css:selector"`) or JS (`"js:() => bool"`) condition before content extraction.                     |
+| **`wait_for_timeout`**     | `int or None` (None)    | Specific timeout in ms for the `wait_for` condition. If None, uses `page_timeout`.                                   |
 | **`wait_for_images`**      | `bool` (False)          | Wait for images to load before finishing. Slows down if you only want text.                                          |
 | **`delay_before_return_html`** | `float` (0.1)       | Additional pause (seconds) before final HTML is captured. Good for last-second updates.                               |
 | **`check_robots_txt`**     | `bool` (False)          | Whether to check and respect robots.txt rules before crawling. If True, caches robots.txt for efficiency.            |
@@ -112,15 +145,17 @@ Use these for controlling whether you read or write from a local content cache. 
 
 ---
 
-### D) **Page Interaction**
+### E) **Page Interaction**
 
 | **Parameter**              | **Type / Default**            | **What It Does**                                                                                                                       |
 |----------------------------|--------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------|
 | **`js_code`**              | `str or list[str]` (None)      | JavaScript to run after load. E.g. `"document.querySelector('button')?.click();"`.                                                     |
-| **`js_only`**              | `bool` (False)                 | If `True`, indicates we’re reusing an existing session and only applying JS. No full reload.                                           |
+| **`c4a_script`**           | `str or list[str]` (None)      | C4A script that compiles to JavaScript. Alternative to writing raw JS.                                                                 |
+| **`js_only`**              | `bool` (False)                 | If `True`, indicates we're reusing an existing session and only applying JS. No full reload.                                           |
 | **`ignore_body_visibility`** | `bool` (True)                | Skip checking if `<body>` is visible. Usually best to keep `True`.                                                                     |
 | **`scan_full_page`**       | `bool` (False)                 | If `True`, auto-scroll the page to load dynamic content (infinite scroll).                                                              |
 | **`scroll_delay`**         | `float` (0.2)                  | Delay between scroll steps if `scan_full_page=True`.                                                                                   |
+| **`max_scroll_steps`**     | `int or None` (None)           | Maximum number of scroll steps during full page scan. If None, scrolls until entire page is loaded.                                     |
 | **`process_iframes`**      | `bool` (False)                 | Inlines iframe content for single-page extraction.                                                                                     |
 | **`remove_overlay_elements`** | `bool` (False)              | Removes potential modals/popups blocking the main content.                                                                              |
 | **`simulate_user`**        | `bool` (False)                 | Simulate user interactions (mouse movements) to avoid bot detection.                                                                    |
@@ -132,7 +167,7 @@ If your page is a single-page app with repeated JS updates, set `js_only=True` i
 
 ---
 
-### E) **Media Handling**
+### F) **Media Handling**
 
 | **Parameter**                              | **Type / Default**  | **What It Does**                                                                                         |
 |--------------------------------------------|---------------------|-----------------------------------------------------------------------------------------------------------|
@@ -141,13 +176,16 @@ If your page is a single-page app with repeated JS updates, set `js_only=True` i
 | **`screenshot_height_threshold`**          | `int` (~20000)      | If the page is taller than this, alternate screenshot strategies are used.                                |
 | **`pdf`**                                  | `bool` (False)      | If `True`, returns a PDF in `result.pdf`.                                                                 |
 | **`capture_mhtml`**                        | `bool` (False)      | If `True`, captures an MHTML snapshot of the page in `result.mhtml`. MHTML includes all page resources (CSS, images, etc.) in a single file. |
-| **`image_description_min_word_threshold`** | `int` (~50)         | Minimum words for an image’s alt text or description to be considered valid.                              |
+| **`image_description_min_word_threshold`** | `int` (~50)         | Minimum words for an image's alt text or description to be considered valid.                              |
 | **`image_score_threshold`**                | `int` (~3)          | Filter out low-scoring images. The crawler scores images by relevance (size, context, etc.).              |
 | **`exclude_external_images`**              | `bool` (False)      | Exclude images from other domains.                                                                        |
+| **`exclude_all_images`**                   | `bool` (False)      | If `True`, excludes all images from processing (both internal and external).                              |
+| **`table_score_threshold`**                | `int` (7)           | Minimum score threshold for processing a table. Lower values include more tables.                         |
+| **`table_extraction`**                     | `TableExtractionStrategy` (DefaultTableExtraction) | Strategy for table extraction. Defaults to DefaultTableExtraction with configured threshold. |
 
 ---
 
-### F) **Link/Domain Handling**
+### G) **Link/Domain Handling**
 
 | **Parameter**                | **Type / Default**      | **What It Does**                                                                                                             |
 |------------------------------|-------------------------|-----------------------------------------------------------------------------------------------------------------------------|
@@ -155,22 +193,39 @@ If your page is a single-page app with repeated JS updates, set `js_only=True` i
 | **`exclude_external_links`** | `bool` (False)          | Removes all links pointing outside the current domain.                                                                      |
 | **`exclude_social_media_links`** | `bool` (False)      | Strips links specifically to social sites (like Facebook or Twitter).                                                      |
 | **`exclude_domains`**        | `list` ([])             | Provide a custom list of domains to exclude (like `["ads.com", "trackers.io"]`).                                            |
+| **`exclude_internal_links`** | `bool` (False)          | If `True`, excludes internal links from the results.                                                                        |
+| **`score_links`**            | `bool` (False)          | If `True`, calculates intrinsic quality scores for all links using URL structure, text quality, and contextual metrics.     |
+| **`preserve_https_for_internal_links`** | `bool` (False) | If `True`, preserves HTTPS scheme for internal links even when the server redirects to HTTP. Useful for security-conscious crawling. |
 
 Use these for link-level content filtering (often to keep crawls “internal” or to remove spammy domains).
 
 ---
 
-### G) **Debug & Logging**
+### H) **Debug, Logging & Network Monitoring**
 
 | **Parameter**  | **Type / Default** | **What It Does**                                                         |
 |----------------|--------------------|---------------------------------------------------------------------------|
 | **`verbose`**  | `bool` (True)     | Prints logs detailing each step of crawling, interactions, or errors.    |
-| **`log_console`** | `bool` (False) | Logs the page’s JavaScript console output if you want deeper JS debugging.|
+| **`log_console`** | `bool` (False) | Logs the page's JavaScript console output if you want deeper JS debugging.|
+| **`capture_network_requests`** | `bool` (False) | If `True`, captures network requests made by the page in `result.captured_requests`. |
+| **`capture_console_messages`** | `bool` (False) | If `True`, captures console messages from the page in `result.console_messages`. |
 
 ---
 
+### I) **Connection & HTTP Parameters**
 
-### H) **Virtual Scroll Configuration**
+| **Parameter**               | **Type / Default**      | **What It Does**                                                                                                    |
+|-----------------------------|-------------------------|----------------------------------------------------------------------------------------------------------------------|
+| **`method`**                | `str` ("GET")          | HTTP method to use when using AsyncHTTPCrawlerStrategy (e.g., "GET", "POST").                                       |
+| **`stream`**                | `bool` (False)         | If `True`, enables streaming mode for `arun_many()` to process URLs as they complete rather than waiting for all.   |
+| **`url`**                   | `str or None` (None)   | URL for this specific config. Not typically set directly but used internally for URL-specific configurations.       |
+| **`user_agent`**            | `str or None` (None)   | Custom User-Agent string for this crawl. Can override browser-level user agent.                                     |
+| **`user_agent_mode`**       | `str or None` (None)   | Set to `"random"` to randomize user agent. Can override browser-level setting.                                      |
+| **`user_agent_generator_config`** | `dict` ({})      | Configuration for user agent generation when `user_agent_mode="random"`.                                            |
+
+---
+
+### J) **Virtual Scroll Configuration**
 
 | **Parameter**                | **Type / Default**           | **What It Does**                                                                                                                    |
 |------------------------------|------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
@@ -210,7 +265,7 @@ See [Virtual Scroll documentation](../../advanced/virtual-scroll.md) for detaile
 
 ---
 
-### I) **URL Matching Configuration**
+### K) **URL Matching Configuration**
 
 | **Parameter**          | **Type / Default**           | **What It Does**                                                                                                                    |
 |------------------------|------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
@@ -273,7 +328,25 @@ default_config = CrawlerRunConfig()  # No url_matcher = matches everything
 - If no config matches a URL and there's no default config (one without `url_matcher`), the URL will fail with "No matching configuration found"
 - Always include a default config as the last item if you want to handle all URLs
 
----## 2.2 Helper Methods
+---
+
+### L) **Advanced Crawling Features**
+
+| **Parameter**               | **Type / Default**           | **What It Does**                                                                                                                    |
+|-----------------------------|------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
+| **`deep_crawl_strategy`**   | `DeepCrawlStrategy or None` (None) | Strategy for deep/recursive crawling. Enables automatic link following and multi-level site crawling.                     |
+| **`link_preview_config`**   | `LinkPreviewConfig or dict or None` (None) | Configuration for link head extraction and scoring. Fetches and scores link metadata without full page loads.  |
+| **`experimental`**          | `dict or None` (None)       | Dictionary for experimental/beta features not yet integrated into main parameters. Use with caution.                                |
+
+**Deep Crawl Strategy** enables automatic site exploration by following links according to defined rules. Useful for sitemap generation or comprehensive site archiving.
+
+**Link Preview Config** allows efficient link discovery and scoring by fetching only the `<head>` section of linked pages, enabling smart crawl prioritization without the overhead of full page loads.
+
+**Experimental** parameters are features in beta testing. They may change or be removed in future versions. Check documentation for currently available experimental features.
+
+---
+
+## 2.2 Helper Methods
 
 Both `BrowserConfig` and `CrawlerRunConfig` provide a `clone()` method to create modified copies:
 
