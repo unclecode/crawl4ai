@@ -4,6 +4,8 @@ from collections.abc import Callable
 from enum import Enum
 from typing import Any, Union
 
+from crawl4ai.cache_client import DEFAULT_CACHE_TTL_SECONDS
+
 from .cache_context import CacheMode
 from .chunking_strategy import ChunkingStrategy, RegexChunking
 from .config import (
@@ -34,8 +36,6 @@ UrlMatcher = Union[str, Callable[[str], bool], list[str | Callable[[str], bool]]
 class MatchMode(Enum):
     OR = "or"
     AND = "and"
-
-# from .proxy_strategy import ProxyConfig
 
 
 
@@ -827,13 +827,6 @@ class HTTPCrawlerConfig:
         return HTTPCrawlerConfig.from_kwargs(config)
 
 class CrawlerRunConfig:
-    _UNWANTED_PROPS = {
-        'disable_cache' : 'Instead, use cache_mode=CacheMode.DISABLED',
-        'bypass_cache' : 'Instead, use cache_mode=CacheMode.BYPASS',
-        'no_cache_read' : 'Instead, use cache_mode=CacheMode.WRITE_ONLY',
-        'no_cache_write' : 'Instead, use cache_mode=CacheMode.READ_ONLY',
-    }
-
     """
     Configuration class for controlling how the crawler runs each crawl operation.
     This includes parameters for content extraction, page manipulation, waiting conditions,
@@ -1068,11 +1061,8 @@ class CrawlerRunConfig:
         fetch_ssl_certificate: bool = False,
         # Caching Parameters
         cache_mode: CacheMode = CacheMode.BYPASS,
+        cache_ttl_seconds: int = DEFAULT_CACHE_TTL_SECONDS,
         session_id: str = None,
-        bypass_cache: bool = False,
-        disable_cache: bool = False,
-        no_cache_read: bool = False,
-        no_cache_write: bool = False,
         shared_data: dict = None,
         # Page Navigation and Timing Parameters
         wait_until: str = "domcontentloaded",
@@ -1180,11 +1170,8 @@ class CrawlerRunConfig:
 
         # Caching Parameters
         self.cache_mode = cache_mode
+        self.cache_ttl_seconds = cache_ttl_seconds
         self.session_id = session_id
-        self.bypass_cache = bypass_cache
-        self.disable_cache = disable_cache
-        self.no_cache_read = no_cache_read
-        self.no_cache_write = no_cache_write
         self.shared_data = shared_data
 
         # Page Navigation and Timing Parameters
@@ -1412,20 +1399,7 @@ class CrawlerRunConfig:
 
     def __getattr__(self, name):
         """Handle attribute access."""
-        if name in self._UNWANTED_PROPS:
-            raise AttributeError(f"Getting '{name}' is deprecated. {self._UNWANTED_PROPS[name]}")
         raise AttributeError(f"'{self.__class__.__name__}' has no attribute '{name}'")
-
-    def __setattr__(self, name, value):
-        """Handle attribute setting."""
-        # TODO: Planning to set properties dynamically based on the __init__ signature
-        sig = inspect.signature(self.__init__)
-        all_params = sig.parameters  # Dictionary of parameter names and their details
-
-        if name in self._UNWANTED_PROPS and value is not all_params[name].default:
-            raise AttributeError(f"Setting '{name}' is deprecated. {self._UNWANTED_PROPS[name]}")
-        
-        super().__setattr__(name, value)
 
     @staticmethod
     def from_kwargs(kwargs: dict) -> "CrawlerRunConfig":
@@ -1456,11 +1430,8 @@ class CrawlerRunConfig:
             fetch_ssl_certificate=kwargs.get("fetch_ssl_certificate", False),
             # Caching Parameters
             cache_mode=kwargs.get("cache_mode", CacheMode.BYPASS),
+            cache_ttl_seconds=kwargs.get("cache_ttl_seconds", DEFAULT_CACHE_TTL_SECONDS),
             session_id=kwargs.get("session_id"),
-            bypass_cache=kwargs.get("bypass_cache", False),
-            disable_cache=kwargs.get("disable_cache", False),
-            no_cache_read=kwargs.get("no_cache_read", False),
-            no_cache_write=kwargs.get("no_cache_write", False),
             shared_data=kwargs.get("shared_data", None),
             # Page Navigation and Timing Parameters
             wait_until=kwargs.get("wait_until", "domcontentloaded"),
@@ -1575,11 +1546,8 @@ class CrawlerRunConfig:
             "geolocation": self.geolocation,
             "fetch_ssl_certificate": self.fetch_ssl_certificate,
             "cache_mode": self.cache_mode,
+            "cache_ttl_seconds": self.cache_ttl_seconds,
             "session_id": self.session_id,
-            "bypass_cache": self.bypass_cache,
-            "disable_cache": self.disable_cache,
-            "no_cache_read": self.no_cache_read,
-            "no_cache_write": self.no_cache_write,
             "shared_data": self.shared_data,
             "wait_until": self.wait_until,
             "page_timeout": self.page_timeout,

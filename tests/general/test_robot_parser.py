@@ -1,11 +1,12 @@
-from crawl4ai.utils import RobotsParser
-            
 import asyncio
-import aiohttp
-from aiohttp import web
-import tempfile
+import os
 import shutil
-import os, sys, time, json
+import tempfile
+import time
+
+from aiohttp import web
+
+from crawl4ai.utils import RobotsParser
 
 
 async def test_robots_parser():
@@ -126,12 +127,8 @@ Allow: /public/
         # 5. Cache manipulation
         print("\n5. Testing cache manipulation...")
         
-        # Clear expired
-        parser.clear_expired()
-        print("✓ Clear expired entries completed")
-        
         # Clear all
-        parser.clear_cache()
+        parser.cache_client.clear()
         print("✓ Clear all cache completed")
         
         # Test with custom TTL
