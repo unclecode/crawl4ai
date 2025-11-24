@@ -6,51 +6,52 @@ It determines when sufficient information has been gathered to answer a query,
 avoiding unnecessary crawls while ensuring comprehensive coverage.
 """
 
-from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Set, Tuple, Any, Union
-from dataclasses import dataclass, field
 import asyncio
-import pickle
-import os
 import json
 import math
-from collections import defaultdict, Counter
+import os
 import re
+from abc import ABC, abstractmethod
+from collections import defaultdict
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
-from crawl4ai.async_webcrawler import AsyncWebCrawler
-from crawl4ai.async_configs import CrawlerRunConfig, LinkPreviewConfig
-from crawl4ai.models import Link, CrawlResult
 import numpy as np
+
+from crawl4ai.async_configs import CrawlerRunConfig, LinkPreviewConfig
+from crawl4ai.async_webcrawler import AsyncWebCrawler
+from crawl4ai.models import CrawlResult, Link
+
 
 @dataclass
 class CrawlState:
     """Tracks the current state of adaptive crawling"""
-    crawled_urls: Set[str] = field(default_factory=set)
-    knowledge_base: List[CrawlResult] = field(default_factory=list)
-    pending_links: List[Link] = field(default_factory=list)
+    crawled_urls: set[str] = field(default_factory=set)
+    knowledge_base: list[CrawlResult] = field(default_factory=list)
+    pending_links: list[Link] = field(default_factory=list)
     query: str = ""
-    metrics: Dict[str, float] = field(default_factory=dict)
+    metrics: dict[str, float] = field(default_factory=dict)
     
     # Statistical tracking
-    term_frequencies: Dict[str, int] = field(default_factory=lambda: defaultdict(int))
-    document_frequencies: Dict[str, int] = field(default_factory=lambda: defaultdict(int))
-    documents_with_terms: Dict[str, Set[int]] = field(default_factory=lambda: defaultdict(set))
+    term_frequencies: dict[str, int] = field(default_factory=lambda: defaultdict(int))
+    document_frequencies: dict[str, int] = field(default_factory=lambda: defaultdict(int))
+    documents_with_terms: dict[str, set[int]] = field(default_factory=lambda: defaultdict(set))
     total_documents: int = 0
     
     # History tracking for saturation
-    new_terms_history: List[int] = field(default_factory=list)
-    crawl_order: List[str] = field(default_factory=list)
+    new_terms_history: list[int] = field(default_factory=list)
+    crawl_order: list[str] = field(default_factory=list)
     
     # Embedding-specific tracking (only if strategy is embedding)
-    kb_embeddings: Optional[Any] = None  # Will be numpy array
-    query_embeddings: Optional[Any] = None  # Will be numpy array
-    expanded_queries: List[str] = field(default_factory=list)
-    coverage_shape: Optional[Any] = None  # Alpha shape
-    semantic_gaps: List[Tuple[List[float], float]] = field(default_factory=list)  # Serializable
+    kb_embeddings: Any | None = None  # Will be numpy array
+    query_embeddings: Any | None = None  # Will be numpy array
+    expanded_queries: list[str] = field(default_factory=list)
+    coverage_shape: Any | None = None  # Alpha shape
+    semantic_gaps: list[tuple[list[float], float]] = field(default_factory=list)  # Serializable
     embedding_model: str = ""
     
-    def save(self, path: Union[str, Path]):
+    def save(self, path: str | Path):
         """Save state to disk for persistence"""
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -80,10 +81,10 @@ class CrawlState:
             json.dump(state_dict, f, indent=2)
     
     @classmethod
-    def load(cls, path: Union[str, Path]) -> 'CrawlState':
+    def load(cls, path: str | Path) -> 'CrawlState':
         """Load state from disk"""
         path = Path(path)
-        with open(path, 'r') as f:
+        with open(path) as f:
             state_dict = json.load(f)
         
         state = cls()
@@ -110,7 +111,7 @@ class CrawlState:
         return state
     
     @staticmethod
-    def _crawl_result_to_dict(cr: CrawlResult) -> Dict:
+    def _crawl_result_to_dict(cr: CrawlResult) -> dict:
         """Convert CrawlResult to serializable dict"""
         # Extract markdown content safely
         markdown_content = ""
@@ -128,7 +129,7 @@ class CrawlState:
         }
     
     @staticmethod
-    def _dict_to_crawl_result(d: Dict):
+    def _dict_to_crawl_result(d: dict):
         """Convert dict back to CrawlResult"""
         # Create a mock object that has the minimal interface we need
         class MockMarkdown:
@@ -174,11 +175,11 @@ class AdaptiveConfig:
     
     # Persistence
     save_state: bool = False
-    state_path: Optional[str] = None
+    state_path: str | None = None
     
     # Embedding strategy parameters
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
-    embedding_llm_config: Optional[Dict] = None  # Separate config for embeddings
+    embedding_llm_config: dict | None = None  # Separate config for embeddings
     n_query_variations: int = 10
     coverage_threshold: float = 0.85
     alpha_shape_alpha: float = 0.5
@@ -261,7 +262,7 @@ class CrawlStrategy(ABC):
         pass
     
     @abstractmethod
-    async def rank_links(self, state: CrawlState, config: AdaptiveConfig) -> List[Tuple[Link, float]]:
+    async def rank_links(self, state: CrawlState, config: AdaptiveConfig) -> list[tuple[Link, float]]:
         """Rank pending links by expected information gain"""
         pass
     
@@ -271,7 +272,7 @@ class CrawlStrategy(ABC):
         pass
     
     @abstractmethod
-    async def update_state(self, state: CrawlState, new_results: List[CrawlResult]) -> None:
+    async def update_state(self, state: CrawlState, new_results: list[CrawlResult]) -> None:
         """Update state with new crawl results"""
         pass
 
@@ -388,7 +389,7 @@ class StatisticalStrategy(CrawlStrategy):
         
         return max(0.0, min(saturation, 1.0))
     
-    async def rank_links(self, state: CrawlState, config: AdaptiveConfig) -> List[Tuple[Link, float]]:
+    async def rank_links(self, state: CrawlState, config: AdaptiveConfig) -> list[tuple[Link, float]]:
         """Rank links by expected information gain"""
         scored_links = []
         
@@ -523,7 +524,7 @@ class StatisticalStrategy(CrawlStrategy):
             
         return False
     
-    async def update_state(self, state: CrawlState, new_results: List[CrawlResult]) -> None:
+    async def update_state(self, state: CrawlState, new_results: list[CrawlResult]) -> None:
         """Update state with new crawl results"""
         for result in new_results:
             # Track new terms
@@ -573,7 +574,7 @@ class StatisticalStrategy(CrawlStrategy):
             # Add to crawl order
             state.crawl_order.append(result.url)
     
-    def _tokenize(self, text: str) -> List[str]:
+    def _tokenize(self, text: str) -> list[str]:
         """Simple tokenization - can be enhanced"""
         # Remove punctuation and split
         text = re.sub(r'[^\w\s]', ' ', text)
@@ -584,7 +585,7 @@ class StatisticalStrategy(CrawlStrategy):
         
         return tokens
     
-    def _get_document_terms(self, crawl_result: CrawlResult) -> List[str]:
+    def _get_document_terms(self, crawl_result: CrawlResult) -> list[str]:
         """Extract terms from a crawl result"""
         content = crawl_result.markdown.raw_markdown or ""
         return self._tokenize(content.lower())
@@ -593,7 +594,7 @@ class StatisticalStrategy(CrawlStrategy):
 class EmbeddingStrategy(CrawlStrategy):
     """Embedding-based adaptive crawling using semantic space coverage"""
     
-    def __init__(self, embedding_model: str = None, llm_config: Dict = None):
+    def __init__(self, embedding_model: str = None, llm_config: dict = None):
         self.embedding_model = embedding_model or "sentence-transformers/all-MiniLM-L6-v2"
         self.llm_config = llm_config
         self._embedding_cache = {}
@@ -606,7 +607,7 @@ class EmbeddingStrategy(CrawlStrategy):
         self._validation_embeddings_cache = None  # Cache validation query embeddings
         self._kb_similarity_threshold = 0.95  # Threshold for deduplication
         
-    async def _get_embeddings(self, texts: List[str]) -> Any:
+    async def _get_embeddings(self, texts: list[str]) -> Any:
         """Get embeddings using configured method"""
         from .utils import get_text_embeddings
         embedding_llm_config = {
@@ -665,7 +666,6 @@ class EmbeddingStrategy(CrawlStrategy):
         
     async def map_query_semantic_space(self, query: str, n_synthetic: int = 10) -> Any:
         """Generate a point cloud representing the semantic neighborhood of the query"""
-        from .utils import perform_completion_with_backoff
         
         # Generate more variations than needed for train/val split
         n_total = int(n_synthetic * 1.3)  # Generate 30% more for validation
@@ -759,7 +759,7 @@ class EmbeddingStrategy(CrawlStrategy):
             # Fallback if computation fails
             return None
     
-    def _sample_boundary_points(self, shape, n_samples: int = 20) -> List[Any]:
+    def _sample_boundary_points(self, shape, n_samples: int = 20) -> list[Any]:
         """Sample points from the boundary of a shape"""
         
         
@@ -771,7 +771,7 @@ class EmbeddingStrategy(CrawlStrategy):
         # This is a placeholder - actual implementation would depend on shape type
         return []
         
-    def find_coverage_gaps(self, kb_embeddings: Any, query_embeddings: Any) -> List[Tuple[Any, float]]:
+    def find_coverage_gaps(self, kb_embeddings: Any, query_embeddings: Any) -> list[tuple[Any, float]]:
         """Calculate gap distances for all query variations using vectorized operations"""
         
         
@@ -803,14 +803,14 @@ class EmbeddingStrategy(CrawlStrategy):
         
     async def select_links_for_expansion(
         self, 
-        candidate_links: List[Link], 
-        gaps: List[Tuple[Any, float]], 
+        candidate_links: list[Link], 
+        gaps: list[tuple[Any, float]], 
         kb_embeddings: Any
-    ) -> List[Tuple[Link, float]]:
+    ) -> list[tuple[Link, float]]:
         """Select links that most efficiently fill the gaps"""
-        from .utils import cosine_distance, cosine_similarity, get_text_embeddings
-        
         import hashlib
+
+        from .utils import cosine_distance, get_text_embeddings
         
         scored_links = []
         
@@ -1021,7 +1021,7 @@ class EmbeddingStrategy(CrawlStrategy):
     #     # For stopping criteria, return learning score
     #     return float(learning_score)
         
-    async def rank_links(self, state: CrawlState, config: AdaptiveConfig) -> List[Tuple[Link, float]]:
+    async def rank_links(self, state: CrawlState, config: AdaptiveConfig) -> list[tuple[Link, float]]:
         """Main entry point for link ranking"""
         # Store config for use in other methods
         self.config = config
@@ -1133,8 +1133,7 @@ class EmbeddingStrategy(CrawlStrategy):
                 state.metrics['stopped_reason'] = 'converged_validated'
                 self._validation_passed = True
                 return True
-            else:
-                state.metrics['stopped_reason'] = 'low_validation'
+            state.metrics['stopped_reason'] = 'low_validation'
                 # Continue crawling despite convergence
         
         return False
@@ -1166,7 +1165,7 @@ class EmbeddingStrategy(CrawlStrategy):
             
         return confidence
     
-    async def update_state(self, state: CrawlState, new_results: List[CrawlResult]) -> None:
+    async def update_state(self, state: CrawlState, new_results: list[CrawlResult]) -> None:
         """Update embeddings and coverage metrics with deduplication"""
         from .utils import get_text_embeddings
         
@@ -1232,9 +1231,9 @@ class AdaptiveCrawler:
     """Main adaptive crawler that orchestrates the crawling process"""
     
     def __init__(self, 
-                 crawler: Optional[AsyncWebCrawler] = None,
-                 config: Optional[AdaptiveConfig] = None,
-                 strategy: Optional[CrawlStrategy] = None):
+                 crawler: AsyncWebCrawler | None = None,
+                 config: AdaptiveConfig | None = None,
+                 strategy: CrawlStrategy | None = None):
         self.crawler = crawler
         self.config = config or AdaptiveConfig()
         self.config.validate()
@@ -1246,7 +1245,7 @@ class AdaptiveCrawler:
             self.strategy = self._create_strategy(self.config.strategy)
         
         # Initialize state
-        self.state: Optional[CrawlState] = None
+        self.state: CrawlState | None = None
         
         # Track if we own the crawler (for cleanup)
         self._owns_crawler = crawler is None
@@ -1255,18 +1254,17 @@ class AdaptiveCrawler:
         """Create strategy instance based on name"""
         if strategy_name == "statistical":
             return StatisticalStrategy()
-        elif strategy_name == "embedding":
+        if strategy_name == "embedding":
             return EmbeddingStrategy(
                 embedding_model=self.config.embedding_model,
                 llm_config=self.config.embedding_llm_config
             )
-        else:
-            raise ValueError(f"Unknown strategy: {strategy_name}")
+        raise ValueError(f"Unknown strategy: {strategy_name}")
     
     async def digest(self, 
                                start_url: str, 
                                query: str,
-                               resume_from: Optional[str] = None) -> CrawlState:
+                               resume_from: str | None = None) -> CrawlState:
         """Main entry point for adaptive crawling"""
         # Initialize or resume state
         if resume_from:
@@ -1409,7 +1407,7 @@ class AdaptiveCrawler:
             if self._owns_crawler and self.crawler:
                 await self.crawler.__aexit__(None, None, None)
     
-    async def _crawl_with_preview(self, url: str, query: str) -> Optional[CrawlResult]:
+    async def _crawl_with_preview(self, url: str, query: str) -> CrawlResult | None:
         """Crawl a URL with link preview enabled"""
         config = CrawlerRunConfig(
             link_preview_config=LinkPreviewConfig(
@@ -1441,7 +1439,7 @@ class AdaptiveCrawler:
             print(f"Error crawling {url}: {e}")
             return None
     
-    async def _crawl_batch(self, links_with_scores: List[Tuple[Link, float]], query: str) -> List[CrawlResult]:
+    async def _crawl_batch(self, links_with_scores: list[tuple[Link, float]], query: str) -> list[CrawlResult]:
         """Crawl multiple URLs in parallel"""
         tasks = []
         for link, score in links_with_scores:
@@ -1473,7 +1471,7 @@ class AdaptiveCrawler:
         return 0.0
     
     @property
-    def coverage_stats(self) -> Dict[str, Any]:
+    def coverage_stats(self) -> dict[str, Any]:
         """Detailed coverage statistics"""
         if not self.state:
             return {}
@@ -1501,9 +1499,8 @@ class AdaptiveCrawler:
         if isinstance(self.strategy, EmbeddingStrategy):
             # For embedding strategy, sufficient = validation passed
             return self.strategy._validation_passed
-        else:
-            # For statistical strategy, use threshold
-            return self.confidence >= self.config.confidence_threshold
+        # For statistical strategy, use threshold
+        return self.confidence >= self.config.confidence_threshold
     
     def print_stats(self, detailed: bool = False) -> None:
         """Print comprehensive statistics about the knowledge base
@@ -1578,7 +1575,7 @@ class AdaptiveCrawler:
             total_words = sum(self.state.term_frequencies.values())
             unique_terms = len(self.state.term_frequencies)
             
-            print(f"\n[*] Content Statistics:")
+            print("\n[*] Content Statistics:")
             print(f"  Total Content: {total_content_length:,} characters")
             print(f"  Total Words: {total_words:,}")
             print(f"  Unique Terms: {unique_terms:,}")
@@ -1588,13 +1585,13 @@ class AdaptiveCrawler:
             # Strategy-specific output
             if isinstance(self.strategy, EmbeddingStrategy):
                 # Semantic coverage for embedding strategy
-                print(f"\n[*] Semantic Coverage Analysis:")
+                print("\n[*] Semantic Coverage Analysis:")
                 print(f"  Average Min Distance: {self.state.metrics.get('avg_min_distance', 0):.3f}")
                 print(f"  Avg Close Neighbors (< 0.3): {self.state.metrics.get('avg_close_neighbors', 0):.1f}")
                 print(f"  Avg Very Close Neighbors (< 0.2): {self.state.metrics.get('avg_very_close_neighbors', 0):.1f}")
                 
                 # Confidence metrics
-                print(f"\n[*] Confidence Metrics:")
+                print("\n[*] Confidence Metrics:")
                 if self.is_sufficient:
                     if use_rich:
                         console.print(f"  Overall Confidence: {self.confidence:.2%} [green][VALIDATED][/green]")
@@ -1611,7 +1608,7 @@ class AdaptiveCrawler:
                 
             else:
                 # Query coverage for statistical strategy
-                print(f"\n[*] Query Coverage:")
+                print("\n[*] Query Coverage:")
                 query_terms = self.strategy._tokenize(self.state.query.lower())
                 for term in query_terms:
                     tf = self.state.term_frequencies.get(term, 0)
@@ -1628,7 +1625,7 @@ class AdaptiveCrawler:
                             print(f"  '{term}': [X] not found")
                 
                 # Confidence metrics
-                print(f"\n[*] Confidence Metrics:")
+                print("\n[*] Confidence Metrics:")
                 status = "[OK]" if self.is_sufficient else "[!!]"
                 if use_rich:
                     status_colored = "[green][OK][/green]" if self.is_sufficient else "[red][!!][/red]"
@@ -1642,7 +1639,7 @@ class AdaptiveCrawler:
             # Crawl efficiency
             if self.state.new_terms_history:
                 avg_new_terms = sum(self.state.new_terms_history) / len(self.state.new_terms_history)
-                print(f"\n[*] Crawl Efficiency:")
+                print("\n[*] Crawl Efficiency:")
                 print(f"  Avg New Terms per Page: {avg_new_terms:.1f}")
                 print(f"  Information Saturation: {self.state.metrics.get('saturation', 0):.2%}")
                 
@@ -1693,7 +1690,7 @@ class AdaptiveCrawler:
                     if self.state.kb_embeddings is not None:
                         print(f"  Knowledge Embeddings: {self.state.kb_embeddings.shape}")
                     else:
-                        print(f"  Knowledge Embeddings: None")
+                        print("  Knowledge Embeddings: None")
                     print(f"  Semantic Gaps: {len(self.state.semantic_gaps)}")
                     print(f"  Coverage Achievement: {self.confidence:.2%}")
                     
@@ -1716,7 +1713,7 @@ class AdaptiveCrawler:
             return str(result.markdown)
         return ""
     
-    def export_knowledge_base(self, filepath: Union[str, Path], format: str = "jsonl") -> None:
+    def export_knowledge_base(self, filepath: str | Path, format: str = "jsonl") -> None:
         """Export the knowledge base to a file
         
         Args:
@@ -1743,7 +1740,7 @@ class AdaptiveCrawler:
         else:
             raise ValueError(f"Unsupported export format: {format}")
     
-    def _crawl_result_to_export_dict(self, result) -> Dict[str, Any]:
+    def _crawl_result_to_export_dict(self, result) -> dict[str, Any]:
         """Convert CrawlResult to a dictionary for export"""
         # Extract all available fields
         export_dict = {
@@ -1780,7 +1777,7 @@ class AdaptiveCrawler:
         
         return export_dict
     
-    def import_knowledge_base(self, filepath: Union[str, Path], format: str = "jsonl") -> None:
+    def import_knowledge_base(self, filepath: str | Path, format: str = "jsonl") -> None:
         """Import a knowledge base from a file
         
         Args:
@@ -1793,7 +1790,7 @@ class AdaptiveCrawler:
         
         if format == "jsonl":
             imported_results = []
-            with open(filepath, 'r', encoding='utf-8') as f:
+            with open(filepath, encoding='utf-8') as f:
                 for line in f:
                     if line.strip():
                         data = json.loads(line)
@@ -1815,7 +1812,7 @@ class AdaptiveCrawler:
         else:
             raise ValueError(f"Unsupported import format: {format}")
     
-    def _import_dict_to_crawl_result(self, data: Dict[str, Any]):
+    def _import_dict_to_crawl_result(self, data: dict[str, Any]):
         """Convert imported dict back to a mock CrawlResult"""
         class MockMarkdown:
             def __init__(self, content):
@@ -1832,7 +1829,7 @@ class AdaptiveCrawler:
         
         return MockCrawlResult(data)
     
-    def get_relevant_content(self, top_k: int = 5) -> List[Dict[str, Any]]:
+    def get_relevant_content(self, top_k: int = 5) -> list[dict[str, Any]]:
         """Get most relevant content for the query"""
         if not self.state or not self.state.knowledge_base:
             return []

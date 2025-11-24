@@ -5,17 +5,18 @@ This module provides various strategies for detecting and extracting tables from
 The strategy pattern allows for flexible table extraction methods while maintaining a consistent interface.
 """
 
-from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Any, Union, Tuple
-from lxml import etree
-import re
 import json
-from .types import LLMConfig, create_llm_config
-from .utils import perform_completion_with_backoff, sanitize_html
 import os
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
+from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any
+
 import tiktoken
+from lxml import etree
+
+from .types import LLMConfig
+from .utils import perform_completion_with_backoff, sanitize_html
 
 
 class TableExtractionStrategy(ABC):
@@ -37,7 +38,7 @@ class TableExtractionStrategy(ABC):
         self.logger = kwargs.get("logger", None)
     
     @abstractmethod
-    def extract_tables(self, element: etree.Element, **kwargs) -> List[Dict[str, Any]]:
+    def extract_tables(self, element: etree.Element, **kwargs) -> list[dict[str, Any]]:
         """
         Extract tables from the given HTML element.
         
@@ -87,7 +88,7 @@ class DefaultTableExtraction(TableExtractionStrategy):
         self.min_rows = kwargs.get("min_rows", 0)
         self.min_cols = kwargs.get("min_cols", 0)
     
-    def extract_tables(self, element: etree.Element, **kwargs) -> List[Dict[str, Any]]:
+    def extract_tables(self, element: etree.Element, **kwargs) -> list[dict[str, Any]]:
         """
         Extract all data tables from the HTML element.
         
@@ -210,7 +211,7 @@ class DefaultTableExtraction(TableExtractionStrategy):
         threshold = kwargs.get("table_score_threshold", self.table_score_threshold)
         return score >= threshold
     
-    def extract_table_data(self, table: etree.Element) -> Dict[str, Any]:
+    def extract_table_data(self, table: etree.Element) -> dict[str, Any]:
         """
         Extract structured data from a table element.
         
@@ -303,7 +304,7 @@ class NoTableExtraction(TableExtractionStrategy):
     This can be used to explicitly disable table extraction when needed.
     """
     
-    def extract_tables(self, element: etree.Element, **kwargs) -> List[Dict[str, Any]]:
+    def extract_tables(self, element: etree.Element, **kwargs) -> list[dict[str, Any]]:
         """
         Return an empty list (no tables extracted).
         
@@ -688,8 +689,8 @@ Your output must conform to the following JSON schema (OpenAPI 3.0 format):
 **CRITICAL**: Your response must be a valid JSON object that conforms to this schema. The entire purpose of using an LLM for this task is to handle complex HTML tables that standard parsers cannot process correctly. Your value lies in intelligently interpreting complex structures and returning complete, clean, tabulated data in valid JSON format."""
     
     def __init__(self, 
-                 llm_config: Optional[LLMConfig] = None,
-                 css_selector: Optional[str] = None,
+                 llm_config: LLMConfig | None = None,
+                 css_selector: str | None = None,
                  max_tries: int = 3,
                  enable_chunking: bool = True,
                  chunk_token_threshold: int = 3000,
@@ -717,6 +718,7 @@ Your output must conform to the following JSON schema (OpenAPI 3.0 format):
         self.llm_config = llm_config
         if not self.llm_config:
             # Use default configuration if not provided
+            from .async_configs import create_llm_config
             self.llm_config = create_llm_config(
                 provider=os.getenv("DEFAULT_PROVIDER", "openai/gpt-4o-mini"),
                 api_token=os.getenv("OPENAI_API_KEY"),
@@ -730,7 +732,7 @@ Your output must conform to the following JSON schema (OpenAPI 3.0 format):
         self.max_parallel_chunks = max(1, max_parallel_chunks)
         self.extra_args = kwargs.get("extra_args", {})
     
-    def extract_tables(self, element: etree.Element, **kwargs) -> List[Dict[str, Any]]:
+    def extract_tables(self, element: etree.Element, **kwargs) -> list[dict[str, Any]]:
         """
         Extract tables from HTML using LLM.
         
@@ -760,7 +762,7 @@ Your output must conform to the following JSON schema (OpenAPI 3.0 format):
         # Check if there are any tables in the content
         if '<table' not in html_content.lower():
             if self.verbose:
-                self._log("info", f"No <table> tags found in HTML content")
+                self._log("info", "No <table> tags found in HTML content")
             return []
         
         if self.verbose:
@@ -857,18 +859,16 @@ Return only a JSON array of extracted tables following the specified format."""
                         if self.verbose:
                             self._log("warning", f"No valid tables extracted on attempt {attempt}, retrying...")
                         continue
-                    else:
-                        if self.verbose:
-                            self._log("warning", f"No valid tables extracted after {self.max_tries} attempts")
-                        return []
+                    if self.verbose:
+                        self._log("warning", f"No valid tables extracted after {self.max_tries} attempts")
+                    return []
                     
             except json.JSONDecodeError as e:
                 if self.verbose:
                     self._log("error", f"JSON parsing error on attempt {attempt}: {str(e)}")
                 if attempt < self.max_tries:
                     continue
-                else:
-                    return []
+                return []
                     
             except Exception as e:
                 if self.verbose:
@@ -883,8 +883,7 @@ Return only a JSON array of extracted tables following the specified format."""
                     import time
                     time.sleep(1)
                     continue
-                else:
-                    return []
+                return []
         
         # Should not reach here, but return empty list as fallback
         return []
@@ -920,7 +919,7 @@ Return only a JSON array of extracted tables following the specified format."""
         
         return needs_chunk
     
-    def _extract_table_structure(self, html_content: str) -> Tuple[List[etree.Element], List[etree.Element], List[etree.Element], bool]:
+    def _extract_table_structure(self, html_content: str) -> tuple[list[etree.Element], list[etree.Element], list[etree.Element], bool]:
         """
         Extract headers, body rows, and footer from table HTML.
         
@@ -981,7 +980,7 @@ Return only a JSON array of extracted tables following the specified format."""
         
         return header_rows, body_rows, footer_rows, has_headers
     
-    def _create_smart_chunks(self, html_content: str) -> Tuple[List[str], bool]:
+    def _create_smart_chunks(self, html_content: str) -> tuple[list[str], bool]:
         """
         Create smart chunks of table HTML, preserving headers in each chunk.
         
@@ -1053,7 +1052,7 @@ Return only a JSON array of extracted tables following the specified format."""
         
         return chunks, has_headers
     
-    def _create_chunk_html(self, header_html: str, body_rows: List[str], footer_html: Optional[str]) -> str:
+    def _create_chunk_html(self, header_html: str, body_rows: list[str], footer_html: str | None) -> str:
         """
         Create a complete table HTML chunk with headers, body rows, and optional footer.
         """
@@ -1073,7 +1072,7 @@ Return only a JSON array of extracted tables following the specified format."""
         
         return ''.join(html_parts)
     
-    def _rebalance_chunks(self, chunks: List[str], min_rows: int) -> List[str]:
+    def _rebalance_chunks(self, chunks: list[str], min_rows: int) -> list[str]:
         """
         Rebalance chunks to ensure minimum rows per chunk.
         Merge small chunks if necessary.
@@ -1082,7 +1081,7 @@ Return only a JSON array of extracted tables following the specified format."""
         # In production, you'd want more sophisticated rebalancing
         return chunks
     
-    def _process_chunk(self, chunk_html: str, chunk_index: int, total_chunks: int, has_headers: bool = True) -> Dict[str, Any]:
+    def _process_chunk(self, chunk_html: str, chunk_index: int, total_chunks: int, has_headers: bool = True) -> dict[str, Any]:
         """
         Process a single chunk with the LLM.
         """
@@ -1164,12 +1163,11 @@ Return only a JSON array of extracted tables following the specified format."""
                 if attempt < self.max_tries:
                     time.sleep(1)
                     continue
-                else:
-                    return {'chunk_index': chunk_index, 'table': None, 'error': str(e)}
+                return {'chunk_index': chunk_index, 'table': None, 'error': str(e)}
         
         return {'chunk_index': chunk_index, 'table': None}
     
-    def _merge_chunk_results(self, chunk_results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _merge_chunk_results(self, chunk_results: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """
         Merge results from multiple chunks into a single table.
         """
@@ -1205,7 +1203,7 @@ Return only a JSON array of extracted tables following the specified format."""
         
         return [merged_table]
     
-    def _extract_with_chunking(self, html_content: str) -> List[Dict[str, Any]]:
+    def _extract_with_chunking(self, html_content: str) -> list[dict[str, Any]]:
         """
         Extract tables using chunking and parallel processing.
         """
@@ -1251,12 +1249,12 @@ Return only a JSON array of extracted tables following the specified format."""
                     chunk_results.append({'chunk_index': chunk_index, 'table': None, 'error': str(e)})
         
         if self.verbose:
-            self._log("info", f"All chunks processed, merging results...")
+            self._log("info", "All chunks processed, merging results...")
         
         # Merge results
         return self._merge_chunk_results(chunk_results)
     
-    def _css_to_xpath_select(self, element: etree.Element, css_selector: str) -> List[etree.Element]:
+    def _css_to_xpath_select(self, element: etree.Element, css_selector: str) -> list[etree.Element]:
         """
         Convert CSS selector to XPath and select elements.
         This is a basic implementation - for complex CSS selectors, 
@@ -1301,7 +1299,7 @@ Return only a JSON array of extracted tables following the specified format."""
             self._log("warning", f"XPath conversion failed for selector '{css_selector}': {str(e)}")
             return []
     
-    def _validate_table_structure(self, table: Dict) -> bool:
+    def _validate_table_structure(self, table: dict) -> bool:
         """
         Validate that the table has the required structure.
         
@@ -1350,7 +1348,7 @@ Return only a JSON array of extracted tables following the specified format."""
         
         return True
     
-    def _ensure_table_format(self, table: Dict) -> Dict[str, Any]:
+    def _ensure_table_format(self, table: dict) -> dict[str, Any]:
         """
         Ensure the table has all required fields with proper defaults.
         

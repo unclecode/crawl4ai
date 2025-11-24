@@ -1,49 +1,56 @@
-from abc import ABC, abstractmethod
-import inspect
-from typing import Any, List, Dict, Optional, Tuple, Pattern, Union
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import json
-import time
-from enum import IntFlag, auto
+from __future__ import annotations
 
-from .prompts import PROMPT_EXTRACT_BLOCKS, PROMPT_EXTRACT_BLOCKS_WITH_INSTRUCTION, PROMPT_EXTRACT_SCHEMA_WITH_INSTRUCTION, JSON_SCHEMA_BUILDER_XPATH, PROMPT_EXTRACT_INFERRED_SCHEMA
+import inspect
+import json
+import re
+import time
+from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from enum import IntFlag, auto
+from functools import partial
+from re import Pattern
+from typing import Any, TYPE_CHECKING
+
+import numpy as np
+from bs4 import BeautifulSoup
+from lxml import etree, html
+
+if TYPE_CHECKING:
+    from .async_configs import LLMConfig
+
 from .config import (
+    CHUNK_TOKEN_THRESHOLD,
     DEFAULT_PROVIDER,
     DEFAULT_PROVIDER_API_KEY,
-    CHUNK_TOKEN_THRESHOLD,
     OVERLAP_RATE,
     WORD_TOKEN_RATE,
 )
-from .utils import *  # noqa: F403
-
-from .utils import (
-    sanitize_html,
-    escape_json_string,
-    perform_completion_with_backoff,
-    extract_xml_data,
-    split_and_parse_json_objects,
-    sanitize_input_encode,
-    merge_chunks,
-)
-from .models import * # noqa: F403
-
-from .models import TokenUsage
-
-from .model_loader import * # noqa: F403
+from .model_loader import *  # noqa: F403
 from .model_loader import (
+    calculate_batch_size,
     get_device,
     load_HF_embedding_model,
     load_text_multilabel_classifier,
-    calculate_batch_size
 )
-
-from .types import LLMConfig, create_llm_config
-
-from functools import partial
-import numpy as np
-import re
-from bs4 import BeautifulSoup
-from lxml import html, etree
+from .models import *  # noqa: F403
+from .models import TokenUsage
+from .prompts import (
+    JSON_SCHEMA_BUILDER_XPATH,
+    PROMPT_EXTRACT_BLOCKS,
+    PROMPT_EXTRACT_BLOCKS_WITH_INSTRUCTION,
+    PROMPT_EXTRACT_INFERRED_SCHEMA,
+    PROMPT_EXTRACT_SCHEMA_WITH_INSTRUCTION,
+)
+from .utils import *  # noqa: F403
+from .utils import (
+    escape_json_string,
+    extract_xml_data,
+    merge_chunks,
+    perform_completion_with_backoff,
+    sanitize_html,
+    sanitize_input_encode,
+    split_and_parse_json_objects,
+)
 
 
 class ExtractionStrategy(ABC):
@@ -66,7 +73,7 @@ class ExtractionStrategy(ABC):
         self.verbose = kwargs.get("verbose", False)
 
     @abstractmethod
-    def extract(self, url: str, html: str, *q, **kwargs) -> List[Dict[str, Any]]:
+    def extract(self, url: str, html: str, *q, **kwargs) -> list[dict[str, Any]]:
         """
         Extract meaningful blocks or chunks from the given HTML.
 
@@ -76,7 +83,7 @@ class ExtractionStrategy(ABC):
         """
         pass
 
-    def run(self, url: str, sections: List[str], *q, **kwargs) -> List[Dict[str, Any]]:
+    def run(self, url: str, sections: list[str], *q, **kwargs) -> list[dict[str, Any]]:
         """
         Process sections of text in parallel by default.
 
@@ -100,13 +107,13 @@ class NoExtractionStrategy(ExtractionStrategy):
     A strategy that does not extract any meaningful content from the HTML. It simply returns the entire HTML as a single block.
     """
 
-    def extract(self, url: str, html: str, *q, **kwargs) -> List[Dict[str, Any]]:
+    def extract(self, url: str, html: str, *q, **kwargs) -> list[dict[str, Any]]:
         """
         Extract meaningful blocks or chunks from the given HTML.
         """
         return [{"index": 0, "content": html}]
 
-    def run(self, url: str, sections: List[str], *q, **kwargs) -> List[Dict[str, Any]]:
+    def run(self, url: str, sections: list[str], *q, **kwargs) -> list[dict[str, Any]]:
         return [
             {"index": i, "tags": [], "content": section}
             for i, section in enumerate(sections)
@@ -226,8 +233,8 @@ class CosineStrategy(ExtractionStrategy):
             )
 
     def filter_documents_embeddings(
-        self, documents: List[str], semantic_filter: str, at_least_k: int = 20
-    ) -> List[str]:
+        self, documents: list[str], semantic_filter: str, at_least_k: int = 20
+    ) -> list[str]:
         """
         Filter and sort documents based on the cosine similarity of their embeddings with the semantic_filter embedding.
 
@@ -282,7 +289,7 @@ class CosineStrategy(ExtractionStrategy):
         return filtered_docs[:at_least_k]
 
     def get_embeddings(
-        self, sentences: List[str], batch_size=None, bypass_buffer=False
+        self, sentences: list[str], batch_size=None, bypass_buffer=False
     ):
         """
         Get BERT embeddings for a list of sentences.
@@ -336,7 +343,7 @@ class CosineStrategy(ExtractionStrategy):
             self.buffer_embeddings = np.vstack(all_embeddings)
         return self.buffer_embeddings
 
-    def hierarchical_clustering(self, sentences: List[str], embeddings=None):
+    def hierarchical_clustering(self, sentences: list[str], embeddings=None):
         """
         Perform hierarchical clustering on sentences and return cluster labels.
 
@@ -347,7 +354,7 @@ class CosineStrategy(ExtractionStrategy):
             NumPy array of cluster labels.
         """
         # Get embeddings
-        from scipy.cluster.hierarchy import linkage, fcluster
+        from scipy.cluster.hierarchy import fcluster, linkage
         from scipy.spatial.distance import pdist
 
         self.timer = time.time()
@@ -362,8 +369,8 @@ class CosineStrategy(ExtractionStrategy):
         return labels
 
     def filter_clusters_by_word_count(
-        self, clusters: Dict[int, List[str]]
-    ) -> Dict[int, List[str]]:
+        self, clusters: dict[int, list[str]]
+    ) -> dict[int, list[str]]:
         """
         Filter clusters to remove those with a word count below the threshold.
 
@@ -386,7 +393,7 @@ class CosineStrategy(ExtractionStrategy):
 
         return filtered_clusters
 
-    def extract(self, url: str, html: str, *q, **kwargs) -> List[Dict[str, Any]]:
+    def extract(self, url: str, html: str, *q, **kwargs) -> list[dict[str, Any]]:
         """
         Extract clusters from HTML content using hierarchical clustering.
 
@@ -458,7 +465,7 @@ class CosineStrategy(ExtractionStrategy):
 
         return cluster_list
 
-    def run(self, url: str, sections: List[str], *q, **kwargs) -> List[Dict[str, Any]]:
+    def run(self, url: str, sections: list[str], *q, **kwargs) -> list[dict[str, Any]]:
         """
         Process sections using hierarchical clustering.
 
@@ -501,9 +508,9 @@ class LLMExtractionStrategy(ExtractionStrategy):
         }
     def __init__(
         self,
-        llm_config: 'LLMConfig' = None,
+        llm_config: LLMConfig = None,
         instruction: str = None,
-        schema: Dict = None,
+        schema: dict = None,
         extraction_type="block",
         chunk_token_threshold=CHUNK_TOKEN_THRESHOLD,
         overlap_rate=OVERLAP_RATE,
@@ -514,7 +521,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
         verbose=False,
         # Deprecated arguments
         provider: str = DEFAULT_PROVIDER,
-        api_token: Optional[str] = None,
+        api_token: str | None = None,
         base_url: str = None,
         api_base: str = None,
         **kwargs,
@@ -546,6 +553,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
         super().__init__( input_format=input_format, **kwargs)
         self.llm_config = llm_config
         if not self.llm_config:
+            from .async_configs import create_llm_config
             self.llm_config = create_llm_config(
                 provider=DEFAULT_PROVIDER,
                 api_token=os.environ.get(DEFAULT_PROVIDER_API_KEY),
@@ -584,7 +592,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
         
         super().__setattr__(name, value)  
         
-    def extract(self, url: str, ix: int, html: str) -> List[Dict[str, Any]]:
+    def extract(self, url: str, ix: int, html: str) -> list[dict[str, Any]]:
         """
         Extract meaningful blocks or chunks from the given HTML using an LLM.
 
@@ -711,7 +719,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
                 }
             ]
 
-    def _merge(self, documents, chunk_token_threshold, overlap) -> List[str]:
+    def _merge(self, documents, chunk_token_threshold, overlap) -> list[str]:
         """
         Merge documents into sections based on chunk_token_threshold and overlap.
         """
@@ -723,7 +731,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
         )
         return sections
 
-    def run(self, url: str, sections: List[str]) -> List[Dict[str, Any]]:
+    def run(self, url: str, sections: list[str]) -> list[dict[str, Any]]:
         """
         Process sections sequentially with a delay for rate limiting issues, specifically for LLMExtractionStrategy.
 
@@ -835,7 +843,7 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
 
     DEL = "\n"
 
-    def __init__(self, schema: Dict[str, Any], **kwargs):
+    def __init__(self, schema: dict[str, Any], **kwargs):
         """
         Initialize the JSON element extraction strategy with a schema.
 
@@ -848,7 +856,7 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
 
     def extract(
         self, url: str, html_content: str, *q, **kwargs
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Extract structured data from HTML content.
 
@@ -1027,9 +1035,9 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
 
         if transform == "lowercase":
             return value.lower()
-        elif transform == "uppercase":
+        if transform == "uppercase":
             return value.upper()
-        elif transform == "strip":
+        if transform == "strip":
             return value.strip()
         return value
 
@@ -1037,14 +1045,14 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
         try:
             if "expression" in field:
                 return eval(field["expression"], {}, item)
-            elif "function" in field:
+            if "function" in field:
                 return field["function"](item)
         except Exception as e:
             if self.verbose:
                 print(f"Error computing field {field['name']}: {str(e)}")
             return field.get("default")
 
-    def run(self, url: str, sections: List[str], *q, **kwargs) -> List[Dict[str, Any]]:
+    def run(self, url: str, sections: list[str], *q, **kwargs) -> list[dict[str, Any]]:
         """
         Run the extraction strategy on a combined HTML content.
 
@@ -1091,7 +1099,7 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
         schema_type: str = "CSS", # or XPATH
         query: str = None,
         target_json_example: str = None,
-        llm_config: 'LLMConfig' = create_llm_config(),
+        llm_config: LLMConfig = None,
         provider: str = None,
         api_token: str = None,
         **kwargs
@@ -1111,6 +1119,11 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
         Returns:
             dict: Generated schema following the JsonElementExtractionStrategy format
         """
+        # Create default LLMConfig if not provided
+        if llm_config is None:
+            from .async_configs import create_llm_config
+            llm_config = create_llm_config()
+            
         from .prompts import JSON_SCHEMA_BUILDER
         from .utils import perform_completion_with_backoff
         for name, message in JsonElementExtractionStrategy._GENERATE_SCHEMA_UNWANTED_PROPS.items():
@@ -1216,7 +1229,7 @@ class JsonCssExtractionStrategy(JsonElementExtractionStrategy):
         _get_element_attribute(element, attribute): Retrieves an attribute value from a BeautifulSoup element.
     """
 
-    def __init__(self, schema: Dict[str, Any], **kwargs):
+    def __init__(self, schema: dict[str, Any], **kwargs):
         kwargs["input_format"] = "html"  # Force HTML input
         super().__init__(schema, **kwargs)
 
@@ -1242,7 +1255,7 @@ class JsonCssExtractionStrategy(JsonElementExtractionStrategy):
         return element.get(attribute)
 
 class JsonLxmlExtractionStrategy(JsonElementExtractionStrategy):
-    def __init__(self, schema: Dict[str, Any], **kwargs):
+    def __init__(self, schema: dict[str, Any], **kwargs):
         kwargs["input_format"] = "html"
         super().__init__(schema, **kwargs)
         self._selector_cache = {}
@@ -1513,7 +1526,7 @@ class JsonLxmlExtractionStrategy(JsonElementExtractionStrategy):
             self._result_cache.clear()
 
 class JsonLxmlExtractionStrategy_naive(JsonElementExtractionStrategy):
-    def __init__(self, schema: Dict[str, Any], **kwargs):
+    def __init__(self, schema: dict[str, Any], **kwargs):
         kwargs["input_format"] = "html"  # Force HTML input
         super().__init__(schema, **kwargs)
         self._selector_cache = {}
@@ -1564,8 +1577,7 @@ class JsonLxmlExtractionStrategy_naive(JsonElementExtractionStrategy):
                                 sub_selector = selector_str.split(')', 1)[-1].strip()
                                 if sub_selector:
                                     return element.xpath(f".//td[{col_num}]//{sub_selector}")
-                                else:
-                                    return element.xpath(f".//td[{col_num}]")
+                                return element.xpath(f".//td[{col_num}]")
                         
                         # Last resort: try each part of the selector separately
                         parts = selector_str.split()
@@ -1632,7 +1644,7 @@ class JsonXPathExtractionStrategy(JsonElementExtractionStrategy):
         _get_element_attribute(element, attribute): Retrieves an attribute value from an lxml element.
     """
 
-    def __init__(self, schema: Dict[str, Any], **kwargs):
+    def __init__(self, schema: dict[str, Any], **kwargs):
         kwargs["input_format"] = "html"  # Force HTML input
         super().__init__(schema, **kwargs)
 
@@ -1683,7 +1695,7 @@ _CTRL = {c: rf"\x{ord(c):02x}" for c in map(chr, range(32)) if c not in "\t\n\r"
 _WB_FIX = re.compile(r"\x08")               # stray back-space   →   word-boundary
 _NEEDS_ESCAPE = re.compile(r"(?<!\\)\\(?![\\u])")   # lone backslash
 
-def _sanitize_schema(schema: Dict[str, str]) -> Dict[str, str]:
+def _sanitize_schema(schema: dict[str, str]) -> dict[str, str]:
     """Fix common JSON-escape goofs coming from LLMs or manual edits."""
     safe = {}
     for label, pat in schema.items():
@@ -1781,7 +1793,7 @@ class RegexExtractionStrategy(ExtractionStrategy):
     # ------------------------------------------------------------------ #
     # Built-in pattern catalog
     # ------------------------------------------------------------------ #
-    DEFAULT_PATTERNS: Dict[str, str] = {
+    DEFAULT_PATTERNS: dict[str, str] = {
         # Communication
         "email":           r"[\w.+-]+@[\w-]+\.[\w.-]+",
         "phone_intl":      r"\+?\d[\d .()-]{7,}\d",
@@ -1822,9 +1834,9 @@ class RegexExtractionStrategy(ExtractionStrategy):
     # ------------------------------------------------------------------ #
     def __init__(
         self,
-        pattern: "_B" = _B.NOTHING,
+        pattern: _B = _B.NOTHING,
         *,
-        custom: Optional[Union[Dict[str, str], List[Tuple[str, str]]]] = None,
+        custom: dict[str, str] | list[tuple[str, str]] | None = None,
         input_format: str = "fit_html",
         **kwargs,
     ) -> None:
@@ -1838,7 +1850,7 @@ class RegexExtractionStrategy(ExtractionStrategy):
         super().__init__(input_format=input_format, **kwargs)
 
         # 1️⃣  take only the requested built-ins
-        merged: Dict[str, str] = {
+        merged: dict[str, str] = {
             key: rx
             for key, rx in self.DEFAULT_PATTERNS.items()
             if getattr(self._B, key.upper()).value & pattern
@@ -1851,16 +1863,16 @@ class RegexExtractionStrategy(ExtractionStrategy):
             else:  # iterable of (label, regex)
                 merged.update({lbl: rx for lbl, rx in custom})
 
-        self._compiled: Dict[str, Pattern] = {
+        self._compiled: dict[str, Pattern] = {
             lbl: re.compile(rx, self._FLAGS) for lbl, rx in merged.items()
         }
 
     # ------------------------------------------------------------------ #
     # Extraction
     # ------------------------------------------------------------------ #
-    def extract(self, url: str, content: str, *q, **kw) -> List[Dict[str, Any]]:
+    def extract(self, url: str, content: str, *q, **kw) -> list[dict[str, Any]]:
         # text = self._plain_text(html)
-        out: List[Dict[str, Any]] = []
+        out: list[dict[str, Any]] = []
 
         for label, cre in self._compiled.items():
             for m in cre.finditer(content):
@@ -1893,11 +1905,11 @@ class RegexExtractionStrategy(ExtractionStrategy):
         label: str,
         html: str,
         *,
-        query: Optional[str] = None,
-        examples: Optional[List[str]] = None,
-        llm_config: Optional[LLMConfig] = None,
+        query: str | None = None,
+        examples: list[str] | None = None,
+        llm_config: LLMConfig | None = None,
         **kwargs,
-    ) -> Dict[str, str]:
+    ) -> dict[str, str]:
         """
         Ask an LLM for a single page-specific regex and return
             {label: pattern}   ── ready for RegexExtractionStrategy(custom=…)
@@ -1912,6 +1924,7 @@ class RegexExtractionStrategy(ExtractionStrategy):
 
         # ── default LLM config
         if llm_config is None:
+            from .async_configs import create_llm_config
             llm_config = create_llm_config()
 
         # ── system prompt – hardened

@@ -1,15 +1,16 @@
 import pytest
 
-import asyncio
 import os
+import shutil
 import sys
-from unittest.mock import AsyncMock, patch
+import tempfile
+from unittest.mock import Mock, patch
 
 import pytest_asyncio
 
 from crawl4ai.async_configs import CrawlerRunConfig
-from crawl4ai.async_database import AsyncDatabaseManager, async_db_manager
 from crawl4ai.async_webcrawler import AsyncWebCrawler
+from crawl4ai.cache_client import CacheClient
 from crawl4ai.cache_context import CacheMode
 from crawl4ai.models import AsyncCrawlResponse
 
@@ -51,83 +52,91 @@ async def mock_async_crawl_response(monkeypatch):
     monkeypatch.setattr("crawl4ai.async_crawler_strategy.AsyncPlaywrightCrawlerStrategy.crawl", mock_crawl)
 
 
+class TestCacheClient(CacheClient):
+    """
+    A simple local file-based cache client. Does not support cache expiration.
+    """
+    def __init__(self):
+        self.base_directory = tempfile.mkdtemp(prefix="crawl4ai_test_cache_")
+
+    def _get_file_path(self, key: str) -> str:
+        safe_key = key.replace(":", "_").replace("/", "_")
+        return os.path.join(self.base_directory, safe_key)
+
+    def get(self, key: str) -> str | None:
+        file_path = self._get_file_path(key)
+        if os.path.exists(self._get_file_path(key)):
+            with open(file_path, encoding="utf-8") as f:
+                return f.read()
+        return None
+
+    def set(self, key: str, value: str, ttl_seconds: int) -> None:
+        file_path = self._get_file_path(key)
+        with open(file_path, "w+", encoding="utf-8") as f:
+            f.write(value)
+
+    def clear(self, prefix: str) -> None:
+        for filename in os.listdir(self.base_directory):
+            if filename.startswith(prefix.replace(":", "_")):
+                file_path = os.path.join(self.base_directory, filename)
+                os.remove(file_path)
+    
+    # === UTILITY METHODS FOR TESTING ===
+    
+    def count(self) -> int:
+        return len(os.listdir(self.base_directory))
+
+    def cleanup(self):
+        shutil.rmtree(self.base_directory)
+
+
 @pytest.mark.asyncio
 async def test_caching():
-    async with AsyncWebCrawler(verbose=True) as crawler:
+    cache_client = TestCacheClient()
+
+    async with AsyncWebCrawler(cache_client=cache_client) as crawler:
         # First crawl (should not use cache)
-        start_time = asyncio.get_event_loop().time()
         result1 = await crawler.arun(url=EXAMPLE_URL, config=CrawlerRunConfig(
             cache_mode=CacheMode.ENABLED
         ))
-        end_time = asyncio.get_event_loop().time()
-        time_taken1 = end_time - start_time
-        cache_size = await async_db_manager.aget_total_count()
+        cache_size = cache_client.count()
 
         assert result1.success
-        assert cache_size > 0
+        assert cache_size == 1
 
         # Second crawl (should use cache)
-        start_time = asyncio.get_event_loop().time()
         result2 = await crawler.arun(url=EXAMPLE_URL, config=CrawlerRunConfig(
             cache_mode=CacheMode.ENABLED
         ))
-        end_time = asyncio.get_event_loop().time()
-        time_taken2 = end_time - start_time
-        final_cache_size = await async_db_manager.aget_total_count()
+        final_cache_size = cache_client.count()
 
         assert result2.success
-        assert time_taken2 < time_taken1  # Cached result should be faster
-        assert final_cache_size == cache_size
-
-
-@pytest.mark.asyncio
-async def test_cache_base_directory(mock_async_crawl_response, tmp_path):
-    custom_base_dir = tmp_path / "test_crawl4ai_base"
-    custom_db_path = custom_base_dir / ".crawl4ai" / "crawl4ai.db"
-
-    with patch("crawl4ai.async_database.DB_PATH", str(custom_db_path)):
-        test_db_manager = AsyncDatabaseManager()
-        assert str(custom_db_path) == test_db_manager.db_path
-
-        with patch('crawl4ai.async_webcrawler.async_db_manager', test_db_manager):
-            await test_db_manager.initialize()
-            assert os.path.exists(test_db_manager.db_path)
-
-            cache_size = await test_db_manager.aget_total_count()
-            assert cache_size == 0
-        
-            async with AsyncWebCrawler(base_directory=str(custom_base_dir), verbose=True) as crawler:
-                result = await crawler.arun(url=EXAMPLE_URL, config=CrawlerRunConfig(
-                    cache_mode=CacheMode.ENABLED
-                ))
-                
-                assert result.success
-                assert result.html == EXAMPLE_RAW_HTML
-                
-                cache_size = await test_db_manager.aget_total_count()
-                assert cache_size == 1
+        assert result2.html == result1.html
+        assert final_cache_size == 1
     
-        await test_db_manager.cleanup()
+    cache_client.cleanup()
 
 
 @pytest.mark.asyncio
 async def test_cache_excluded_tags(mock_async_crawl_response):
-    async with AsyncWebCrawler(verbose=True) as crawler:
+    cache_client = TestCacheClient()
+
+    async with AsyncWebCrawler(cache_client=cache_client) as crawler:
         result1 = await crawler.arun(url=EXAMPLE_URL, config=CrawlerRunConfig(
             cache_mode=CacheMode.ENABLED,
             excluded_tags=["p"]
         ))
-        cache_size = await async_db_manager.aget_total_count()
+        cache_size = cache_client.count()
         
         assert result1.success
         assert result1.markdown == "# Example Domain\n"
-        assert cache_size > 0
+        assert cache_size == 1
 
         result2 = await crawler.arun(url=EXAMPLE_URL, config=CrawlerRunConfig(
             cache_mode=CacheMode.ENABLED,
             excluded_tags=["h1"]
         ))
-        cache_size2 = await async_db_manager.aget_total_count()
+        cache_size2 = cache_client.count()
 
         assert result2.success
         assert result2.markdown == "This domain is for use in documentation examples without needing permission. Avoid use in operations.\n[Learn more](https://iana.org/domains/example)\n"
@@ -136,50 +145,53 @@ async def test_cache_excluded_tags(mock_async_crawl_response):
         result3 = await crawler.arun(url=EXAMPLE_URL, config=CrawlerRunConfig(
             cache_mode=CacheMode.ENABLED,
         ))
-        cache_size3 = await async_db_manager.aget_total_count()
+        cache_size3 = cache_client.count()
 
         assert result3.success
         assert result3.markdown == "# Example Domain\nThis domain is for use in documentation examples without needing permission. Avoid use in operations.\n[Learn more](https://iana.org/domains/example)\n"
         assert cache_size3 == cache_size
+    
+    cache_client.cleanup()
 
 
 @pytest.mark.asyncio
 async def test_bypass_cache():
-    aget_cached_url_spy = AsyncMock(wraps=async_db_manager.aget_cached_url)
+    cache_client = TestCacheClient()
+    get_spy = Mock(wraps=cache_client.get)
 
-    with patch.object(async_db_manager, 'aget_cached_url', aget_cached_url_spy):
-        async with AsyncWebCrawler(verbose=True) as crawler:
+    with patch.object(TestCacheClient, 'get', get_spy):
+        async with AsyncWebCrawler(cache_client=cache_client) as crawler:
             result1 = await crawler.arun(url=EXAMPLE_URL, config=CrawlerRunConfig(
                 cache_mode=CacheMode.ENABLED
             ))
 
             assert result1.success
-            assert aget_cached_url_spy.call_count == 1
+            assert get_spy.call_count == 1
 
             result2 = await crawler.arun(url=EXAMPLE_URL, config=CrawlerRunConfig(
                 cache_mode=CacheMode.BYPASS
             ))
             
             assert result2.success
-            assert aget_cached_url_spy.call_count == 1
+            assert get_spy.call_count == 1
+
+    cache_client.cleanup()
 
 
 @pytest.mark.asyncio
 async def test_clear_cache():
-    async with AsyncWebCrawler(verbose=True) as crawler:
-        # Crawl and cache
+    cache_client = TestCacheClient()
+
+    async with AsyncWebCrawler(cache_client=cache_client) as crawler:
         await crawler.arun(url=EXAMPLE_URL, config=CrawlerRunConfig(
             cache_mode=CacheMode.ENABLED
         ))
-        cache_size = await async_db_manager.aget_total_count()
-        assert cache_size > 0
+        assert cache_client.count() == 1
 
-        # Clear cache
-        await async_db_manager.aclear_db()
+        cache_client.clear(prefix="")
+        assert cache_client.count() == 0
 
-        # Check cache size
-        cache_size = await async_db_manager.aget_total_count()
-        assert cache_size == 0
+    cache_client.cleanup()
 
 
 # Entry point for debugging

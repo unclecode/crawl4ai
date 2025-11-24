@@ -1,6 +1,5 @@
 import asyncio
 import cProfile
-import hashlib
 import html
 import json
 import linecache
@@ -8,13 +7,13 @@ import os
 import platform
 import pstats
 import re
-import sqlite3
 import subprocess
 import textwrap
 import time
 import traceback
 from array import array
 from collections import deque
+from collections.abc import Callable, Generator, Iterable, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache, wraps
 from itertools import chain
@@ -22,14 +21,6 @@ from pathlib import Path
 from socket import gaierror
 from typing import (
    Any,
-   Callable,
-   Dict,
-   Generator,
-   Iterable,
-   List,
-   Optional,
-   Sequence,
-   Tuple,
 )
 from urllib.parse import (
    parse_qs,
@@ -57,6 +48,12 @@ from lxml import etree
 from lxml import html as lhtml
 from packaging import version
 from requests.exceptions import InvalidSchema
+
+from crawl4ai.cache_client import (
+   DEFAULT_CACHE_TTL_SECONDS,
+   ROBOTS_CACHE_KEY_PREFIX,
+   CacheClient,
+)
 
 from . import __version__
 from .config import (
@@ -93,8 +90,8 @@ def chunk_documents(
     chunk_token_threshold: int,
     overlap: int,
     word_token_rate: float = 0.75,
-    tokenizer: Optional[Callable[[str], List[str]]] = None,
-) -> Generator[str, None, None]:
+    tokenizer: Callable[[str], list[str]] | None = None,
+) -> Generator[str]:
     """
     Efficiently chunks documents into token-limited sections with overlap between chunks.
 
@@ -180,7 +177,7 @@ def merge_chunks(
     overlap: int = 0,
     word_token_ratio: float = 1.0,
     splitter: Callable = None
-) -> List[str]:
+) -> list[str]:
     """
     Merges a sequence of documents into chunks based on a target token count, with optional overlap.
     
@@ -199,7 +196,7 @@ def merge_chunks(
     # Pre-tokenize all docs and store token counts
     splitter = splitter or str.split
     token_counts = array('I')
-    all_tokens: List[List[str]] = []
+    all_tokens: list[list[str]] = []
     total_tokens = 0
     
     for doc in docs:
@@ -215,7 +212,7 @@ def merge_chunks(
 
     # Pre-allocate chunks
     num_chunks = max(1, (total_tokens + target_size - 1) // target_size)
-    chunks: List[List[str]] = [[] for _ in range(num_chunks)]
+    chunks: list[list[str]] = [[] for _ in range(num_chunks)]
     
     curr_chunk = 0
     curr_size = 0
@@ -264,65 +261,22 @@ class VersionManager:
 
 
 class RobotsParser:
-    # Default 7 days cache TTL
-    CACHE_TTL = 7 * 24 * 60 * 60
+    def __init__(self, cache_client=CacheClient, cache_ttl=None):
+        self.cache_client = cache_client
+        self.cache_ttl = cache_ttl or DEFAULT_CACHE_TTL_SECONDS
 
-    def __init__(self, cache_dir=None, cache_ttl=None):
-        self.cache_dir = cache_dir or os.path.join(get_home_folder(), "robots")
-        self.cache_ttl = cache_ttl or self.CACHE_TTL
-        os.makedirs(self.cache_dir, exist_ok=True)
-        self.db_path = os.path.join(self.cache_dir, "robots_cache.db")
-        self._init_db()
+    def _get_cache_key(self, domain: str) -> str:
+        return f"{ROBOTS_CACHE_KEY_PREFIX}{domain}"
 
-    def _init_db(self):
-        # Use WAL mode for better concurrency and performance
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute("PRAGMA journal_mode=WAL")
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS robots_cache (
-                    domain TEXT PRIMARY KEY,
-                    rules TEXT NOT NULL,
-                    fetch_time INTEGER NOT NULL,
-                    hash TEXT NOT NULL
-                )
-            """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_domain ON robots_cache(domain)")
-
-    def _get_cached_rules(self, domain: str) -> tuple[str, bool]:
-        """Get cached rules. Returns (rules, is_fresh)"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute(
-                "SELECT rules, fetch_time, hash FROM robots_cache WHERE domain = ?", 
-                (domain,)
-            )
-            result = cursor.fetchone()
-            
-            if not result:
-                return None, False
-                
-            rules, fetch_time, _ = result
-            # Check if cache is still fresh based on TTL
-            return rules, (time.time() - fetch_time) < self.cache_ttl
+    def _get_cached_rules(self, domain: str) -> str:
+        return self.cache_client.get(key=self._get_cache_key(domain))
 
     def _cache_rules(self, domain: str, content: str):
-        """Cache robots.txt content with hash for change detection"""
-        hash_val = hashlib.md5(content.encode()).hexdigest()
-        with sqlite3.connect(self.db_path) as conn:
-            # Check if content actually changed
-            cursor = conn.execute(
-                "SELECT hash FROM robots_cache WHERE domain = ?", 
-                (domain,)
-            )
-            result = cursor.fetchone()
-            
-            # Only update if hash changed or no previous entry
-            if not result or result[0] != hash_val:
-                conn.execute(
-                    """INSERT OR REPLACE INTO robots_cache 
-                       (domain, rules, fetch_time, hash) 
-                       VALUES (?, ?, ?, ?)""",
-                    (domain, content, int(time.time()), hash_val)
-                )
+        self.cache_client.set(
+            key=self._get_cache_key(domain),
+            value=content,
+            ttl_seconds=self.cache_ttl
+        )
 
     async def can_fetch(self, url: str, user_agent: str = "*") -> bool:
         """
@@ -345,10 +299,10 @@ class RobotsParser:
             return True
 
         # Fast path - check cache first
-        rules, is_fresh = self._get_cached_rules(domain)
+        rules = self._get_cached_rules(domain)
         
         # If rules not found or stale, fetch new ones
-        if not is_fresh:
+        if not rules:
             try:
                 # Ensure we use the same scheme as the input URL
                 scheme = parsed.scheme or 'http'
@@ -365,9 +319,6 @@ class RobotsParser:
                 # On any error (timeout, connection failed, etc), allow access
                 return True
 
-        if not rules:
-            return True
-
         # Create parser for this check
         parser = RobotFileParser() 
         parser.parse(rules.splitlines())
@@ -377,18 +328,6 @@ class RobotsParser:
             return True
             
         return parser.can_fetch(user_agent, url)
-
-    def clear_cache(self):
-        """Clear all cached robots.txt entries"""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute("DELETE FROM robots_cache")
-
-    def clear_expired(self):
-        """Remove only expired entries from cache"""
-        with sqlite3.connect(self.db_path) as conn:
-            expire_time = int(time.time()) - self.cache_ttl
-            conn.execute("DELETE FROM robots_cache WHERE fetch_time < ?", (expire_time,))
-      
 
 class InvalidCSSSelectorError(Exception):
     pass
@@ -584,7 +523,7 @@ def get_system_memory():
 
     system = platform.system()
     if system == "Linux":
-        with open("/proc/meminfo", "r") as mem:
+        with open("/proc/meminfo") as mem:
             for line in mem:
                 if line.startswith("MemTotal:"):
                     return int(line.split()[1]) * 1024  # Convert KB to bytes
@@ -671,7 +610,7 @@ async def get_chromium_path(browser_type) -> str:
     home_folder = get_home_folder()
     path_file = os.path.join(home_folder, f"{browser_type.lower()}.path")
     if os.path.exists(path_file):
-        with open(path_file, "r") as f:
+        with open(path_file) as f:
             return f.read()
 
     from playwright.async_api import async_playwright
@@ -788,7 +727,7 @@ def sanitize_html(html):
     return sanitized_html
 
 
-def sanitize_input_encode(text: str) -> str:
+def sanitize_input_encode(text: str | None) -> str:
     """Sanitize input to handle potential encoding issues."""
     try:
         try:
@@ -831,7 +770,7 @@ def escape_json_string(s):
 
     # Additional problematic characters
     # Unicode control characters
-    s = re.sub(r"[\x00-\x1f\x7f-\x9f]", lambda x: "\\u{:04x}".format(ord(x.group())), s)
+    s = re.sub(r"[\x00-\x1f\x7f-\x9f]", lambda x: f"\\u{ord(x.group()):04x}", s)
 
     return s
 
@@ -1160,7 +1099,7 @@ def get_content_of_website_optimized(
     word_count_threshold: int = MIN_WORD_THRESHOLD,
     css_selector: str = None,
     **kwargs,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Extracts and cleans content from website HTML, optimizing for useful media and contextual information.
     
@@ -1298,9 +1237,8 @@ def get_content_of_website_optimized(
                     response = requests.head(img_url)
                     if response.status_code == 200:
                         return response.headers.get("Content-Length", None)
-                    else:
-                        print(f"Failed to retrieve file size for {img_url}")
-                        return None
+                    print(f"Failed to retrieve file size for {img_url}")
+                    return None
                 except InvalidSchema:
                     return None
 
@@ -2717,7 +2655,7 @@ def generate_content_hash(content: str) -> str:
     # return hashlib.sha256(content.encode()).hexdigest()
 
 
-def ensure_content_dirs(base_path: str) -> Dict[str, str]:
+def ensure_content_dirs(base_path: str) -> dict[str, str]:
     """Create content directories if they don't exist"""
     dirs = {
         "html": "html_content",
@@ -3263,8 +3201,8 @@ def calculate_link_intrinsic_score(
 
 
 def calculate_total_score(
-    intrinsic_score: Optional[float] = None,
-    contextual_score: Optional[float] = None,
+    intrinsic_score: float | None = None,
+    contextual_score: float | None = None,
     score_links_enabled: bool = False,
     query_provided: bool = False
 ) -> float:
@@ -3312,8 +3250,8 @@ def calculate_total_score(
 
 # Embedding utilities
 async def get_text_embeddings(
-    texts: List[str], 
-    llm_config: Optional[Dict] = None,
+    texts: list[str], 
+    llm_config: dict | None = None,
     model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
     batch_size: int = 32
 ) -> np.ndarray:
@@ -3367,39 +3305,38 @@ async def get_text_embeddings(
         return np.array(embeddings)
     
     # Default: use sentence-transformers
-    else:
-        # Lazy load to avoid importing heavy libraries unless needed
-        try:
-            from sentence_transformers import SentenceTransformer
-        except ImportError:
-            raise ImportError(
-                "sentence-transformers is required for local embeddings. "
-                "Install it with: pip install 'crawl4ai[transformer]' or pip install sentence-transformers"
-            )
-        
-        # Cache the model in function attribute to avoid reloading
-        if not hasattr(get_text_embeddings, '_models'):
-            get_text_embeddings._models = {}
-        
-        if model_name not in get_text_embeddings._models:
-            get_text_embeddings._models[model_name] = SentenceTransformer(model_name)
-        
-        encoder = get_text_embeddings._models[model_name]
-        
-        # Batch encode for efficiency
-        embeddings = encoder.encode(
-            texts,
-            batch_size=batch_size,
-            show_progress_bar=False,
-            convert_to_numpy=True
+    # Lazy load to avoid importing heavy libraries unless needed
+    try:
+        from sentence_transformers import SentenceTransformer
+    except ImportError:
+        raise ImportError(
+            "sentence-transformers is required for local embeddings. "
+            "Install it with: pip install 'crawl4ai[transformer]' or pip install sentence-transformers"
         )
-        
-        return embeddings
+
+    # Cache the model in function attribute to avoid reloading
+    if not hasattr(get_text_embeddings, '_models'):
+        get_text_embeddings._models = {}
+
+    if model_name not in get_text_embeddings._models:
+        get_text_embeddings._models[model_name] = SentenceTransformer(model_name)
+
+    encoder = get_text_embeddings._models[model_name]
+
+    # Batch encode for efficiency
+    embeddings = encoder.encode(
+        texts,
+        batch_size=batch_size,
+        show_progress_bar=False,
+        convert_to_numpy=True
+    )
+
+    return embeddings
 
 
 def get_text_embeddings_sync(
-    texts: List[str],
-    llm_config: Optional[Dict] = None,
+    texts: list[str],
+    llm_config: dict | None = None,
     model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
     batch_size: int = 32
 ) -> np.ndarray:
@@ -3482,7 +3419,7 @@ def get_true_memory_usage_percent() -> float:
     return max(0.0, min(100.0, used_percent))
 
 
-def get_memory_stats() -> Tuple[float, float, float]:
+def get_memory_stats() -> tuple[float, float, float]:
     """
     Get comprehensive memory statistics.
     

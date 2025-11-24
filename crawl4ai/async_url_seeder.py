@@ -14,26 +14,28 @@ Features
 """
 
 from __future__ import annotations
-import aiofiles
+
 import asyncio
+import fnmatch
 import gzip
 import hashlib
-import io
 import json
 import os
 import pathlib
 import re
 import time
+from collections.abc import Sequence
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Union
+from typing import Any
 from urllib.parse import quote, urljoin
 
+import aiofiles
 import httpx
-import fnmatch
+
 try:
-    from lxml import html as lxml_html
     from lxml import etree
+    from lxml import html as lxml_html
     LXML = True
 except ImportError:
     LXML = False
@@ -52,10 +54,11 @@ except ImportError:
 # Assuming crawl4ai/async_logger.py defines AsyncLoggerBase
 # You might need to adjust this import based on your exact file structure
 # Import AsyncLogger for default if needed
-from .async_logger import AsyncLoggerBase, AsyncLogger
-
 # Import SeedingConfig for type hints
 from typing import TYPE_CHECKING
+
+from .async_logger import AsyncLoggerBase
+
 if TYPE_CHECKING:
     from .async_configs import SeedingConfig
 
@@ -86,7 +89,7 @@ def _match(url: str, pattern: str) -> bool:
             or (canon.startswith("www.") and fnmatch.fnmatch(canon[4:], pattern)))
 
 
-def _parse_head(src: str) -> Dict[str, Any]:
+def _parse_head(src: str) -> dict[str, Any]:
     if LXML:
         try:
             if isinstance(src, str):
@@ -95,7 +98,7 @@ def _parse_head(src: str) -> Dict[str, Any]:
             doc = lxml_html.fromstring(src)
         except (ValueError, etree.ParserError):
             return {}        # malformed, bail gracefully
-        info: Dict[str, Any] = {
+        info: dict[str, Any] = {
             "title": (doc.find(".//title").text or "").strip()
             if doc.find(".//title") is not None else None,
             "charset": None,
@@ -133,7 +136,7 @@ def _parse_head(src: str) -> Dict[str, Any]:
             info["lang"] = html_elem.attrib.get("lang", "")
         return info
     # regex fallback
-    info: Dict[str, Any] = {"title": None, "charset": None,
+    info: dict[str, Any] = {"title": None, "charset": None,
                             "meta": {}, "link": {}, "jsonld": [], "lang": ""}
     m = _title_rx.search(src)
     info["title"] = m.group(1).strip() if m else None
@@ -198,11 +201,11 @@ class AsyncUrlSeeder:
     def __init__(
         self,
         ttl: timedelta = TTL,
-        client: Optional[httpx.AsyncClient] = None,
-        logger: Optional[AsyncLoggerBase] = None,  # NEW: Add logger parameter
+        client: httpx.AsyncClient | None = None,
+        logger: AsyncLoggerBase | None = None,  # NEW: Add logger parameter
         # NEW: Add base_directory
-        base_directory: Optional[Union[str, pathlib.Path]] = None,
-        cache_root: Optional[Union[str, Path]] = None,
+        base_directory: str | pathlib.Path | None = None,
+        cache_root: str | Path | None = None,
     ):
         self.ttl = ttl
         self._owns_client = client is None  # Track if we created the client
@@ -219,8 +222,8 @@ class AsyncUrlSeeder:
             "latest_cc_index.txt"  # NEW: Index cache path
 
         # defer – grabbing the index inside an active loop blows up
-        self.index_id: Optional[str] = None
-        self._rate_sem: Optional[asyncio.Semaphore] = None
+        self.index_id: str | None = None
+        self._rate_sem: asyncio.Semaphore | None = None
 
         # ───────── cache dirs ─────────
         self.cache_root = Path(os.path.expanduser(
@@ -243,19 +246,19 @@ class AsyncUrlSeeder:
         h = hashlib.sha1(url.encode()).hexdigest()
         return self.cache_root / kind / f"{h}.json"
 
-    async def _cache_get(self, kind: str, url: str) -> Optional[Dict[str, Any]]:
+    async def _cache_get(self, kind: str, url: str) -> dict[str, Any] | None:
         p = self._cache_path(kind, url)
         if not p.exists():
             return None
         if time.time()-p.stat().st_mtime > self.ttl.total_seconds():
             return None
         try:
-            async with aiofiles.open(p, "r") as f:
+            async with aiofiles.open(p) as f:
                 return json.loads(await f.read())
         except Exception:
             return None
 
-    async def _cache_set(self, kind: str, url: str, data: Dict[str, Any]) -> None:
+    async def _cache_set(self, kind: str, url: str, data: dict[str, Any]) -> None:
         try:
             async with aiofiles.open(self._cache_path(kind, url), "w") as f:
                 await f.write(json.dumps(data, separators=(",", ":")))
@@ -266,8 +269,8 @@ class AsyncUrlSeeder:
 
     async def urls(self,
                    domain: str,
-                   config: "SeedingConfig",
-                   ) -> List[Dict[str, Any]]:
+                   config: SeedingConfig,
+                   ) -> list[dict[str, Any]]:
         """
         Fetch URLs for a domain using configuration from SeedingConfig.
 
@@ -364,7 +367,7 @@ class AsyncUrlSeeder:
                 producer_done.set()
                 self._log("debug", "Producer finished.", tag="URL_SEED")
 
-        async def worker(res_list: List[Dict[str, Any]]):
+        async def worker(res_list: list[dict[str, Any]]):
             while True:
                 if queue.empty() and producer_done.is_set():
                     # self._log("debug", "Worker exiting: queue empty and producer done.", tag="URL_SEED")
@@ -372,7 +375,7 @@ class AsyncUrlSeeder:
                 try:
                     # Increased timeout slightly
                     url = await asyncio.wait_for(queue.get(), 5)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     continue  # Keep checking queue and producer_done status
                 except Exception as e:
                     self._log("error", "Worker failed to get URL from queue: {error}", params={
@@ -412,7 +415,7 @@ class AsyncUrlSeeder:
                 queue.task_done()  # Mark task as done for queue.join() if ever used
 
         # launch
-        results: List[Dict[str, Any]] = []
+        results: list[dict[str, Any]] = []
         prod_task = asyncio.create_task(producer())
         workers = [asyncio.create_task(worker(results))
                    for _ in range(concurrency)]
@@ -450,8 +453,8 @@ class AsyncUrlSeeder:
     async def many_urls(
         self,
         domains: Sequence[str],
-        config: "SeedingConfig",
-    ) -> Dict[str, List[Dict[str, Any]]]:
+        config: SeedingConfig,
+    ) -> dict[str, list[dict[str, Any]]]:
         """
         Fetch URLs for many domains in parallel.
 
@@ -484,11 +487,11 @@ class AsyncUrlSeeder:
 
     async def extract_head_for_urls(
         self,
-        urls: List[str],
-        config: Optional["SeedingConfig"] = None,
+        urls: list[str],
+        config: SeedingConfig | None = None,
         concurrency: int = 10,
         timeout: int = 5
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Extract head content for a custom list of URLs using URLSeeder's parallel processing.
         
@@ -546,7 +549,7 @@ class AsyncUrlSeeder:
         seen: set[str] = set()
         
         # Results collection
-        results: List[Dict[str, Any]] = []
+        results: list[dict[str, Any]] = []
         
         async def producer():
             """Producer to feed URLs into the queue."""
@@ -563,13 +566,13 @@ class AsyncUrlSeeder:
             finally:
                 producer_done.set()
         
-        async def worker(res_list: List[Dict[str, Any]]):
+        async def worker(res_list: list[dict[str, Any]]):
             """Worker to process URLs from the queue."""
             while True:
                 try:
                     # Wait for URL or producer completion
                     url = await asyncio.wait_for(queue.get(), timeout=1.0)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     if producer_done.is_set() and queue.empty():
                         break
                     continue
@@ -642,7 +645,7 @@ class AsyncUrlSeeder:
         
         return results
 
-    async def _apply_bm25_scoring(self, results: List[Dict[str, Any]], config: "SeedingConfig") -> List[Dict[str, Any]]:
+    async def _apply_bm25_scoring(self, results: list[dict[str, Any]], config: SeedingConfig) -> list[dict[str, Any]]:
         """Apply BM25 scoring to results that have head_data."""
         if not HAS_BM25:
             self._log("warning", "BM25 scoring requested but rank_bm25 not available", tag="URL_SEED")
@@ -676,7 +679,7 @@ class AsyncUrlSeeder:
         
         return results
 
-    async def _resolve_head(self, url: str) -> Optional[str]:
+    async def _resolve_head(self, url: str) -> str | None:
         """
         HEAD-probe a URL.
 
@@ -721,7 +724,7 @@ class AsyncUrlSeeder:
         if path.exists() and not force:
             self._log("info", "Loading CC URLs for {domain} from cache: {path}",
                       params={"domain": domain, "path": path}, tag="URL_SEED")
-            async with aiofiles.open(path, "r") as fp:
+            async with aiofiles.open(path) as fp:
                 async for line in fp:
                     url = line.strip()
                     if _match(url, pattern):
@@ -778,7 +781,7 @@ class AsyncUrlSeeder:
         if path.exists() and not force:
             self._log("info", "Loading sitemap URLs for {d} from cache: {p}",
                       params={"d": host, "p": str(path)}, tag="URL_SEED")
-            async with aiofiles.open(path, "r") as fp:
+            async with aiofiles.open(path) as fp:
                 async for line in fp:
                     url = line.strip()
                     if _match(url, pattern):
@@ -956,9 +959,9 @@ class AsyncUrlSeeder:
                 yield u
 
     # ─────────────────────────────── validate helpers
-    async def _validate(self, url: str, res_list: List[Dict[str, Any]], live: bool,
-                        extract: bool, timeout: int, verbose: bool, query: Optional[str] = None,
-                        score_threshold: Optional[float] = None, scoring_method: str = "bm25",
+    async def _validate(self, url: str, res_list: list[dict[str, Any]], live: bool,
+                        extract: bool, timeout: int, verbose: bool, query: str | None = None,
+                        score_threshold: float | None = None, scoring_method: str = "bm25",
                         filter_nonsense: bool = True):
         # Local verbose parameter for this function is used to decide if intermediate logs should be printed
         # The main logger's verbose status should be controlled by the caller.
@@ -1059,11 +1062,10 @@ class AsyncUrlSeeder:
                             self._log("debug", "Redirecting from {original_url} to {new_url}",
                                       params={"original_url": r.url, "new_url": url}, tag="URL_SEED")
                             continue
-                        else:
-                            self._log("warning", "Redirect status {status_code} but no Location header for {url}",
-                                      params={"status_code": r.status_code, "url": r.url}, tag="URL_SEED")
-                            # Return original URL if no new location
-                            return False, "", str(r.url)
+                        self._log("warning", "Redirect status {status_code} but no Location header for {url}",
+                                  params={"status_code": r.status_code, "url": r.url}, tag="URL_SEED")
+                        # Return original URL if no new location
+                        return False, "", str(r.url)
 
                     # For 2xx or other non-redirect codes, proceed to read content
                     # Only allow successful codes, or continue
@@ -1140,7 +1142,7 @@ class AsyncUrlSeeder:
         return False, "", url
 
     # ─────────────────────────────── BM25 scoring helpers
-    def _extract_text_context(self, head_data: Dict[str, Any]) -> str:
+    def _extract_text_context(self, head_data: dict[str, Any]) -> str:
         """Extract all relevant text from head metadata for scoring."""
         # Priority fields with their weights (for future enhancement)
         text_parts = []
@@ -1197,7 +1199,6 @@ class AsyncUrlSeeder:
         """Calculate relevance score between query and URL using string matching."""
         # Normalize inputs
         query_lower = query.lower()
-        url_lower = url.lower()
 
         # Extract URL components
         from urllib.parse import urlparse
@@ -1377,7 +1378,7 @@ class AsyncUrlSeeder:
         
         return False
     
-    def _calculate_bm25_score(self, query: str, documents: List[str]) -> List[float]:
+    def _calculate_bm25_score(self, query: str, documents: list[str]) -> list[float]:
         """Calculate BM25 scores for documents against a query."""
         if not HAS_BM25:
             self._log(
