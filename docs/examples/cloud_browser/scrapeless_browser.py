@@ -3,9 +3,9 @@ import asyncio
 from urllib.parse import quote, urlencode
 from crawl4ai import CrawlerRunConfig, BrowserConfig, AsyncWebCrawler
 
-# Get free anti-detection fingerprint browser client and cloud browsers: 
+# Scrapeless provides a free anti-detection fingerprint browser client and cloud browsers:
 # https://www.scrapeless.com/en/blog/scrapeless-nstbrowser-strategic-integration
-# Get Live ChatGPT/perplexity/Copilot... data via cloud browsers or Scraper endpoint, specific to the selected location, contact us
+
 async def main():
     # customize browser fingerprint
     fingerprint = {
