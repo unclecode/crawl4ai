@@ -1,53 +1,51 @@
-from crawl4ai.cache_client import HTML_CACHE_KEY_PREFIX
-from .__version__ import __version__ as crawl4ai_version
+from __future__ import annotations
+
+import asyncio
+import json
 import os
 import sys
 import time
-from pathlib import Path
-from typing import Optional, List
-import json
-import asyncio
-
-# from contextlib import nullcontext, asynccontextmanager
 from contextlib import asynccontextmanager
-from .models import (
-    CrawlResult,
-    MarkdownGenerationResult,
-    DispatchResult,
-    ScrapingResult,
-    CrawlResultContainer,
-    RunManyReturn
-)
-from .chunking_strategy import *  # noqa: F403
-from .chunking_strategy import IdentityChunking
-from .content_filter_strategy import *  # noqa: F403
-from .extraction_strategy import *  # noqa: F403
-from .extraction_strategy import NoExtractionStrategy
+from pathlib import Path
+from typing import Any
+
+from crawl4ai.cache_client import HTML_CACHE_KEY_PREFIX, CacheClient
+
+from .__version__ import __version__ as crawl4ai_version
+from .async_configs import BrowserConfig, CrawlerRunConfig, ProxyConfig, SeedingConfig
 from .async_crawler_strategy import (
     AsyncCrawlerStrategy,
-    AsyncPlaywrightCrawlerStrategy,
     AsyncCrawlResponse,
+    AsyncPlaywrightCrawlerStrategy,
 )
-from .cache_context import CacheMode, CacheContext
+from .async_dispatcher import BaseDispatcher, MemoryAdaptiveDispatcher, RateLimiter
+from .async_logger import AsyncLogger, AsyncLoggerBase
+from .async_url_seeder import AsyncUrlSeeder
+from .cache_context import CacheContext, CacheMode
+from .chunking_strategy import IdentityChunking
+from .deep_crawling import DeepCrawlDecorator
+from .extraction_strategy import NoExtractionStrategy
 from .markdown_generation_strategy import (
     DefaultMarkdownGenerator,
     MarkdownGenerationStrategy,
 )
-from .deep_crawling import DeepCrawlDecorator
-from .async_logger import AsyncLogger, AsyncLoggerBase
-from .async_configs import BrowserConfig, CrawlerRunConfig, ProxyConfig, SeedingConfig
-from .async_dispatcher import *  # noqa: F403
-from .async_dispatcher import BaseDispatcher, MemoryAdaptiveDispatcher, RateLimiter
-from .async_url_seeder import AsyncUrlSeeder
-
+from .models import (
+    CrawlResult,
+    CrawlResultContainer,
+    DispatchResult,
+    MarkdownGenerationResult,
+    RunManyReturn,
+    ScrapingResult,
+)
 from .utils import (
-    sanitize_input_encode,
     InvalidCSSSelectorError,
+    RobotsParser,
     fast_format_html,
     get_error_context,
-    RobotsParser,
     preprocess_html_for_schema,
+    sanitize_input_encode,
 )
+
 
 class AsyncWebCrawler:
     """
@@ -696,10 +694,10 @@ class AsyncWebCrawler:
 
     async def aseed_urls(
         self,
-        domain_or_domains: Union[str, list[str]],
+        domain_or_domains: str | list[str],
         config: SeedingConfig | None = None,
         **kwargs
-    ) -> Union[list[str], Dict[str, list[Union[str, Dict[str, Any]]]]]:
+    ) -> list[str] | dict[str, list[str, dict[str, Any]]]:
         """
         Discovers, filters, and optionally validates URLs for a given domain(s)
         using sitemaps and Common Crawl archives.

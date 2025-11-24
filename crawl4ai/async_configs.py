@@ -1800,3 +1800,6 @@ class SeedingConfig:
         config_dict = self.to_dict()
         config_dict.update(kwargs)
         return SeedingConfig.from_kwargs(config_dict)
+
+def create_llm_config(*args, **kwargs) -> LLMConfig:
+    return LLMConfig(*args, **kwargs)
