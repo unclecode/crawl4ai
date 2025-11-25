@@ -1,6 +1,11 @@
+import pytest
+
 import asyncio
+
 from crawl4ai import *
 
+
+@pytest.mark.asyncio
 async def test_real_websites():
     print("\n=== Testing Real Website Robots.txt Compliance ===\n")
     
