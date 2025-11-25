@@ -1053,9 +1053,17 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             raise e
 
         finally:
+            # Release the context reference so cleanup can work
+            if not self.browser_config.use_managed_browser:
+                try:
+                    config_signature = self.browser_manager._make_config_signature(config)
+                    await self.browser_manager.release_context(config_signature)
+                except Exception:
+                    pass  # Don't fail on cleanup
+
             # If no session_id is given we should close the page
             all_contexts = page.context.browser.contexts
-            total_pages = sum(len(context.pages) for context in all_contexts)                
+            total_pages = sum(len(context.pages) for context in all_contexts)
             if config.session_id:
                 pass
             elif total_pages <= 1 and (self.browser_config.use_managed_browser or self.browser_config.headless):

@@ -611,12 +611,16 @@ class BrowserManager:
         # Keep track of contexts by a "config signature," so each unique config reuses a single context
         self.contexts_by_config = {}
         self._contexts_lock = asyncio.Lock()
-        
+
+        # Reference counting for contexts - tracks how many requests are using each context
+        # Key: config_signature, Value: count of active requests using this context
+        self._context_refcounts = {}
+
         # Serialize context.new_page() across concurrent tasks to avoid races
         # when using a shared persistent context (context.pages may be empty
         # for all racers). Prevents 'Target page/context closed' errors.
         self._page_lock = asyncio.Lock()
-        
+
         # Stealth adapter for stealth mode
         self._stealth_adapter = None
         if self.config.enable_stealth and not self.use_undetected:
@@ -1102,6 +1106,9 @@ class BrowserManager:
                     await self.setup_context(context, crawlerRunConfig)
                     self.contexts_by_config[config_signature] = context
 
+                # Increment reference count - this context is now in use
+                self._context_refcounts[config_signature] = self._context_refcounts.get(config_signature, 0) + 1
+
             # Create a new page from the chosen context
             page = await context.new_page()
             await self._apply_stealth_to_page(page)
@@ -1137,11 +1144,127 @@ class BrowserManager:
         for sid in expired_sessions:
             asyncio.create_task(self.kill_session(sid))
 
+    async def cleanup_contexts(self, max_contexts: int = 5, force: bool = False):
+        """
+        Clean up contexts to prevent memory growth.
+        Only closes contexts that have no active references AND no open pages (safe cleanup).
+
+        Args:
+            max_contexts: Maximum number of contexts to keep. Excess idle contexts
+                          will be closed, starting with the oldest ones.
+            force: If True, close contexts even if they have pages (but never if refcount > 0).
+                   Use with caution.
+        """
+        async with self._contexts_lock:
+            # First, identify contexts that are safe to close:
+            # - No active references (refcount == 0)
+            # - No open pages (or force=True)
+            idle_contexts = []
+            active_contexts = []
+
+            for sig, ctx in list(self.contexts_by_config.items()):
+                try:
+                    refcount = self._context_refcounts.get(sig, 0)
+                    has_pages = hasattr(ctx, 'pages') and len(ctx.pages) > 0
+
+                    # Context is safe to close only if refcount is 0
+                    if refcount > 0:
+                        # Context is actively being used by a request - never close
+                        active_contexts.append((sig, ctx))
+                    elif has_pages and not force:
+                        # Has pages but no refs - might be finishing up, skip unless forced
+                        active_contexts.append((sig, ctx))
+                    else:
+                        # refcount == 0 and (no pages or force=True) - safe to close
+                        idle_contexts.append((sig, ctx))
+                except Exception:
+                    # Context may be in bad state, only cleanup if no refs
+                    if self._context_refcounts.get(sig, 0) == 0:
+                        idle_contexts.append((sig, ctx))
+                    else:
+                        active_contexts.append((sig, ctx))
+
+            # Log context status for debugging
+            self.logger.debug(
+                message="Context cleanup check: {total} total, {idle} idle (refcount=0), {active} active",
+                tag="CLEANUP",
+                params={
+                    "total": len(self.contexts_by_config),
+                    "idle": len(idle_contexts),
+                    "active": len(active_contexts)
+                }
+            )
+
+            # Close idle contexts if we exceed max_contexts total
+            contexts_to_close = []
+            if len(self.contexts_by_config) > max_contexts:
+                # Calculate how many we need to close
+                excess = len(self.contexts_by_config) - max_contexts
+                # Only close from idle contexts (safe)
+                contexts_to_close = idle_contexts[:excess]
+
+            # If force=True and we still have too many, close active ones too
+            if force and len(self.contexts_by_config) - len(contexts_to_close) > max_contexts:
+                remaining_excess = len(self.contexts_by_config) - len(contexts_to_close) - max_contexts
+                contexts_to_close.extend(active_contexts[:remaining_excess])
+
+            # Perform cleanup
+            for sig, ctx in contexts_to_close:
+                try:
+                    # If forcing and context has pages, close them first
+                    if force and hasattr(ctx, 'pages'):
+                        for page in list(ctx.pages):
+                            try:
+                                await page.close()
+                            except Exception:
+                                pass
+
+                    # Remove from our tracking dicts
+                    self.contexts_by_config.pop(sig, None)
+                    self._context_refcounts.pop(sig, None)
+
+                    # Close the context
+                    await ctx.close()
+
+                    self.logger.info(
+                        message="Cleaned up context: {sig}",
+                        tag="CLEANUP",
+                        params={"sig": sig[:8]}
+                    )
+                except Exception as e:
+                    # Still remove from tracking even if close fails
+                    self.contexts_by_config.pop(sig, None)
+                    self._context_refcounts.pop(sig, None)
+                    self.logger.warning(
+                        message="Error closing context during cleanup: {error}",
+                        tag="WARNING",
+                        params={"error": str(e)}
+                    )
+
+            return len(contexts_to_close)  # Return count of cleaned contexts
+
+    async def release_context(self, config_signature: str):
+        """
+        Decrement the reference count for a context after a crawl completes.
+        Call this when a crawl operation finishes (success or failure).
+
+        Args:
+            config_signature: The config signature of the context to release
+        """
+        async with self._contexts_lock:
+            if config_signature in self._context_refcounts:
+                self._context_refcounts[config_signature] = max(0, self._context_refcounts[config_signature] - 1)
+                self.logger.debug(
+                    message="Released context ref: {sig}, remaining refs: {refs}",
+                    tag="CLEANUP",
+                    params={"sig": config_signature[:8], "refs": self._context_refcounts[config_signature]}
+                )
+
     async def close(self):
         """Close all browser resources and clean up."""
         if self.config.cdp_url:
             return
-        
+
         if self.config.sleep_on_close:
             await asyncio.sleep(0.5)
 
