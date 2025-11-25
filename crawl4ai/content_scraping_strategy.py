@@ -11,6 +11,8 @@ from lxml import etree
 from lxml import html as lhtml
 from requests.exceptions import InvalidSchema
 
+from crawl4ai.cache_client import CacheClient, NoCacheClient
+
 from .config import (
     IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
     IMAGE_SCORE_THRESHOLD,
@@ -104,7 +106,8 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
     backward compatibility.
     """
 
-    def __init__(self, logger=None):
+    def __init__(self, cache_client: CacheClient = NoCacheClient(), logger=None):
+        self.cache_client = cache_client
         self.logger = logger
         self.DIMENSION_REGEX = re.compile(r"(\d+)(\D*)")
         self.BASE64_PATTERN = re.compile(r'data:image/[^;]+;base64,([^"]+)')
@@ -838,7 +841,7 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
 
                     # Extract head content (run async operation in sync context)
                     async def extract_links():
-                        async with LinkPreview(self.logger) as extractor:
+                        async with LinkPreview(self.cache_client, self.logger) as extractor:
                             return await extractor.extract_link_heads(links_obj, config)
 
                     # Run the async operation

@@ -2,35 +2,42 @@ from __future__ import annotations
 
 import asyncio
 import base64
-import time
-from abc import ABC, abstractmethod
-from typing import Callable, Dict, Any, List, Union
-from typing import Optional, AsyncGenerator, Final
-import os
-from playwright.async_api import Page, Error
-from playwright.async_api import TimeoutError as PlaywrightTimeoutError
-from io import BytesIO
-from PIL import Image, ImageDraw, ImageFont
+import contextlib
 import hashlib
+import os
+import time
 import uuid
-from .js_snippet import load_js_script
-from .models import AsyncCrawlResponse
-from .config import SCREENSHOT_HEIGHT_TRESHOLD
-from .async_configs import BrowserConfig, CrawlerRunConfig, HTTPCrawlerConfig
-from .async_logger import AsyncLogger
-from .ssl_certificate import SSLCertificate
-from .user_agent_generator import ValidUAGenerator
-from .browser_manager import BrowserManager
-from .browser_adapter import BrowserAdapter, PlaywrightAdapter, UndetectedAdapter
+from abc import ABC, abstractmethod
+from collections.abc import AsyncGenerator, Callable
+from functools import partial
+from io import BytesIO
+from types import MappingProxyType
+from typing import Any, Final
+from urllib.parse import urlparse
 
 import aiofiles
 import aiohttp
 import chardet
 from aiohttp.client import ClientTimeout
-from urllib.parse import urlparse
-from types import MappingProxyType
-import contextlib
-from functools import partial
+from PIL import Image, ImageDraw, ImageFont
+from playwright.async_api import Error, Page
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+
+from .async_configs import (
+    BrowserConfig,
+    CrawlerRunConfig,
+    HTTPCrawlerConfig,
+    VirtualScrollConfig,
+)
+from .async_logger import AsyncLogger
+from .browser_adapter import BrowserAdapter, PlaywrightAdapter, UndetectedAdapter
+from .browser_manager import BrowserManager
+from .config import SCREENSHOT_HEIGHT_TRESHOLD
+from .js_snippet import load_js_script
+from .models import AsyncCrawlResponse
+from .ssl_certificate import SSLCertificate
+from .user_agent_generator import ValidUAGenerator
+
 
 class AsyncCrawlerStrategy(ABC):
     """
@@ -200,8 +207,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         if hook:
             if asyncio.iscoroutinefunction(hook):
                 return await hook(*args, **kwargs)
-            else:
-                return hook(*args, **kwargs)
+            return hook(*args, **kwargs)
         return args[0] if args else None
 
     def update_user_agent(self, user_agent: str):
@@ -216,7 +222,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         """
         self.user_agent = user_agent
 
-    def set_custom_headers(self, headers: Dict[str, str]):
+    def set_custom_headers(self, headers: dict[str, str]):
         """
         Set custom headers for the browser.
 
@@ -252,7 +258,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             # Explicitly specified JavaScript
             js_code = wait_for[3:].strip()
             return await self.csp_compliant_wait(page, js_code, timeout)
-        elif wait_for.startswith("css:"):
+        if wait_for.startswith("css:"):
             # Explicitly specified CSS selector
             css_selector = wait_for[4:].strip()
             try:
@@ -262,35 +268,32 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     raise TimeoutError(
                         f"Timeout after {timeout}ms waiting for selector '{css_selector}'"
                     )
-                else:
-                    raise ValueError(f"Invalid CSS selector: '{css_selector}'")
+                raise ValueError(f"Invalid CSS selector: '{css_selector}'")
         else:
             # Auto-detect based on content
             if wait_for.startswith("()") or wait_for.startswith("function"):
                 # It's likely a JavaScript function
                 return await self.csp_compliant_wait(page, wait_for, timeout)
-            else:
-                # Assume it's a CSS selector first
+            # Assume it's a CSS selector first
+            try:
+                await page.wait_for_selector(wait_for, timeout=timeout)
+            except Error as e:
+                if "Timeout" in str(e):
+                    raise TimeoutError(
+                        f"Timeout after {timeout}ms waiting for selector '{wait_for}'"
+                    )
+                # If it's not a timeout error, it might be an invalid selector
+                # Let's try to evaluate it as a JavaScript function as a fallback
                 try:
-                    await page.wait_for_selector(wait_for, timeout=timeout)
-                except Error as e:
-                    if "Timeout" in str(e):
-                        raise TimeoutError(
-                            f"Timeout after {timeout}ms waiting for selector '{wait_for}'"
-                        )
-                    else:
-                        # If it's not a timeout error, it might be an invalid selector
-                        # Let's try to evaluate it as a JavaScript function as a fallback
-                        try:
-                            return await self.csp_compliant_wait(
-                                page, f"() => {{{wait_for}}}", timeout
-                            )
-                        except Error:
-                            raise ValueError(
-                                f"Invalid wait_for parameter: '{wait_for}'. "
-                                "It should be either a valid CSS selector, a JavaScript function, "
-                                "or explicitly prefixed with 'js:' or 'css:'."
-                            )
+                    return await self.csp_compliant_wait(
+                        page, f"() => {{{wait_for}}}", timeout
+                    )
+                except Error:
+                    raise ValueError(
+                        f"Invalid wait_for parameter: '{wait_for}'. "
+                        "It should be either a valid CSS selector, a JavaScript function, "
+                        "or explicitly prefixed with 'js:' or 'css:'."
+                    )
 
     async def csp_compliant_wait(
         self, page: Page, user_wait_function: str, timeout: float = 30000
@@ -452,7 +455,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         if url.startswith(("http://", "https://", "view-source:")):
             return await self._crawl_web(url, config)
 
-        elif url.startswith("file://"):
+        if url.startswith("file://"):
             # initialize empty lists for console messages
             captured_console = []
             
@@ -460,7 +463,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             local_file_path = url[7:]  # Remove 'file://' prefix
             if not os.path.exists(local_file_path):
                 raise FileNotFoundError(f"Local file not found: {local_file_path}")
-            with open(local_file_path, "r", encoding="utf-8") as f:
+            with open(local_file_path, encoding="utf-8") as f:
                 html = f.read()
             if config.screenshot:
                 screenshot_data = await self._generate_screenshot_from_html(html)
@@ -482,7 +485,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         # Fix: Check for "raw://" first, then "raw:"
         # Also, the prefix "raw://" is actually 6 characters long, not 7, so it should be sliced accordingly: url[6:]
         #####
-        elif url.startswith("raw://") or url.startswith("raw:"):
+        if url.startswith("raw://") or url.startswith("raw:"):
             # Process raw HTML content
             # raw_html = url[4:] if url[:4] == "raw:" else url[7:]
             raw_html = url[6:] if url.startswith("raw://") else url[4:]
@@ -496,10 +499,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 screenshot=screenshot_data,
                 get_delayed_content=None,
             )
-        else:
-            raise ValueError(
-                "URL must start with 'http://', 'https://', 'file://', or 'raw:'"
-            )
+        raise ValueError(
+            "URL must start with 'http://', 'https://', 'file://', or 'raw:'"
+        )
 
     async def _crawl_web(
         self, url: str, config: CrawlerRunConfig
@@ -592,7 +594,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         # body = await response.body()
                         # json_body = await response.json()
                         text_body = await response.text()
-                    except Exception as e:
+                    except Exception:
                         body = None
                         # json_body = None
                         # text_body = None
@@ -720,12 +722,6 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 
                     status_code = first_resp.status
                     response_headers = first_resp.headers
-                # if response is None:
-                #     status_code = 200
-                #     response_headers = {}
-                # else:
-                #     status_code = response.status
-                #     response_headers = response.headers
 
             else:
                 status_code = 200
@@ -767,48 +763,6 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 if not config.ignore_body_visibility:
                     raise Error(f"Body element is hidden: {visibility_info}")
 
-            # try:
-            #     await page.wait_for_selector("body", state="attached", timeout=30000)
-
-            #     await page.wait_for_function(
-            #         """
-            #         () => {
-            #             const body = document.body;
-            #             const style = window.getComputedStyle(body);
-            #             return style.display !== 'none' &&
-            #                 style.visibility !== 'hidden' &&
-            #                 style.opacity !== '0';
-            #         }
-            #     """,
-            #         timeout=30000,
-            #     )
-            # except Error as e:
-            #     visibility_info = await page.evaluate(
-            #         """
-            #         () => {
-            #             const body = document.body;
-            #             const style = window.getComputedStyle(body);
-            #             return {
-            #                 display: style.display,
-            #                 visibility: style.visibility,
-            #                 opacity: style.opacity,
-            #                 hasContent: body.innerHTML.length,
-            #                 classList: Array.from(body.classList)
-            #             }
-            #         }
-            #     """
-            #     )
-
-            #     if self.config.verbose:
-            #         self.logger.debug(
-            #             message="Body visibility info: {info}",
-            #             tag="DEBUG",
-            #             params={"info": visibility_info},
-            #         )
-
-            #     if not config.ignore_body_visibility:
-            #         raise Error(f"Body element is hidden: {visibility_info}")
-
             # Handle content loading and viewport adjustment
             if not self.browser_config.text_mode and (
                 config.wait_for_images or config.adjust_viewport_to_content
@@ -835,12 +789,6 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     dimensions = await self.get_page_dimensions(page)
                     page_height = dimensions["height"]
                     page_width = dimensions["width"]
-                    # page_width = await page.evaluate(
-                    #     "document.documentElement.scrollWidth"
-                    # )
-                    # page_height = await page.evaluate(
-                    #     "document.documentElement.scrollHeight"
-                    # )
 
                     target_width = self.browser_config.viewport_width
                     target_height = int(target_width * page_width / page_height * 0.95)
@@ -876,16 +824,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             if config.virtual_scroll_config:
                 await self._handle_virtual_scroll(page, config.virtual_scroll_config)
 
-            # Execute JavaScript if provided
-            # if config.js_code:
-            #     if isinstance(config.js_code, str):
-            #         await page.evaluate(config.js_code)
-            #     elif isinstance(config.js_code, list):
-            #         for js in config.js_code:
-            #             await page.evaluate(js)
-
             if config.js_code:
-                # execution_result = await self.execute_user_script(page, config.js_code)
                 execution_result = await self.robust_execute_user_script(
                     page, config.js_code
                 )
@@ -970,14 +909,12 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                             print(f"Warning: Could not get content for selector '{selector}': {str(e)}")
                     
                     # Wrap in a div to create a valid HTML structure
-                    html = f"<div class='crawl4ai-result'>\n" + "\n".join(html_parts) + "\n</div>"                    
+                    html = "<div class='crawl4ai-result'>\n" + "\n".join(html_parts) + "\n</div>"                    
                 except Error as e:
                     raise RuntimeError(f"Failed to extract HTML content: {str(e)}")
             else:
                 html = await page.content()
             
-            # # Get final HTML content
-            # html = await page.content()
             await self.execute_hook(
                 "before_return_html", page=page, html=html, context=context, config=config
             )
@@ -1073,7 +1010,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 await page.close()
 
     # async def _handle_full_page_scan(self, page: Page, scroll_delay: float = 0.1):
-    async def _handle_full_page_scan(self, page: Page, scroll_delay: float = 0.1, max_scroll_steps: Optional[int] = None):
+    async def _handle_full_page_scan(self, page: Page, scroll_delay: float = 0.1, max_scroll_steps: int | None = None):
         """
         Helper method to handle full page scanning.
 
@@ -1151,7 +1088,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             # await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
             await self.safe_scroll(page, 0, total_height)
 
-    async def _handle_virtual_scroll(self, page: Page, config: "VirtualScrollConfig"):
+    async def _handle_virtual_scroll(self, page: Page, config: VirtualScrollConfig):
         """
         Handle virtual scroll containers (e.g., Twitter-like feeds) by capturing
         content at different scroll positions and merging unique elements.
@@ -1418,7 +1355,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         pdf_data = await page.pdf(print_background=True)
         return pdf_data
         
-    async def capture_mhtml(self, page: Page) -> Optional[str]:
+    async def capture_mhtml(self, page: Page) -> str | None:
         """
         Captures the current page as MHTML using CDP.
         
@@ -1484,7 +1421,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
     async def _capture_console_messages(
         self, page: Page, file_path: str
-    ) -> List[Dict[str, Union[str, float]]]:
+    ) -> list[dict[str, str | float]]:
         """
         Captures console messages from the page.
         Args:
@@ -1534,9 +1471,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         if not need_scroll:
             # Page is short enough, just take a screenshot
             return await self.take_screenshot_naive(page)
-        else:
-            # Page is too long, try to take a full-page screenshot
-            return await self.take_screenshot_scroller(page, **kwargs)
+        # Page is too long, try to take a full-page screenshot
+        return await self.take_screenshot_scroller(page, **kwargs)
             # return await self.take_screenshot_from_pdf(await self.export_pdf(page))
 
     async def take_screenshot_from_pdf(self, pdf_data: bytes) -> str:
@@ -1725,15 +1661,14 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 params={"path": path},
             )
             return state
-        else:
-            self.logger.warning(
-                message="No default_context available to export storage state.",
-                tag="WARNING",
-            )
+        self.logger.warning(
+            message="No default_context available to export storage state.",
+            tag="WARNING",
+        )
 
     async def robust_execute_user_script(
-        self, page: Page, js_code: Union[str, List[str]]
-    ) -> Dict[str, Any]:
+        self, page: Page, js_code: str | list[str]
+    ) -> dict[str, Any]:
         """
         Executes user-provided JavaScript code with proper error handling and context,
         supporting both synchronous and async user code, plus navigations.
@@ -1882,8 +1817,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             return {"success": False, "error": str(e)}
 
     async def execute_user_script(
-        self, page: Page, js_code: Union[str, List[str]]
-    ) -> Dict[str, Any]:
+        self, page: Page, js_code: str | list[str]
+    ) -> dict[str, Any]:
         """
         Executes user-provided JavaScript code with proper error handling and context.
 
@@ -2020,7 +1955,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             await page.wait_for_timeout(delay * 1000)
         return result
 
-    async def csp_scroll_to(self, page: Page, x: int, y: int) -> Dict[str, Any]:
+    async def csp_scroll_to(self, page: Page, x: int, y: int) -> dict[str, Any]:
         """
         Performs a CSP-compliant scroll operation and returns the result status.
 
@@ -2174,8 +2109,8 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
     
     def __init__(
         self, 
-        browser_config: Optional[HTTPCrawlerConfig] = None,
-        logger: Optional[AsyncLogger] = None,
+        browser_config: HTTPCrawlerConfig | None = None,
+        logger: AsyncLogger | None = None,
         max_connections: int = DEFAULT_MAX_CONNECTIONS,
         dns_cache_ttl: int = DEFAULT_DNS_CACHE_TTL,
         chunk_size: int = DEFAULT_CHUNK_SIZE
@@ -2186,7 +2121,7 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
         self.max_connections = max_connections
         self.dns_cache_ttl = dns_cache_ttl
         self.chunk_size = chunk_size
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._session: aiohttp.ClientSession | None = None
         
         self.hooks = {
             k: partial(self._execute_hook, k) 
@@ -2250,7 +2185,7 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
         if self._session and not self._session.closed:
             try:
                 await asyncio.wait_for(self._session.close(), timeout=5.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 if self.logger:
                     self.logger.warning(
                         message="Session cleanup timed out",
@@ -2259,7 +2194,7 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
             finally:
                 self._session = None
 
-    async def _stream_file(self, path: str) -> AsyncGenerator[memoryview, None]:
+    async def _stream_file(self, path: str) -> AsyncGenerator[memoryview]:
         async with aiofiles.open(path, mode='rb') as f:
             while chunk := await f.read(self.chunk_size):
                 yield memoryview(chunk)
@@ -2364,7 +2299,7 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
     async def crawl(
         self, 
         url: str, 
-        config: Optional[CrawlerRunConfig] = None, 
+        config: CrawlerRunConfig | None = None, 
         **kwargs
     ) -> AsyncCrawlResponse:
         config = config or CrawlerRunConfig.from_kwargs(kwargs)
@@ -2378,10 +2313,10 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
         try:
             if scheme == 'file':
                 return await self._handle_file(parsed.path)
-            elif scheme == 'raw':
+            if scheme == 'raw':
                 return await self._handle_raw(parsed.path)
-            else:  # http or https
-                return await self._handle_http(url, config)
+            # http or https
+            return await self._handle_http(url, config)
                 
         except Exception as e:
             if self.logger:

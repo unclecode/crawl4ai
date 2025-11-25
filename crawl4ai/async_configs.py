@@ -4,7 +4,7 @@ from collections.abc import Callable
 from enum import Enum
 from typing import Any, Union
 
-from crawl4ai.cache_client import DEFAULT_CACHE_TTL_SECONDS
+from crawl4ai.cache_client import DEFAULT_CACHE_TTL_SECONDS, CacheClient, NoCacheClient
 
 from .cache_context import CacheMode
 from .chunking_strategy import ChunkingStrategy, RegexChunking
@@ -1061,6 +1061,7 @@ class CrawlerRunConfig:
         fetch_ssl_certificate: bool = False,
         # Caching Parameters
         cache_mode: CacheMode = CacheMode.BYPASS,
+        cache_client: CacheClient = NoCacheClient(),
         cache_ttl_seconds: int = DEFAULT_CACHE_TTL_SECONDS,
         session_id: str = None,
         shared_data: dict = None,
@@ -1151,7 +1152,7 @@ class CrawlerRunConfig:
         self.remove_forms = remove_forms
         self.prettiify = prettiify
         self.parser_type = parser_type
-        self.scraping_strategy = scraping_strategy or LXMLWebScrapingStrategy()
+        self.scraping_strategy = scraping_strategy or LXMLWebScrapingStrategy(cache_client=cache_client)
         self.proxy_config = proxy_config
         if isinstance(proxy_config, dict):
             self.proxy_config = ProxyConfig.from_dict(proxy_config)
@@ -1170,6 +1171,7 @@ class CrawlerRunConfig:
 
         # Caching Parameters
         self.cache_mode = cache_mode
+        self.cache_client = cache_client
         self.cache_ttl_seconds = cache_ttl_seconds
         self.session_id = session_id
         self.shared_data = shared_data
@@ -1430,6 +1432,7 @@ class CrawlerRunConfig:
             fetch_ssl_certificate=kwargs.get("fetch_ssl_certificate", False),
             # Caching Parameters
             cache_mode=kwargs.get("cache_mode", CacheMode.BYPASS),
+            cache_client=kwargs.get("cache_client", None),
             cache_ttl_seconds=kwargs.get("cache_ttl_seconds", DEFAULT_CACHE_TTL_SECONDS),
             session_id=kwargs.get("session_id"),
             shared_data=kwargs.get("shared_data", None),
@@ -1546,6 +1549,7 @@ class CrawlerRunConfig:
             "geolocation": self.geolocation,
             "fetch_ssl_certificate": self.fetch_ssl_certificate,
             "cache_mode": self.cache_mode,
+            "cache_client": self.cache_client,
             "cache_ttl_seconds": self.cache_ttl_seconds,
             "session_id": self.session_id,
             "shared_data": self.shared_data,
