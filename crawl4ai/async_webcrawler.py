@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-from crawl4ai.cache_client import HTML_CACHE_KEY_PREFIX, CacheClient
+from crawl4ai.cache_client import HTML_CACHE_KEY_PREFIX, CacheClient, NoCacheClient
 
 from .__version__ import __version__ as crawl4ai_version
 from .async_configs import BrowserConfig, CrawlerRunConfig, ProxyConfig, SeedingConfig
@@ -106,7 +106,7 @@ class AsyncWebCrawler:
 
     def __init__(
         self,
-        cache_client: CacheClient,
+        cache_client: CacheClient = NoCacheClient(),
         crawler_strategy: AsyncCrawlerStrategy = None,
         config: BrowserConfig = None,
         base_directory: str = str(
@@ -322,7 +322,7 @@ class AsyncWebCrawler:
                 t2 = time.perf_counter()
                 self.logger.url_status(
                     url=cache_context.display_url,
-                    success=bool(html),
+                    success=async_response.status_code == 200 and bool(html),
                     timing=t2 - t1,
                     tag="FETCH",
                 )
@@ -739,9 +739,10 @@ class AsyncWebCrawler:
             # Pass the crawler's base_directory for seeder's cache management
             # Pass the crawler's logger for consistent logging
             self.url_seeder = AsyncUrlSeeder(
+                cache_client=self.cache_client,
                 base_directory=self.crawl4ai_folder,
                 logger=self.logger
-            )                    
+            )
 
         # Merge config object with direct kwargs, giving kwargs precedence
         seeding_config = config.clone(**kwargs) if config else SeedingConfig.from_kwargs(kwargs)

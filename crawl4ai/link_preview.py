@@ -5,13 +5,15 @@ Extracts head content from links discovered during crawling using URLSeeder's
 efficient parallel processing and caching infrastructure.
 """
 
-import asyncio
 import fnmatch
-from typing import Dict, List, Optional, Any
+from typing import Any
+
+from crawl4ai.cache_client import CacheClient, NoCacheClient
+
+from .async_configs import CrawlerRunConfig, SeedingConfig
 from .async_logger import AsyncLogger
 from .async_url_seeder import AsyncUrlSeeder
-from .async_configs import SeedingConfig, CrawlerRunConfig
-from .models import Links, Link
+from .models import Link, Links
 from .utils import calculate_total_score
 
 
@@ -27,15 +29,16 @@ class LinkPreview:
     - Memory-safe processing for large link sets
     """
     
-    def __init__(self, logger: Optional[AsyncLogger] = None):
+    def __init__(self, cache_client: CacheClient = NoCacheClient(), logger: AsyncLogger | None = None):
         """
         Initialize the LinkPreview.
         
         Args:
             logger: Optional logger instance for recording events
         """
+        self.cache_client = cache_client
         self.logger = logger
-        self.seeder: Optional[AsyncUrlSeeder] = None
+        self.seeder: AsyncUrlSeeder | None = None
         self._owns_seeder = False
     
     async def __aenter__(self):
@@ -50,7 +53,7 @@ class LinkPreview:
     async def start(self):
         """Initialize the URLSeeder instance."""
         if not self.seeder:
-            self.seeder = AsyncUrlSeeder(logger=self.logger)
+            self.seeder = AsyncUrlSeeder(cache_client=self.cache_client, logger=self.logger)
             await self.seeder.__aenter__()
             self._owns_seeder = True
     
@@ -109,7 +112,7 @@ class LinkPreview:
         
         return updated_links
     
-    def _filter_links(self, links: Links, link_config: Dict[str, Any]) -> List[str]:
+    def _filter_links(self, links: Links, link_config: dict[str, Any]) -> list[str]:
         """
         Filter links based on configuration parameters.
         
@@ -176,9 +179,9 @@ class LinkPreview:
     
     async def _extract_heads_parallel(
         self, 
-        urls: List[str], 
-        link_config: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
+        urls: list[str], 
+        link_config: dict[str, Any]
+    ) -> list[dict[str, Any]]:
         """
         Extract head content for URLs using URLSeeder's parallel processing.
         
@@ -223,10 +226,10 @@ class LinkPreview:
     
     async def _extract_with_progress(
         self, 
-        urls: List[str], 
+        urls: list[str], 
         seeding_config: SeedingConfig, 
-        link_config: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
+        link_config: dict[str, Any]
+    ) -> list[dict[str, Any]]:
         """Extract head content with progress reporting."""
         
         total_urls = len(urls)
@@ -276,7 +279,7 @@ class LinkPreview:
     def _merge_head_data(
         self, 
         original_links: Links, 
-        head_results: List[Dict[str, Any]],
+        head_results: list[dict[str, Any]],
         config: CrawlerRunConfig
     ) -> Links:
         """

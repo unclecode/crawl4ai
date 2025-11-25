@@ -261,7 +261,7 @@ class VersionManager:
 
 
 class RobotsParser:
-    def __init__(self, cache_client=CacheClient, cache_ttl=None):
+    def __init__(self, cache_client: CacheClient, cache_ttl=None):
         self.cache_client = cache_client
         self.cache_ttl = cache_ttl or DEFAULT_CACHE_TTL_SECONDS
 

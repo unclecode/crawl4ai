@@ -1,14 +1,16 @@
-import asyncio
 import pytest
-from typing import List
+
+import asyncio
+
 from crawl4ai import (
     AsyncWebCrawler,
-    BrowserConfig, 
+    BrowserConfig,
+    CacheMode,
     CrawlerRunConfig,
     MemoryAdaptiveDispatcher,
     RateLimiter,
-    CacheMode
 )
+
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("viewport", [
