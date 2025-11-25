@@ -1,25 +1,14 @@
 import pytest
 
-import os
-import shutil
-import sys
-import tempfile
 from unittest.mock import Mock, patch
 
 import pytest_asyncio
 
 from crawl4ai.async_configs import CrawlerRunConfig
 from crawl4ai.async_webcrawler import AsyncWebCrawler
-from crawl4ai.cache_client import CacheClient
 from crawl4ai.cache_context import CacheMode
 from crawl4ai.models import AsyncCrawlResponse
-
-# Add the parent directory to the Python path
-parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(parent_dir)
-
-EXAMPLE_RAW_HTML = """<!DOCTYPE html><html lang="en"><head><title>Example Domain</title><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{background:#eee;width:60vw;margin:15vh auto;font-family:system-ui,sans-serif}h1{font-size:1.5em}div{opacity:0.8}a:link,a:visited{color:#348}</style></head><body><div><h1>Example Domain</h1><p>This domain is for use in documentation examples without needing permission. Avoid use in operations.</p><p><a href="https://iana.org/domains/example">Learn more</a></p></div>\n</body></html>"""
-EXAMPLE_URL = "https://example.com"
+from tests.helpers import EXAMPLE_RAW_HTML, EXAMPLE_URL, TestCacheClient
 
 
 @pytest_asyncio.fixture
@@ -50,44 +39,6 @@ async def mock_async_crawl_response(monkeypatch):
     async def mock_crawl(self, url, **kwargs):
         return mock_crawl_response
     monkeypatch.setattr("crawl4ai.async_crawler_strategy.AsyncPlaywrightCrawlerStrategy.crawl", mock_crawl)
-
-
-class TestCacheClient(CacheClient):
-    """
-    A simple local file-based cache client. Does not support cache expiration.
-    """
-    def __init__(self):
-        self.base_directory = tempfile.mkdtemp(prefix="crawl4ai_test_cache_")
-
-    def _get_file_path(self, key: str) -> str:
-        safe_key = key.replace(":", "_").replace("/", "_")
-        return os.path.join(self.base_directory, safe_key)
-
-    def get(self, key: str) -> str | None:
-        file_path = self._get_file_path(key)
-        if os.path.exists(self._get_file_path(key)):
-            with open(file_path, encoding="utf-8") as f:
-                return f.read()
-        return None
-
-    def set(self, key: str, value: str, ttl_seconds: int) -> None:
-        file_path = self._get_file_path(key)
-        with open(file_path, "w+", encoding="utf-8") as f:
-            f.write(value)
-
-    def clear(self, prefix: str) -> None:
-        for filename in os.listdir(self.base_directory):
-            if filename.startswith(prefix.replace(":", "_")):
-                file_path = os.path.join(self.base_directory, filename)
-                os.remove(file_path)
-    
-    # === UTILITY METHODS FOR TESTING ===
-    
-    def count(self) -> int:
-        return len(os.listdir(self.base_directory))
-
-    def cleanup(self):
-        shutil.rmtree(self.base_directory)
 
 
 @pytest.mark.asyncio
