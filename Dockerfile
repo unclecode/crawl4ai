@@ -167,6 +167,11 @@ RUN mkdir -p /home/appuser/.cache/ms-playwright \
 
 RUN crawl4ai-doctor
 
+# Ensure all cache directories belong to appuser
+# This fixes permission issues with .cache/url_seeder and other runtime cache dirs
+RUN mkdir -p /home/appuser/.cache \
+    && chown -R appuser:appuser /home/appuser/.cache
+
 # Copy application code
 COPY deploy/docker/* ${APP_HOME}/
 
