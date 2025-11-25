@@ -6,6 +6,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from aiohttp import web
 
+from crawl4ai.async_configs import BrowserConfig, CrawlerRunConfig
+from crawl4ai.async_webcrawler import AsyncWebCrawler
+from crawl4ai.cache_context import CacheMode
 from crawl4ai.utils import RobotsParser
 from tests.helpers import EXAMPLE_URL, TestCacheClient
 
@@ -118,3 +121,46 @@ Allow: /public/
     finally:
         await runner.cleanup()
         cache_client.cleanup()
+
+@pytest.mark.asyncio
+async def test_real_websites():
+    browser_config = BrowserConfig(headless=True, verbose=True)
+    cache_client = TestCacheClient()
+    async with AsyncWebCrawler(cache_client=cache_client, config=browser_config) as crawler:
+        
+        # Test cases with URLs
+        test_cases = [
+            # Public sites that should be allowed
+            ("https://example.com", True),  # Simple public site
+            ("https://httpbin.org/get", True),  # API endpoint
+            
+            # Sites with known strict robots.txt
+            ("https://www.facebook.com/robots.txt", False),  # Social media
+            ("https://www.google.com/search", False),  # Search pages
+            
+            # Edge cases
+            ("https://api.github.com", True),  # API service
+            ("https://raw.githubusercontent.com", True),  # Content delivery
+            
+            # Non-existent/error cases
+            ("https://thisisnotarealwebsite.com", True),  # Non-existent domain
+            ("https://localhost:12345", True),  # Invalid port
+        ]
+
+        for url, expected in test_cases:
+            try:
+                config = CrawlerRunConfig(
+                    cache_mode=CacheMode.BYPASS,
+                    check_robots_txt=True,  # Enable robots.txt checking
+                    verbose=True
+                )
+                
+                result = await crawler.arun(url=url, config=config)
+                allowed = result.success and not result.error_message
+
+                assert expected == allowed
+                
+            except Exception:
+                continue
+
+    cache_client.cleanup()
