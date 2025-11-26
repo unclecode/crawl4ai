@@ -598,7 +598,7 @@ class BrowserConfig:
             "chrome_channel": self.chrome_channel,
             "channel": self.channel,
             "proxy": self.proxy,
-            "proxy_config": self.proxy_config,
+            "proxy_config": self.proxy_config.to_dict() if self.proxy_config else None,
             "viewport_width": self.viewport_width,
             "viewport_height": self.viewport_height,
             "accept_downloads": self.accept_downloads,
