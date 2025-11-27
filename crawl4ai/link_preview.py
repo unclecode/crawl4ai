@@ -336,8 +336,40 @@ class LinkPreview:
                 
                 updated_internal.append(updated_link)
             else:
-                # Keep original link unchanged
-                updated_internal.append(link)
+                # # Keep original link unchanged
+                # updated_internal.append(link)
+                
+                # Head extraction failed - calculate fallback scores
+                # Use URL-based scoring if query provided
+                contextual_score = None
+                if config.link_preview_config and config.link_preview_config.query:
+                    # Calculate URL-based relevance score as fallback
+                    contextual_score = self.seeder._calculate_url_relevance_score(
+                        config.link_preview_config.query,
+                        link.href
+                    )
+
+                # Create updated link with fallback scoring
+                updated_link = Link(
+                    href=link.href,
+                    text=link.text,
+                    title=link.title,
+                    base_domain=link.base_domain,
+                    head_data=None,  # No head data available
+                    head_extraction_status="failed",
+                    intrinsic_score=getattr(link, 'intrinsic_score', None),
+                    contextual_score=contextual_score
+                )
+
+                # Calculate total score even without head data
+                updated_link.total_score = calculate_total_score(
+                    intrinsic_score=updated_link.intrinsic_score,
+                    contextual_score=updated_link.contextual_score,
+                    score_links_enabled=getattr(config, 'score_links', False),
+                    query_provided=bool(config.link_preview_config and config.link_preview_config.query)
+                )
+
+                updated_internal.append(updated_link)
         
         # Update external links
         updated_external = []
@@ -374,8 +406,40 @@ class LinkPreview:
                 
                 updated_external.append(updated_link)
             else:
-                # Keep original link unchanged
-                updated_external.append(link)
+                # # Keep original link unchanged
+                # updated_external.append(link)
+                
+                # Head extraction failed - calculate fallback scores
+                # Use URL-based scoring if query provided
+                contextual_score = None
+                if config.link_preview_config and config.link_preview_config.query:
+                    # Calculate URL-based relevance score as fallback
+                    contextual_score = self.seeder._calculate_url_relevance_score(
+                        config.link_preview_config.query,
+                        link.href
+                    )
+
+                # Create updated link with fallback scoring
+                updated_link = Link(
+                    href=link.href,
+                    text=link.text,
+                    title=link.title,
+                    base_domain=link.base_domain,
+                    head_data=None,  # No head data available
+                    head_extraction_status="failed",
+                    intrinsic_score=getattr(link, 'intrinsic_score', None),
+                    contextual_score=contextual_score
+                )
+
+                # Calculate total score even without head data
+                updated_link.total_score = calculate_total_score(
+                    intrinsic_score=updated_link.intrinsic_score,
+                    contextual_score=updated_link.contextual_score,
+                    score_links_enabled=getattr(config, 'score_links', False),
+                    query_provided=bool(config.link_preview_config and config.link_preview_config.query)
+                )
+
+                updated_external.append(updated_link)
         
         # Sort links by relevance score if available
         if any(hasattr(link, 'head_data') and link.head_data and 'relevance_score' in link.head_data 
