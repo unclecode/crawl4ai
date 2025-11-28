@@ -795,6 +795,9 @@ Return only a JSON array of extracted tables following the specified format."""
                     api_token=self.llm_config.api_token,
                     base_url=self.llm_config.base_url,
                     json_response=True,
+                    base_delay=self.llm_config.backoff_base_delay,
+                    max_attempts=self.llm_config.backoff_max_attempts,
+                    exponential_factor=self.llm_config.backoff_exponential_factor,
                     extra_args=self.extra_args
                 )
                 
@@ -1116,6 +1119,9 @@ Return only a JSON array of extracted tables following the specified format."""
                     api_token=self.llm_config.api_token,
                     base_url=self.llm_config.base_url,
                     json_response=True,
+                    base_delay=self.llm_config.backoff_base_delay,
+                    max_attempts=self.llm_config.backoff_max_attempts,
+                    exponential_factor=self.llm_config.backoff_exponential_factor,
                     extra_args=self.extra_args
                 )
                 

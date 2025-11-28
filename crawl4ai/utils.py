@@ -1745,6 +1745,9 @@ def perform_completion_with_backoff(
     api_token,
     json_response=False,
     base_url=None,
+    base_delay=2,
+    max_attempts=3,
+    exponential_factor=2,
     **kwargs,
 ):
     """
@@ -1761,6 +1764,9 @@ def perform_completion_with_backoff(
         api_token (str): The API token for authentication.
         json_response (bool): Whether to request a JSON response. Defaults to False.
         base_url (Optional[str]): The base URL for the API. Defaults to None.
+        base_delay (int): The base delay in seconds. Defaults to 2.
+        max_attempts (int): The maximum number of attempts. Defaults to 3.
+        exponential_factor (int): The exponential factor. Defaults to 2.
         **kwargs: Additional arguments for the API request.
 
     Returns:
@@ -1769,9 +1775,6 @@ def perform_completion_with_backoff(
 
     from litellm import completion
     from litellm.exceptions import RateLimitError
-
-    max_attempts = 3
-    base_delay = 2  # Base delay in seconds, you can adjust this based on your needs
 
     extra_args = {"temperature": 0.01, "api_key": api_token, "base_url": base_url}
     if json_response:
@@ -1798,7 +1801,7 @@ def perform_completion_with_backoff(
             # Check if we have exhausted our max attempts
             if attempt < max_attempts - 1:
                 # Calculate the delay and wait
-                delay = base_delay * (2**attempt)  # Exponential backoff formula
+                delay = base_delay * (exponential_factor**attempt)  # Exponential backoff formula
                 print(f"Waiting for {delay} seconds before retrying...")
                 time.sleep(delay)
             else:
@@ -1831,6 +1834,9 @@ async def aperform_completion_with_backoff(
     api_token,
     json_response=False,
     base_url=None,
+    base_delay=2,
+    max_attempts=3,
+    exponential_factor=2,
     **kwargs,
 ):
     """
@@ -1847,6 +1853,9 @@ async def aperform_completion_with_backoff(
         api_token (str): The API token for authentication.
         json_response (bool): Whether to request a JSON response. Defaults to False.
         base_url (Optional[str]): The base URL for the API. Defaults to None.
+        base_delay (int): The base delay in seconds. Defaults to 2.
+        max_attempts (int): The maximum number of attempts. Defaults to 3.
+        exponential_factor (int): The exponential factor. Defaults to 2.
         **kwargs: Additional arguments for the API request.
 
     Returns:
@@ -1856,9 +1865,6 @@ async def aperform_completion_with_backoff(
     from litellm import acompletion
     from litellm.exceptions import RateLimitError
     import asyncio
-
-    max_attempts = 3
-    base_delay = 2  # Base delay in seconds, you can adjust this based on your needs
 
     extra_args = {"temperature": 0.01, "api_key": api_token, "base_url": base_url}
     if json_response:
@@ -1885,7 +1891,7 @@ async def aperform_completion_with_backoff(
             # Check if we have exhausted our max attempts
             if attempt < max_attempts - 1:
                 # Calculate the delay and wait
-                delay = base_delay * (2**attempt)  # Exponential backoff formula
+                delay = base_delay * (exponential_factor**attempt)  # Exponential backoff formula
                 print(f"Waiting for {delay} seconds before retrying...")
                 await asyncio.sleep(delay)
             else:

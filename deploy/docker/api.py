@@ -108,7 +108,10 @@ async def handle_llm_qa(
             prompt_with_variables=prompt,
             api_token=get_llm_api_key(config),  # Returns None to let litellm handle it
             temperature=get_llm_temperature(config),
-            base_url=get_llm_base_url(config)
+            base_url=get_llm_base_url(config),
+            base_delay=config["llm"].get("backoff_base_delay", 2),
+            max_attempts=config["llm"].get("backoff_max_attempts", 3),
+            exponential_factor=config["llm"].get("backoff_exponential_factor", 2)
         )
 
         return response.choices[0].message.content

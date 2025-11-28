@@ -649,6 +649,9 @@ class LLMExtractionStrategy(ExtractionStrategy):
                 base_url=self.llm_config.base_url,
                 json_response=self.force_json_response,
                 extra_args=self.extra_args,
+                base_delay=self.llm_config.backoff_base_delay,
+                max_attempts=self.llm_config.backoff_max_attempts,
+                exponential_factor=self.llm_config.backoff_exponential_factor
             )  # , json_response=self.extract_type == "schema")
             # Track usage
             usage = TokenUsage(
@@ -846,6 +849,9 @@ class LLMExtractionStrategy(ExtractionStrategy):
                 base_url=self.llm_config.base_url,
                 json_response=self.force_json_response,
                 extra_args=self.extra_args,
+                base_delay=self.llm_config.backoff_base_delay,
+                max_attempts=self.llm_config.backoff_max_attempts,
+                exponential_factor=self.llm_config.backoff_exponential_factor
             )
             # Track usage
             usage = TokenUsage(

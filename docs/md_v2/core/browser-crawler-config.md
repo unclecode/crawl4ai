@@ -308,8 +308,20 @@ The `clone()` method:
 3.⠀**`base_url`**:  
    - If your provider has a custom endpoint
 
+4.⠀**Retry/backoff controls** *(optional)*:  
+   - `backoff_base_delay` *(default `2` seconds)* – base delay inserted before the first retry when the provider returns a rate-limit response.  
+   - `backoff_max_attempts` *(default `3`)* – total number of attempts (initial call plus retries) before the request is surfaced as an error.  
+   - `backoff_exponential_factor` *(default `2`)* – growth rate for the retry delay (`delay = base_delay * factor^attempt`).  
+   - These values are forwarded to the shared `perform_completion_with_backoff` helper, ensuring every strategy that consumes your `LLMConfig` honors the same throttling policy.
+
 ```python
-llm_config = LLMConfig(provider="openai/gpt-4o-mini", api_token=os.getenv("OPENAI_API_KEY"))
+llm_config = LLMConfig(
+    provider="openai/gpt-4o-mini",
+    api_token=os.getenv("OPENAI_API_KEY"),
+    backoff_base_delay=1, # optional
+    backoff_max_attempts=5, # optional
+    backoff_exponential_factor=3, #optional
+)
 ```
 
 ## 4. Putting It All Together

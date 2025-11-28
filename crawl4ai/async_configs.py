@@ -1792,7 +1792,10 @@ class LLMConfig:
         frequency_penalty: Optional[float] = None,
         presence_penalty: Optional[float] = None,
         stop: Optional[List[str]] = None,
-        n: Optional[int] = None,    
+        n: Optional[int] = None,
+        backoff_base_delay: Optional[int] = None,
+        backoff_max_attempts: Optional[int] = None,
+        backoff_exponential_factor: Optional[int] = None,
     ):
         """Configuaration class for LLM provider and API token."""
         self.provider = provider
@@ -1821,6 +1824,9 @@ class LLMConfig:
         self.presence_penalty = presence_penalty
         self.stop = stop
         self.n = n
+        self.backoff_base_delay = backoff_base_delay if backoff_base_delay is not None else 2
+        self.backoff_max_attempts = backoff_max_attempts if backoff_max_attempts is not None else 3
+        self.backoff_exponential_factor = backoff_exponential_factor if backoff_exponential_factor is not None else 2
 
     @staticmethod
     def from_kwargs(kwargs: dict) -> "LLMConfig":
@@ -1834,7 +1840,10 @@ class LLMConfig:
             frequency_penalty=kwargs.get("frequency_penalty"),
             presence_penalty=kwargs.get("presence_penalty"),
             stop=kwargs.get("stop"),
-            n=kwargs.get("n")
+            n=kwargs.get("n"),
+            backoff_base_delay=kwargs.get("backoff_base_delay"),
+            backoff_max_attempts=kwargs.get("backoff_max_attempts"),
+            backoff_exponential_factor=kwargs.get("backoff_exponential_factor")
         )
 
     def to_dict(self):
@@ -1848,7 +1857,10 @@ class LLMConfig:
             "frequency_penalty": self.frequency_penalty,
             "presence_penalty": self.presence_penalty,
             "stop": self.stop,
-            "n": self.n
+            "n": self.n,
+            "backoff_base_delay": self.backoff_base_delay,
+            "backoff_max_attempts": self.backoff_max_attempts,
+            "backoff_exponential_factor": self.backoff_exponential_factor
         }
 
     def clone(self, **kwargs):
