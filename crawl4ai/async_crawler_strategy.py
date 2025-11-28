@@ -682,6 +682,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         url, wait_until=config.wait_until, timeout=config.page_timeout
                     )
                     redirected_url = page.url
+                    redirected_status_code = response.status
                 except Error as e:
                     # Allow navigation to be aborted when downloading files
                     # This is expected behavior for downloads in some browser engines
@@ -1038,6 +1039,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     self._downloaded_files if self._downloaded_files else None
                 ),
                 redirected_url=redirected_url,
+                redirected_status_code=redirected_status_code,
                 # Include captured data if enabled
                 network_requests=captured_requests if config.capture_network_requests else None,
                 console_messages=captured_console if config.capture_console_messages else None,
