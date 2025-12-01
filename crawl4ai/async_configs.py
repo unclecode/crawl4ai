@@ -1815,7 +1815,6 @@ class LLMConfig:
                     with open(credential_path, "r") as file:
                         vertex_credentials = json.load(file)
                     # Convert to JSON string
-
                     self.vertex_credentials = json.dumps(vertex_credentials)
                     self.api_token = None
                 else:
