@@ -2,6 +2,7 @@
 Test the complete fix for both the filter serialization and JSON serialization issues.
 """
 import os
+import traceback
 from typing import Any
 
 import asyncio
@@ -24,7 +25,7 @@ except TypeError:
 BASE_URL = f"http://localhost:{BASE_PORT}/"  # Adjust port as needed
 
 
-async def test_with_docker_client(filter_chain: list[URLFilter]) -> bool:
+async def test_with_docker_client(filter_chain: list[URLFilter], max_pages: int = 20, timeout: int = 30) -> bool:
     """Test using the Docker client (same as 1419.py)."""
     from crawl4ai.docker_client import Crawl4aiDockerClient
     
@@ -41,7 +42,7 @@ async def test_with_docker_client(filter_chain: list[URLFilter]) -> bool:
             crawler_config = CrawlerRunConfig(
                 deep_crawl_strategy=BFSDeepCrawlStrategy(
                     max_depth=2,  # Keep it shallow for testing
-                    # max_pages=5,  # Limit pages for testing
+                    max_pages=max_pages,  # Limit pages for testing
                     filter_chain=FilterChain(filter_chain)
                 ),
                 cache_mode=CacheMode.BYPASS,
@@ -52,6 +53,7 @@ async def test_with_docker_client(filter_chain: list[URLFilter]) -> bool:
                 ["https://docs.crawl4ai.com"],  # Simple test page
                 browser_config=BrowserConfig(headless=True),
                 crawler_config=crawler_config,
+                hooks_timeout=timeout,
             )
             
             if results:
@@ -79,12 +81,11 @@ async def test_with_docker_client(filter_chain: list[URLFilter]) -> bool:
         
     except Exception as e:
         print(f"❌ Docker client test failed: {e}")
-        import traceback
         traceback.print_exc()
         return False
 
 
-async def test_with_rest_api(filters: list[dict[str, Any]]) -> bool:
+async def test_with_rest_api(filters: list[dict[str, Any]], max_pages: int = 20, timeout: int = 30) -> bool:
     """Test using REST API directly."""
     print("\n" + "=" * 60)
     print("Testing with REST API")
@@ -95,7 +96,7 @@ async def test_with_rest_api(filters: list[dict[str, Any]]) -> bool:
         "type": "BFSDeepCrawlStrategy",
         "params": {
             "max_depth": 2,
-            # "max_pages": 5,
+            "max_pages": max_pages,
             "filter_chain": {
                 "type": "FilterChain",
                 "params": {
@@ -123,7 +124,7 @@ async def test_with_rest_api(filters: list[dict[str, Any]]) -> bool:
             response = await client.post(
                 f"{BASE_URL}crawl",
                 json=crawl_payload,
-                timeout=30
+                timeout=timeout,
             )
             
             if response.status_code == 200:
@@ -147,7 +148,6 @@ async def test_with_rest_api(filters: list[dict[str, Any]]) -> bool:
         
     except Exception as e:
         print(f"❌ REST API test failed: {e}")
-        import traceback
         traceback.print_exc()
         return False
 
@@ -162,6 +162,8 @@ async def main():
     results = []
     
     # Test 1: Docker client
+    max_pages_ = [20, 5]
+    timeouts = [30, 60]
     filter_chain_test_cases = [
         [
             URLPatternFilter(
@@ -177,11 +179,13 @@ async def main():
             ),
         ],
     ]
-    for idx, filter_chain in enumerate(filter_chain_test_cases):
-        docker_passed = await test_with_docker_client(filter_chain=filter_chain)
+    for idx, (filter_chain, max_pages, timeout) in enumerate(zip(filter_chain_test_cases, max_pages_, timeouts)):
+        docker_passed = await test_with_docker_client(filter_chain=filter_chain, max_pages=max_pages, timeout=timeout)
         results.append((f"Docker Client w/ filter chain {idx}", docker_passed))
     
     # Test 2: REST API
+    max_pages_ = [20, 5, 5]
+    timeouts = [30, 60, 60]
     filters_test_cases = [
         [
             {
@@ -211,8 +215,8 @@ async def main():
             }
         ],
     ]
-    for idx, filters in enumerate(filters_test_cases):
-        rest_passed = await test_with_rest_api(filters=filters)
+    for idx, (filters, max_pages, timeout) in enumerate(zip(filters_test_cases, max_pages_, timeouts)):
+        rest_passed = await test_with_rest_api(filters=filters, max_pages=max_pages, timeout=timeout)
         results.append((f"REST API w/ filters {idx}", rest_passed))
     
     # Summary
