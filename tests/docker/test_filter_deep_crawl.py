@@ -1,16 +1,30 @@
 """
 Test the complete fix for both the filter serialization and JSON serialization issues.
 """
+import os
+from typing import Any
 
 import asyncio
 import httpx
 
 from crawl4ai import BrowserConfig, CacheMode, CrawlerRunConfig
-from crawl4ai.deep_crawling import BFSDeepCrawlStrategy, FilterChain, URLPatternFilter
+from crawl4ai.deep_crawling import (
+    BFSDeepCrawlStrategy,
+    ContentRelevanceFilter,
+    FilterChain,
+    URLFilter,
+    URLPatternFilter,
+)
 
-BASE_URL = "http://localhost:11234/"  # Adjust port as needed
+CRAWL4AI_DOCKER_PORT = os.environ.get("CRAWL4AI_DOCKER_PORT", "11234")
+try:
+    BASE_PORT = int(CRAWL4AI_DOCKER_PORT)
+except TypeError:
+    BASE_PORT = 11234
+BASE_URL = f"http://localhost:{BASE_PORT}/"  # Adjust port as needed
 
-async def test_with_docker_client():
+
+async def test_with_docker_client(filter_chain: list[URLFilter]) -> bool:
     """Test using the Docker client (same as 1419.py)."""
     from crawl4ai.docker_client import Crawl4aiDockerClient
     
@@ -23,15 +37,6 @@ async def test_with_docker_client():
             base_url=BASE_URL,
             verbose=True,
         ) as client:
-            
-            # Create filter chain - testing the serialization fix
-            filter_chain = [
-                URLPatternFilter(
-                    # patterns=["*about*", "*privacy*", "*terms*"],
-                    patterns=["*advanced*"],
-                    reverse=True
-                ),
-            ]
             
             crawler_config = CrawlerRunConfig(
                 deep_crawl_strategy=BFSDeepCrawlStrategy(
@@ -79,7 +84,7 @@ async def test_with_docker_client():
         return False
 
 
-async def test_with_rest_api():
+async def test_with_rest_api(filters: list[dict[str, Any]]) -> bool:
     """Test using REST API directly."""
     print("\n" + "=" * 60)
     print("Testing with REST API")
@@ -94,15 +99,7 @@ async def test_with_rest_api():
             "filter_chain": {
                 "type": "FilterChain",
                 "params": {
-                    "filters": [
-                        {
-                            "type": "URLPatternFilter",
-                            "params": {
-                                "patterns": ["*advanced*"],
-                                "reverse": True
-                            }
-                        }
-                    ]
+                    "filters": filters
                 }
             }
         }
@@ -165,12 +162,58 @@ async def main():
     results = []
     
     # Test 1: Docker client
-    docker_passed = await test_with_docker_client()
-    results.append(("Docker Client", docker_passed))
+    filter_chain_test_cases = [
+        [
+            URLPatternFilter(
+                # patterns=["*about*", "*privacy*", "*terms*"],
+                patterns=["*advanced*"],
+                reverse=True
+            ),
+        ],
+        [
+            ContentRelevanceFilter(
+                query="about faq",
+                threshold=0.2,
+            ),
+        ],
+    ]
+    for idx, filter_chain in enumerate(filter_chain_test_cases):
+        docker_passed = await test_with_docker_client(filter_chain=filter_chain)
+        results.append((f"Docker Client w/ filter chain {idx}", docker_passed))
     
     # Test 2: REST API
-    rest_passed = await test_with_rest_api()
-    results.append(("REST API", rest_passed))
+    filters_test_cases = [
+        [
+            {
+                "type": "URLPatternFilter",
+                "params": {
+                    "patterns": ["*advanced*"],
+                    "reverse": True
+                }
+            }
+        ],
+        [
+            {
+                "type": "ContentRelevanceFilter",
+                "params": {
+                    "query": "about faq",
+                    "threshold": 0.2,
+                }
+            }
+        ],
+        [
+            {
+                "type": "ContentRelevanceFilter",
+                "params": {
+                    "query": ["about", "faq"],
+                    "threshold": 0.2,
+                }
+            }
+        ],
+    ]
+    for idx, filters in enumerate(filters_test_cases):
+        rest_passed = await test_with_rest_api(filters=filters)
+        results.append((f"REST API w/ filters {idx}", rest_passed))
     
     # Summary
     print("\n" + "=" * 60)
@@ -186,10 +229,7 @@ async def main():
     
     print("=" * 60)
     if all_passed:
-        print("🎉 ALL TESTS PASSED! Both issues are fully resolved!")
-        print("\nThe fixes:")
-        print("1. Filter serialization: Fixed by not serializing private __slots__")
-        print("2. JSON serialization: Fixed by removing property descriptors from model_dump()")
+        print("🎉 ALL TESTS PASSED!")
     else:
         print("⚠️ Some tests failed. Please check the server logs for details.")
     
