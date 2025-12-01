@@ -22,6 +22,11 @@ PROVIDER_MODELS = {
     "anthropic/claude-3-opus-20240229": os.getenv("ANTHROPIC_API_KEY"),
     "anthropic/claude-3-sonnet-20240229": os.getenv("ANTHROPIC_API_KEY"),
     "anthropic/claude-3-5-sonnet-20240620": os.getenv("ANTHROPIC_API_KEY"),
+    "vertex_ai/gemini-2.0-flash-lite": os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
+    'vertex_ai/gemini-2.0-flash': os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
+    'vertex_ai/gemini-2.5-flash': os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
+    'vertex_ai/gemini-2.5-pro': os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
+    'vertex_ai/gemini-3-pro-preview': os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
     "gemini/gemini-pro": os.getenv("GEMINI_API_KEY"),
     'gemini/gemini-1.5-pro': os.getenv("GEMINI_API_KEY"),
     'gemini/gemini-2.0-flash': os.getenv("GEMINI_API_KEY"),
@@ -35,6 +40,7 @@ PROVIDER_MODELS_PREFIXES = {
     "openai": os.getenv("OPENAI_API_KEY"),
     "anthropic": os.getenv("ANTHROPIC_API_KEY"),
     "gemini": os.getenv("GEMINI_API_KEY"),
+    "vertex_ai": os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
     "deepseek": os.getenv("DEEPSEEK_API_KEY"),
 }
 
