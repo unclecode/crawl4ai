@@ -1593,8 +1593,20 @@ The `clone()` method:
     - Environment variable - use with prefix "env:" <br/> eg:`api_token = "env: GROQ_API_KEY"`            
 3. **`base_url`**:  
    - If your provider has a custom endpoint
+
+4. **Backoff controls** *(optional)*:  
+   - `backoff_base_delay` *(default `2` seconds)* – how long to pause before the first retry if the provider rate-limits you.  
+   - `backoff_max_attempts` *(default `3`)* – total tries for the same prompt (initial call + retries).  
+   - `backoff_exponential_factor` *(default `2`)* – how quickly the pause grows between retries. A factor of 2 yields waits like 2s → 4s → 8s.  
+   - Because these plug into Crawl4AI’s retry helper, every LLM strategy automatically follows the pacing you define here.
 ```python
-llm_config = LLMConfig(provider="openai/gpt-4o-mini", api_token=os.getenv("OPENAI_API_KEY"))
+llm_config = LLMConfig(
+    provider="openai/gpt-4o-mini",
+    api_token=os.getenv("OPENAI_API_KEY"),
+    backoff_base_delay=1, # optional
+    backoff_max_attempts=5, # optional
+    backoff_exponential_factor=3, # optional
+)
 ```
 ## 4. Putting It All Together
 In a typical scenario, you define **one** `BrowserConfig` for your crawler session, then create **one or more** `CrawlerRunConfig` & `LLMConfig` depending on each call's needs:

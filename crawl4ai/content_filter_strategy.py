@@ -980,6 +980,9 @@ class LLMContentFilter(RelevantContentFilter):
                         prompt,
                         api_token,
                         base_url=base_url,
+                        base_delay=self.llm_config.backoff_base_delay,
+                        max_attempts=self.llm_config.backoff_max_attempts,
+                        exponential_factor=self.llm_config.backoff_exponential_factor,
                         extra_args=extra_args,
                     )
 
