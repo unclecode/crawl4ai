@@ -1269,7 +1269,8 @@ class LLMConfig:
         frequency_penalty: Optional[float] = None,
         presence_penalty: Optional[float] = None,
         stop: Optional[List[str]] = None,
-        n: Optional[int] = None,    
+        n: Optional[int] = None,
+        **kwargs,
     ):
         """Configuaration class for LLM provider and API token."""
         self.provider = provider
@@ -1280,13 +1281,25 @@ class LLMConfig:
         else:
             # Check if given provider starts with any of key in PROVIDER_MODELS_PREFIXES
             # If not, check if it is in PROVIDER_MODELS
+
             prefixes = PROVIDER_MODELS_PREFIXES.keys()
             if any(provider.startswith(prefix) for prefix in prefixes):
-                selected_prefix = next(
-                    (prefix for prefix in prefixes if provider.startswith(prefix)),
-                    None,
-                )
-                self.api_token = PROVIDER_MODELS_PREFIXES.get(selected_prefix)                    
+
+                if provider.startswith("vertex_ai"):
+                    credential_path = PROVIDER_MODELS_PREFIXES["vertex_ai"]
+
+                    with open(credential_path, "r") as file:
+                        vertex_credentials = json.load(file)
+                    # Convert to JSON string
+                    self.vertex_credentials = json.dumps(vertex_credentials)
+
+                    self.api_token = None
+                else:
+                    selected_prefix = next(
+                        (prefix for prefix in prefixes if provider.startswith(prefix)),
+                        None,
+                    )
+                    self.api_token = PROVIDER_MODELS_PREFIXES.get(selected_prefix)
             else:
                 self.provider = DEFAULT_PROVIDER
                 self.api_token = os.getenv(DEFAULT_PROVIDER_API_KEY)
@@ -1311,11 +1324,11 @@ class LLMConfig:
             frequency_penalty=kwargs.get("frequency_penalty"),
             presence_penalty=kwargs.get("presence_penalty"),
             stop=kwargs.get("stop"),
-            n=kwargs.get("n")
+            n=kwargs.get("n"),
         )
 
     def to_dict(self):
-        return {
+        result = {
             "provider": self.provider,
             "api_token": self.api_token,
             "base_url": self.base_url,
@@ -1325,8 +1338,11 @@ class LLMConfig:
             "frequency_penalty": self.frequency_penalty,
             "presence_penalty": self.presence_penalty,
             "stop": self.stop,
-            "n": self.n
+            "n": self.n,
         }
+        if self.provider.startswith("vertex_ai"):
+            result["extra_args"] = {"vertex_credentials": self.vertex_credentials}
+        return result
 
     def clone(self, **kwargs):
         """Create a copy of this configuration with updated values.
@@ -4094,7 +4110,9 @@ class LLMExtractionStrategy(ExtractionStrategy):
         self.overlap_rate = overlap_rate
         self.word_token_rate = word_token_rate
         self.apply_chunking = apply_chunking
-        self.extra_args = kwargs.get("extra_args", {})
+        self.extra_args = kwargs.get("extra_args", {}) | self.llm_config.to_dict().get(
+            "extra_args", {}
+        )
         if not self.apply_chunking:
             self.chunk_token_threshold = 1e9
         self.verbose = verbose
