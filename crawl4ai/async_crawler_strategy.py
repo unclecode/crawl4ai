@@ -1023,6 +1023,12 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 final_messages = await self.adapter.retrieve_console_messages(page)
                 captured_console.extend(final_messages)
 
+            ###
+            # This ensures we capture the current page URL at the time we return the response, 
+            # which correctly reflects any JavaScript navigation that occurred.
+            ###
+            redirected_url = page.url  # Use current page URL to capture JS redirects
+            
             # Return complete response
             return AsyncCrawlResponse(
                 html=html,
