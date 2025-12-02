@@ -142,5 +142,15 @@ USER_SETTINGS = {
         "description": "Default user agent mode (default, random, or mobile)",
         "type": "string",
         "options": ["default", "random", "mobile"]
+    },
+    "AZURE_API_BASE": {
+        "default": "",
+        "description": "Azure OpenAI API base URL (e.g., 'https://your-resource.openai.azure.com')",
+        "type": "string"
+    },
+    "AZURE_API_VERSION": {
+        "default": "",
+        "description": "Azure OpenAI API version (e.g., '2024-08-01-preview')",
+        "type": "string"
     }
 }
