@@ -15,9 +15,9 @@ from .utils import (
     clean_pdf_text_to_html,
 )
 
-# Remove direct PyPDF2 imports from the top
-# import PyPDF2
-# from PyPDF2 import PdfReader
+# Remove direct pypdf imports from the top
+# import pypdf
+# from pypdf import PdfReader
 
 logger = logging.getLogger(__name__)
 
@@ -59,9 +59,9 @@ class NaivePDFProcessorStrategy(PDFProcessorStrategy):
                  save_images_locally: bool = False, image_save_dir: Optional[Path] = None, batch_size: int = 4):
         # Import check at initialization time
         try:
-            import PyPDF2
+            import pypdf
         except ImportError:
-            raise ImportError("PyPDF2 is required for PDF processing. Install with 'pip install crawl4ai[pdf]'")
+            raise ImportError("pypdf is required for PDF processing. Install with 'pip install crawl4ai[pdf]'")
             
         self.image_dpi = image_dpi
         self.image_quality = image_quality
@@ -75,9 +75,9 @@ class NaivePDFProcessorStrategy(PDFProcessorStrategy):
     def process(self, pdf_path: Path) -> PDFProcessResult:
         # Import inside method to allow dependency to be optional
         try:
-            from PyPDF2 import PdfReader
+            from pypdf import PdfReader
         except ImportError:
-            raise ImportError("PyPDF2 is required for PDF processing. Install with 'pip install crawl4ai[pdf]'")
+            raise ImportError("pypdf is required for PDF processing. Install with 'pip install crawl4ai[pdf]'")
             
         start_time = time()
         result = PDFProcessResult(
@@ -125,15 +125,15 @@ class NaivePDFProcessorStrategy(PDFProcessorStrategy):
         """Like process() but processes PDF pages in parallel batches"""
         # Import inside method to allow dependency to be optional
         try:
-            from PyPDF2 import PdfReader
-            import PyPDF2  # For type checking
+            from pypdf import PdfReader
+            import pypdf  # For type checking
         except ImportError:
-            raise ImportError("PyPDF2 is required for PDF processing. Install with 'pip install crawl4ai[pdf]'")
+            raise ImportError("pypdf is required for PDF processing. Install with 'pip install crawl4ai[pdf]'")
             
         import concurrent.futures
         import threading
         
-        # Initialize PyPDF2 thread support
+        # Initialize pypdf thread support
         if not hasattr(threading.current_thread(), "_children"): 
             threading.current_thread()._children = set()
         
@@ -232,11 +232,11 @@ class NaivePDFProcessorStrategy(PDFProcessorStrategy):
         return pdf_page
 
     def _extract_images(self, page, image_dir: Optional[Path]) -> List[Dict]:
-        # Import PyPDF2 for type checking only when needed
+        # Import pypdf for type checking only when needed
         try:
-            import PyPDF2
+            from pypdf.generic import IndirectObject
         except ImportError:
-            raise ImportError("PyPDF2 is required for PDF processing. Install with 'pip install crawl4ai[pdf]'")
+            raise ImportError("pypdf is required for PDF processing. Install with 'pip install crawl4ai[pdf]'")
             
         if not self.extract_images:
             return []
@@ -266,7 +266,7 @@ class NaivePDFProcessorStrategy(PDFProcessorStrategy):
                                     width = xobj.get('/Width', 0)
                                     height = xobj.get('/Height', 0)
                                     color_space = xobj.get('/ColorSpace', '/DeviceRGB')
-                                    if isinstance(color_space, PyPDF2.generic.IndirectObject):
+                                    if isinstance(color_space, IndirectObject):
                                         color_space = color_space.get_object()
 
                                     # Handle different image encodings
@@ -277,7 +277,7 @@ class NaivePDFProcessorStrategy(PDFProcessorStrategy):
                                     if '/FlateDecode' in filters:
                                         try:
                                             decode_parms = xobj.get('/DecodeParms', {})
-                                            if isinstance(decode_parms, PyPDF2.generic.IndirectObject):
+                                            if isinstance(decode_parms, IndirectObject):
                                                 decode_parms = decode_parms.get_object()
                                             
                                             predictor = decode_parms.get('/Predictor', 1)
@@ -416,10 +416,10 @@ class NaivePDFProcessorStrategy(PDFProcessorStrategy):
         # Import inside method to allow dependency to be optional 
         if reader is None:
             try:
-                from PyPDF2 import PdfReader
+                from pypdf import PdfReader
                 reader = PdfReader(pdf_path)
             except ImportError:
-                raise ImportError("PyPDF2 is required for PDF processing. Install with 'pip install crawl4ai[pdf]'")
+                raise ImportError("pypdf is required for PDF processing. Install with 'pip install crawl4ai[pdf]'")
 
         meta = reader.metadata or {}
         created = self._parse_pdf_date(meta.get('/CreationDate', ''))
@@ -459,11 +459,11 @@ if __name__ == "__main__":
     from pathlib import Path
     
     try:
-        # Import PyPDF2 only when running the file directly
-        import PyPDF2
-        from PyPDF2 import PdfReader
+        # Import pypdf only when running the file directly
+        import pypdf
+        from pypdf import PdfReader
     except ImportError:
-        print("PyPDF2 is required for PDF processing. Install with 'pip install crawl4ai[pdf]'")
+        print("pypdf is required for PDF processing. Install with 'pip install crawl4ai[pdf]'")
         exit(1)
         
     current_dir = Path(__file__).resolve().parent
