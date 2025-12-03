@@ -1,5 +1,5 @@
+import importlib
 import os
-from typing import Union
 import warnings
 import requests
 from .config import (
@@ -27,13 +27,13 @@ from .table_extraction import TableExtractionStrategy, DefaultTableExtraction
 from .cache_context import CacheMode
 from .proxy_strategy import ProxyRotationStrategy
 
-from typing import Union, List, Callable
 import inspect
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
 from enum import Enum
 
 # Type alias for URL matching
 UrlMatcher = Union[str, Callable[[str], bool], List[Union[str, Callable[[str], bool]]]]
+
 
 class MatchMode(Enum):
     OR = "or"
@@ -42,8 +42,7 @@ class MatchMode(Enum):
 # from .proxy_strategy import ProxyConfig
 
 
-
-def to_serializable_dict(obj: Any, ignore_default_value : bool = False) -> Dict:
+def to_serializable_dict(obj: Any, ignore_default_value : bool = False):
     """
     Recursively convert an object to a serializable dictionary using {type, params} structure
     for complex objects.
@@ -110,8 +109,6 @@ def to_serializable_dict(obj: Any, ignore_default_value : bool = False) -> Dict:
         #             if value is not None:
         #                 current_values[attr_name] = to_serializable_dict(value)
 
-            
-        
         return {
             "type": obj.__class__.__name__,
             "params": current_values
@@ -137,12 +134,20 @@ def from_serializable_dict(data: Any) -> Any:
         if data["type"] == "dict" and "value" in data:
             return {k: from_serializable_dict(v) for k, v in data["value"].items()}
 
-        # Import from crawl4ai for class instances
-        import crawl4ai
+        cls = None
+        # If you are receiving an error while trying to convert a dict to an object:
+        # Either add a module to `modules_paths` list, or add the `data["type"]` to the crawl4ai __init__.py file
+        module_paths = ["crawl4ai"]
+        for module_path in module_paths:
+            try:
+                mod = importlib.import_module(module_path)
+                if hasattr(mod, data["type"]):
+                    cls = getattr(mod, data["type"])
+                    break
+            except (ImportError, AttributeError):
+                continue
 
-        if hasattr(crawl4ai, data["type"]):
-            cls = getattr(crawl4ai, data["type"])
-
+        if cls is not None:
             # Handle Enum
             if issubclass(cls, Enum):
                 return cls(data["params"])
