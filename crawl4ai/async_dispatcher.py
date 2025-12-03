@@ -1,43 +1,38 @@
-from typing import Dict, Optional, List, Tuple, Union
+import asyncio
+import random
+import time
+import uuid
+from abc import ABC, abstractmethod
+from collections.abc import AsyncGenerator
+from urllib.parse import urlparse
+
+import psutil
+
 from .async_configs import CrawlerRunConfig
+from .components.crawler_monitor import CrawlerMonitor
 from .models import (
-    CrawlResult,
     CrawlerTaskResult,
+    CrawlResult,
     CrawlStatus,
     DomainState,
 )
-
-from .components.crawler_monitor import CrawlerMonitor
-
 from .types import AsyncWebCrawler
-
-from collections.abc import AsyncGenerator
-
-import time
-import psutil
-import asyncio
-import uuid
-
-from urllib.parse import urlparse
-import random
-from abc import ABC, abstractmethod
-
 from .utils import get_true_memory_usage_percent
 
 
 class RateLimiter:
     def __init__(
         self,
-        base_delay: Tuple[float, float] = (1.0, 3.0),
+        base_delay: tuple[float, float] = (1.0, 3.0),
         max_delay: float = 60.0,
         max_retries: int = 3,
-        rate_limit_codes: List[int] = None,
+        rate_limit_codes: list[int] = None,
     ):
         self.base_delay = base_delay
         self.max_delay = max_delay
         self.max_retries = max_retries
         self.rate_limit_codes = rate_limit_codes or [429, 503]
-        self.domains: Dict[str, DomainState] = {}
+        self.domains: dict[str, DomainState] = {}
 
     def get_domain(self, url: str) -> str:
         return urlparse(url).netloc
@@ -89,16 +84,16 @@ class RateLimiter:
 class BaseDispatcher(ABC):
     def __init__(
         self,
-        rate_limiter: Optional[RateLimiter] = None,
-        monitor: Optional[CrawlerMonitor] = None,
+        rate_limiter: RateLimiter | None = None,
+        monitor: CrawlerMonitor | None = None,
     ):
         self.crawler = None
-        self._domain_last_hit: Dict[str, float] = {}
+        self._domain_last_hit: dict[str, float] = {}
         self.concurrent_sessions = 0
         self.rate_limiter = rate_limiter
         self.monitor = monitor
 
-    def select_config(self, url: str, configs: Union[CrawlerRunConfig, List[CrawlerRunConfig]]) -> Optional[CrawlerRunConfig]:
+    def select_config(self, url: str, configs: CrawlerRunConfig | list[CrawlerRunConfig]) -> CrawlerRunConfig | None:
         """Select the appropriate config for a given URL.
         
         Args:
@@ -128,20 +123,20 @@ class BaseDispatcher(ABC):
     async def crawl_url(
         self,
         url: str,
-        config: Union[CrawlerRunConfig, List[CrawlerRunConfig]],
+        config: CrawlerRunConfig | list[CrawlerRunConfig],
         task_id: str,
-        monitor: Optional[CrawlerMonitor] = None,
+        monitor: CrawlerMonitor | None = None,
     ) -> CrawlerTaskResult:
         pass
 
     @abstractmethod
     async def run_urls(
         self,
-        urls: List[str],
+        urls: list[str],
         crawler: AsyncWebCrawler,  # noqa: F821
-        config: Union[CrawlerRunConfig, List[CrawlerRunConfig]],
-        monitor: Optional[CrawlerMonitor] = None,
-    ) -> List[CrawlerTaskResult]:
+        config: CrawlerRunConfig | list[CrawlerRunConfig],
+        monitor: CrawlerMonitor | None = None,
+    ) -> list[CrawlerTaskResult]:
         pass
 
 
@@ -154,9 +149,9 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
         check_interval: float = 1.0,
         max_session_permit: int = 20,
         fairness_timeout: float = 600.0,  # 10 minutes before prioritizing long-waiting URLs
-        memory_wait_timeout: Optional[float] = 600.0,
-        rate_limiter: Optional[RateLimiter] = None,
-        monitor: Optional[CrawlerMonitor] = None,
+        memory_wait_timeout: float | None = 600.0,
+        rate_limiter: RateLimiter | None = None,
+        monitor: CrawlerMonitor | None = None,
     ):
         super().__init__(rate_limiter, monitor)
         self.memory_threshold_percent = memory_threshold_percent
@@ -170,7 +165,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
         self.task_queue = asyncio.PriorityQueue()  # Priority queue for better management
         self.memory_pressure_mode = False  # Flag to indicate when we're in memory pressure mode
         self.current_memory_percent = 0.0  # Track current memory usage
-        self._high_memory_start_time: Optional[float] = None
+        self._high_memory_start_time: float | None = None
         
     async def _memory_monitor_task(self):
         """Background task to continuously monitor memory usage and update state"""
@@ -228,7 +223,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
     async def crawl_url(
         self,
         url: str,
-        config: Union[CrawlerRunConfig, List[CrawlerRunConfig]],
+        config: CrawlerRunConfig | list[CrawlerRunConfig],
         task_id: str,
         retry_count: int = 0,
     ) -> CrawlerTaskResult:
@@ -373,10 +368,10 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
         
     async def run_urls(
         self,
-        urls: List[str],
+        urls: list[str],
         crawler: AsyncWebCrawler,
-        config: Union[CrawlerRunConfig, List[CrawlerRunConfig]],
-    ) -> List[CrawlerTaskResult]:
+        config: CrawlerRunConfig | list[CrawlerRunConfig],
+    ) -> list[CrawlerTaskResult]:
         self.crawler = crawler
         
         # Start the memory monitor task
@@ -461,6 +456,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
         except Exception as e:
             if self.monitor:
                 self.monitor.update_memory_status(f"QUEUE_ERROR: {str(e)}")                
+            raise e
         
         finally:
             # Clean up
@@ -499,7 +495,7 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
                     if self.monitor and task_id in self.monitor.stats:
                         self.monitor.update_task(task_id, wait_time=wait_time)
                         
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     # Queue might be empty or very slow
                     break
         except Exception as e:
@@ -529,10 +525,10 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
                 
     async def run_urls_stream(
         self,
-        urls: List[str],
+        urls: list[str],
         crawler: AsyncWebCrawler,
-        config: Union[CrawlerRunConfig, List[CrawlerRunConfig]],
-    ) -> AsyncGenerator[CrawlerTaskResult, None]:
+        config: CrawlerRunConfig | list[CrawlerRunConfig],
+    ) -> AsyncGenerator[CrawlerTaskResult]:
         self.crawler = crawler
         
         # Start the memory monitor task
@@ -625,8 +621,8 @@ class SemaphoreDispatcher(BaseDispatcher):
         self,
         semaphore_count: int = 5,
         max_session_permit: int = 20,
-        rate_limiter: Optional[RateLimiter] = None,
-        monitor: Optional[CrawlerMonitor] = None,
+        rate_limiter: RateLimiter | None = None,
+        monitor: CrawlerMonitor | None = None,
     ):
         super().__init__(rate_limiter, monitor)
         self.semaphore_count = semaphore_count
@@ -635,7 +631,7 @@ class SemaphoreDispatcher(BaseDispatcher):
     async def crawl_url(
         self,
         url: str,
-        config: Union[CrawlerRunConfig, List[CrawlerRunConfig]],
+        config: CrawlerRunConfig | list[CrawlerRunConfig],
         task_id: str,
         semaphore: asyncio.Semaphore = None,
     ) -> CrawlerTaskResult:
@@ -746,9 +742,9 @@ class SemaphoreDispatcher(BaseDispatcher):
     async def run_urls(
         self,
         crawler: AsyncWebCrawler,  # noqa: F821
-        urls: List[str],
-        config: Union[CrawlerRunConfig, List[CrawlerRunConfig]],
-    ) -> List[CrawlerTaskResult]:
+        urls: list[str],
+        config: CrawlerRunConfig | list[CrawlerRunConfig],
+    ) -> list[CrawlerTaskResult]:
         self.crawler = crawler
         if self.monitor:
             self.monitor.start()
