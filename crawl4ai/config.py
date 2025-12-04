@@ -28,6 +28,23 @@ PROVIDER_MODELS = {
     'gemini/gemini-2.0-flash-exp': os.getenv("GEMINI_API_KEY"),
     'gemini/gemini-2.0-flash-lite-preview-02-05': os.getenv("GEMINI_API_KEY"),
     "deepseek/deepseek-chat": os.getenv("DEEPSEEK_API_KEY"),
+    "openrouter/openai/gpt-4o": os.getenv("OPENROUTER_API_KEY"),
+    "openrouter/openai/gpt-4o-mini": os.getenv("OPENROUTER_API_KEY"),
+    "openrouter/openai/gpt-4.5-preview": os.getenv("OPENROUTER_API_KEY"),
+    "openrouter/openai/o3-mini": os.getenv("OPENROUTER_API_KEY"),
+    "openrouter/openai/o4-mini": os.getenv("OPENROUTER_API_KEY"),
+    "openrouter/openai/o1-mini": os.getenv("OPENROUTER_API_KEY"),
+    "openrouter/anthropic/claude-opus-4": os.getenv("OPENROUTER_API_KEY"),
+    "openrouter/anthropic/claude-sonnet-4": os.getenv("OPENROUTER_API_KEY"),
+    "openrouter/anthropic/claude-3.5-sonnet": os.getenv("OPENROUTER_API_KEY"),
+    "openrouter/anthropic/claude-3.7-sonnet": os.getenv("OPENROUTER_API_KEY"),
+    "openrouter/anthropic/claude-3-haiku": os.getenv("OPENROUTER_API_KEY"),
+    "openrouter/google/gemini-2.5-pro": os.getenv("OPENROUTER_API_KEY"),
+    "openrouter/google/gemini-2.0-flash-001": os.getenv("OPENROUTER_API_KEY"),
+    "openrouter/google/gemini-2.5-flash": os.getenv("OPENROUTER_API_KEY"),
+    "openrouter/deepseek/deepseek-chat-v3-0324": os.getenv("OPENROUTER_API_KEY"),
+    "openrouter/x-ai/grok-3": os.getenv("OPENROUTER_API_KEY"),
+    "openrouter/x-ai/grok-4": os.getenv("OPENROUTER_API_KEY"),
 }
 PROVIDER_MODELS_PREFIXES = {
     "ollama": "no-token-needed",  # Any model from Ollama no need for API token
