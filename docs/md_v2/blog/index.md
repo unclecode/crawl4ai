@@ -20,24 +20,34 @@ Ever wondered why your AI coding assistant struggles with your library despite c
 
 ## Latest Release
 
+### [Crawl4AI v0.7.8 – Stability & Bug Fix Release](../blog/release-v0.7.8.md)
+*December 2025*
+
+Crawl4AI v0.7.8 is a focused stability release addressing 11 bugs reported by the community. While there are no new features, these fixes resolve important issues affecting Docker deployments, LLM extraction, URL handling, and dependency compatibility.
+
+Key highlights:
+- **🐳 Docker API Fixes**: ContentRelevanceFilter deserialization, ProxyConfig serialization, cache folder permissions
+- **🤖 LLM Improvements**: Configurable rate limiter backoff, HTML input format support, raw HTML URL handling
+- **🔗 URL Handling**: Correct relative URL resolution after JavaScript redirects
+- **📦 Dependencies**: Replaced deprecated PyPDF2 with pypdf, Pydantic v2 ConfigDict compatibility
+- **🧠 AdaptiveCrawler**: Fixed query expansion to actually use LLM instead of mock data
+
+[Read full release notes →](../blog/release-v0.7.8.md)
+
+## Recent Releases
+
 ### [Crawl4AI v0.7.7 – The Self-Hosting & Monitoring Update](../blog/release-v0.7.7.md)
 *November 14, 2025*
 
-Crawl4AI v0.7.7 transforms Docker into a complete self-hosting platform with enterprise-grade real-time monitoring, comprehensive observability, and full operational control. Experience complete visibility into your crawling infrastructure!
+Crawl4AI v0.7.7 transforms Docker into a complete self-hosting platform with enterprise-grade real-time monitoring, comprehensive observability, and full operational control.
 
 Key highlights:
-- **📊 Real-time Monitoring Dashboard**: Interactive web UI with live system metrics and browser pool visibility
-- **🔌 Comprehensive Monitor API**: Complete REST API for programmatic access to all monitoring data
-- **⚡ WebSocket Streaming**: Real-time updates every 2 seconds for custom dashboards
-- **🔥 Smart Browser Pool**: 3-tier architecture (permanent/hot/cold) with automatic promotion and cleanup
-- **🧹 Janitor System**: Automatic resource management with event logging
-- **🎮 Control Actions**: Manual browser management (kill, restart, cleanup) via API
-- **📈 Production Ready**: Prometheus integration, alerting patterns, and 6 critical metrics for ops excellence
-- **🐛 Critical Fixes**: Async LLM extraction (#1055), DFS crawling (#1607), viewport config, and security updates
+- **📊 Real-time Monitoring Dashboard**: Interactive web UI with live system metrics
+- **🔌 Comprehensive Monitor API**: Complete REST API for programmatic access
+- **⚡ WebSocket Streaming**: Real-time updates every 2 seconds
+- **🔥 Smart Browser Pool**: 3-tier architecture with automatic promotion and cleanup
 
 [Read full release notes →](../blog/release-v0.7.7.md)
-
-## Recent Releases
 
 ### [Crawl4AI v0.7.6 – The Webhook Infrastructure Update](../blog/release-v0.7.6.md)
 *October 22, 2025*
@@ -66,14 +76,16 @@ Key highlights:
 
 [Read full release notes →](../blog/release-v0.7.5.md)
 
-### [Crawl4AI v0.7.4 – The Intelligent Table Extraction & Performance Update](../blog/release-v0.7.4.md)
-*August 17, 2025*
-
-Revolutionary LLM-powered table extraction with intelligent chunking, performance improvements for concurrent crawling, enhanced browser management, and critical stability fixes.
-
-[Read full release notes →](../blog/release-v0.7.4.md)
-
 ---
+
+## Older Releases
+
+| Version | Date | Highlights |
+|---------|------|------------|
+| [v0.7.4](../blog/release-v0.7.4.md) | August 2025 | LLM-powered table extraction, performance improvements |
+| [v0.7.3](../blog/release-v0.7.3.md) | July 2025 | Undetected browser, multi-URL config, memory monitoring |
+| [v0.7.1](../blog/release-v0.7.1.md) | June 2025 | Bug fixes and stability improvements |
+| [v0.7.0](../blog/release-v0.7.0.md) | May 2025 | Adaptive crawling, virtual scroll, link analysis |
 
 ## Project History
 
