@@ -12,6 +12,16 @@
 [![Downloads](https://static.pepy.tech/badge/crawl4ai/month)](https://pepy.tech/project/crawl4ai)
 [![GitHub Sponsors](https://img.shields.io/github/sponsors/unclecode?style=flat&logo=GitHub-Sponsors&label=Sponsors&color=pink)](https://github.com/sponsors/unclecode)
 
+---
+#### 🚀 Crawl4AI Cloud API — Closed Beta (Launching Soon)
+Reliable, large-scale web extraction, now built to be _**drastically more cost-effective**_ than any of the existing solutions.
+
+👉 **Apply [here](https://forms.gle/E9MyPaNXACnAMaqG7) for early access**  
+_We’ll be onboarding in phases and working closely with early users.
+Limited slots._
+
+---
+
 <p align="center">
     <a href="https://x.com/crawl4ai">
       <img src="https://img.shields.io/badge/Follow%20on%20X-000000?style=for-the-badge&logo=x&logoColor=white" alt="Follow on X" />
