@@ -1378,9 +1378,10 @@ In this scenario, use your best judgment to generate the schema. You need to exa
                 base_url=llm_config.base_url,
                 extra_args=kwargs
             )
-            
+              # Simply strip the markdown formatting
+            raw_json = response.choices[0].message.content.replace('```json\n', '').replace('\n```', '')
             # Extract and return schema
-            return json.loads(response.choices[0].message.content)
+            return json.loads(raw_json)
             
         except Exception as e:
             raise Exception(f"Failed to generate schema: {str(e)}")
