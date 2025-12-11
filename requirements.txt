@@ -33,4 +33,4 @@ shapely>=2.0.0
 
 fake-useragent>=2.2.0
 pdf2image>=1.17.0
-PyPDF2>=3.0.1
+pypdf>=6.0.0

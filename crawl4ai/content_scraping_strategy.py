@@ -542,6 +542,19 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
             if el.tag in bypass_tags:
                 continue
 
+            # Skip elements inside <pre> or <code> tags where whitespace is significant
+            # This preserves whitespace-only spans (e.g., <span class="w"> </span>) in code blocks
+            is_in_code_block = False
+            ancestor = el.getparent()
+            while ancestor is not None:
+                if ancestor.tag in ("pre", "code"):
+                    is_in_code_block = True
+                    break
+                ancestor = ancestor.getparent()
+
+            if is_in_code_block:
+                continue
+
             text_content = (el.text_content() or "").strip()
             if (
                 len(text_content.split()) < word_count_threshold

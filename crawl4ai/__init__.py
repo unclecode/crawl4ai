@@ -72,6 +72,8 @@ from .deep_crawling import (
     BestFirstCrawlingStrategy,
     DFSDeepCrawlStrategy,
     DeepCrawlDecorator,
+    ContentRelevanceFilter,
+    ContentTypeScorer,
 )
 # NEW: Import AsyncUrlSeeder
 from .async_url_seeder import AsyncUrlSeeder

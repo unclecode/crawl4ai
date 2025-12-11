@@ -1,5 +1,5 @@
+import importlib
 import os
-from typing import Union
 import warnings
 import requests
 from .config import (
@@ -27,13 +27,13 @@ from .table_extraction import TableExtractionStrategy, DefaultTableExtraction
 from .cache_context import CacheMode
 from .proxy_strategy import ProxyRotationStrategy
 
-from typing import Union, List, Callable
 import inspect
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
 from enum import Enum
 
 # Type alias for URL matching
 UrlMatcher = Union[str, Callable[[str], bool], List[Union[str, Callable[[str], bool]]]]
+
 
 class MatchMode(Enum):
     OR = "or"
@@ -42,8 +42,7 @@ class MatchMode(Enum):
 # from .proxy_strategy import ProxyConfig
 
 
-
-def to_serializable_dict(obj: Any, ignore_default_value : bool = False) -> Dict:
+def to_serializable_dict(obj: Any, ignore_default_value : bool = False):
     """
     Recursively convert an object to a serializable dictionary using {type, params} structure
     for complex objects.
@@ -110,8 +109,6 @@ def to_serializable_dict(obj: Any, ignore_default_value : bool = False) -> Dict:
         #             if value is not None:
         #                 current_values[attr_name] = to_serializable_dict(value)
 
-            
-        
         return {
             "type": obj.__class__.__name__,
             "params": current_values
@@ -137,12 +134,20 @@ def from_serializable_dict(data: Any) -> Any:
         if data["type"] == "dict" and "value" in data:
             return {k: from_serializable_dict(v) for k, v in data["value"].items()}
 
-        # Import from crawl4ai for class instances
-        import crawl4ai
+        cls = None
+        # If you are receiving an error while trying to convert a dict to an object:
+        # Either add a module to `modules_paths` list, or add the `data["type"]` to the crawl4ai __init__.py file
+        module_paths = ["crawl4ai"]
+        for module_path in module_paths:
+            try:
+                mod = importlib.import_module(module_path)
+                if hasattr(mod, data["type"]):
+                    cls = getattr(mod, data["type"])
+                    break
+            except (ImportError, AttributeError):
+                continue
 
-        if hasattr(crawl4ai, data["type"]):
-            cls = getattr(crawl4ai, data["type"])
-
+        if cls is not None:
             # Handle Enum
             if issubclass(cls, Enum):
                 return cls(data["params"])
@@ -598,7 +603,7 @@ class BrowserConfig:
             "chrome_channel": self.chrome_channel,
             "channel": self.channel,
             "proxy": self.proxy,
-            "proxy_config": self.proxy_config,
+            "proxy_config": self.proxy_config.to_dict() if self.proxy_config else None,
             "viewport_width": self.viewport_width,
             "viewport_height": self.viewport_height,
             "accept_downloads": self.accept_downloads,
@@ -1792,7 +1797,10 @@ class LLMConfig:
         frequency_penalty: Optional[float] = None,
         presence_penalty: Optional[float] = None,
         stop: Optional[List[str]] = None,
-        n: Optional[int] = None,    
+        n: Optional[int] = None,
+        backoff_base_delay: Optional[int] = None,
+        backoff_max_attempts: Optional[int] = None,
+        backoff_exponential_factor: Optional[int] = None,
     ):
         """Configuaration class for LLM provider and API token."""
         self.provider = provider
@@ -1821,6 +1829,9 @@ class LLMConfig:
         self.presence_penalty = presence_penalty
         self.stop = stop
         self.n = n
+        self.backoff_base_delay = backoff_base_delay if backoff_base_delay is not None else 2
+        self.backoff_max_attempts = backoff_max_attempts if backoff_max_attempts is not None else 3
+        self.backoff_exponential_factor = backoff_exponential_factor if backoff_exponential_factor is not None else 2
 
     @staticmethod
     def from_kwargs(kwargs: dict) -> "LLMConfig":
@@ -1834,7 +1845,10 @@ class LLMConfig:
             frequency_penalty=kwargs.get("frequency_penalty"),
             presence_penalty=kwargs.get("presence_penalty"),
             stop=kwargs.get("stop"),
-            n=kwargs.get("n")
+            n=kwargs.get("n"),
+            backoff_base_delay=kwargs.get("backoff_base_delay"),
+            backoff_max_attempts=kwargs.get("backoff_max_attempts"),
+            backoff_exponential_factor=kwargs.get("backoff_exponential_factor")
         )
 
     def to_dict(self):
@@ -1848,7 +1862,10 @@ class LLMConfig:
             "frequency_penalty": self.frequency_penalty,
             "presence_penalty": self.presence_penalty,
             "stop": self.stop,
-            "n": self.n
+            "n": self.n,
+            "backoff_base_delay": self.backoff_base_delay,
+            "backoff_max_attempts": self.backoff_max_attempts,
+            "backoff_exponential_factor": self.backoff_exponential_factor
         }
 
     def clone(self, **kwargs):

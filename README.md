@@ -12,6 +12,16 @@
 [![Downloads](https://static.pepy.tech/badge/crawl4ai/month)](https://pepy.tech/project/crawl4ai)
 [![GitHub Sponsors](https://img.shields.io/github/sponsors/unclecode?style=flat&logo=GitHub-Sponsors&label=Sponsors&color=pink)](https://github.com/sponsors/unclecode)
 
+---
+#### 🚀 Crawl4AI Cloud API — Closed Beta (Launching Soon)
+Reliable, large-scale web extraction, now built to be _**drastically more cost-effective**_ than any of the existing solutions.
+
+👉 **Apply [here](https://forms.gle/E9MyPaNXACnAMaqG7) for early access**  
+_We’ll be onboarding in phases and working closely with early users.
+Limited slots._
+
+---
+
 <p align="center">
     <a href="https://x.com/crawl4ai">
       <img src="https://img.shields.io/badge/Follow%20on%20X-000000?style=for-the-badge&logo=x&logoColor=white" alt="Follow on X" />
@@ -27,13 +37,13 @@
 
 Crawl4AI turns the web into clean, LLM ready Markdown for RAG, agents, and data pipelines. Fast, controllable, battle tested by a 50k+ star community.
 
-[✨ Check out latest update v0.7.7](#-recent-updates)
+[✨ Check out latest update v0.7.8](#-recent-updates)
 
-✨ **New in v0.7.7**: Complete Self-Hosting Platform with Real-time Monitoring! Enterprise-grade monitoring dashboard, comprehensive REST API, WebSocket streaming, smart browser pool management, and production-ready observability. Full visibility and control over your crawling infrastructure. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.7.md)
+✨ **New in v0.7.8**: Stability & Bug Fix Release! 11 bug fixes addressing Docker API issues (ContentRelevanceFilter, ProxyConfig, cache permissions), LLM extraction improvements (configurable backoff, HTML input format), URL handling fixes, and dependency updates (pypdf, Pydantic v2). [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.8.md)
 
-✨ Recent v0.7.6: Complete Webhook Infrastructure for Docker Job Queue API! Real-time notifications for both `/crawl/job` and `/llm/job` endpoints with exponential backoff retry, custom headers, and flexible delivery modes. No more polling! [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.6.md)
+✨ Recent v0.7.7: Complete Self-Hosting Platform with Real-time Monitoring! Enterprise-grade monitoring dashboard, comprehensive REST API, WebSocket streaming, smart browser pool management, and production-ready observability. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.7.md)
 
-✨ Previous v0.7.5: Docker Hooks System with function-based API for pipeline customization, Enhanced LLM Integration with custom providers, HTTPS Preservation, and multiple community-reported bug fixes. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.5.md)
+✨ Previous v0.7.6: Complete Webhook Infrastructure for Docker Job Queue API! Real-time notifications for both `/crawl/job` and `/llm/job` endpoints with exponential backoff retry, custom headers, and flexible delivery modes. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.6.md)
 
 <details>
   <summary>🤓 <strong>My Personal Story</strong></summary>
@@ -551,6 +561,55 @@ async def test_news_crawl():
 > **💡 Tip:** Some websites may use **CAPTCHA** based verification mechanisms to prevent automated access. If your workflow encounters such challenges, you may optionally integrate a third-party CAPTCHA-handling service such as <strong>[CapSolver](https://www.capsolver.com/blog/Partners/crawl4ai-capsolver/?utm_source=crawl4ai&utm_medium=github_pr&utm_campaign=crawl4ai_integration)</strong>. They support reCAPTCHA v2/v3, Cloudflare Turnstile, Challenge, AWS WAF, and more. Please ensure that your usage complies with the target website’s terms of service and applicable laws.
 
 ## ✨ Recent Updates
+
+<details>
+<summary><strong>Version 0.7.8 Release Highlights - Stability & Bug Fix Release</strong></summary>
+
+This release focuses on stability with 11 bug fixes addressing issues reported by the community. No new features, but significant improvements to reliability.
+
+- **🐳 Docker API Fixes**:
+  - Fixed `ContentRelevanceFilter` deserialization in deep crawl requests (#1642)
+  - Fixed `ProxyConfig` JSON serialization in `BrowserConfig.to_dict()` (#1629)
+  - Fixed `.cache` folder permissions in Docker image (#1638)
+
+- **🤖 LLM Extraction Improvements**:
+  - Configurable rate limiter backoff with new `LLMConfig` parameters (#1269):
+    ```python
+    from crawl4ai import LLMConfig
+
+    config = LLMConfig(
+        provider="openai/gpt-4o-mini",
+        backoff_base_delay=5,           # Wait 5s on first retry
+        backoff_max_attempts=5,          # Try up to 5 times
+        backoff_exponential_factor=3     # Multiply delay by 3 each attempt
+    )
+    ```
+  - HTML input format support for `LLMExtractionStrategy` (#1178):
+    ```python
+    from crawl4ai import LLMExtractionStrategy
+
+    strategy = LLMExtractionStrategy(
+        llm_config=config,
+        instruction="Extract table data",
+        input_format="html"  # Now supports: "html", "markdown", "fit_markdown"
+    )
+    ```
+  - Fixed raw HTML URL variable - extraction strategies now receive `"Raw HTML"` instead of HTML blob (#1116)
+
+- **🔗 URL Handling**:
+  - Fixed relative URL resolution after JavaScript redirects (#1268)
+  - Fixed import statement formatting in extracted code (#1181)
+
+- **📦 Dependency Updates**:
+  - Replaced deprecated PyPDF2 with pypdf (#1412)
+  - Pydantic v2 ConfigDict compatibility - no more deprecation warnings (#678)
+
+- **🧠 AdaptiveCrawler**:
+  - Fixed query expansion to actually use LLM instead of hardcoded mock data (#1621)
+
+[Full v0.7.8 Release Notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.8.md)
+
+</details>
 
 <details>
 <summary><strong>Version 0.7.7 Release Highlights - The Self-Hosting & Monitoring Update</strong></summary>

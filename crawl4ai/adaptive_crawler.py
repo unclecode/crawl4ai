@@ -728,18 +728,18 @@ class EmbeddingStrategy(CrawlStrategy):
         provider = llm_config_dict.get('provider', 'openai/gpt-4o-mini') if llm_config_dict else 'openai/gpt-4o-mini'
         api_token = llm_config_dict.get('api_token') if llm_config_dict else None
         
-        # response = perform_completion_with_backoff(
-        #     provider=provider,
-        #     prompt_with_variables=prompt,
-        #     api_token=api_token,
-        #     json_response=True
-        # )
+        response = perform_completion_with_backoff(
+            provider=provider,
+            prompt_with_variables=prompt,
+            api_token=api_token,
+            json_response=True
+        )
         
-        # variations = json.loads(response.choices[0].message.content)
+        variations = json.loads(response.choices[0].message.content)
         
         
         # # Mock data with more variations for split
-        variations ={'queries': ['what are the best vegetables to use in fried rice?', 'how do I make vegetable fried rice from scratch?', 'can you provide a quick recipe for vegetable fried rice?', 'what cooking techniques are essential for perfect fried rice with vegetables?', 'how to add flavor to vegetable fried rice?', 'are there any tips for making healthy fried rice with vegetables?']}
+        # variations ={'queries': ['what are the best vegetables to use in fried rice?', 'how do I make vegetable fried rice from scratch?', 'can you provide a quick recipe for vegetable fried rice?', 'what cooking techniques are essential for perfect fried rice with vegetables?', 'how to add flavor to vegetable fried rice?', 'are there any tips for making healthy fried rice with vegetables?']}
         
         
         # variations = {'queries': [
