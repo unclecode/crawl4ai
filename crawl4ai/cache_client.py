@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-DEFAULT_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60  # 7 days
+DEFAULT_CACHE_TTL_SECONDS = 2 * 60  # 2 hours
 
 _CRAWL4AI_CACHE_KEY_PREFIX = "c4ai:"
 HTML_CACHE_KEY_PREFIX = f"{_CRAWL4AI_CACHE_KEY_PREFIX}html:"
