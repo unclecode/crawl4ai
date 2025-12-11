@@ -235,6 +235,21 @@ crwl https://example.com -f filter_bm25.yml -o markdown-fit
 - `markdown` / `md` - Raw markdown output
 - `markdown-fit` / `md-fit` - Filtered markdown for better readability
 
+### Unicode Handling in JSON Output
+
+By default, non-ASCII characters in JSON output are escaped (e.g., 'š' becomes `\u0161`). You can control this behavior:
+
+```bash
+# Preserve Unicode characters in JSON output
+crwl https://example.com -o all --no-json-ensure-ascii
+
+# Escape non-ASCII characters (default behavior)
+crwl https://example.com -o all --json-ensure-ascii
+
+# Set global default
+crwl config set JSON_ENSURE_ASCII false  # Preserve Unicode by default
+```
+
 ## Complete Examples
 
 1. Basic Extraction:

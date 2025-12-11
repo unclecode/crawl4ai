@@ -142,5 +142,10 @@ USER_SETTINGS = {
         "description": "Default user agent mode (default, random, or mobile)",
         "type": "string",
         "options": ["default", "random", "mobile"]
+    },
+    "JSON_ENSURE_ASCII": {
+        "default": True,
+        "description": "Whether to escape non-ASCII characters in JSON output (False preserves Unicode like 'š', True escapes as '\\u0161')",
+        "type": "boolean"
     }
 }
