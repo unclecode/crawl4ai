@@ -574,7 +574,10 @@ class LLMExtractionStrategy(ExtractionStrategy):
         self.overlap_rate = overlap_rate
         self.word_token_rate = word_token_rate
         self.apply_chunking = apply_chunking
-        self.extra_args = kwargs.get("extra_args", {})
+        # Merge both extra kwargs
+        self.extra_args = kwargs.get("extra_args", {}) | self.llm_config.to_dict().get(
+            "extra_args", {}
+        )
         if not self.apply_chunking:
             self.chunk_token_threshold = 1e9
         self.verbose = verbose
