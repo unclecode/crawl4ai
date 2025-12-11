@@ -1230,9 +1230,21 @@ Always return valid, properly formatted JSON."""
                 click.echo(json.dumps(extracted_items, indent=2))
                 
             elif output in ["markdown", "md"]:
-                click.echo(main_result.markdown.raw_markdown)
+                if isinstance(result, list):
+                    # Combine markdown from all crawled pages for deep crawl
+                    for r in all_results:
+                        click.echo(f"\n\n{'='*60}\n# {r.url}\n{'='*60}\n\n")
+                        click.echo(r.markdown.raw_markdown)
+                else:
+                    click.echo(main_result.markdown.raw_markdown)
             elif output in ["markdown-fit", "md-fit"]:
-                click.echo(main_result.markdown.fit_markdown)
+                if isinstance(result, list):
+                    # Combine fit markdown from all crawled pages for deep crawl
+                    for r in all_results:
+                        click.echo(f"\n\n{'='*60}\n# {r.url}\n{'='*60}\n\n")
+                        click.echo(r.markdown.fit_markdown)
+                else:
+                    click.echo(main_result.markdown.fit_markdown)
         else:
             if output == "all":
                 with open(output_file, "w") as f:
@@ -1246,10 +1258,22 @@ Always return valid, properly formatted JSON."""
                     f.write(main_result.extracted_content)
             elif output in ["markdown", "md"]:
                 with open(output_file, "w") as f:
-                    f.write(main_result.markdown.raw_markdown)
+                    if isinstance(result, list):
+                        # Combine markdown from all crawled pages for deep crawl
+                        for r in all_results:
+                            f.write(f"\n\n{'='*60}\n# {r.url}\n{'='*60}\n\n")
+                            f.write(r.markdown.raw_markdown)
+                    else:
+                        f.write(main_result.markdown.raw_markdown)
             elif output in ["markdown-fit", "md-fit"]:
                 with open(output_file, "w") as f:
-                    f.write(main_result.markdown.fit_markdown)
+                    if isinstance(result, list):
+                        # Combine fit markdown from all crawled pages for deep crawl
+                        for r in all_results:
+                            f.write(f"\n\n{'='*60}\n# {r.url}\n{'='*60}\n\n")
+                            f.write(r.markdown.fit_markdown)
+                    else:
+                        f.write(main_result.markdown.fit_markdown)
             
     except Exception as e:
         raise click.ClickException(str(e))
