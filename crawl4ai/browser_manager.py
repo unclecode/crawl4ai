@@ -1184,29 +1184,33 @@ class BrowserManager:
                 await self._apply_stealth_to_page(page)
             else:
                 context = self.default_context
-                pages = context.pages
-                page = next((p for p in pages if p.url == crawlerRunConfig.url), None)
-                if not page:
-                    if pages:
-                        page = pages[0]
-                    else:
-                        # Double-check under lock to avoid TOCTOU and ensure only
-                        # one task calls new_page when pages=[] concurrently
+
+                # When target_id is provided, use it to find the specific page
+                # This is critical for concurrent requests sharing a browser
+                if self.config.browser_context_id and self.config.target_id:
+                    page = await self._get_page_by_target_id(context, self.config.target_id)
+                    if not page:
+                        # Fallback: create new page in existing context
                         async with self._page_lock:
-                            pages = context.pages
-                            if pages:
-                                page = pages[0]
-                            elif self.config.browser_context_id and self.config.target_id:
-                                # Pre-existing context/target provided - use CDP to get the page
-                                # This handles the case where Playwright doesn't see the target yet
-                                page = await self._get_page_by_target_id(context, self.config.target_id)
-                                if not page:
-                                    # Fallback: create new page in existing context
+                            page = await context.new_page()
+                            await self._apply_stealth_to_page(page)
+                else:
+                    # Original logic for cases without pre-created target
+                    pages = context.pages
+                    page = next((p for p in pages if p.url == crawlerRunConfig.url), None)
+                    if not page:
+                        if pages:
+                            page = pages[0]
+                        else:
+                            # Double-check under lock to avoid TOCTOU and ensure only
+                            # one task calls new_page when pages=[] concurrently
+                            async with self._page_lock:
+                                pages = context.pages
+                                if pages:
+                                    page = pages[0]
+                                else:
                                     page = await context.new_page()
                                     await self._apply_stealth_to_page(page)
-                            else:
-                                page = await context.new_page()
-                                await self._apply_stealth_to_page(page)
         else:
             # Otherwise, check if we have an existing context for this config
             config_signature = self._make_config_signature(crawlerRunConfig)
