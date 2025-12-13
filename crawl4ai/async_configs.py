@@ -373,6 +373,13 @@ class BrowserConfig:
         use_managed_browser (bool): Launch the browser using a managed approach (e.g., via CDP), allowing
                                     advanced manipulation. Default: False.
         cdp_url (str): URL for the Chrome DevTools Protocol (CDP) endpoint. Default: "ws://localhost:9222/devtools/browser/".
+        browser_context_id (str or None): Pre-existing CDP browser context ID to use. When provided along with
+                                          cdp_url, the crawler will reuse this context instead of creating a new one.
+                                          Useful for cloud browser services that pre-create isolated contexts.
+                                          Default: None.
+        target_id (str or None): Pre-existing CDP target ID (page) to use. When provided along with
+                                 browser_context_id, the crawler will reuse this target instead of creating
+                                 a new page. Default: None.
         debugging_port (int): Port for the browser debugging protocol. Default: 9222.
         use_persistent_context (bool): Use a persistent browser context (like a persistent profile).
                                        Automatically sets use_managed_browser=True. Default: False.
@@ -427,6 +434,8 @@ class BrowserConfig:
         browser_mode: str = "dedicated",
         use_managed_browser: bool = False,
         cdp_url: str = None,
+        browser_context_id: str = None,
+        target_id: str = None,
         use_persistent_context: bool = False,
         user_data_dir: str = None,
         chrome_channel: str = "chromium",
@@ -462,10 +471,12 @@ class BrowserConfig:
     ):
         
         self.browser_type = browser_type
-        self.headless = headless 
+        self.headless = headless
         self.browser_mode = browser_mode
         self.use_managed_browser = use_managed_browser
         self.cdp_url = cdp_url
+        self.browser_context_id = browser_context_id
+        self.target_id = target_id
         self.use_persistent_context = use_persistent_context
         self.user_data_dir = user_data_dir
         self.chrome_channel = chrome_channel or self.browser_type or "chromium"
@@ -561,6 +572,8 @@ class BrowserConfig:
             browser_mode=kwargs.get("browser_mode", "dedicated"),
             use_managed_browser=kwargs.get("use_managed_browser", False),
             cdp_url=kwargs.get("cdp_url"),
+            browser_context_id=kwargs.get("browser_context_id"),
+            target_id=kwargs.get("target_id"),
             use_persistent_context=kwargs.get("use_persistent_context", False),
             user_data_dir=kwargs.get("user_data_dir"),
             chrome_channel=kwargs.get("chrome_channel", "chromium"),
@@ -598,6 +611,8 @@ class BrowserConfig:
             "browser_mode": self.browser_mode,
             "use_managed_browser": self.use_managed_browser,
             "cdp_url": self.cdp_url,
+            "browser_context_id": self.browser_context_id,
+            "target_id": self.target_id,
             "use_persistent_context": self.use_persistent_context,
             "user_data_dir": self.user_data_dir,
             "chrome_channel": self.chrome_channel,
