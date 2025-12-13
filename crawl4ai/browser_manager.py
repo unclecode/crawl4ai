@@ -1149,12 +1149,22 @@ class BrowserManager:
 
         # If using a managed browser, just grab the shared default_context
         if self.config.use_managed_browser:
-            # If create_isolated_context is True, create a fresh context for this crawl
-            # This is essential for concurrent crawls on the same browser to prevent
-            # navigation conflicts (multiple crawls sharing the same page)
+            # If create_isolated_context is True, create isolated contexts for concurrent crawls
+            # Uses the same caching mechanism as non-CDP mode: cache context by config signature,
+            # but always create a new page. This prevents navigation conflicts while allowing
+            # context reuse for multiple URLs with the same config (e.g., batch/deep crawls).
             if self.config.create_isolated_context:
-                context = await self.create_browser_context(crawlerRunConfig)
-                await self.setup_context(context, crawlerRunConfig)
+                config_signature = self._make_config_signature(crawlerRunConfig)
+
+                async with self._contexts_lock:
+                    if config_signature in self.contexts_by_config:
+                        context = self.contexts_by_config[config_signature]
+                    else:
+                        context = await self.create_browser_context(crawlerRunConfig)
+                        await self.setup_context(context, crawlerRunConfig)
+                        self.contexts_by_config[config_signature] = context
+
+                # Always create a new page for each crawl (isolation for navigation)
                 page = await context.new_page()
                 await self._apply_stealth_to_page(page)
             elif self.config.storage_state:
