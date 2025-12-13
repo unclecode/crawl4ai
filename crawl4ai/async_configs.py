@@ -580,6 +580,7 @@ class BrowserConfig:
             cdp_url=kwargs.get("cdp_url"),
             browser_context_id=kwargs.get("browser_context_id"),
             target_id=kwargs.get("target_id"),
+            cdp_cleanup_on_close=kwargs.get("cdp_cleanup_on_close", False),
             use_persistent_context=kwargs.get("use_persistent_context", False),
             user_data_dir=kwargs.get("user_data_dir"),
             chrome_channel=kwargs.get("chrome_channel", "chromium"),
