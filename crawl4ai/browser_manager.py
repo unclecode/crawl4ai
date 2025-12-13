@@ -676,78 +676,12 @@ class BrowserManager:
                         f"Using pre-existing browser context: {self.config.browser_context_id}",
                         tag="BROWSER"
                     )
-
-                # Find the specific context by matching browserContextId
-                # Each Playwright context has pages, and we need to find which one
-                # corresponds to our CDP browserContextId
-                found_context = None
-                if contexts and len(contexts) == 1:
-                    # Only one context - use it directly
-                    found_context = contexts[0]
-                elif contexts and len(contexts) > 1:
-                    # Multiple contexts - need to find the right one
-                    # Use CDP to query which context owns our target
-                    try:
-                        # Get first page from any context to create CDP session
-                        any_page = None
-                        for ctx in contexts:
-                            if ctx.pages:
-                                any_page = ctx.pages[0]
-                                break
-
-                        if any_page:
-                            cdp = await any_page.context.new_cdp_session(any_page)
-                            try:
-                                result = await cdp.send("Target.getTargets")
-                                targets = result.get("targetInfos", [])
-
-                                # Find our target and its browserContextId
-                                for target in targets:
-                                    if target.get("targetId") == self.config.target_id:
-                                        target_browser_context_id = target.get("browserContextId")
-                                        if target_browser_context_id == self.config.browser_context_id:
-                                            # Found it - now find which Playwright context has a page matching
-                                            for ctx in contexts:
-                                                for page in ctx.pages:
-                                                    # Check if this page's context matches
-                                                    # by checking if the page is in the right context
-                                                    page_cdp = await ctx.new_cdp_session(page)
-                                                    try:
-                                                        page_targets = await page_cdp.send("Target.getTargets")
-                                                        for pt in page_targets.get("targetInfos", []):
-                                                            if pt.get("browserContextId") == self.config.browser_context_id:
-                                                                found_context = ctx
-                                                                break
-                                                    finally:
-                                                        await page_cdp.detach()
-                                                    if found_context:
-                                                        break
-                                                if found_context:
-                                                    break
-                                        break
-                            finally:
-                                await cdp.detach()
-                    except Exception as e:
-                        if self.logger:
-                            self.logger.warning(
-                                f"Failed to find context via CDP: {e}",
-                                tag="BROWSER"
-                            )
-
-                if found_context:
-                    self.default_context = found_context
-                    if self.logger:
-                        self.logger.debug(
-                            f"Found context for browserContextId: {self.config.browser_context_id}",
-                            tag="BROWSER"
-                        )
-                elif contexts:
-                    # Fallback to first context if we can't find the specific one
+                # When connecting to a pre-created context, it should be in contexts
+                if contexts:
                     self.default_context = contexts[0]
                     if self.logger:
-                        self.logger.warning(
-                            f"Could not find context for browserContextId {self.config.browser_context_id}, "
-                            f"using first of {len(contexts)} context(s)",
+                        self.logger.debug(
+                            f"Found {len(contexts)} existing context(s), using first one",
                             tag="BROWSER"
                         )
                 else:
@@ -1226,33 +1160,29 @@ class BrowserManager:
                 await self._apply_stealth_to_page(page)
             else:
                 context = self.default_context
-
-                # When target_id is provided, use it to find the specific page
-                # This is critical for concurrent requests sharing a browser
-                if self.config.browser_context_id and self.config.target_id:
-                    page = await self._get_page_by_target_id(context, self.config.target_id)
-                    if not page:
-                        # Fallback: create new page in existing context
+                pages = context.pages
+                page = next((p for p in pages if p.url == crawlerRunConfig.url), None)
+                if not page:
+                    if pages:
+                        page = pages[0]
+                    else:
+                        # Double-check under lock to avoid TOCTOU and ensure only
+                        # one task calls new_page when pages=[] concurrently
                         async with self._page_lock:
-                            page = await context.new_page()
-                            await self._apply_stealth_to_page(page)
-                else:
-                    # Original logic for cases without pre-created target
-                    pages = context.pages
-                    page = next((p for p in pages if p.url == crawlerRunConfig.url), None)
-                    if not page:
-                        if pages:
-                            page = pages[0]
-                        else:
-                            # Double-check under lock to avoid TOCTOU and ensure only
-                            # one task calls new_page when pages=[] concurrently
-                            async with self._page_lock:
-                                pages = context.pages
-                                if pages:
-                                    page = pages[0]
-                                else:
+                            pages = context.pages
+                            if pages:
+                                page = pages[0]
+                            elif self.config.browser_context_id and self.config.target_id:
+                                # Pre-existing context/target provided - use CDP to get the page
+                                # This handles the case where Playwright doesn't see the target yet
+                                page = await self._get_page_by_target_id(context, self.config.target_id)
+                                if not page:
+                                    # Fallback: create new page in existing context
                                     page = await context.new_page()
                                     await self._apply_stealth_to_page(page)
+                            else:
+                                page = await context.new_page()
+                                await self._apply_stealth_to_page(page)
         else:
             # Otherwise, check if we have an existing context for this config
             config_signature = self._make_config_signature(crawlerRunConfig)
