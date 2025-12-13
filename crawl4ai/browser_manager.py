@@ -677,34 +677,76 @@ class BrowserManager:
                         tag="BROWSER"
                     )
 
-                # Find the specific context by matching target_id to pages
-                # This is critical for concurrent crawls sharing a browser
+                # Find the specific context by matching browserContextId
+                # Each Playwright context has pages, and we need to find which one
+                # corresponds to our CDP browserContextId
                 found_context = None
-                if self.config.target_id and contexts:
-                    for ctx in contexts:
-                        for page in ctx.pages:
-                            # Playwright stores target ID in internal implementation
-                            page_impl = getattr(page, '_impl_obj', None)
-                            page_target_id = getattr(page_impl, '_target_id', None) if page_impl else None
-                            if page_target_id == self.config.target_id:
-                                found_context = ctx
-                                if self.logger:
-                                    self.logger.debug(
-                                        f"Found context by target_id: {self.config.target_id}",
-                                        tag="BROWSER"
-                                    )
+                if contexts and len(contexts) == 1:
+                    # Only one context - use it directly
+                    found_context = contexts[0]
+                elif contexts and len(contexts) > 1:
+                    # Multiple contexts - need to find the right one
+                    # Use CDP to query which context owns our target
+                    try:
+                        # Get first page from any context to create CDP session
+                        any_page = None
+                        for ctx in contexts:
+                            if ctx.pages:
+                                any_page = ctx.pages[0]
                                 break
-                        if found_context:
-                            break
+
+                        if any_page:
+                            cdp = await any_page.context.new_cdp_session(any_page)
+                            try:
+                                result = await cdp.send("Target.getTargets")
+                                targets = result.get("targetInfos", [])
+
+                                # Find our target and its browserContextId
+                                for target in targets:
+                                    if target.get("targetId") == self.config.target_id:
+                                        target_browser_context_id = target.get("browserContextId")
+                                        if target_browser_context_id == self.config.browser_context_id:
+                                            # Found it - now find which Playwright context has a page matching
+                                            for ctx in contexts:
+                                                for page in ctx.pages:
+                                                    # Check if this page's context matches
+                                                    # by checking if the page is in the right context
+                                                    page_cdp = await ctx.new_cdp_session(page)
+                                                    try:
+                                                        page_targets = await page_cdp.send("Target.getTargets")
+                                                        for pt in page_targets.get("targetInfos", []):
+                                                            if pt.get("browserContextId") == self.config.browser_context_id:
+                                                                found_context = ctx
+                                                                break
+                                                    finally:
+                                                        await page_cdp.detach()
+                                                    if found_context:
+                                                        break
+                                                if found_context:
+                                                    break
+                                        break
+                            finally:
+                                await cdp.detach()
+                    except Exception as e:
+                        if self.logger:
+                            self.logger.warning(
+                                f"Failed to find context via CDP: {e}",
+                                tag="BROWSER"
+                            )
 
                 if found_context:
                     self.default_context = found_context
+                    if self.logger:
+                        self.logger.debug(
+                            f"Found context for browserContextId: {self.config.browser_context_id}",
+                            tag="BROWSER"
+                        )
                 elif contexts:
                     # Fallback to first context if we can't find the specific one
                     self.default_context = contexts[0]
                     if self.logger:
                         self.logger.warning(
-                            f"Could not find context for target_id {self.config.target_id}, "
+                            f"Could not find context for browserContextId {self.config.browser_context_id}, "
                             f"using first of {len(contexts)} context(s)",
                             tag="BROWSER"
                         )
