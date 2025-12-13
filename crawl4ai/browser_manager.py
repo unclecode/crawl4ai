@@ -676,12 +676,36 @@ class BrowserManager:
                         f"Using pre-existing browser context: {self.config.browser_context_id}",
                         tag="BROWSER"
                     )
-                # When connecting to a pre-created context, it should be in contexts
-                if contexts:
+
+                # Find the specific context by matching target_id to pages
+                # This is critical for concurrent crawls sharing a browser
+                found_context = None
+                if self.config.target_id and contexts:
+                    for ctx in contexts:
+                        for page in ctx.pages:
+                            # Playwright stores target ID in internal implementation
+                            page_impl = getattr(page, '_impl_obj', None)
+                            page_target_id = getattr(page_impl, '_target_id', None) if page_impl else None
+                            if page_target_id == self.config.target_id:
+                                found_context = ctx
+                                if self.logger:
+                                    self.logger.debug(
+                                        f"Found context by target_id: {self.config.target_id}",
+                                        tag="BROWSER"
+                                    )
+                                break
+                        if found_context:
+                            break
+
+                if found_context:
+                    self.default_context = found_context
+                elif contexts:
+                    # Fallback to first context if we can't find the specific one
                     self.default_context = contexts[0]
                     if self.logger:
-                        self.logger.debug(
-                            f"Found {len(contexts)} existing context(s), using first one",
+                        self.logger.warning(
+                            f"Could not find context for target_id {self.config.target_id}, "
+                            f"using first of {len(contexts)} context(s)",
                             tag="BROWSER"
                         )
                 else:
