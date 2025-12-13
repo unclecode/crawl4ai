@@ -1149,7 +1149,15 @@ class BrowserManager:
 
         # If using a managed browser, just grab the shared default_context
         if self.config.use_managed_browser:
-            if self.config.storage_state:
+            # If create_isolated_context is True, create a fresh context for this crawl
+            # This is essential for concurrent crawls on the same browser to prevent
+            # navigation conflicts (multiple crawls sharing the same page)
+            if self.config.create_isolated_context:
+                context = await self.create_browser_context(crawlerRunConfig)
+                await self.setup_context(context, crawlerRunConfig)
+                page = await context.new_page()
+                await self._apply_stealth_to_page(page)
+            elif self.config.storage_state:
                 context = await self.create_browser_context(crawlerRunConfig)
                 ctx = self.default_context        # default context, one window only
                 ctx = await clone_runtime_state(context, ctx, crawlerRunConfig, self.config)
