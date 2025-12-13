@@ -380,6 +380,10 @@ class BrowserConfig:
         target_id (str or None): Pre-existing CDP target ID (page) to use. When provided along with
                                  browser_context_id, the crawler will reuse this target instead of creating
                                  a new page. Default: None.
+        cdp_cleanup_on_close (bool): When True and using cdp_url, the close() method will still clean up
+                                     the local Playwright client resources. Useful for cloud/server scenarios
+                                     where you don't own the remote browser but need to prevent memory leaks
+                                     from accumulated Playwright instances. Default: False.
         debugging_port (int): Port for the browser debugging protocol. Default: 9222.
         use_persistent_context (bool): Use a persistent browser context (like a persistent profile).
                                        Automatically sets use_managed_browser=True. Default: False.
@@ -436,6 +440,7 @@ class BrowserConfig:
         cdp_url: str = None,
         browser_context_id: str = None,
         target_id: str = None,
+        cdp_cleanup_on_close: bool = False,
         use_persistent_context: bool = False,
         user_data_dir: str = None,
         chrome_channel: str = "chromium",
@@ -477,6 +482,7 @@ class BrowserConfig:
         self.cdp_url = cdp_url
         self.browser_context_id = browser_context_id
         self.target_id = target_id
+        self.cdp_cleanup_on_close = cdp_cleanup_on_close
         self.use_persistent_context = use_persistent_context
         self.user_data_dir = user_data_dir
         self.chrome_channel = chrome_channel or self.browser_type or "chromium"

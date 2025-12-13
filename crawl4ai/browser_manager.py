@@ -1234,8 +1234,14 @@ class BrowserManager:
     async def close(self):
         """Close all browser resources and clean up."""
         if self.config.cdp_url:
+            # When using external CDP, we don't own the browser so skip most cleanup.
+            # But if cdp_cleanup_on_close is True, still clean up local Playwright client
+            # to prevent memory leaks in server/cloud scenarios.
+            if self.config.cdp_cleanup_on_close and self.playwright:
+                await self.playwright.stop()
+                self.playwright = None
             return
-        
+
         if self.config.sleep_on_close:
             await asyncio.sleep(0.5)
 
