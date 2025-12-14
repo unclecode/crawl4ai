@@ -477,6 +477,7 @@ class BrowserConfig:
         debugging_port: int = 9222,
         host: str = "localhost",
         enable_stealth: bool = False,
+        init_scripts: List[str] = None,
     ):
         
         self.browser_type = browser_type
@@ -536,6 +537,7 @@ class BrowserConfig:
         self.debugging_port = debugging_port
         self.host = host
         self.enable_stealth = enable_stealth
+        self.init_scripts = init_scripts if init_scripts is not None else []
 
         fa_user_agenr_generator = ValidUAGenerator()
         if self.user_agent_mode == "random":
@@ -615,6 +617,7 @@ class BrowserConfig:
             debugging_port=kwargs.get("debugging_port", 9222),
             host=kwargs.get("host", "localhost"),
             enable_stealth=kwargs.get("enable_stealth", False),
+            init_scripts=kwargs.get("init_scripts", []),
         )
 
     def to_dict(self):
@@ -654,9 +657,10 @@ class BrowserConfig:
             "debugging_port": self.debugging_port,
             "host": self.host,
             "enable_stealth": self.enable_stealth,
+            "init_scripts": self.init_scripts,
         }
 
-                
+
         return result
 
     def clone(self, **kwargs):

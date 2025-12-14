@@ -890,7 +890,12 @@ class BrowserManager:
                 or crawlerRunConfig.simulate_user
                 or crawlerRunConfig.magic
             ):
-                await context.add_init_script(load_js_script("navigator_overrider"))        
+                await context.add_init_script(load_js_script("navigator_overrider"))
+
+        # Apply custom init_scripts from BrowserConfig (for stealth evasions, etc.)
+        if self.config.init_scripts:
+            for script in self.config.init_scripts:
+                await context.add_init_script(script)
 
     async def create_browser_context(self, crawlerRunConfig: CrawlerRunConfig = None):
         """
