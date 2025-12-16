@@ -149,6 +149,7 @@ class CrawlResult(BaseModel):
     ssl_certificate: Optional[SSLCertificate] = None
     dispatch_result: Optional[DispatchResult] = None
     redirected_url: Optional[str] = None
+    redirected_status_code: Optional[int] = None
     network_requests: Optional[List[Dict[str, Any]]] = None
     console_messages: Optional[List[Dict[str, Any]]] = None
     tables: List[Dict] = Field(default_factory=list)  # NEW – [{headers,rows,caption,summary}]
@@ -328,6 +329,7 @@ class AsyncCrawlResponse(BaseModel):
     downloaded_files: Optional[List[str]] = None
     ssl_certificate: Optional[SSLCertificate] = None
     redirected_url: Optional[str] = None
+    redirected_status_code: Optional[int] = None
     network_requests: Optional[List[Dict[str, Any]]] = None
     console_messages: Optional[List[Dict[str, Any]]] = None
 
