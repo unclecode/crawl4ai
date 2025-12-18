@@ -717,13 +717,38 @@ class BrowserManager:
             self.default_context = self.browser
 
     async def _verify_cdp_ready(self, cdp_url: str) -> bool:
-        """Verify CDP endpoint is ready with exponential backoff"""
+        """Verify CDP endpoint is ready with exponential backoff.
+
+        Supports multiple URL formats:
+        - HTTP URLs: http://localhost:9222
+        - HTTP URLs with query params: http://localhost:9222?browser_id=XXX
+        - WebSocket URLs: ws://localhost:9222/devtools/browser/XXX
+        """
         import aiohttp
-        self.logger.debug(f"Starting CDP verification for {cdp_url}", tag="BROWSER")
+        from urllib.parse import urlparse, urlunparse
+
+        # If WebSocket URL, Playwright handles connection directly - skip HTTP verification
+        if cdp_url.startswith(('ws://', 'wss://')):
+            self.logger.debug(f"WebSocket CDP URL provided, skipping HTTP verification", tag="BROWSER")
+            return True
+
+        # Parse HTTP URL and properly construct /json/version endpoint
+        parsed = urlparse(cdp_url)
+        # Build URL with /json/version path, preserving query params
+        verify_url = urlunparse((
+            parsed.scheme,
+            parsed.netloc,
+            '/json/version',  # Always use this path for verification
+            '',  # params
+            parsed.query,  # preserve query string
+            ''   # fragment
+        ))
+
+        self.logger.debug(f"Starting CDP verification for {verify_url}", tag="BROWSER")
         for attempt in range(5):
             try:
                 async with aiohttp.ClientSession() as session:
-                    async with session.get(f"{cdp_url}/json/version", timeout=aiohttp.ClientTimeout(total=2)) as response:
+                    async with session.get(verify_url, timeout=aiohttp.ClientTimeout(total=2)) as response:
                         if response.status == 200:
                             self.logger.debug(f"CDP endpoint ready after {attempt + 1} attempts", tag="BROWSER")
                             return True
@@ -1257,12 +1282,42 @@ class BrowserManager:
     async def close(self):
         """Close all browser resources and clean up."""
         if self.config.cdp_url:
-            # When using external CDP, we don't own the browser so skip most cleanup.
-            # But if cdp_cleanup_on_close is True, still clean up local Playwright client
-            # to prevent memory leaks in server/cloud scenarios.
-            if self.config.cdp_cleanup_on_close and self.playwright:
-                await self.playwright.stop()
-                self.playwright = None
+            # When using external CDP, we don't own the browser process.
+            # If cdp_cleanup_on_close is True, properly disconnect from the browser
+            # and clean up Playwright resources. This frees the browser for other clients.
+            if self.config.cdp_cleanup_on_close:
+                # First close all sessions (pages)
+                session_ids = list(self.sessions.keys())
+                for session_id in session_ids:
+                    await self.kill_session(session_id)
+
+                # Close all contexts we created
+                for ctx in self.contexts_by_config.values():
+                    try:
+                        await ctx.close()
+                    except Exception:
+                        pass
+                self.contexts_by_config.clear()
+
+                # Disconnect from browser (doesn't terminate it, just releases connection)
+                if self.browser:
+                    try:
+                        await self.browser.close()
+                    except Exception as e:
+                        if self.logger:
+                            self.logger.debug(
+                                message="Error disconnecting from CDP browser: {error}",
+                                tag="BROWSER",
+                                params={"error": str(e)}
+                            )
+                    self.browser = None
+                    # Allow time for CDP connection to fully release before another client connects
+                    await asyncio.sleep(1.0)
+
+                # Stop Playwright instance to prevent memory leaks
+                if self.playwright:
+                    await self.playwright.stop()
+                    self.playwright = None
             return
 
         if self.config.sleep_on_close:
