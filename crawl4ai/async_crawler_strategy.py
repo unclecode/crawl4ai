@@ -989,8 +989,53 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             mhtml_data = None
 
             if config.pdf:
-                pdf_data = await self.export_pdf(page)
-
+                if config.css_selector:
+                    # Extract content with styles and fixed image URLs
+                    content_with_styles = await page.evaluate(f"""
+                        () => {{
+                            const element = document.querySelector("{config.css_selector}");
+                            const clone = element.cloneNode(true);
+                            
+                            // Fix all image URLs to absolute
+                            clone.querySelectorAll('img').forEach(img => {{
+                                if (img.src) img.src = img.src;  // This converts to absolute URL
+                            }});
+                            
+                            // Get all styles
+                            const styles = Array.from(document.styleSheets)
+                                .map(sheet => {{
+                                    try {{
+                                        return Array.from(sheet.cssRules).map(rule => rule.cssText).join('\\n');
+                                    }} catch(e) {{
+                                        return '';
+                                    }}
+                                }}).join('\\n');
+                            
+                            return {{
+                                html: clone.outerHTML,
+                                styles: styles,
+                                baseUrl: window.location.origin
+                            }};
+                        }}
+                    """)
+                    
+                    # Create page with base URL for relative resources
+                    temp_page = await context.new_page()
+                    await temp_page.goto(content_with_styles['baseUrl'])  # Set the base URL
+                    await temp_page.set_content(f"""
+                        <html>
+                        <head>
+                            <base href="{content_with_styles['baseUrl']}">
+                            <style>{content_with_styles['styles']}</style>
+                        </head>
+                        <body>{content_with_styles['html']}</body>
+                        </html>
+                    """)
+                    
+                    pdf_data = await self.export_pdf(temp_page)
+                    await temp_page.close()
+                else:
+                    pdf_data = await self.export_pdf(page)
             if config.capture_mhtml:
                 mhtml_data = await self.capture_mhtml(page)
 
