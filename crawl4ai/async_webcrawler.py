@@ -366,7 +366,7 @@ class AsyncWebCrawler:
                         screenshot_data=screenshot_data,
                         pdf_data=pdf_data,
                         verbose=config.verbose,
-                        is_raw_html=True if url.startswith("raw:") else False,
+                        is_raw_html=is_raw_html,
                         redirected_url=async_response.redirected_url,
                         original_scheme=urlparse(url).scheme,
                         **kwargs,
