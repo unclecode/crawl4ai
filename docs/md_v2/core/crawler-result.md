@@ -19,13 +19,15 @@ class MarkdownGenerationResult(BaseModel):
 class CrawlResult(BaseModel):
     url: str
     html: str
+    fit_html: Optional[str] = None
     success: bool
     cleaned_html: Optional[str] = None
     media: Dict[str, List[Dict]] = {}
     links: Dict[str, List[Dict]] = {}
     downloaded_files: Optional[List[str]] = None
+    js_execution_result: Optional[Dict[str, Any]] = None
     screenshot: Optional[str] = None
-    pdf : Optional[bytes] = None
+    pdf: Optional[bytes] = None
     mhtml: Optional[str] = None
     markdown: Optional[Union[str, MarkdownGenerationResult]] = None
     extracted_content: Optional[str] = None
@@ -35,6 +37,12 @@ class CrawlResult(BaseModel):
     response_headers: Optional[dict] = None
     status_code: Optional[int] = None
     ssl_certificate: Optional[SSLCertificate] = None
+    dispatch_result: Optional[DispatchResult] = None
+    redirected_url: Optional[str] = None
+    network_requests: Optional[List[Dict[str, Any]]] = None
+    console_messages: Optional[List[Dict[str, Any]]] = None
+    tables: List[Dict] = Field(default_factory=list)
+
     class Config:
         arbitrary_types_allowed = True
 ```
@@ -45,11 +53,13 @@ class CrawlResult(BaseModel):
 |-------------------------------------------|-----------------------------------------------------------------------------------------------------|
 | **url (`str`)**                           | The final or actual URL crawled (in case of redirects).                                             |
 | **html (`str`)**                          | Original, unmodified page HTML. Good for debugging or custom processing.                            |
+| **fit_html (`Optional[str]`)**            | Preprocessed HTML optimized for extraction and content filtering.                                    |
 | **success (`bool`)**                      | `True` if the crawl completed without major errors, else `False`.                                   |
 | **cleaned_html (`Optional[str]`)**        | Sanitized HTML with scripts/styles removed; can exclude tags if configured via `excluded_tags` etc. |
 | **media (`Dict[str, List[Dict]]`)**       | Extracted media info (images, audio, etc.), each with attributes like `src`, `alt`, `score`, etc.   |
 | **links (`Dict[str, List[Dict]]`)**       | Extracted link data, split by `internal` and `external`. Each link usually has `href`, `text`, etc. |
 | **downloaded_files (`Optional[List[str]]`)** | If `accept_downloads=True` in `BrowserConfig`, this lists the filepaths of saved downloads.         |
+| **js_execution_result (`Optional[Dict[str, Any]]`)** | Results from JavaScript execution during crawling. |
 | **screenshot (`Optional[str]`)**          | Screenshot of the page (base64-encoded) if `screenshot=True`.                                       |
 | **pdf (`Optional[bytes]`)**               | PDF of the page if `pdf=True`.                                                                      |
 | **mhtml (`Optional[str]`)**               | MHTML snapshot of the page if `capture_mhtml=True`. Contains the full page with all resources.      |
@@ -61,6 +71,11 @@ class CrawlResult(BaseModel):
 | **response_headers (`Optional[dict]`)**   | HTTP response headers, if captured.                                                                 |
 | **status_code (`Optional[int]`)**         | HTTP status code (e.g., 200 for OK).                                                                |
 | **ssl_certificate (`Optional[SSLCertificate]`)** | SSL certificate info if `fetch_ssl_certificate=True`.                                               |
+| **dispatch_result (`Optional[DispatchResult]`)** | Additional concurrency and resource usage information when crawling URLs in parallel.               |
+| **redirected_url (`Optional[str]`)**      | The URL after any redirects (different from `url` which is the final URL).                          |
+| **network_requests (`Optional[List[Dict[str, Any]]]`)** | List of network requests, responses, and failures captured during the crawl if `capture_network_requests=True`. |
+| **console_messages (`Optional[List[Dict[str, Any]]]`)** | List of browser console messages captured during the crawl if `capture_console_messages=True`.       |
+| **tables (`List[Dict]`)**                 | Table data extracted from HTML tables with structure `[{headers, rows, caption, summary}]`.           |
 
 ---
 
@@ -138,7 +153,7 @@ If you run a JSON-based extraction strategy (CSS, XPath, LLM, etc.), the structu
 import asyncio
 import json
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 async def main():
     schema = {
@@ -172,7 +187,7 @@ Here:
 
 ---
 
-## 5. More Fields: Links, Media, and More
+## 5. More Fields: Links, Media, Tables and More
 
 ### 5.1 `links`
 
@@ -192,7 +207,77 @@ for img in images:
     print("Image URL:", img["src"], "Alt:", img.get("alt"))
 ```
 
-### 5.3 `screenshot`, `pdf`, and `mhtml`
+### 5.3 `tables`
+
+The `tables` field contains structured data extracted from HTML tables found on the crawled page. Tables are analyzed based on various criteria to determine if they are actual data tables (as opposed to layout tables), including:
+
+- Presence of thead and tbody sections
+- Use of th elements for headers
+- Column consistency
+- Text density
+- And other factors
+
+Tables that score above the threshold (default: 7) are extracted and stored in result.tables.
+
+### Accessing Table data:
+```python
+import asyncio
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
+
+async def main():
+    async with AsyncWebCrawler() as crawler:
+        result = await crawler.arun(
+            url="https://www.w3schools.com/html/html_tables.asp",
+            config=CrawlerRunConfig(
+                table_score_threshold=7  # Minimum score for table detection
+            )
+        )
+
+        if result.success and result.tables:
+            print(f"Found {len(result.tables)} tables")
+
+            for i, table in enumerate(result.tables):
+                print(f"\nTable {i+1}:")
+                print(f"Caption: {table.get('caption', 'No caption')}")
+                print(f"Headers: {table['headers']}")
+                print(f"Rows: {len(table['rows'])}")
+
+                # Print first few rows as example
+                for j, row in enumerate(table['rows'][:3]):
+                    print(f"  Row {j+1}: {row}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
+```
+
+### Configuring Table Extraction:
+
+You can adjust the sensitivity of the table detection algorithm with:
+
+```python
+config = CrawlerRunConfig(
+    table_score_threshold=5  # Lower value = more tables detected (default: 7)
+)
+```
+
+Each extracted table contains: 
+
+- `headers`: Column header names 
+- `rows`: List of rows, each containing cell values
+- `caption`: Table caption text (if available) 
+- `summary`: Table summary attribute (if specified)
+
+### Table Extraction Tips
+
+- Not all HTML tables are extracted - only those detected as "data tables" vs. layout tables.
+- Tables with inconsistent cell counts, nested tables, or those used purely for layout may be skipped.
+- If you're missing tables, try adjusting the `table_score_threshold` to a lower value (default is 7).
+
+The table detection algorithm scores tables based on features like consistent columns, presence of headers, text density, and more. Tables scoring above the threshold are considered data tables worth extracting.
+
+
+### 5.4 `screenshot`, `pdf`, and `mhtml`
 
 If you set `screenshot=True`, `pdf=True`, or `capture_mhtml=True` in **`CrawlerRunConfig`**, then:
 
@@ -213,7 +298,7 @@ if result.mhtml:
 
 The MHTML (MIME HTML) format is particularly useful as it captures the entire web page including all of its resources (CSS, images, scripts, etc.) in a single file, making it perfect for archiving or offline viewing.
 
-### 5.4 `ssl_certificate`
+### 5.5 `ssl_certificate`
 
 If `fetch_ssl_certificate=True`, `result.ssl_certificate` holds details about the site’s SSL cert, such as issuer, validity dates, etc.
 

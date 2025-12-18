@@ -21,6 +21,7 @@ from .async_logger import AsyncLogger
 from .ssl_certificate import SSLCertificate
 from .user_agent_generator import ValidUAGenerator
 from .browser_manager import BrowserManager
+from .browser_adapter import BrowserAdapter, PlaywrightAdapter, UndetectedAdapter
 
 import aiofiles
 import aiohttp
@@ -71,7 +72,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
     """
 
     def __init__(
-        self, browser_config: BrowserConfig = None, logger: AsyncLogger = None, **kwargs
+        self, browser_config: BrowserConfig = None, logger: AsyncLogger = None, browser_adapter: BrowserAdapter = None, **kwargs
     ):
         """
         Initialize the AsyncPlaywrightCrawlerStrategy with a browser configuration.
@@ -80,11 +81,16 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             browser_config (BrowserConfig): Configuration object containing browser settings.
                                           If None, will be created from kwargs for backwards compatibility.
             logger: Logger instance for recording events and errors.
+            browser_adapter (BrowserAdapter): Browser adapter for handling browser-specific operations.
+                                           If None, defaults to PlaywrightAdapter.
             **kwargs: Additional arguments for backwards compatibility and extending functionality.
         """
         # Initialize browser config, either from provided object or kwargs
         self.browser_config = browser_config or BrowserConfig.from_kwargs(kwargs)
         self.logger = logger
+        
+        # Initialize browser adapter
+        self.adapter = browser_adapter or PlaywrightAdapter()
 
         # Initialize session management
         self._downloaded_files = []
@@ -104,7 +110,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
         # Initialize browser manager with config
         self.browser_manager = BrowserManager(
-            browser_config=self.browser_config, logger=self.logger
+            browser_config=self.browser_config, 
+            logger=self.logger,
+            use_undetected=isinstance(self.adapter, UndetectedAdapter)
         )
 
     async def __aenter__(self):
@@ -322,7 +330,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         """
 
         try:
-            result = await page.evaluate(wrapper_js)
+            result = await self.adapter.evaluate(page, wrapper_js)
             return result
         except Exception as e:
             if "Error evaluating condition" in str(e):
@@ -367,7 +375,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
                     # Replace the iframe with a div containing the extracted content
                     _iframe = iframe_content.replace("`", "\\`")
-                    await page.evaluate(
+                    await self.adapter.evaluate(page,
                         f"""
                         () => {{
                             const iframe = document.getElementById('iframe-{i}');
@@ -445,6 +453,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             return await self._crawl_web(url, config)
 
         elif url.startswith("file://"):
+            # initialize empty lists for console messages
+            captured_console = []
+            
             # Process local file
             local_file_path = url[7:]  # Remove 'file://' prefix
             if not os.path.exists(local_file_path):
@@ -466,9 +477,15 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 console_messages=captured_console,
             )
 
-        elif url.startswith("raw:") or url.startswith("raw://"):
+        ##### 
+        # Since both "raw:" and "raw://" start with "raw:", the first condition is always true for both, so "raw://" will be sliced as "//...", which is incorrect.
+        # Fix: Check for "raw://" first, then "raw:"
+        # Also, the prefix "raw://" is actually 6 characters long, not 7, so it should be sliced accordingly: url[6:]
+        #####
+        elif url.startswith("raw://") or url.startswith("raw:"):
             # Process raw HTML content
-            raw_html = url[4:] if url[:4] == "raw:" else url[7:]
+            # raw_html = url[4:] if url[:4] == "raw:" else url[7:]
+            raw_html = url[6:] if url.startswith("raw://") else url[4:]
             html = raw_html
             if config.screenshot:
                 screenshot_data = await self._generate_screenshot_from_html(html)
@@ -619,91 +636,16 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             page.on("requestfailed", handle_request_failed_capture)
 
         # Console Message Capturing
+        handle_console = None
+        handle_error = None
         if config.capture_console_messages:
-            def handle_console_capture(msg):
-                try:
-                    message_type = "unknown"
-                    try:
-                        message_type = msg.type
-                    except:
-                        pass
-                        
-                    message_text = "unknown"
-                    try:
-                        message_text = msg.text
-                    except:
-                        pass
-                        
-                    # Basic console message with minimal content
-                    entry = {
-                        "type": message_type,
-                        "text": message_text,
-                        "timestamp": time.time()
-                    }
-                    
-                    captured_console.append(entry)
-                    
-                except Exception as e:
-                    if self.logger:
-                        self.logger.warning(f"Error capturing console message: {e}", tag="CAPTURE")
-                    # Still add something to the list even on error
-                    captured_console.append({
-                        "type": "console_capture_error", 
-                        "error": str(e), 
-                        "timestamp": time.time()
-                    })
-
-            def handle_pageerror_capture(err):
-                try:
-                    error_message = "Unknown error"
-                    try:
-                        error_message = err.message
-                    except:
-                        pass
-                        
-                    error_stack = ""
-                    try:
-                        error_stack = err.stack
-                    except:
-                        pass
-                        
-                    captured_console.append({
-                        "type": "error",
-                        "text": error_message,
-                        "stack": error_stack,
-                        "timestamp": time.time()
-                    })
-                except Exception as e:
-                    if self.logger:
-                        self.logger.warning(f"Error capturing page error: {e}", tag="CAPTURE")
-                    captured_console.append({
-                        "type": "pageerror_capture_error", 
-                        "error": str(e), 
-                        "timestamp": time.time()
-                    })
-
-            # Add event listeners directly
-            page.on("console", handle_console_capture)
-            page.on("pageerror", handle_pageerror_capture)
+            # Set up console capture using adapter
+            handle_console = await self.adapter.setup_console_capture(page, captured_console)
+            handle_error = await self.adapter.setup_error_capture(page, captured_console)
 
         # Set up console logging if requested
-        if config.log_console:
-            def log_consol(
-                msg, console_log_type="debug"
-            ):  # Corrected the parameter syntax
-                if console_log_type == "error":
-                    self.logger.error(
-                        message=f"Console error: {msg}",  # Use f-string for variable interpolation
-                        tag="CONSOLE"
-                    )
-                elif console_log_type == "debug":
-                    self.logger.debug(
-                        message=f"Console: {msg}",  # Use f-string for variable interpolation
-                        tag="CONSOLE"
-                    )
-
-            page.on("console", log_consol)
-            page.on("pageerror", lambda e: log_consol(e, "error"))
+        # Note: For undetected browsers, console logging won't work directly
+        # but captured messages can still be logged after retrieval
 
         try:
             # Get SSL certificate information if requested and URL is HTTPS
@@ -741,18 +683,49 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     )
                     redirected_url = page.url
                 except Error as e:
-                    raise RuntimeError(f"Failed on navigating ACS-GOTO:\n{str(e)}")
+                    # Allow navigation to be aborted when downloading files
+                    # This is expected behavior for downloads in some browser engines
+                    if 'net::ERR_ABORTED' in str(e) and self.browser_config.accept_downloads:
+                        self.logger.info(
+                            message=f"Navigation aborted, likely due to file download: {url}",
+                            tag="GOTO",
+                            params={"url": url},
+                        )
+                        response = None
+                    else:
+                        raise RuntimeError(f"Failed on navigating ACS-GOTO:\n{str(e)}")
 
                 await self.execute_hook(
                     "after_goto", page, context=context, url=url, response=response, config=config
                 )
 
+                # ──────────────────────────────────────────────────────────────
+                # Walk the redirect chain.  Playwright returns only the last
+                # hop, so we trace the `request.redirected_from` links until the
+                # first response that differs from the final one and surface its
+                # status-code.
+                # ──────────────────────────────────────────────────────────────
                 if response is None:
                     status_code = 200
                     response_headers = {}
                 else:
-                    status_code = response.status
-                    response_headers = response.headers
+                    first_resp = response
+                    req = response.request
+                    while req and req.redirected_from:
+                        prev_req = req.redirected_from
+                        prev_resp = await prev_req.response()
+                        if prev_resp:                       # keep earliest
+                            first_resp = prev_resp
+                        req = prev_req
+                
+                    status_code = first_resp.status
+                    response_headers = first_resp.headers
+                # if response is None:
+                #     status_code = 200
+                #     response_headers = {}
+                # else:
+                #     status_code = response.status
+                #     response_headers = response.headers
 
             else:
                 status_code = 200
@@ -784,7 +757,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             except Error:
                 visibility_info = await self.check_visibility(page)
 
-                if self.browser_config.config.verbose:
+                if self.browser_config.verbose:
                     self.logger.debug(
                         message="Body visibility info: {info}",
                         tag="DEBUG",
@@ -896,7 +869,12 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
             # Handle full page scanning
             if config.scan_full_page:
-                await self._handle_full_page_scan(page, config.scroll_delay)
+                # await self._handle_full_page_scan(page, config.scroll_delay)
+                await self._handle_full_page_scan(page, config.scroll_delay, config.max_scroll_steps)
+
+            # Handle virtual scroll if configured
+            if config.virtual_scroll_config:
+                await self._handle_virtual_scroll(page, config.virtual_scroll_config)
 
             # Execute JavaScript if provided
             # if config.js_code:
@@ -937,8 +915,10 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
             if config.wait_for:
                 try:
+                    # Use wait_for_timeout if specified, otherwise fall back to page_timeout
+                    timeout = config.wait_for_timeout if config.wait_for_timeout is not None else config.page_timeout
                     await self.smart_wait(
-                        page, config.wait_for, timeout=config.page_timeout
+                        page, config.wait_for, timeout=timeout
                     )
                 except Exception as e:
                     raise RuntimeError(f"Wait condition failed: {str(e)}")
@@ -951,7 +931,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         await page.wait_for_load_state("domcontentloaded", timeout=5)
                     except PlaywrightTimeoutError:
                         pass
-                    await page.evaluate(update_image_dimensions_js)
+                    await self.adapter.evaluate(page, update_image_dimensions_js)
                 except Exception as e:
                     self.logger.error(
                         message="Error updating image dimensions: {error}",
@@ -980,7 +960,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     
                     for selector in selectors:
                         try:
-                            content = await page.evaluate(
+                            content = await self.adapter.evaluate(page,
                                 f"""Array.from(document.querySelectorAll("{selector}"))
                                     .map(el => el.outerHTML)
                                     .join('')"""
@@ -1038,6 +1018,17 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 await asyncio.sleep(delay)
                 return await page.content()
 
+            # For undetected browsers, retrieve console messages before returning
+            if config.capture_console_messages and hasattr(self.adapter, 'retrieve_console_messages'):
+                final_messages = await self.adapter.retrieve_console_messages(page)
+                captured_console.extend(final_messages)
+
+            ###
+            # This ensures we capture the current page URL at the time we return the response, 
+            # which correctly reflects any JavaScript navigation that occurred.
+            ###
+            redirected_url = page.url  # Use current page URL to capture JS redirects
+            
             # Return complete response
             return AsyncCrawlResponse(
                 html=html,
@@ -1063,19 +1054,32 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
         finally:
             # If no session_id is given we should close the page
-            if not config.session_id:
+            all_contexts = page.context.browser.contexts
+            total_pages = sum(len(context.pages) for context in all_contexts)                
+            if config.session_id:
+                pass
+            elif total_pages <= 1 and (self.browser_config.use_managed_browser or self.browser_config.headless):
+                pass
+            else:
                 # Detach listeners before closing to prevent potential errors during close
                 if config.capture_network_requests:
                     page.remove_listener("request", handle_request_capture)
                     page.remove_listener("response", handle_response_capture)
                     page.remove_listener("requestfailed", handle_request_failed_capture)
                 if config.capture_console_messages:
-                    page.remove_listener("console", handle_console_capture)
-                    page.remove_listener("pageerror", handle_pageerror_capture)
+                    # Retrieve any final console messages for undetected browsers
+                    if hasattr(self.adapter, 'retrieve_console_messages'):
+                        final_messages = await self.adapter.retrieve_console_messages(page)
+                        captured_console.extend(final_messages)
+                    
+                    # Clean up console capture
+                    await self.adapter.cleanup_console_capture(page, handle_console, handle_error)
                 
+                # Close the page
                 await page.close()
 
-    async def _handle_full_page_scan(self, page: Page, scroll_delay: float = 0.1):
+    # async def _handle_full_page_scan(self, page: Page, scroll_delay: float = 0.1):
+    async def _handle_full_page_scan(self, page: Page, scroll_delay: float = 0.1, max_scroll_steps: Optional[int] = None):
         """
         Helper method to handle full page scanning.
 
@@ -1090,6 +1094,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         Args:
             page (Page): The Playwright page object
             scroll_delay (float): The delay between page scrolls
+            max_scroll_steps (Optional[int]): Maximum number of scroll steps to perform. If None, scrolls until end.
 
         """
         try:
@@ -1114,9 +1119,21 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             dimensions = await self.get_page_dimensions(page)
             total_height = dimensions["height"]
 
+            scroll_step_count = 0
             while current_position < total_height:
+                #### 
+                # NEW FEATURE: Check if we've reached the maximum allowed scroll steps
+                # This prevents infinite scrolling on very long pages or infinite scroll scenarios
+                # If max_scroll_steps is None, this check is skipped (unlimited scrolling - original behavior)
+                ####
+                if max_scroll_steps is not None and scroll_step_count >= max_scroll_steps:
+                    break
                 current_position = min(current_position + viewport_height, total_height)
                 await self.safe_scroll(page, 0, current_position, delay=scroll_delay)
+
+                # Increment the step counter for max_scroll_steps tracking
+                scroll_step_count += 1
+                
                 # await page.evaluate(f"window.scrollTo(0, {current_position})")
                 # await asyncio.sleep(scroll_delay)
 
@@ -1139,6 +1156,177 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         else:
             # await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
             await self.safe_scroll(page, 0, total_height)
+
+    async def _handle_virtual_scroll(self, page: Page, config: "VirtualScrollConfig"):
+        """
+        Handle virtual scroll containers (e.g., Twitter-like feeds) by capturing
+        content at different scroll positions and merging unique elements.
+        
+        Following the design:
+        1. Get container HTML
+        2. Scroll by container height
+        3. Wait and check if container HTML changed
+        4. Three cases:
+           - No change: continue scrolling
+           - New items added (appended): continue (items already in page)
+           - Items replaced: capture HTML chunk and add to list
+        5. After N scrolls, merge chunks if any were captured
+        
+        Args:
+            page: The Playwright page object
+            config: Virtual scroll configuration
+        """
+        try:
+            # Import VirtualScrollConfig to avoid circular import
+            from .async_configs import VirtualScrollConfig
+            
+            # Ensure config is a VirtualScrollConfig instance
+            if isinstance(config, dict):
+                config = VirtualScrollConfig.from_dict(config)
+            
+            self.logger.info(
+                message="Starting virtual scroll capture for container: {selector}",
+                tag="VSCROLL",
+                params={"selector": config.container_selector}
+            )
+            
+            # JavaScript function to handle virtual scroll capture
+            virtual_scroll_js = """
+            async (config) => {
+                const container = document.querySelector(config.container_selector);
+                if (!container) {
+                    throw new Error(`Container not found: ${config.container_selector}`);
+                }
+                
+                // List to store HTML chunks when content is replaced
+                const htmlChunks = [];
+                let previousHTML = container.innerHTML;
+                let scrollCount = 0;
+                
+                // Determine scroll amount
+                let scrollAmount;
+                if (typeof config.scroll_by === 'number') {
+                    scrollAmount = config.scroll_by;
+                } else if (config.scroll_by === 'page_height') {
+                    scrollAmount = window.innerHeight;
+                } else { // container_height
+                    scrollAmount = container.offsetHeight;
+                }
+                
+                // Perform scrolling
+                while (scrollCount < config.scroll_count) {
+                    // Scroll the container
+                    container.scrollTop += scrollAmount;
+                    
+                    // Wait for content to potentially load
+                    await new Promise(resolve => setTimeout(resolve, config.wait_after_scroll * 1000));
+                    
+                    // Get current HTML
+                    const currentHTML = container.innerHTML;
+                    
+                    // Determine what changed
+                    if (currentHTML === previousHTML) {
+                        // Case 0: No change - continue scrolling
+                        console.log(`Scroll ${scrollCount + 1}: No change in content`);
+                    } else if (currentHTML.startsWith(previousHTML)) {
+                        // Case 1: New items appended - content already in page
+                        console.log(`Scroll ${scrollCount + 1}: New items appended`);
+                    } else {
+                        // Case 2: Items replaced - capture the previous HTML
+                        console.log(`Scroll ${scrollCount + 1}: Content replaced, capturing chunk`);
+                        htmlChunks.push(previousHTML);
+                    }
+                    
+                    // Update previous HTML for next iteration
+                    previousHTML = currentHTML;
+                    scrollCount++;
+                    
+                    // Check if we've reached the end
+                    if (container.scrollTop + container.clientHeight >= container.scrollHeight - 10) {
+                        console.log(`Reached end of scrollable content at scroll ${scrollCount}`);
+                        // Capture final chunk if content was replaced
+                        if (htmlChunks.length > 0) {
+                            htmlChunks.push(currentHTML);
+                        }
+                        break;
+                    }
+                }
+                
+                // If we have chunks (case 2 occurred), merge them
+                if (htmlChunks.length > 0) {
+                    console.log(`Merging ${htmlChunks.length} HTML chunks`);
+                    
+                    // Parse all chunks to extract unique elements
+                    const tempDiv = document.createElement('div');
+                    const seenTexts = new Set();
+                    const uniqueElements = [];
+                    
+                    // Process each chunk
+                    for (const chunk of htmlChunks) {
+                        tempDiv.innerHTML = chunk;
+                        const elements = tempDiv.children;
+                        
+                        for (let i = 0; i < elements.length; i++) {
+                            const element = elements[i];
+                            // Normalize text for deduplication
+                            const normalizedText = element.innerText
+                                .toLowerCase()
+                                .replace(/[\\s\\W]/g, ''); // Remove spaces and symbols
+                            
+                            if (!seenTexts.has(normalizedText)) {
+                                seenTexts.add(normalizedText);
+                                uniqueElements.push(element.outerHTML);
+                            }
+                        }
+                    }
+                    
+                    // Replace container content with merged unique elements
+                    container.innerHTML = uniqueElements.join('\\n');
+                    console.log(`Merged ${uniqueElements.length} unique elements from ${htmlChunks.length} chunks`);
+                    
+                    return {
+                        success: true,
+                        chunksCount: htmlChunks.length,
+                        uniqueCount: uniqueElements.length,
+                        replaced: true
+                    };
+                } else {
+                    console.log('No content replacement detected, all content remains in page');
+                    return {
+                        success: true,
+                        chunksCount: 0,
+                        uniqueCount: 0,
+                        replaced: false
+                    };
+                }
+            }
+            """
+            
+            # Execute virtual scroll capture
+            result = await self.adapter.evaluate(page, virtual_scroll_js, config.to_dict())
+            
+            if result.get("replaced", False):
+                self.logger.success(
+                    message="Virtual scroll completed. Merged {unique} unique elements from {chunks} chunks",
+                    tag="VSCROLL",
+                    params={
+                        "unique": result.get("uniqueCount", 0),
+                        "chunks": result.get("chunksCount", 0)
+                    }
+                )
+            else:
+                self.logger.info(
+                    message="Virtual scroll completed. Content was appended, no merging needed",
+                    tag="VSCROLL"
+                )
+            
+        except Exception as e:
+            self.logger.error(
+                message="Virtual scroll capture failed: {error}",
+                tag="VSCROLL",
+                params={"error": str(e)}
+            )
+            # Continue with normal flow even if virtual scroll fails
 
     async def _handle_download(self, download):
         """
@@ -1199,11 +1387,12 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         remove_overlays_js = load_js_script("remove_overlay_elements")
 
         try:
-            await page.evaluate(
+            await self.adapter.evaluate(page,
                 f"""
-                (() => {{
+                (async () => {{
                     try {{
-                        {remove_overlays_js}
+                        const removeOverlays = {remove_overlays_js};
+                        await removeOverlays();
                         return {{ success: true }};
                     }} catch (error) {{
                         return {{
@@ -1432,11 +1621,31 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             num_segments = (page_height // viewport_height) + 1
             for i in range(num_segments):
                 y_offset = i * viewport_height
+                # Special handling for the last segment
+                if i == num_segments - 1:
+                    last_part_height = page_height % viewport_height
+                    
+                    # If page_height is an exact multiple of viewport_height,
+                    # we don't need an extra segment
+                    if last_part_height == 0:
+                        # Skip last segment if page height is exact multiple of viewport
+                        break
+                    
+                    # Adjust viewport to exactly match the remaining content height
+                    await page.set_viewport_size({"width": page_width, "height": last_part_height})
+                
                 await page.evaluate(f"window.scrollTo(0, {y_offset})")
                 await asyncio.sleep(0.01)  # wait for render
-                seg_shot = await page.screenshot(full_page=False)
+                
+                # Capture the current segment
+                # Note: Using compression options (format, quality) would go here
+                seg_shot = await page.screenshot(full_page=False, type="jpeg", quality=85)
+                # seg_shot = await page.screenshot(full_page=False)
                 img = Image.open(BytesIO(seg_shot)).convert("RGB")
                 segments.append(img)
+
+            # Reset viewport to original size after capturing segments
+            await page.set_viewport_size({"width": page_width, "height": viewport_height})
 
             total_height = sum(img.height for img in segments)
             stitched = Image.new("RGB", (segments[0].width, total_height))
@@ -1566,12 +1775,31 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     # then wait for the new page to load before continuing
                     result = None
                     try:
-                        result = await page.evaluate(
+                        # OLD VERSION:
+                        # result = await page.evaluate(
+                        #     f"""
+                        # (async () => {{
+                        #     try {{
+                        #         const script_result = {script};
+                        #         return {{ success: true, result: script_result }};
+                        #     }} catch (err) {{
+                        #         return {{ success: false, error: err.toString(), stack: err.stack }};
+                        #     }}
+                        # }})();
+                        # """
+                        # )
+                        
+                        # """ NEW VERSION:
+                        # When {script} contains statements (e.g., const link = …; link.click();), 
+                        # this forms invalid JavaScript, causing Playwright execution error: SyntaxError: Unexpected token 'const'.
+                        # """
+                        result = await self.adapter.evaluate(page,
                             f"""
                         (async () => {{
                             try {{
-                                const script_result = {script};
-                                return {{ success: true, result: script_result }};
+                                return await (async () => {{
+                                    {script}
+                                }})();
                             }} catch (err) {{
                                 return {{ success: false, error: err.toString(), stack: err.stack }};
                             }}
@@ -1687,7 +1915,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             for script in scripts:
                 try:
                     # Execute the script and wait for network idle
-                    result = await page.evaluate(
+                    result = await self.adapter.evaluate(page,
                         f"""
                         (() => {{
                             return new Promise((resolve) => {{
@@ -1771,7 +1999,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         Returns:
             Boolean indicating visibility
         """
-        return await page.evaluate(
+        return await self.adapter.evaluate(page,
             """
             () => {
                 const element = document.body;
@@ -1812,7 +2040,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             Dict containing scroll status and position information
         """
         try:
-            result = await page.evaluate(
+            result = await self.adapter.evaluate(page,
                 f"""() => {{
                     try {{
                         const startX = window.scrollX;
@@ -1869,7 +2097,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         Returns:
             Dict containing width and height of the page
         """
-        return await page.evaluate(
+        return await self.adapter.evaluate(page,
             """
             () => {
                 const {scrollWidth, scrollHeight} = document.documentElement;
@@ -1889,7 +2117,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             bool: True if page needs scrolling
         """
         try:
-            need_scroll = await page.evaluate(
+            need_scroll = await self.adapter.evaluate(page,
                 """
             () => {
                 const scrollHeight = document.documentElement.scrollHeight;

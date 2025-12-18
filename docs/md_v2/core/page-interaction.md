@@ -296,7 +296,7 @@ if __name__ == "__main__":
 Once dynamic content is loaded, you can attach an **`extraction_strategy`** (like `JsonCssExtractionStrategy` or `LLMExtractionStrategy`). For example:
 
 ```python
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 schema = {
     "name": "Commits",
@@ -341,3 +341,44 @@ Crawl4AI’s **page interaction** features let you:
 4. Combine with **structured extraction** for dynamic sites.
 
 With these tools, you can scrape modern, interactive webpages confidently. For advanced hooking, user simulation, or in-depth config, check the [API reference](../api/parameters.md) or related advanced docs. Happy scripting!
+
+---
+
+## 9. Virtual Scrolling
+
+For sites that use **virtual scrolling** (where content is replaced rather than appended as you scroll, like Twitter or Instagram), Crawl4AI provides a dedicated `VirtualScrollConfig`:
+
+```python
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, VirtualScrollConfig
+
+async def crawl_twitter_timeline():
+    # Configure virtual scroll for Twitter-like feeds
+    virtual_config = VirtualScrollConfig(
+        container_selector="[data-testid='primaryColumn']",  # Twitter's main column
+        scroll_count=30,                # Scroll 30 times
+        scroll_by="container_height",   # Scroll by container height each time
+        wait_after_scroll=1.0          # Wait 1 second after each scroll
+    )
+    
+    config = CrawlerRunConfig(
+        virtual_scroll_config=virtual_config
+    )
+    
+    async with AsyncWebCrawler() as crawler:
+        result = await crawler.arun(
+            url="https://twitter.com/search?q=AI",
+            config=config
+        )
+        # result.html now contains ALL tweets from the virtual scroll
+```
+
+### Virtual Scroll vs JavaScript Scrolling
+
+| Feature | Virtual Scroll | JS Code Scrolling |
+|---------|---------------|-------------------|
+| **Use Case** | Content replaced during scroll | Content appended or simple scroll |
+| **Configuration** | `VirtualScrollConfig` object | `js_code` with scroll commands |
+| **Automatic Merging** | Yes - merges all unique content | No - captures final state only |
+| **Best For** | Twitter, Instagram, virtual tables | Traditional pages, load more buttons |
+
+For detailed examples and configuration options, see the [Virtual Scroll documentation](../advanced/virtual-scroll.md).

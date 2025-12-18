@@ -79,7 +79,7 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-> IMPORTANT: By default cache mode is set to `CacheMode.ENABLED`. So to have fresh content, you need to set it to `CacheMode.BYPASS`
+> IMPORTANT: By default cache mode is set to `CacheMode.BYPASS` to have fresh content. Set `CacheMode.ENABLED` to enable caching.
 
 We’ll explore more advanced config in later tutorials (like enabling proxies, PDF output, multi-tab sessions, etc.). For now, just note how you pass these objects to manage crawling.
 
@@ -127,7 +127,7 @@ Crawl4AI can also extract structured data (JSON) using CSS or XPath selectors. B
 > **New!** Crawl4AI now provides a powerful utility to automatically generate extraction schemas using LLM. This is a one-time cost that gives you a reusable schema for fast, LLM-free extractions:
 
 ```python
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 from crawl4ai import LLMConfig
 
 # Generate a schema (one-time cost)
@@ -157,7 +157,7 @@ Here's a basic extraction example:
 import asyncio
 import json
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 async def main():
     schema = {
@@ -212,7 +212,7 @@ import json
 import asyncio
 from pydantic import BaseModel, Field
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, LLMConfig
-from crawl4ai.extraction_strategy import LLMExtractionStrategy
+from crawl4ai import LLMExtractionStrategy
 
 class OpenAIModelFee(BaseModel):
     model_name: str = Field(..., description="Name of the OpenAI model.")
@@ -272,7 +272,43 @@ if __name__ == "__main__":
 
 ---
 
-## 7. Multi-URL Concurrency (Preview)
+## 7. Adaptive Crawling (New!)
+
+Crawl4AI now includes intelligent adaptive crawling that automatically determines when sufficient information has been gathered. Here's a quick example:
+
+```python
+import asyncio
+from crawl4ai import AsyncWebCrawler, AdaptiveCrawler
+
+async def adaptive_example():
+    async with AsyncWebCrawler() as crawler:
+        adaptive = AdaptiveCrawler(crawler)
+        
+        # Start adaptive crawling
+        result = await adaptive.digest(
+            start_url="https://docs.python.org/3/",
+            query="async context managers"
+        )
+        
+        # View results
+        adaptive.print_stats()
+        print(f"Crawled {len(result.crawled_urls)} pages")
+        print(f"Achieved {adaptive.confidence:.0%} confidence")
+
+if __name__ == "__main__":
+    asyncio.run(adaptive_example())
+```
+
+**What's special about adaptive crawling?**
+- **Automatic stopping**: Stops when sufficient information is gathered
+- **Intelligent link selection**: Follows only relevant links
+- **Confidence scoring**: Know how complete your information is
+
+[Learn more about Adaptive Crawling →](adaptive-crawling.md)
+
+---
+
+## 8. Multi-URL Concurrency (Preview)
 
 If you need to crawl multiple URLs in **parallel**, you can use `arun_many()`. By default, Crawl4AI employs a **MemoryAdaptiveDispatcher**, automatically adjusting concurrency based on system resources. Here’s a quick glimpse:
 
@@ -328,7 +364,7 @@ Some sites require multiple “page clicks” or dynamic JavaScript updates. Bel
 ```python
 import asyncio
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 async def extract_structured_data_using_css_extractor():
     print("\n--- Using JsonCssExtractionStrategy for Fast Structured Output ---")

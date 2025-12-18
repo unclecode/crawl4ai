@@ -14,7 +14,7 @@ class PDFCrawlerStrategy(AsyncCrawlerStrategy):
     async def crawl(self, url: str, **kwargs) -> AsyncCrawlResponse:
         # Just pass through with empty HTML - scraper will handle actual processing
         return AsyncCrawlResponse(
-            html="",  # Scraper will handle the real work
+            html="Scraper will handle the real work",  # Scraper will handle the real work
             response_headers={"Content-Type": "application/pdf"},
             status_code=200
         )
@@ -66,6 +66,7 @@ class PDFContentScrapingStrategy(ContentScrapingStrategy):
             image_save_dir=image_save_dir,
             batch_size=batch_size
         )
+        self._temp_files = []  # Track temp files for cleanup
 
     def scrap(self, url: str, html: str, **params) -> ScrapingResult:
         """
@@ -124,7 +125,13 @@ class PDFContentScrapingStrategy(ContentScrapingStrategy):
         finally:
             # Cleanup temp file if downloaded
             if url.startswith(("http://", "https://")):
-                Path(pdf_path).unlink(missing_ok=True)
+                try:
+                    Path(pdf_path).unlink(missing_ok=True)
+                    if pdf_path in self._temp_files:
+                        self._temp_files.remove(pdf_path)
+                except Exception as e:
+                    if self.logger:
+                        self.logger.warning(f"Failed to cleanup temp file {pdf_path}: {e}")
 
     async def ascrap(self, url: str, html: str, **kwargs) -> ScrapingResult:
         # For simple cases, you can use the sync version
@@ -138,22 +145,45 @@ class PDFContentScrapingStrategy(ContentScrapingStrategy):
             
             # Create temp file with .pdf extension
             temp_file = tempfile.NamedTemporaryFile(suffix='.pdf', delete=False)
+            self._temp_files.append(temp_file.name)
             
             try:
-                # Download PDF with streaming
-                response = requests.get(url, stream=True)
+                if self.logger:
+                    self.logger.info(f"Downloading PDF from {url}...")
+                
+                # Download PDF with streaming and timeout
+                # Connection timeout: 10s, Read timeout: 300s (5 minutes for large PDFs)
+                response = requests.get(url, stream=True, timeout=(20, 60 * 10))
                 response.raise_for_status()
+                
+                # Get file size if available
+                total_size = int(response.headers.get('content-length', 0))
+                downloaded = 0
                 
                 # Write to temp file
                 with open(temp_file.name, 'wb') as f:
                     for chunk in response.iter_content(chunk_size=8192):
                         f.write(chunk)
+                        downloaded += len(chunk)
+                        if self.logger and total_size > 0:
+                            progress = (downloaded / total_size) * 100
+                            if progress % 10 < 0.1:  # Log every 10%
+                                self.logger.debug(f"PDF download progress: {progress:.0f}%")
+                
+                if self.logger:
+                    self.logger.info(f"PDF downloaded successfully: {temp_file.name}")
                         
                 return temp_file.name
                 
+            except requests.exceptions.Timeout as e:
+                # Clean up temp file if download fails
+                Path(temp_file.name).unlink(missing_ok=True)
+                self._temp_files.remove(temp_file.name)
+                raise RuntimeError(f"Timeout downloading PDF from {url}: {str(e)}")
             except Exception as e:
                 # Clean up temp file if download fails
                 Path(temp_file.name).unlink(missing_ok=True)
+                self._temp_files.remove(temp_file.name)
                 raise RuntimeError(f"Failed to download PDF from {url}: {str(e)}")
                 
         elif url.startswith("file://"):

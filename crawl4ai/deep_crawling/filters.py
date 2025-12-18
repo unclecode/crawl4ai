@@ -120,6 +120,9 @@ class URLPatternFilter(URLFilter):
     """Pattern filter balancing speed and completeness"""
 
     __slots__ = (
+        "patterns",  # Store original patterns for serialization
+        "use_glob",  # Store original use_glob for serialization  
+        "reverse",   # Store original reverse for serialization
         "_simple_suffixes",
         "_simple_prefixes",
         "_domain_patterns",
@@ -142,6 +145,11 @@ class URLPatternFilter(URLFilter):
         reverse: bool = False,
     ):
         super().__init__()
+        # Store original constructor params for serialization
+        self.patterns = patterns
+        self.use_glob = use_glob
+        self.reverse = reverse
+        
         self._reverse = reverse
         patterns = [patterns] if isinstance(patterns, (str, Pattern)) else patterns
 
@@ -227,10 +235,21 @@ class URLPatternFilter(URLFilter):
         # Prefix check (/foo/*)
         if self._simple_prefixes:
             path = url.split("?")[0]
-            if any(path.startswith(p) for p in self._simple_prefixes):
-                result = True
-                self._update_stats(result)
-                return not result if self._reverse else result
+            # if any(path.startswith(p) for p in self._simple_prefixes):
+            #     result = True
+            #     self._update_stats(result)
+            #     return not result if self._reverse else result
+            ####
+            # Modified the prefix matching logic to ensure path boundary checking:
+            # - Check if the matched prefix is followed by a path separator (`/`), query parameter (`?`), fragment (`#`), or is at the end of the path
+            # - This ensures `/api/` only matches complete path segments, not substrings like `/apiv2/`
+            ####
+            for prefix in self._simple_prefixes:
+                if path.startswith(prefix):
+                    if len(path) == len(prefix) or path[len(prefix)] in ['/', '?', '#']:
+                        result = True
+                        self._update_stats(result)
+                        return not result if self._reverse else result
 
         # Complex patterns
         if self._path_patterns:
@@ -337,6 +356,15 @@ class ContentTypeFilter(URLFilter):
         "sqlite": "application/vnd.sqlite3",
         # Placeholder
         "unknown": "application/octet-stream",  # Fallback for unknown file types
+        # php
+        "php": "application/x-httpd-php",
+        "php3": "application/x-httpd-php",
+        "php4": "application/x-httpd-php",
+        "php5": "application/x-httpd-php",
+        "php7": "application/x-httpd-php",
+        "phtml": "application/x-httpd-php",
+        "phps": "application/x-httpd-php-source",
+
     }
 
     @staticmethod
@@ -481,18 +509,22 @@ class DomainFilter(URLFilter):
 class ContentRelevanceFilter(URLFilter):
     """BM25-based relevance filter using head section content"""
 
-    __slots__ = ("query_terms", "threshold", "k1", "b", "avgdl")
+    __slots__ = ("query_terms", "threshold", "k1", "b", "avgdl", "query")
 
     def __init__(
         self,
-        query: str,
+        query: Union[str, List[str]],
         threshold: float,
         k1: float = 1.2,
         b: float = 0.75,
         avgdl: int = 1000,
     ):
         super().__init__(name="BM25RelevanceFilter")
-        self.query_terms = self._tokenize(query)
+        if isinstance(query, list):
+            self.query = " ".join(query)
+        else:
+            self.query = query
+        self.query_terms = self._tokenize(self.query)
         self.threshold = threshold
         self.k1 = k1  # TF saturation parameter
         self.b = b  # Length normalization parameter

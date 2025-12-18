@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>App Details - Crawl4AI Marketplace</title>
+    <link rel="stylesheet" href="marketplace.css">
+    <link rel="stylesheet" href="app-detail.css">
+</head>
+<body>
+    <div class="app-detail-container">
+        <!-- Header -->
+        <header class="marketplace-header">
+            <div class="header-content">
+                <div class="header-left">
+                    <div class="logo-title">
+                        <img src="../../assets/images/logo.png" alt="Crawl4AI" class="header-logo">
+                        <h1>
+                            <span class="ascii-border">[</span>
+                            Marketplace
+                            <span class="ascii-border">]</span>
+                        </h1>
+                    </div>
+                </div>
+                <div class="header-nav">
+                    <a href="index.html" class="back-btn">← Back to Marketplace</a>
+                </div>
+            </div>
+        </header>
+
+        <!-- App Hero Section -->
+        <section class="app-hero">
+            <div class="app-hero-content">
+                <div class="app-hero-image" id="app-image">
+                    <!-- Dynamic image -->
+                </div>
+                <div class="app-hero-info">
+                    <div class="app-badges">
+                        <span class="app-badge" id="app-type">Open Source</span>
+                        <span class="app-badge featured" id="app-featured" style="display:none">FEATURED</span>
+                        <span class="app-badge sponsored" id="app-sponsored" style="display:none">SPONSORED</span>
+                    </div>
+                    <h1 id="app-name">App Name</h1>
+                    <p id="app-description" class="app-tagline">App description goes here</p>
+
+                    <div class="app-stats">
+                        <div class="stat">
+                            <span class="stat-value" id="app-rating">★★★★★</span>
+                            <span class="stat-label">Rating</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value" id="app-downloads">0</span>
+                            <span class="stat-label">Downloads</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value" id="app-category">Category</span>
+                            <span class="stat-label">Category</span>
+                        </div>
+                    </div>
+
+                    <div class="app-actions">
+                        <a href="#" id="app-website" class="action-btn primary" target="_blank">
+                            <span>→</span> Visit Website
+                        </a>
+                        <a href="#" id="app-github" class="action-btn secondary" target="_blank">
+                            <span>⚡</span> View on GitHub
+                        </a>
+                        <button id="copy-integration" class="action-btn ghost">
+                            <span>📋</span> Copy Integration
+                        </button>
+                    </div>
+
+                    <div class="pricing-info">
+                        <span class="pricing-label">Pricing:</span>
+                        <span id="app-pricing" class="pricing-value">Free</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Navigation Tabs -->
+        <nav class="app-nav">
+            <button class="nav-tab active" data-tab="integration">Integration Guide</button>
+            <button class="nav-tab" data-tab="docs">Documentation</button>
+            <button class="nav-tab" data-tab="examples">Examples</button>
+            <button class="nav-tab" data-tab="support">Support</button>
+        </nav>
+
+        <!-- Content Sections -->
+        <main class="app-content">
+            <!-- Integration Guide Tab -->
+            <section id="integration-tab" class="tab-content active">
+                <div class="docs-content">
+                    <h2>Quick Start</h2>
+                    <p>Get started with this integration in just a few steps.</p>
+
+                    <h3>Installation</h3>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-lang">bash</span>
+                            <button class="copy-btn">Copy</button>
+                        </div>
+                        <pre><code id="install-code">pip install crawl4ai</code></pre>
+                    </div>
+
+                    <h3>Basic Usage</h3>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-lang">python</span>
+                            <button class="copy-btn">Copy</button>
+                        </div>
+                        <pre><code id="usage-code">from crawl4ai import AsyncWebCrawler
+
+async def main():
+    async with AsyncWebCrawler() as crawler:
+        result = await crawler.arun(
+            url="https://example.com",
+            # Your configuration here
+        )
+        print(result.markdown)
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(main())</code></pre>
+                    </div>
+
+                    <h3>Advanced Configuration</h3>
+                    <p>Customize the crawler with these advanced options:</p>
+
+                    <div class="feature-grid">
+                        <div class="feature-card">
+                            <h4>🚀 Performance</h4>
+                            <p>Optimize crawling speed with parallel processing and caching strategies.</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>🔒 Authentication</h4>
+                            <p>Handle login forms, cookies, and session management automatically.</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>🎯 Extraction</h4>
+                            <p>Use CSS selectors, XPath, or AI-powered content extraction.</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>🔄 Proxy Support</h4>
+                            <p>Rotate proxies and bypass rate limiting with built-in proxy management.</p>
+                        </div>
+                    </div>
+
+                    <h3>Integration Example</h3>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-lang">python</span>
+                            <button class="copy-btn">Copy</button>
+                        </div>
+                        <pre><code id="integration-code">from crawl4ai import AsyncWebCrawler
+from crawl4ai.extraction_strategy import LLMExtractionStrategy
+
+async def extract_with_llm():
+    async with AsyncWebCrawler() as crawler:
+        result = await crawler.arun(
+            url="https://example.com",
+            extraction_strategy=LLMExtractionStrategy(
+                provider="openai",
+                api_key="your-api-key",
+                instruction="Extract product information"
+            ),
+            bypass_cache=True
+        )
+        return result.extracted_content
+
+# Run the extraction
+data = await extract_with_llm()
+print(data)</code></pre>
+                    </div>
+
+                    <div class="info-box">
+                        <h4>💡 Pro Tip</h4>
+                        <p>Use the <code>bypass_cache=True</code> parameter when you need fresh data, or set <code>cache_mode="write"</code> to update the cache with new content.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Documentation Tab -->
+            <section id="docs-tab" class="tab-content">
+                <div class="docs-content">
+                    <h2>Documentation</h2>
+                    <p>Complete documentation and API reference.</p>
+                    <!-- Dynamic content loaded here -->
+                </div>
+            </section>
+
+            <!-- Examples Tab -->
+            <section id="examples-tab" class="tab-content">
+                <div class="docs-content">
+                    <h2>Examples</h2>
+                    <p>Real-world examples and use cases.</p>
+                    <!-- Dynamic content loaded here -->
+                </div>
+            </section>
+
+            <!-- Support Tab -->
+            <section id="support-tab" class="tab-content">
+                <div class="docs-content">
+                    <h2>Support</h2>
+                    <div class="support-grid">
+                        <div class="support-card">
+                            <h3>📧 Contact</h3>
+                            <p id="app-contact">contact@example.com</p>
+                        </div>
+                        <div class="support-card">
+                            <h3>🐛 Report Issues</h3>
+                            <p>Found a bug? Report it on GitHub Issues.</p>
+                        </div>
+                        <div class="support-card">
+                            <h3>💬 Community</h3>
+                            <p>Join our Discord for help and discussions.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Related Apps -->
+        <section class="related-apps">
+            <h2>Related Apps</h2>
+            <div id="related-apps-grid" class="related-grid">
+                <!-- Dynamic related apps -->
+            </div>
+        </section>
+    </div>
+
+    <script src="app-detail.js"></script>
+</body>
+</html>

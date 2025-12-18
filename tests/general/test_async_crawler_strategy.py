@@ -15,6 +15,24 @@ CRAWL4AI_HOME_DIR = Path(os.path.expanduser("~")).joinpath(".crawl4ai")
 if not CRAWL4AI_HOME_DIR.joinpath("profiles", "test_profile").exists():
     CRAWL4AI_HOME_DIR.joinpath("profiles", "test_profile").mkdir(parents=True)
 
+@pytest.fixture
+def basic_html():
+    return """
+    <html lang="en">
+    <head>
+        <title>Basic HTML</title>
+    </head>
+    <body>
+        <h1>Main Heading</h1>
+        <main>
+            <div class="container">
+                <p>Basic HTML document for testing purposes.</p>
+            </div>
+        </main>
+    </body>
+    </html>
+    """
+
 # Test Config Files
 @pytest.fixture
 def basic_browser_config():
@@ -325,6 +343,13 @@ async def test_stealth_mode(crawler_strategy):
     )
     assert response.status_code == 200
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("prefix", ("raw:", "raw://"))
+async def test_raw_urls(crawler_strategy, basic_html, prefix):
+    url = f"{prefix}{basic_html}"
+    response = await crawler_strategy.crawl(url, CrawlerRunConfig())
+    assert response.html == basic_html
+
 # Error Handling Tests  
 @pytest.mark.asyncio
 async def test_invalid_url():
@@ -338,6 +363,20 @@ async def test_network_error_handling():
     with pytest.raises(Exception):
         async with AsyncPlaywrightCrawlerStrategy() as strategy:
             await strategy.crawl("https://invalid.example.com", config)
+
+@pytest.mark.asyncio
+async def test_remove_overlay_elements(crawler_strategy):
+    config = CrawlerRunConfig(
+        remove_overlay_elements=True,
+        delay_before_return_html=5,
+    )
+    
+    response = await crawler_strategy.crawl(
+        "https://www2.hm.com/en_us/index.html",
+        config
+    )
+    assert response.status_code == 200
+    assert "Accept all cookies" not in response.html
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

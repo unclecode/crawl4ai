@@ -137,7 +137,7 @@ if __name__ == "__main__":
   - Higher → fewer chunks but more relevant.  
   - Lower → more inclusive.  
 
-> In more advanced scenarios, you might see parameters like `use_stemming`, `case_sensitive`, or `priority_tags` to refine how text is tokenized or weighted.
+> In more advanced scenarios, you might see parameters like `language`, `case_sensitive`, or `priority_tags` to refine how text is tokenized or weighted.
 
 ---
 

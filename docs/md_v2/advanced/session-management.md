@@ -45,50 +45,79 @@ Here's an example of crawling GitHub commits across multiple pages while preserv
 
 ```python
 from crawl4ai.async_configs import CrawlerRunConfig
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 from crawl4ai.cache_context import CacheMode
 
 async def crawl_dynamic_content():
-    async with AsyncWebCrawler() as crawler:
-        session_id = "github_commits_session"
-        url = "https://github.com/microsoft/TypeScript/commits/main"
-        all_commits = []
+    url = "https://github.com/microsoft/TypeScript/commits/main"
+    session_id = "wait_for_session"
+    all_commits = []
 
-        # Define extraction schema
-        schema = {
-            "name": "Commit Extractor",
-            "baseSelector": "li.Box-sc-g0xbh4-0",
-            "fields": [{
-                "name": "title", "selector": "h4.markdown-title", "type": "text"
-            }],
-        }
-        extraction_strategy = JsonCssExtractionStrategy(schema)
+    js_next_page = """
+    const commits = document.querySelectorAll('li[data-testid="commit-row-item"] h4');
+    if (commits.length > 0) {
+        window.lastCommit = commits[0].textContent.trim();
+    }
+    const button = document.querySelector('a[data-testid="pagination-next-button"]');
+    if (button) {button.click(); console.log('button clicked') }
+    """
 
-        # JavaScript and wait configurations
-        js_next_page = """document.querySelector('a[data-testid="pagination-next-button"]').click();"""
-        wait_for = """() => document.querySelectorAll('li.Box-sc-g0xbh4-0').length > 0"""
-
-        # Crawl multiple pages
+    wait_for = """() => {
+        const commits = document.querySelectorAll('li[data-testid="commit-row-item"] h4');
+        if (commits.length === 0) return false;
+        const firstCommit = commits[0].textContent.trim();
+        return firstCommit !== window.lastCommit;
+    }"""
+    
+    schema = {
+        "name": "Commit Extractor",
+        "baseSelector": "li[data-testid='commit-row-item']",
+        "fields": [
+            {
+                "name": "title",
+                "selector": "h4 a",
+                "type": "text",
+                "transform": "strip",
+            },
+        ],
+    }
+    extraction_strategy = JsonCssExtractionStrategy(schema, verbose=True)
+    
+    
+    browser_config = BrowserConfig(
+        verbose=True,
+        headless=False,
+    )
+        
+    async with AsyncWebCrawler(config=browser_config) as crawler:
         for page in range(3):
-            config = CrawlerRunConfig(
-                url=url,
+            crawler_config = CrawlerRunConfig(
                 session_id=session_id,
+                css_selector="li[data-testid='commit-row-item']",
                 extraction_strategy=extraction_strategy,
                 js_code=js_next_page if page > 0 else None,
                 wait_for=wait_for if page > 0 else None,
                 js_only=page > 0,
-                cache_mode=CacheMode.BYPASS
+                cache_mode=CacheMode.BYPASS,
+                capture_console_messages=True,
             )
-
-            result = await crawler.arun(config=config)
-            if result.success:
+            
+            result = await crawler.arun(url=url, config=crawler_config)
+            
+            if result.console_messages:
+                print(f"Page {page + 1} console messages:", result.console_messages)
+            
+            if result.extracted_content:
+                # print(f"Page {page + 1} result:", result.extracted_content)
                 commits = json.loads(result.extracted_content)
                 all_commits.extend(commits)
                 print(f"Page {page + 1}: Found {len(commits)} commits")
+            else:
+                print(f"Page {page + 1}: No content extracted")
 
+        print(f"Successfully crawled {len(all_commits)} commits across 3 pages")
         # Clean up session
         await crawler.crawler_strategy.kill_session(session_id)
-        return all_commits
 ```
 
 ---

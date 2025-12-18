@@ -38,7 +38,13 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
         self.include_external = include_external
         self.score_threshold = score_threshold
         self.max_pages = max_pages
-        self.logger = logger or logging.getLogger(__name__)
+        # self.logger = logger or logging.getLogger(__name__)
+        # Ensure logger is always a Logger instance, not a dict from serialization
+        if isinstance(logger, logging.Logger):
+            self.logger = logger
+        else:
+            # Create a new logger if logger is None, dict, or any other non-Logger type
+            self.logger = logging.getLogger(__name__)
         self.stats = TraversalStats(start_time=datetime.now())
         self._cancel_event = asyncio.Event()
         self._pages_crawled = 0
@@ -157,6 +163,11 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
         results: List[CrawlResult] = []
 
         while current_level and not self._cancel_event.is_set():
+            # Check if we've already reached max_pages before starting a new level
+            if self._pages_crawled >= self.max_pages:
+                self.logger.info(f"Max pages limit ({self.max_pages}) reached, stopping crawl")
+                break
+            
             next_level: List[Tuple[str, Optional[str]]] = []
             urls = [url for url, _ in current_level]
 
@@ -221,6 +232,10 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
                 # Count only successful crawls
                 if result.success:
                     self._pages_crawled += 1
+                    # Check if we've reached the limit during batch processing
+                    if self._pages_crawled >= self.max_pages:
+                        self.logger.info(f"Max pages limit ({self.max_pages}) reached during batch, stopping crawl")
+                        break  # Exit the generator
                 
                 results_count += 1
                 yield result

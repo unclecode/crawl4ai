@@ -12,7 +12,7 @@ import os
 
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
 from crawl4ai import LLMConfig
-from crawl4ai.extraction_strategy import (
+from crawl4ai import (
     LLMExtractionStrategy,
     JsonCssExtractionStrategy,
     JsonXPathExtractionStrategy,

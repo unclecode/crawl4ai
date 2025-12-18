@@ -14,23 +14,9 @@ import hashlib
 from .js_snippet import load_js_script
 from .config import DOWNLOAD_PAGE_TIMEOUT
 from .async_configs import BrowserConfig, CrawlerRunConfig
-from playwright_stealth import StealthConfig
 from .utils import get_chromium_path
+import warnings
 
-stealth_config = StealthConfig(
-    webdriver=True,
-    chrome_app=True,
-    chrome_csi=True,
-    chrome_load_times=True,
-    chrome_runtime=True,
-    navigator_languages=True,
-    navigator_plugins=True,
-    navigator_permissions=True,
-    webgl_vendor=True,
-    outerdimensions=True,
-    navigator_hardware_concurrency=True,
-    media_codecs=True,
-)
 
 BROWSER_DISABLE_OPTIONS = [
     "--disable-background-networking",
@@ -255,6 +241,13 @@ class ManagedBrowser:
                     preexec_fn=os.setpgrp  # Start in a new process group
                 )
                 
+            # If verbose is True print args used to run the process
+            if self.logger and self.browser_config.verbose:
+                self.logger.debug(
+                    f"Starting browser with args: {' '.join(args)}",
+                    tag="BROWSER"
+                )    
+                
             # We'll monitor for a short time to make sure it starts properly, but won't keep monitoring
             await asyncio.sleep(0.5)  # Give browser time to start
             await self._initial_startup_check()
@@ -376,6 +369,9 @@ class ManagedBrowser:
             ]
             if self.headless:
                 flags.append("--headless=new")
+            # Add viewport flag if specified in config
+            if self.browser_config.viewport_height and self.browser_config.viewport_width:
+                flags.append(f"--window-size={self.browser_config.viewport_width},{self.browser_config.viewport_height}")
             # merge common launch flags
             flags.extend(self.build_browser_flags(self.browser_config))
         elif self.browser_type == "firefox":
@@ -511,6 +507,56 @@ class ManagedBrowser:
         return profiler.delete_profile(profile_name_or_path)
 
 
+async def clone_runtime_state(
+    src: BrowserContext,
+    dst: BrowserContext,
+    crawlerRunConfig: CrawlerRunConfig | None = None,
+    browserConfig: BrowserConfig | None = None,
+) -> None:
+    """
+    Bring everything that *can* be changed at runtime from `src` → `dst`.
+
+    1. Cookies
+    2. localStorage (and sessionStorage, same API)
+    3. Extra headers, permissions, geolocation if supplied in configs
+    """
+
+    # ── 1. cookies ────────────────────────────────────────────────────────────
+    cookies = await src.cookies()
+    if cookies:
+        await dst.add_cookies(cookies)
+
+    # ── 2. localStorage / sessionStorage ──────────────────────────────────────
+    state = await src.storage_state()
+    for origin in state.get("origins", []):
+        url = origin["origin"]
+        kvs = origin.get("localStorage", [])
+        if not kvs:
+            continue
+
+        page = dst.pages[0] if dst.pages else await dst.new_page()
+        await page.goto(url, wait_until="domcontentloaded")
+        for k, v in kvs:
+            await page.evaluate("(k,v)=>localStorage.setItem(k,v)", k, v)
+
+    # ── 3. runtime-mutable extras from configs ────────────────────────────────
+    # headers
+    if browserConfig and browserConfig.headers:
+        await dst.set_extra_http_headers(browserConfig.headers)
+
+    # geolocation
+    if crawlerRunConfig and crawlerRunConfig.geolocation:
+        await dst.grant_permissions(["geolocation"])
+        await dst.set_geolocation(
+            {
+                "latitude": crawlerRunConfig.geolocation.latitude,
+                "longitude": crawlerRunConfig.geolocation.longitude,
+                "accuracy": crawlerRunConfig.geolocation.accuracy,
+            }
+        )
+        
+    return dst
+
 
 
 class BrowserManager:
@@ -531,21 +577,26 @@ class BrowserManager:
     _playwright_instance = None
     
     @classmethod
-    async def get_playwright(cls):
-        from playwright.async_api import async_playwright
+    async def get_playwright(cls, use_undetected: bool = False):
+        if use_undetected:
+            from patchright.async_api import async_playwright
+        else:
+            from playwright.async_api import async_playwright
         cls._playwright_instance = await async_playwright().start()
         return cls._playwright_instance    
 
-    def __init__(self, browser_config: BrowserConfig, logger=None):
+    def __init__(self, browser_config: BrowserConfig, logger=None, use_undetected: bool = False):
         """
         Initialize the BrowserManager with a browser configuration.
 
         Args:
             browser_config (BrowserConfig): Configuration object containing all browser settings
             logger: Logger instance for recording events and errors
+            use_undetected (bool): Whether to use undetected browser (Patchright)
         """
         self.config: BrowserConfig = browser_config
         self.logger = logger
+        self.use_undetected = use_undetected
 
         # Browser state
         self.browser = None
@@ -559,7 +610,18 @@ class BrowserManager:
 
         # Keep track of contexts by a "config signature," so each unique config reuses a single context
         self.contexts_by_config = {}
-        self._contexts_lock = asyncio.Lock() 
+        self._contexts_lock = asyncio.Lock()
+        
+        # Serialize context.new_page() across concurrent tasks to avoid races
+        # when using a shared persistent context (context.pages may be empty
+        # for all racers). Prevents 'Target page/context closed' errors.
+        self._page_lock = asyncio.Lock()
+        
+        # Stealth adapter for stealth mode
+        self._stealth_adapter = None
+        if self.config.enable_stealth and not self.use_undetected:
+            from .browser_adapter import StealthAdapter
+            self._stealth_adapter = StealthAdapter()
 
         # Initialize ManagedBrowser if needed
         if self.config.use_managed_browser:
@@ -588,13 +650,22 @@ class BrowserManager:
         if self.playwright is not None:
             await self.close()
             
-        from playwright.async_api import async_playwright
+        if self.use_undetected:
+            from patchright.async_api import async_playwright
+        else:
+            from playwright.async_api import async_playwright
 
+        # Initialize playwright
         self.playwright = await async_playwright().start()
 
         if self.config.cdp_url or self.config.use_managed_browser:
             self.config.use_managed_browser = True
             cdp_url = await self.managed_browser.start() if not self.config.cdp_url else self.config.cdp_url
+            
+            # Add CDP endpoint verification before connecting
+            if not await self._verify_cdp_ready(cdp_url):
+                raise Exception(f"CDP endpoint at {cdp_url} is not ready after startup")
+            
             self.browser = await self.playwright.chromium.connect_over_cdp(cdp_url)
             contexts = self.browser.contexts
             if contexts:
@@ -615,6 +686,24 @@ class BrowserManager:
 
             self.default_context = self.browser
 
+    async def _verify_cdp_ready(self, cdp_url: str) -> bool:
+        """Verify CDP endpoint is ready with exponential backoff"""
+        import aiohttp
+        self.logger.debug(f"Starting CDP verification for {cdp_url}", tag="BROWSER")
+        for attempt in range(5):
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(f"{cdp_url}/json/version", timeout=aiohttp.ClientTimeout(total=2)) as response:
+                        if response.status == 200:
+                            self.logger.debug(f"CDP endpoint ready after {attempt + 1} attempts", tag="BROWSER")
+                            return True
+            except Exception as e:
+                self.logger.debug(f"CDP check attempt {attempt + 1} failed: {e}", tag="BROWSER")
+            delay = 0.5 * (1.4 ** attempt)
+            self.logger.debug(f"Waiting {delay:.2f}s before next CDP check...", tag="BROWSER")
+            await asyncio.sleep(delay)
+        self.logger.debug(f"CDP verification failed after 5 attempts", tag="BROWSER")
+        return False
 
     def _build_browser_args(self) -> dict:
         """Build browser launch arguments from config."""
@@ -673,17 +762,18 @@ class BrowserManager:
             )
             os.makedirs(browser_args["downloads_path"], exist_ok=True)
 
-        if self.config.proxy or self.config.proxy_config:
+        if self.config.proxy:
+            warnings.warn(
+                "BrowserConfig.proxy is deprecated and ignored. Use proxy_config instead.",
+                DeprecationWarning,
+            )
+        if self.config.proxy_config:
             from playwright.async_api import ProxySettings
 
-            proxy_settings = (
-                ProxySettings(server=self.config.proxy)
-                if self.config.proxy
-                else ProxySettings(
-                    server=self.config.proxy_config.server,
-                    username=self.config.proxy_config.username,
-                    password=self.config.proxy_config.password,
-                )
+            proxy_settings = ProxySettings(
+                server=self.config.proxy_config.server,
+                username=self.config.proxy_config.username,
+                password=self.config.proxy_config.password,
             )
             browser_args["proxy"] = proxy_settings
 
@@ -939,6 +1029,19 @@ class BrowserManager:
         signature_hash = hashlib.sha256(signature_json.encode("utf-8")).hexdigest()
         return signature_hash
 
+    async def _apply_stealth_to_page(self, page):
+        """Apply stealth to a page if stealth mode is enabled"""
+        if self._stealth_adapter:
+            try:
+                await self._stealth_adapter.apply_stealth(page)
+            except Exception as e:
+                if self.logger:
+                    self.logger.warning(
+                        message="Failed to apply stealth to page: {error}",
+                        tag="STEALTH",
+                        params={"error": str(e)}
+                    )
+
     async def get_page(self, crawlerRunConfig: CrawlerRunConfig):
         """
         Get a page for the given session ID, creating a new one if needed.
@@ -960,11 +1063,32 @@ class BrowserManager:
 
         # If using a managed browser, just grab the shared default_context
         if self.config.use_managed_browser:
-            context = self.default_context
-            pages = context.pages
-            page = next((p for p in pages if p.url == crawlerRunConfig.url), None)
-            if not page:
-                page = context.pages[0] # await context.new_page()
+            if self.config.storage_state:
+                context = await self.create_browser_context(crawlerRunConfig)
+                ctx = self.default_context        # default context, one window only
+                ctx = await clone_runtime_state(context, ctx, crawlerRunConfig, self.config)
+                # Avoid concurrent new_page on shared persistent context
+                # See GH-1198: context.pages can be empty under races
+                async with self._page_lock:
+                    page = await ctx.new_page()
+                await self._apply_stealth_to_page(page)
+            else:
+                context = self.default_context
+                pages = context.pages
+                page = next((p for p in pages if p.url == crawlerRunConfig.url), None)
+                if not page:
+                    if pages:
+                        page = pages[0]
+                    else:
+                        # Double-check under lock to avoid TOCTOU and ensure only
+                        # one task calls new_page when pages=[] concurrently
+                        async with self._page_lock:
+                            pages = context.pages
+                            if pages:
+                                page = pages[0]
+                            else:
+                                page = await context.new_page()
+                                await self._apply_stealth_to_page(page)
         else:
             # Otherwise, check if we have an existing context for this config
             config_signature = self._make_config_signature(crawlerRunConfig)
@@ -980,6 +1104,7 @@ class BrowserManager:
 
             # Create a new page from the chosen context
             page = await context.new_page()
+            await self._apply_stealth_to_page(page)
 
         # If a session_id is specified, store this session so we can reuse later
         if crawlerRunConfig.session_id:

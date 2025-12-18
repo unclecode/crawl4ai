@@ -66,29 +66,38 @@ Sometimes you need a visual record of a page or a PDF “printout.” Crawl4AI c
 ```python
 import os, asyncio
 from base64 import b64decode
-from crawl4ai import AsyncWebCrawler, CacheMode
+from crawl4ai import AsyncWebCrawler, CacheMode, CrawlerRunConfig
 
 async def main():
+    run_config = CrawlerRunConfig(
+        cache_mode=CacheMode.BYPASS,
+        screenshot=True,
+        pdf=True
+    )
+
     async with AsyncWebCrawler() as crawler:
         result = await crawler.arun(
             url="https://en.wikipedia.org/wiki/List_of_common_misconceptions",
-            cache_mode=CacheMode.BYPASS,
-            pdf=True,
-            screenshot=True
+            config=run_config
         )
-        
         if result.success:
-            # Save screenshot
+            print(f"Screenshot data present: {result.screenshot is not None}")
+            print(f"PDF data present: {result.pdf is not None}")
+
             if result.screenshot:
+                print(f"[OK] Screenshot captured, size: {len(result.screenshot)} bytes")
                 with open("wikipedia_screenshot.png", "wb") as f:
                     f.write(b64decode(result.screenshot))
-            
-            # Save PDF
+            else:
+                print("[WARN] Screenshot data is None.")
+
             if result.pdf:
+                print(f"[OK] PDF captured, size: {len(result.pdf)} bytes")
                 with open("wikipedia_page.pdf", "wb") as f:
                     f.write(result.pdf)
-            
-            print("[OK] PDF & screenshot captured.")
+            else:
+                print("[WARN] PDF data is None.")
+
         else:
             print("[ERROR]", result.error_message)
 
@@ -349,9 +358,77 @@ if __name__ == "__main__":
 
 ---
 
+---
+
+## 7. Anti-Bot Features (Stealth Mode & Undetected Browser)
+
+Crawl4AI provides two powerful features to bypass bot detection:
+
+### 7.1 Stealth Mode
+
+Stealth mode uses playwright-stealth to modify browser fingerprints and behaviors. Enable it with a simple flag:
+
+```python
+browser_config = BrowserConfig(
+    enable_stealth=True,  # Activates stealth mode
+    headless=False
+)
+```
+
+**When to use**: Sites with basic bot detection (checking navigator.webdriver, plugins, etc.)
+
+### 7.2 Undetected Browser
+
+For advanced bot detection, use the undetected browser adapter:
+
+```python
+from crawl4ai import UndetectedAdapter
+from crawl4ai.async_crawler_strategy import AsyncPlaywrightCrawlerStrategy
+
+# Create undetected adapter
+adapter = UndetectedAdapter()
+strategy = AsyncPlaywrightCrawlerStrategy(
+    browser_config=browser_config,
+    browser_adapter=adapter
+)
+
+async with AsyncWebCrawler(crawler_strategy=strategy, config=browser_config) as crawler:
+    # Your crawling code
+```
+
+**When to use**: Sites with sophisticated bot detection (Cloudflare, DataDome, etc.)
+
+### 7.3 Combining Both
+
+For maximum evasion, combine stealth mode with undetected browser:
+
+```python
+browser_config = BrowserConfig(
+    enable_stealth=True,  # Enable stealth
+    headless=False
+)
+
+adapter = UndetectedAdapter()  # Use undetected browser
+```
+
+### Choosing the Right Approach
+
+| Detection Level | Recommended Approach |
+|----------------|---------------------|
+| No protection | Regular browser |
+| Basic checks | Regular + Stealth mode |
+| Advanced protection | Undetected browser |
+| Maximum evasion | Undetected + Stealth mode |
+
+**Best Practice**: Start with regular browser + stealth mode. Only use undetected browser if needed, as it may be slightly slower.
+
+See [Undetected Browser Mode](undetected-browser.md) for detailed examples.
+
+---
+
 ## Conclusion & Next Steps
 
-You’ve now explored several **advanced** features:
+You've now explored several **advanced** features:
 
 - **Proxy Usage**  
 - **PDF & Screenshot** capturing for large or critical pages  
@@ -359,7 +436,10 @@ You’ve now explored several **advanced** features:
 - **Custom Headers** for language or specialized requests  
 - **Session Persistence** via storage state
 - **Robots.txt Compliance**
+- **Anti-Bot Features** (Stealth Mode & Undetected Browser)
 
-With these power tools, you can build robust scraping workflows that mimic real user behavior, handle secure sites, capture detailed snapshots, and manage sessions across multiple runs—streamlining your entire data collection pipeline.
+With these power tools, you can build robust scraping workflows that mimic real user behavior, handle secure sites, capture detailed snapshots, manage sessions across multiple runs, and bypass bot detection—streamlining your entire data collection pipeline.
 
-**Last Updated**: 2025-01-01
+**Note**: In future versions, we may enable stealth mode and undetected browser by default. For now, users should explicitly enable these features when needed.
+
+**Last Updated**: 2025-01-17

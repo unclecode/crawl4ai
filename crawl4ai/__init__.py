@@ -2,12 +2,13 @@
 import warnings
 
 from .async_webcrawler import AsyncWebCrawler, CacheMode
-from .async_configs import BrowserConfig, CrawlerRunConfig, HTTPCrawlerConfig, LLMConfig, ProxyConfig, GeolocationConfig
+# MODIFIED: Add SeedingConfig and VirtualScrollConfig here
+from .async_configs import BrowserConfig, CrawlerRunConfig, HTTPCrawlerConfig, LLMConfig, ProxyConfig, GeolocationConfig, SeedingConfig, VirtualScrollConfig, LinkPreviewConfig, MatchMode
 
 from .content_scraping_strategy import (
     ContentScrapingStrategy,
-    WebScrapingStrategy,
     LXMLWebScrapingStrategy,
+    WebScrapingStrategy,  # Backward compatibility alias
 )
 from .async_logger import (
     AsyncLoggerBase,
@@ -28,6 +29,12 @@ from .extraction_strategy import (
 )
 from .chunking_strategy import ChunkingStrategy, RegexChunking
 from .markdown_generation_strategy import DefaultMarkdownGenerator
+from .table_extraction import (
+    TableExtractionStrategy,
+    DefaultTableExtraction,
+    NoTableExtraction,
+    LLMTableExtraction,
+)
 from .content_filter_strategy import (
     PruningContentFilter,
     BM25ContentFilter,
@@ -36,6 +43,7 @@ from .content_filter_strategy import (
 )
 from .models import CrawlResult, MarkdownGenerationResult, DisplayMode
 from .components.crawler_monitor import CrawlerMonitor
+from .link_preview import LinkPreview
 from .async_dispatcher import (
     MemoryAdaptiveDispatcher,
     SemaphoreDispatcher,
@@ -64,6 +72,41 @@ from .deep_crawling import (
     BestFirstCrawlingStrategy,
     DFSDeepCrawlStrategy,
     DeepCrawlDecorator,
+    ContentRelevanceFilter,
+    ContentTypeScorer,
+)
+# NEW: Import AsyncUrlSeeder
+from .async_url_seeder import AsyncUrlSeeder
+# Adaptive Crawler
+from .adaptive_crawler import (
+    AdaptiveCrawler,
+    AdaptiveConfig,
+    CrawlState,
+    CrawlStrategy,
+    StatisticalStrategy
+)
+
+# C4A Script Language Support
+from .script import (
+    compile as c4a_compile,
+    validate as c4a_validate,
+    compile_file as c4a_compile_file,
+    CompilationResult,
+    ValidationResult,
+    ErrorDetail
+)
+
+# Browser Adapters
+from .browser_adapter import (
+    BrowserAdapter,
+    PlaywrightAdapter,
+    UndetectedAdapter
+)
+
+from .utils import (
+    start_colab_display_server,
+    setup_colab_environment,
+    hooks_to_string
 )
 
 __all__ = [
@@ -73,6 +116,17 @@ __all__ = [
     "BrowserProfiler",
     "LLMConfig",
     "GeolocationConfig",
+    # NEW: Add SeedingConfig and VirtualScrollConfig
+    "SeedingConfig",
+    "VirtualScrollConfig",
+    # NEW: Add AsyncUrlSeeder
+    "AsyncUrlSeeder",
+    # Adaptive Crawler
+    "AdaptiveCrawler",
+    "AdaptiveConfig", 
+    "CrawlState",
+    "CrawlStrategy",
+    "StatisticalStrategy",
     "DeepCrawlStrategy",
     "BFSDeepCrawlStrategy",
     "BestFirstCrawlingStrategy",
@@ -94,6 +148,7 @@ __all__ = [
     "CrawlResult",
     "CrawlerHub",
     "CacheMode",
+    "MatchMode",
     "ContentScrapingStrategy",
     "WebScrapingStrategy",
     "LXMLWebScrapingStrategy",
@@ -110,6 +165,9 @@ __all__ = [
     "ChunkingStrategy",
     "RegexChunking",
     "DefaultMarkdownGenerator",
+    "TableExtractionStrategy",
+    "DefaultTableExtraction",
+    "NoTableExtraction",
     "RelevantContentFilter",
     "PruningContentFilter",
     "BM25ContentFilter",
@@ -119,12 +177,28 @@ __all__ = [
     "SemaphoreDispatcher",
     "RateLimiter",
     "CrawlerMonitor",
+    "LinkPreview",
     "DisplayMode",
     "MarkdownGenerationResult",
     "Crawl4aiDockerClient",
     "ProxyRotationStrategy",
     "RoundRobinProxyStrategy",
-    "ProxyConfig"
+    "ProxyConfig",
+    "start_colab_display_server",
+    "setup_colab_environment",
+    "hooks_to_string",
+    # C4A Script additions
+    "c4a_compile",
+    "c4a_validate", 
+    "c4a_compile_file",
+    "CompilationResult",
+    "ValidationResult",
+    "ErrorDetail",
+    # Browser Adapters
+    "BrowserAdapter",
+    "PlaywrightAdapter", 
+    "UndetectedAdapter",
+    "LinkPreviewConfig"
 ]
 
 

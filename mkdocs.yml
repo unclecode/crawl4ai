@@ -1,4 +1,4 @@
-site_name: Crawl4AI Documentation (v0.6.x)
+site_name: Crawl4AI Documentation (v0.7.x)
 site_description:  🚀🤖 Crawl4AI, Open-source LLM-Friendly Web Crawler & Scraper
 site_url: https://docs.crawl4ai.com
 repo_url: https://github.com/unclecode/crawl4ai
@@ -7,12 +7,19 @@ docs_dir: docs/md_v2
 
 nav:
   - Home: 'index.md'
+  - "📚 Complete SDK Reference": "complete-sdk-reference.md"
   - "Ask AI": "core/ask-ai.md"
   - "Quick Start": "core/quickstart.md"
   - "Code Examples": "core/examples.md"
+  - Apps:
+    - "Demo Apps": "apps/index.md"
+    - "C4A-Script Editor": "apps/c4a-script/index.html"
+    - "LLM Context Builder": "apps/llmtxt/index.html"
+    - "Marketplace": "marketplace/index.html"
+    - "Marketplace Admin": "marketplace/admin/index.html"
   - Setup & Installation:
     - "Installation": "core/installation.md"
-    - "Docker Deployment": "core/docker-deployment.md"
+    - "Self-Hosting Guide": "core/self-hosting.md"
   - "Blog & Changelog":
     - "Blog Home": "blog/index.md"
     - "Changelog": "https://github.com/unclecode/crawl4ai/blob/main/CHANGELOG.md"
@@ -20,6 +27,9 @@ nav:
     - "Command Line Interface": "core/cli.md"
     - "Simple Crawling": "core/simple-crawling.md"
     - "Deep Crawling": "core/deep-crawling.md"
+    - "Adaptive Crawling": "core/adaptive-crawling.md"
+    - "URL Seeding": "core/url-seeding.md"
+    - "C4A-Script": "core/c4a-script.md"
     - "Crawler Result": "core/crawler-result.md"
     - "Browser, Crawler & LLM Config": "core/browser-crawler-config.md"
     - "Markdown Generation": "core/markdown-generation.md"
@@ -31,16 +41,20 @@ nav:
     - "Link & Media": "core/link-media.md"
   - Advanced:
     - "Overview": "advanced/advanced-features.md"
+    - "Adaptive Strategies": "advanced/adaptive-strategies.md"
+    - "Virtual Scroll": "advanced/virtual-scroll.md"
     - "File Downloading": "advanced/file-downloading.md"
     - "Lazy Loading": "advanced/lazy-loading.md"
     - "Hooks & Auth": "advanced/hooks-auth.md"
     - "Proxy & Security": "advanced/proxy-security.md"
+    - "Undetected Browser": "advanced/undetected-browser.md"
     - "Session Management": "advanced/session-management.md"
     - "Multi-URL Crawling": "advanced/multi-url-crawling.md"
     - "Crawl Dispatcher": "advanced/crawl-dispatcher.md"
     - "Identity Based Crawling": "advanced/identity-based-crawling.md"
     - "SSL Certificate": "advanced/ssl-certificate.md"
     - "Network & Console Capture": "advanced/network-console-capture.md"
+    - "PDF Parsing": "advanced/pdf-parsing.md"
   - Extraction:
     - "LLM-Free Strategies": "extraction/no-llm-strategies.md"
     - "LLM Strategies": "extraction/llm-strategies.md"
@@ -53,10 +67,15 @@ nav:
     - "Browser, Crawler & LLM Config": "api/parameters.md"
     - "CrawlResult": "api/crawl-result.md"
     - "Strategies": "api/strategies.md"
+    - "C4A-Script Reference": "api/c4a-script-reference.md"
+  - "Brand Book": "branding/index.md"
 
 theme:
   name: 'terminal'
   palette: 'dark'
+  favicon: favicon.ico
+  custom_dir: docs/md_v2/overrides
+  color_mode: 'dark'
   icon:
     repo: fontawesome/brands/github
 
@@ -82,14 +101,19 @@ extra_css:
   - assets/styles.css
   - assets/highlight.css
   - assets/dmvendor.css
+  - assets/feedback-overrides.css
+  - assets/page_actions.css
 
 extra_javascript:
+  - https://www.googletagmanager.com/gtag/js?id=G-58W0K2ZQ25
+  - assets/gtag.js
   - assets/highlight.min.js
   - assets/highlight_init.js
   - https://buttons.github.io/buttons.js
   - assets/toc.js
-  - assets/github_stats.js 
+  - assets/github_stats.js
   - assets/selection_ask_ai.js
   - assets/copy_code.js
   - assets/floating_ask_ai_button.js
   - assets/mobile_menu.js
+  - assets/page_actions.js?v=20251006

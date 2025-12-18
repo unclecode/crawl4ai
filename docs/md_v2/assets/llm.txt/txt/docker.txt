@@ -1,0 +1,826 @@
+## Docker Deployment
+
+Complete Docker deployment guide with pre-built images, API endpoints, configuration, and MCP integration.
+
+### Quick Start with Pre-built Images
+
+```bash
+# Pull latest image
+docker pull unclecode/crawl4ai:latest
+
+# Setup LLM API keys
+cat > .llm.env << EOL
+OPENAI_API_KEY=sk-your-key
+ANTHROPIC_API_KEY=your-anthropic-key
+GROQ_API_KEY=your-groq-key
+GEMINI_API_TOKEN=your-gemini-token
+EOL
+
+# Run with LLM support
+docker run -d \
+  -p 11235:11235 \
+  --name crawl4ai \
+  --env-file .llm.env \
+  --shm-size=1g \
+  unclecode/crawl4ai:latest
+
+# Basic run (no LLM)
+docker run -d \
+  -p 11235:11235 \
+  --name crawl4ai \
+  --shm-size=1g \
+  unclecode/crawl4ai:latest
+
+# Check health
+curl http://localhost:11235/health
+```
+
+### Docker Compose Deployment
+
+```bash
+# Clone and setup
+git clone https://github.com/unclecode/crawl4ai.git
+cd crawl4ai
+cp deploy/docker/.llm.env.example .llm.env
+# Edit .llm.env with your API keys
+
+# Run pre-built image
+IMAGE=unclecode/crawl4ai:latest docker compose up -d
+
+# Build locally
+docker compose up --build -d
+
+# Build with all features
+INSTALL_TYPE=all docker compose up --build -d
+
+# Build with GPU support
+ENABLE_GPU=true docker compose up --build -d
+
+# Stop service
+docker compose down
+```
+
+### Manual Build with Multi-Architecture
+
+```bash
+# Clone repository
+git clone https://github.com/unclecode/crawl4ai.git
+cd crawl4ai
+
+# Build for current architecture
+docker buildx build -t crawl4ai-local:latest --load .
+
+# Build for multiple architectures
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t crawl4ai-local:latest --load .
+
+# Build with specific features
+docker buildx build \
+  --build-arg INSTALL_TYPE=all \
+  --build-arg ENABLE_GPU=false \
+  -t crawl4ai-local:latest --load .
+
+# Run custom build
+docker run -d \
+  -p 11235:11235 \
+  --name crawl4ai-custom \
+  --env-file .llm.env \
+  --shm-size=1g \
+  crawl4ai-local:latest
+```
+
+### Build Arguments
+
+```bash
+# Available build options
+docker buildx build \
+  --build-arg INSTALL_TYPE=all \     # default|all|torch|transformer
+  --build-arg ENABLE_GPU=true \      # true|false
+  --build-arg APP_HOME=/app \        # Install path
+  --build-arg USE_LOCAL=true \       # Use local source
+  --build-arg GITHUB_REPO=url \      # Git repo if USE_LOCAL=false
+  --build-arg GITHUB_BRANCH=main \   # Git branch
+  -t crawl4ai-custom:latest --load .
+```
+
+### Core API Endpoints
+
+```python
+# Main crawling endpoints
+import requests
+import json
+
+# Basic crawl
+payload = {
+    "urls": ["https://example.com"],
+    "browser_config": {"type": "BrowserConfig", "params": {"headless": True}},
+    "crawler_config": {"type": "CrawlerRunConfig", "params": {"cache_mode": "bypass"}}
+}
+response = requests.post("http://localhost:11235/crawl", json=payload)
+
+# Streaming crawl
+payload["crawler_config"]["params"]["stream"] = True
+response = requests.post("http://localhost:11235/crawl/stream", json=payload)
+
+# Health check
+response = requests.get("http://localhost:11235/health")
+
+# API schema
+response = requests.get("http://localhost:11235/schema")
+
+# Metrics (Prometheus format)
+response = requests.get("http://localhost:11235/metrics")
+```
+
+### Specialized Endpoints
+
+```python
+# HTML extraction (preprocessed for schema)
+response = requests.post("http://localhost:11235/html", 
+    json={"url": "https://example.com"})
+
+# Screenshot capture
+response = requests.post("http://localhost:11235/screenshot", json={
+    "url": "https://example.com",
+    "screenshot_wait_for": 2,
+    "output_path": "/path/to/save/screenshot.png"
+})
+
+# PDF generation
+response = requests.post("http://localhost:11235/pdf", json={
+    "url": "https://example.com",
+    "output_path": "/path/to/save/document.pdf"
+})
+
+# JavaScript execution
+response = requests.post("http://localhost:11235/execute_js", json={
+    "url": "https://example.com",
+    "scripts": [
+        "return document.title",
+        "return Array.from(document.querySelectorAll('a')).map(a => a.href)"
+    ]
+})
+
+# Markdown generation
+response = requests.post("http://localhost:11235/md", json={
+    "url": "https://example.com",
+    "f": "fit",  # raw|fit|bm25|llm
+    "q": "extract main content",  # query for filtering
+    "c": "0"  # cache: 0=bypass, 1=use
+})
+
+# LLM Q&A
+response = requests.get("http://localhost:11235/llm/https://example.com?q=What is this page about?")
+
+# Library context (for AI assistants)
+response = requests.get("http://localhost:11235/ask", params={
+    "context_type": "all",  # code|doc|all
+    "query": "how to use extraction strategies",
+    "score_ratio": 0.5,
+    "max_results": 20
+})
+```
+
+### Python SDK Usage
+
+```python
+import asyncio
+from crawl4ai.docker_client import Crawl4aiDockerClient
+from crawl4ai import BrowserConfig, CrawlerRunConfig, CacheMode
+
+async def main():
+    async with Crawl4aiDockerClient(base_url="http://localhost:11235") as client:
+        # Non-streaming crawl
+        results = await client.crawl(
+            ["https://example.com"],
+            browser_config=BrowserConfig(headless=True),
+            crawler_config=CrawlerRunConfig(cache_mode=CacheMode.BYPASS)
+        )
+        
+        for result in results:
+            print(f"URL: {result.url}, Success: {result.success}")
+            print(f"Content length: {len(result.markdown)}")
+        
+        # Streaming crawl
+        stream_config = CrawlerRunConfig(stream=True, cache_mode=CacheMode.BYPASS)
+        async for result in await client.crawl(
+            ["https://example.com", "https://python.org"],
+            browser_config=BrowserConfig(headless=True),
+            crawler_config=stream_config
+        ):
+            print(f"Streamed: {result.url} - {result.success}")
+        
+        # Get API schema
+        schema = await client.get_schema()
+        print(f"Schema available: {bool(schema)}")
+
+asyncio.run(main())
+```
+
+### Advanced API Configuration
+
+```python
+# Complex extraction with LLM
+payload = {
+    "urls": ["https://example.com"],
+    "browser_config": {
+        "type": "BrowserConfig",
+        "params": {
+            "headless": True,
+            "viewport": {"type": "dict", "value": {"width": 1200, "height": 800}}
+        }
+    },
+    "crawler_config": {
+        "type": "CrawlerRunConfig",
+        "params": {
+            "extraction_strategy": {
+                "type": "LLMExtractionStrategy",
+                "params": {
+                    "llm_config": {
+                        "type": "LLMConfig",
+                        "params": {
+                            "provider": "openai/gpt-4o-mini",
+                            "api_token": "env:OPENAI_API_KEY"
+                        }
+                    },
+                    "schema": {
+                        "type": "dict",
+                        "value": {
+                            "type": "object",
+                            "properties": {
+                                "title": {"type": "string"},
+                                "content": {"type": "string"}
+                            }
+                        }
+                    },
+                    "instruction": "Extract title and main content"
+                }
+            },
+            "markdown_generator": {
+                "type": "DefaultMarkdownGenerator",
+                "params": {
+                    "content_filter": {
+                        "type": "PruningContentFilter",
+                        "params": {"threshold": 0.6}
+                    }
+                }
+            }
+        }
+    }
+}
+
+response = requests.post("http://localhost:11235/crawl", json=payload)
+```
+
+### CSS Extraction Strategy
+
+```python
+# CSS-based structured extraction
+schema = {
+    "name": "ProductList",
+    "baseSelector": ".product",
+    "fields": [
+        {"name": "title", "selector": "h2", "type": "text"},
+        {"name": "price", "selector": ".price", "type": "text"},
+        {"name": "link", "selector": "a", "type": "attribute", "attribute": "href"}
+    ]
+}
+
+payload = {
+    "urls": ["https://example-shop.com"],
+    "browser_config": {"type": "BrowserConfig", "params": {"headless": True}},
+    "crawler_config": {
+        "type": "CrawlerRunConfig",
+        "params": {
+            "extraction_strategy": {
+                "type": "JsonCssExtractionStrategy",
+                "params": {
+                    "schema": {"type": "dict", "value": schema}
+                }
+            }
+        }
+    }
+}
+
+response = requests.post("http://localhost:11235/crawl", json=payload)
+data = response.json()
+extracted = json.loads(data["results"][0]["extracted_content"])
+```
+
+### MCP (Model Context Protocol) Integration
+
+```bash
+# Add Crawl4AI as MCP provider to Claude Code
+claude mcp add --transport sse c4ai-sse http://localhost:11235/mcp/sse
+
+# List MCP providers
+claude mcp list
+
+# Test MCP connection
+python tests/mcp/test_mcp_socket.py
+
+# Available MCP endpoints
+# SSE: http://localhost:11235/mcp/sse
+# WebSocket: ws://localhost:11235/mcp/ws
+# Schema: http://localhost:11235/mcp/schema
+```
+
+Available MCP tools:
+- `md` - Generate markdown from web content
+- `html` - Extract preprocessed HTML  
+- `screenshot` - Capture webpage screenshots
+- `pdf` - Generate PDF documents
+- `execute_js` - Run JavaScript on web pages
+- `crawl` - Perform multi-URL crawling
+- `ask` - Query Crawl4AI library context
+
+### Configuration Management
+
+```yaml
+# config.yml structure
+app:
+  title: "Crawl4AI API"
+  version: "1.0.0"
+  host: "0.0.0.0"
+  port: 11235
+  timeout_keep_alive: 300
+
+llm:
+  provider: "openai/gpt-4o-mini"
+  api_key_env: "OPENAI_API_KEY"
+
+security:
+  enabled: false
+  jwt_enabled: false
+  trusted_hosts: ["*"]
+
+crawler:
+  memory_threshold_percent: 95.0
+  rate_limiter:
+    base_delay: [1.0, 2.0]
+  timeouts:
+    stream_init: 30.0
+    batch_process: 300.0
+  pool:
+    max_pages: 40
+    idle_ttl_sec: 1800
+
+rate_limiting:
+  enabled: true
+  default_limit: "1000/minute"
+  storage_uri: "memory://"
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+```
+
+### Custom Configuration Deployment
+
+```bash
+# Method 1: Mount custom config
+docker run -d -p 11235:11235 \
+  --name crawl4ai-custom \
+  --env-file .llm.env \
+  --shm-size=1g \
+  -v $(pwd)/my-config.yml:/app/config.yml \
+  unclecode/crawl4ai:latest
+
+# Method 2: Build with custom config
+# Edit deploy/docker/config.yml then build
+docker buildx build -t crawl4ai-custom:latest --load .
+```
+
+### Monitoring and Health Checks
+
+```bash
+# Health endpoint
+curl http://localhost:11235/health
+
+# Prometheus metrics
+curl http://localhost:11235/metrics
+
+# Configuration validation
+curl -X POST http://localhost:11235/config/dump \
+  -H "Content-Type: application/json" \
+  -d '{"code": "CrawlerRunConfig(cache_mode=\"BYPASS\", screenshot=True)"}'
+```
+
+### Playground Interface
+
+Access the interactive playground at `http://localhost:11235/playground` for:
+- Testing configurations with visual interface
+- Generating JSON payloads for REST API
+- Converting Python config to JSON format
+- Testing crawl operations directly in browser
+
+### Async Job Processing
+
+```python
+# Submit job for async processing
+import time
+
+# Submit crawl job
+response = requests.post("http://localhost:11235/crawl/job", json=payload)
+task_id = response.json()["task_id"]
+
+# Poll for completion
+while True:
+    result = requests.get(f"http://localhost:11235/crawl/job/{task_id}")
+    status = result.json()
+    
+    if status["status"] in ["COMPLETED", "FAILED"]:
+        break
+    time.sleep(1.5)
+
+print("Final result:", status)
+```
+
+### Production Deployment
+
+```bash
+# Production-ready deployment
+docker run -d \
+  --name crawl4ai-prod \
+  --restart unless-stopped \
+  -p 11235:11235 \
+  --env-file .llm.env \
+  --shm-size=2g \
+  --memory=8g \
+  --cpus=4 \
+  -v /path/to/custom-config.yml:/app/config.yml \
+  unclecode/crawl4ai:latest
+
+# With Docker Compose for production
+version: '3.8'
+services:
+  crawl4ai:
+    image: unclecode/crawl4ai:latest
+    ports:
+      - "11235:11235"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - ./config.yml:/app/config.yml
+    shm_size: 2g
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+          cpus: '4'
+    restart: unless-stopped
+```
+
+### Configuration Validation and JSON Structure
+
+```python
+# Method 1: Create config objects and dump to see expected JSON structure
+from crawl4ai import BrowserConfig, CrawlerRunConfig, LLMConfig, CacheMode
+from crawl4ai import JsonCssExtractionStrategy, LLMExtractionStrategy
+import json
+
+# Create browser config and see JSON structure
+browser_config = BrowserConfig(
+    headless=True,
+    viewport_width=1280,
+    viewport_height=720,
+    proxy="http://user:pass@proxy:8080"
+)
+
+# Get JSON structure
+browser_json = browser_config.dump()
+print("BrowserConfig JSON structure:")
+print(json.dumps(browser_json, indent=2))
+
+# Create crawler config with extraction strategy
+schema = {
+    "name": "Articles",
+    "baseSelector": ".article",
+    "fields": [
+        {"name": "title", "selector": "h2", "type": "text"},
+        {"name": "content", "selector": ".content", "type": "html"}
+    ]
+}
+
+crawler_config = CrawlerRunConfig(
+    cache_mode=CacheMode.BYPASS,
+    screenshot=True,
+    extraction_strategy=JsonCssExtractionStrategy(schema),
+    js_code=["window.scrollTo(0, document.body.scrollHeight);"],
+    wait_for="css:.loaded"
+)
+
+crawler_json = crawler_config.dump()
+print("\nCrawlerRunConfig JSON structure:")
+print(json.dumps(crawler_json, indent=2))
+```
+
+### Reverse Validation - JSON to Objects
+
+```python
+# Method 2: Load JSON back to config objects for validation
+from crawl4ai.async_configs import from_serializable_dict
+
+# Test JSON structure by converting back to objects
+test_browser_json = {
+    "type": "BrowserConfig",
+    "params": {
+        "headless": True,
+        "viewport_width": 1280,
+        "proxy": "http://user:pass@proxy:8080"
+    }
+}
+
+try:
+    # Convert JSON back to object
+    restored_browser = from_serializable_dict(test_browser_json)
+    print(f"✅ Valid BrowserConfig: {type(restored_browser)}")
+    print(f"Headless: {restored_browser.headless}")
+    print(f"Proxy: {restored_browser.proxy}")
+except Exception as e:
+    print(f"❌ Invalid BrowserConfig JSON: {e}")
+
+# Test complex crawler config JSON
+test_crawler_json = {
+    "type": "CrawlerRunConfig", 
+    "params": {
+        "cache_mode": "bypass",
+        "screenshot": True,
+        "extraction_strategy": {
+            "type": "JsonCssExtractionStrategy",
+            "params": {
+                "schema": {
+                    "type": "dict",
+                    "value": {
+                        "name": "Products",
+                        "baseSelector": ".product",
+                        "fields": [
+                            {"name": "title", "selector": "h3", "type": "text"}
+                        ]
+                    }
+                }
+            }
+        }
+    }
+}
+
+try:
+    restored_crawler = from_serializable_dict(test_crawler_json)
+    print(f"✅ Valid CrawlerRunConfig: {type(restored_crawler)}")
+    print(f"Cache mode: {restored_crawler.cache_mode}")
+    print(f"Has extraction strategy: {restored_crawler.extraction_strategy is not None}")
+except Exception as e:
+    print(f"❌ Invalid CrawlerRunConfig JSON: {e}")
+```
+
+### Using Server's /config/dump Endpoint for Validation
+
+```python
+import requests
+
+# Method 3: Use server endpoint to validate configuration syntax
+def validate_config_with_server(config_code: str) -> dict:
+    """Validate configuration using server's /config/dump endpoint"""
+    response = requests.post(
+        "http://localhost:11235/config/dump",
+        json={"code": config_code}
+    )
+    
+    if response.status_code == 200:
+        print("✅ Valid configuration syntax")
+        return response.json()
+    else:
+        print(f"❌ Invalid configuration: {response.status_code}")
+        print(response.json())
+        return None
+
+# Test valid configuration
+valid_config = """
+CrawlerRunConfig(
+    cache_mode=CacheMode.BYPASS,
+    screenshot=True,
+    js_code=["window.scrollTo(0, document.body.scrollHeight);"],
+    wait_for="css:.content-loaded"
+)
+"""
+
+result = validate_config_with_server(valid_config)
+if result:
+    print("Generated JSON structure:")
+    print(json.dumps(result, indent=2))
+
+# Test invalid configuration (should fail)
+invalid_config = """
+CrawlerRunConfig(
+    cache_mode="invalid_mode",
+    screenshot=True,
+    js_code=some_function()  # This will fail
+)
+"""
+
+validate_config_with_server(invalid_config)
+```
+
+### Configuration Builder Helper
+
+```python
+def build_and_validate_request(urls, browser_params=None, crawler_params=None):
+    """Helper to build and validate complete request payload"""
+    
+    # Create configurations
+    browser_config = BrowserConfig(**(browser_params or {}))
+    crawler_config = CrawlerRunConfig(**(crawler_params or {}))
+    
+    # Build complete request payload
+    payload = {
+        "urls": urls if isinstance(urls, list) else [urls],
+        "browser_config": browser_config.dump(),
+        "crawler_config": crawler_config.dump()
+    }
+    
+    print("✅ Complete request payload:")
+    print(json.dumps(payload, indent=2))
+    
+    # Validate by attempting to reconstruct
+    try:
+        test_browser = from_serializable_dict(payload["browser_config"])
+        test_crawler = from_serializable_dict(payload["crawler_config"])
+        print("✅ Payload validation successful")
+        return payload
+    except Exception as e:
+        print(f"❌ Payload validation failed: {e}")
+        return None
+
+# Example usage
+payload = build_and_validate_request(
+    urls=["https://example.com"],
+    browser_params={"headless": True, "viewport_width": 1280},
+    crawler_params={
+        "cache_mode": CacheMode.BYPASS,
+        "screenshot": True,
+        "word_count_threshold": 10
+    }
+)
+
+if payload:
+    # Send to server
+    response = requests.post("http://localhost:11235/crawl", json=payload)
+    print(f"Server response: {response.status_code}")
+```
+
+### Common JSON Structure Patterns
+
+```python
+# Pattern 1: Simple primitive values
+simple_config = {
+    "type": "CrawlerRunConfig",
+    "params": {
+        "cache_mode": "bypass",  # String enum value
+        "screenshot": True,      # Boolean
+        "page_timeout": 60000   # Integer
+    }
+}
+
+# Pattern 2: Nested objects
+nested_config = {
+    "type": "CrawlerRunConfig", 
+    "params": {
+        "extraction_strategy": {
+            "type": "LLMExtractionStrategy",
+            "params": {
+                "llm_config": {
+                    "type": "LLMConfig",
+                    "params": {
+                        "provider": "openai/gpt-4o-mini",
+                        "api_token": "env:OPENAI_API_KEY"
+                    }
+                },
+                "instruction": "Extract main content"
+            }
+        }
+    }
+}
+
+# Pattern 3: Dictionary values (must use type: dict wrapper)
+dict_config = {
+    "type": "CrawlerRunConfig",
+    "params": {
+        "extraction_strategy": {
+            "type": "JsonCssExtractionStrategy", 
+            "params": {
+                "schema": {
+                    "type": "dict",  # Required wrapper
+                    "value": {       # Actual dictionary content
+                        "name": "Products",
+                        "baseSelector": ".product",
+                        "fields": [
+                            {"name": "title", "selector": "h2", "type": "text"}
+                        ]
+                    }
+                }
+            }
+        }
+    }
+}
+
+# Pattern 4: Lists and arrays
+list_config = {
+    "type": "CrawlerRunConfig",
+    "params": {
+        "js_code": [  # Lists are handled directly
+            "window.scrollTo(0, document.body.scrollHeight);",
+            "document.querySelector('.load-more')?.click();"
+        ],
+        "excluded_tags": ["script", "style", "nav"]
+    }
+}
+```
+
+### Troubleshooting Common JSON Errors
+
+```python
+def diagnose_json_errors():
+    """Common JSON structure errors and fixes"""
+    
+    # ❌ WRONG: Missing type wrapper for objects
+    wrong_config = {
+        "browser_config": {
+            "headless": True  # Missing type wrapper
+        }
+    }
+    
+    # ✅ CORRECT: Proper type wrapper
+    correct_config = {
+        "browser_config": {
+            "type": "BrowserConfig",
+            "params": {
+                "headless": True
+            }
+        }
+    }
+    
+    # ❌ WRONG: Dictionary without type: dict wrapper  
+    wrong_dict = {
+        "schema": {
+            "name": "Products"  # Raw dict, should be wrapped
+        }
+    }
+    
+    # ✅ CORRECT: Dictionary with proper wrapper
+    correct_dict = {
+        "schema": {
+            "type": "dict",
+            "value": {
+                "name": "Products"
+            }
+        }
+    }
+    
+    # ❌ WRONG: Invalid enum string
+    wrong_enum = {
+        "cache_mode": "DISABLED"  # Wrong case/value
+    }
+    
+    # ✅ CORRECT: Valid enum string  
+    correct_enum = {
+        "cache_mode": "bypass"  # or "enabled", "disabled", etc.
+    }
+    
+    print("Common error patterns documented above")
+
+# Validate your JSON structure before sending
+def pre_flight_check(payload):
+    """Run checks before sending to server"""
+    required_keys = ["urls", "browser_config", "crawler_config"]
+    
+    for key in required_keys:
+        if key not in payload:
+            print(f"❌ Missing required key: {key}")
+            return False
+    
+    # Check type wrappers
+    for config_key in ["browser_config", "crawler_config"]:
+        config = payload[config_key]
+        if not isinstance(config, dict) or "type" not in config:
+            print(f"❌ {config_key} missing type wrapper")
+            return False
+        if "params" not in config:
+            print(f"❌ {config_key} missing params")
+            return False
+    
+    print("✅ Pre-flight check passed")
+    return True
+
+# Example usage
+payload = {
+    "urls": ["https://example.com"],
+    "browser_config": {"type": "BrowserConfig", "params": {"headless": True}},
+    "crawler_config": {"type": "CrawlerRunConfig", "params": {"cache_mode": "bypass"}}
+}
+
+if pre_flight_check(payload):
+    # Safe to send to server
+    pass
+```
+
+**📖 Learn more:** [Complete Docker Guide](https://docs.crawl4ai.com/core/docker-deployment/), [API Reference](https://docs.crawl4ai.com/api/), [MCP Integration](https://docs.crawl4ai.com/core/docker-deployment/#mcp-model-context-protocol-support), [Configuration Options](https://docs.crawl4ai.com/core/docker-deployment/#server-configuration)

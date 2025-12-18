@@ -47,7 +47,13 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
         self.url_scorer = url_scorer
         self.include_external = include_external
         self.max_pages = max_pages
-        self.logger = logger or logging.getLogger(__name__)
+        # self.logger = logger or logging.getLogger(__name__)
+        # Ensure logger is always a Logger instance, not a dict from serialization
+        if isinstance(logger, logging.Logger):
+            self.logger = logger
+        else:
+            # Create a new logger if logger is None, dict, or any other non-Logger type
+            self.logger = logging.getLogger(__name__)
         self.stats = TraversalStats(start_time=datetime.now())
         self._cancel_event = asyncio.Event()
         self._pages_crawled = 0
@@ -116,11 +122,6 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
                 
             valid_links.append(base_url)
             
-        # If we have more valid links than capacity, limit them
-        if len(valid_links) > remaining_capacity:
-            valid_links = valid_links[:remaining_capacity]
-            self.logger.info(f"Limiting to {remaining_capacity} URLs due to max_pages limit")
-            
         # Record the new depths and add to next_links
         for url in valid_links:
             depths[url] = new_depth
@@ -140,13 +141,22 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
         """
         queue: asyncio.PriorityQueue = asyncio.PriorityQueue()
         # Push the initial URL with score 0 and depth 0.
-        await queue.put((0, 0, start_url, None))
+        initial_score = self.url_scorer.score(start_url) if self.url_scorer else 0
+        await queue.put((-initial_score, 0, start_url, None))
         visited: Set[str] = set()
         depths: Dict[str, int] = {start_url: 0}
 
         while not queue.empty() and not self._cancel_event.is_set():
             # Stop if we've reached the max pages limit
             if self._pages_crawled >= self.max_pages:
+                self.logger.info(f"Max pages limit ({self.max_pages}) reached, stopping crawl")
+                break
+                
+            # Calculate how many more URLs we can process in this batch
+            remaining = self.max_pages - self._pages_crawled
+            batch_size = min(BATCH_SIZE, remaining)
+            if batch_size <= 0:
+                # No more pages to crawl
                 self.logger.info(f"Max pages limit ({self.max_pages}) reached, stopping crawl")
                 break
                 
@@ -179,11 +189,15 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
                 result.metadata = result.metadata or {}
                 result.metadata["depth"] = depth
                 result.metadata["parent_url"] = parent_url
-                result.metadata["score"] = score
+                result.metadata["score"] = -score
                 
                 # Count only successful crawls toward max_pages limit
                 if result.success:
                     self._pages_crawled += 1
+                    # Check if we've reached the limit during batch processing
+                    if self._pages_crawled >= self.max_pages:
+                        self.logger.info(f"Max pages limit ({self.max_pages}) reached during batch, stopping crawl")
+                        break  # Exit the generator
                 
                 yield result
                 
@@ -196,7 +210,7 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
                     for new_url, new_parent in new_links:
                         new_depth = depths.get(new_url, depth + 1)
                         new_score = self.url_scorer.score(new_url) if self.url_scorer else 0
-                        await queue.put((new_score, new_depth, new_url, new_parent))
+                        await queue.put((-new_score, new_depth, new_url, new_parent))
 
         # End of crawl.
 

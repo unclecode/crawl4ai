@@ -1,0 +1,478 @@
+## Extraction Strategy Workflows and Architecture
+
+Visual representations of Crawl4AI's data extraction approaches, strategy selection, and processing workflows.
+
+### Extraction Strategy Decision Tree
+
+```mermaid
+flowchart TD
+    A[Content to Extract] --> B{Content Type?}
+    
+    B -->|Simple Patterns| C[Common Data Types]
+    B -->|Structured HTML| D[Predictable Structure]
+    B -->|Complex Content| E[Requires Reasoning]
+    B -->|Mixed Content| F[Multiple Data Types]
+    
+    C --> C1{Pattern Type?}
+    C1 -->|Email, Phone, URLs| C2[Built-in Regex Patterns]
+    C1 -->|Custom Patterns| C3[Custom Regex Strategy]
+    C1 -->|LLM-Generated| C4[One-time Pattern Generation]
+    
+    D --> D1{Selector Type?}
+    D1 -->|CSS Selectors| D2[JsonCssExtractionStrategy]
+    D1 -->|XPath Expressions| D3[JsonXPathExtractionStrategy]
+    D1 -->|Need Schema?| D4[Auto-generate Schema with LLM]
+    
+    E --> E1{LLM Provider?}
+    E1 -->|OpenAI/Anthropic| E2[Cloud LLM Strategy]
+    E1 -->|Local Ollama| E3[Local LLM Strategy]
+    E1 -->|Cost-sensitive| E4[Hybrid: Generate Schema Once]
+    
+    F --> F1[Multi-Strategy Approach]
+    F1 --> F2[1. Regex for Patterns]
+    F1 --> F3[2. CSS for Structure]
+    F1 --> F4[3. LLM for Complex Analysis]
+    
+    C2 --> G[Fast Extraction ⚡]
+    C3 --> G
+    C4 --> H[Cached Pattern Reuse]
+    
+    D2 --> I[Schema-based Extraction 🏗️]
+    D3 --> I
+    D4 --> J[Generated Schema Cache]
+    
+    E2 --> K[Intelligent Parsing 🧠]
+    E3 --> K
+    E4 --> L[Hybrid Cost-Effective]
+    
+    F2 --> M[Comprehensive Results 📊]
+    F3 --> M
+    F4 --> M
+    
+    style G fill:#c8e6c9
+    style I fill:#e3f2fd
+    style K fill:#fff3e0
+    style M fill:#f3e5f5
+    style H fill:#e8f5e8
+    style J fill:#e8f5e8
+    style L fill:#ffecb3
+```
+
+### LLM Extraction Strategy Workflow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Crawler
+    participant LLMStrategy
+    participant Chunker
+    participant LLMProvider
+    participant Parser
+    
+    User->>Crawler: Configure LLMExtractionStrategy
+    User->>Crawler: arun(url, config)
+    
+    Crawler->>Crawler: Navigate to URL
+    Crawler->>Crawler: Extract content (HTML/Markdown)
+    Crawler->>LLMStrategy: Process content
+    
+    LLMStrategy->>LLMStrategy: Check content size
+    
+    alt Content > chunk_threshold
+        LLMStrategy->>Chunker: Split into chunks with overlap
+        Chunker-->>LLMStrategy: Return chunks[]
+        
+        loop For each chunk
+            LLMStrategy->>LLMProvider: Send chunk + schema + instruction
+            LLMProvider-->>LLMStrategy: Return structured JSON
+        end
+        
+        LLMStrategy->>LLMStrategy: Merge chunk results
+    else Content <= threshold
+        LLMStrategy->>LLMProvider: Send full content + schema
+        LLMProvider-->>LLMStrategy: Return structured JSON
+    end
+    
+    LLMStrategy->>Parser: Validate JSON schema
+    Parser-->>LLMStrategy: Validated data
+    
+    LLMStrategy->>LLMStrategy: Track token usage
+    LLMStrategy-->>Crawler: Return extracted_content
+    
+    Crawler-->>User: CrawlResult with JSON data
+    
+    User->>LLMStrategy: show_usage()
+    LLMStrategy-->>User: Token count & estimated cost
+```
+
+### Schema-Based Extraction Architecture
+
+```mermaid
+graph TB
+    subgraph "Schema Definition"
+        A[JSON Schema] --> A1[baseSelector]
+        A --> A2[fields[]]
+        A --> A3[nested structures]
+        
+        A2 --> A4[CSS/XPath selectors]
+        A2 --> A5[Data types: text, html, attribute]
+        A2 --> A6[Default values]
+        
+        A3 --> A7[nested objects]
+        A3 --> A8[nested_list arrays]
+        A3 --> A9[simple lists]
+    end
+    
+    subgraph "Extraction Engine"
+        B[HTML Content] --> C[Selector Engine]
+        C --> C1[CSS Selector Parser]
+        C --> C2[XPath Evaluator]
+        
+        C1 --> D[Element Matcher]
+        C2 --> D
+        
+        D --> E[Type Converter]
+        E --> E1[Text Extraction]
+        E --> E2[HTML Preservation]
+        E --> E3[Attribute Extraction]
+        E --> E4[Nested Processing]
+    end
+    
+    subgraph "Result Processing"
+        F[Raw Extracted Data] --> G[Structure Builder]
+        G --> G1[Object Construction]
+        G --> G2[Array Assembly]
+        G --> G3[Type Validation]
+        
+        G1 --> H[JSON Output]
+        G2 --> H
+        G3 --> H
+    end
+    
+    A --> C
+    E --> F
+    H --> I[extracted_content]
+    
+    style A fill:#e3f2fd
+    style C fill:#f3e5f5
+    style G fill:#e8f5e8
+    style H fill:#c8e6c9
+```
+
+### Automatic Schema Generation Process
+
+```mermaid
+stateDiagram-v2
+    [*] --> CheckCache
+    
+    CheckCache --> CacheHit: Schema exists
+    CheckCache --> SamplePage: Schema missing
+    
+    CacheHit --> LoadSchema
+    LoadSchema --> FastExtraction
+    
+    SamplePage --> ExtractHTML: Crawl sample URL
+    ExtractHTML --> LLMAnalysis: Send HTML to LLM
+    LLMAnalysis --> GenerateSchema: Create CSS/XPath selectors
+    GenerateSchema --> ValidateSchema: Test generated schema
+    
+    ValidateSchema --> SchemaWorks: Valid selectors
+    ValidateSchema --> RefineSchema: Invalid selectors
+    
+    RefineSchema --> LLMAnalysis: Iterate with feedback
+    
+    SchemaWorks --> CacheSchema: Save for reuse
+    CacheSchema --> FastExtraction: Use cached schema
+    
+    FastExtraction --> [*]: No more LLM calls needed
+    
+    note right of CheckCache : One-time LLM cost
+    note right of FastExtraction : Unlimited fast reuse
+    note right of CacheSchema : JSON file storage
+```
+
+### Multi-Strategy Extraction Pipeline
+
+```mermaid
+flowchart LR
+    A[Web Page Content] --> B[Strategy Pipeline]
+    
+    subgraph B["Extraction Pipeline"]
+        B1[Stage 1: Regex Patterns]
+        B2[Stage 2: Schema-based CSS]
+        B3[Stage 3: LLM Analysis]
+        
+        B1 --> B1a[Email addresses]
+        B1 --> B1b[Phone numbers]
+        B1 --> B1c[URLs and links]
+        B1 --> B1d[Currency amounts]
+        
+        B2 --> B2a[Structured products]
+        B2 --> B2b[Article metadata]
+        B2 --> B2c[User reviews]
+        B2 --> B2d[Navigation links]
+        
+        B3 --> B3a[Sentiment analysis]
+        B3 --> B3b[Key topics]
+        B3 --> B3c[Entity recognition]
+        B3 --> B3d[Content summary]
+    end
+    
+    B1a --> C[Result Merger]
+    B1b --> C
+    B1c --> C
+    B1d --> C
+    
+    B2a --> C
+    B2b --> C
+    B2c --> C
+    B2d --> C
+    
+    B3a --> C
+    B3b --> C
+    B3c --> C
+    B3d --> C
+    
+    C --> D[Combined JSON Output]
+    D --> E[Final CrawlResult]
+    
+    style B1 fill:#c8e6c9
+    style B2 fill:#e3f2fd
+    style B3 fill:#fff3e0
+    style C fill:#f3e5f5
+```
+
+### Performance Comparison Matrix
+
+```mermaid
+graph TD
+    subgraph "Strategy Performance"
+        A[Extraction Strategy Comparison]
+        
+        subgraph "Speed ⚡"
+            S1[Regex: ~10ms]
+            S2[CSS Schema: ~50ms]
+            S3[XPath: ~100ms]
+            S4[LLM: ~2-10s]
+        end
+        
+        subgraph "Accuracy 🎯"
+            A1[Regex: Pattern-dependent]
+            A2[CSS: High for structured]
+            A3[XPath: Very high]
+            A4[LLM: Excellent for complex]
+        end
+        
+        subgraph "Cost 💰"
+            C1[Regex: Free]
+            C2[CSS: Free]
+            C3[XPath: Free]
+            C4[LLM: $0.001-0.01 per page]
+        end
+        
+        subgraph "Complexity 🔧"
+            X1[Regex: Simple patterns only]
+            X2[CSS: Structured HTML]
+            X3[XPath: Complex selectors]
+            X4[LLM: Any content type]
+        end
+    end
+    
+    style S1 fill:#c8e6c9
+    style S2 fill:#e8f5e8
+    style S3 fill:#fff3e0
+    style S4 fill:#ffcdd2
+    
+    style A2 fill:#e8f5e8
+    style A3 fill:#c8e6c9
+    style A4 fill:#c8e6c9
+    
+    style C1 fill:#c8e6c9
+    style C2 fill:#c8e6c9
+    style C3 fill:#c8e6c9
+    style C4 fill:#fff3e0
+    
+    style X1 fill:#ffcdd2
+    style X2 fill:#e8f5e8
+    style X3 fill:#c8e6c9
+    style X4 fill:#c8e6c9
+```
+
+### Regex Pattern Strategy Flow
+
+```mermaid
+flowchart TD
+    A[Regex Extraction] --> B{Pattern Source?}
+    
+    B -->|Built-in| C[Use Predefined Patterns]
+    B -->|Custom| D[Define Custom Regex]
+    B -->|LLM-Generated| E[Generate with AI]
+    
+    C --> C1[Email Pattern]
+    C --> C2[Phone Pattern]
+    C --> C3[URL Pattern]
+    C --> C4[Currency Pattern]
+    C --> C5[Date Pattern]
+    
+    D --> D1[Write Custom Regex]
+    D --> D2[Test Pattern]
+    D --> D3{Pattern Works?}
+    D3 -->|No| D1
+    D3 -->|Yes| D4[Use Pattern]
+    
+    E --> E1[Provide Sample Content]
+    E --> E2[LLM Analyzes Content]
+    E --> E3[Generate Optimized Regex]
+    E --> E4[Cache Pattern for Reuse]
+    
+    C1 --> F[Pattern Matching]
+    C2 --> F
+    C3 --> F
+    C4 --> F
+    C5 --> F
+    D4 --> F
+    E4 --> F
+    
+    F --> G[Extract Matches]
+    G --> H[Group by Pattern Type]
+    H --> I[JSON Output with Labels]
+    
+    style C fill:#e8f5e8
+    style D fill:#e3f2fd
+    style E fill:#fff3e0
+    style F fill:#f3e5f5
+```
+
+### Complex Schema Structure Visualization
+
+```mermaid
+graph TB
+    subgraph "E-commerce Schema Example"
+        A[Category baseSelector] --> B[Category Fields]
+        A --> C[Products nested_list]
+        
+        B --> B1[category_name]
+        B --> B2[category_id attribute]
+        B --> B3[category_url attribute]
+        
+        C --> C1[Product baseSelector]
+        C1 --> C2[name text]
+        C1 --> C3[price text]
+        C1 --> C4[Details nested object]
+        C1 --> C5[Features list]
+        C1 --> C6[Reviews nested_list]
+        
+        C4 --> C4a[brand text]
+        C4 --> C4b[model text]
+        C4 --> C4c[specs html]
+        
+        C5 --> C5a[feature text array]
+        
+        C6 --> C6a[reviewer text]
+        C6 --> C6b[rating attribute]
+        C6 --> C6c[comment text]
+        C6 --> C6d[date attribute]
+    end
+    
+    subgraph "JSON Output Structure"
+        D[categories array] --> D1[category object]
+        D1 --> D2[category_name]
+        D1 --> D3[category_id]
+        D1 --> D4[products array]
+        
+        D4 --> D5[product object]
+        D5 --> D6[name, price]
+        D5 --> D7[details object]
+        D5 --> D8[features array]
+        D5 --> D9[reviews array]
+        
+        D7 --> D7a[brand, model, specs]
+        D8 --> D8a[feature strings]
+        D9 --> D9a[review objects]
+    end
+    
+    A -.-> D
+    B1 -.-> D2
+    C2 -.-> D6
+    C4 -.-> D7
+    C5 -.-> D8
+    C6 -.-> D9
+    
+    style A fill:#e3f2fd
+    style C fill:#f3e5f5
+    style C4 fill:#e8f5e8
+    style D fill:#fff3e0
+```
+
+### Error Handling and Fallback Strategy
+
+```mermaid
+stateDiagram-v2
+    [*] --> PrimaryStrategy
+    
+    PrimaryStrategy --> Success: Extraction successful
+    PrimaryStrategy --> ValidationFailed: Invalid data
+    PrimaryStrategy --> ExtractionFailed: No matches found
+    PrimaryStrategy --> TimeoutError: LLM timeout
+    
+    ValidationFailed --> FallbackStrategy: Try alternative
+    ExtractionFailed --> FallbackStrategy: Try alternative
+    TimeoutError --> FallbackStrategy: Try alternative
+    
+    FallbackStrategy --> FallbackSuccess: Fallback works
+    FallbackStrategy --> FallbackFailed: All strategies failed
+    
+    FallbackSuccess --> Success: Return results
+    FallbackFailed --> ErrorReport: Log failure details
+    
+    Success --> [*]: Complete
+    ErrorReport --> [*]: Return empty results
+    
+    note right of PrimaryStrategy : Try fastest/most accurate first
+    note right of FallbackStrategy : Use simpler but reliable method
+    note left of ErrorReport : Provide debugging information
+```
+
+### Token Usage and Cost Optimization
+
+```mermaid
+flowchart TD
+    A[LLM Extraction Request] --> B{Content Size Check}
+    
+    B -->|Small < 1200 tokens| C[Single LLM Call]
+    B -->|Large > 1200 tokens| D[Chunking Strategy]
+    
+    C --> C1[Send full content]
+    C1 --> C2[Parse JSON response]
+    C2 --> C3[Track token usage]
+    
+    D --> D1[Split into chunks]
+    D1 --> D2[Add overlap between chunks]
+    D2 --> D3[Process chunks in parallel]
+    
+    D3 --> D4[Chunk 1 → LLM]
+    D3 --> D5[Chunk 2 → LLM]
+    D3 --> D6[Chunk N → LLM]
+    
+    D4 --> D7[Merge results]
+    D5 --> D7
+    D6 --> D7
+    
+    D7 --> D8[Deduplicate data]
+    D8 --> D9[Aggregate token usage]
+    
+    C3 --> E[Cost Calculation]
+    D9 --> E
+    
+    E --> F[Usage Report]
+    F --> F1[Prompt tokens: X]
+    F --> F2[Completion tokens: Y]
+    F --> F3[Total cost: $Z]
+    
+    style C fill:#c8e6c9
+    style D fill:#fff3e0
+    style E fill:#e3f2fd
+    style F fill:#f3e5f5
+```
+
+**📖 Learn more:** [LLM Strategies](https://docs.crawl4ai.com/extraction/llm-strategies/), [Schema-Based Extraction](https://docs.crawl4ai.com/extraction/no-llm-strategies/), [Pattern Matching](https://docs.crawl4ai.com/extraction/no-llm-strategies/#regexextractionstrategy), [Performance Optimization](https://docs.crawl4ai.com/advanced/multi-url-crawling/)

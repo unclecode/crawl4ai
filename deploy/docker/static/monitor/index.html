@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crawl4AI Monitor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4EFFFF',
+                        primarydim: '#09b5a5',
+                        accent: '#F380F5',
+                        dark: '#070708',
+                        light: '#E8E9ED',
+                        secondary: '#D5CEBF',
+                        codebg: '#1E1E1E',
+                        surface: '#202020',
+                        border: '#3F3F44',
+                    },
+                    fontFamily: {
+                        mono: ['Fira Code', 'monospace'],
+                    },
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        @keyframes pulse-slow {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .pulse-slow { animation: pulse-slow 2s ease-in-out infinite; }
+
+        @keyframes pulse-fast {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.1); }
+        }
+        .pulse-fast { animation: pulse-fast 1s ease-in-out infinite; }
+
+        @keyframes spin-slow {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .spin-slow { animation: spin-slow 3s linear infinite; }
+
+        /* Progress bar animation */
+        .progress-bar {
+            transition: width 0.3s ease;
+        }
+
+        /* Sparkline styles */
+        .sparkline {
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        /* Table hover */
+        tbody tr:hover {
+            background-color: rgba(78, 255, 255, 0.05);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #070708;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #3F3F44;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4EFFFF;
+        }
+    </style>
+</head>
+
+<body class="bg-dark text-light font-mono min-h-screen flex flex-col" style="font-feature-settings: 'calt' 0;">
+    <!-- Header -->
+    <header class="border-b border-border px-4 py-2 flex items-center">
+        <h1 class="text-lg font-medium flex items-center space-x-4">
+            <img src="/static/assets/logo.png" alt="Crawl4AI" class="h-8">
+            <span class="text-secondary">Monitor</span>
+            <a href="https://github.com/unclecode/crawl4ai" target="_blank" class="flex space-x-1">
+                <img src="https://img.shields.io/github/stars/unclecode/crawl4ai?style=social" alt="GitHub stars" class="h-5">
+            </a>
+        </h1>
+
+        <div class="ml-auto flex items-center space-x-4">
+            <!-- Connection Status -->
+            <div class="flex items-center space-x-2">
+                <div id="ws-status" class="flex items-center space-x-1">
+                    <div class="w-2 h-2 rounded-full bg-gray-500" id="ws-indicator"></div>
+                    <span class="text-xs text-secondary" id="ws-text">Connecting...</span>
+                </div>
+            </div>
+
+            <!-- Auto-refresh toggle -->
+            <div class="flex items-center space-x-2">
+                <label class="text-xs text-secondary">Auto-refresh:</label>
+                <button id="auto-refresh-toggle" class="px-2 py-1 rounded text-xs bg-primary text-dark">
+                    ON ⚡1s
+                </button>
+            </div>
+
+            <!-- Navigation -->
+            <a href="/playground" class="text-xs text-secondary hover:text-primary underline">Playground</a>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-auto p-4 space-y-4">
+        <!-- System Health Bar -->
+        <section class="bg-surface rounded-lg border border-border p-4">
+            <h2 class="text-sm font-medium mb-3 text-primary">System Health</h2>
+
+            <div class="grid grid-cols-4 gap-4 mb-4">
+                <!-- CPU -->
+                <div>
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-secondary">CPU</span>
+                        <span id="cpu-percent" class="text-light">--%</span>
+                    </div>
+                    <div class="w-full bg-dark rounded-full h-2">
+                        <div id="cpu-bar" class="progress-bar h-2 rounded-full bg-primary" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Memory -->
+                <div>
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-secondary">Memory</span>
+                        <span id="mem-percent" class="text-light">--%</span>
+                    </div>
+                    <div class="w-full bg-dark rounded-full h-2">
+                        <div id="mem-bar" class="progress-bar h-2 rounded-full bg-accent" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Network -->
+                <div>
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-secondary">Network</span>
+                        <span id="net-io" class="text-light">--</span>
+                    </div>
+                    <div class="text-xs text-secondary">⬆<span id="net-sent">0</span> MB / ⬇<span id="net-recv">0</span> MB</div>
+                </div>
+
+                <!-- Uptime -->
+                <div>
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-secondary">Uptime</span>
+                        <span id="uptime" class="text-light">--</span>
+                    </div>
+                    <div class="text-xs text-secondary" id="last-update">Updated: never</div>
+                </div>
+            </div>
+
+            <!-- Pool Status -->
+            <div class="border-t border-border pt-3">
+                <div class="grid grid-cols-3 gap-4 text-xs">
+                    <div>
+                        <span class="text-secondary">🔥 Permanent:</span>
+                        <span id="pool-perm" class="text-primary ml-2">INACTIVE (0MB)</span>
+                    </div>
+                    <div>
+                        <span class="text-secondary">♨️ Hot:</span>
+                        <span id="pool-hot" class="text-accent ml-2">0 (0MB)</span>
+                    </div>
+                    <div>
+                        <span class="text-secondary">❄️ Cold:</span>
+                        <span id="pool-cold" class="text-light ml-2">0 (0MB)</span>
+                    </div>
+                </div>
+                <div class="mt-2 text-xs text-secondary">
+                    <span>Janitor: </span><span id="janitor-status">adaptive</span> |
+                    <span>Memory pressure: </span><span id="mem-pressure">LOW</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Live Activity Grid (2x2) -->
+        <div class="grid grid-cols-2 gap-4">
+            <!-- Requests Section -->
+            <section class="bg-surface rounded-lg border border-border overflow-hidden flex flex-col" style="height: 350px;">
+                <div class="px-4 py-2 border-b border-border flex items-center justify-between">
+                    <h3 class="text-sm font-medium text-primary">📝 Requests (<span id="active-count">0</span> active)</h3>
+                    <select id="filter-requests" class="bg-dark border border-border rounded px-2 py-1 text-xs">
+                        <option value="all">All</option>
+                        <option value="success">Success</option>
+                        <option value="error">Errors</option>
+                    </select>
+                </div>
+                <div class="flex-1 overflow-auto p-3 space-y-2">
+                    <div id="active-requests-list" class="text-xs space-y-1 mb-3">
+                        <div class="text-secondary text-center py-2">No active requests</div>
+                    </div>
+                    <h4 class="text-xs font-medium text-secondary border-t border-border pt-2 mb-2">Recent Completed</h4>
+                    <div id="completed-requests-list" class="text-xs space-y-1">
+                        <div class="text-secondary text-center py-2">No completed requests</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Browsers Section -->
+            <section class="bg-surface rounded-lg border border-border overflow-hidden flex flex-col" style="height: 350px;">
+                <div class="px-4 py-2 border-b border-border flex items-center justify-between">
+                    <h3 class="text-sm font-medium text-primary">🌐 Browsers (<span id="browser-count">0</span>, <span id="browser-mem">0</span>MB)</h3>
+                    <div class="text-xs text-secondary">Reuse: <span id="reuse-rate" class="text-primary">--%</span></div>
+                </div>
+                <div class="flex-1 overflow-auto p-3">
+                    <table class="w-full text-xs">
+                        <thead class="border-b border-border">
+                            <tr class="text-secondary text-left">
+                                <th class="py-1 pr-2">Type</th>
+                                <th class="py-1 pr-2">Sig</th>
+                                <th class="py-1 pr-2">Age</th>
+                                <th class="py-1 pr-2">Used</th>
+                                <th class="py-1 pr-2">Hits</th>
+                                <th class="py-1">Act</th>
+                            </tr>
+                        </thead>
+                        <tbody id="browsers-table-body">
+                            <tr><td colspan="6" class="text-center py-4 text-secondary">No browsers</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Janitor Section -->
+            <section class="bg-surface rounded-lg border border-border overflow-hidden flex flex-col" style="height: 300px;">
+                <div class="px-4 py-2 border-b border-border">
+                    <h3 class="text-sm font-medium text-primary">🧹 Janitor Events</h3>
+                </div>
+                <div class="flex-1 overflow-auto p-3">
+                    <div id="janitor-log" class="text-xs space-y-1 font-mono">
+                        <div class="text-secondary text-center py-4">No events yet</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Errors Section -->
+            <section class="bg-surface rounded-lg border border-border overflow-hidden flex flex-col" style="height: 300px;">
+                <div class="px-4 py-2 border-b border-border">
+                    <h3 class="text-sm font-medium text-primary">❌ Errors</h3>
+                </div>
+                <div class="flex-1 overflow-auto p-3">
+                    <div id="errors-log" class="text-xs space-y-1">
+                        <div class="text-secondary text-center py-4">No errors</div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Endpoint Analytics & Timeline (Side by side) -->
+        <div class="grid grid-cols-2 gap-4">
+            <!-- Endpoint Analytics -->
+            <section class="bg-surface rounded-lg border border-border p-4">
+                <h2 class="text-sm font-medium mb-3 text-primary">Endpoint Analytics</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs">
+                        <thead class="border-b border-border">
+                            <tr class="text-secondary text-left">
+                                <th class="py-2 pr-4">Endpoint</th>
+                                <th class="py-2 pr-4 text-right">Count</th>
+                                <th class="py-2 pr-4 text-right">Avg Latency</th>
+                                <th class="py-2 pr-4 text-right">Success%</th>
+                                <th class="py-2 pr-4 text-right">Pool%</th>
+                            </tr>
+                        </thead>
+                        <tbody id="endpoints-table-body">
+                            <tr><td colspan="5" class="text-center py-4 text-secondary">No data</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Resource Timeline -->
+            <section class="bg-surface rounded-lg border border-border p-4">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-sm font-medium text-primary">Resource Timeline (5min)</h2>
+                    <select id="timeline-metric" class="bg-dark border border-border rounded px-2 py-1 text-xs">
+                        <option value="memory">Memory %</option>
+                        <option value="requests">Requests/5s</option>
+                        <option value="browsers">Browser Count</option>
+                    </select>
+                </div>
+
+                <svg id="timeline-chart" class="w-full" style="height: 120px;" viewBox="0 0 400 120">
+                    <!-- Chart will be drawn here -->
+                    <text x="200" y="60" text-anchor="middle" fill="#D5CEBF" font-size="12">Loading...</text>
+                </svg>
+            </section>
+        </div>
+
+        <!-- Control Actions -->
+        <section class="bg-surface rounded-lg border border-accent p-4">
+            <h2 class="text-sm font-medium mb-3 text-accent">Control Actions</h2>
+            <div class="flex flex-wrap gap-2">
+                <button id="btn-force-cleanup" class="px-3 py-1 bg-accent text-dark rounded text-xs hover:opacity-90">
+                    🧹 Force Cleanup
+                </button>
+                <button id="btn-restart-perm" class="px-3 py-1 bg-primary text-dark rounded text-xs hover:opacity-90">
+                    🔄 Restart Permanent
+                </button>
+                <button id="btn-reset-stats" class="px-3 py-1 border border-border rounded text-xs hover:bg-dark">
+                    📊 Reset Stats
+                </button>
+                <div class="ml-auto text-xs text-secondary" id="action-status"></div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // ========== State Management ==========
+        let autoRefresh = true;
+        let refreshInterval;
+        const REFRESH_RATE = 1000; // 1 second
+        let websocket = null;
+        let wsReconnectAttempts = 0;
+        const MAX_WS_RECONNECT = 5;
+        let useWebSocket = true; // Try WebSocket first, fallback to polling
+
+        // No more tabs - all sections visible at once!
+
+        // ========== WebSocket Connection ==========
+        function updateConnectionStatus(status, message) {
+            const indicator = document.getElementById('ws-indicator');
+            const text = document.getElementById('ws-text');
+
+            indicator.className = 'w-2 h-2 rounded-full';
+
+            if (status === 'connected') {
+                indicator.classList.add('bg-green-500', 'pulse-fast');
+                text.textContent = 'Live';
+                text.className = 'text-xs text-green-400';
+            } else if (status === 'connecting') {
+                indicator.classList.add('bg-yellow-500', 'pulse-slow');
+                text.textContent = 'Connecting...';
+                text.className = 'text-xs text-yellow-400';
+            } else if (status === 'polling') {
+                indicator.classList.add('bg-blue-500', 'pulse-slow');
+                text.textContent = 'Polling';
+                text.className = 'text-xs text-blue-400';
+            } else {
+                indicator.classList.add('bg-red-500');
+                text.textContent = message || 'Disconnected';
+                text.className = 'text-xs text-red-400';
+            }
+        }
+
+        function connectWebSocket() {
+            if (wsReconnectAttempts >= MAX_WS_RECONNECT) {
+                console.log('Max WebSocket reconnect attempts reached, falling back to polling');
+                useWebSocket = false;
+                updateConnectionStatus('polling');
+                startAutoRefresh();
+                return;
+            }
+
+            updateConnectionStatus('connecting');
+            wsReconnectAttempts++;
+
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/monitor/ws`;
+
+            websocket = new WebSocket(wsUrl);
+
+            websocket.onopen = () => {
+                console.log('WebSocket connected');
+                wsReconnectAttempts = 0;
+                updateConnectionStatus('connected');
+                stopAutoRefresh(); // Stop polling if running
+            };
+
+            websocket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                updateDashboard(data);
+            };
+
+            websocket.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+
+            websocket.onclose = () => {
+                console.log('WebSocket closed');
+                updateConnectionStatus('disconnected', 'Reconnecting...');
+
+                if (useWebSocket) {
+                    setTimeout(connectWebSocket, 2000 * wsReconnectAttempts);
+                } else {
+                    startAutoRefresh();
+                }
+            };
+        }
+
+        function updateDashboard(data) {
+            // Update all dashboard sections with WebSocket data
+            try {
+                if (data.health) {
+                    updateHealthDisplay(data.health);
+                }
+                if (data.requests) {
+                    updateRequestsDisplay(data.requests);
+                }
+                if (data.browsers) {
+                    updateBrowsersDisplay(data.browsers);
+                }
+                if (data.janitor) {
+                    updateJanitorDisplay(data.janitor);
+                }
+                if (data.errors && data.errors.length > 0) {
+                    updateErrorsDisplay(data.errors);
+                }
+            } catch (e) {
+                console.error('Error updating dashboard:', e);
+            }
+        }
+
+        // Helper functions to update displays from WebSocket data
+        function updateHealthDisplay(health) {
+            const cpu = health.container.cpu_percent;
+            const mem = health.container.memory_percent;
+
+            document.getElementById('cpu-percent').textContent = cpu.toFixed(1) + '%';
+            document.getElementById('cpu-bar').style.width = Math.min(cpu, 100) + '%';
+            document.getElementById('cpu-bar').className = `progress-bar h-2 rounded-full ${cpu > 80 ? 'bg-red-500' : cpu > 60 ? 'bg-yellow-500' : 'bg-primary'}`;
+
+            document.getElementById('mem-percent').textContent = mem.toFixed(1) + '%';
+            document.getElementById('mem-bar').style.width = Math.min(mem, 100) + '%';
+            document.getElementById('mem-bar').className = `progress-bar h-2 rounded-full ${mem > 80 ? 'bg-red-500' : mem > 60 ? 'bg-yellow-500' : 'bg-accent'}`;
+
+            document.getElementById('net-sent').textContent = health.container.network_sent_mb.toFixed(1);
+            document.getElementById('net-recv').textContent = health.container.network_recv_mb.toFixed(1);
+
+            const uptime = formatUptime(health.container.uptime_seconds);
+            document.getElementById('uptime').textContent = uptime;
+
+            const perm = health.pool.permanent;
+            document.getElementById('pool-perm').textContent = `${perm.active ? 'ACTIVE' : 'INACTIVE'} (${perm.memory_mb}MB)`;
+            document.getElementById('pool-perm').className = perm.active ? 'text-primary ml-2' : 'text-secondary ml-2';
+
+            document.getElementById('pool-hot').textContent = `${health.pool.hot.count} (${health.pool.hot.memory_mb}MB)`;
+            document.getElementById('pool-cold').textContent = `${health.pool.cold.count} (${health.pool.cold.memory_mb}MB)`;
+
+            document.getElementById('janitor-status').textContent = health.janitor.next_cleanup_estimate;
+            const pressure = health.janitor.memory_pressure;
+            const pressureEl = document.getElementById('mem-pressure');
+            pressureEl.textContent = pressure;
+            pressureEl.className = pressure === 'HIGH' ? 'text-red-500' : pressure === 'MEDIUM' ? 'text-yellow-500' : 'text-green-500';
+
+            document.getElementById('last-update').textContent = 'Live: ' + new Date().toLocaleTimeString();
+        }
+
+        function updateRequestsDisplay(requests) {
+            // Update active requests count
+            const activeCount = document.getElementById('active-count');
+            if (activeCount) activeCount.textContent = requests.active.length;
+
+            // Update active requests list
+            const activeList = document.getElementById('active-requests-list');
+            if (activeList) {
+                if (requests.active.length === 0) {
+                    activeList.innerHTML = '<div class="text-secondary text-center py-2">No active requests</div>';
+                } else {
+                    activeList.innerHTML = requests.active.map(req => `
+                        <div class="flex items-center justify-between p-2 bg-dark rounded border border-border">
+                            <span class="text-primary">${req.id.substring(0, 8)}</span>
+                            <span class="text-secondary">${req.endpoint}</span>
+                            <span class="text-light truncate max-w-[200px]" title="${req.url}">${req.url}</span>
+                            <span class="text-accent">${req.elapsed.toFixed(1)}s</span>
+                            <span class="pulse-slow">⏳</span>
+                        </div>
+                    `).join('');
+                }
+            }
+
+            // Update completed requests
+            const completedList = document.getElementById('completed-requests-list');
+            if (completedList) {
+                if (requests.completed.length === 0) {
+                    completedList.innerHTML = '<div class="text-secondary text-center py-2">No completed requests</div>';
+                } else {
+                    completedList.innerHTML = requests.completed.map(req => `
+                        <div class="flex items-center gap-3 p-2 bg-dark rounded">
+                            <span class="text-secondary w-16 flex-shrink-0">${req.id.substring(0, 8)}</span>
+                            <span class="text-secondary w-16 flex-shrink-0">${req.endpoint}</span>
+                            <span class="text-light truncate flex-1" title="${req.url}">${req.url}</span>
+                            <span class="w-12 flex-shrink-0 text-right">${req.elapsed.toFixed(2)}s</span>
+                            <span class="text-secondary w-16 flex-shrink-0 text-right">${req.mem_delta > 0 ? '+' : ''}${req.mem_delta}MB</span>
+                            <span class="w-12 flex-shrink-0 text-right">${req.success ? '✅' : '❌'} ${req.status_code}</span>
+                        </div>
+                    `).join('');
+                }
+            }
+        }
+
+        function updateBrowsersDisplay(browsers) {
+            const tbody = document.getElementById('browsers-table-body');
+            if (tbody) {
+                if (browsers.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-2 text-secondary">No browsers</td></tr>';
+                } else {
+                    tbody.innerHTML = browsers.map(b => {
+                        const typeIcon = b.type === 'permanent' ? '🔥' : b.type === 'hot' ? '♨️' : '❄️';
+                        const typeColor = b.type === 'permanent' ? 'text-primary' : b.type === 'hot' ? 'text-accent' : 'text-light';
+
+                        return `
+                            <tr class="border-t border-border hover:bg-dark">
+                                <td class="py-1 pr-2"><span class="${typeColor}">${typeIcon} ${b.type}</span></td>
+                                <td class="py-1 pr-2 font-mono text-xs">${b.sig}</td>
+                                <td class="py-1 pr-2">${formatSeconds(b.age_seconds || 0)}</td>
+                                <td class="py-1 pr-2">${formatSeconds(b.last_used_seconds || 0)}</td>
+                                <td class="py-1 pr-2">${b.hits}</td>
+                                <td class="py-1">
+                                    ${b.killable ? `
+                                        <button onclick="killBrowser('${b.sig}')" class="text-red-500 hover:underline text-xs">X</button>
+                                    ` : `
+                                        <button onclick="restartBrowser('permanent')" class="text-primary hover:underline text-xs">↻</button>
+                                    `}
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+            }
+
+            // Update browser count and total memory
+            const countEl = document.getElementById('browser-count');
+            if (countEl) countEl.textContent = browsers.length;
+
+            const memEl = document.getElementById('browser-mem');
+            if (memEl) {
+                const totalMem = browsers.reduce((sum, b) => sum + (b.memory_mb || 0), 0);
+                memEl.textContent = totalMem;
+            }
+
+            // Update reuse rate (if available from summary data)
+            // Note: WebSocket sends just browsers array, not summary
+            // Reuse rate calculation would need to be added to monitor.py
+            const reuseEl = document.getElementById('reuse-rate');
+            if (reuseEl) {
+                reuseEl.textContent = '---%'; // Not available in real-time yet
+            }
+        }
+
+        function updateJanitorDisplay(events) {
+            const janitorLog = document.getElementById('janitor-log');
+            if (janitorLog) {
+                if (events.length === 0) {
+                    janitorLog.innerHTML = '<div class="text-secondary text-center py-4">No events yet</div>';
+                } else {
+                    janitorLog.innerHTML = events.slice(0, 10).reverse().map(evt => {
+                        const time = new Date(evt.timestamp * 1000).toLocaleTimeString();
+                        const icon = evt.type === 'close_cold' ? '🧹❄️' : evt.type === 'close_hot' ? '🧹♨️' : '⬆️';
+                        const details = JSON.stringify(evt.details);
+
+                        return `<div class="p-2 bg-dark rounded">
+                            <span class="text-secondary">${time}</span>
+                            <span>${icon}</span>
+                            <span class="text-primary">${evt.type}</span>
+                            <span class="text-secondary">sig=${evt.sig}</span>
+                            <span class="text-xs text-secondary ml-2">${details}</span>
+                        </div>`;
+                    }).join('');
+                }
+            }
+        }
+
+        function updateErrorsDisplay(errors) {
+            const errorLog = document.getElementById('errors-log');
+            if (errorLog) {
+                if (errors.length === 0) {
+                    errorLog.innerHTML = '<div class="text-secondary text-center py-4">No errors</div>';
+                } else {
+                    errorLog.innerHTML = errors.slice(0, 10).reverse().map(err => {
+                        const time = new Date(err.timestamp * 1000).toLocaleTimeString();
+
+                        return `<div class="p-2 bg-dark rounded border border-red-500">
+                            <div class="flex justify-between">
+                                <span class="text-secondary">${time}</span>
+                                <span class="text-red-500">${err.endpoint}</span>
+                            </div>
+                            <div class="text-xs text-light mt-1">${err.url}</div>
+                            <div class="text-xs text-red-400 mt-1 font-mono">${err.error}</div>
+                        </div>`;
+                    }).join('');
+                }
+            }
+        }
+
+        // ========== Auto-refresh Toggle ==========
+        document.getElementById('auto-refresh-toggle').addEventListener('click', function() {
+            autoRefresh = !autoRefresh;
+            this.textContent = autoRefresh ? 'ON ⚡1s' : 'OFF';
+            this.classList.toggle('bg-primary');
+            this.classList.toggle('bg-dark');
+            this.classList.toggle('text-dark');
+            this.classList.toggle('text-light');
+
+            if (autoRefresh) {
+                startAutoRefresh();
+            } else {
+                stopAutoRefresh();
+            }
+        });
+
+        function startAutoRefresh() {
+            fetchAll();
+            refreshInterval = setInterval(fetchAll, REFRESH_RATE);
+        }
+
+        function stopAutoRefresh() {
+            if (refreshInterval) clearInterval(refreshInterval);
+        }
+
+        // ========== Data Fetching ==========
+        async function fetchAll() {
+            await Promise.all([
+                fetchHealth(),
+                fetchRequests(),
+                fetchBrowsers(),
+                fetchJanitorLog(),
+                fetchErrors(),
+                fetchEndpointStats(),
+                fetchTimeline()
+            ]);
+        }
+
+        async function fetchHealth() {
+            try {
+                const res = await fetch('/monitor/health');
+                const data = await res.json();
+
+                // Container metrics
+                const cpu = data.container.cpu_percent;
+                const mem = data.container.memory_percent;
+
+                document.getElementById('cpu-percent').textContent = cpu.toFixed(1) + '%';
+                document.getElementById('cpu-bar').style.width = Math.min(cpu, 100) + '%';
+                document.getElementById('cpu-bar').className = `progress-bar h-2 rounded-full ${cpu > 80 ? 'bg-red-500' : cpu > 60 ? 'bg-yellow-500' : 'bg-primary'}`;
+
+                document.getElementById('mem-percent').textContent = mem.toFixed(1) + '%';
+                document.getElementById('mem-bar').style.width = Math.min(mem, 100) + '%';
+                document.getElementById('mem-bar').className = `progress-bar h-2 rounded-full ${mem > 80 ? 'bg-red-500' : mem > 60 ? 'bg-yellow-500' : 'bg-accent'}`;
+
+                document.getElementById('net-sent').textContent = data.container.network_sent_mb.toFixed(1);
+                document.getElementById('net-recv').textContent = data.container.network_recv_mb.toFixed(1);
+
+                const uptime = formatUptime(data.container.uptime_seconds);
+                document.getElementById('uptime').textContent = uptime;
+
+                // Pool status
+                const perm = data.pool.permanent;
+                document.getElementById('pool-perm').textContent =
+                    `${perm.active ? 'ACTIVE' : 'INACTIVE'} (${perm.memory_mb}MB)`;
+                document.getElementById('pool-perm').className = perm.active ? 'text-primary ml-2' : 'text-secondary ml-2';
+
+                document.getElementById('pool-hot').textContent =
+                    `${data.pool.hot.count} (${data.pool.hot.memory_mb}MB)`;
+                document.getElementById('pool-cold').textContent =
+                    `${data.pool.cold.count} (${data.pool.cold.memory_mb}MB)`;
+
+                // Janitor
+                document.getElementById('janitor-status').textContent = data.janitor.next_cleanup_estimate;
+                const pressure = data.janitor.memory_pressure;
+                const pressureEl = document.getElementById('mem-pressure');
+                pressureEl.textContent = pressure;
+                pressureEl.className = pressure === 'HIGH' ? 'text-red-500' : pressure === 'MEDIUM' ? 'text-yellow-500' : 'text-green-500';
+
+                document.getElementById('last-update').textContent = 'Updated: ' + new Date().toLocaleTimeString();
+            } catch (e) {
+                console.error('Failed to fetch health:', e);
+            }
+        }
+
+        async function fetchRequests() {
+            try {
+                const filter = document.getElementById('filter-requests')?.value || 'all';
+                const res = await fetch(`/monitor/requests?status=${filter}&limit=50`);
+                const data = await res.json();
+
+                // Active requests
+                const activeList = document.getElementById('active-requests-list');
+                document.getElementById('active-count').textContent = data.active.length;
+
+                if (data.active.length === 0) {
+                    activeList.innerHTML = '<div class="text-secondary text-center py-2">No active requests</div>';
+                } else {
+                    activeList.innerHTML = data.active.map(req => `
+                        <div class="flex items-center justify-between p-2 bg-dark rounded border border-border">
+                            <span class="text-primary">${req.id.substring(0, 8)}</span>
+                            <span class="text-secondary">${req.endpoint}</span>
+                            <span class="text-light truncate max-w-[200px]" title="${req.url}">${req.url}</span>
+                            <span class="text-accent">${req.elapsed.toFixed(1)}s</span>
+                            <span class="pulse-slow">⏳</span>
+                        </div>
+                    `).join('');
+                }
+
+                // Completed requests
+                const completedList = document.getElementById('completed-requests-list');
+                if (data.completed.length === 0) {
+                    completedList.innerHTML = '<div class="text-secondary text-center py-2">No completed requests</div>';
+                } else {
+                    completedList.innerHTML = data.completed.map(req => `
+                        <div class="flex items-center gap-3 p-2 bg-dark rounded">
+                            <span class="text-secondary w-16 flex-shrink-0">${req.id.substring(0, 8)}</span>
+                            <span class="text-secondary w-16 flex-shrink-0">${req.endpoint}</span>
+                            <span class="text-light truncate flex-1" title="${req.url}">${req.url}</span>
+                            <span class="w-12 flex-shrink-0 text-right">${req.elapsed.toFixed(2)}s</span>
+                            <span class="text-secondary w-16 flex-shrink-0 text-right">${req.mem_delta > 0 ? '+' : ''}${req.mem_delta}MB</span>
+                            <span class="w-12 flex-shrink-0 text-right">${req.success ? '✅' : '❌'} ${req.status_code}</span>
+                        </div>
+                    `).join('');
+                }
+            } catch (e) {
+                console.error('Failed to fetch requests:', e);
+            }
+        }
+
+        async function fetchBrowsers() {
+            try {
+                const res = await fetch('/monitor/browsers');
+                const data = await res.json();
+
+                document.getElementById('browser-count').textContent = data.summary.total_count;
+                document.getElementById('browser-mem').textContent = data.summary.total_memory_mb;
+                document.getElementById('reuse-rate').textContent = data.summary.reuse_rate_percent.toFixed(1) + '%';
+
+                const tbody = document.getElementById('browsers-table-body');
+                if (data.browsers.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-2 text-secondary">No browsers</td></tr>';
+                } else {
+                    tbody.innerHTML = data.browsers.map(b => {
+                        const typeIcon = b.type === 'permanent' ? '🔥' : b.type === 'hot' ? '♨️' : '❄️';
+                        const typeColor = b.type === 'permanent' ? 'text-primary' : b.type === 'hot' ? 'text-accent' : 'text-light';
+
+                        return `
+                            <tr class="border-t border-border hover:bg-dark">
+                                <td class="py-1 pr-2"><span class="${typeColor}">${typeIcon} ${b.type}</span></td>
+                                <td class="py-1 pr-2 font-mono text-xs">${b.sig}</td>
+                                <td class="py-1 pr-2">${formatSeconds(b.age_seconds)}</td>
+                                <td class="py-1 pr-2">${formatSeconds(b.last_used_seconds)}</td>
+                                <td class="py-1 pr-2">${b.hits}</td>
+                                <td class="py-1">
+                                    ${b.killable ? `
+                                        <button onclick="killBrowser('${b.sig}')" class="text-red-500 hover:underline text-xs">X</button>
+                                    ` : `
+                                        <button onclick="restartBrowser('permanent')" class="text-primary hover:underline text-xs">↻</button>
+                                    `}
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+            } catch (e) {
+                console.error('Failed to fetch browsers:', e);
+            }
+        }
+
+        async function fetchJanitorLog() {
+            try {
+                const res = await fetch('/monitor/logs/janitor?limit=100');
+                const data = await res.json();
+
+                const logEl = document.getElementById('janitor-log');
+                if (data.events.length === 0) {
+                    logEl.innerHTML = '<div class="text-secondary text-center py-4">No events yet</div>';
+                } else {
+                    logEl.innerHTML = data.events.reverse().map(evt => {
+                        const time = new Date(evt.timestamp * 1000).toLocaleTimeString();
+                        const icon = evt.type === 'close_cold' ? '🧹❄️' : evt.type === 'close_hot' ? '🧹♨️' : '⬆️';
+                        const details = JSON.stringify(evt.details);
+
+                        return `<div class="p-2 bg-dark rounded">
+                            <span class="text-secondary">${time}</span>
+                            <span>${icon}</span>
+                            <span class="text-primary">${evt.type}</span>
+                            <span class="text-secondary">sig=${evt.sig}</span>
+                            <span class="text-xs text-secondary ml-2">${details}</span>
+                        </div>`;
+                    }).join('');
+                }
+            } catch (e) {
+                console.error('Failed to fetch janitor log:', e);
+            }
+        }
+
+        async function fetchErrors() {
+            try {
+                const res = await fetch('/monitor/logs/errors?limit=100');
+                const data = await res.json();
+
+                const logEl = document.getElementById('errors-log');
+                if (data.errors.length === 0) {
+                    logEl.innerHTML = '<div class="text-secondary text-center py-4">No errors</div>';
+                } else {
+                    logEl.innerHTML = data.errors.reverse().map(err => {
+                        const time = new Date(err.timestamp * 1000).toLocaleTimeString();
+
+                        return `<div class="p-2 bg-dark rounded border border-red-500">
+                            <div class="flex justify-between">
+                                <span class="text-secondary">${time}</span>
+                                <span class="text-red-500">${err.endpoint}</span>
+                            </div>
+                            <div class="text-xs text-light mt-1">${err.url}</div>
+                            <div class="text-xs text-red-400 mt-1 font-mono">${err.error}</div>
+                        </div>`;
+                    }).join('');
+                }
+            } catch (e) {
+                console.error('Failed to fetch errors:', e);
+            }
+        }
+
+        async function fetchEndpointStats() {
+            try {
+                const res = await fetch('/monitor/endpoints/stats');
+                const data = await res.json();
+
+                const tbody = document.getElementById('endpoints-table-body');
+                const endpoints = Object.entries(data);
+
+                if (endpoints.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-secondary">No data</td></tr>';
+                } else {
+                    tbody.innerHTML = endpoints.map(([endpoint, stats]) => `
+                        <tr class="border-t border-border">
+                            <td class="py-2 pr-4 text-primary">${endpoint}</td>
+                            <td class="py-2 pr-4 text-right">${stats.count}</td>
+                            <td class="py-2 pr-4 text-right">${stats.avg_latency_ms}ms</td>
+                            <td class="py-2 pr-4 text-right ${stats.success_rate_percent >= 99 ? 'text-green-500' : 'text-yellow-500'}">
+                                ${stats.success_rate_percent.toFixed(1)}%
+                            </td>
+                            <td class="py-2 pr-4 text-right ${stats.pool_hit_rate_percent >= 90 ? 'text-green-500' : 'text-yellow-500'}">
+                                ${stats.pool_hit_rate_percent.toFixed(1)}%
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (e) {
+                console.error('Failed to fetch endpoint stats:', e);
+            }
+        }
+
+        async function fetchTimeline() {
+            try {
+                const metric = document.getElementById('timeline-metric').value;
+                const res = await fetch(`/monitor/timeline?metric=${metric}`);
+                const data = await res.json();
+
+                drawTimeline(data, metric);
+            } catch (e) {
+                console.error('Failed to fetch timeline:', e);
+            }
+        }
+
+        function drawTimeline(data, metric) {
+            const svg = document.getElementById('timeline-chart');
+            const width = 400;
+            const height = 120;
+            const padding = 20;
+
+            // Clear previous chart
+            svg.innerHTML = '';
+
+            if (!data.values || data.values.length === 0) {
+                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('x', width / 2);
+                text.setAttribute('y', height / 2);
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('fill', '#D5CEBF');
+                text.setAttribute('font-size', '12');
+                text.textContent = 'No data';
+                svg.appendChild(text);
+                return;
+            }
+
+            // Handle browsers metric (nested data)
+            let values = data.values;
+            if (metric === 'browsers') {
+                // Sum all browser types
+                values = values.map(v => (v.permanent || 0) + (v.hot || 0) + (v.cold || 0));
+            }
+
+            const maxValue = Math.max(...values, 1);
+            const minValue = 0;
+
+            // Draw grid lines
+            for (let i = 0; i <= 4; i++) {
+                const y = padding + (height - 2 * padding) * (i / 4);
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', padding);
+                line.setAttribute('y1', y);
+                line.setAttribute('x2', width - padding);
+                line.setAttribute('y2', y);
+                line.setAttribute('stroke', '#3F3F44');
+                line.setAttribute('stroke-width', '1');
+                line.setAttribute('stroke-dasharray', '2,2');
+                svg.appendChild(line);
+            }
+
+            // Draw line
+            if (values.length > 1) {
+                const points = values.map((v, i) => {
+                    const x = padding + (width - 2 * padding) * (i / (values.length - 1));
+                    const y = height - padding - ((v - minValue) / (maxValue - minValue)) * (height - 2 * padding);
+                    return `${x},${y}`;
+                }).join(' ');
+
+                const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+                polyline.setAttribute('points', points);
+                polyline.setAttribute('fill', 'none');
+                polyline.setAttribute('stroke', '#4EFFFF');
+                polyline.setAttribute('stroke-width', '2');
+                polyline.classList.add('sparkline');
+                svg.appendChild(polyline);
+
+                // Add glow effect
+                const polylineGlow = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+                polylineGlow.setAttribute('points', points);
+                polylineGlow.setAttribute('fill', 'none');
+                polylineGlow.setAttribute('stroke', '#4EFFFF');
+                polylineGlow.setAttribute('stroke-width', '4');
+                polylineGlow.setAttribute('opacity', '0.3');
+                polylineGlow.classList.add('sparkline');
+                svg.insertBefore(polylineGlow, polyline);
+            }
+
+            // Y-axis labels
+            const labelMax = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            labelMax.setAttribute('x', '5');
+            labelMax.setAttribute('y', padding);
+            labelMax.setAttribute('fill', '#D5CEBF');
+            labelMax.setAttribute('font-size', '10');
+            labelMax.textContent = maxValue.toFixed(0);
+            svg.appendChild(labelMax);
+
+            const labelMin = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            labelMin.setAttribute('x', '5');
+            labelMin.setAttribute('y', height - padding);
+            labelMin.setAttribute('fill', '#D5CEBF');
+            labelMin.setAttribute('font-size', '10');
+            labelMin.textContent = minValue.toFixed(0);
+            svg.appendChild(labelMin);
+        }
+
+        // Timeline metric selector
+        document.getElementById('timeline-metric').addEventListener('change', fetchTimeline);
+
+        // ========== Control Actions ==========
+        async function killBrowser(sig) {
+            if (!confirm(`Kill browser ${sig}?`)) return;
+
+            try {
+                const res = await fetch('/monitor/actions/kill_browser', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({sig})
+                });
+                const data = await res.json();
+
+                showActionStatus(data.success ? `✅ Killed ${sig}` : `❌ Failed to kill`, data.success);
+                if (data.success) fetchBrowsers();
+            } catch (e) {
+                showActionStatus('❌ Error: ' + e.message, false);
+            }
+        }
+
+        async function restartBrowser(sig) {
+            if (!confirm(`Restart browser ${sig}?`)) return;
+
+            try {
+                const res = await fetch('/monitor/actions/restart_browser', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({sig})
+                });
+                const data = await res.json();
+
+                showActionStatus(data.success ? `✅ Restarted ${sig}` : `❌ Failed to restart`, data.success);
+                if (data.success) fetchBrowsers();
+            } catch (e) {
+                showActionStatus('❌ Error: ' + e.message, false);
+            }
+        }
+
+        document.getElementById('btn-force-cleanup').addEventListener('click', async () => {
+            if (!confirm('Force cleanup all cold pool browsers?')) return;
+
+            try {
+                const res = await fetch('/monitor/actions/cleanup', {method: 'POST'});
+                const data = await res.json();
+
+                showActionStatus(`✅ Killed ${data.killed_browsers} browsers`, true);
+                fetchAll();
+            } catch (e) {
+                showActionStatus('❌ Error: ' + e.message, false);
+            }
+        });
+
+        document.getElementById('btn-restart-perm').addEventListener('click', async () => {
+            if (!confirm('Restart permanent browser? This will briefly interrupt service.')) return;
+
+            try {
+                const res = await fetch('/monitor/actions/restart_browser', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({sig: 'permanent'})
+                });
+                const data = await res.json();
+
+                showActionStatus(data.success ? '✅ Permanent browser restarted' : '❌ Failed', data.success);
+                fetchAll();
+            } catch (e) {
+                showActionStatus('❌ Error: ' + e.message, false);
+            }
+        });
+
+        document.getElementById('btn-reset-stats').addEventListener('click', async () => {
+            if (!confirm('Reset all endpoint statistics?')) return;
+
+            try {
+                const res = await fetch('/monitor/stats/reset', {method: 'POST'});
+                const data = await res.json();
+
+                showActionStatus('✅ Stats reset', true);
+                fetchEndpointStats();
+            } catch (e) {
+                showActionStatus('❌ Error: ' + e.message, false);
+            }
+        });
+
+        function showActionStatus(msg, success) {
+            const el = document.getElementById('action-status');
+            el.textContent = msg;
+            el.className = success ? 'ml-auto text-xs text-green-500' : 'ml-auto text-xs text-red-500';
+            setTimeout(() => el.textContent = '', 3000);
+        }
+
+        // ========== Utility Functions ==========
+        function formatUptime(seconds) {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            return `${h}h ${m}m`;
+        }
+
+        function formatSeconds(seconds) {
+            if (seconds < 60) return `${seconds}s`;
+            const m = Math.floor(seconds / 60);
+            const s = seconds % 60;
+            return `${m}m ${s}s`;
+        }
+
+        // ========== Filter change handler ==========
+        document.getElementById('filter-requests')?.addEventListener('change', fetchRequests);
+
+        // ========== Initialize ==========
+        // Try WebSocket first, fallback to polling on failure
+        connectWebSocket();
+    </script>
+</body>
+</html>

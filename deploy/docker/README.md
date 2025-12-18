@@ -12,6 +12,7 @@
   - [Python SDK](#python-sdk)
   - [Understanding Request Schema](#understanding-request-schema)
   - [REST API Examples](#rest-api-examples)
+  - [Asynchronous Jobs with Webhooks](#asynchronous-jobs-with-webhooks)
 - [Additional API Endpoints](#additional-api-endpoints)
   - [HTML Extraction Endpoint](#html-extraction-endpoint)
   - [Screenshot Endpoint](#screenshot-endpoint)
@@ -58,13 +59,13 @@ Pull and run images directly from Docker Hub without building locally.
 
 #### 1. Pull the Image
 
-Our latest release candidate is `0.6.0-r1`. Images are built with multi-arch manifests, so Docker automatically pulls the correct version for your system.
+Our latest stable release is `0.7.7`. Images are built with multi-arch manifests, so Docker automatically pulls the correct version for your system.
 
 ```bash
-# Pull the release candidate (recommended for latest features)
-docker pull unclecode/crawl4ai:0.6.0-rN # Use your favorite revision number
+# Pull the latest stable version (0.7.7)
+docker pull unclecode/crawl4ai:0.7.7
 
-# Or pull the latest stable version
+# Or use the latest tag (points to 0.7.7)
 docker pull unclecode/crawl4ai:latest
 ```
 
@@ -99,7 +100,7 @@ EOL
       -p 11235:11235 \
       --name crawl4ai \
       --shm-size=1g \
-      unclecode/crawl4ai:0.6.0-rN # Use your favorite revision number
+      unclecode/crawl4ai:0.7.7
     ```
 
 *   **With LLM support:**
@@ -110,7 +111,7 @@ EOL
       --name crawl4ai \
       --env-file .llm.env \
       --shm-size=1g \
-      unclecode/crawl4ai:0.6.0-rN # Use your favorite revision number
+      unclecode/crawl4ai:0.7.7
     ```
 
 > The server will be available at `http://localhost:11235`. Visit `/playground` to access the interactive testing interface.
@@ -124,7 +125,7 @@ docker stop crawl4ai && docker rm crawl4ai
 #### Docker Hub Versioning Explained
 
 *   **Image Name:** `unclecode/crawl4ai`
-*   **Tag Format:** `LIBRARY_VERSION[-SUFFIX]` (e.g., `0.6.0-r1`)
+*   **Tag Format:** `LIBRARY_VERSION[-SUFFIX]` (e.g., `0.7.0-r1`)
     *   `LIBRARY_VERSION`: The semantic version of the core `crawl4ai` Python library
     *   `SUFFIX`: Optional tag for release candidates (``) and revisions (`r1`)
 *   **`latest` Tag:** Points to the most recent stable version
@@ -152,6 +153,29 @@ cp deploy/docker/.llm.env.example .llm.env
 # Now edit .llm.env and add your API keys
 ```
 
+**Flexible LLM Provider Configuration:**
+
+The Docker setup now supports flexible LLM provider configuration through three methods:
+
+1. **Environment Variable** (Highest Priority): Set `LLM_PROVIDER` to override the default
+   ```bash
+   export LLM_PROVIDER="anthropic/claude-3-opus"
+   # Or in your .llm.env file:
+   # LLM_PROVIDER=anthropic/claude-3-opus
+   ```
+
+2. **API Request Parameter**: Specify provider per request
+   ```json
+   {
+     "url": "https://example.com",
+     "provider": "groq/mixtral-8x7b"
+   }
+   ```
+
+3. **Config File Default**: Falls back to `config.yml` (default: `openai/gpt-4o-mini`)
+
+The system automatically selects the appropriate API key based on the provider.
+
 #### 3. Build and Run with Compose
 
 The `docker-compose.yml` file in the project root provides a simplified approach that automatically handles architecture detection using buildx.
@@ -160,7 +184,7 @@ The `docker-compose.yml` file in the project root provides a simplified approach
     ```bash
     # Pulls and runs the release candidate from Docker Hub
     # Automatically selects the correct architecture
-    IMAGE=unclecode/crawl4ai:0.6.0-rN # Use your favorite revision number docker compose up -d
+    IMAGE=unclecode/crawl4ai:0.7.7 docker compose up -d
     ```
 
 *   **Build and Run Locally:**
@@ -623,6 +647,194 @@ async def test_stream_crawl(token: str = None): # Made token optional
 # asyncio.run(test_stream_crawl())
 ```
 
+### Asynchronous Jobs with Webhooks
+
+For long-running crawls or when you want to avoid keeping connections open, use the job queue endpoints. Instead of polling for results, configure a webhook to receive notifications when jobs complete.
+
+#### Why Use Jobs & Webhooks?
+
+- **No Polling Required** - Get notified when crawls complete instead of constantly checking status
+- **Better Resource Usage** - Free up client connections while jobs run in the background
+- **Scalable Architecture** - Ideal for high-volume crawling with TypeScript/Node.js clients or microservices
+- **Reliable Delivery** - Automatic retry with exponential backoff (5 attempts: 1s → 2s → 4s → 8s → 16s)
+
+#### How It Works
+
+1. **Submit Job** → POST to `/crawl/job` with optional `webhook_config`
+2. **Get Task ID** → Receive a `task_id` immediately
+3. **Job Runs** → Crawl executes in the background
+4. **Webhook Fired** → Server POSTs completion notification to your webhook URL
+5. **Fetch Results** → If data wasn't included in webhook, GET `/crawl/job/{task_id}`
+
+#### Quick Example
+
+```bash
+# Submit a crawl job with webhook notification
+curl -X POST http://localhost:11235/crawl/job \
+  -H "Content-Type: application/json" \
+  -d '{
+    "urls": ["https://example.com"],
+    "webhook_config": {
+      "webhook_url": "https://myapp.com/webhooks/crawl-complete",
+      "webhook_data_in_payload": false
+    }
+  }'
+
+# Response: {"task_id": "crawl_a1b2c3d4"}
+```
+
+**Your webhook receives:**
+```json
+{
+  "task_id": "crawl_a1b2c3d4",
+  "task_type": "crawl",
+  "status": "completed",
+  "timestamp": "2025-10-21T10:30:00.000000+00:00",
+  "urls": ["https://example.com"]
+}
+```
+
+Then fetch the results:
+```bash
+curl http://localhost:11235/crawl/job/crawl_a1b2c3d4
+```
+
+#### Include Data in Webhook
+
+Set `webhook_data_in_payload: true` to receive the full crawl results directly in the webhook:
+
+```bash
+curl -X POST http://localhost:11235/crawl/job \
+  -H "Content-Type: application/json" \
+  -d '{
+    "urls": ["https://example.com"],
+    "webhook_config": {
+      "webhook_url": "https://myapp.com/webhooks/crawl-complete",
+      "webhook_data_in_payload": true
+    }
+  }'
+```
+
+**Your webhook receives the complete data:**
+```json
+{
+  "task_id": "crawl_a1b2c3d4",
+  "task_type": "crawl",
+  "status": "completed",
+  "timestamp": "2025-10-21T10:30:00.000000+00:00",
+  "urls": ["https://example.com"],
+  "data": {
+    "markdown": "...",
+    "html": "...",
+    "links": {...},
+    "metadata": {...}
+  }
+}
+```
+
+#### Webhook Authentication
+
+Add custom headers for authentication:
+
+```json
+{
+  "urls": ["https://example.com"],
+  "webhook_config": {
+    "webhook_url": "https://myapp.com/webhooks/crawl",
+    "webhook_data_in_payload": false,
+    "webhook_headers": {
+      "X-Webhook-Secret": "your-secret-token",
+      "X-Service-ID": "crawl4ai-prod"
+    }
+  }
+}
+```
+
+#### Global Default Webhook
+
+Configure a default webhook URL in `config.yml` for all jobs:
+
+```yaml
+webhooks:
+  enabled: true
+  default_url: "https://myapp.com/webhooks/default"
+  data_in_payload: false
+  retry:
+    max_attempts: 5
+    initial_delay_ms: 1000
+    max_delay_ms: 32000
+    timeout_ms: 30000
+```
+
+Now jobs without `webhook_config` automatically use the default webhook.
+
+#### Job Status Polling (Without Webhooks)
+
+If you prefer polling instead of webhooks, just omit `webhook_config`:
+
+```bash
+# Submit job
+curl -X POST http://localhost:11235/crawl/job \
+  -H "Content-Type: application/json" \
+  -d '{"urls": ["https://example.com"]}'
+# Response: {"task_id": "crawl_xyz"}
+
+# Poll for status
+curl http://localhost:11235/crawl/job/crawl_xyz
+```
+
+The response includes `status` field: `"processing"`, `"completed"`, or `"failed"`.
+
+#### LLM Extraction Jobs with Webhooks
+
+The same webhook system works for LLM extraction jobs via `/llm/job`:
+
+```bash
+# Submit LLM extraction job with webhook
+curl -X POST http://localhost:11235/llm/job \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://example.com/article",
+    "q": "Extract the article title, author, and main points",
+    "provider": "openai/gpt-4o-mini",
+    "webhook_config": {
+      "webhook_url": "https://myapp.com/webhooks/llm-complete",
+      "webhook_data_in_payload": true,
+      "webhook_headers": {
+        "X-Webhook-Secret": "your-secret-token"
+      }
+    }
+  }'
+
+# Response: {"task_id": "llm_1234567890"}
+```
+
+**Your webhook receives:**
+```json
+{
+  "task_id": "llm_1234567890",
+  "task_type": "llm_extraction",
+  "status": "completed",
+  "timestamp": "2025-10-22T12:30:00.000000+00:00",
+  "urls": ["https://example.com/article"],
+  "data": {
+    "extracted_content": {
+      "title": "Understanding Web Scraping",
+      "author": "John Doe",
+      "main_points": ["Point 1", "Point 2", "Point 3"]
+    }
+  }
+}
+```
+
+**Key Differences for LLM Jobs:**
+- Task type is `"llm_extraction"` instead of `"crawl"`
+- Extracted data is in `data.extracted_content`
+- Single URL only (not an array)
+- Supports schema-based extraction with `schema` parameter
+
+> 💡 **Pro tip**: See [WEBHOOK_EXAMPLES.md](./WEBHOOK_EXAMPLES.md) for detailed examples including TypeScript client code, Flask webhook handlers, and failure handling.
+
 ---
 
 ## Metrics & Monitoring
@@ -666,9 +878,8 @@ app:
 
 # Default LLM Configuration
 llm:
-  provider: "openai/gpt-4o-mini"
-  api_key_env: "OPENAI_API_KEY"
-  # api_key: sk-...  # If you pass the API key directly then api_key_env will be ignored
+  provider: "openai/gpt-4o-mini"  # Can be overridden by LLM_PROVIDER env var
+  # api_key: sk-...  # If you pass the API key directly (not recommended)
 
 # Redis Configuration (Used by internal Redis server managed by supervisord)
 redis:
@@ -802,10 +1013,11 @@ We're here to help you succeed with Crawl4AI! Here's how to get support:
 
 In this guide, we've covered everything you need to get started with Crawl4AI's Docker deployment:
 - Building and running the Docker container
-- Configuring the environment  
+- Configuring the environment
 - Using the interactive playground for testing
 - Making API requests with proper typing
 - Using the Python SDK
+- Asynchronous job queues with webhook notifications
 - Leveraging specialized endpoints for screenshots, PDFs, and JavaScript execution
 - Connecting via the Model Context Protocol (MCP)
 - Monitoring your deployment

@@ -74,7 +74,7 @@ async def test_direct_api():
     # Make direct API call
     async with httpx.AsyncClient() as client:
         response = await client.post(
-            "http://localhost:8000/crawl",
+            "http://localhost:11235/crawl",
             json=request_data,
             timeout=300
         )
@@ -100,12 +100,23 @@ async def test_direct_api():
 
     async with httpx.AsyncClient() as client:
         response = await client.post(
-            "http://localhost:8000/crawl",
+            "http://localhost:11235/crawl",
             json=request_data
         )
         assert response.status_code == 200
         result = response.json()
         print("Structured extraction result:", result["success"])
+
+    # Test 3: Raw HTML
+    request_data["urls"] = ["raw://<html><body><h1>Hello, World!</h1><a href='https://example.com'>Example</a></body></html>"]
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            "http://localhost:11235/crawl",
+            json=request_data
+        )
+        assert response.status_code == 200
+        result = response.json()
+        print("Raw HTML result:", result["success"])
 
     # Test 3: Get schema
     # async with httpx.AsyncClient() as client:
@@ -118,7 +129,7 @@ async def test_with_client():
     """Test using the Crawl4AI Docker client SDK"""
     print("\n=== Testing Client SDK ===")
     
-    async with Crawl4aiDockerClient(verbose=True) as client:
+    async with Crawl4aiDockerClient(base_url="http://localhost:11235", verbose=True) as client:
         # Test 1: Basic crawl
         browser_config = BrowserConfig(headless=True)
         crawler_config = CrawlerRunConfig(

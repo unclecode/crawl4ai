@@ -1,0 +1,330 @@
+/* Font Face Definitions */
+@font-face {
+  font-family: 'Dank Mono';
+  src: url('../assets/DankMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Dank Mono';
+  src: url('../assets/DankMono-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Dank Mono';
+  src: url('../assets/DankMono-Italic.woff2') format('woff2');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+:root {
+  --font-primary: 'Dank Mono', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  width: 380px;
+  font-family: var(--font-primary);
+  background: #0a0a0a;
+  color: #e0e0e0;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.popup-container {
+  padding: 20px;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.logo {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+}
+
+.header-content {
+  flex: 1;
+}
+
+header h1 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #fff;
+  margin: 0 0 4px 0;
+}
+
+.header-stats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.github-stars {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #999;
+  text-decoration: none;
+  font-size: 13px;
+  transition: color 0.2s ease;
+}
+
+.github-stars:hover {
+  color: #4a9eff;
+}
+
+.github-icon {
+  flex-shrink: 0;
+}
+
+.mode-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.mode-button {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: #1a1a1a;
+  border: 2px solid #2a2a2a;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+  text-align: left;
+}
+
+.mode-button:hover:not(:disabled) {
+  background: #252525;
+  border-color: #4a9eff;
+  transform: translateY(-2px);
+}
+
+.mode-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mode-button .icon {
+  font-size: 32px;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #252525;
+  border-radius: 8px;
+}
+
+.mode-button.schema .icon {
+  background: #1e3a5f;
+}
+
+.mode-button.script .icon {
+  background: #3a1e5f;
+}
+
+.mode-button.c2c .icon {
+  background: #1e5f3a;
+}
+
+.mode-info h3 {
+  font-size: 16px;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.mode-info p {
+  font-size: 13px;
+  color: #999;
+  line-height: 1.4;
+}
+
+.active-session {
+  background: #1a1a1a;
+  border: 2px solid #4a9eff;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.active-session.hidden {
+  display: none;
+}
+
+.session-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  background: #4a9eff;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.session-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #4a9eff;
+}
+
+.session-stats {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #0a0a0a;
+  border-radius: 8px;
+}
+
+.stat {
+  flex: 1;
+}
+
+.stat-label {
+  display: block;
+  font-size: 11px;
+  color: #666;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.stat-value {
+  font-size: 14px;
+  color: #fff;
+  font-weight: 600;
+}
+
+.session-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.action-button {
+  flex: 1;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.action-button.primary {
+  background: #4a9eff;
+  color: #000;
+}
+
+.action-button.primary:hover:not(:disabled) {
+  background: #3a8eef;
+  transform: translateY(-1px);
+}
+
+.action-button.primary:disabled {
+  background: #2a4a7f;
+  color: #666;
+  cursor: not-allowed;
+}
+
+.action-button.secondary {
+  background: #2a2a2a;
+  color: #fff;
+}
+
+.action-button.secondary:hover {
+  background: #3a3a3a;
+}
+
+.instructions {
+  background: #1a1a1a;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.instructions h4 {
+  font-size: 14px;
+  margin-bottom: 12px;
+  color: #fff;
+}
+
+.instructions ol {
+  padding-left: 20px;
+}
+
+.instructions li {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #ccc;
+  margin-bottom: 6px;
+}
+
+footer {
+  padding-top: 16px;
+  border-top: 1px solid #2a2a2a;
+}
+
+.social-links {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+}
+
+.social-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #999;
+  text-decoration: none;
+  font-size: 12px;
+  transition: all 0.2s ease;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: #1a1a1a;
+}
+
+.social-link:hover {
+  color: #0fbbaa;
+  background: #2a2a2a;
+  transform: translateY(-1px);
+}
+
+.social-link svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}

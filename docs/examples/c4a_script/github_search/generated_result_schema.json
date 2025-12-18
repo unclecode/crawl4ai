@@ -1,0 +1,66 @@
+{
+  "name": "GitHub Repository Cards",
+  "baseSelector": "div.Box-sc-g0xbh4-0.iwUbcA",
+  "fields": [
+    {
+      "name": "repository_name",
+      "selector": "div.search-title a span",
+      "type": "text",
+      "transform": "strip"
+    },
+    {
+      "name": "repository_owner",
+      "selector": "div.search-title a span",
+      "type": "text",
+      "transform": "split",
+      "pattern": "/"
+    },
+    {
+      "name": "repository_url",
+      "selector": "div.search-title a",
+      "type": "attribute",
+      "attribute": "href",
+      "transform": "prepend",
+      "pattern": "https://github.com"
+    },
+    {
+      "name": "description",
+      "selector": "div.dcdlju span",
+      "type": "text"
+    },
+    {
+      "name": "primary_language",
+      "selector": "ul.bZkODq li span[aria-label]",
+      "type": "text"
+    },
+    {
+      "name": "star_count",
+      "selector": "ul.bZkODq li a[href*='stargazers'] span",
+      "type": "text",
+      "transform": "strip"
+    },
+    {
+      "name": "topics",
+      "type": "list",
+      "selector": "div.jgRnBg div a",
+      "fields": [
+        {
+          "name": "topic_name",
+          "selector": "a",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "name": "last_updated",
+      "selector": "ul.bZkODq li span[title]",
+      "type": "text"
+    },
+    {
+      "name": "has_sponsor_button",
+      "selector": "button[aria-label*='Sponsor']",
+      "type": "text",
+      "transform": "exists"
+    }
+  ]
+}

@@ -10,17 +10,22 @@ CacheMode = Union['CacheModeType']
 CrawlResult = Union['CrawlResultType']
 CrawlerHub = Union['CrawlerHubType']
 BrowserProfiler = Union['BrowserProfilerType']
+# NEW: Add AsyncUrlSeederType
+AsyncUrlSeeder = Union['AsyncUrlSeederType']
 
 # Configuration types
 BrowserConfig = Union['BrowserConfigType']
 CrawlerRunConfig = Union['CrawlerRunConfigType']
 HTTPCrawlerConfig = Union['HTTPCrawlerConfigType']
 LLMConfig = Union['LLMConfigType']
+# NEW: Add SeedingConfigType
+SeedingConfig = Union['SeedingConfigType']
 
 # Content scraping types
 ContentScrapingStrategy = Union['ContentScrapingStrategyType']
-WebScrapingStrategy = Union['WebScrapingStrategyType']
 LXMLWebScrapingStrategy = Union['LXMLWebScrapingStrategyType']
+# Backward compatibility alias
+WebScrapingStrategy = Union['LXMLWebScrapingStrategyType']
 
 # Proxy types
 ProxyRotationStrategy = Union['ProxyRotationStrategyType']
@@ -94,6 +99,8 @@ if TYPE_CHECKING:
     from .models import CrawlResult as CrawlResultType
     from .hub import CrawlerHub as CrawlerHubType
     from .browser_profiler import BrowserProfiler as BrowserProfilerType
+    # NEW: Import AsyncUrlSeeder for type checking
+    from .async_url_seeder import AsyncUrlSeeder as AsyncUrlSeederType
     
     # Configuration imports
     from .async_configs import (
@@ -101,12 +108,13 @@ if TYPE_CHECKING:
         CrawlerRunConfig as CrawlerRunConfigType,
         HTTPCrawlerConfig as HTTPCrawlerConfigType,
         LLMConfig as LLMConfigType,
+        # NEW: Import SeedingConfig for type checking
+        SeedingConfig as SeedingConfigType,
     )
     
     # Content scraping imports
     from .content_scraping_strategy import (
         ContentScrapingStrategy as ContentScrapingStrategyType,
-        WebScrapingStrategy as WebScrapingStrategyType,
         LXMLWebScrapingStrategy as LXMLWebScrapingStrategyType,
     )
     

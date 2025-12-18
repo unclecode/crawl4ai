@@ -332,7 +332,7 @@ The `clone()` method:
 ### Key fields to note
 
 1. **`provider`**:  
-- Which LLM provoder to use. 
+- Which LLM provider to use. 
 - Possible values are `"ollama/llama3","groq/llama3-70b-8192","groq/llama3-8b-8192", "openai/gpt-4o-mini" ,"openai/gpt-4o","openai/o1-mini","openai/o1-preview","openai/o3-mini","openai/o3-mini-high","anthropic/claude-3-haiku-20240307","anthropic/claude-3-opus-20240229","anthropic/claude-3-sonnet-20240229","anthropic/claude-3-5-sonnet-20240620","gemini/gemini-pro","gemini/gemini-1.5-pro","gemini/gemini-2.0-flash","gemini/gemini-2.0-flash-exp","gemini/gemini-2.0-flash-lite-preview-02-05","deepseek/deepseek-chat"`<br/>*(default: `"openai/gpt-4o-mini"`)*
 
 2. **`api_token`**:  
@@ -354,7 +354,7 @@ In a typical scenario, you define **one** `BrowserConfig` for your crawler sessi
 ```python
 import asyncio
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, LLMConfig
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 async def main():
     # 1) Browser config: headless, bigger viewport, no proxy
@@ -403,7 +403,7 @@ async def main():
 
     md_generator = DefaultMarkdownGenerator(
     content_filter=filter,
-    options={"ignore_links": True}
+    options={"ignore_links": True})
 
     # 4) Crawler run config: skip cache, use extraction
     run_conf = CrawlerRunConfig(
@@ -1042,7 +1042,7 @@ You can combine content selection with a more advanced extraction strategy. For 
 import asyncio
 import json
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 async def main():
     # Minimal schema for repeated items
@@ -1094,7 +1094,7 @@ import asyncio
 import json
 from pydantic import BaseModel, Field
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, LLMConfig
-from crawl4ai.extraction_strategy import LLMExtractionStrategy
+from crawl4ai import LLMExtractionStrategy
 
 class ArticleData(BaseModel):
     headline: str
@@ -1139,7 +1139,7 @@ Below is a short function that unifies **CSS selection**, **exclusion** logic, a
 import asyncio
 import json
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 async def extract_main_articles(url: str):
     schema = {
@@ -1488,7 +1488,7 @@ If you run a JSON-based extraction strategy (CSS, XPath, LLM, etc.), the structu
 import asyncio
 import json
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 async def main():
     schema = {
@@ -2241,7 +2241,7 @@ docker build -t crawl4ai
 
 | Argument | Description | Default | Options |
 |----------|-------------|---------|----------|
-| PYTHON_VERSION | Python version | 3.10 | 3.8, 3.9, 3.10 |
+| PYTHON_VERSION | Python version | 3.10 | 3.10, 3.11, 3.12, 3.13 |
 | INSTALL_TYPE | Feature set | default | default, all, torch, transformer |
 | ENABLE_GPU | GPU support | false | true, false |
 | APP_HOME | Install path | /app | any valid path |
@@ -3760,11 +3760,11 @@ To crawl a live web page, provide the URL starting with `http://` or `https://`,
 
 ```python
 import asyncio
-from crawl4ai import AsyncWebCrawler
+from crawl4ai import AsyncWebCrawler, CacheMode
 from crawl4ai.async_configs import CrawlerRunConfig
 
 async def crawl_web():
-    config = CrawlerRunConfig(bypass_cache=True)
+    config = CrawlerRunConfig(cache_mode=CacheMode.BYPASS)
     async with AsyncWebCrawler() as crawler:
         result = await crawler.arun(
             url="https://en.wikipedia.org/wiki/apple", 
@@ -3785,13 +3785,13 @@ To crawl a local HTML file, prefix the file path with `file://`.
 
 ```python
 import asyncio
-from crawl4ai import AsyncWebCrawler
+from crawl4ai import AsyncWebCrawler, CacheMode
 from crawl4ai.async_configs import CrawlerRunConfig
 
 async def crawl_local_file():
     local_file_path = "/path/to/apple.html"  # Replace with your file path
     file_url = f"file://{local_file_path}"
-    config = CrawlerRunConfig(bypass_cache=True)
+    config = CrawlerRunConfig(cache_mode=CacheMode.BYPASS)
     
     async with AsyncWebCrawler() as crawler:
         result = await crawler.arun(url=file_url, config=config)
@@ -3810,13 +3810,13 @@ To crawl raw HTML content, prefix the HTML string with `raw:`.
 
 ```python
 import asyncio
-from crawl4ai import AsyncWebCrawler
+from crawl4ai import AsyncWebCrawler, CacheMode
 from crawl4ai.async_configs import CrawlerRunConfig
 
 async def crawl_raw_html():
     raw_html = "<html><body><h1>Hello, World!</h1></body></html>"
     raw_html_url = f"raw:{raw_html}"
-    config = CrawlerRunConfig(bypass_cache=True)
+    config = CrawlerRunConfig(cache_mode=CacheMode.BYPASS)
     
     async with AsyncWebCrawler() as crawler:
         result = await crawler.arun(url=raw_html_url, config=config)
@@ -3845,7 +3845,7 @@ import os
 import sys
 import asyncio
 from pathlib import Path
-from crawl4ai import AsyncWebCrawler
+from crawl4ai import AsyncWebCrawler, CacheMode
 from crawl4ai.async_configs import CrawlerRunConfig
 
 async def main():
@@ -3856,7 +3856,7 @@ async def main():
     async with AsyncWebCrawler() as crawler:
         # Step 1: Crawl the Web URL
         print("\n=== Step 1: Crawling the Wikipedia URL ===")
-        web_config = CrawlerRunConfig(bypass_cache=True)
+        web_config = CrawlerRunConfig(cache_mode=CacheMode.BYPASS)
         result = await crawler.arun(url=wikipedia_url, config=web_config)
 
         if not result.success:
@@ -3871,7 +3871,7 @@ async def main():
         # Step 2: Crawl from the Local HTML File
         print("=== Step 2: Crawling from the Local HTML File ===")
         file_url = f"file://{html_file_path.resolve()}"
-        file_config = CrawlerRunConfig(bypass_cache=True)
+        file_config = CrawlerRunConfig(cache_mode=CacheMode.BYPASS)
         local_result = await crawler.arun(url=file_url, config=file_config)
 
         if not local_result.success:
@@ -3887,7 +3887,7 @@ async def main():
         with open(html_file_path, 'r', encoding='utf-8') as f:
             raw_html_content = f.read()
         raw_html_url = f"raw:{raw_html_content}"
-        raw_config = CrawlerRunConfig(bypass_cache=True)
+        raw_config = CrawlerRunConfig(cache_mode=CacheMode.BYPASS)
         raw_result = await crawler.arun(url=raw_html_url, config=raw_config)
 
         if not raw_result.success:
@@ -4152,7 +4152,7 @@ prune_filter = PruningContentFilter(
 For intelligent content filtering and high-quality markdown generation, you can use the **LLMContentFilter**. This filter leverages LLMs to generate relevant markdown while preserving the original content's meaning and structure:
 
 ```python
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, LLMConfig
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, LLMConfig, DefaultMarkdownGenerator
 from crawl4ai.content_filter_strategy import LLMContentFilter
 
 async def main():
@@ -4175,8 +4175,13 @@ async def main():
         verbose=True
     )
 
+    md_generator = DefaultMarkdownGenerator(
+        content_filter=filter,
+        options={"ignore_links": True}
+    )
+
     config = CrawlerRunConfig(
-        content_filter=filter
+        markdown_generator=md_generator
     )
 
     async with AsyncWebCrawler() as crawler:
@@ -4722,7 +4727,7 @@ if __name__ == "__main__":
 Once dynamic content is loaded, you can attach an **`extraction_strategy`** (like `JsonCssExtractionStrategy` or `LLMExtractionStrategy`). For example:
 
 ```python
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 schema = {
     "name": "Commits",
@@ -4902,7 +4907,7 @@ Crawl4AI can also extract structured data (JSON) using CSS or XPath selectors. B
 > **New!** Crawl4AI now provides a powerful utility to automatically generate extraction schemas using LLM. This is a one-time cost that gives you a reusable schema for fast, LLM-free extractions:
 
 ```python
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 from crawl4ai import LLMConfig
 
 # Generate a schema (one-time cost)
@@ -4932,7 +4937,7 @@ Here's a basic extraction example:
 import asyncio
 import json
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 async def main():
     schema = {
@@ -4987,7 +4992,7 @@ import json
 import asyncio
 from pydantic import BaseModel, Field
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, LLMConfig
-from crawl4ai.extraction_strategy import LLMExtractionStrategy
+from crawl4ai import LLMExtractionStrategy
 
 class OpenAIModelFee(BaseModel):
     model_name: str = Field(..., description="Name of the OpenAI model.")
@@ -5103,7 +5108,7 @@ Some sites require multiple “page clicks” or dynamic JavaScript updates. Bel
 ```python
 import asyncio
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 async def extract_structured_data_using_css_extractor():
     print("\n--- Using JsonCssExtractionStrategy for Fast Structured Output ---")
@@ -5428,29 +5433,38 @@ Sometimes you need a visual record of a page or a PDF “printout.” Crawl4AI c
 ```python
 import os, asyncio
 from base64 import b64decode
-from crawl4ai import AsyncWebCrawler, CacheMode
+from crawl4ai import AsyncWebCrawler, CacheMode, CrawlerRunConfig
 
 async def main():
+    run_config = CrawlerRunConfig(
+        cache_mode=CacheMode.BYPASS,
+        screenshot=True,
+        pdf=True
+    )
+
     async with AsyncWebCrawler() as crawler:
         result = await crawler.arun(
             url="https://en.wikipedia.org/wiki/List_of_common_misconceptions",
-            cache_mode=CacheMode.BYPASS,
-            pdf=True,
-            screenshot=True
+            config=run_config
         )
-        
         if result.success:
-            # Save screenshot
+            print(f"Screenshot data present: {result.screenshot is not None}")
+            print(f"PDF data present: {result.pdf is not None}")
+
             if result.screenshot:
+                print(f"[OK] Screenshot captured, size: {len(result.screenshot)} bytes")
                 with open("wikipedia_screenshot.png", "wb") as f:
                     f.write(b64decode(result.screenshot))
-            
-            # Save PDF
+            else:
+                print("[WARN] Screenshot data is None.")
+
             if result.pdf:
+                print(f"[OK] PDF captured, size: {len(result.pdf)} bytes")
                 with open("wikipedia_page.pdf", "wb") as f:
                     f.write(result.pdf)
-            
-            print("[OK] PDF & screenshot captured.")
+            else:
+                print("[WARN] PDF data is None.")
+
         else:
             print("[ERROR]", result.error_message)
 
@@ -6705,7 +6719,7 @@ dispatcher = MemoryAdaptiveDispatcher(
 3. **`max_session_permit`** (`int`, default: `10`)  
   The maximum number of concurrent crawling tasks allowed. This ensures resource limits are respected while maintaining concurrency.
 
-4. **`memory_wait_timeout`** (`float`, default: `300.0`)  
+4. **`memory_wait_timeout`** (`float`, default: `600.0`)
   Optional timeout (in seconds). If memory usage exceeds `memory_threshold_percent` for longer than this duration, a `MemoryError` is raised.
 
 5. **`rate_limiter`** (`RateLimiter`, default: `None`)  
@@ -7300,7 +7314,7 @@ Here's an example of crawling GitHub commits across multiple pages while preserv
 
 ```python
 from crawl4ai.async_configs import CrawlerRunConfig
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 from crawl4ai.cache_context import CacheMode
 
 async def crawl_dynamic_content():
@@ -7850,7 +7864,7 @@ The Cosine Strategy:
 ## Basic Usage
 
 ```python
-from crawl4ai.extraction_strategy import CosineStrategy
+from crawl4ai import CosineStrategy
 
 strategy = CosineStrategy(
     semantic_filter="product reviews",    # Target content type
@@ -8161,7 +8175,7 @@ import json
 from pydantic import BaseModel, Field
 from typing import List
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, LLMConfig
-from crawl4ai.extraction_strategy import LLMExtractionStrategy
+from crawl4ai import LLMExtractionStrategy
 
 class Product(BaseModel):
     name: str
@@ -8278,7 +8292,7 @@ import asyncio
 from typing import List
 from pydantic import BaseModel, Field
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
-from crawl4ai.extraction_strategy import LLMExtractionStrategy
+from crawl4ai import LLMExtractionStrategy
 
 class Entity(BaseModel):
     name: str
@@ -8423,7 +8437,7 @@ Let’s begin with a **simple** schema-based extraction using the `JsonCssExtrac
 import json
 import asyncio
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 async def extract_crypto_prices():
     # 1. Define a simple extraction schema
@@ -8493,7 +8507,7 @@ Below is a short example demonstrating **XPath** extraction plus the **`raw://`*
 import json
 import asyncio
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
-from crawl4ai.extraction_strategy import JsonXPathExtractionStrategy
+from crawl4ai import JsonXPathExtractionStrategy
 
 async def extract_crypto_prices_xpath():
     # 1. Minimal dummy HTML with some repeating rows
@@ -8694,7 +8708,7 @@ Key Takeaways:
 import json
 import asyncio
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy
 
 ecommerce_schema = {
     # ... the advanced schema from above ...
@@ -8804,7 +8818,7 @@ While manually crafting schemas is powerful and precise, Crawl4AI now offers a c
 The schema generator is available as a static method on both `JsonCssExtractionStrategy` and `JsonXPathExtractionStrategy`. You can choose between OpenAI's GPT-4 or the open-source Ollama for schema generation:
 
 ```python
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy, JsonXPathExtractionStrategy
+from crawl4ai import JsonCssExtractionStrategy, JsonXPathExtractionStrategy
 from crawl4ai import LLMConfig
 
 # Sample HTML with product information

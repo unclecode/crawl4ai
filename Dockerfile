@@ -1,7 +1,7 @@
 FROM python:3.12-slim-bookworm AS build
 
 # C4ai version
-ARG C4AI_VER=0.6.0
+ARG C4AI_VER=0.7.8
 ENV C4AI_VERSION=$C4AI_VER
 LABEL c4ai.version=$C4AI_VER
 
@@ -166,6 +166,11 @@ RUN mkdir -p /home/appuser/.cache/ms-playwright \
     && chown -R appuser:appuser /home/appuser/.cache/ms-playwright
 
 RUN crawl4ai-doctor
+
+# Ensure all cache directories belong to appuser
+# This fixes permission issues with .cache/url_seeder and other runtime cache dirs
+RUN mkdir -p /home/appuser/.cache \
+    && chown -R appuser:appuser /home/appuser/.cache
 
 # Copy application code
 COPY deploy/docker/* ${APP_HOME}/

@@ -472,6 +472,17 @@ Note that for BestFirstCrawlingStrategy, score_threshold is not needed since pag
 
 5.**Balance breadth vs. depth.** Choose your strategy wisely - BFS for comprehensive coverage, DFS for deep exploration, BestFirst for focused relevance-based crawling.
 
+6.**Preserve HTTPS for security.** If crawling HTTPS sites that redirect to HTTP, use `preserve_https_for_internal_links=True` to maintain secure connections:
+
+```python
+config = CrawlerRunConfig(
+    deep_crawl_strategy=BFSDeepCrawlStrategy(max_depth=2),
+    preserve_https_for_internal_links=True  # Keep HTTPS even if server redirects to HTTP
+)
+```
+
+This is especially useful for security-conscious crawling or when dealing with sites that support both protocols.
+
 ---
 
 ## 10. Summary & Next Steps

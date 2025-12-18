@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>App Details - Crawl4AI Marketplace</title>
+    <link rel="stylesheet" href="marketplace.css">
+    <link rel="stylesheet" href="app-detail.css">
+</head>
+<body>
+    <div class="app-detail-container">
+        <!-- Header -->
+        <header class="marketplace-header">
+            <div class="header-content">
+                <div class="header-left">
+                    <div class="logo-title">
+                        <img src="../assets/images/logo.png" alt="Crawl4AI" class="header-logo">
+                        <h1>
+                            <span class="ascii-border">[</span>
+                            Marketplace
+                            <span class="ascii-border">]</span>
+                        </h1>
+                    </div>
+                </div>
+                <div class="header-nav">
+                    <a href="index.html" class="back-btn">← Back to Marketplace</a>
+                </div>
+            </div>
+        </header>
+
+        <!-- App Hero Section -->
+        <section class="app-hero">
+            <div class="app-hero-content">
+                <div class="app-hero-image" id="app-image">
+                    <!-- Dynamic image -->
+                </div>
+                <div class="app-hero-info">
+                    <div class="app-badges">
+                        <span class="app-badge" id="app-type">Open Source</span>
+                        <span class="app-badge featured" id="app-featured" style="display:none">FEATURED</span>
+                        <span class="app-badge sponsored" id="app-sponsored" style="display:none">SPONSORED</span>
+                    </div>
+                    <h1 id="app-name">App Name</h1>
+                    <p id="app-description" class="app-tagline">App description goes here</p>
+
+                    <div class="app-stats">
+                        <div class="stat">
+                            <span class="stat-value" id="app-rating">★★★★★</span>
+                            <span class="stat-label">Rating</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value" id="app-downloads">0</span>
+                            <span class="stat-label">Downloads</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value" id="app-category">Category</span>
+                            <span class="stat-label">Category</span>
+                        </div>
+                    </div>
+
+                    <div class="app-actions">
+                        <a href="#" id="app-website" class="action-btn primary" target="_blank">Visit Website</a>
+                        <a href="#" id="app-github" class="action-btn" target="_blank">View GitHub</a>
+                        <a href="#" id="app-demo" class="action-btn" target="_blank" style="display:none">Live Demo</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- App Details Section -->
+        <main class="app-main">
+            <div class="app-content">
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="overview">Overview</button>
+                    <button class="tab-btn" data-tab="integration">Integration</button>
+                    <!-- <button class="tab-btn" data-tab="docs">Documentation</button>
+                    <button class="tab-btn" data-tab="support">Support</button> -->
+                </div>
+
+                <section id="overview-tab" class="tab-content active">
+                    <div class="overview-columns">
+                        <div class="overview-main">
+                            <div id="app-overview">Overview content goes here.</div>
+                        </div>
+
+                        <aside class="sidebar">
+                            <div class="sidebar-card">
+                                <h3>Download Stats</h3>
+                                <div class="stats-grid">
+                                    <div>
+                                        <span class="stat-value" id="sidebar-downloads">0</span>
+                                        <span class="stat-label">Downloads</span>
+                                    </div>
+                                    <div>
+                                        <span class="stat-value" id="sidebar-rating">0.0</span>
+                                        <span class="stat-label">Rating</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="sidebar-card">
+                                <h3>App Metadata</h3>
+                                <dl class="metadata">
+                                    <div>
+                                        <dt>Category</dt>
+                                        <dd id="sidebar-category">-</dd>
+                                    </div>
+                                    <div>
+                                        <dt>Type</dt>
+                                        <dd id="sidebar-type">-</dd>
+                                    </div>
+                                    <div>
+                                        <dt>Status</dt>
+                                        <dd id="sidebar-status">Active</dd>
+                                    </div>
+                                    <div>
+                                        <dt>Pricing</dt>
+                                        <dd id="sidebar-pricing">-</dd>
+                                    </div>
+                                </dl>
+                            </div>
+
+                            <div class="sidebar-card">
+                                <h3>Contact</h3>
+                                <p id="sidebar-contact">contact@example.com</p>
+                            </div>
+                        </aside>
+                    </div>
+                </section>
+
+                <section id="integration-tab" class="tab-content">
+                    <div class="integration-content" id="app-integration">
+                    </div>
+                </section>
+
+                <!-- <section id="docs-tab" class="tab-content">
+                    <div class="docs-content" id="app-docs">
+                    </div>
+                </section> -->
+
+                <!-- <section id="support-tab" class="tab-content">
+                    <div class="docs-content">
+                        <h2>Support</h2>
+                        <div class="support-grid">
+                            <div class="support-card">
+                                <h3>📧 Contact</h3>
+                                <p id="app-contact">contact@example.com</p>
+                            </div>
+                            <div class="support-card">
+                                <h3>🐛 Report Issues</h3>
+                                <p>Found a bug? Report it on GitHub Issues.</p>
+                            </div>
+                            <div class="support-card">
+                                <h3>💬 Community</h3>
+                                <p>Join our Discord for help and discussions.</p>
+                            </div>
+                        </div>
+                    </div>
+                </section> -->
+            </div>
+
+        </main>
+
+        <!-- Related Apps -->
+        <section class="related-apps">
+            <h2>Related Apps</h2>
+            <div id="related-apps-grid" class="related-grid">
+                <!-- Dynamic related apps -->
+            </div>
+        </section>
+    </div>
+
+    <script src="app-detail.js"></script>
+</body>
+</html>

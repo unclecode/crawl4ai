@@ -35,9 +35,10 @@ from .markdown_generation_strategy import (
 )
 from .deep_crawling import DeepCrawlDecorator
 from .async_logger import AsyncLogger, AsyncLoggerBase
-from .async_configs import BrowserConfig, CrawlerRunConfig, ProxyConfig
+from .async_configs import BrowserConfig, CrawlerRunConfig, ProxyConfig, SeedingConfig
 from .async_dispatcher import *  # noqa: F403
 from .async_dispatcher import BaseDispatcher, MemoryAdaptiveDispatcher, RateLimiter
+from .async_url_seeder import AsyncUrlSeeder
 
 from .utils import (
     sanitize_input_encode,
@@ -163,6 +164,8 @@ class AsyncWebCrawler:
         # Decorate arun method with deep crawling capabilities
         self._deep_handler = DeepCrawlDecorator(self)
         self.arun = self._deep_handler(self.arun)
+        
+        self.url_seeder: Optional[AsyncUrlSeeder] = None
 
     async def start(self):
         """
@@ -354,6 +357,7 @@ class AsyncWebCrawler:
                     ###############################################################
                     # Process the HTML content, Call CrawlerStrategy.process_html #
                     ###############################################################
+                    from urllib.parse import urlparse
                     crawl_result: CrawlResult = await self.aprocess_html(
                         url=url,
                         html=html,
@@ -364,6 +368,7 @@ class AsyncWebCrawler:
                         verbose=config.verbose,
                         is_raw_html=True if url.startswith("raw:") else False,
                         redirected_url=async_response.redirected_url,
+                        original_scheme=urlparse(url).scheme,
                         **kwargs,
                     )
 
@@ -502,9 +507,12 @@ class AsyncWebCrawler:
             metadata = result.get("metadata", {})
         else:
             cleaned_html = sanitize_input_encode(result.cleaned_html)
-            media = result.media.model_dump()
-            tables = media.pop("tables", [])
-            links = result.links.model_dump()
+            # media = result.media.model_dump()
+            # tables = media.pop("tables", [])
+            # links = result.links.model_dump()
+            media = result.media.model_dump() if hasattr(result.media, 'model_dump') else result.media
+            tables = media.pop("tables", []) if isinstance(media, dict) else []
+            links = result.links.model_dump() if hasattr(result.links, 'model_dump') else result.links
             metadata = result.metadata
 
         fit_html = preprocess_html_for_schema(html_content=html, text_threshold= 500, max_size= 300_000)
@@ -588,11 +596,13 @@ class AsyncWebCrawler:
             # Choose content based on input_format
             content_format = config.extraction_strategy.input_format
             if content_format == "fit_markdown" and not markdown_result.fit_markdown:
-                self.logger.warning(
-                    message="Fit markdown requested but not available. Falling back to raw markdown.",
-                    tag="EXTRACT",
-                    params={"url": _url},
-                )
+
+                self.logger.url_status(
+                        url=_url,
+                        success=bool(html),
+                        timing=time.perf_counter() - t1,
+                        tag="EXTRACT",
+                    )
                 content_format = "markdown"
 
             content = {
@@ -610,17 +620,28 @@ class AsyncWebCrawler:
                 else config.chunking_strategy
             )
             sections = chunking.chunk(content)
-            extracted_content = config.extraction_strategy.run(url, sections)
+            # extracted_content = config.extraction_strategy.run(_url, sections)
+
+            # Use async version if available for better parallelism
+            if hasattr(config.extraction_strategy, 'arun'):
+                extracted_content = await config.extraction_strategy.arun(_url, sections)
+            else:
+                # Fallback to sync version run in thread pool to avoid blocking
+                extracted_content = await asyncio.to_thread(
+                    config.extraction_strategy.run, url, sections
+                )
+                
             extracted_content = json.dumps(
                 extracted_content, indent=4, default=str, ensure_ascii=False
             )
 
             # Log extraction completion
-            self.logger.info(
-                message="Completed for {url:.50}... | Time: {timing}s",
-                tag="EXTRACT",
-                params={"url": _url, "timing": time.perf_counter() - t1},
-            )
+            self.logger.url_status(
+                        url=_url,
+                        success=bool(html),
+                        timing=time.perf_counter() - t1,
+                        tag="EXTRACT",
+                    )
 
         # Apply HTML formatting if requested
         if config.prettiify:
@@ -647,7 +668,7 @@ class AsyncWebCrawler:
     async def arun_many(
         self,
         urls: List[str],
-        config: Optional[CrawlerRunConfig] = None,
+        config: Optional[Union[CrawlerRunConfig, List[CrawlerRunConfig]]] = None,
         dispatcher: Optional[BaseDispatcher] = None,
         # Legacy parameters maintained for backwards compatibility
         # word_count_threshold=MIN_WORD_THRESHOLD,
@@ -668,7 +689,9 @@ class AsyncWebCrawler:
 
         Args:
         urls: List of URLs to crawl
-        config: Configuration object controlling crawl behavior for all URLs
+        config: Configuration object(s) controlling crawl behavior. Can be:
+            - Single CrawlerRunConfig: Used for all URLs
+            - List[CrawlerRunConfig]: Configs with url_matcher for URL-specific settings
         dispatcher: The dispatcher strategy instance to use. Defaults to MemoryAdaptiveDispatcher
         [other parameters maintained for backwards compatibility]
 
@@ -733,7 +756,11 @@ class AsyncWebCrawler:
                 or task_result.result
             )
 
-        stream = config.stream
+        # Handle stream setting - use first config's stream setting if config is a list
+        if isinstance(config, list):
+            stream = config[0].stream if config else False
+        else:
+            stream = config.stream
 
         if stream:
 
@@ -747,3 +774,94 @@ class AsyncWebCrawler:
         else:
             _results = await dispatcher.run_urls(crawler=self, urls=urls, config=config)
             return [transform_result(res) for res in _results]
+
+    async def aseed_urls(
+        self,
+        domain_or_domains: Union[str, List[str]],
+        config: Optional[SeedingConfig] = None,
+        **kwargs
+    ) -> Union[List[str], Dict[str, List[Union[str, Dict[str, Any]]]]]:
+        """
+        Discovers, filters, and optionally validates URLs for a given domain(s)
+        using sitemaps and Common Crawl archives.
+
+        Args:
+            domain_or_domains: A single domain string (e.g., "iana.org") or a list of domains.
+            config: A SeedingConfig object to control the seeding process.
+                    Parameters passed directly via kwargs will override those in 'config'.
+            **kwargs: Additional parameters (e.g., `source`, `live_check`, `extract_head`,
+                      `pattern`, `concurrency`, `hits_per_sec`, `force_refresh`, `verbose`)
+                      that will be used to construct or update the SeedingConfig.
+
+        Returns:
+            If `extract_head` is False:
+                - For a single domain: `List[str]` of discovered URLs.
+                - For multiple domains: `Dict[str, List[str]]` mapping each domain to its URLs.
+            If `extract_head` is True:
+                - For a single domain: `List[Dict[str, Any]]` where each dict contains 'url'
+                  and 'head_data' (parsed <head> metadata).
+                - For multiple domains: `Dict[str, List[Dict[str, Any]]]` mapping each domain
+                  to a list of URL data dictionaries.
+
+        Raises:
+            ValueError: If `domain_or_domains` is not a string or a list of strings.
+            Exception: Any underlying exceptions from AsyncUrlSeeder or network operations.
+
+        Example:
+            >>> # Discover URLs from sitemap with live check for 'example.com'
+            >>> result = await crawler.aseed_urls("example.com", source="sitemap", live_check=True, hits_per_sec=10)
+
+            >>> # Discover URLs from Common Crawl, extract head data for 'example.com' and 'python.org'
+            >>> multi_domain_result = await crawler.aseed_urls(
+            >>>     ["example.com", "python.org"],
+            >>>     source="cc", extract_head=True, concurrency=200, hits_per_sec=50
+            >>> )
+        """
+        # Initialize AsyncUrlSeeder here if it hasn't been already
+        if not self.url_seeder:
+            # Pass the crawler's base_directory for seeder's cache management
+            # Pass the crawler's logger for consistent logging
+            self.url_seeder = AsyncUrlSeeder(
+                base_directory=self.crawl4ai_folder,
+                logger=self.logger
+            )                    
+
+        # Merge config object with direct kwargs, giving kwargs precedence
+        seeding_config = config.clone(**kwargs) if config else SeedingConfig.from_kwargs(kwargs)
+        
+        # Ensure base_directory is set for the seeder's cache
+        seeding_config.base_directory = seeding_config.base_directory or self.crawl4ai_folder        
+        # Ensure the seeder uses the crawler's logger (if not already set)
+        if not self.url_seeder.logger:
+            self.url_seeder.logger = self.logger
+
+        # Pass verbose setting if explicitly provided in SeedingConfig or kwargs
+        if seeding_config.verbose is not None:
+            self.url_seeder.logger.verbose = seeding_config.verbose
+        else: # Default to crawler's verbose setting
+            self.url_seeder.logger.verbose = self.logger.verbose
+
+
+        if isinstance(domain_or_domains, str):
+            self.logger.info(
+                message="Starting URL seeding for domain: {domain}",
+                tag="SEED",
+                params={"domain": domain_or_domains}
+            )
+            return await self.url_seeder.urls(
+                domain_or_domains,
+                seeding_config
+            )
+        elif isinstance(domain_or_domains, (list, tuple)):
+            self.logger.info(
+                message="Starting URL seeding for {count} domains",
+                tag="SEED",
+                params={"count": len(domain_or_domains)}
+            )
+            # AsyncUrlSeeder.many_urls directly accepts a list of domains and individual params.
+            return await self.url_seeder.many_urls(
+                domain_or_domains,
+                seeding_config
+            )
+        else:
+            raise ValueError("`domain_or_domains` must be a string or a list of strings.")

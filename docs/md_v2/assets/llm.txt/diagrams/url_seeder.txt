@@ -1,0 +1,441 @@
+## URL Seeding Workflows and Architecture
+
+Visual representations of URL discovery strategies, filtering pipelines, and smart crawling workflows.
+
+### URL Seeding vs Deep Crawling Strategy Comparison
+
+```mermaid
+graph TB
+    subgraph "Deep Crawling Approach"
+        A1[Start URL] --> A2[Load Page]
+        A2 --> A3[Extract Links]
+        A3 --> A4{More Links?}
+        A4 -->|Yes| A5[Queue Next Page]
+        A5 --> A2
+        A4 -->|No| A6[Complete]
+        
+        A7[⏱️ Real-time Discovery]
+        A8[🐌 Sequential Processing]
+        A9[🔍 Limited by Page Structure]
+        A10[💾 High Memory Usage]
+    end
+    
+    subgraph "URL Seeding Approach"
+        B1[Domain Input] --> B2[Query Sitemap]
+        B1 --> B3[Query Common Crawl]
+        B2 --> B4[Merge Results]
+        B3 --> B4
+        B4 --> B5[Apply Filters]
+        B5 --> B6[Score Relevance]
+        B6 --> B7[Rank Results]
+        B7 --> B8[Select Top URLs]
+        
+        B9[⚡ Instant Discovery]
+        B10[🚀 Parallel Processing]
+        B11[🎯 Pattern-based Filtering]
+        B12[💡 Smart Relevance Scoring]
+    end
+    
+    style A1 fill:#ffecb3
+    style B1 fill:#e8f5e8
+    style A6 fill:#ffcdd2
+    style B8 fill:#c8e6c9
+```
+
+### URL Discovery Data Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Seeder as AsyncUrlSeeder
+    participant SM as Sitemap
+    participant CC as Common Crawl
+    participant Filter as URL Filter
+    participant Scorer as BM25 Scorer
+    
+    User->>Seeder: urls("example.com", config)
+    
+    par Parallel Data Sources
+        Seeder->>SM: Fetch sitemap.xml
+        SM-->>Seeder: 500 URLs
+    and
+        Seeder->>CC: Query Common Crawl
+        CC-->>Seeder: 2000 URLs
+    end
+    
+    Seeder->>Seeder: Merge and deduplicate
+    Note over Seeder: 2200 unique URLs
+    
+    Seeder->>Filter: Apply pattern filter
+    Filter-->>Seeder: 800 matching URLs
+    
+    alt extract_head=True
+        loop For each URL
+            Seeder->>Seeder: Extract <head> metadata
+        end
+        Note over Seeder: Title, description, keywords
+    end
+    
+    alt query provided
+        Seeder->>Scorer: Calculate relevance scores
+        Scorer-->>Seeder: Scored URLs
+        Seeder->>Seeder: Filter by score_threshold
+        Note over Seeder: 200 relevant URLs
+    end
+    
+    Seeder->>Seeder: Sort by relevance
+    Seeder->>Seeder: Apply max_urls limit
+    Seeder-->>User: Top 100 URLs ready for crawling
+```
+
+### SeedingConfig Decision Tree
+
+```mermaid
+flowchart TD
+    A[SeedingConfig Setup] --> B{Data Source Strategy?}
+    
+    B -->|Fast & Official| C[source="sitemap"]
+    B -->|Comprehensive| D[source="cc"]  
+    B -->|Maximum Coverage| E[source="sitemap+cc"]
+    
+    C --> F{Need Filtering?}
+    D --> F
+    E --> F
+    
+    F -->|Yes| G[Set URL Pattern]
+    F -->|No| H[pattern="*"]
+    
+    G --> I{Pattern Examples}
+    I --> I1[pattern="*/blog/*"]
+    I --> I2[pattern="*/docs/api/*"]
+    I --> I3[pattern="*.pdf"]
+    I --> I4[pattern="*/product/*"]
+    
+    H --> J{Need Metadata?}
+    I1 --> J
+    I2 --> J
+    I3 --> J
+    I4 --> J
+    
+    J -->|Yes| K[extract_head=True]
+    J -->|No| L[extract_head=False]
+    
+    K --> M{Need Validation?}
+    L --> M
+    
+    M -->|Yes| N[live_check=True]
+    M -->|No| O[live_check=False]
+    
+    N --> P{Need Relevance Scoring?}
+    O --> P
+    
+    P -->|Yes| Q[Set Query + BM25]
+    P -->|No| R[Skip Scoring]
+    
+    Q --> S[query="search terms"]
+    S --> T[scoring_method="bm25"]
+    T --> U[score_threshold=0.3]
+    
+    R --> V[Performance Tuning]
+    U --> V
+    
+    V --> W[Set max_urls]
+    W --> X[Set concurrency]
+    X --> Y[Set hits_per_sec]
+    Y --> Z[Configuration Complete]
+    
+    style A fill:#e3f2fd
+    style Z fill:#c8e6c9
+    style K fill:#fff3e0
+    style N fill:#fff3e0
+    style Q fill:#f3e5f5
+```
+
+### BM25 Relevance Scoring Pipeline
+
+```mermaid
+graph TB
+    subgraph "Text Corpus Preparation"
+        A1[URL Collection] --> A2[Extract Metadata]
+        A2 --> A3[Title + Description + Keywords]
+        A3 --> A4[Tokenize Text]
+        A4 --> A5[Remove Stop Words]
+        A5 --> A6[Create Document Corpus]
+    end
+    
+    subgraph "BM25 Algorithm"
+        B1[Query Terms] --> B2[Term Frequency Calculation]
+        A6 --> B2
+        B2 --> B3[Inverse Document Frequency]
+        B3 --> B4[BM25 Score Calculation]
+        B4 --> B5[Score = Σ(IDF × TF × K1+1)/(TF + K1×(1-b+b×|d|/avgdl))]
+    end
+    
+    subgraph "Scoring Results"
+        B5 --> C1[URL Relevance Scores]
+        C1 --> C2{Score ≥ Threshold?}
+        C2 -->|Yes| C3[Include in Results]
+        C2 -->|No| C4[Filter Out]
+        C3 --> C5[Sort by Score DESC]
+        C5 --> C6[Return Top URLs]
+    end
+    
+    subgraph "Example Scores"
+        D1["python async tutorial" → 0.85]
+        D2["python documentation" → 0.72]
+        D3["javascript guide" → 0.23]
+        D4["contact us page" → 0.05]
+    end
+    
+    style B5 fill:#e3f2fd
+    style C6 fill:#c8e6c9
+    style D1 fill:#c8e6c9
+    style D2 fill:#c8e6c9
+    style D3 fill:#ffecb3
+    style D4 fill:#ffcdd2
+```
+
+### Multi-Domain Discovery Architecture
+
+```mermaid
+graph TB
+    subgraph "Input Layer"
+        A1[Domain List]
+        A2[SeedingConfig]
+        A3[Query Terms]
+    end
+    
+    subgraph "Discovery Engine"
+        B1[AsyncUrlSeeder]
+        B2[Parallel Workers]
+        B3[Rate Limiter]
+        B4[Memory Manager]
+    end
+    
+    subgraph "Data Sources"
+        C1[Sitemap Fetcher]
+        C2[Common Crawl API]
+        C3[Live URL Checker]
+        C4[Metadata Extractor]
+    end
+    
+    subgraph "Processing Pipeline"
+        D1[URL Deduplication]
+        D2[Pattern Filtering]
+        D3[Relevance Scoring]
+        D4[Quality Assessment]
+    end
+    
+    subgraph "Output Layer"
+        E1[Scored URL Lists]
+        E2[Domain Statistics]
+        E3[Performance Metrics]
+        E4[Cache Storage]
+    end
+    
+    A1 --> B1
+    A2 --> B1
+    A3 --> B1
+    
+    B1 --> B2
+    B2 --> B3
+    B3 --> B4
+    
+    B2 --> C1
+    B2 --> C2
+    B2 --> C3
+    B2 --> C4
+    
+    C1 --> D1
+    C2 --> D1
+    C3 --> D2
+    C4 --> D3
+    
+    D1 --> D2
+    D2 --> D3
+    D3 --> D4
+    
+    D4 --> E1
+    B4 --> E2
+    B3 --> E3
+    D1 --> E4
+    
+    style B1 fill:#e3f2fd
+    style D3 fill:#f3e5f5
+    style E1 fill:#c8e6c9
+```
+
+### Complete Discovery-to-Crawl Pipeline
+
+```mermaid
+stateDiagram-v2
+    [*] --> Discovery
+    
+    Discovery --> SourceSelection: Configure data sources
+    SourceSelection --> Sitemap: source="sitemap"
+    SourceSelection --> CommonCrawl: source="cc"
+    SourceSelection --> Both: source="sitemap+cc"
+    
+    Sitemap --> URLCollection
+    CommonCrawl --> URLCollection
+    Both --> URLCollection
+    
+    URLCollection --> Filtering: Apply patterns
+    Filtering --> MetadataExtraction: extract_head=True
+    Filtering --> LiveValidation: extract_head=False
+    
+    MetadataExtraction --> LiveValidation: live_check=True
+    MetadataExtraction --> RelevanceScoring: live_check=False
+    LiveValidation --> RelevanceScoring
+    
+    RelevanceScoring --> ResultRanking: query provided
+    RelevanceScoring --> ResultLimiting: no query
+    
+    ResultRanking --> ResultLimiting: apply score_threshold
+    ResultLimiting --> URLSelection: apply max_urls
+    
+    URLSelection --> CrawlPreparation: URLs ready
+    CrawlPreparation --> CrawlExecution: AsyncWebCrawler
+    
+    CrawlExecution --> StreamProcessing: stream=True
+    CrawlExecution --> BatchProcessing: stream=False
+    
+    StreamProcessing --> [*]
+    BatchProcessing --> [*]
+    
+    note right of Discovery : 🔍 Smart URL Discovery
+    note right of URLCollection : 📚 Merge & Deduplicate
+    note right of RelevanceScoring : 🎯 BM25 Algorithm
+    note right of CrawlExecution : 🕷️ High-Performance Crawling
+```
+
+### Performance Optimization Strategies
+
+```mermaid
+graph LR
+    subgraph "Input Optimization"
+        A1[Smart Source Selection] --> A2[Sitemap First]
+        A2 --> A3[Add CC if Needed]
+        A3 --> A4[Pattern Filtering Early]
+    end
+    
+    subgraph "Processing Optimization"
+        B1[Parallel Workers] --> B2[Bounded Queues]
+        B2 --> B3[Rate Limiting]
+        B3 --> B4[Memory Management]
+        B4 --> B5[Lazy Evaluation]
+    end
+    
+    subgraph "Output Optimization"
+        C1[Relevance Threshold] --> C2[Max URL Limits]
+        C2 --> C3[Caching Strategy]
+        C3 --> C4[Streaming Results]
+    end
+    
+    subgraph "Performance Metrics"
+        D1[URLs/Second: 100-1000]
+        D2[Memory Usage: Bounded]
+        D3[Network Efficiency: 95%+]
+        D4[Cache Hit Rate: 80%+]
+    end
+    
+    A4 --> B1
+    B5 --> C1
+    C4 --> D1
+    
+    style A2 fill:#e8f5e8
+    style B2 fill:#e3f2fd
+    style C3 fill:#f3e5f5
+    style D3 fill:#c8e6c9
+```
+
+### URL Discovery vs Traditional Crawling Comparison
+
+```mermaid
+graph TB
+    subgraph "Traditional Approach"
+        T1[Start URL] --> T2[Crawl Page]
+        T2 --> T3[Extract Links]
+        T3 --> T4[Queue New URLs]
+        T4 --> T2
+        T5[❌ Time: Hours/Days]
+        T6[❌ Resource Heavy]
+        T7[❌ Depth Limited]
+        T8[❌ Discovery Bias]
+    end
+    
+    subgraph "URL Seeding Approach"
+        S1[Domain Input] --> S2[Query All Sources]
+        S2 --> S3[Pattern Filter]
+        S3 --> S4[Relevance Score]
+        S4 --> S5[Select Best URLs]
+        S5 --> S6[Ready to Crawl]
+        
+        S7[✅ Time: Seconds/Minutes]
+        S8[✅ Resource Efficient]
+        S9[✅ Complete Coverage]
+        S10[✅ Quality Focused]
+    end
+    
+    subgraph "Use Case Decision Matrix"
+        U1[Small Sites < 1000 pages] --> U2[Use Deep Crawling]
+        U3[Large Sites > 10000 pages] --> U4[Use URL Seeding]
+        U5[Unknown Structure] --> U6[Start with Seeding]
+        U7[Real-time Discovery] --> U8[Use Deep Crawling]
+        U9[Quality over Quantity] --> U10[Use URL Seeding]
+    end
+    
+    style S6 fill:#c8e6c9
+    style S7 fill:#c8e6c9
+    style S8 fill:#c8e6c9
+    style S9 fill:#c8e6c9
+    style S10 fill:#c8e6c9
+    style T5 fill:#ffcdd2
+    style T6 fill:#ffcdd2
+    style T7 fill:#ffcdd2
+    style T8 fill:#ffcdd2
+```
+
+### Data Source Characteristics and Selection
+
+```mermaid
+graph TB
+    subgraph "Sitemap Source"
+        SM1[📋 Official URL List]
+        SM2[⚡ Fast Response]
+        SM3[📅 Recently Updated]
+        SM4[🎯 High Quality URLs]
+        SM5[❌ May Miss Some Pages]
+    end
+    
+    subgraph "Common Crawl Source"
+        CC1[🌐 Comprehensive Coverage]
+        CC2[📚 Historical Data]
+        CC3[🔍 Deep Discovery]
+        CC4[⏳ Slower Response]
+        CC5[🧹 May Include Noise]
+    end
+    
+    subgraph "Combined Strategy"
+        CB1[🚀 Best of Both]
+        CB2[📊 Maximum Coverage]
+        CB3[✨ Automatic Deduplication]
+        CB4[⚖️ Balanced Performance]
+    end
+    
+    subgraph "Selection Guidelines"
+        G1[Speed Critical → Sitemap Only]
+        G2[Coverage Critical → Common Crawl]
+        G3[Best Quality → Combined]
+        G4[Unknown Domain → Combined]
+    end
+    
+    style SM2 fill:#c8e6c9
+    style SM4 fill:#c8e6c9
+    style CC1 fill:#e3f2fd
+    style CC3 fill:#e3f2fd
+    style CB1 fill:#f3e5f5
+    style CB3 fill:#f3e5f5
+```
+
+**📖 Learn more:** [URL Seeding Guide](https://docs.crawl4ai.com/core/url-seeding/), [Performance Optimization](https://docs.crawl4ai.com/advanced/optimization/), [Multi-URL Crawling](https://docs.crawl4ai.com/advanced/multi-url-crawling/)

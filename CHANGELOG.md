@@ -5,6 +5,151 @@ All notable changes to Crawl4AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **🔒 HTTPS Preservation for Internal Links**: New `preserve_https_for_internal_links` configuration flag
+  - Maintains HTTPS scheme for internal links even when servers redirect to HTTP
+  - Prevents security downgrades during deep crawling
+  - Useful for security-conscious crawling and sites supporting both protocols
+  - Fully backward compatible with opt-in flag (default: `False`)
+  - Fixes issue #1410 where HTTPS URLs were being downgraded to HTTP
+
+## [0.7.3] - 2025-08-09
+
+### Added
+- **🕵️ Undetected Browser Support**: New browser adapter pattern with stealth capabilities
+  - `browser_adapter.py` with undetected Chrome integration
+  - Bypass sophisticated bot detection systems (Cloudflare, Akamai, custom solutions)
+  - Support for headless stealth mode with anti-detection techniques
+  - Human-like behavior simulation with random mouse movements and scrolling
+  - Comprehensive examples for anti-bot strategies and stealth crawling
+  - Full documentation guide for undetected browser usage
+
+- **🎨 Multi-URL Configuration System**: URL-specific crawler configurations for batch processing
+  - Different crawling strategies for different URL patterns in a single batch
+  - Support for string patterns with wildcards (`"*.pdf"`, `"*/blog/*"`)
+  - Lambda function matchers for complex URL logic
+  - Mixed matchers combining strings and functions with AND/OR logic
+  - Fallback configuration support when no patterns match
+  - First-match-wins configuration selection with optional fallback
+
+- **🧠 Memory Monitoring & Optimization**: Comprehensive memory usage tracking
+  - New `memory_utils.py` module for memory monitoring and optimization
+  - Real-time memory usage tracking during crawl sessions
+  - Memory leak detection and reporting
+  - Performance optimization recommendations
+  - Peak memory usage analysis and efficiency metrics
+  - Automatic cleanup suggestions for memory-intensive operations
+
+- **📊 Enhanced Table Extraction**: Improved table access and DataFrame conversion
+  - Direct `result.tables` interface replacing generic `result.media` approach
+  - Instant pandas DataFrame conversion with `pd.DataFrame(table['data'])`
+  - Enhanced table detection algorithms for better accuracy
+  - Table metadata including source XPath and headers
+  - Improved table structure preservation during extraction
+
+- **💰 GitHub Sponsors Integration**: 4-tier sponsorship system
+  - Supporter ($5/month): Community support + early feature previews
+  - Professional ($25/month): Priority support + beta access
+  - Business ($100/month): Direct consultation + custom integrations
+  - Enterprise ($500/month): Dedicated support + feature development
+  - Custom arrangement options for larger organizations
+
+- **🐳 Docker LLM Provider Flexibility**: Environment-based LLM configuration
+  - `LLM_PROVIDER` environment variable support for dynamic provider switching
+  - `.llm.env` file support for secure configuration management
+  - Per-request provider override capabilities in API endpoints
+  - Support for OpenAI, Groq, and other providers without rebuilding images
+  - Enhanced Docker documentation with deployment examples
+
+### Fixed
+- **URL Matcher Fallback**: Resolved edge cases in URL pattern matching logic
+- **Memory Management**: Fixed memory leaks in long-running crawl sessions
+- **Sitemap Processing**: Improved redirect handling in sitemap fetching
+- **Table Extraction**: Enhanced table detection and extraction accuracy
+- **Error Handling**: Better error messages and recovery from network failures
+
+### Changed
+- **Architecture Refactoring**: Major cleanup and optimization
+  - Moved 2,450+ lines from main `async_crawler_strategy.py` to backup
+  - Cleaner separation of concerns in crawler architecture
+  - Better maintainability and code organization
+  - Preserved backward compatibility while improving performance
+
+### Documentation
+- **Comprehensive Examples**: Added real-world URLs and practical use cases
+- **API Documentation**: Complete CrawlResult field documentation with all available fields
+- **Migration Guides**: Updated table extraction patterns from `result.media` to `result.tables`
+- **Undetected Browser Guide**: Full documentation for stealth mode and anti-bot strategies
+- **Multi-Config Examples**: Detailed examples for URL-specific configurations
+- **Docker Deployment**: Enhanced Docker documentation with LLM provider configuration
+
+## [0.7.x] - 2025-06-29
+
+### Added
+- **Virtual Scroll Support**: New `VirtualScrollConfig` for handling virtualized scrolling on modern websites
+  - Automatically detects and handles three scrolling scenarios:
+    - Content unchanged (continue scrolling)
+    - Content appended (traditional infinite scroll)
+    - Content replaced (true virtual scroll - Twitter/Instagram style)
+  - Captures ALL content from pages that replace DOM elements during scroll
+  - Intelligent deduplication based on normalized text content
+  - Configurable scroll amount, count, and wait times
+  - Seamless integration with existing extraction strategies
+  - Comprehensive examples including Twitter timeline, Instagram grid, and mixed content scenarios
+
+## [Unreleased]
+
+### Added
+- **Flexible LLM Provider Configuration** (Docker): 
+  - Support for `LLM_PROVIDER` environment variable to override default provider
+  - Per-request provider override via optional `provider` parameter in API endpoints
+  - Automatic provider validation with clear error messages
+  - Updated Docker documentation and examples
+
+### Changed
+- **WebScrapingStrategy Refactoring**: Simplified content scraping architecture
+  - `WebScrapingStrategy` is now an alias for `LXMLWebScrapingStrategy` for backward compatibility
+  - Removed redundant BeautifulSoup-based implementation (~1000 lines of code)
+  - `LXMLWebScrapingStrategy` now inherits directly from `ContentScrapingStrategy`
+  - All existing code using `WebScrapingStrategy` continues to work without modification
+  - Default scraping strategy remains `LXMLWebScrapingStrategy` for optimal performance
+
+### Added
+- **AsyncUrlSeeder**: High-performance URL discovery system for intelligent crawling at scale
+  - Discover URLs from sitemaps and Common Crawl index
+  - Extract and analyze page metadata without full crawling
+  - BM25 relevance scoring for query-based URL filtering
+  - Multi-domain parallel discovery with `many_urls()` method
+  - Automatic caching with TTL for discovered URLs
+  - Rate limiting and concurrent request management
+  - Live URL validation with HEAD requests
+  - JSON-LD and Open Graph metadata extraction
+- **SeedingConfig**: Configuration class for URL seeding operations
+  - Support for multiple discovery sources (`sitemap`, `cc`, `sitemap+cc`)
+  - Pattern-based URL filtering with wildcards
+  - Configurable concurrency and rate limiting
+  - Query-based relevance scoring with BM25
+  - Score threshold filtering for quality control
+- Comprehensive documentation for URL seeding feature
+  - Detailed comparison with deep crawling approaches
+  - Complete API reference with examples
+  - Integration guide with AsyncWebCrawler
+  - Performance benchmarks and best practices
+- Example scripts demonstrating URL seeding:
+  - `url_seeder_demo.py`: Interactive Rich-based demonstration
+  - `url_seeder_quick_demo.py`: Screenshot-friendly examples
+- Test suite for URL seeding with BM25 scoring
+
+### Changed
+- Updated `__init__.py` to export AsyncUrlSeeder and SeedingConfig
+- Enhanced documentation with URL seeding integration examples
+
+### Fixed
+- Corrected examples to properly extract URLs from seeder results before passing to `arun_many()`
+- Fixed logger color compatibility issue (changed `lightblack` to `bright_black`)
+
 ## [0.6.2] - 2025-05-02
 
 ### Added

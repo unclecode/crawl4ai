@@ -1,0 +1,43 @@
+# Advanced control flow with IF, EXISTS, and REPEAT
+
+# Define reusable procedures
+PROC handle_cookie_banner
+  IF (EXISTS `.cookie-banner`) THEN CLICK `.accept-cookies`
+  IF (EXISTS `.privacy-notice`) THEN CLICK `.dismiss-privacy`
+ENDPROC
+
+PROC scroll_to_load
+  SCROLL DOWN 500
+  WAIT 0.5
+ENDPROC
+
+PROC try_login
+  CLICK `#email`
+  TYPE "user@example.com"
+  CLICK `#password`
+  TYPE "secure123"
+  CLICK `button[type="submit"]`
+  WAIT 2
+ENDPROC
+
+# Main script
+GO https://example.com
+WAIT 2
+
+# Handle popups
+handle_cookie_banner
+
+# Conditional navigation based on login state
+IF (EXISTS `.user-menu`) THEN CLICK `.dashboard-link` ELSE try_login
+
+# Repeat scrolling based on content count
+REPEAT (scroll_to_load, 5)
+
+# Load more content while button exists
+REPEAT (CLICK `.load-more`, `document.querySelector('.load-more') && !document.querySelector('.no-more-content')`)
+
+# Process items conditionally
+IF (`document.querySelectorAll('.item').length > 10`) THEN EVAL `console.log('Found ' + document.querySelectorAll('.item').length + ' items')`
+
+# Complex condition with viewport check
+IF (`window.innerWidth < 768 && document.querySelector('.mobile-menu')`) THEN CLICK `.mobile-menu-toggle`
