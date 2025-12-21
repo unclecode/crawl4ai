@@ -267,6 +267,7 @@ continue_config.json
 .private/
 
 .claude/
+.context/
 
 CLAUDE_MONITOR.md
 CLAUDE.md
