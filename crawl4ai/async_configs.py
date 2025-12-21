@@ -1061,6 +1061,15 @@ class CrawlerRunConfig():
         shared_data (dict or None): Shared data to be passed between hooks.
                                      Default: None.
 
+        # Cache Validation Parameters (Smart Cache)
+        check_cache_freshness (bool): If True, validates cached content freshness using HTTP
+                                      conditional requests (ETag/Last-Modified) and head fingerprinting
+                                      before returning cached results. Avoids full browser crawls when
+                                      content hasn't changed. Only applies when cache_mode allows reads.
+                                      Default: False.
+        cache_validation_timeout (float): Timeout in seconds for cache validation HTTP requests.
+                                          Default: 10.0.
+
         # Page Navigation and Timing Parameters
         wait_until (str): The condition to wait for when navigating, e.g. "domcontentloaded".
                           Default: "domcontentloaded".
@@ -1226,6 +1235,9 @@ class CrawlerRunConfig():
         no_cache_read: bool = False,
         no_cache_write: bool = False,
         shared_data: dict = None,
+        # Cache Validation Parameters (Smart Cache)
+        check_cache_freshness: bool = False,
+        cache_validation_timeout: float = 10.0,
         # Page Navigation and Timing Parameters
         wait_until: str = "domcontentloaded",
         page_timeout: int = PAGE_TIMEOUT,
@@ -1339,6 +1351,9 @@ class CrawlerRunConfig():
         self.no_cache_read = no_cache_read
         self.no_cache_write = no_cache_write
         self.shared_data = shared_data
+        # Cache Validation (Smart Cache)
+        self.check_cache_freshness = check_cache_freshness
+        self.cache_validation_timeout = cache_validation_timeout
 
         # Page Navigation and Timing Parameters
         self.wait_until = wait_until

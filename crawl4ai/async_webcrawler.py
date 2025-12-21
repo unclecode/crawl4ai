@@ -47,7 +47,9 @@ from .utils import (
     get_error_context,
     RobotsParser,
     preprocess_html_for_schema,
+    compute_head_fingerprint,
 )
+from .cache_validator import CacheValidator, CacheValidationResult
 
 
 class AsyncWebCrawler:
@@ -267,6 +269,51 @@ class AsyncWebCrawler:
                 if cache_context.should_read():
                     cached_result = await async_db_manager.aget_cached_url(url)
 
+                # Smart Cache: Validate cache freshness if enabled
+                if cached_result and config.check_cache_freshness:
+                    cache_metadata = await async_db_manager.aget_cache_metadata(url)
+                    if cache_metadata:
+                        async with CacheValidator(timeout=config.cache_validation_timeout) as validator:
+                            validation = await validator.validate(
+                                url=url,
+                                stored_etag=cache_metadata.get("etag"),
+                                stored_last_modified=cache_metadata.get("last_modified"),
+                                stored_head_fingerprint=cache_metadata.get("head_fingerprint"),
+                            )
+
+                        if validation.status == CacheValidationResult.FRESH:
+                            cached_result.cache_status = "hit_validated"
+                            self.logger.info(
+                                message="Cache validated: {reason}",
+                                tag="CACHE",
+                                params={"reason": validation.reason}
+                            )
+                            # Update metadata if we got new values
+                            if validation.new_etag or validation.new_last_modified:
+                                await async_db_manager.aupdate_cache_metadata(
+                                    url=url,
+                                    etag=validation.new_etag,
+                                    last_modified=validation.new_last_modified,
+                                    head_fingerprint=validation.new_head_fingerprint,
+                                )
+                        elif validation.status == CacheValidationResult.ERROR:
+                            cached_result.cache_status = "hit_fallback"
+                            self.logger.warning(
+                                message="Cache validation failed, using cached: {reason}",
+                                tag="CACHE",
+                                params={"reason": validation.reason}
+                            )
+                        else:
+                            # STALE or UNKNOWN - force recrawl
+                            self.logger.info(
+                                message="Cache stale: {reason}",
+                                tag="CACHE",
+                                params={"reason": validation.reason}
+                            )
+                            cached_result = None
+                elif cached_result:
+                    cached_result.cache_status = "hit"
+
                 if cached_result:
                     html = sanitize_input_encode(cached_result.html)
                     extracted_content = sanitize_input_encode(
@@ -383,6 +430,14 @@ class AsyncWebCrawler:
                     crawl_result.success = bool(html)
                     crawl_result.session_id = getattr(
                         config, "session_id", None)
+                    crawl_result.cache_status = "miss"
+
+                    # Compute head fingerprint for cache validation
+                    if html:
+                        head_end = html.lower().find('</head>')
+                        if head_end != -1:
+                            head_html = html[:head_end + 7]
+                            crawl_result.head_fingerprint = compute_head_fingerprint(head_html)
 
                     self.logger.url_status(
                         url=cache_context.display_url,
