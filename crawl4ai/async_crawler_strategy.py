@@ -463,7 +463,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             with open(local_file_path, "r", encoding="utf-8") as f:
                 html = f.read()
             if config.screenshot:
-                screenshot_data = await self._generate_screenshot_from_html(html)
+                screenshot_data = await self._generate_screenshot_from_html(html, config)
             if config.capture_console_messages:
                 page, context = await self.browser_manager.get_page(crawlerRunConfig=config)
                 captured_console = await self._capture_console_messages(page, url)
@@ -488,7 +488,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             raw_html = url[6:] if url.startswith("raw://") else url[4:]
             html = raw_html
             if config.screenshot:
-                screenshot_data = await self._generate_screenshot_from_html(html)
+                screenshot_data = await self._generate_screenshot_from_html(html, config)
             return AsyncCrawlResponse(
                 html=html,
                 response_headers=response_headers,
@@ -1524,7 +1524,58 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         await page.goto(file_path)
 
         return captured_console
-        
+
+    async def _generate_screenshot_from_html(self, html: str, config: CrawlerRunConfig = None) -> str:
+        """
+        Generate a screenshot from raw HTML content by loading it into a browser page.
+
+        This method is used for raw: and file:// URLs where we have HTML content
+        but need to render it in a browser to take a screenshot.
+
+        Args:
+            html (str): The raw HTML content to render
+            config (CrawlerRunConfig, optional): Configuration for screenshot options
+
+        Returns:
+            str: The base64-encoded screenshot data
+        """
+        page = None
+        context = None
+        try:
+            # Get a browser page
+            config = config or CrawlerRunConfig()
+            page, context = await self.browser_manager.get_page(crawlerRunConfig=config)
+
+            # Load the HTML content into the page
+            await page.set_content(html, wait_until="domcontentloaded")
+
+            # Take the screenshot using existing method
+            screenshot_height_threshold = getattr(config, 'screenshot_height_threshold', None)
+            return await self.take_screenshot(page, screenshot_height_threshold=screenshot_height_threshold)
+
+        except Exception as e:
+            error_message = f"Failed to generate screenshot from HTML: {str(e)}"
+            self.logger.error(
+                message="HTML Screenshot failed: {error}",
+                tag="ERROR",
+                params={"error": error_message},
+            )
+            # Return error image as fallback
+            img = Image.new("RGB", (800, 600), color="black")
+            draw = ImageDraw.Draw(img)
+            font = ImageFont.load_default()
+            draw.text((10, 10), error_message, fill=(255, 255, 255), font=font)
+            buffered = BytesIO()
+            img.save(buffered, format="JPEG")
+            return base64.b64encode(buffered.getvalue()).decode("utf-8")
+        finally:
+            # Clean up the page
+            if page:
+                try:
+                    await page.close()
+                except Exception:
+                    pass
+
     async def take_screenshot(self, page, **kwargs) -> str:
         """
         Take a screenshot of the current page.
