@@ -455,15 +455,22 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         elif url.startswith("file://"):
             # initialize empty lists for console messages
             captured_console = []
-            
+            pdf_data = None
+            mhtml_data = None
+
             # Process local file
             local_file_path = url[7:]  # Remove 'file://' prefix
             if not os.path.exists(local_file_path):
                 raise FileNotFoundError(f"Local file not found: {local_file_path}")
             with open(local_file_path, "r", encoding="utf-8") as f:
                 html = f.read()
-            if config.screenshot:
-                screenshot_data = await self._generate_screenshot_from_html(html, config)
+
+            # Handle media generation - all require loading HTML into browser
+            if config.screenshot or config.pdf or config.capture_mhtml:
+                screenshot_data, pdf_data, mhtml_data = await self._generate_media_from_html(
+                    html, config
+                )
+
             if config.capture_console_messages:
                 page, context = await self.browser_manager.get_page(crawlerRunConfig=config)
                 captured_console = await self._capture_console_messages(page, url)
@@ -473,6 +480,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 response_headers=response_headers,
                 status_code=status_code,
                 screenshot=screenshot_data,
+                pdf_data=pdf_data,
+                mhtml_data=mhtml_data,
                 get_delayed_content=None,
                 console_messages=captured_console,
             )
@@ -487,13 +496,22 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             # raw_html = url[4:] if url[:4] == "raw:" else url[7:]
             raw_html = url[6:] if url.startswith("raw://") else url[4:]
             html = raw_html
-            if config.screenshot:
-                screenshot_data = await self._generate_screenshot_from_html(html, config)
+            pdf_data = None
+            mhtml_data = None
+
+            # Handle media generation - all require loading HTML into browser
+            if config.screenshot or config.pdf or config.capture_mhtml:
+                screenshot_data, pdf_data, mhtml_data = await self._generate_media_from_html(
+                    html, config
+                )
+
             return AsyncCrawlResponse(
                 html=html,
                 response_headers=response_headers,
                 status_code=status_code,
                 screenshot=screenshot_data,
+                pdf_data=pdf_data,
+                mhtml_data=mhtml_data,
                 get_delayed_content=None,
             )
         else:
@@ -1525,22 +1543,27 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
         return captured_console
 
-    async def _generate_screenshot_from_html(self, html: str, config: CrawlerRunConfig = None) -> str:
+    async def _generate_media_from_html(
+        self, html: str, config: CrawlerRunConfig = None
+    ) -> tuple:
         """
-        Generate a screenshot from raw HTML content by loading it into a browser page.
+        Generate media (screenshot, PDF, MHTML) from raw HTML content.
 
         This method is used for raw: and file:// URLs where we have HTML content
-        but need to render it in a browser to take a screenshot.
+        but need to render it in a browser to generate media outputs.
 
         Args:
             html (str): The raw HTML content to render
-            config (CrawlerRunConfig, optional): Configuration for screenshot options
+            config (CrawlerRunConfig, optional): Configuration for media options
 
         Returns:
-            str: The base64-encoded screenshot data
+            tuple: (screenshot_data, pdf_data, mhtml_data) - any can be None
         """
         page = None
-        context = None
+        screenshot_data = None
+        pdf_data = None
+        mhtml_data = None
+
         try:
             # Get a browser page
             config = config or CrawlerRunConfig()
@@ -1549,25 +1572,40 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             # Load the HTML content into the page
             await page.set_content(html, wait_until="domcontentloaded")
 
-            # Take the screenshot using existing method
-            screenshot_height_threshold = getattr(config, 'screenshot_height_threshold', None)
-            return await self.take_screenshot(page, screenshot_height_threshold=screenshot_height_threshold)
+            # Generate requested media
+            if config.pdf:
+                pdf_data = await self.export_pdf(page)
+
+            if config.capture_mhtml:
+                mhtml_data = await self.capture_mhtml(page)
+
+            if config.screenshot:
+                if config.screenshot_wait_for:
+                    await asyncio.sleep(config.screenshot_wait_for)
+                screenshot_height_threshold = getattr(config, 'screenshot_height_threshold', None)
+                screenshot_data = await self.take_screenshot(
+                    page, screenshot_height_threshold=screenshot_height_threshold
+                )
+
+            return screenshot_data, pdf_data, mhtml_data
 
         except Exception as e:
-            error_message = f"Failed to generate screenshot from HTML: {str(e)}"
+            error_message = f"Failed to generate media from HTML: {str(e)}"
             self.logger.error(
-                message="HTML Screenshot failed: {error}",
+                message="HTML media generation failed: {error}",
                 tag="ERROR",
                 params={"error": error_message},
             )
-            # Return error image as fallback
-            img = Image.new("RGB", (800, 600), color="black")
-            draw = ImageDraw.Draw(img)
-            font = ImageFont.load_default()
-            draw.text((10, 10), error_message, fill=(255, 255, 255), font=font)
-            buffered = BytesIO()
-            img.save(buffered, format="JPEG")
-            return base64.b64encode(buffered.getvalue()).decode("utf-8")
+            # Return error image for screenshot if it was requested
+            if config and config.screenshot:
+                img = Image.new("RGB", (800, 600), color="black")
+                draw = ImageDraw.Draw(img)
+                font = ImageFont.load_default()
+                draw.text((10, 10), error_message, fill=(255, 255, 255), font=font)
+                buffered = BytesIO()
+                img.save(buffered, format="JPEG")
+                screenshot_data = base64.b64encode(buffered.getvalue()).decode("utf-8")
+            return screenshot_data, pdf_data, mhtml_data
         finally:
             # Clean up the page
             if page:
