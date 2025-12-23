@@ -122,10 +122,14 @@ async def lifespan(_: FastAPI):
     monitor_module.monitor_stats.start_persistence_worker()
 
     # Initialize browser pool
-    await init_permanent(BrowserConfig(
-        extra_args=config["crawler"]["browser"].get("extra_args", []),
-        **config["crawler"]["browser"].get("kwargs", {}),
-    ))
+    use_permanent = config.get("crawler", {}).get("pool", {}).get("use_permanent", True)
+    if use_permanent:
+        await init_permanent(BrowserConfig(
+            extra_args=config["crawler"]["browser"].get("extra_args", []),
+            **config["crawler"]["browser"].get("kwargs", {}),
+        ))
+    else:
+        logger.info("Permanent browser instance is disabled by configuration.")
 
     # Start background tasks
     app.state.janitor = asyncio.create_task(janitor())
