@@ -618,7 +618,8 @@ class AsyncWebCrawler:
         markdown_result: MarkdownGenerationResult = (
             markdown_generator.generate_markdown(
                 input_html=markdown_input_html,
-                base_url=params.get("redirected_url", url)
+                # Use explicit base_url if provided (for raw: HTML), otherwise redirected_url, then url
+                base_url=params.get("base_url") or params.get("redirected_url") or url
                 # html2text_options=kwargs.get('html2text', {})
             )
         )

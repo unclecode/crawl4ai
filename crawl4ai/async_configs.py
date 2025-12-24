@@ -1292,6 +1292,7 @@ class CrawlerRunConfig():
         method: str = "GET",
         stream: bool = False,
         url: str = None,
+        base_url: str = None,  # Base URL for markdown link resolution (used with raw: HTML)
         check_robots_txt: bool = False,
         user_agent: str = None,
         user_agent_mode: str = None,
@@ -1310,6 +1311,7 @@ class CrawlerRunConfig():
     ):
         # TODO: Planning to set properties dynamically based on the __init__ signature
         self.url = url
+        self.base_url = base_url  # Base URL for markdown link resolution
 
         # Content Processing Parameters
         self.word_count_threshold = word_count_threshold
@@ -1701,6 +1703,7 @@ class CrawlerRunConfig():
             # Link Extraction Parameters
             link_preview_config=kwargs.get("link_preview_config"),
             url=kwargs.get("url"),
+            base_url=kwargs.get("base_url"),
             # URL Matching Parameters
             url_matcher=kwargs.get("url_matcher"),
             match_mode=kwargs.get("match_mode", MatchMode.OR),
