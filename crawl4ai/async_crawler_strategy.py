@@ -2475,7 +2475,10 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
             if scheme == 'file':
                 return await self._handle_file(parsed.path)
             elif scheme == 'raw':
-                return await self._handle_raw(parsed.path)
+                # Don't use parsed.path - urlparse truncates at '#' which is common in CSS
+                # Strip prefix directly: "raw://" (6 chars) or "raw:" (4 chars)
+                raw_content = url[6:] if url.startswith("raw://") else url[4:]
+                return await self._handle_raw(raw_content)
             else:  # http or https
                 return await self._handle_http(url, config)
                 
