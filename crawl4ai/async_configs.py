@@ -1291,6 +1291,7 @@ class CrawlerRunConfig():
         # Connection Parameters
         method: str = "GET",
         stream: bool = False,
+        prefetch: bool = False,  # When True, return only HTML + links (skip heavy processing)
         url: str = None,
         base_url: str = None,  # Base URL for markdown link resolution (used with raw: HTML)
         check_robots_txt: bool = False,
@@ -1422,6 +1423,7 @@ class CrawlerRunConfig():
 
         # Connection Parameters
         self.stream = stream
+        self.prefetch = prefetch  # Prefetch mode: return only HTML + links
         self.method = method
 
         # Robots.txt Handling Parameters
@@ -1694,6 +1696,7 @@ class CrawlerRunConfig():
             # Connection Parameters
             method=kwargs.get("method", "GET"),
             stream=kwargs.get("stream", False),
+            prefetch=kwargs.get("prefetch", False),
             check_robots_txt=kwargs.get("check_robots_txt", False),
             user_agent=kwargs.get("user_agent"),
             user_agent_mode=kwargs.get("user_agent_mode"),
@@ -1799,6 +1802,7 @@ class CrawlerRunConfig():
             "capture_console_messages": self.capture_console_messages,
             "method": self.method,
             "stream": self.stream,
+            "prefetch": self.prefetch,
             "check_robots_txt": self.check_robots_txt,
             "user_agent": self.user_agent,
             "user_agent_mode": self.user_agent_mode,

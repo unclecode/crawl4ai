@@ -514,6 +514,27 @@ class AsyncWebCrawler:
         Returns:
             CrawlResult: Processed result containing extracted and formatted content
         """
+        # === PREFETCH MODE SHORT-CIRCUIT ===
+        if getattr(config, 'prefetch', False):
+            from .utils import quick_extract_links
+
+            # Use base_url from config (for raw: URLs), redirected_url, or original url
+            effective_url = getattr(config, 'base_url', None) or kwargs.get('redirected_url') or url
+            links = quick_extract_links(html, effective_url)
+
+            return CrawlResult(
+                url=url,
+                html=html,
+                success=True,
+                links=links,
+                status_code=kwargs.get('status_code'),
+                response_headers=kwargs.get('response_headers'),
+                redirected_url=kwargs.get('redirected_url'),
+                ssl_certificate=kwargs.get('ssl_certificate'),
+                # All other fields default to None
+            )
+        # === END PREFETCH SHORT-CIRCUIT ===
+
         cleaned_html = ""
         try:
             _url = url if not kwargs.get("is_raw_html", False) else "Raw HTML"
