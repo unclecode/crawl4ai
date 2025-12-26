@@ -1033,6 +1033,18 @@ class CrawlerRunConfig():
         proxy_config (ProxyConfig or dict or None): Detailed proxy configuration, e.g. {"server": "...", "username": "..."}.
                                      If None, no additional proxy config. Default: None.
 
+        # Sticky Proxy Session Parameters
+        proxy_session_id (str or None): When set, maintains the same proxy for all requests sharing this session ID.
+                                        The proxy is acquired on first request and reused for subsequent requests.
+                                        Session expires when explicitly released or crawler context is closed.
+                                        Default: None.
+        proxy_session_ttl (int or None): Time-to-live for sticky session in seconds.
+                                         After TTL expires, a new proxy is acquired on next request.
+                                         Default: None (session lasts until explicitly released or crawler closes).
+        proxy_session_auto_release (bool): If True, automatically release the proxy session after a batch operation.
+                                           Useful for arun_many() to clean up sessions automatically.
+                                           Default: False.
+
         # Browser Location and Identity Parameters
         locale (str or None): Locale to use for the browser context (e.g., "en-US").
                              Default: None.
@@ -1221,6 +1233,10 @@ class CrawlerRunConfig():
         scraping_strategy: ContentScrapingStrategy = None,
         proxy_config: Union[ProxyConfig, dict, None] = None,
         proxy_rotation_strategy: Optional[ProxyRotationStrategy] = None,
+        # Sticky Proxy Session Parameters
+        proxy_session_id: Optional[str] = None,
+        proxy_session_ttl: Optional[int] = None,
+        proxy_session_auto_release: bool = False,
         # Browser Location and Identity Parameters
         locale: Optional[str] = None,
         timezone_id: Optional[str] = None,
@@ -1337,7 +1353,12 @@ class CrawlerRunConfig():
             self.proxy_config = ProxyConfig.from_string(proxy_config)
 
         self.proxy_rotation_strategy = proxy_rotation_strategy
-        
+
+        # Sticky Proxy Session Parameters
+        self.proxy_session_id = proxy_session_id
+        self.proxy_session_ttl = proxy_session_ttl
+        self.proxy_session_auto_release = proxy_session_auto_release
+
         # Browser Location and Identity Parameters
         self.locale = locale
         self.timezone_id = timezone_id
@@ -1621,6 +1642,10 @@ class CrawlerRunConfig():
             scraping_strategy=kwargs.get("scraping_strategy"),
             proxy_config=kwargs.get("proxy_config"),
             proxy_rotation_strategy=kwargs.get("proxy_rotation_strategy"),
+            # Sticky Proxy Session Parameters
+            proxy_session_id=kwargs.get("proxy_session_id"),
+            proxy_session_ttl=kwargs.get("proxy_session_ttl"),
+            proxy_session_auto_release=kwargs.get("proxy_session_auto_release", False),
             # Browser Location and Identity Parameters
             locale=kwargs.get("locale", None),
             timezone_id=kwargs.get("timezone_id", None),
@@ -1746,6 +1771,9 @@ class CrawlerRunConfig():
             "scraping_strategy": self.scraping_strategy,
             "proxy_config": self.proxy_config,
             "proxy_rotation_strategy": self.proxy_rotation_strategy,
+            "proxy_session_id": self.proxy_session_id,
+            "proxy_session_ttl": self.proxy_session_ttl,
+            "proxy_session_auto_release": self.proxy_session_auto_release,
             "locale": self.locale,
             "timezone_id": self.timezone_id,
             "geolocation": self.geolocation,

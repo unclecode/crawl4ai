@@ -343,15 +343,32 @@ class AsyncWebCrawler:
 
                 # Update proxy configuration from rotation strategy if available
                 if config and config.proxy_rotation_strategy:
-                    next_proxy: ProxyConfig = await config.proxy_rotation_strategy.get_next_proxy()
-                    if next_proxy:
-                        self.logger.info(
-                            message="Switch proxy: {proxy}",
-                            tag="PROXY",
-                            params={"proxy": next_proxy.server}
+                    # Handle sticky sessions - use same proxy for all requests with same session_id
+                    if config.proxy_session_id:
+                        next_proxy: ProxyConfig = await config.proxy_rotation_strategy.get_proxy_for_session(
+                            config.proxy_session_id,
+                            ttl=config.proxy_session_ttl
                         )
-                        config.proxy_config = next_proxy
-                        # config = config.clone(proxy_config=next_proxy)
+                        if next_proxy:
+                            self.logger.info(
+                                message="Using sticky proxy session: {session_id} -> {proxy}",
+                                tag="PROXY",
+                                params={
+                                    "session_id": config.proxy_session_id,
+                                    "proxy": next_proxy.server
+                                }
+                            )
+                            config.proxy_config = next_proxy
+                    else:
+                        # Existing behavior: rotate on each request
+                        next_proxy: ProxyConfig = await config.proxy_rotation_strategy.get_next_proxy()
+                        if next_proxy:
+                            self.logger.info(
+                                message="Switch proxy: {proxy}",
+                                tag="PROXY",
+                                params={"proxy": next_proxy.server}
+                            )
+                            config.proxy_config = next_proxy
 
                 # Fetch fresh content if needed
                 if not cached_result or not html:
@@ -833,21 +850,45 @@ class AsyncWebCrawler:
         # Handle stream setting - use first config's stream setting if config is a list
         if isinstance(config, list):
             stream = config[0].stream if config else False
+            primary_config = config[0] if config else None
         else:
             stream = config.stream
+            primary_config = config
+
+        # Helper to release sticky session if auto_release is enabled
+        async def maybe_release_session():
+            if (primary_config and
+                primary_config.proxy_session_id and
+                primary_config.proxy_session_auto_release and
+                primary_config.proxy_rotation_strategy):
+                await primary_config.proxy_rotation_strategy.release_session(
+                    primary_config.proxy_session_id
+                )
+                self.logger.info(
+                    message="Auto-released proxy session: {session_id}",
+                    tag="PROXY",
+                    params={"session_id": primary_config.proxy_session_id}
+                )
 
         if stream:
-
             async def result_transformer():
-                async for task_result in dispatcher.run_urls_stream(
-                    crawler=self, urls=urls, config=config
-                ):
-                    yield transform_result(task_result)
+                try:
+                    async for task_result in dispatcher.run_urls_stream(
+                        crawler=self, urls=urls, config=config
+                    ):
+                        yield transform_result(task_result)
+                finally:
+                    # Auto-release session after streaming completes
+                    await maybe_release_session()
 
             return result_transformer()
         else:
-            _results = await dispatcher.run_urls(crawler=self, urls=urls, config=config)
-            return [transform_result(res) for res in _results]
+            try:
+                _results = await dispatcher.run_urls(crawler=self, urls=urls, config=config)
+                return [transform_result(res) for res in _results]
+            finally:
+                # Auto-release session after batch completes
+                await maybe_release_session()
 
     async def aseed_urls(
         self,
