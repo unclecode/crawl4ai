@@ -2382,9 +2382,28 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
         )
 
 
+    def _format_proxy_url(self, proxy_config) -> str:
+        """Format ProxyConfig into aiohttp-compatible proxy URL."""
+        if not proxy_config:
+            return None
+
+        server = proxy_config.server
+        username = getattr(proxy_config, 'username', None)
+        password = getattr(proxy_config, 'password', None)
+
+        if username and password:
+            # Insert credentials into URL: http://user:pass@host:port
+            if '://' in server:
+                protocol, rest = server.split('://', 1)
+                return f"{protocol}://{username}:{password}@{rest}"
+            else:
+                return f"http://{username}:{password}@{server}"
+
+        return server
+
     async def _handle_http(
-        self, 
-        url: str, 
+        self,
+        url: str,
         config: CrawlerRunConfig
     ) -> AsyncCrawlResponse:
         async with self._session_context() as session:
@@ -2393,7 +2412,7 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
                 connect=10,
                 sock_read=30
             )
-            
+
             headers = dict(self._BASE_HEADERS)
             if self.browser_config.headers:
                 headers.update(self.browser_config.headers)
@@ -2404,6 +2423,12 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
                 'ssl': self.browser_config.verify_ssl,
                 'headers': headers
             }
+
+            # Add proxy support - use config.proxy_config (set by arun() from rotation strategy or direct config)
+            proxy_url = None
+            if config.proxy_config:
+                proxy_url = self._format_proxy_url(config.proxy_config)
+                request_kwargs['proxy'] = proxy_url
 
             if self.browser_config.method == "POST":
                 if self.browser_config.data:
