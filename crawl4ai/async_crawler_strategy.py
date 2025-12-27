@@ -452,66 +452,48 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         if url.startswith(("http://", "https://", "view-source:")):
             return await self._crawl_web(url, config)
 
-        elif url.startswith("file://"):
-            # initialize empty lists for console messages
-            captured_console = []
-            pdf_data = None
-            mhtml_data = None
-
-            # Process local file
-            local_file_path = url[7:]  # Remove 'file://' prefix
-            if not os.path.exists(local_file_path):
-                raise FileNotFoundError(f"Local file not found: {local_file_path}")
-            with open(local_file_path, "r", encoding="utf-8") as f:
-                html = f.read()
-
-            # Handle media generation - all require loading HTML into browser
-            if config.screenshot or config.pdf or config.capture_mhtml:
-                screenshot_data, pdf_data, mhtml_data = await self._generate_media_from_html(
-                    html, config
-                )
-
-            if config.capture_console_messages:
-                page, context = await self.browser_manager.get_page(crawlerRunConfig=config)
-                captured_console = await self._capture_console_messages(page, url)
-
-            return AsyncCrawlResponse(
-                html=html,
-                response_headers=response_headers,
-                status_code=status_code,
-                screenshot=screenshot_data,
-                pdf_data=pdf_data,
-                mhtml_data=mhtml_data,
-                get_delayed_content=None,
-                console_messages=captured_console,
+        elif url.startswith("file://") or url.startswith("raw://") or url.startswith("raw:"):
+            # Check if browser processing is required for file:// or raw: URLs
+            needs_browser = (
+                config.process_in_browser or
+                config.screenshot or
+                config.pdf or
+                config.capture_mhtml or
+                config.js_code or
+                config.wait_for or
+                config.scan_full_page or
+                config.remove_overlay_elements or
+                config.simulate_user or
+                config.magic or
+                config.process_iframes or
+                config.capture_console_messages or
+                config.capture_network_requests
             )
 
-        ##### 
-        # Since both "raw:" and "raw://" start with "raw:", the first condition is always true for both, so "raw://" will be sliced as "//...", which is incorrect.
-        # Fix: Check for "raw://" first, then "raw:"
-        # Also, the prefix "raw://" is actually 6 characters long, not 7, so it should be sliced accordingly: url[6:]
-        #####
-        elif url.startswith("raw://") or url.startswith("raw:"):
-            # Process raw HTML content
-            # raw_html = url[4:] if url[:4] == "raw:" else url[7:]
-            raw_html = url[6:] if url.startswith("raw://") else url[4:]
-            html = raw_html
-            pdf_data = None
-            mhtml_data = None
+            if needs_browser:
+                # Route through _crawl_web() for full browser pipeline
+                # _crawl_web() will detect file:// and raw: URLs and use set_content()
+                return await self._crawl_web(url, config)
 
-            # Handle media generation - all require loading HTML into browser
-            if config.screenshot or config.pdf or config.capture_mhtml:
-                screenshot_data, pdf_data, mhtml_data = await self._generate_media_from_html(
-                    html, config
-                )
+            # Fast path: return HTML directly without browser interaction
+            if url.startswith("file://"):
+                # Process local file
+                local_file_path = url[7:]  # Remove 'file://' prefix
+                if not os.path.exists(local_file_path):
+                    raise FileNotFoundError(f"Local file not found: {local_file_path}")
+                with open(local_file_path, "r", encoding="utf-8") as f:
+                    html = f.read()
+            else:
+                # Process raw HTML content (raw:// or raw:)
+                html = url[6:] if url.startswith("raw://") else url[4:]
 
             return AsyncCrawlResponse(
                 html=html,
                 response_headers=response_headers,
                 status_code=status_code,
-                screenshot=screenshot_data,
-                pdf_data=pdf_data,
-                mhtml_data=mhtml_data,
+                screenshot=None,
+                pdf_data=None,
+                mhtml_data=None,
                 get_delayed_content=None,
             )
         else:
@@ -684,66 +666,82 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             if not config.js_only:
                 await self.execute_hook("before_goto", page, context=context, url=url, config=config)
 
-                try:
-                    # Generate a unique nonce for this request
-                    if config.experimental.get("use_csp_nonce", False):
-                        nonce = hashlib.sha256(os.urandom(32)).hexdigest()
+                # Check if this is a file:// or raw: URL that needs set_content() instead of goto()
+                is_local_content = url.startswith("file://") or url.startswith("raw://") or url.startswith("raw:")
 
-                        # Add CSP headers to the request
-                        await page.set_extra_http_headers(
-                            {
-                                "Content-Security-Policy": f"default-src 'self'; script-src 'self' 'nonce-{nonce}' 'strict-dynamic'"
-                            }
-                        )
-
-                    response = await page.goto(
-                        url, wait_until=config.wait_until, timeout=config.page_timeout
-                    )
-                    redirected_url = page.url
-                except Error as e:
-                    # Allow navigation to be aborted when downloading files
-                    # This is expected behavior for downloads in some browser engines
-                    if 'net::ERR_ABORTED' in str(e) and self.browser_config.accept_downloads:
-                        self.logger.info(
-                            message=f"Navigation aborted, likely due to file download: {url}",
-                            tag="GOTO",
-                            params={"url": url},
-                        )
-                        response = None
+                if is_local_content:
+                    # Load local content using set_content() instead of network navigation
+                    if url.startswith("file://"):
+                        local_file_path = url[7:]  # Remove 'file://' prefix
+                        if not os.path.exists(local_file_path):
+                            raise FileNotFoundError(f"Local file not found: {local_file_path}")
+                        with open(local_file_path, "r", encoding="utf-8") as f:
+                            html_content = f.read()
                     else:
-                        raise RuntimeError(f"Failed on navigating ACS-GOTO:\n{str(e)}")
+                        # raw:// or raw:
+                        html_content = url[6:] if url.startswith("raw://") else url[4:]
+
+                    await page.set_content(html_content, wait_until=config.wait_until)
+                    response = None
+                    redirected_url = config.base_url or url
+                    status_code = 200
+                    response_headers = {}
+                else:
+                    # Standard web navigation with goto()
+                    try:
+                        # Generate a unique nonce for this request
+                        if config.experimental.get("use_csp_nonce", False):
+                            nonce = hashlib.sha256(os.urandom(32)).hexdigest()
+
+                            # Add CSP headers to the request
+                            await page.set_extra_http_headers(
+                                {
+                                    "Content-Security-Policy": f"default-src 'self'; script-src 'self' 'nonce-{nonce}' 'strict-dynamic'"
+                                }
+                            )
+
+                        response = await page.goto(
+                            url, wait_until=config.wait_until, timeout=config.page_timeout
+                        )
+                        redirected_url = page.url
+                    except Error as e:
+                        # Allow navigation to be aborted when downloading files
+                        # This is expected behavior for downloads in some browser engines
+                        if 'net::ERR_ABORTED' in str(e) and self.browser_config.accept_downloads:
+                            self.logger.info(
+                                message=f"Navigation aborted, likely due to file download: {url}",
+                                tag="GOTO",
+                                params={"url": url},
+                            )
+                            response = None
+                        else:
+                            raise RuntimeError(f"Failed on navigating ACS-GOTO:\n{str(e)}")
+
+                    # ──────────────────────────────────────────────────────────────
+                    # Walk the redirect chain.  Playwright returns only the last
+                    # hop, so we trace the `request.redirected_from` links until the
+                    # first response that differs from the final one and surface its
+                    # status-code.
+                    # ──────────────────────────────────────────────────────────────
+                    if response is None:
+                        status_code = 200
+                        response_headers = {}
+                    else:
+                        first_resp = response
+                        req = response.request
+                        while req and req.redirected_from:
+                            prev_req = req.redirected_from
+                            prev_resp = await prev_req.response()
+                            if prev_resp:                       # keep earliest
+                                first_resp = prev_resp
+                            req = prev_req
+
+                        status_code = first_resp.status
+                        response_headers = first_resp.headers
 
                 await self.execute_hook(
                     "after_goto", page, context=context, url=url, response=response, config=config
                 )
-
-                # ──────────────────────────────────────────────────────────────
-                # Walk the redirect chain.  Playwright returns only the last
-                # hop, so we trace the `request.redirected_from` links until the
-                # first response that differs from the final one and surface its
-                # status-code.
-                # ──────────────────────────────────────────────────────────────
-                if response is None:
-                    status_code = 200
-                    response_headers = {}
-                else:
-                    first_resp = response
-                    req = response.request
-                    while req and req.redirected_from:
-                        prev_req = req.redirected_from
-                        prev_resp = await prev_req.response()
-                        if prev_resp:                       # keep earliest
-                            first_resp = prev_resp
-                        req = prev_req
-                
-                    status_code = first_resp.status
-                    response_headers = first_resp.headers
-                # if response is None:
-                #     status_code = 200
-                #     response_headers = {}
-                # else:
-                #     status_code = response.status
-                #     response_headers = response.headers
 
             else:
                 status_code = 200

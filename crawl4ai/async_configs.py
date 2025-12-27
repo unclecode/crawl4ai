@@ -1188,6 +1188,12 @@ class CrawlerRunConfig():
         # Connection Parameters
         stream (bool): If True, enables streaming of crawled URLs as they are processed when used with arun_many.
                       Default: False.
+        process_in_browser (bool): If True, forces raw:/file:// URLs to be processed through the browser
+                                   pipeline (enabling js_code, wait_for, scrolling, etc.). When False (default),
+                                   raw:/file:// URLs use a fast path that returns HTML directly without browser
+                                   interaction. This is automatically enabled when browser-requiring parameters
+                                   are detected (js_code, wait_for, screenshot, pdf, etc.).
+                                   Default: False.
 
         check_robots_txt (bool): Whether to check robots.txt rules before crawling. Default: False
                                  Default: False.
@@ -1308,6 +1314,7 @@ class CrawlerRunConfig():
         method: str = "GET",
         stream: bool = False,
         prefetch: bool = False,  # When True, return only HTML + links (skip heavy processing)
+        process_in_browser: bool = False,  # Force browser processing for raw:/file:// URLs
         url: str = None,
         base_url: str = None,  # Base URL for markdown link resolution (used with raw: HTML)
         check_robots_txt: bool = False,
@@ -1445,6 +1452,7 @@ class CrawlerRunConfig():
         # Connection Parameters
         self.stream = stream
         self.prefetch = prefetch  # Prefetch mode: return only HTML + links
+        self.process_in_browser = process_in_browser  # Force browser processing for raw:/file:// URLs
         self.method = method
 
         # Robots.txt Handling Parameters
@@ -1722,6 +1730,7 @@ class CrawlerRunConfig():
             method=kwargs.get("method", "GET"),
             stream=kwargs.get("stream", False),
             prefetch=kwargs.get("prefetch", False),
+            process_in_browser=kwargs.get("process_in_browser", False),
             check_robots_txt=kwargs.get("check_robots_txt", False),
             user_agent=kwargs.get("user_agent"),
             user_agent_mode=kwargs.get("user_agent_mode"),
@@ -1831,6 +1840,7 @@ class CrawlerRunConfig():
             "method": self.method,
             "stream": self.stream,
             "prefetch": self.prefetch,
+            "process_in_browser": self.process_in_browser,
             "check_robots_txt": self.check_robots_txt,
             "user_agent": self.user_agent,
             "user_agent_mode": self.user_agent_mode,

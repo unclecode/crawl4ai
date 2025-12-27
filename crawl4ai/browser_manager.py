@@ -895,18 +895,27 @@ class BrowserManager:
             combined_headers.update(self.config.headers)
             await context.set_extra_http_headers(combined_headers)
 
-        # Add default cookie
-        await context.add_cookies(
-            [
-                {
-                    "name": "cookiesEnabled",
-                    "value": "true",
-                    "url": crawlerRunConfig.url
-                    if crawlerRunConfig and crawlerRunConfig.url
-                    else "https://crawl4ai.com/",
-                }
-            ]
-        )
+        # Add default cookie (skip for raw:/file:// URLs which are not valid cookie URLs)
+        cookie_url = None
+        if crawlerRunConfig and crawlerRunConfig.url:
+            url = crawlerRunConfig.url
+            # Only set cookie for http/https URLs
+            if url.startswith(("http://", "https://")):
+                cookie_url = url
+            elif crawlerRunConfig.base_url and crawlerRunConfig.base_url.startswith(("http://", "https://")):
+                # Use base_url as fallback for raw:/file:// URLs
+                cookie_url = crawlerRunConfig.base_url
+
+        if cookie_url:
+            await context.add_cookies(
+                [
+                    {
+                        "name": "cookiesEnabled",
+                        "value": "true",
+                        "url": cookie_url,
+                    }
+                ]
+            )
 
         # Handle navigator overrides
         if crawlerRunConfig:
