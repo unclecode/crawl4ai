@@ -312,6 +312,14 @@ class HTML2Text(html.parser.HTMLParser):
     ) -> None:
         self.current_tag = tag
 
+        if tag == "base" and start and attrs.get("href"):
+            href = attrs["href"]
+            if self.baseurl:
+                self.baseurl = urlparse.urljoin(self.baseurl, href)
+            else:
+                self.baseurl = href
+            return
+
         if self.tag_callback is not None:
             if self.tag_callback(self, tag, attrs, start) is True:
                 return
