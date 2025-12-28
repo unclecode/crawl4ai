@@ -695,9 +695,6 @@ class EmbeddingStrategy(CrawlStrategy):
         from .utils import get_text_embeddings
         embedding_llm_config = self._get_embedding_llm_config_dict()
 
-        print("EMBEDDING LLM CONFIGGGG")
-        print(embedding_llm_config)
-        print("\n\n\n\n")
         return await get_text_embeddings(
             texts, 
             embedding_llm_config,
