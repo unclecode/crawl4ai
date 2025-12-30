@@ -296,3 +296,4 @@ scripts/
 *.db
 *.rdb
 *.ldb
+MEMORY.md
