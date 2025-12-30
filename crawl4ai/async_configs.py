@@ -1996,6 +1996,8 @@ class SeedingConfig:
         score_threshold: Optional[float] = None,
         scoring_method: str = "bm25",
         filter_nonsense_urls: bool = True,
+        cache_ttl_hours: int = 24,
+        validate_sitemap_lastmod: bool = True,
     ):
         """
         Initialize URL seeding configuration.
@@ -2027,10 +2029,14 @@ class SeedingConfig:
                   Requires extract_head=True. Default: None
             score_threshold: Minimum relevance score (0.0-1.0) to include URL. 
                            Only applies when query is provided. Default: None
-            scoring_method: Scoring algorithm to use. Currently only "bm25" is supported. 
+            scoring_method: Scoring algorithm to use. Currently only "bm25" is supported.
                           Future: "semantic". Default: "bm25"
-            filter_nonsense_urls: Filter out utility URLs like robots.txt, sitemap.xml, 
+            filter_nonsense_urls: Filter out utility URLs like robots.txt, sitemap.xml,
                                  ads.txt, favicon.ico, etc. Default: True
+            cache_ttl_hours: Hours before sitemap cache expires. Set to 0 to disable TTL
+                            (only lastmod validation). Default: 24
+            validate_sitemap_lastmod: If True, compares sitemap's <lastmod> with cache
+                                     timestamp and refetches if sitemap is newer. Default: True
         """
         self.source = source
         self.pattern = pattern
@@ -2047,6 +2053,8 @@ class SeedingConfig:
         self.score_threshold = score_threshold
         self.scoring_method = scoring_method
         self.filter_nonsense_urls = filter_nonsense_urls
+        self.cache_ttl_hours = cache_ttl_hours
+        self.validate_sitemap_lastmod = validate_sitemap_lastmod
 
     # Add to_dict, from_kwargs, and clone methods for consistency
     def to_dict(self) -> Dict[str, Any]:
