@@ -67,7 +67,8 @@ async def handle_llm_qa(
     config: dict
 ) -> str:
     """Process QA using LLM with crawled content as context."""
-    from crawler_pool import get_crawler
+    from crawler_pool import get_crawler, release_crawler
+    crawler = None
     try:
         if not url.startswith(('http://', 'https://')) and not url.startswith(("raw:", "raw://")):
             url = 'https://' + url
@@ -121,6 +122,9 @@ async def handle_llm_qa(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
+    finally:
+        if crawler:
+            await release_crawler(crawler)
 
 async def process_llm_extraction(
     redis: aioredis.Redis,
@@ -282,32 +286,37 @@ async def handle_markdown_request(
 
         cache_mode = CacheMode.ENABLED if cache == "1" else CacheMode.WRITE_ONLY
 
-        from crawler_pool import get_crawler
+        from crawler_pool import get_crawler, release_crawler
         from utils import load_config as _load_config
         _cfg = _load_config()
         browser_cfg = BrowserConfig(
             extra_args=_cfg["crawler"]["browser"].get("extra_args", []),
             **_cfg["crawler"]["browser"].get("kwargs", {}),
         )
-        crawler = await get_crawler(browser_cfg)
-        result = await crawler.arun(
-            url=decoded_url,
-            config=CrawlerRunConfig(
-                markdown_generator=md_generator,
-                scraping_strategy=LXMLWebScrapingStrategy(),
-                cache_mode=cache_mode
-            )
-        )
-
-        if not result.success:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=result.error_message
+        crawler = None
+        try:
+            crawler = await get_crawler(browser_cfg)
+            result = await crawler.arun(
+                url=decoded_url,
+                config=CrawlerRunConfig(
+                    markdown_generator=md_generator,
+                    scraping_strategy=LXMLWebScrapingStrategy(),
+                    cache_mode=cache_mode
+                )
             )
 
-        return (result.markdown.raw_markdown
-               if filter_type == FilterType.RAW
-               else result.markdown.fit_markdown)
+            if not result.success:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=result.error_message
+                )
+
+            return (result.markdown.raw_markdown
+                   if filter_type == FilterType.RAW
+                   else result.markdown.fit_markdown)
+        finally:
+            if crawler:
+                await release_crawler(crawler)
 
     except Exception as e:
         logger.error(f"Markdown error: {str(e)}", exc_info=True)
@@ -481,6 +490,7 @@ async def stream_results(crawler: AsyncWebCrawler, results_gen: AsyncGenerator) 
     """Stream results with heartbeats and completion markers."""
     import json
     from utils import datetime_handler
+    from crawler_pool import release_crawler
 
     try:
         async for result in results_gen:
@@ -511,7 +521,8 @@ async def stream_results(crawler: AsyncWebCrawler, results_gen: AsyncGenerator) 
         #     await crawler.close()
         # except Exception as e:
         #     logger.error(f"Crawler cleanup error: {e}")
-        pass
+        if crawler:
+            await release_crawler(crawler)
 
 async def handle_crawl_request(
     urls: List[str],
@@ -549,41 +560,46 @@ async def handle_crawl_request(
             ) if config["crawler"]["rate_limiter"]["enabled"] else None
         )
         
-        from crawler_pool import get_crawler
-        crawler = await get_crawler(browser_config)
+        from crawler_pool import get_crawler, release_crawler
+        crawler = None
+        try:
+            crawler = await get_crawler(browser_config)
 
-        # crawler: AsyncWebCrawler = AsyncWebCrawler(config=browser_config)
-        # await crawler.start()
-        
-        # Attach hooks if provided
-        hooks_status = {}
-        if hooks_config:
-            from hook_manager import attach_user_hooks_to_crawler, UserHookManager
-            hook_manager = UserHookManager(timeout=hooks_config.get('timeout', 30))
-            hooks_status, hook_manager = await attach_user_hooks_to_crawler(
-                crawler,
-                hooks_config.get('code', {}),
-                timeout=hooks_config.get('timeout', 30),
-                hook_manager=hook_manager
-            )
-            logger.info(f"Hooks attachment status: {hooks_status['status']}")
-        
-        base_config = config["crawler"]["base_config"]
-        # Iterate on key-value pairs in global_config then use hasattr to set them
-        for key, value in base_config.items():
-            if hasattr(crawler_config, key):
-                current_value = getattr(crawler_config, key)
-                # Only set base config if user didn't provide a value
-                if current_value is None or current_value == "":
-                    setattr(crawler_config, key, value)
+            # crawler: AsyncWebCrawler = AsyncWebCrawler(config=browser_config)
+            # await crawler.start()
+            
+            # Attach hooks if provided
+            hooks_status = {}
+            if hooks_config:
+                from hook_manager import attach_user_hooks_to_crawler, UserHookManager
+                hook_manager = UserHookManager(timeout=hooks_config.get('timeout', 30))
+                hooks_status, hook_manager = await attach_user_hooks_to_crawler(
+                    crawler,
+                    hooks_config.get('code', {}),
+                    timeout=hooks_config.get('timeout', 30),
+                    hook_manager=hook_manager
+                )
+                logger.info(f"Hooks attachment status: {hooks_status['status']}")
+            
+            base_config = config["crawler"]["base_config"]
+            # Iterate on key-value pairs in global_config then use hasattr to set them
+            for key, value in base_config.items():
+                if hasattr(crawler_config, key):
+                    current_value = getattr(crawler_config, key)
+                    # Only set base config if user didn't provide a value
+                    if current_value is None or current_value == "":
+                        setattr(crawler_config, key, value)
 
-        results = []
-        func = getattr(crawler, "arun" if len(urls) == 1 else "arun_many")
-        partial_func = partial(func, 
-                                urls[0] if len(urls) == 1 else urls, 
-                                config=crawler_config, 
-                                dispatcher=dispatcher)
-        results = await partial_func()
+            results = []
+            func = getattr(crawler, "arun" if len(urls) == 1 else "arun_many")
+            partial_func = partial(func, 
+                                    urls[0] if len(urls) == 1 else urls, 
+                                    config=crawler_config, 
+                                    dispatcher=dispatcher)
+            results = await partial_func()
+        finally:
+            if crawler:
+                await release_crawler(crawler)
         
         # Ensure results is always a list
         if not isinstance(results, list):

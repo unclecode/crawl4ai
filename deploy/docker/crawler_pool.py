@@ -1,5 +1,6 @@
 # crawler_pool.py - Smart browser pool with tiered management
-import asyncio, json, hashlib, time
+import asyncio, json, hashlib, time, os
+import psutil
 from contextlib import suppress
 from typing import Dict, Optional
 from crawl4ai import AsyncWebCrawler, BrowserConfig
@@ -13,6 +14,7 @@ CONFIG = load_config()
 PERMANENT: Optional[AsyncWebCrawler] = None  # Always-ready default browser
 HOT_POOL: Dict[str, AsyncWebCrawler] = {}    # Frequent configs
 COLD_POOL: Dict[str, AsyncWebCrawler] = {}   # Rare configs
+RETIRED_POOL: Dict[str, AsyncWebCrawler] = {} # Browsers marked for retirement
 LAST_USED: Dict[str, float] = {}
 USAGE_COUNT: Dict[str, int] = {}
 LOCK = asyncio.Lock()
@@ -21,6 +23,17 @@ LOCK = asyncio.Lock()
 MEM_LIMIT = CONFIG.get("crawler", {}).get("memory_threshold_percent", 95.0)
 BASE_IDLE_TTL = CONFIG.get("crawler", {}).get("pool", {}).get("idle_ttl_sec", 300)
 DEFAULT_CONFIG_SIG = None  # Cached sig for default config
+
+# Retirement Config (from env)
+RETIREMENT_ENABLED = os.getenv("CRAWL4AI_BROWSER_RETIREMENT_ENABLED", "false").lower() == "true"
+MAX_USAGE_COUNT = int(os.getenv("CRAWL4AI_BROWSER_MAX_USAGE", "100"))
+MEMORY_RETIRE_THRESHOLD = int(os.getenv("CRAWL4AI_MEMORY_RETIRE_THRESHOLD", "75"))
+MEMORY_RETIRE_MIN_USAGE = int(os.getenv("CRAWL4AI_MEMORY_RETIRE_MIN_USAGE", "10"))
+
+# if RETIREMENT_ENABLED:
+#     logger.info(f"✅ Browser retirement enabled (Max Usage: {MAX_USAGE_COUNT}, Mem Threshold: {MEMORY_RETIRE_THRESHOLD}%)")
+# else:
+#     logger.info("ℹ️ Browser retirement disabled")
 
 def _sig(cfg: BrowserConfig) -> str:
     """Generate config signature."""
@@ -44,10 +57,43 @@ async def get_crawler(cfg: BrowserConfig) -> AsyncWebCrawler:
 
         # Check hot pool
         if sig in HOT_POOL:
-            LAST_USED[sig] = time.time()
-            USAGE_COUNT[sig] = USAGE_COUNT.get(sig, 0) + 1
-            logger.info(f"♨️  Using hot pool browser (sig={sig[:8]})")
-            return HOT_POOL[sig]
+            crawler = HOT_POOL[sig]
+            usage = USAGE_COUNT.get(sig, 0)
+            
+            # Ensure active_requests is initialized
+            if not hasattr(crawler, 'active_requests'):
+                crawler.active_requests = 0
+
+            should_retire = False
+            
+            if RETIREMENT_ENABLED:
+                # 1. Max Usage Check
+                if usage >= MAX_USAGE_COUNT:
+                    should_retire = True
+                    logger.info(f"👴 Retirement time for browser {sig[:8]}: Max usage reached ({usage})")
+                
+                # 2. Memory Check (if used enough times to stabilize)
+                elif usage >= MEMORY_RETIRE_MIN_USAGE:
+                    try:
+                        mem_percent = psutil.virtual_memory().percent
+                        if mem_percent > MEMORY_RETIRE_THRESHOLD:
+                            should_retire = True
+                            logger.info(f"👴 Retirement time for browser {sig[:8]}: Memory high ({mem_percent}%)")
+                    except Exception as e:
+                        logger.warning(f"Failed to check memory for retirement: {e}")
+
+            if should_retire:
+                # Move to retired pool
+                RETIRED_POOL[sig] = HOT_POOL.pop(sig)
+                # Do NOT close here, let janitor handle it when active_requests is 0
+                # Fall through to create a new one
+            else:
+                # Healthy -> Reuse
+                LAST_USED[sig] = time.time()
+                USAGE_COUNT[sig] = usage + 1
+                crawler.active_requests += 1
+                logger.info(f"♨️  Using hot pool browser (sig={sig[:8]}, usage={USAGE_COUNT[sig]}, active={crawler.active_requests})")
+                return crawler
 
         # Check cold pool (promote to hot if used 3+ times)
         if sig in COLD_POOL:
@@ -64,11 +110,19 @@ async def get_crawler(cfg: BrowserConfig) -> AsyncWebCrawler:
                     await get_monitor().track_janitor_event("promote", sig, {"count": USAGE_COUNT[sig]})
                 except:
                     pass
-
-                return HOT_POOL[sig]
+                
+                crawler = HOT_POOL[sig]
+                if not hasattr(crawler, 'active_requests'):
+                    crawler.active_requests = 0
+                crawler.active_requests += 1
+                return crawler
 
             logger.info(f"❄️  Using cold pool browser (sig={sig[:8]})")
-            return COLD_POOL[sig]
+            crawler = COLD_POOL[sig]
+            if not hasattr(crawler, 'active_requests'):
+                crawler.active_requests = 0
+            crawler.active_requests += 1
+            return crawler
 
         # Memory check before creating new
         mem_pct = get_container_memory_percent()
@@ -80,14 +134,39 @@ async def get_crawler(cfg: BrowserConfig) -> AsyncWebCrawler:
         logger.info(f"🆕 Creating new browser in cold pool (sig={sig[:8]}, mem={mem_pct:.1f}%)")
         crawler = AsyncWebCrawler(config=cfg, thread_safe=False)
         await crawler.start()
+        crawler.active_requests = 1
         COLD_POOL[sig] = crawler
         LAST_USED[sig] = time.time()
         USAGE_COUNT[sig] = 1
         return crawler
 
+async def release_crawler(crawler: AsyncWebCrawler):
+    """Decrement active request count for a crawler."""
+    async with LOCK:
+        # Permanent browser doesn't need ref counting in this scheme 
+        # (unless we want to track it too, but we are not touching its lifecycle)
+        if crawler is PERMANENT:
+            return
+
+        if hasattr(crawler, 'active_requests'):
+            crawler.active_requests -= 1
+            if crawler.active_requests < 0:
+                crawler.active_requests = 0
+            
+            # Identify which pool it belongs to for logging
+            # (Optimization: Just log active count)
+            # logger.debug(f"Released crawler, active={crawler.active_requests}")
+
 async def init_permanent(cfg: BrowserConfig):
     """Initialize permanent default browser."""
     global PERMANENT, DEFAULT_CONFIG_SIG
+    
+    # Log retirement status once on startup (hooked here as it's called during app startup)
+    if RETIREMENT_ENABLED:
+        logger.info(f"✅ Browser retirement enabled (Max Usage: {MAX_USAGE_COUNT}, Mem Threshold: {MEMORY_RETIRE_THRESHOLD}%)")
+    else:
+        logger.info("ℹ️ Browser retirement disabled")
+
     async with LOCK:
         if PERMANENT:
             return
@@ -106,9 +185,11 @@ async def close_all():
             tasks.append(PERMANENT.close())
         tasks.extend([c.close() for c in HOT_POOL.values()])
         tasks.extend([c.close() for c in COLD_POOL.values()])
+        tasks.extend([c.close() for c in RETIRED_POOL.values()]) # Close retired too
         await asyncio.gather(*tasks, return_exceptions=True)
         HOT_POOL.clear()
         COLD_POOL.clear()
+        RETIRED_POOL.clear()
         LAST_USED.clear()
         USAGE_COUNT.clear()
 
@@ -132,39 +213,59 @@ async def janitor():
             # Clean cold pool
             for sig in list(COLD_POOL.keys()):
                 if now - LAST_USED.get(sig, now) > cold_ttl:
-                    idle_time = now - LAST_USED[sig]
-                    logger.info(f"🧹 Closing cold browser (sig={sig[:8]}, idle={idle_time:.0f}s)")
-                    with suppress(Exception):
-                        await COLD_POOL[sig].close()
-                    COLD_POOL.pop(sig, None)
-                    LAST_USED.pop(sig, None)
-                    USAGE_COUNT.pop(sig, None)
-
-                    # Track in monitor
-                    try:
-                        from monitor import get_monitor
-                        await get_monitor().track_janitor_event("close_cold", sig, {"idle_seconds": int(idle_time), "ttl": cold_ttl})
-                    except:
-                        pass
+                    crawler = COLD_POOL[sig]
+                    # Only close if no active requests
+                    if not hasattr(crawler, 'active_requests') or crawler.active_requests == 0:
+                        idle_time = now - LAST_USED[sig]
+                        logger.info(f"🧹 Closing cold browser (sig={sig[:8]}, idle={idle_time:.0f}s)")
+                        with suppress(Exception):
+                            await crawler.close()
+                        COLD_POOL.pop(sig, None)
+                        LAST_USED.pop(sig, None)
+                        USAGE_COUNT.pop(sig, None)
+                        try:
+                            from monitor import get_monitor
+                            await get_monitor().track_janitor_event("close_cold", sig, {"idle_seconds": int(idle_time), "ttl": cold_ttl})
+                        except:
+                            pass
 
             # Clean hot pool (more conservative)
             for sig in list(HOT_POOL.keys()):
                 if now - LAST_USED.get(sig, now) > hot_ttl:
-                    idle_time = now - LAST_USED[sig]
-                    logger.info(f"🧹 Closing hot browser (sig={sig[:8]}, idle={idle_time:.0f}s)")
+                    crawler = HOT_POOL[sig]
+                    # Only close if no active requests
+                    if not hasattr(crawler, 'active_requests') or crawler.active_requests == 0:
+                        idle_time = now - LAST_USED[sig]
+                        logger.info(f"🧹 Closing hot browser (sig={sig[:8]}, idle={idle_time:.0f}s)")
+                        with suppress(Exception):
+                            await crawler.close()
+                        HOT_POOL.pop(sig, None)
+                        LAST_USED.pop(sig, None)
+                        USAGE_COUNT.pop(sig, None)
+                        try:
+                            from monitor import get_monitor
+                            await get_monitor().track_janitor_event("close_hot", sig, {"idle_seconds": int(idle_time), "ttl": hot_ttl})
+                        except:
+                            pass
+            
+            # Clean retired pool (Aggressive cleanup)
+            for sig in list(RETIRED_POOL.keys()):
+                crawler = RETIRED_POOL[sig]
+                # Only close if no active requests
+                if hasattr(crawler, 'active_requests') and crawler.active_requests == 0:
+                    logger.info(f"💀 Janitor closing retired browser (sig={sig[:8]})")
                     with suppress(Exception):
-                        await HOT_POOL[sig].close()
-                    HOT_POOL.pop(sig, None)
+                        await crawler.close()
+                    RETIRED_POOL.pop(sig, None)
+                    # Keys might have been popped from LAST_USED/USAGE_COUNT already
                     LAST_USED.pop(sig, None)
                     USAGE_COUNT.pop(sig, None)
-
-                    # Track in monitor
                     try:
                         from monitor import get_monitor
-                        await get_monitor().track_janitor_event("close_hot", sig, {"idle_seconds": int(idle_time), "ttl": hot_ttl})
+                        await get_monitor().track_janitor_event("close_retired", sig, {})
                     except:
                         pass
 
             # Log pool stats
-            if mem_pct > 60:
-                logger.info(f"📊 Pool: hot={len(HOT_POOL)}, cold={len(COLD_POOL)}, mem={mem_pct:.1f}%")
+            if mem_pct > 60 or len(RETIRED_POOL) > 0:
+                logger.info(f"📊 Pool: hot={len(HOT_POOL)}, cold={len(COLD_POOL)}, retired={len(RETIRED_POOL)}, mem={mem_pct:.1f}%")
