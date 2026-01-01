@@ -44,6 +44,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     lsof \
     redis-server \
     supervisor \
+    tini \
     && apt-get clean \ 
     && rm -rf /var/lib/apt/lists/*
 
@@ -200,7 +201,12 @@ EXPOSE 6379
 USER appuser
 
 # Set environment variables to ptoduction
-ENV PYTHON_ENV=production 
+ENV PYTHON_ENV=production
+
+# Use tini as init system to properly reap zombie processes
+# This is required for Playwright/Chromium which spawns many child processes
+# See: https://github.com/unclecode/crawl4ai/issues/1666
+ENTRYPOINT ["/usr/bin/tini", "--"]
 
 # Start the application using supervisord
 CMD ["supervisord", "-c", "supervisord.conf"]
