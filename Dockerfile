@@ -41,6 +41,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     python3-dev \
     libjpeg-dev \
+    lsof \
     redis-server \
     supervisor \
     && apt-get clean \ 
