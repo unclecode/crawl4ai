@@ -859,8 +859,8 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                         updated_links = asyncio.run(extract_links())
 
                     # Convert back to dict format
-                    links["internal"] = [link.dict() for link in updated_links.internal]
-                    links["external"] = [link.dict() for link in updated_links.external]
+                    links["internal"] = [link.model_dump() for link in updated_links.internal]
+                    links["external"] = [link.model_dump() for link in updated_links.external]
 
                     if verbose:
                         successful_internal = len(

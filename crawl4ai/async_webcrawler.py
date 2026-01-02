@@ -277,7 +277,6 @@ class AsyncWebCrawler:
                             config=config,
                             screenshot_data=None,
                             pdf_data=None,
-                            verbose=config.verbose,
                             is_raw_html=True if url.startswith("raw:") else False,
                             **kwargs,
                         )
@@ -337,7 +336,6 @@ class AsyncWebCrawler:
                     config=config,  # Pass the config object instead of individual parameters
                     screenshot_data=screenshot_data,
                     pdf_data=pdf_data,
-                    verbose=config.verbose,
                     is_raw_html=True if url.startswith("raw:") else False,
                     redirected_url=async_response.redirected_url,
                     **kwargs,
@@ -404,7 +402,6 @@ class AsyncWebCrawler:
         config: CrawlerRunConfig,
         screenshot_data: str,
         pdf_data: str,
-        verbose: bool,
         **kwargs,
     ) -> CrawlResult:
         """

@@ -144,7 +144,3 @@ async def test_clear_cache():
 
     cache_client.cleanup()
 
-
-# Entry point for debugging
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])

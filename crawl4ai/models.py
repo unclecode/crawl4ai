@@ -227,16 +227,6 @@ class CrawlResult(BaseModel):
             "Please use 'markdown.fit_markdown' instead."
         )
     
-    @property
-    def fit_html(self):
-        """
-        Deprecated property that raises an AttributeError when accessed.
-        """
-        raise AttributeError(
-            "The 'fit_html' attribute is deprecated and has been removed. "
-            "Please use 'markdown.fit_html' instead."
-        )
-
     def model_dump(self, *args, **kwargs):
         """
         Override model_dump to include the _markdown private attribute in serialization.

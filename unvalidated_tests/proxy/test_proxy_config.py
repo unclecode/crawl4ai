@@ -8,10 +8,9 @@ Comprehensive test suite for ProxyConfig in different forms:
 Tests cover all possible scenarios and edge cases using pytest.
 """
 
-import asyncio
-import os
 import pytest
-import tempfile
+
+import os
 from unittest.mock import patch
 
 from crawl4ai import AsyncWebCrawler, BrowserConfig
@@ -562,21 +561,3 @@ async def test_env_proxy():
     else:
         print("No proxies loaded from environment")
 
-
-if __name__ == "__main__":
-    print("Running comprehensive ProxyConfig tests...")
-    print("=" * 50)
-    
-    # Run the standalone test functions
-    print("\n1. Testing dict proxy format...")
-    asyncio.run(test_dict_proxy())
-    
-    print("\n2. Testing string proxy format...")
-    asyncio.run(test_string_proxy())
-    
-    print("\n3. Testing environment variable proxy format...")
-    asyncio.run(test_env_proxy())
-    
-    print("\n" + "=" * 50)
-    print("To run the full pytest suite, use: pytest " + __file__)
-    print("=" * 50)
