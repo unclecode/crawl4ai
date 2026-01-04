@@ -418,6 +418,8 @@ class BrowserConfig:
                            Default: [].
         enable_stealth (bool): If True, applies playwright-stealth to bypass basic bot detection.
                               Cannot be used with use_undetected browser mode. Default: False.
+        avoid_ads (bool): If True, attempts to block ad-related network requests. Default: False.
+        avoid_css (bool): If True, blocks loading of CSS files for faster and leaner crawling. Default: False.
     """
 
     def __init__(
@@ -459,6 +461,8 @@ class BrowserConfig:
         debugging_port: int = 9222,
         host: str = "localhost",
         enable_stealth: bool = False,
+        avoid_ads: bool = False,
+        avoid_css: bool = False,
     ):
         
         self.browser_type = browser_type
@@ -514,6 +518,8 @@ class BrowserConfig:
         self.debugging_port = debugging_port
         self.host = host
         self.enable_stealth = enable_stealth
+        self.avoid_ads = avoid_ads
+        self.avoid_css = avoid_css
 
         fa_user_agenr_generator = ValidUAGenerator()
         if self.user_agent_mode == "random":
@@ -589,6 +595,8 @@ class BrowserConfig:
             debugging_port=kwargs.get("debugging_port", 9222),
             host=kwargs.get("host", "localhost"),
             enable_stealth=kwargs.get("enable_stealth", False),
+            avoid_ads=kwargs.get("avoid_ads", False),
+            avoid_css=kwargs.get("avoid_css", False),
         )
 
     def to_dict(self):
@@ -624,6 +632,8 @@ class BrowserConfig:
             "debugging_port": self.debugging_port,
             "host": self.host,
             "enable_stealth": self.enable_stealth,
+            "avoid_ads": self.avoid_ads,
+            "avoid_css": self.avoid_css,
         }
 
                 

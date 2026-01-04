@@ -897,7 +897,7 @@ class BrowserManager:
             "otf",
             "eot",
             # Styles
-            # 'css', 'less', 'scss', 'sass',
+            "css", "less", "scss", "sass",
             # Media
             "mp4",
             "webm",
@@ -931,6 +931,26 @@ class BrowserManager:
             "xml",
             "swf",
             "wasm",
+        ]
+
+        # Ad and Tracker patterns
+        ad_tracker_patterns = [
+            "**/google-analytics.com/**",
+            "**/googletagmanager.com/**",
+            "**/googlesyndication.com/**",
+            "**/doubleclick.net/**",
+            "**/adservice.google.com/**",
+            "**/adsystem.com/**",
+            "**/adzerk.net/**",
+            "**/adnxs.com/**",
+            "**/ads.linkedin.com/**",
+            "**/facebook.net/**",
+            "**/analytics.twitter.com/**",
+            "**/t.co/**",
+            "**/hotjar.com/**",
+            "**/clarity.ms/**",
+            "**/scorecardresearch.com/**",
+            "**/pixel.wp.com/**",
         ]
 
         # Common context settings
@@ -986,11 +1006,17 @@ class BrowserManager:
         # Create and return the context with all settings
         context = await self.browser.new_context(**context_settings)
 
-        # Apply text mode settings if enabled
-        if self.config.text_mode:
+        # Apply resource filtering based on config
+        if self.config.avoid_css or self.config.text_mode:
             # Create and apply route patterns for each extension
             for ext in blocked_extensions:
                 await context.route(f"**/*.{ext}", lambda route: route.abort())
+        
+        if self.config.avoid_ads:
+            # Apply ad/tracker blocking
+            for pattern in ad_tracker_patterns:
+                await context.route(pattern, lambda route: route.abort())
+                
         return context
 
     def _make_config_signature(self, crawlerRunConfig: CrawlerRunConfig) -> str:
