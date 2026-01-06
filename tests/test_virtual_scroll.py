@@ -152,7 +152,7 @@ async def test_virtual_scroll():
         )
         
         browserConfig = BrowserConfig(
-            headless=False
+            headless=True
         )
         
         async with AsyncWebCrawler(config=browserConfig) as crawler:

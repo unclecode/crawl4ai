@@ -84,7 +84,6 @@ from .extraction_strategy import (
     LLMExtractionStrategy,
     RegexExtractionStrategy,
 )
-from .hub import CrawlerHub
 from .link_preview import LinkPreview
 from .markdown_generation_strategy import DefaultMarkdownGenerator
 from .models import CrawlResult, DisplayMode, MarkdownGenerationResult
@@ -143,7 +142,6 @@ __all__ = [
     "PathDepthScorer",
     "DeepCrawlDecorator",
     "CrawlResult",
-    "CrawlerHub",
     "CacheMode",
     "MatchMode",
     "ContentScrapingStrategy",

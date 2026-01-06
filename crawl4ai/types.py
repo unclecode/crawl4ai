@@ -8,7 +8,6 @@ AsyncLogger = Union['AsyncLoggerType']
 AsyncWebCrawler = Union['AsyncWebCrawlerType']
 CacheMode = Union['CacheModeType']
 CrawlResult = Union['CrawlResultType']
-CrawlerHub = Union['CrawlerHubType']
 BrowserProfiler = Union['BrowserProfilerType']
 # NEW: Add AsyncUrlSeederType
 AsyncUrlSeeder = Union['AsyncUrlSeederType']
@@ -247,7 +246,6 @@ if TYPE_CHECKING:
     from .extraction_strategy import (
         LLMExtractionStrategy as LLMExtractionStrategyType,
     )
-    from .hub import CrawlerHub as CrawlerHubType
 
     # Markdown generation imports
     from .markdown_generation_strategy import (

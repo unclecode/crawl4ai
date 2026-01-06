@@ -1,0 +1,63 @@
+# Run this workflow when a pull request is created or activity
+# happens on the PR target branch.
+name: PR CI
+
+on: [pull_request]
+
+env:
+  PYTHON_VERSION: 3.13.10
+
+# Cancel jobs in progress when a new reference is pushed.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Cancel in progress CI for non-renovate PRs.
+  cancel-in-progress: ${{ github.actor != 'renovate[bot]' }}
+
+jobs:
+  # Lint step disabled until we format all files.
+  # lint:
+  #   runs-on: blacksmith-2vcpu-ubuntu-2404
+
+  #   steps:
+  #     - name: PR Checkout
+  #       uses: actions/checkout@v6
+  #       with:
+  #         fetch-depth: 0
+  #     - name: Lint Python Files
+  #       uses: astral-sh/ruff-action@v3
+  #       with:
+  #         version: "0.14.10" # keep in sync with pyproject.toml
+  #     - name: Format Python Files
+  #       run: ruff format --check
+
+  python_test:
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    env:
+      # Allow the Python interpreter version to be newer than PyO3's maximum supported version.
+      PYO3_USE_ABI3_FORWARD_COMPATIBILITY: 1
+
+    steps:
+      - name: PR Checkout
+        uses: actions/checkout@v6
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install \
+            libxml2-dev \
+            libxslt1-dev \
+            libjpeg-dev \
+            libgeos-dev
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          activate-environment: true
+          enable-cache: true
+          cache-local-path: ".cache/.uv-cache"
+      - name: Install Playwright
+        run: uv run playwright install --with-deps chromium
+      - name: Python Tests
+        run: uv run pytest tests/
+        timeout-minutes: 10
+      - name: Minimize uv cache
+        run: uv cache prune --ci

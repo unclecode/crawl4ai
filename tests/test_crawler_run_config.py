@@ -33,14 +33,13 @@ def test_is_match_with_or_mode():
     for url, expected in test_urls:
         assert config.is_match(url) == expected
     
-    # Test 3: Custom function
 def test_is_match_custom_function():
     config = CrawlerRunConfig(
         url_matcher=lambda url: 'api' in url and (url.endswith('.json') or url.endswith('.xml'))
     )
     test_urls = [
-        (f"{EXAMPLE_URL}/data.json", True),
-        (f"{EXAMPLE_URL}/data.xml", True),
+        (f"{EXAMPLE_URL}/api/data.json", True),
+        (f"{EXAMPLE_URL}/api/data.xml", True),
         (f"{EXAMPLE_URL}/data.html", False),
         (f"{EXAMPLE_URL}/data.json", False),  # No 'api'
     ]
@@ -58,8 +57,8 @@ def test_is_match_mixed_with_and_mode():
     )
     test_urls = [
         (f"{EXAMPLE_URL}/page", True),
-        (f"{EXAMPLE_URL}/page", False),  # Not HTTPS
-        (f"{EXAMPLE_URL}/page", False),  # No .com
+        ("http://example.com/page", False),  # Not HTTPS
+        ("example.org/page", False),  # No .com
         (f"{EXAMPLE_URL}/" + "x" * 50, False),  # Too long
     ]
     for url, expected in test_urls:

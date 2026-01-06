@@ -1,19 +1,9 @@
-## Summary
-Please include a summary of the change and/or which issues are fixed.
+[sc-XStoryNumberXX](https://app.shortcut.com/coprocure/story/XStoryNumberXX/helpful-shortcut-but-still-need-tag-above-for-integration)
 
-eg: `Fixes #123` (Tag GitHub issue numbers in this format, so it automatically links the issues with your PR)
+### Summary
 
-## List of files changed and why
-eg: quickstart.py - To update the example as per new changes
+XX Replace me - What is the goal of this PR? What changes were made? XX
 
-## How Has This Been Tested?
-Please describe the tests that you ran to verify your changes.
+### Testing
 
-## Checklist:
-
-- [ ] My code follows the style guidelines of this project
-- [ ] I have performed a self-review of my own code
-- [ ] I have commented my code, particularly in hard-to-understand areas
-- [ ] I have made corresponding changes to the documentation
-- [ ] I have added/updated unit tests that prove my fix is effective or that my feature works
-- [ ] New and existing unit tests pass locally with my changes
+XX Replace me - Automated tests? Manual testing? XX
