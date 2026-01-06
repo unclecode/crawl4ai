@@ -878,79 +878,29 @@ class BrowserManager:
         }
         proxy_settings = {"server": self.config.proxy} if self.config.proxy else None
 
-        blocked_extensions = [
+        # Define resource categories
+        css_extensions = ["css", "less", "scss", "sass"]
+        static_extensions = [
             # Images
-            "jpg",
-            "jpeg",
-            "png",
-            "gif",
-            "webp",
-            "svg",
-            "ico",
-            "bmp",
-            "tiff",
-            "psd",
+            "jpg", "jpeg", "png", "gif", "webp", "svg", "ico", "bmp", "tiff",
             # Fonts
-            "woff",
-            "woff2",
-            "ttf",
-            "otf",
-            "eot",
-            # Styles
-            "css", "less", "scss", "sass",
+            "woff", "woff2", "ttf", "otf", "eot",
             # Media
-            "mp4",
-            "webm",
-            "ogg",
-            "avi",
-            "mov",
-            "wmv",
-            "flv",
-            "m4v",
-            "mp3",
-            "wav",
-            "aac",
-            "m4a",
-            "opus",
-            "flac",
-            # Documents
-            "pdf",
-            "doc",
-            "docx",
-            "xls",
-            "xlsx",
-            "ppt",
-            "pptx",
-            # Archives
-            "zip",
-            "rar",
-            "7z",
-            "tar",
-            "gz",
-            # Scripts and data
-            "xml",
-            "swf",
-            "wasm",
+            "mp4", "webm", "ogg", "mp3", "wav", "aac", "flac",
+            # Documents & Archives
+            "pdf", "doc", "docx", "xls", "xlsx", "zip", "rar", "7z", "tar", "gz",
+            # Other
+            "xml", "swf", "wasm"
         ]
 
-        # Ad and Tracker patterns
+        # Ad and Tracker patterns (Top 20 curated from uBlock sources for performance)
         ad_tracker_patterns = [
-            "**/google-analytics.com/**",
-            "**/googletagmanager.com/**",
-            "**/googlesyndication.com/**",
-            "**/doubleclick.net/**",
-            "**/adservice.google.com/**",
-            "**/adsystem.com/**",
-            "**/adzerk.net/**",
-            "**/adnxs.com/**",
-            "**/ads.linkedin.com/**",
-            "**/facebook.net/**",
-            "**/analytics.twitter.com/**",
-            "**/t.co/**",
-            "**/hotjar.com/**",
-            "**/clarity.ms/**",
-            "**/scorecardresearch.com/**",
-            "**/pixel.wp.com/**",
+            "**/google-analytics.com/**", "**/googletagmanager.com/**", "**/googlesyndication.com/**",
+            "**/doubleclick.net/**", "**/adservice.google.com/**", "**/adsystem.com/**",
+            "**/adzerk.net/**", "**/adnxs.com/**", "**/ads.linkedin.com/**", "**/facebook.net/**",
+            "**/analytics.twitter.com/**", "**/t.co/**", "**/ads-twitter.com/**",
+            "**/hotjar.com/**", "**/clarity.ms/**", "**/scorecardresearch.com/**", "**/pixel.wp.com/**",
+            "**/amazon-adsystem.com/**", "**/mixpanel.com/**", "**/segment.com/**"
         ]
 
         # Common context settings
@@ -1006,10 +956,15 @@ class BrowserManager:
         # Create and return the context with all settings
         context = await self.browser.new_context(**context_settings)
 
-        # Apply resource filtering based on config
-        if self.config.avoid_css or self.config.text_mode:
-            # Create and apply route patterns for each extension
-            for ext in blocked_extensions:
+        # Apply resource filtering based on config (Dynamic addition)
+        to_block = []
+        if self.config.avoid_css:
+            to_block += css_extensions
+        if self.config.text_mode:
+            to_block += static_extensions
+            
+        if to_block:
+            for ext in to_block:
                 await context.route(f"**/*.{ext}", lambda route: route.abort())
         
         if self.config.avoid_ads:

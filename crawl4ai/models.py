@@ -151,7 +151,7 @@ class CrawlResult(BaseModel):
     redirected_url: Optional[str] = None
     network_requests: Optional[List[Dict[str, Any]]] = None
     console_messages: Optional[List[Dict[str, Any]]] = None
-    tables: List[Dict] = Field(default_factory=list)  # NEW – [{headers,rows,caption,summary}]
+    tables: List[Dict] = Field(default_factory=list)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
