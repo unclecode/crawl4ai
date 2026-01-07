@@ -67,7 +67,8 @@ async def handle_llm_qa(
     config: dict
 ) -> str:
     """Process QA using LLM with crawled content as context."""
-    from crawler_pool import get_crawler
+    from crawler_pool import get_crawler, release_crawler
+    crawler = None
     try:
         if not url.startswith(('http://', 'https://')) and not url.startswith(("raw:", "raw://")):
             url = 'https://' + url
@@ -121,6 +122,9 @@ async def handle_llm_qa(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
+    finally:
+        if crawler:
+            await release_crawler(crawler)
 
 async def process_llm_extraction(
     redis: aioredis.Redis,
@@ -249,6 +253,7 @@ async def handle_markdown_request(
     base_url: Optional[str] = None
 ) -> str:
     """Handle markdown generation requests."""
+    crawler = None
     try:
         # Validate provider if using LLM filter
         if filter_type == FilterType.LLM:
@@ -282,7 +287,7 @@ async def handle_markdown_request(
 
         cache_mode = CacheMode.ENABLED if cache == "1" else CacheMode.WRITE_ONLY
 
-        from crawler_pool import get_crawler
+        from crawler_pool import get_crawler, release_crawler
         from utils import load_config as _load_config
         _cfg = _load_config()
         browser_cfg = BrowserConfig(
@@ -315,6 +320,9 @@ async def handle_markdown_request(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
+    finally:
+        if crawler:
+            await release_crawler(crawler)
 
 async def handle_llm_request(
     redis: aioredis.Redis,
@@ -481,6 +489,7 @@ async def stream_results(crawler: AsyncWebCrawler, results_gen: AsyncGenerator) 
     """Stream results with heartbeats and completion markers."""
     import json
     from utils import datetime_handler
+    from crawler_pool import release_crawler
 
     try:
         async for result in results_gen:
@@ -507,11 +516,8 @@ async def stream_results(crawler: AsyncWebCrawler, results_gen: AsyncGenerator) 
     except asyncio.CancelledError:
         logger.warning("Client disconnected during streaming")
     finally:
-        # try:
-        #     await crawler.close()
-        # except Exception as e:
-        #     logger.error(f"Crawler cleanup error: {e}")
-        pass
+        if crawler:
+            await release_crawler(crawler)
 
 async def handle_crawl_request(
     urls: List[str],
@@ -523,6 +529,7 @@ async def handle_crawl_request(
     """Handle non-streaming crawl requests with optional hooks."""
     # Track request start
     request_id = f"req_{uuid4().hex[:8]}"
+    crawler = None
     try:
         from monitor import get_monitor
         await get_monitor().track_request_start(
@@ -549,12 +556,9 @@ async def handle_crawl_request(
             ) if config["crawler"]["rate_limiter"]["enabled"] else None
         )
         
-        from crawler_pool import get_crawler
+        from crawler_pool import get_crawler, release_crawler
         crawler = await get_crawler(browser_config)
 
-        # crawler: AsyncWebCrawler = AsyncWebCrawler(config=browser_config)
-        # await crawler.start()
-        
         # Attach hooks if provided
         hooks_status = {}
         if hooks_config:
@@ -589,8 +593,6 @@ async def handle_crawl_request(
         if not isinstance(results, list):
             results = [results]
 
-        # await crawler.close()
-        
         end_mem_mb = _get_memory_mb() # <--- Get memory after
         end_time = time.time()
         
@@ -689,13 +691,6 @@ async def handle_crawl_request(
         except:
             pass
 
-        if 'crawler' in locals() and crawler.ready: # Check if crawler was initialized and started
-            #  try:
-            #      await crawler.close()
-            #  except Exception as close_e:
-            #       logger.error(f"Error closing crawler during exception handling: {close_e}")
-            logger.error(f"Error closing crawler during exception handling: {str(e)}")
-
         # Measure memory even on error if possible
         end_mem_mb_error = _get_memory_mb()
         if start_mem_mb is not None and end_mem_mb_error is not None:
@@ -709,6 +704,9 @@ async def handle_crawl_request(
                 "server_peak_memory_mb": max(peak_mem_mb if peak_mem_mb else 0, end_mem_mb_error or 0)
             })
         )
+    finally:
+        if crawler:
+            await release_crawler(crawler)
 
 async def handle_stream_crawl_request(
     urls: List[str],
@@ -719,6 +717,7 @@ async def handle_stream_crawl_request(
 ) -> Tuple[AsyncWebCrawler, AsyncGenerator, Optional[Dict]]:
     """Handle streaming crawl requests with optional hooks."""
     hooks_info = None
+    crawler = None
     try:
         browser_config = BrowserConfig.load(browser_config)
         # browser_config.verbose = True # Set to False or remove for production stress testing
@@ -734,7 +733,7 @@ async def handle_stream_crawl_request(
             )
         )
 
-        from crawler_pool import get_crawler
+        from crawler_pool import get_crawler, release_crawler
         crawler = await get_crawler(browser_config)
 
         # crawler = AsyncWebCrawler(config=browser_config)
@@ -763,13 +762,9 @@ async def handle_stream_crawl_request(
         return crawler, results_gen, hooks_info
 
     except Exception as e:
-        # Make sure to close crawler if started during an error here
-        if 'crawler' in locals() and crawler.ready:
-            #  try:
-            #       await crawler.close()
-            #  except Exception as close_e:
-            #       logger.error(f"Error closing crawler during stream setup exception: {close_e}")
-            logger.error(f"Error closing crawler during stream setup exception: {str(e)}")
+        # Make sure to release crawler if started during an error here
+        if crawler:
+            await release_crawler(crawler)
         logger.error(f"Stream crawl error: {str(e)}", exc_info=True)
         # Raising HTTPException here will prevent streaming response
         raise HTTPException(

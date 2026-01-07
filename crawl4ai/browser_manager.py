@@ -878,7 +878,9 @@ class BrowserManager:
         }
         proxy_settings = {"server": self.config.proxy} if self.config.proxy else None
 
-        blocked_extensions = [
+        # Define resource categories
+        css_extensions = ["css", "less", "scss", "sass"]
+        static_extensions = [
             # Images
             "jpg",
             "jpeg",
@@ -896,8 +898,6 @@ class BrowserManager:
             "ttf",
             "otf",
             "eot",
-            # Styles
-            # 'css', 'less', 'scss', 'sass',
             # Media
             "mp4",
             "webm",
@@ -931,6 +931,16 @@ class BrowserManager:
             "xml",
             "swf",
             "wasm",
+        ]
+
+        # Ad and Tracker patterns (Top 20 curated from uBlock sources for performance)
+        ad_tracker_patterns = [
+            "**/google-analytics.com/**", "**/googletagmanager.com/**", "**/googlesyndication.com/**",
+            "**/doubleclick.net/**", "**/adservice.google.com/**", "**/adsystem.com/**",
+            "**/adzerk.net/**", "**/adnxs.com/**", "**/ads.linkedin.com/**", "**/facebook.net/**",
+            "**/analytics.twitter.com/**", "**/t.co/**", "**/ads-twitter.com/**",
+            "**/hotjar.com/**", "**/clarity.ms/**", "**/scorecardresearch.com/**", "**/pixel.wp.com/**",
+            "**/amazon-adsystem.com/**", "**/mixpanel.com/**", "**/segment.com/**"
         ]
 
         # Common context settings
@@ -986,11 +996,22 @@ class BrowserManager:
         # Create and return the context with all settings
         context = await self.browser.new_context(**context_settings)
 
-        # Apply text mode settings if enabled
+        # Apply resource filtering based on config (Dynamic addition)
+        to_block = []
+        if self.config.avoid_css:
+            to_block += css_extensions
         if self.config.text_mode:
-            # Create and apply route patterns for each extension
-            for ext in blocked_extensions:
+            to_block += static_extensions
+            
+        if to_block:
+            for ext in to_block:
                 await context.route(f"**/*.{ext}", lambda route: route.abort())
+        
+        if self.config.avoid_ads:
+            # Apply ad/tracker blocking
+            for pattern in ad_tracker_patterns:
+                await context.route(pattern, lambda route: route.abort())
+                
         return context
 
     def _make_config_signature(self, crawlerRunConfig: CrawlerRunConfig) -> str:
