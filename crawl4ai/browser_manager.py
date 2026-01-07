@@ -882,15 +882,55 @@ class BrowserManager:
         css_extensions = ["css", "less", "scss", "sass"]
         static_extensions = [
             # Images
-            "jpg", "jpeg", "png", "gif", "webp", "svg", "ico", "bmp", "tiff",
+            "jpg",
+            "jpeg",
+            "png",
+            "gif",
+            "webp",
+            "svg",
+            "ico",
+            "bmp",
+            "tiff",
+            "psd",
             # Fonts
-            "woff", "woff2", "ttf", "otf", "eot",
+            "woff",
+            "woff2",
+            "ttf",
+            "otf",
+            "eot",
             # Media
-            "mp4", "webm", "ogg", "mp3", "wav", "aac", "flac",
-            # Documents & Archives
-            "pdf", "doc", "docx", "xls", "xlsx", "zip", "rar", "7z", "tar", "gz",
-            # Other
-            "xml", "swf", "wasm"
+            "mp4",
+            "webm",
+            "ogg",
+            "avi",
+            "mov",
+            "wmv",
+            "flv",
+            "m4v",
+            "mp3",
+            "wav",
+            "aac",
+            "m4a",
+            "opus",
+            "flac",
+            # Documents
+            "pdf",
+            "doc",
+            "docx",
+            "xls",
+            "xlsx",
+            "ppt",
+            "pptx",
+            # Archives
+            "zip",
+            "rar",
+            "7z",
+            "tar",
+            "gz",
+            # Scripts and data
+            "xml",
+            "swf",
+            "wasm",
         ]
 
         # Ad and Tracker patterns (Top 20 curated from uBlock sources for performance)
