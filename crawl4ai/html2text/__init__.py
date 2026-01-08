@@ -400,6 +400,12 @@ class HTML2Text(html.parser.HTMLParser):
             else:
                 self.quiet -= 1
 
+        if tag == "base" and start:
+            # Update baseurl from <base href="..."> tag
+            href = attrs.get("href")
+            if href:
+                self.baseurl = urlparse.urljoin(self.baseurl, href)
+
         if tag == "style":
             if start:
                 self.style += 1
