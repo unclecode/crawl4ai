@@ -9,15 +9,30 @@ IMPORTANT: Uses LOCAL Claude Code CLI authentication.
 Each user must have their own Claude Code CLI installed and authenticated.
 
 Usage:
-    from crawl4ai.async_configs import LLMConfig
-
-    # Use your Claude Code subscription
-    config = LLMConfig(provider="claude-code/claude-sonnet-4-20250514")
+    >>> from crawl4ai.async_configs import LLMConfig
+    >>> config = LLMConfig(provider="claude-code/claude-sonnet-4-20250514")
 
 Supported models:
     - claude-code/claude-sonnet-4-20250514 (recommended)
     - claude-code/claude-opus-4-20250514
     - claude-code/claude-haiku-3-5-latest
+
+Requirements:
+    - Claude Code CLI: npm install -g @anthropic-ai/claude-code
+    - Authenticated: run `claude login`
+    - SDK: pip install crawl4ai[claude-code]
+
+Exceptions:
+    - ClaudeCodeError: Base exception for all provider errors
+    - ClaudeCodeSDKError: SDK not installed
+    - ClaudeCodeAuthenticationError: CLI auth failed
+    - ClaudeCodeConnectionError: Connection to service failed
+
+See Also:
+    - LLMConfig: Configuration class for LLM providers
+    - https://docs.anthropic.com/claude-code/
+
+.. versionadded:: 0.7.9
 """
 import asyncio
 import logging
@@ -32,6 +47,32 @@ logger = logging.getLogger(__name__)
 
 class ClaudeCodeError(Exception):
     """Base exception for Claude Code provider errors."""
+    pass
+
+
+class ClaudeCodeSDKError(ClaudeCodeError):
+    """Raised when claude-agent-sdk is not installed.
+
+    Recovery:
+        1. Install: pip install crawl4ai[claude-code]
+        2. Or directly: pip install claude-agent-sdk
+    """
+    pass
+
+
+class ClaudeCodeAuthenticationError(ClaudeCodeError):
+    """Raised when Claude Code CLI authentication fails.
+
+    Recovery:
+        1. Install CLI: npm install -g @anthropic-ai/claude-code
+        2. Authenticate: claude login
+        3. Verify: run `claude` in terminal
+    """
+    pass
+
+
+class ClaudeCodeConnectionError(ClaudeCodeError):
+    """Raised when connection to Claude Code service fails."""
     pass
 
 
@@ -130,9 +171,12 @@ class ClaudeCodeProvider(CustomLLM):
                 query,
             )
         except ImportError:
-            raise ImportError(
-                "claude-agent-sdk is not installed. "
-                "Install with: pip install crawl4ai[claude-code]"
+            raise ClaudeCodeSDKError(
+                "The claude-agent-sdk package is not installed.\n\n"
+                "To fix this:\n"
+                "  1. Install: pip install crawl4ai[claude-code]\n"
+                "  2. Or directly: pip install claude-agent-sdk\n\n"
+                "Docs: https://github.com/anthropics/claude-code"
             )
 
         options = ClaudeAgentOptions(
@@ -166,9 +210,12 @@ class ClaudeCodeProvider(CustomLLM):
                 else:
                     logger.debug(f"Received unexpected message type: {type(message).__name__}")
         except ConnectionError as e:
-            raise ClaudeCodeError(
-                f"Failed to connect to Claude Code service: {e}. "
-                "Ensure the Claude Code CLI is installed and authenticated."
+            raise ClaudeCodeConnectionError(
+                f"Failed to connect to Claude Code service: {e}\n\n"
+                "To fix this:\n"
+                "  1. Check Claude Code CLI is running: claude --version\n"
+                "  2. Re-authenticate if needed: claude login\n"
+                "  3. Verify it works: claude 'Hello'"
             ) from e
         except Exception as e:
             # Re-raise ImportError as-is

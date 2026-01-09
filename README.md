@@ -293,6 +293,7 @@ pip install -e ".[torch]"           # With PyTorch features
 pip install -e ".[transformer]"     # With Transformer features
 pip install -e ".[cosine]"          # With cosine similarity features
 pip install -e ".[sync]"            # With synchronous crawling (Selenium)
+pip install -e ".[claude-code]"     # With Claude Code provider (no API keys needed)
 pip install -e ".[all]"             # Install all optional features
 ```
 
@@ -514,6 +515,52 @@ async def main():
 if __name__ == "__main__":
     asyncio.run(main())
 ```
+
+</details>
+
+<details>
+<summary>🔐 <strong>Using Claude Code Provider (No API Keys Required)</strong></summary>
+
+Use your Claude Code CLI subscription for LLM extraction without managing API keys:
+
+```python
+import asyncio
+from crawl4ai import AsyncWebCrawler, LLMConfig, CrawlerRunConfig
+from crawl4ai import LLMExtractionStrategy
+
+async def main():
+    # Claude Code uses local CLI authentication - no API key needed!
+    llm_config = LLMConfig(provider="claude-code/claude-sonnet-4-20250514")
+
+    strategy = LLMExtractionStrategy(
+        llm_config=llm_config,
+        instruction="Extract all product names and prices as JSON"
+    )
+
+    config = CrawlerRunConfig(extraction_strategy=strategy)
+
+    async with AsyncWebCrawler() as crawler:
+        result = await crawler.arun(url="https://example.com", config=config)
+        print(result.extracted_content)
+
+asyncio.run(main())
+```
+
+**Installation:**
+```bash
+pip install crawl4ai[claude-code]
+```
+
+**Prerequisites:**
+- Claude Code CLI installed: `npm install -g @anthropic-ai/claude-code`
+- CLI authenticated: run `claude login`
+
+**Supported Models:**
+| Model | Provider String | Use Case |
+|-------|-----------------|----------|
+| Sonnet 4 | `claude-code/claude-sonnet-4-20250514` | Balanced (recommended) |
+| Opus 4 | `claude-code/claude-opus-4-20250514` | Most capable |
+| Haiku 3.5 | `claude-code/claude-haiku-3-5-latest` | Fastest |
 
 </details>
 

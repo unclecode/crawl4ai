@@ -185,13 +185,16 @@ class TestErrorHandling:
 
     @pytest.mark.asyncio
     async def test_import_error_when_sdk_not_installed(self):
-        """Should raise ImportError with helpful message if SDK not installed."""
-        from crawl4ai.providers.claude_code_provider import ClaudeCodeProvider
+        """Should raise ClaudeCodeSDKError with helpful message if SDK not installed."""
+        from crawl4ai.providers.claude_code_provider import (
+            ClaudeCodeProvider,
+            ClaudeCodeSDKError,
+        )
 
         provider = ClaudeCodeProvider()
 
         with patch.dict('sys.modules', {'claude_agent_sdk': None}):
-            with pytest.raises(ImportError) as exc_info:
+            with pytest.raises(ClaudeCodeSDKError) as exc_info:
                 await provider.acompletion(
                     model="claude-code/claude-sonnet-4-20250514",
                     messages=[{"role": "user", "content": "Hello"}]

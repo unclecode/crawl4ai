@@ -616,7 +616,12 @@ class LLMExtractionStrategy(ExtractionStrategy):
             A list of extracted blocks or chunks.
         """
         if self.verbose:
-            # print("[LOG] Extracting blocks from URL:", url)
+            # Log which LLM provider/model is being used
+            provider_str = self.llm_config.provider if self.llm_config else "unknown"
+            provider_parts = provider_str.split('/')
+            provider_name = provider_parts[0] if provider_parts else "unknown"
+            model_name = provider_parts[1] if len(provider_parts) > 1 else provider_str
+            print(f"[LOG] LLM Provider: {provider_name} | Model: {model_name}")
             print(f"[LOG] Call LLM for {url} - block index: {ix}")
 
         variable_values = {
@@ -817,6 +822,12 @@ class LLMExtractionStrategy(ExtractionStrategy):
         from .utils import aperform_completion_with_backoff
 
         if self.verbose:
+            # Log which LLM provider/model is being used
+            provider_str = self.llm_config.provider if self.llm_config else "unknown"
+            provider_parts = provider_str.split('/')
+            provider_name = provider_parts[0] if provider_parts else "unknown"
+            model_name = provider_parts[1] if len(provider_parts) > 1 else provider_str
+            print(f"[LOG] LLM Provider: {provider_name} | Model: {model_name}")
             print(f"[LOG] Call LLM for {url} - block index: {ix}")
 
         variable_values = {
