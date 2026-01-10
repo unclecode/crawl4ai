@@ -330,6 +330,7 @@ class AsyncCrawlResponse(BaseModel):
     redirected_url: Optional[str] = None
     network_requests: Optional[List[Dict[str, Any]]] = None
     console_messages: Optional[List[Dict[str, Any]]] = None
+    css_images_data: Optional[List[Dict[str, Any]]] = None  # CSS background images extracted from browser
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -370,6 +371,7 @@ class Media(BaseModel):
         MediaItem
     ] = []  # Using MediaItem model for now, can be extended with Audio model if needed
     tables: List[Dict] = []  # Table data extracted from HTML tables
+    css_images: List[MediaItem] = []  # CSS background images extracted from styles
 
 
 class Links(BaseModel):

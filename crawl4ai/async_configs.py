@@ -1228,6 +1228,12 @@ class CrawlerRunConfig():
         table_extraction: TableExtractionStrategy = None,
         exclude_external_images: bool = False,
         exclude_all_images: bool = False,
+        # CSS Background Images Parameters
+        extract_css_images: bool = False,
+        css_image_min_width: int = 100,
+        css_image_min_height: int = 100,
+        css_image_score_threshold: int = 2,
+        css_exclude_repeating: bool = True,
         # Link and Domain Handling Parameters
         exclude_social_media_domains: list = None,
         exclude_external_links: bool = False,
@@ -1343,6 +1349,12 @@ class CrawlerRunConfig():
         self.exclude_external_images = exclude_external_images
         self.exclude_all_images = exclude_all_images
         self.table_score_threshold = table_score_threshold
+        # CSS Background Images Parameters
+        self.extract_css_images = extract_css_images
+        self.css_image_min_width = css_image_min_width
+        self.css_image_min_height = css_image_min_height
+        self.css_image_score_threshold = css_image_score_threshold
+        self.css_exclude_repeating = css_exclude_repeating
         
         # Table extraction strategy (default to DefaultTableExtraction if not specified)
         if table_extraction is None:
