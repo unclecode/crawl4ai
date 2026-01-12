@@ -37,6 +37,10 @@ rate_limiting:
   storage_uri: "memory://"  # Use "redis://localhost:6379" for production
 
 # Security Configuration
+# WARNING: For production deployments, enable security and use proper SECRET_KEY:
+#   - Set jwt_enabled: true for authentication
+#   - Set SECRET_KEY environment variable to a secure random value
+#   - Set CRAWL4AI_HOOKS_ENABLED=true only if you need hooks (RCE risk)
 security:
   enabled: false
   jwt_enabled: false

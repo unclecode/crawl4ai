@@ -79,6 +79,10 @@ __version__ = "0.5.1-d1"
 MAX_PAGES = config["crawler"]["pool"].get("max_pages", 30)
 GLOBAL_SEM = asyncio.Semaphore(MAX_PAGES)
 
+# ── security feature flags ───────────────────────────────────
+# Hooks are disabled by default for security (RCE risk). Set to "true" to enable.
+HOOKS_ENABLED = os.environ.get("CRAWL4AI_HOOKS_ENABLED", "false").lower() == "true"
+
 # ── default browser config helper ─────────────────────────────
 def get_default_browser_config() -> BrowserConfig:
     """Get default BrowserConfig from config.yml."""
@@ -236,6 +240,19 @@ async def add_security_headers(request: Request, call_next):
         resp.headers.update(config["security"]["headers"])
     return resp
 
+# ───────────────── URL validation helper ─────────────────
+ALLOWED_URL_SCHEMES = ("http://", "https://")
+ALLOWED_URL_SCHEMES_WITH_RAW = ("http://", "https://", "raw:", "raw://")
+
+
+def validate_url_scheme(url: str, allow_raw: bool = False) -> None:
+    """Validate URL scheme to prevent file:// LFI attacks."""
+    allowed = ALLOWED_URL_SCHEMES_WITH_RAW if allow_raw else ALLOWED_URL_SCHEMES
+    if not url.startswith(allowed):
+        schemes = ", ".join(allowed)
+        raise HTTPException(400, f"URL must start with {schemes}")
+
+
 # ───────────────── safe config‑dump helper ─────────────────
 ALLOWED_TYPES = {
     "CrawlerRunConfig": CrawlerRunConfig,
@@ -337,6 +354,7 @@ async def generate_html(
     Crawls the URL, preprocesses the raw HTML for schema extraction, and returns the processed HTML.
     Use when you need sanitized HTML structures for building schemas or further processing.
     """
+    validate_url_scheme(body.url, allow_raw=True)
     from crawler_pool import get_crawler
     cfg = CrawlerRunConfig()
     try:
@@ -368,6 +386,7 @@ async def generate_screenshot(
     Use when you need an image snapshot of the rendered page. Its recommened to provide an output path to save the screenshot.
     Then in result instead of the screenshot you will get a path to the saved file.
     """
+    validate_url_scheme(body.url)
     from crawler_pool import get_crawler
     try:
         cfg = CrawlerRunConfig(screenshot=True, screenshot_wait_for=body.screenshot_wait_for)
@@ -402,6 +421,7 @@ async def generate_pdf(
     Use when you need a printable or archivable snapshot of the page. It is recommended to provide an output path to save the PDF.
     Then in result instead of the PDF you will get a path to the saved file.
     """
+    validate_url_scheme(body.url)
     from crawler_pool import get_crawler
     try:
         cfg = CrawlerRunConfig(pdf=True)
@@ -474,6 +494,7 @@ async def execute_js(
         ```
 
     """
+    validate_url_scheme(body.url)
     from crawler_pool import get_crawler
     try:
         cfg = CrawlerRunConfig(js_code=body.scripts)
@@ -600,6 +621,8 @@ async def crawl(
     """
     if not crawl_request.urls:
         raise HTTPException(400, "At least one URL required")
+    if crawl_request.hooks and not HOOKS_ENABLED:
+        raise HTTPException(403, "Hooks are disabled. Set CRAWL4AI_HOOKS_ENABLED=true to enable.")
     # Check whether it is a redirection for a streaming request
     crawler_config = CrawlerRunConfig.load(crawl_request.crawler_config)
     if crawler_config.stream:
@@ -635,6 +658,8 @@ async def crawl_stream(
 ):
     if not crawl_request.urls:
         raise HTTPException(400, "At least one URL required")
+    if crawl_request.hooks and not HOOKS_ENABLED:
+        raise HTTPException(403, "Hooks are disabled. Set CRAWL4AI_HOOKS_ENABLED=true to enable.")
 
     return await stream_process(crawl_request=crawl_request)
 

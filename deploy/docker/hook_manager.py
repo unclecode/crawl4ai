@@ -117,18 +117,18 @@ class UserHookManager:
         """
         try:
             # Create a safe namespace for the hook
-            # Use a more complete builtins that includes __import__
+            # SECURITY: No __import__ to prevent arbitrary module imports (RCE risk)
             import builtins
             safe_builtins = {}
-            
-            # Add safe built-in functions
+
+            # Add safe built-in functions (no __import__ for security)
             allowed_builtins = [
                 'print', 'len', 'str', 'int', 'float', 'bool',
                 'list', 'dict', 'set', 'tuple', 'range', 'enumerate',
                 'zip', 'map', 'filter', 'any', 'all', 'sum', 'min', 'max',
                 'sorted', 'reversed', 'abs', 'round', 'isinstance', 'type',
                 'getattr', 'hasattr', 'setattr', 'callable', 'iter', 'next',
-                '__import__', '__build_class__'  # Required for exec
+                '__build_class__'  # Required for class definitions in exec
             ]
             
             for name in allowed_builtins:
