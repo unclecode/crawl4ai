@@ -730,9 +730,30 @@ class AsyncWebCrawler:
         #     )
 
         if dispatcher is None:
+            # Determine if we need to respect crawl-delay
+            respect_crawl_delay = False
+            user_agent = self.browser_config.user_agent or "*"
+            
+            if isinstance(config, list):
+                respect_crawl_delay = any(c.respect_crawl_delay for c in config)
+                # Use user_agent from first config that has one
+                for c in config:
+                    if c.user_agent:
+                        user_agent = c.user_agent
+                        break
+            else:
+                respect_crawl_delay = config.respect_crawl_delay
+                if config.user_agent:
+                    user_agent = config.user_agent
+            
             dispatcher = MemoryAdaptiveDispatcher(
                 rate_limiter=RateLimiter(
-                    base_delay=(1.0, 3.0), max_delay=60.0, max_retries=3
+                    base_delay=(1.0, 3.0), 
+                    max_delay=60.0, 
+                    max_retries=3,
+                    robots_parser=self.robots_parser if respect_crawl_delay else None,
+                    respect_crawl_delay=respect_crawl_delay,
+                    default_user_agent=user_agent,
                 ),
             )
 

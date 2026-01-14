@@ -259,6 +259,11 @@ class RobotsParser:
         os.makedirs(self.cache_dir, exist_ok=True)
         self.db_path = os.path.join(self.cache_dir, "robots_cache.db")
         self._init_db()
+        
+        # Shared session for efficient connection pooling
+        self._session: Optional[aiohttp.ClientSession] = None
+        # Track in-flight requests to prevent duplicate fetches
+        self._pending_fetches: Dict[str, asyncio.Future] = {}
 
     def _init_db(self):
         # Use WAL mode for better concurrency and performance
@@ -273,6 +278,54 @@ class RobotsParser:
                 )
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_domain ON robots_cache(domain)")
+
+    async def _get_session(self) -> aiohttp.ClientSession:
+        """Get or create a shared aiohttp session for connection pooling."""
+        if self._session is None or self._session.closed:
+            timeout = aiohttp.ClientTimeout(total=2)
+            connector = aiohttp.TCPConnector(limit=100, limit_per_host=2)
+            self._session = aiohttp.ClientSession(timeout=timeout, connector=connector)
+        return self._session
+
+    async def _fetch_robots_txt(self, domain: str, scheme: str) -> Optional[str]:
+        """
+        Fetch robots.txt with deduplication of in-flight requests.
+        Multiple concurrent requests for the same domain will share the result.
+        """
+        # If there's already a pending fetch for this domain, wait for it
+        if domain in self._pending_fetches:
+            return await self._pending_fetches[domain]
+        
+        # Create a future for this fetch so others can wait
+        loop = asyncio.get_event_loop()
+        future = loop.create_future()
+        self._pending_fetches[domain] = future
+        
+        try:
+            robots_url = f"{scheme}://{domain}/robots.txt"
+            session = await self._get_session()
+            
+            async with session.get(robots_url, ssl=False) as response:
+                if response.status == 200:
+                    rules = await response.text()
+                    self._cache_rules(domain, rules)
+                    future.set_result(rules)
+                    return rules
+                else:
+                    future.set_result(None)
+                    return None
+        except Exception as _ex:
+            future.set_result(None)
+            return None
+        finally:
+            # Clean up the pending fetch
+            self._pending_fetches.pop(domain, None)
+
+    async def close(self):
+        """Close the shared session. Call this when done with the parser."""
+        if self._session and not self._session.closed:
+            await self._session.close()
+            self._session = None
 
     def _get_cached_rules(self, domain: str) -> tuple[str, bool]:
         """Get cached rules. Returns (rules, is_fresh)"""
@@ -335,20 +388,9 @@ class RobotsParser:
         
         # If rules not found or stale, fetch new ones
         if not is_fresh:
-            try:
-                # Ensure we use the same scheme as the input URL
-                scheme = parsed.scheme or 'http'
-                robots_url = f"{scheme}://{domain}/robots.txt"
-                
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(robots_url, timeout=2, ssl=False) as response:
-                        if response.status == 200:
-                            rules = await response.text()
-                            self._cache_rules(domain, rules)
-                        else:
-                            return True
-            except Exception as _ex:
-                # On any error (timeout, connection failed, etc), allow access
+            scheme = parsed.scheme or 'http'
+            rules = await self._fetch_robots_txt(domain, scheme)
+            if rules is None:
                 return True
 
         if not rules:
@@ -363,6 +405,44 @@ class RobotsParser:
             return True
             
         return parser.can_fetch(user_agent, url)
+
+    async def get_crawl_delay(self, url: str, user_agent: str = "*") -> Optional[float]:
+        """
+        Get the Crawl-delay directive from robots.txt for a URL/user-agent.
+        
+        Args:
+            url: The URL to check (used to determine the domain)
+            user_agent: User agent string to check against (default: "*")
+            
+        Returns:
+            float: Crawl delay in seconds, or None if not specified
+        """
+        # Handle empty/invalid URLs
+        try:
+            parsed = urlparse(url)
+            domain = parsed.netloc
+            if not domain:
+                return None
+        except Exception as _ex:
+            return None
+
+        # Check cache first
+        rules, is_fresh = self._get_cached_rules(domain)
+        
+        # If rules not found or stale, fetch new ones
+        if not is_fresh:
+            scheme = parsed.scheme or 'http'
+            rules = await self._fetch_robots_txt(domain, scheme)
+
+        if not rules:
+            return None
+
+        # Create parser and extract crawl-delay
+        parser = RobotFileParser()
+        parser.parse(rules.splitlines())
+        
+        delay = parser.crawl_delay(user_agent)
+        return float(delay) if delay is not None else None
 
     def clear_cache(self):
         """Clear all cached robots.txt entries"""

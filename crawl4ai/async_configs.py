@@ -1136,6 +1136,10 @@ class CrawlerRunConfig():
 
         check_robots_txt (bool): Whether to check robots.txt rules before crawling. Default: False
                                  Default: False.
+        respect_crawl_delay (bool): Whether to respect Crawl-delay directives from robots.txt.
+                                    When True, the crawler will wait the specified delay between
+                                    requests to the same domain. Requires check_robots_txt=True.
+                                    Default: False.
         user_agent (str): Custom User-Agent string to use.
                           Default: None.
         user_agent_mode (str or None): Mode for generating the user agent (e.g., "random"). If None, use the provided user_agent as-is.
@@ -1247,6 +1251,7 @@ class CrawlerRunConfig():
         stream: bool = False,
         url: str = None,
         check_robots_txt: bool = False,
+        respect_crawl_delay: bool = False,
         user_agent: str = None,
         user_agent_mode: str = None,
         user_agent_generator_config: dict = {},
@@ -1375,6 +1380,7 @@ class CrawlerRunConfig():
 
         # Robots.txt Handling Parameters
         self.check_robots_txt = check_robots_txt
+        self.respect_crawl_delay = respect_crawl_delay
 
         # User Agent Parameters
         self.user_agent = user_agent
@@ -1644,6 +1650,7 @@ class CrawlerRunConfig():
             method=kwargs.get("method", "GET"),
             stream=kwargs.get("stream", False),
             check_robots_txt=kwargs.get("check_robots_txt", False),
+            respect_crawl_delay=kwargs.get("respect_crawl_delay", False),
             user_agent=kwargs.get("user_agent"),
             user_agent_mode=kwargs.get("user_agent_mode"),
             user_agent_generator_config=kwargs.get("user_agent_generator_config", {}),
@@ -1748,6 +1755,7 @@ class CrawlerRunConfig():
             "method": self.method,
             "stream": self.stream,
             "check_robots_txt": self.check_robots_txt,
+            "respect_crawl_delay": self.respect_crawl_delay,
             "user_agent": self.user_agent,
             "user_agent_mode": self.user_agent_mode,
             "user_agent_generator_config": self.user_agent_generator_config,
