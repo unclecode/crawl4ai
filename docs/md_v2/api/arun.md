@@ -23,7 +23,8 @@ async def main():
         verbose=True,            # Detailed logging
         cache_mode=CacheMode.ENABLED,  # Use normal read/write cache
         check_robots_txt=True,   # Respect robots.txt rules
-        # ... other parameters
+        respect_crawl_delay=True, # Honor Crawl-delay directives
+        # ... other parameters
     )
 
     async with AsyncWebCrawler() as crawler:
@@ -232,7 +233,8 @@ async def main():
         # Core
         verbose=True,
         cache_mode=CacheMode.ENABLED,
-        check_robots_txt=True,   # Respect robots.txt rules
+        check_robots_txt=True,    # Respect robots.txt rules
+        respect_crawl_delay=True, # Honor Crawl-delay directives
         
         # Content
         word_count_threshold=10,
