@@ -15,7 +15,7 @@ from .models import (
     DispatchResult,
     ScrapingResult,
     CrawlResultContainer,
-    RunManyReturn
+    RunManyReturn,
 )
 from .async_database import async_db_manager
 from .chunking_strategy import *  # noqa: F403
@@ -111,8 +111,7 @@ class AsyncWebCrawler:
         self,
         crawler_strategy: AsyncCrawlerStrategy = None,
         config: BrowserConfig = None,
-        base_directory: str = str(
-            os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home())),
+        base_directory: str = str(os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home())),
         thread_safe: bool = False,
         logger: AsyncLoggerBase = None,
         **kwargs,
@@ -140,8 +139,7 @@ class AsyncWebCrawler:
         )
 
         # Initialize crawler strategy
-        params = {k: v for k, v in kwargs.items() if k in [
-            "browser_config", "logger"]}
+        params = {k: v for k, v in kwargs.items() if k in ["browser_config", "logger"]}
         self.crawler_strategy = crawler_strategy or AsyncPlaywrightCrawlerStrategy(
             browser_config=browser_config,
             logger=self.logger,
@@ -164,7 +162,7 @@ class AsyncWebCrawler:
         # Decorate arun method with deep crawling capabilities
         self._deep_handler = DeepCrawlDecorator(self)
         self.arun = self._deep_handler(self.arun)
-        
+
         self.url_seeder: Optional[AsyncUrlSeeder] = None
 
     async def start(self):
@@ -241,8 +239,7 @@ class AsyncWebCrawler:
 
         config = config or CrawlerRunConfig()
         if not isinstance(url, str) or not url:
-            raise ValueError(
-                "Invalid URL, make sure the URL is a non-empty string")
+            raise ValueError("Invalid URL, make sure the URL is a non-empty string")
 
         async with self._lock or self.nullcontext():
             try:
@@ -296,12 +293,14 @@ class AsyncWebCrawler:
 
                 # Update proxy configuration from rotation strategy if available
                 if config and config.proxy_rotation_strategy:
-                    next_proxy: ProxyConfig = await config.proxy_rotation_strategy.get_next_proxy()
+                    next_proxy: ProxyConfig = (
+                        await config.proxy_rotation_strategy.get_next_proxy()
+                    )
                     if next_proxy:
                         self.logger.info(
                             message="Switch proxy: {proxy}",
                             tag="PROXY",
-                            params={"proxy": next_proxy.server}
+                            params={"proxy": next_proxy.server},
                         )
                         config.proxy_config = next_proxy
                         # config = config.clone(proxy_config=next_proxy)
@@ -311,8 +310,7 @@ class AsyncWebCrawler:
                     t1 = time.perf_counter()
 
                     if config.user_agent:
-                        self.crawler_strategy.update_user_agent(
-                            config.user_agent)
+                        self.crawler_strategy.update_user_agent(config.user_agent)
 
                     # Check robots.txt if enabled
                     if config and config.check_robots_txt:
@@ -355,6 +353,7 @@ class AsyncWebCrawler:
                     # Process the HTML content, Call CrawlerStrategy.process_html #
                     ###############################################################
                     from urllib.parse import urlparse
+
                     crawl_result: CrawlResult = await self.aprocess_html(
                         url=url,
                         html=html,
@@ -381,8 +380,7 @@ class AsyncWebCrawler:
                     crawl_result.console_messages = async_response.console_messages
 
                     crawl_result.success = bool(html)
-                    crawl_result.session_id = getattr(
-                        config, "session_id", None)
+                    crawl_result.session_id = getattr(config, "session_id", None)
 
                     self.logger.url_status(
                         url=cache_context.display_url,
@@ -402,11 +400,10 @@ class AsyncWebCrawler:
                         url=cache_context.display_url,
                         success=True,
                         timing=time.perf_counter() - start_time,
-                        tag="COMPLETE"
+                        tag="COMPLETE",
                     )
                     cached_result.success = bool(html)
-                    cached_result.session_id = getattr(
-                        config, "session_id", None)
+                    cached_result.session_id = getattr(config, "session_id", None)
                     cached_result.redirected_url = cached_result.redirected_url or url
                     return CrawlResultContainer(cached_result)
 
@@ -473,14 +470,12 @@ class AsyncWebCrawler:
             params = config.__dict__.copy()
             params.pop("url", None)
             # add keys from kwargs to params that doesn't exist in params
-            params.update({k: v for k, v in kwargs.items()
-                          if k not in params.keys()})
+            params.update({k: v for k, v in kwargs.items() if k not in params.keys()})
 
             ################################
             # Scraping Strategy Execution  #
             ################################
-            result: ScrapingResult = scraping_strategy.scrap(
-                url, html, **params)
+            result: ScrapingResult = scraping_strategy.scrap(url, html, **params)
 
             if result is None:
                 raise ValueError(
@@ -496,8 +491,7 @@ class AsyncWebCrawler:
 
         # Extract results - handle both dict and ScrapingResult
         if isinstance(result, dict):
-            cleaned_html = sanitize_input_encode(
-                result.get("cleaned_html", ""))
+            cleaned_html = sanitize_input_encode(result.get("cleaned_html", ""))
             media = result.get("media", {})
             tables = media.pop("tables", []) if isinstance(media, dict) else []
             links = result.get("links", {})
@@ -507,12 +501,22 @@ class AsyncWebCrawler:
             # media = result.media.model_dump()
             # tables = media.pop("tables", [])
             # links = result.links.model_dump()
-            media = result.media.model_dump() if hasattr(result.media, 'model_dump') else result.media
+            media = (
+                result.media.model_dump()
+                if hasattr(result.media, "model_dump")
+                else result.media
+            )
             tables = media.pop("tables", []) if isinstance(media, dict) else []
-            links = result.links.model_dump() if hasattr(result.links, 'model_dump') else result.links
+            links = (
+                result.links.model_dump()
+                if hasattr(result.links, "model_dump")
+                else result.links
+            )
             metadata = result.metadata
 
-        fit_html = preprocess_html_for_schema(html_content=html, text_threshold= 500, max_size= 300_000)
+        fit_html = preprocess_html_for_schema(
+            html_content=html, text_threshold=500, max_size=300_000
+        )
 
         ################################
         # Generate Markdown            #
@@ -523,7 +527,9 @@ class AsyncWebCrawler:
 
         # --- SELECT HTML SOURCE BASED ON CONTENT_SOURCE ---
         # Get the desired source from the generator config, default to 'cleaned_html'
-        selected_html_source = getattr(markdown_generator, 'content_source', 'cleaned_html')
+        selected_html_source = getattr(
+            markdown_generator, "content_source", "cleaned_html"
+        )
 
         # Define the source selection logic using dict dispatch
         html_source_selector = {
@@ -536,7 +542,9 @@ class AsyncWebCrawler:
 
         try:
             # Get the appropriate lambda function, default to returning cleaned_html if key not found
-            source_lambda = html_source_selector.get(selected_html_source, lambda: cleaned_html)
+            source_lambda = html_source_selector.get(
+                selected_html_source, lambda: cleaned_html
+            )
             # Execute the lambda to get the selected HTML
             markdown_input_html = source_lambda()
 
@@ -550,7 +558,7 @@ class AsyncWebCrawler:
             if self.logger:
                 self.logger.warning(
                     f"Error getting/processing '{selected_html_source}' for markdown source: {e}. Falling back to cleaned_html.",
-                    tag="MARKDOWN_SRC"
+                    tag="MARKDOWN_SRC",
                 )
             # Ensure markdown_input_html is still the default cleaned_html in case of error
             markdown_input_html = cleaned_html
@@ -563,7 +571,7 @@ class AsyncWebCrawler:
         markdown_result: MarkdownGenerationResult = (
             markdown_generator.generate_markdown(
                 input_html=markdown_input_html,
-                base_url=params.get("redirected_url", url)
+                base_url=params.get("redirected_url", url),
                 # html2text_options=kwargs.get('html2text', {})
             )
         )
@@ -573,7 +581,7 @@ class AsyncWebCrawler:
             url=_url,
             success=True,
             timing=int((time.perf_counter() - t1) * 1000) / 1000,
-            tag="SCRAPE"
+            tag="SCRAPE",
         )
         # self.logger.info(
         #     message="{url:.50}... | Time: {timing}s",
@@ -593,13 +601,12 @@ class AsyncWebCrawler:
             # Choose content based on input_format
             content_format = config.extraction_strategy.input_format
             if content_format == "fit_markdown" and not markdown_result.fit_markdown:
-
                 self.logger.url_status(
-                        url=_url,
-                        success=bool(html),
-                        timing=time.perf_counter() - t1,
-                        tag="EXTRACT",
-                    )
+                    url=_url,
+                    success=bool(html),
+                    timing=time.perf_counter() - t1,
+                    tag="EXTRACT",
+                )
                 content_format = "markdown"
 
             content = {
@@ -620,7 +627,7 @@ class AsyncWebCrawler:
             # extracted_content = config.extraction_strategy.run(url, sections)
 
             # Use async version if available for better parallelism
-            if hasattr(config.extraction_strategy, 'arun'):
+            if hasattr(config.extraction_strategy, "arun"):
                 extracted_content = await config.extraction_strategy.arun(url, sections)
             else:
                 # Fallback to sync version run in thread pool to avoid blocking
@@ -634,11 +641,11 @@ class AsyncWebCrawler:
 
             # Log extraction completion
             self.logger.url_status(
-                        url=_url,
-                        success=bool(html),
-                        timing=time.perf_counter() - t1,
-                        tag="EXTRACT",
-                    )
+                url=_url,
+                success=bool(html),
+                timing=time.perf_counter() - t1,
+                tag="EXTRACT",
+            )
 
         # Apply HTML formatting if requested
         if config.prettiify:
@@ -652,7 +659,7 @@ class AsyncWebCrawler:
             cleaned_html=cleaned_html,
             markdown=markdown_result,
             media=media,
-            tables=tables,                       # NEW
+            tables=tables,  # NEW
             links=links,
             metadata=metadata,
             screenshot=screenshot_data,
@@ -770,13 +777,35 @@ class AsyncWebCrawler:
             return result_transformer()
         else:
             _results = await dispatcher.run_urls(crawler=self, urls=urls, config=config)
-            return [transform_result(res) for res in _results]
+
+            data = []
+            from .models import CrawlerTaskResult
+
+            for task_result in _results:
+                for res in task_result.result:
+                    # all sub urls within parent url will have same dispatch_results
+                    tsk = CrawlerTaskResult(
+                        task_id=task_result.task_id,
+                        url=task_result.url,
+                        result=res,
+                        memory_usage=task_result.memory_usage,
+                        peak_memory=task_result.peak_memory,
+                        start_time=task_result.start_time,
+                        end_time=task_result.end_time,
+                        error_message=task_result.error_message,
+                        retry_count=task_result.retry_count,
+                        wait_time=task_result.wait_time,
+                    )
+                    data.append(tsk)
+            _results = data
+            results = [transform_result(res) for res in _results]
+            return results
 
     async def aseed_urls(
         self,
         domain_or_domains: Union[str, List[str]],
         config: Optional[SeedingConfig] = None,
-        **kwargs
+        **kwargs,
     ) -> Union[List[str], Dict[str, List[Union[str, Dict[str, Any]]]]]:
         """
         Discovers, filters, and optionally validates URLs for a given domain(s)
@@ -819,15 +848,18 @@ class AsyncWebCrawler:
             # Pass the crawler's base_directory for seeder's cache management
             # Pass the crawler's logger for consistent logging
             self.url_seeder = AsyncUrlSeeder(
-                base_directory=self.crawl4ai_folder,
-                logger=self.logger
-            )                    
+                base_directory=self.crawl4ai_folder, logger=self.logger
+            )
 
         # Merge config object with direct kwargs, giving kwargs precedence
-        seeding_config = config.clone(**kwargs) if config else SeedingConfig.from_kwargs(kwargs)
-        
+        seeding_config = (
+            config.clone(**kwargs) if config else SeedingConfig.from_kwargs(kwargs)
+        )
+
         # Ensure base_directory is set for the seeder's cache
-        seeding_config.base_directory = seeding_config.base_directory or self.crawl4ai_folder        
+        seeding_config.base_directory = (
+            seeding_config.base_directory or self.crawl4ai_folder
+        )
         # Ensure the seeder uses the crawler's logger (if not already set)
         if not self.url_seeder.logger:
             self.url_seeder.logger = self.logger
@@ -835,30 +867,25 @@ class AsyncWebCrawler:
         # Pass verbose setting if explicitly provided in SeedingConfig or kwargs
         if seeding_config.verbose is not None:
             self.url_seeder.logger.verbose = seeding_config.verbose
-        else: # Default to crawler's verbose setting
+        else:  # Default to crawler's verbose setting
             self.url_seeder.logger.verbose = self.logger.verbose
-
 
         if isinstance(domain_or_domains, str):
             self.logger.info(
                 message="Starting URL seeding for domain: {domain}",
                 tag="SEED",
-                params={"domain": domain_or_domains}
+                params={"domain": domain_or_domains},
             )
-            return await self.url_seeder.urls(
-                domain_or_domains,
-                seeding_config
-            )
+            return await self.url_seeder.urls(domain_or_domains, seeding_config)
         elif isinstance(domain_or_domains, (list, tuple)):
             self.logger.info(
                 message="Starting URL seeding for {count} domains",
                 tag="SEED",
-                params={"count": len(domain_or_domains)}
+                params={"count": len(domain_or_domains)},
             )
             # AsyncUrlSeeder.many_urls directly accepts a list of domains and individual params.
-            return await self.url_seeder.many_urls(
-                domain_or_domains,
-                seeding_config
-            )
+            return await self.url_seeder.many_urls(domain_or_domains, seeding_config)
         else:
-            raise ValueError("`domain_or_domains` must be a string or a list of strings.")
+            raise ValueError(
+                "`domain_or_domains` must be a string or a list of strings."
+            )

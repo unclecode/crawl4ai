@@ -5,47 +5,80 @@ from typing import AsyncGenerator, Optional, Set, List, Dict
 from functools import wraps
 from contextvars import ContextVar
 from ..types import AsyncWebCrawler, CrawlerRunConfig, CrawlResult, RunManyReturn
+from ..models import CrawlResultContainer
 
 
 class DeepCrawlDecorator:
     """Decorator that adds deep crawling capability to arun method."""
+
     deep_crawl_active = ContextVar("deep_crawl_active", default=False)
-    
-    def __init__(self, crawler: AsyncWebCrawler): 
+
+    def __init__(self, crawler: AsyncWebCrawler):
         self.crawler = crawler
 
     def __call__(self, original_arun):
         @wraps(original_arun)
         async def wrapped_arun(url: str, config: CrawlerRunConfig = None, **kwargs):
             # If deep crawling is already active, call the original method to avoid recursion.
-            if config and config.deep_crawl_strategy and not self.deep_crawl_active.get():
+            if (
+                config
+                and config.deep_crawl_strategy
+                and not self.deep_crawl_active.get()
+            ):
                 token = self.deep_crawl_active.set(True)
                 # Await the arun call to get the actual result object.
                 result_obj = await config.deep_crawl_strategy.arun(
-                    crawler=self.crawler,
-                    start_url=url,
-                    config=config
+                    crawler=self.crawler, start_url=url, config=config
                 )
                 if config.stream:
+
                     async def result_wrapper():
                         try:
                             async for result in result_obj:
                                 yield result
                         finally:
                             self.deep_crawl_active.reset(token)
+
                     return result_wrapper()
                 else:
                     try:
+                        """
+                        # before
+                        result_obj = [
+                            CrawlResultContainer([
+                                CrawlResult(...)
+                            ]),
+                            CrawlResultContainer([
+                                CrawlResult(...)
+                            ]),
+                        ]
+                        # after
+                        result_obj = CrawlResultContainer([
+                            CrawlResult(...),
+                            CrawlResult(...),
+                            ...
+                        ])
+                        """
+
+                        crwl_rslt = [
+                            data
+                            for crwl_cntr in result_obj
+                            for data in crwl_cntr._results
+                        ]
+                        result_obj = CrawlResultContainer(results=crwl_rslt)
                         return result_obj
+
                     finally:
                         self.deep_crawl_active.reset(token)
             return await original_arun(url, config=config, **kwargs)
+
         return wrapped_arun
+
 
 class DeepCrawlStrategy(ABC):
     """
     Abstract base class for deep crawling strategies.
-    
+
     Core functions:
       - arun: Main entry point that returns an async generator of CrawlResults.
       - shutdown: Clean up resources.
@@ -78,7 +111,7 @@ class DeepCrawlStrategy(ABC):
         Processes one BFS level at a time and yields results immediately as they arrive.
         """
         pass
-    
+
     async def arun(
         self,
         start_url: str,
@@ -87,12 +120,12 @@ class DeepCrawlStrategy(ABC):
     ) -> RunManyReturn:
         """
         Traverse the given URL using the specified crawler.
-        
+
         Args:
             start_url (str): The URL from which to start crawling.
             crawler (AsyncWebCrawler): The crawler instance to use.
             crawler_run_config (Optional[CrawlerRunConfig]): Crawler configuration.
-        
+
         Returns:
             Union[CrawlResultT, List[CrawlResultT], AsyncGenerator[CrawlResultT, None]]
         """
@@ -104,7 +137,9 @@ class DeepCrawlStrategy(ABC):
         else:
             return await self._arun_batch(start_url, crawler, config)
 
-    def __call__(self, start_url: str, crawler: AsyncWebCrawler, config: CrawlerRunConfig):
+    def __call__(
+        self, start_url: str, crawler: AsyncWebCrawler, config: CrawlerRunConfig
+    ):
         return self.arun(start_url, crawler, config)
 
     @abstractmethod
@@ -118,11 +153,11 @@ class DeepCrawlStrategy(ABC):
     async def can_process_url(self, url: str, depth: int) -> bool:
         """
         Validate the URL format and apply custom filtering logic.
-        
+
         Args:
             url (str): The URL to validate.
             depth (int): The current depth in the crawl.
-        
+
         Returns:
             bool: True if the URL should be processed, False otherwise.
         """
@@ -140,13 +175,13 @@ class DeepCrawlStrategy(ABC):
     ) -> None:
         """
         Extract and process links from the given crawl result.
-        
+
         This method should:
           - Validate each extracted URL using can_process_url.
           - Optionally score URLs.
           - Append valid URLs (and their parent references) to the next_level list.
           - Update the depths dictionary with the new depth for each URL.
-        
+
         Args:
             result (CrawlResult): The result from a crawl operation.
             source_url (str): The URL from which this result was obtained.
@@ -156,4 +191,3 @@ class DeepCrawlStrategy(ABC):
             depths (Dict[str, int]): Mapping of URLs to their current depth.
         """
         pass
-
