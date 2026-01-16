@@ -1775,6 +1775,8 @@ def perform_completion_with_backoff(
 
     from litellm import completion
     from litellm.exceptions import RateLimitError
+    import litellm
+    litellm.drop_params = True  # Auto-drop unsupported params (e.g., temperature for O-series/GPT-5)
 
     extra_args = {"temperature": 0.01, "api_key": api_token, "base_url": base_url}
     if json_response:
@@ -1864,7 +1866,9 @@ async def aperform_completion_with_backoff(
 
     from litellm import acompletion
     from litellm.exceptions import RateLimitError
+    import litellm
     import asyncio
+    litellm.drop_params = True  # Auto-drop unsupported params (e.g., temperature for O-series/GPT-5)
 
     extra_args = {"temperature": 0.01, "api_key": api_token, "base_url": base_url}
     if json_response:
