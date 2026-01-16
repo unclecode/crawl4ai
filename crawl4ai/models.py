@@ -1,4 +1,4 @@
-from pydantic import BaseModel, HttpUrl, PrivateAttr, Field
+from pydantic import BaseModel, HttpUrl, PrivateAttr, Field, ConfigDict
 from typing import List, Dict, Optional, Callable, Awaitable, Union, Any
 from typing import AsyncGenerator
 from typing import Generic, TypeVar
@@ -157,12 +157,13 @@ class CrawlResult(BaseModel):
     redirected_url: Optional[str] = None
     network_requests: Optional[List[Dict[str, Any]]] = None
     console_messages: Optional[List[Dict[str, Any]]] = None
-    tables: List[Dict] = Field(
-        default_factory=list
-    )  # NEW – [{headers,rows,caption,summary}]
+    tables: List[Dict] = Field(default_factory=list)  # NEW – [{headers,rows,caption,summary}]
+    # Cache validation metadata (Smart Cache)
+    head_fingerprint: Optional[str] = None
+    cached_at: Optional[float] = None
+    cache_status: Optional[str] = None  # "hit", "hit_validated", "hit_fallback", "miss"
 
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     # NOTE: The StringCompatibleMarkdown class, custom __init__ method, property getters/setters,
     # and model_dump override all exist to support a smooth transition from markdown as a string
@@ -347,8 +348,7 @@ class AsyncCrawlResponse(BaseModel):
     network_requests: Optional[List[Dict[str, Any]]] = None
     console_messages: Optional[List[Dict[str, Any]]] = None
 
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 ###############################

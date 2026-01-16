@@ -2,7 +2,7 @@
 import asyncio
 import logging
 from datetime import datetime
-from typing import AsyncGenerator, Optional, Set, Dict, List, Tuple
+from typing import AsyncGenerator, Optional, Set, Dict, List, Tuple, Any, Callable, Awaitable
 from urllib.parse import urlparse
 
 from ..models import TraversalStats
@@ -41,6 +41,9 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
         include_external: bool = False,
         max_pages: int = infinity,
         logger: Optional[logging.Logger] = None,
+        # Optional resume/callback parameters for crash recovery
+        resume_state: Optional[Dict[str, Any]] = None,
+        on_state_change: Optional[Callable[[Dict[str, Any]], Awaitable[None]]] = None,
     ):
         self.max_depth = max_depth
         self.filter_chain = filter_chain
@@ -57,6 +60,12 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
         self.stats = TraversalStats(start_time=datetime.now())
         self._cancel_event = asyncio.Event()
         self._pages_crawled = 0
+        # Store for use in arun methods
+        self._resume_state = resume_state
+        self._on_state_change = on_state_change
+        self._last_state: Optional[Dict[str, Any]] = None
+        # Shadow list for queue items (only used when on_state_change is set)
+        self._queue_shadow: Optional[List[Tuple[float, int, str, Optional[str]]]] = None
 
     async def can_process_url(self, url: str, depth: int) -> bool:
         """
@@ -135,16 +144,36 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
     ) -> AsyncGenerator[CrawlResult, None]:
         """
         Core best-first crawl method using a priority queue.
-        
+
         The queue items are tuples of (score, depth, url, parent_url). Lower scores
         are treated as higher priority. URLs are processed in batches for efficiency.
         """
         queue: asyncio.PriorityQueue = asyncio.PriorityQueue()
-        # Push the initial URL with score 0 and depth 0.
-        initial_score = self.url_scorer.score(start_url) if self.url_scorer else 0
-        await queue.put((-initial_score, 0, start_url, None))
-        visited: Set[str] = set()
-        depths: Dict[str, int] = {start_url: 0}
+
+        # Conditional state initialization for resume support
+        if self._resume_state:
+            visited = set(self._resume_state.get("visited", []))
+            depths = dict(self._resume_state.get("depths", {}))
+            self._pages_crawled = self._resume_state.get("pages_crawled", 0)
+            # Restore queue from saved items
+            queue_items = self._resume_state.get("queue_items", [])
+            for item in queue_items:
+                await queue.put((item["score"], item["depth"], item["url"], item["parent_url"]))
+            # Initialize shadow list if callback is set
+            if self._on_state_change:
+                self._queue_shadow = [
+                    (item["score"], item["depth"], item["url"], item["parent_url"])
+                    for item in queue_items
+                ]
+        else:
+            # Original initialization
+            initial_score = self.url_scorer.score(start_url) if self.url_scorer else 0
+            await queue.put((-initial_score, 0, start_url, None))
+            visited: Set[str] = set()
+            depths: Dict[str, int] = {start_url: 0}
+            # Initialize shadow list if callback is set
+            if self._on_state_change:
+                self._queue_shadow = [(-initial_score, 0, start_url, None)]
 
         while not queue.empty() and not self._cancel_event.is_set():
             # Stop if we've reached the max pages limit
@@ -166,6 +195,12 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
                 if queue.empty():
                     break
                 item = await queue.get()
+                # Remove from shadow list if tracking
+                if self._on_state_change and self._queue_shadow is not None:
+                    try:
+                        self._queue_shadow.remove(item)
+                    except ValueError:
+                        pass  # Item may have been removed already
                 score, depth, url, parent_url = item
                 if url in visited:
                     continue
@@ -210,7 +245,26 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
                     for new_url, new_parent in new_links:
                         new_depth = depths.get(new_url, depth + 1)
                         new_score = self.url_scorer.score(new_url) if self.url_scorer else 0
-                        await queue.put((-new_score, new_depth, new_url, new_parent))
+                        queue_item = (-new_score, new_depth, new_url, new_parent)
+                        await queue.put(queue_item)
+                        # Add to shadow list if tracking
+                        if self._on_state_change and self._queue_shadow is not None:
+                            self._queue_shadow.append(queue_item)
+
+                    # Capture state after EACH URL processed (if callback set)
+                    if self._on_state_change and self._queue_shadow is not None:
+                        state = {
+                            "strategy_type": "best_first",
+                            "visited": list(visited),
+                            "queue_items": [
+                                {"score": s, "depth": d, "url": u, "parent_url": p}
+                                for s, d, u, p in self._queue_shadow
+                            ],
+                            "depths": depths,
+                            "pages_crawled": self._pages_crawled,
+                        }
+                        self._last_state = state
+                        await self._on_state_change(state)
 
         # End of crawl.
 
@@ -269,3 +323,15 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
         """
         self._cancel_event.set()
         self.stats.end_time = datetime.now()
+
+    def export_state(self) -> Optional[Dict[str, Any]]:
+        """
+        Export current crawl state for external persistence.
+
+        Note: This returns the last captured state. For real-time state,
+        use the on_state_change callback.
+
+        Returns:
+            Dict with strategy state, or None if no state captured yet.
+        """
+        return self._last_state

@@ -38,12 +38,25 @@ class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
         in control of traversal. Every successful page bumps ``_pages_crawled`` and
         seeds new stack items discovered via :meth:`link_discovery`.
         """
-        visited: Set[str] = set()
-        # Stack items: (url, parent_url, depth)
-        stack: List[Tuple[str, Optional[str], int]] = [(start_url, None, 0)]
-        depths: Dict[str, int] = {start_url: 0}
-        results: List[CrawlResult] = []
-        self._reset_seen(start_url)
+        # Conditional state initialization for resume support
+        if self._resume_state:
+            visited = set(self._resume_state.get("visited", []))
+            stack = [
+                (item["url"], item["parent_url"], item["depth"])
+                for item in self._resume_state.get("stack", [])
+            ]
+            depths = dict(self._resume_state.get("depths", {}))
+            self._pages_crawled = self._resume_state.get("pages_crawled", 0)
+            self._dfs_seen = set(self._resume_state.get("dfs_seen", []))
+            results: List[CrawlResult] = []
+        else:
+            # Original initialization
+            visited: Set[str] = set()
+            # Stack items: (url, parent_url, depth)
+            stack: List[Tuple[str, Optional[str], int]] = [(start_url, None, 0)]
+            depths: Dict[str, int] = {start_url: 0}
+            results: List[CrawlResult] = []
+            self._reset_seen(start_url)
 
         while stack and not self._cancel_event.is_set():
             url, parent, depth = stack.pop()
@@ -79,6 +92,22 @@ class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
                     for new_url, new_parent in reversed(new_links):
                         new_depth = depths.get(new_url, depth + 1)
                         stack.append((new_url, new_parent, new_depth))
+
+                    # Capture state after each URL processed (if callback set)
+                    if self._on_state_change:
+                        state = {
+                            "strategy_type": "dfs",
+                            "visited": list(visited),
+                            "stack": [
+                                {"url": u, "parent_url": p, "depth": d}
+                                for u, p, d in stack
+                            ],
+                            "depths": depths,
+                            "pages_crawled": self._pages_crawled,
+                            "dfs_seen": list(self._dfs_seen),
+                        }
+                        self._last_state = state
+                        await self._on_state_change(state)
         return results
 
     async def _arun_stream(
@@ -94,10 +123,22 @@ class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
         yielded before we even look at the next stack entry. Successful crawls
         still feed :meth:`link_discovery`, keeping DFS order intact.
         """
-        visited: Set[str] = set()
-        stack: List[Tuple[str, Optional[str], int]] = [(start_url, None, 0)]
-        depths: Dict[str, int] = {start_url: 0}
-        self._reset_seen(start_url)
+        # Conditional state initialization for resume support
+        if self._resume_state:
+            visited = set(self._resume_state.get("visited", []))
+            stack = [
+                (item["url"], item["parent_url"], item["depth"])
+                for item in self._resume_state.get("stack", [])
+            ]
+            depths = dict(self._resume_state.get("depths", {}))
+            self._pages_crawled = self._resume_state.get("pages_crawled", 0)
+            self._dfs_seen = set(self._resume_state.get("dfs_seen", []))
+        else:
+            # Original initialization
+            visited: Set[str] = set()
+            stack: List[Tuple[str, Optional[str], int]] = [(start_url, None, 0)]
+            depths: Dict[str, int] = {start_url: 0}
+            self._reset_seen(start_url)
 
         while stack and not self._cancel_event.is_set():
             url, parent, depth = stack.pop()
@@ -129,6 +170,22 @@ class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
                     for new_url, new_parent in reversed(new_links):
                         new_depth = depths.get(new_url, depth + 1)
                         stack.append((new_url, new_parent, new_depth))
+
+                    # Capture state after each URL processed (if callback set)
+                    if self._on_state_change:
+                        state = {
+                            "strategy_type": "dfs",
+                            "visited": list(visited),
+                            "stack": [
+                                {"url": u, "parent_url": p, "depth": d}
+                                for u, p, d in stack
+                            ],
+                            "depths": depths,
+                            "pages_crawled": self._pages_crawled,
+                            "dfs_seen": list(self._dfs_seen),
+                        }
+                        self._last_state = state
+                        await self._on_state_change(state)
 
     async def link_discovery(
         self,

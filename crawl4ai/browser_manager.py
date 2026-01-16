@@ -661,14 +661,44 @@ class BrowserManager:
         if self.config.cdp_url or self.config.use_managed_browser:
             self.config.use_managed_browser = True
             cdp_url = await self.managed_browser.start() if not self.config.cdp_url else self.config.cdp_url
-            
+
             # Add CDP endpoint verification before connecting
             if not await self._verify_cdp_ready(cdp_url):
                 raise Exception(f"CDP endpoint at {cdp_url} is not ready after startup")
-            
+
             self.browser = await self.playwright.chromium.connect_over_cdp(cdp_url)
             contexts = self.browser.contexts
-            if contexts:
+
+            # If browser_context_id is provided, we're using a pre-created context
+            if self.config.browser_context_id:
+                if self.logger:
+                    self.logger.debug(
+                        f"Using pre-existing browser context: {self.config.browser_context_id}",
+                        tag="BROWSER"
+                    )
+                # When connecting to a pre-created context, it should be in contexts
+                if contexts:
+                    self.default_context = contexts[0]
+                    if self.logger:
+                        self.logger.debug(
+                            f"Found {len(contexts)} existing context(s), using first one",
+                            tag="BROWSER"
+                        )
+                else:
+                    # Context was created but not yet visible - wait a bit
+                    await asyncio.sleep(0.2)
+                    contexts = self.browser.contexts
+                    if contexts:
+                        self.default_context = contexts[0]
+                    else:
+                        # Still no contexts - this shouldn't happen with pre-created context
+                        if self.logger:
+                            self.logger.warning(
+                                "Pre-created context not found, creating new one",
+                                tag="BROWSER"
+                            )
+                        self.default_context = await self.create_browser_context()
+            elif contexts:
                 self.default_context = contexts[0]
             else:
                 self.default_context = await self.create_browser_context()
@@ -687,13 +717,38 @@ class BrowserManager:
             self.default_context = self.browser
 
     async def _verify_cdp_ready(self, cdp_url: str) -> bool:
-        """Verify CDP endpoint is ready with exponential backoff"""
+        """Verify CDP endpoint is ready with exponential backoff.
+
+        Supports multiple URL formats:
+        - HTTP URLs: http://localhost:9222
+        - HTTP URLs with query params: http://localhost:9222?browser_id=XXX
+        - WebSocket URLs: ws://localhost:9222/devtools/browser/XXX
+        """
         import aiohttp
-        self.logger.debug(f"Starting CDP verification for {cdp_url}", tag="BROWSER")
+        from urllib.parse import urlparse, urlunparse
+
+        # If WebSocket URL, Playwright handles connection directly - skip HTTP verification
+        if cdp_url.startswith(('ws://', 'wss://')):
+            self.logger.debug(f"WebSocket CDP URL provided, skipping HTTP verification", tag="BROWSER")
+            return True
+
+        # Parse HTTP URL and properly construct /json/version endpoint
+        parsed = urlparse(cdp_url)
+        # Build URL with /json/version path, preserving query params
+        verify_url = urlunparse((
+            parsed.scheme,
+            parsed.netloc,
+            '/json/version',  # Always use this path for verification
+            '',  # params
+            parsed.query,  # preserve query string
+            ''   # fragment
+        ))
+
+        self.logger.debug(f"Starting CDP verification for {verify_url}", tag="BROWSER")
         for attempt in range(5):
             try:
                 async with aiohttp.ClientSession() as session:
-                    async with session.get(f"{cdp_url}/json/version", timeout=aiohttp.ClientTimeout(total=2)) as response:
+                    async with session.get(verify_url, timeout=aiohttp.ClientTimeout(total=2)) as response:
                         if response.status == 200:
                             self.logger.debug(f"CDP endpoint ready after {attempt + 1} attempts", tag="BROWSER")
                             return True
@@ -840,18 +895,27 @@ class BrowserManager:
             combined_headers.update(self.config.headers)
             await context.set_extra_http_headers(combined_headers)
 
-        # Add default cookie
-        await context.add_cookies(
-            [
-                {
-                    "name": "cookiesEnabled",
-                    "value": "true",
-                    "url": crawlerRunConfig.url
-                    if crawlerRunConfig and crawlerRunConfig.url
-                    else "https://crawl4ai.com/",
-                }
-            ]
-        )
+        # Add default cookie (skip for raw:/file:// URLs which are not valid cookie URLs)
+        cookie_url = None
+        if crawlerRunConfig and crawlerRunConfig.url:
+            url = crawlerRunConfig.url
+            # Only set cookie for http/https URLs
+            if url.startswith(("http://", "https://")):
+                cookie_url = url
+            elif crawlerRunConfig.base_url and crawlerRunConfig.base_url.startswith(("http://", "https://")):
+                # Use base_url as fallback for raw:/file:// URLs
+                cookie_url = crawlerRunConfig.base_url
+
+        if cookie_url:
+            await context.add_cookies(
+                [
+                    {
+                        "name": "cookiesEnabled",
+                        "value": "true",
+                        "url": cookie_url,
+                    }
+                ]
+            )
 
         # Handle navigator overrides
         if crawlerRunConfig:
@@ -860,7 +924,12 @@ class BrowserManager:
                 or crawlerRunConfig.simulate_user
                 or crawlerRunConfig.magic
             ):
-                await context.add_init_script(load_js_script("navigator_overrider"))        
+                await context.add_init_script(load_js_script("navigator_overrider"))
+
+        # Apply custom init_scripts from BrowserConfig (for stealth evasions, etc.)
+        if self.config.init_scripts:
+            for script in self.config.init_scripts:
+                await context.add_init_script(script)
 
     async def create_browser_context(self, crawlerRunConfig: CrawlerRunConfig = None):
         """
@@ -1042,6 +1111,62 @@ class BrowserManager:
                         params={"error": str(e)}
                     )
 
+    async def _get_page_by_target_id(self, context: BrowserContext, target_id: str):
+        """
+        Get an existing page by its CDP target ID.
+
+        This is used when connecting to a pre-created browser context with an existing page.
+        Playwright may not immediately see targets created via raw CDP commands, so we
+        use CDP to get all targets and find the matching one.
+
+        Args:
+            context: The browser context to search in
+            target_id: The CDP target ID to find
+
+        Returns:
+            Page object if found, None otherwise
+        """
+        try:
+            # First check if Playwright already sees the page
+            for page in context.pages:
+                # Playwright's internal target ID might match
+                if hasattr(page, '_impl_obj') and hasattr(page._impl_obj, '_target_id'):
+                    if page._impl_obj._target_id == target_id:
+                        return page
+
+            # If not found, try using CDP to get targets
+            if hasattr(self.browser, '_impl_obj') and hasattr(self.browser._impl_obj, '_connection'):
+                cdp_session = await context.new_cdp_session(context.pages[0] if context.pages else None)
+                if cdp_session:
+                    try:
+                        result = await cdp_session.send("Target.getTargets")
+                        targets = result.get("targetInfos", [])
+                        for target in targets:
+                            if target.get("targetId") == target_id:
+                                # Found the target - if it's a page type, we can use it
+                                if target.get("type") == "page":
+                                    # The page exists, let Playwright discover it
+                                    await asyncio.sleep(0.1)
+                                    # Refresh pages list
+                                    if context.pages:
+                                        return context.pages[0]
+                    finally:
+                        await cdp_session.detach()
+
+            # Fallback: if there are any pages now, return the first one
+            if context.pages:
+                return context.pages[0]
+
+            return None
+        except Exception as e:
+            if self.logger:
+                self.logger.warning(
+                    message="Failed to get page by target ID: {error}",
+                    tag="BROWSER",
+                    params={"error": str(e)}
+                )
+            return None
+
     async def get_page(self, crawlerRunConfig: CrawlerRunConfig):
         """
         Get a page for the given session ID, creating a new one if needed.
@@ -1063,7 +1188,25 @@ class BrowserManager:
 
         # If using a managed browser, just grab the shared default_context
         if self.config.use_managed_browser:
-            if self.config.storage_state:
+            # If create_isolated_context is True, create isolated contexts for concurrent crawls
+            # Uses the same caching mechanism as non-CDP mode: cache context by config signature,
+            # but always create a new page. This prevents navigation conflicts while allowing
+            # context reuse for multiple URLs with the same config (e.g., batch/deep crawls).
+            if self.config.create_isolated_context:
+                config_signature = self._make_config_signature(crawlerRunConfig)
+
+                async with self._contexts_lock:
+                    if config_signature in self.contexts_by_config:
+                        context = self.contexts_by_config[config_signature]
+                    else:
+                        context = await self.create_browser_context(crawlerRunConfig)
+                        await self.setup_context(context, crawlerRunConfig)
+                        self.contexts_by_config[config_signature] = context
+
+                # Always create a new page for each crawl (isolation for navigation)
+                page = await context.new_page()
+                await self._apply_stealth_to_page(page)
+            elif self.config.storage_state:
                 context = await self.create_browser_context(crawlerRunConfig)
                 ctx = self.default_context        # default context, one window only
                 ctx = await clone_runtime_state(context, ctx, crawlerRunConfig, self.config)
@@ -1086,6 +1229,14 @@ class BrowserManager:
                             pages = context.pages
                             if pages:
                                 page = pages[0]
+                            elif self.config.browser_context_id and self.config.target_id:
+                                # Pre-existing context/target provided - use CDP to get the page
+                                # This handles the case where Playwright doesn't see the target yet
+                                page = await self._get_page_by_target_id(context, self.config.target_id)
+                                if not page:
+                                    # Fallback: create new page in existing context
+                                    page = await context.new_page()
+                                    await self._apply_stealth_to_page(page)
                             else:
                                 page = await context.new_page()
                                 await self._apply_stealth_to_page(page)
@@ -1140,8 +1291,44 @@ class BrowserManager:
     async def close(self):
         """Close all browser resources and clean up."""
         if self.config.cdp_url:
+            # When using external CDP, we don't own the browser process.
+            # If cdp_cleanup_on_close is True, properly disconnect from the browser
+            # and clean up Playwright resources. This frees the browser for other clients.
+            if self.config.cdp_cleanup_on_close:
+                # First close all sessions (pages)
+                session_ids = list(self.sessions.keys())
+                for session_id in session_ids:
+                    await self.kill_session(session_id)
+
+                # Close all contexts we created
+                for ctx in self.contexts_by_config.values():
+                    try:
+                        await ctx.close()
+                    except Exception:
+                        pass
+                self.contexts_by_config.clear()
+
+                # Disconnect from browser (doesn't terminate it, just releases connection)
+                if self.browser:
+                    try:
+                        await self.browser.close()
+                    except Exception as e:
+                        if self.logger:
+                            self.logger.debug(
+                                message="Error disconnecting from CDP browser: {error}",
+                                tag="BROWSER",
+                                params={"error": str(e)}
+                            )
+                    self.browser = None
+                    # Allow time for CDP connection to fully release before another client connects
+                    await asyncio.sleep(1.0)
+
+                # Stop Playwright instance to prevent memory leaks
+                if self.playwright:
+                    await self.playwright.stop()
+                    self.playwright = None
             return
-        
+
         if self.config.sleep_on_close:
             await asyncio.sleep(0.5)
 

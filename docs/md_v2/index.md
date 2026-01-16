@@ -55,6 +55,16 @@
   
 </div>
 
+---
+#### 🚀 Crawl4AI Cloud API — Closed Beta (Launching Soon)
+Reliable, large-scale web extraction, now built to be _**drastically more cost-effective**_ than any of the existing solutions.
+
+👉 **Apply [here](https://forms.gle/E9MyPaNXACnAMaqG7) for early access**  
+_We’ll be onboarding in phases and working closely with early users.
+Limited slots._
+
+---
+
 Crawl4AI is the #1 trending GitHub repository, actively maintained by a vibrant community. It delivers blazing-fast, AI-ready web crawling tailored for large language models, AI agents, and data pipelines. Fully open source, flexible, and built for real-time performance, **Crawl4AI** empowers developers with unmatched speed, precision, and deployment ease.
 
 > Enjoy using Crawl4AI? Consider **[becoming a sponsor](https://github.com/sponsors/unclecode)** to support ongoing development and community growth!
