@@ -1380,7 +1380,15 @@ In this scenario, use your best judgment to generate the schema. You need to exa
             )
             
             # Extract and return schema
-            return json.loads(response.choices[0].message.content)
+            # Clean markdown code blocks that LLMs sometimes wrap JSON in
+            content = response.choices[0].message.content
+            # Remove markdown code block markers if present
+            if "```json" in content:
+                content = content.replace("```json\n", "").replace("\n```", "")
+            elif "```" in content:
+                content = content.replace("```\n", "").replace("\n```", "")
+            content = content.strip()
+            return json.loads(content)
             
         except Exception as e:
             raise Exception(f"Failed to generate schema: {str(e)}")
