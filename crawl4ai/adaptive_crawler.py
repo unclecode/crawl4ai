@@ -630,18 +630,15 @@ class EmbeddingStrategy(CrawlStrategy):
         self._validation_embeddings_cache = None  # Cache validation query embeddings
         self._kb_similarity_threshold = 0.95  # Threshold for deduplication
     
-    def _get_embedding_llm_config_dict(self) -> Dict:
-        """Get embedding LLM config as dict with fallback to default."""
+    def _get_embedding_llm_config_dict(self) -> Optional[Dict]:
+        """Get embedding LLM config as dict, or None for local embeddings."""
         if hasattr(self, 'config') and self.config:
             config_dict = self.config._embedding_llm_config_dict
             if config_dict:
                 return config_dict
-        
-        # Fallback to default if no config provided
-        return {
-            'provider': 'openai/text-embedding-3-small',
-            'api_token': os.getenv('OPENAI_API_KEY')
-        }
+
+        # Return None to use local sentence-transformers embeddings
+        return None
         
     async def _get_embeddings(self, texts: List[str]) -> Any:
         """Get embeddings using configured method"""
