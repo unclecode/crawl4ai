@@ -134,7 +134,7 @@ async def custom_hook_workflow(verbose=True):
         # Set a 'before_goto' hook to run custom code just before navigation
         crawler.crawler_strategy.set_hook(
             "before_goto",
-            lambda page, context: print("[Hook] Preparing to navigate..."),
+            lambda page, context: print("[Hook] Preparing to navigate...") if verbose else None,
         )
 
         # Perform the crawl operation
