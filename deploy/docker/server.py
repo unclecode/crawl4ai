@@ -308,17 +308,6 @@ async def get_markdown(
     body: MarkdownRequest,
     _td: Dict = Depends(token_dep),
 ):
-    """
-    Convert a web page into Markdown format.
-
-    Supports multiple extraction modes:
-    - fit (default): Readability-based extraction for clean content
-    - raw: Direct DOM to Markdown conversion
-    - bm25: BM25 relevance ranking with optional query
-    - llm: LLM-based summarization with optional query
-
-    Use this tool when you need clean, readable text from web pages.
-    """
     if not body.url.startswith(("http://", "https://")) and not body.url.startswith(("raw:", "raw://")):
         raise HTTPException(
             400, "Invalid URL format. Must start with http://, https://, or for raw HTML (raw:, raw://)")
