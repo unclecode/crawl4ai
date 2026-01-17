@@ -103,7 +103,7 @@ async def arun(
     url: str,
     config: Optional[CrawlerRunConfig] = None,
     # Legacy parameters for backward compatibility...
-) -> CrawlResult:
+) -> RunManyReturn:
     ...
 ```
 
@@ -143,7 +143,7 @@ async def arun_many(
     urls: List[str],
     config: Optional[CrawlerRunConfig] = None,
     # Legacy parameters maintained for backwards compatibility...
-) -> List[CrawlResult]:
+) -> RunManyReturn:
     """
     Process multiple URLs with intelligent rate limiting and resource monitoring.
     """
