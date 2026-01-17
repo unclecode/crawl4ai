@@ -267,6 +267,7 @@ continue_config.json
 .private/
 
 .claude/
+.context/
 
 CLAUDE_MONITOR.md
 CLAUDE.md
@@ -295,3 +296,4 @@ scripts/
 *.db
 *.rdb
 *.ldb
+MEMORY.md

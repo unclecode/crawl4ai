@@ -47,7 +47,9 @@ from .utils import (
     get_error_context,
     RobotsParser,
     preprocess_html_for_schema,
+    compute_head_fingerprint,
 )
+from .cache_validator import CacheValidator, CacheValidationResult
 
 
 class AsyncWebCrawler:
@@ -267,6 +269,51 @@ class AsyncWebCrawler:
                 if cache_context.should_read():
                     cached_result = await async_db_manager.aget_cached_url(url)
 
+                # Smart Cache: Validate cache freshness if enabled
+                if cached_result and config.check_cache_freshness:
+                    cache_metadata = await async_db_manager.aget_cache_metadata(url)
+                    if cache_metadata:
+                        async with CacheValidator(timeout=config.cache_validation_timeout) as validator:
+                            validation = await validator.validate(
+                                url=url,
+                                stored_etag=cache_metadata.get("etag"),
+                                stored_last_modified=cache_metadata.get("last_modified"),
+                                stored_head_fingerprint=cache_metadata.get("head_fingerprint"),
+                            )
+
+                        if validation.status == CacheValidationResult.FRESH:
+                            cached_result.cache_status = "hit_validated"
+                            self.logger.info(
+                                message="Cache validated: {reason}",
+                                tag="CACHE",
+                                params={"reason": validation.reason}
+                            )
+                            # Update metadata if we got new values
+                            if validation.new_etag or validation.new_last_modified:
+                                await async_db_manager.aupdate_cache_metadata(
+                                    url=url,
+                                    etag=validation.new_etag,
+                                    last_modified=validation.new_last_modified,
+                                    head_fingerprint=validation.new_head_fingerprint,
+                                )
+                        elif validation.status == CacheValidationResult.ERROR:
+                            cached_result.cache_status = "hit_fallback"
+                            self.logger.warning(
+                                message="Cache validation failed, using cached: {reason}",
+                                tag="CACHE",
+                                params={"reason": validation.reason}
+                            )
+                        else:
+                            # STALE or UNKNOWN - force recrawl
+                            self.logger.info(
+                                message="Cache stale: {reason}",
+                                tag="CACHE",
+                                params={"reason": validation.reason}
+                            )
+                            cached_result = None
+                elif cached_result:
+                    cached_result.cache_status = "hit"
+
                 if cached_result:
                     html = sanitize_input_encode(cached_result.html)
                     extracted_content = sanitize_input_encode(
@@ -296,15 +343,32 @@ class AsyncWebCrawler:
 
                 # Update proxy configuration from rotation strategy if available
                 if config and config.proxy_rotation_strategy:
-                    next_proxy: ProxyConfig = await config.proxy_rotation_strategy.get_next_proxy()
-                    if next_proxy:
-                        self.logger.info(
-                            message="Switch proxy: {proxy}",
-                            tag="PROXY",
-                            params={"proxy": next_proxy.server}
+                    # Handle sticky sessions - use same proxy for all requests with same session_id
+                    if config.proxy_session_id:
+                        next_proxy: ProxyConfig = await config.proxy_rotation_strategy.get_proxy_for_session(
+                            config.proxy_session_id,
+                            ttl=config.proxy_session_ttl
                         )
-                        config.proxy_config = next_proxy
-                        # config = config.clone(proxy_config=next_proxy)
+                        if next_proxy:
+                            self.logger.info(
+                                message="Using sticky proxy session: {session_id} -> {proxy}",
+                                tag="PROXY",
+                                params={
+                                    "session_id": config.proxy_session_id,
+                                    "proxy": next_proxy.server
+                                }
+                            )
+                            config.proxy_config = next_proxy
+                    else:
+                        # Existing behavior: rotate on each request
+                        next_proxy: ProxyConfig = await config.proxy_rotation_strategy.get_next_proxy()
+                        if next_proxy:
+                            self.logger.info(
+                                message="Switch proxy: {proxy}",
+                                tag="PROXY",
+                                params={"proxy": next_proxy.server}
+                            )
+                            config.proxy_config = next_proxy
 
                 # Fetch fresh content if needed
                 if not cached_result or not html:
@@ -383,6 +447,14 @@ class AsyncWebCrawler:
                     crawl_result.success = bool(html)
                     crawl_result.session_id = getattr(
                         config, "session_id", None)
+                    crawl_result.cache_status = "miss"
+
+                    # Compute head fingerprint for cache validation
+                    if html:
+                        head_end = html.lower().find('</head>')
+                        if head_end != -1:
+                            head_html = html[:head_end + 7]
+                            crawl_result.head_fingerprint = compute_head_fingerprint(head_html)
 
                     self.logger.url_status(
                         url=cache_context.display_url,
@@ -459,6 +531,27 @@ class AsyncWebCrawler:
         Returns:
             CrawlResult: Processed result containing extracted and formatted content
         """
+        # === PREFETCH MODE SHORT-CIRCUIT ===
+        if getattr(config, 'prefetch', False):
+            from .utils import quick_extract_links
+
+            # Use base_url from config (for raw: URLs), redirected_url, or original url
+            effective_url = getattr(config, 'base_url', None) or kwargs.get('redirected_url') or url
+            links = quick_extract_links(html, effective_url)
+
+            return CrawlResult(
+                url=url,
+                html=html,
+                success=True,
+                links=links,
+                status_code=kwargs.get('status_code'),
+                response_headers=kwargs.get('response_headers'),
+                redirected_url=kwargs.get('redirected_url'),
+                ssl_certificate=kwargs.get('ssl_certificate'),
+                # All other fields default to None
+            )
+        # === END PREFETCH SHORT-CIRCUIT ===
+
         cleaned_html = ""
         try:
             _url = url if not kwargs.get("is_raw_html", False) else "Raw HTML"
@@ -563,7 +656,8 @@ class AsyncWebCrawler:
         markdown_result: MarkdownGenerationResult = (
             markdown_generator.generate_markdown(
                 input_html=markdown_input_html,
-                base_url=params.get("redirected_url", url)
+                # Use explicit base_url if provided (for raw: HTML), otherwise redirected_url, then url
+                base_url=params.get("base_url") or params.get("redirected_url") or url
                 # html2text_options=kwargs.get('html2text', {})
             )
         )
@@ -756,21 +850,45 @@ class AsyncWebCrawler:
         # Handle stream setting - use first config's stream setting if config is a list
         if isinstance(config, list):
             stream = config[0].stream if config else False
+            primary_config = config[0] if config else None
         else:
             stream = config.stream
+            primary_config = config
+
+        # Helper to release sticky session if auto_release is enabled
+        async def maybe_release_session():
+            if (primary_config and
+                primary_config.proxy_session_id and
+                primary_config.proxy_session_auto_release and
+                primary_config.proxy_rotation_strategy):
+                await primary_config.proxy_rotation_strategy.release_session(
+                    primary_config.proxy_session_id
+                )
+                self.logger.info(
+                    message="Auto-released proxy session: {session_id}",
+                    tag="PROXY",
+                    params={"session_id": primary_config.proxy_session_id}
+                )
 
         if stream:
-
             async def result_transformer():
-                async for task_result in dispatcher.run_urls_stream(
-                    crawler=self, urls=urls, config=config
-                ):
-                    yield transform_result(task_result)
+                try:
+                    async for task_result in dispatcher.run_urls_stream(
+                        crawler=self, urls=urls, config=config
+                    ):
+                        yield transform_result(task_result)
+                finally:
+                    # Auto-release session after streaming completes
+                    await maybe_release_session()
 
             return result_transformer()
         else:
-            _results = await dispatcher.run_urls(crawler=self, urls=urls, config=config)
-            return [transform_result(res) for res in _results]
+            try:
+                _results = await dispatcher.run_urls(crawler=self, urls=urls, config=config)
+                return [transform_result(res) for res in _results]
+            finally:
+                # Auto-release session after batch completes
+                await maybe_release_session()
 
     async def aseed_urls(
         self,
