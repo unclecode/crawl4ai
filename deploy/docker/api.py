@@ -44,7 +44,8 @@ from utils import (
     get_llm_api_key,
     validate_llm_provider,
     get_llm_temperature,
-    get_llm_base_url
+    get_llm_base_url,
+    get_redis_task_ttl
 )
 from webhook import WebhookDeliveryService
 
@@ -59,6 +60,21 @@ def _get_memory_mb():
     except Exception as e:
         logger.warning(f"Could not get memory info: {e}")
         return None
+
+
+async def hset_with_ttl(redis, key: str, mapping: dict, config: dict):
+    """Set Redis hash with automatic TTL expiry.
+
+    Args:
+        redis: Redis client instance
+        key: Redis key (e.g., "task:abc123")
+        mapping: Hash field-value mapping
+        config: Application config containing redis.task_ttl_seconds
+    """
+    await redis.hset(key, mapping=mapping)
+    ttl = get_redis_task_ttl(config)
+    if ttl > 0:
+        await redis.expire(key, ttl)
 
 
 async def handle_llm_qa(
@@ -143,10 +159,10 @@ async def process_llm_extraction(
         # Validate provider
         is_valid, error_msg = validate_llm_provider(config, provider)
         if not is_valid:
-            await redis.hset(f"task:{task_id}", mapping={
+            await hset_with_ttl(redis, f"task:{task_id}", {
                 "status": TaskStatus.FAILED,
                 "error": error_msg
-            })
+            }, config)
 
             # Send webhook notification on failure
             await webhook_service.notify_job_completion(
@@ -183,10 +199,10 @@ async def process_llm_extraction(
             )
 
         if not result.success:
-            await redis.hset(f"task:{task_id}", mapping={
+            await hset_with_ttl(redis, f"task:{task_id}", {
                 "status": TaskStatus.FAILED,
                 "error": result.error_message
-            })
+            }, config)
 
             # Send webhook notification on failure
             await webhook_service.notify_job_completion(
@@ -206,10 +222,10 @@ async def process_llm_extraction(
 
         result_data = {"extracted_content": content}
 
-        await redis.hset(f"task:{task_id}", mapping={
+        await hset_with_ttl(redis, f"task:{task_id}", {
             "status": TaskStatus.COMPLETED,
             "result": json.dumps(content)
-        })
+        }, config)
 
         # Send webhook notification on successful completion
         await webhook_service.notify_job_completion(
@@ -223,10 +239,10 @@ async def process_llm_extraction(
 
     except Exception as e:
         logger.error(f"LLM extraction error: {str(e)}", exc_info=True)
-        await redis.hset(f"task:{task_id}", mapping={
+        await hset_with_ttl(redis, f"task:{task_id}", {
             "status": TaskStatus.FAILED,
             "error": str(e)
-        })
+        }, config)
 
         # Send webhook notification on failure
         await webhook_service.notify_job_completion(
@@ -430,7 +446,7 @@ async def create_new_task(
     if webhook_config:
         task_data["webhook_config"] = json.dumps(webhook_config)
 
-    await redis.hset(f"task:{task_id}", mapping=task_data)
+    await hset_with_ttl(redis, f"task:{task_id}", task_data, config)
 
     background_tasks.add_task(
         process_llm_extraction,
@@ -806,7 +822,7 @@ async def handle_crawl_job(
     if webhook_config:
         task_data["webhook_config"] = json.dumps(webhook_config)
 
-    await redis.hset(f"task:{task_id}", mapping=task_data)
+    await hset_with_ttl(redis, f"task:{task_id}", task_data, config)
 
     # Initialize webhook service
     webhook_service = WebhookDeliveryService(config)
@@ -819,10 +835,10 @@ async def handle_crawl_job(
                 crawler_config=crawler_config,
                 config=config,
             )
-            await redis.hset(f"task:{task_id}", mapping={
+            await hset_with_ttl(redis, f"task:{task_id}", {
                 "status": TaskStatus.COMPLETED,
                 "result": json.dumps(result),
-            })
+            }, config)
 
             # Send webhook notification on successful completion
             await webhook_service.notify_job_completion(
@@ -836,10 +852,10 @@ async def handle_crawl_job(
 
             await asyncio.sleep(5)  # Give Redis time to process the update
         except Exception as exc:
-            await redis.hset(f"task:{task_id}", mapping={
+            await hset_with_ttl(redis, f"task:{task_id}", {
                 "status": TaskStatus.FAILED,
                 "error": str(exc),
-            })
+            }, config)
 
             # Send webhook notification on failure
             await webhook_service.notify_job_completion(

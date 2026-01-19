@@ -36,7 +36,16 @@ def load_config() -> Dict:
     if llm_api_key and "api_key" not in config["llm"]:
         config["llm"]["api_key"] = llm_api_key
         logging.info("LLM API key loaded from LLM_API_KEY environment variable")
-    
+
+    # Override Redis task TTL from environment if set
+    redis_task_ttl = os.environ.get("REDIS_TASK_TTL")
+    if redis_task_ttl:
+        try:
+            config["redis"]["task_ttl_seconds"] = int(redis_task_ttl)
+            logging.info(f"Redis task TTL overridden from REDIS_TASK_TTL: {redis_task_ttl}s")
+        except ValueError:
+            logging.warning(f"Invalid REDIS_TASK_TTL value: {redis_task_ttl}, using default")
+
     return config
 
 def setup_logging(config: Dict) -> None:
@@ -68,6 +77,18 @@ def should_cleanup_task(created_at: str, ttl_seconds: int = 3600) -> bool:
 def decode_redis_hash(hash_data: Dict[bytes, bytes]) -> Dict[str, str]:
     """Decode Redis hash data from bytes to strings."""
     return {k.decode('utf-8'): v.decode('utf-8') for k, v in hash_data.items()}
+
+
+def get_redis_task_ttl(config: Dict) -> int:
+    """Get Redis task TTL in seconds from config.
+
+    Args:
+        config: The application configuration dictionary
+
+    Returns:
+        TTL in seconds (default 3600). Returns 0 if TTL is disabled.
+    """
+    return config.get("redis", {}).get("task_ttl_seconds", 3600)
 
 
 
