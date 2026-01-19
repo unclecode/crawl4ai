@@ -59,13 +59,13 @@ Pull and run images directly from Docker Hub without building locally.
 
 #### 1. Pull the Image
 
-Our latest stable release is `0.7.7`. Images are built with multi-arch manifests, so Docker automatically pulls the correct version for your system.
+Our latest stable release is `0.8.0`. Images are built with multi-arch manifests, so Docker automatically pulls the correct version for your system.
 
 ```bash
-# Pull the latest stable version (0.7.7)
-docker pull unclecode/crawl4ai:0.7.7
+# Pull the latest stable version (0.8.0)
+docker pull unclecode/crawl4ai:0.8.0
 
-# Or use the latest tag (points to 0.7.7)
+# Or use the latest tag (points to 0.8.0)
 docker pull unclecode/crawl4ai:latest
 ```
 
@@ -100,7 +100,7 @@ EOL
       -p 11235:11235 \
       --name crawl4ai \
       --shm-size=1g \
-      unclecode/crawl4ai:0.7.7
+      unclecode/crawl4ai:0.8.0
     ```
 
 *   **With LLM support:**
@@ -111,7 +111,7 @@ EOL
       --name crawl4ai \
       --env-file .llm.env \
       --shm-size=1g \
-      unclecode/crawl4ai:0.7.7
+      unclecode/crawl4ai:0.8.0
     ```
 
 > The server will be available at `http://localhost:11235`. Visit `/playground` to access the interactive testing interface.
@@ -184,7 +184,7 @@ The `docker-compose.yml` file in the project root provides a simplified approach
     ```bash
     # Pulls and runs the release candidate from Docker Hub
     # Automatically selects the correct architecture
-    IMAGE=unclecode/crawl4ai:0.7.7 docker compose up -d
+    IMAGE=unclecode/crawl4ai:0.8.0 docker compose up -d
     ```
 
 *   **Build and Run Locally:**

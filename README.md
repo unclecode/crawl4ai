@@ -37,13 +37,13 @@ Limited slots._
 
 Crawl4AI turns the web into clean, LLM ready Markdown for RAG, agents, and data pipelines. Fast, controllable, battle tested by a 50k+ star community.
 
-[✨ Check out latest update v0.7.8](#-recent-updates)
+[✨ Check out latest update v0.8.0](#-recent-updates)
 
-✨ **New in v0.7.8**: Stability & Bug Fix Release! 11 bug fixes addressing Docker API issues (ContentRelevanceFilter, ProxyConfig, cache permissions), LLM extraction improvements (configurable backoff, HTML input format), URL handling fixes, and dependency updates (pypdf, Pydantic v2). [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.8.md)
+✨ **New in v0.8.0**: Crash Recovery & Prefetch Mode! Deep crawl crash recovery with `resume_state` and `on_state_change` callbacks for long-running crawls. New `prefetch=True` mode for 5-10x faster URL discovery. Critical security fixes for Docker API (hooks disabled by default, file:// URLs blocked). [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.8.0.md)
 
-✨ Recent v0.7.7: Complete Self-Hosting Platform with Real-time Monitoring! Enterprise-grade monitoring dashboard, comprehensive REST API, WebSocket streaming, smart browser pool management, and production-ready observability. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.7.md)
+✨ Recent v0.7.8: Stability & Bug Fix Release! 11 bug fixes addressing Docker API issues, LLM extraction improvements, URL handling fixes, and dependency updates. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.8.md)
 
-✨ Previous v0.7.6: Complete Webhook Infrastructure for Docker Job Queue API! Real-time notifications for both `/crawl/job` and `/llm/job` endpoints with exponential backoff retry, custom headers, and flexible delivery modes. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.6.md)
+✨ Previous v0.7.7: Complete Self-Hosting Platform with Real-time Monitoring! Enterprise-grade monitoring dashboard, comprehensive REST API, WebSocket streaming, and smart browser pool management. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.7.md)
 
 <details>
   <summary>🤓 <strong>My Personal Story</strong></summary>
@@ -561,6 +561,45 @@ async def test_news_crawl():
 > **💡 Tip:** Some websites may use **CAPTCHA** based verification mechanisms to prevent automated access. If your workflow encounters such challenges, you may optionally integrate a third-party CAPTCHA-handling service such as <strong>[CapSolver](https://www.capsolver.com/blog/Partners/crawl4ai-capsolver/?utm_source=crawl4ai&utm_medium=github_pr&utm_campaign=crawl4ai_integration)</strong>. They support reCAPTCHA v2/v3, Cloudflare Turnstile, Challenge, AWS WAF, and more. Please ensure that your usage complies with the target website’s terms of service and applicable laws.
 
 ## ✨ Recent Updates
+
+<details open>
+<summary><strong>Version 0.8.0 Release Highlights - Crash Recovery & Prefetch Mode</strong></summary>
+
+This release introduces crash recovery for deep crawls, a new prefetch mode for fast URL discovery, and critical security fixes for Docker deployments.
+
+- **🔄 Deep Crawl Crash Recovery**:
+  - `on_state_change` callback fires after each URL for real-time state persistence
+  - `resume_state` parameter to continue from a saved checkpoint
+  - JSON-serializable state for Redis/database storage
+  - Works with BFS, DFS, and Best-First strategies
+  ```python
+  from crawl4ai.deep_crawling import BFSDeepCrawlStrategy
+
+  strategy = BFSDeepCrawlStrategy(
+      max_depth=3,
+      resume_state=saved_state,  # Continue from checkpoint
+      on_state_change=save_to_redis,  # Called after each URL
+  )
+  ```
+
+- **⚡ Prefetch Mode for Fast URL Discovery**:
+  - `prefetch=True` skips markdown, extraction, and media processing
+  - 5-10x faster than full processing
+  - Perfect for two-phase crawling: discover first, process selectively
+  ```python
+  config = CrawlerRunConfig(prefetch=True)
+  result = await crawler.arun("https://example.com", config=config)
+  # Returns HTML and links only - no markdown generation
+  ```
+
+- **🔒 Security Fixes (Docker API)**:
+  - Hooks disabled by default (`CRAWL4AI_HOOKS_ENABLED=false`)
+  - `file://` URLs blocked on API endpoints to prevent LFI
+  - `__import__` removed from hook execution sandbox
+
+[Full v0.8.0 Release Notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.8.0.md)
+
+</details>
 
 <details>
 <summary><strong>Version 0.7.8 Release Highlights - Stability & Bug Fix Release</strong></summary>
@@ -1093,6 +1132,7 @@ Our enterprise sponsors and technology partners help scale Crawl4AI to power pro
 
 | Company | About | Sponsorship Tier |
 |------|------|----------------------------|
+| <a href="https://www.thordata.com/?ls=github&lk=crawl4ai" target="_blank"><img src="https://gist.github.com/aravindkarnam/dfc598a67be5036494475acece7e54cf/raw/thor_data.svg" alt="Thor Data" width="120"/></a>  | Leveraging Thordata ensures seamless compatibility with any AI/ML workflows and data infrastructure, massively accessing web data with 99.9% uptime, backed by one-on-one customer support. | 🥈 Silver |
 | <a href="https://app.nstproxy.com/register?i=ecOqW9" target="_blank"><picture><source width="250" media="(prefers-color-scheme: dark)" srcset="https://gist.github.com/aravindkarnam/62f82bd4818d3079d9dd3c31df432cf8/raw/nst-light.svg"><source width="250" media="(prefers-color-scheme: light)" srcset="https://www.nstproxy.com/logo.svg"><img alt="nstproxy" src="ttps://www.nstproxy.com/logo.svg"></picture></a>  | NstProxy is a trusted proxy provider with over 110M+ real residential IPs, city-level targeting, 99.99% uptime, and low pricing at $0.1/GB, it delivers unmatched stability, scale, and cost-efficiency. | 🥈 Silver |
 | <a href="https://app.scrapeless.com/passport/register?utm_source=official&utm_term=crawl4ai" target="_blank"><picture><source width="250" media="(prefers-color-scheme: dark)" srcset="https://gist.githubusercontent.com/aravindkarnam/0d275b942705604263e5c32d2db27bc1/raw/Scrapeless-light-logo.svg"><source width="250" media="(prefers-color-scheme: light)" srcset="https://gist.githubusercontent.com/aravindkarnam/22d0525cc0f3021bf19ebf6e11a69ccd/raw/Scrapeless-dark-logo.svg"><img alt="Scrapeless" src="https://gist.githubusercontent.com/aravindkarnam/22d0525cc0f3021bf19ebf6e11a69ccd/raw/Scrapeless-dark-logo.svg"></picture></a>  | Scrapeless provides production-grade infrastructure for Crawling, Automation, and AI Agents, offering Scraping Browser, 4 Proxy Types and Universal Scraping API. | 🥈 Silver |
 | <a href="https://dashboard.capsolver.com/passport/register?inviteCode=ESVSECTX5Q23" target="_blank"><picture><source width="120" media="(prefers-color-scheme: dark)" srcset="https://docs.crawl4ai.com/uploads/sponsors/20251013045338_72a71fa4ee4d2f40.png"><source width="120" media="(prefers-color-scheme: light)" srcset="https://www.capsolver.com/assets/images/logo-text.png"><img alt="Capsolver" src="https://www.capsolver.com/assets/images/logo-text.png"></picture></a> | AI-powered Captcha solving service. Supports all major Captcha types, including reCAPTCHA, Cloudflare, and more | 🥉 Bronze |
