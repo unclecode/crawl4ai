@@ -200,7 +200,7 @@ class AsyncWebCrawler:
 
     @asynccontextmanager
     async def nullcontext(self):
-        """异步空上下文管理器"""
+        """Async null context manager that yields nothing."""
         yield
 
     async def arun(
