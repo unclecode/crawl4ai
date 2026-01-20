@@ -115,7 +115,7 @@ See [Security Advisory](https://github.com/unclecode/crawl4ai/security/advisorie
 
 We thank the following security researchers for responsibly disclosing vulnerabilities:
 
-- **Neo by ProjectDiscovery** - RCE and LFI vulnerabilities (December 2025)
+- **[Neo by ProjectDiscovery](https://projectdiscovery.io/blog/introducing-neo)** - RCE and LFI vulnerabilities (December 2025)
 
 ---
 

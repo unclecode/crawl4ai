@@ -439,7 +439,9 @@ class AsyncWebCrawler:
                     )
 
                     crawl_result.status_code = async_response.status_code
-                    crawl_result.redirected_url = async_response.redirected_url or url
+                    # For raw: URLs, don't fall back to the raw HTML string as redirected_url
+                    is_raw_url = url.startswith("raw:") or url.startswith("raw://")
+                    crawl_result.redirected_url = async_response.redirected_url or (None if is_raw_url else url)
                     crawl_result.response_headers = async_response.response_headers
                     crawl_result.downloaded_files = async_response.downloaded_files
                     crawl_result.js_execution_result = js_execution_result
@@ -482,8 +484,11 @@ class AsyncWebCrawler:
                         tag="COMPLETE",
                     )
                     cached_result.success = bool(html)
-                    cached_result.session_id = getattr(config, "session_id", None)
-                    cached_result.redirected_url = cached_result.redirected_url or url
+                    cached_result.session_id = getattr(
+                        config, "session_id", None)
+                    # For raw: URLs, don't fall back to the raw HTML string as redirected_url
+                    is_raw_url = url.startswith("raw:") or url.startswith("raw://")
+                    cached_result.redirected_url = cached_result.redirected_url or (None if is_raw_url else url)
                     return CrawlResultContainer(cached_result)
 
             except Exception as e:
