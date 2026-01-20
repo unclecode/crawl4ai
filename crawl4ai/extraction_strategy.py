@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from enum import IntFlag, auto
 from functools import partial
 from re import Pattern
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from bs4 import BeautifulSoup
@@ -25,7 +25,6 @@ from .config import (
     OVERLAP_RATE,
     WORD_TOKEN_RATE,
 )
-from .model_loader import *  # noqa: F403
 from .model_loader import (
     calculate_batch_size,
     get_device,

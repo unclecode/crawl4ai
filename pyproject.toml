@@ -19,7 +19,7 @@ dependencies = [
     "anyio>=4.0.0",
     "lxml~=6.0",
     "litellm>=1.53.1",
-    "numpy==2.3.5",
+    "numpy~=2.4",
     "pillow>=10.4",
     "playwright>=1.49.0",
     "patchright>=1.49.0",
