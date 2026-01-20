@@ -9,6 +9,7 @@ Crawl4AI FastAPI entry‑point
 # ── stdlib & 3rd‑party imports ───────────────────────────────
 from crawler_pool import get_crawler, close_all, janitor
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
+from crawl4ai import __version__
 from auth import create_access_token, get_token_dependency, TokenRequest
 from pydantic import BaseModel
 from typing import Optional, List, Dict
@@ -73,7 +74,7 @@ sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 config = load_config()
 setup_logging(config)
 
-__version__ = "0.5.1-d1"
+# Version is imported from crawl4ai package to ensure it stays in sync
 
 # ── global page semaphore (hard cap) ─────────────────────────
 MAX_PAGES = config["crawler"]["pool"].get("max_pages", 30)
