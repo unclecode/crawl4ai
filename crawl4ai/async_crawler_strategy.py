@@ -495,6 +495,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 pdf_data=None,
                 mhtml_data=None,
                 get_delayed_content=None,
+                # For raw:/file:// URLs, use base_url if provided; don't fall back to the raw content
+                redirected_url=config.base_url,
             )
         else:
             raise ValueError(
@@ -683,7 +685,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
                     await page.set_content(html_content, wait_until=config.wait_until)
                     response = None
-                    redirected_url = config.base_url or url
+                    # For raw: URLs, only use base_url if provided; don't fall back to the raw HTML string
+                    redirected_url = config.base_url
                     status_code = 200
                     response_headers = {}
                 else:
@@ -1040,10 +1043,14 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 captured_console.extend(final_messages)
 
             ###
-            # This ensures we capture the current page URL at the time we return the response, 
+            # This ensures we capture the current page URL at the time we return the response,
             # which correctly reflects any JavaScript navigation that occurred.
+            # For raw:/file:// URLs, preserve the earlier redirected_url (config.base_url or None)
+            # instead of using page.url which would be "about:blank".
             ###
-            redirected_url = page.url  # Use current page URL to capture JS redirects
+            is_local_content = url.startswith("file://") or url.startswith("raw://") or url.startswith("raw:")
+            if not is_local_content:
+                redirected_url = page.url  # Use current page URL to capture JS redirects
             
             # Return complete response
             return AsyncCrawlResponse(
@@ -2372,11 +2379,13 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
             status_code=200
         )
 
-    async def _handle_raw(self, content: str) -> AsyncCrawlResponse:
+    async def _handle_raw(self, content: str, base_url: str = None) -> AsyncCrawlResponse:
         return AsyncCrawlResponse(
             html=content,
             response_headers={},
-            status_code=200
+            status_code=200,
+            # For raw: URLs, use base_url if provided; don't fall back to the raw content
+            redirected_url=base_url
         )
 
 
@@ -2501,7 +2510,7 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
                 # Don't use parsed.path - urlparse truncates at '#' which is common in CSS
                 # Strip prefix directly: "raw://" (6 chars) or "raw:" (4 chars)
                 raw_content = url[6:] if url.startswith("raw://") else url[4:]
-                return await self._handle_raw(raw_content)
+                return await self._handle_raw(raw_content, base_url=config.base_url)
             else:  # http or https
                 return await self._handle_http(url, config)
                 
