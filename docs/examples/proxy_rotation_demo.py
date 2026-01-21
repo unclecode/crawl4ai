@@ -103,10 +103,7 @@ async def demo_proxy_rotation_batch():
 
         print("\n📈 Initializing crawler with proxy rotation...")
         async with AsyncWebCrawler(config=browser_config) as crawler:
-            monitor = CrawlerMonitor(
-                max_visible_rows=10,
-                display_mode=DisplayMode.DETAILED
-            )
+            monitor = CrawlerMonitor()
             
             dispatcher = MemoryAdaptiveDispatcher(
                 memory_threshold_percent=80.0,

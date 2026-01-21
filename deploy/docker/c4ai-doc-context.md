@@ -6667,13 +6667,7 @@ The CrawlerMonitor provides real-time visibility into crawling operations:
 
 ```python
 from crawl4ai import CrawlerMonitor, DisplayMode
-monitor = CrawlerMonitor(
-    # Maximum rows in live display
-    max_visible_rows=15,          
-
-    # DETAILED or AGGREGATED view
-    display_mode=DisplayMode.DETAILED  
-)
+monitor = CrawlerMonitor()
 ```
 
 **Display Modes**:
@@ -6701,10 +6695,7 @@ dispatcher = MemoryAdaptiveDispatcher(
         max_delay=30.0,
         max_retries=2
     ),
-    monitor=CrawlerMonitor(         # Optional monitoring
-        max_visible_rows=15,
-        display_mode=DisplayMode.DETAILED
-    )
+    monitor=CrawlerMonitor()        # Optional monitoring
 )
 ```
 
@@ -6743,10 +6734,7 @@ dispatcher = SemaphoreDispatcher(
         base_delay=(0.5, 1.0),
         max_delay=10.0
     ),
-    monitor=CrawlerMonitor(        # Optional monitoring
-        max_visible_rows=15,
-        display_mode=DisplayMode.DETAILED
-    )
+    monitor=CrawlerMonitor()        # Optional monitoring
 )
 ```
 
@@ -6862,10 +6850,7 @@ async def crawl_with_semaphore(urls):
             base_delay=(0.5, 1.0),
             max_delay=10.0
         ),
-        monitor=CrawlerMonitor(
-            max_visible_rows=15,
-            display_mode=DisplayMode.DETAILED
-        )
+        monitor=CrawlerMonitor()
     )
     
     async with AsyncWebCrawler(config=browser_config) as crawler:

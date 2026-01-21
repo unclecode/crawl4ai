@@ -153,9 +153,7 @@ class TestDispatchStrategies:
 
     async def test_monitor_integration(self, browser_config, run_config, test_urls):
         async with AsyncWebCrawler(config=browser_config) as crawler:
-            monitor = CrawlerMonitor(
-                max_visible_rows=5, display_mode=DisplayMode.DETAILED
-            )
+            monitor = CrawlerMonitor()
             dispatcher = MemoryAdaptiveDispatcher(max_session_permit=2, monitor=monitor)
             results = await crawler.arun_many(
                 test_urls, config=run_config, dispatcher=dispatcher
