@@ -226,7 +226,7 @@ def merge_chunks(
 
 class VersionManager:
     def __init__(self):
-        self.home_dir = Path.home() / ".crawl4ai"
+        self.home_dir = Path(os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home()))
         self.version_file = self.home_dir / "version.txt"
 
     def get_installed_version(self):
