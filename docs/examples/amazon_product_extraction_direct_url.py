@@ -27,7 +27,7 @@ async def extract_amazon_products():
                         "type": "attribute",
                         "attribute": "data-asin",
                     },
-                    {"name": "title", "selector": "h2 a span", "type": "text"},
+                    {"name": "title", "selector": "a h2 span", "type": "text"},
                     {
                         "name": "url",
                         "selector": "h2 a",
