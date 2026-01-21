@@ -263,6 +263,22 @@ class AsyncUrlSeeder:
     Async version of UrlSeeder.
     Call pattern is await/async for / async with.
 
+    Parameters
+    ----------
+    ttl : timedelta, default TTL
+        Time-to-live for cached results.
+    client : httpx.AsyncClient, optional
+        HTTP client to use. If None, creates a new one.
+    logger : AsyncLoggerBase, optional
+        Logger instance for logging messages.
+    base_directory : str or pathlib.Path, optional
+        Base directory for cache storage. Defaults to home directory.
+    cache_root : str or pathlib.Path, optional
+        Root directory for URL seeder cache. Defaults to ~/.cache/url_seeder.
+    verify_redirect_targets : bool, default True
+        Whether to verify that redirect targets are alive (2xx status) before returning them.
+        When False, returns redirect targets without verification (legacy behavior).
+
     Public coroutines
     -----------------
     await seed.urls(...)
@@ -300,6 +316,8 @@ class AsyncUrlSeeder:
         # NEW: Add base_directory
         base_directory: Optional[Union[str, pathlib.Path]] = None,
         cache_root: Optional[Union[str, Path]] = None,
+        # NEW: Control redirect target verification
+        verify_redirect_targets: bool = True,
     ):
         self.ttl = ttl
         self._owns_client = client is None  # Track if we created the client
@@ -324,6 +342,9 @@ class AsyncUrlSeeder:
             cache_root or "~/.cache/url_seeder"))
         (self.cache_root / "live").mkdir(parents=True, exist_ok=True)
         (self.cache_root / "head").mkdir(exist_ok=True)
+        
+        # Store redirect verification setting
+        self.verify_redirect_targets = verify_redirect_targets
 
     def _log(self, level: str, message: str, tag: str = "URL_SEED", **kwargs: Any):
         """Helper to log messages using the provided logger, if available."""
@@ -783,24 +804,47 @@ class AsyncUrlSeeder:
 
         Returns:
             * the same URL if it answers 2xx,
-            * the absolute redirect target if it answers 3xx,
+            * the absolute redirect target if it answers 3xx (and if verify_redirect_targets=True, only if target is alive/2xx),
             * None on any other status or network error.
         """
         try:
             r = await self.client.head(url, timeout=10, follow_redirects=False)
-
-            # direct hit
+            # direct 2xx hit
             if 200 <= r.status_code < 300:
                 return str(r.url)
-
-            # single level redirect
+            # single-level redirect (3xx)
             if r.status_code in (301, 302, 303, 307, 308):
                 loc = r.headers.get("location")
                 if loc:
-                    return urljoin(url, loc)
-
+                    target = urljoin(url, loc)
+                    # Avoid infinite loop on self-redirect
+                    if target == url:
+                        return None
+                    
+                    # If not verifying redirect targets, return immediately (old behavior)
+                    if not self.verify_redirect_targets:
+                        return target
+                    
+                    # Verify redirect target is alive (new behavior)
+                    try:
+                        r2 = await self.client.head(target, timeout=10, follow_redirects=False)
+                        if 200 <= r2.status_code < 300:
+                            return str(r2.url)
+                        # Optionally, could handle another 3xx here for 2-step chains, but spec only says 1
+                        else:
+                            self._log(
+                                "debug",
+                                "HEAD redirect target {target} did not resolve: status {status}",
+                                params={"target": target, "status": r2.status_code},
+                                tag="URL_SEED",
+                            )
+                            return None
+                    except Exception as e2:
+                        self._log("debug", "HEAD {target} failed: {err}",
+                            params={"target": target, "err": str(e2)}, tag="URL_SEED")
+                        return None
+            # all other cases
             return None
-
         except Exception as e:
             self._log("debug", "HEAD {url} failed: {err}",
                       params={"url": url, "err": str(e)}, tag="URL_SEED")
