@@ -65,6 +65,23 @@ class URLFilter(ABC):
         self.stats._counters[1] += passed  # passed
         self.stats._counters[2] += not passed  # rejected
 
+class RegexURLFilter(URLFilter):
+    """
+    A filter that uses regular expressions to determine whether a URL matches a given request.
+    The URLFilter inherited from Crawl4AI.
+    """
+
+    def __init__(self, patterns: List[str], name: str = None):
+        super().__init__(name)
+        self.patterns = [re.compile(p) for p in patterns]
+
+    def apply(self, url: str) -> bool:
+        for pattern in self.patterns:
+            if pattern.search(url):
+                self._update_stats(True)
+                return True
+        self._update_stats(False)
+        return False
 
 class FilterChain:
     """Optimized filter chain"""
