@@ -709,10 +709,30 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                 content_element = body
 
             # Remove script and style tags
-            for tag in ["script", "style", "link", "meta", "noscript"]:
+            for tag in ["style", "link", "meta", "noscript"]:
                 for element in body.xpath(f".//{tag}"):
                     if element.getparent() is not None:
                         element.getparent().remove(element)
+                        
+            # Handle script separately
+            for element in body.xpath(f".//script"):
+                parent = element.getparent()
+                if parent is not None:
+                    tail = element.tail  # Get the tail text
+                    if tail:
+                        prev = element.getprevious()  # Get the previous sibling node
+                        if prev is not None:
+                            if prev.tail:
+                                prev.tail += tail 
+                            else:
+                                prev.tail = tail
+                        else:
+                            if parent.text:
+                                parent.text += tail
+                            else:
+                                parent.text = tail
+                    parent.remove(element)  # Delete the element
+
 
             # Handle social media and domain exclusions
             kwargs["exclude_domains"] = set(kwargs.get("exclude_domains", []))
