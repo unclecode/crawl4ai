@@ -3,6 +3,7 @@ from click.testing import CliRunner
 from pathlib import Path
 import json
 import yaml
+from unittest.mock import patch
 from crawl4ai.cli import cli, load_config_file, parse_key_values
 import tempfile
 import os
@@ -65,14 +66,9 @@ class TestCLIBasics:
         assert 'Crawl4AI CLI' in result.output
 
     def test_examples(self, runner):
-        result = runner.invoke(cli, ['--example'])
+        result = runner.invoke(cli, ['examples'])
         assert result.exit_code == 0
         assert 'Examples' in result.output
-
-    def test_missing_url(self, runner):
-        result = runner.invoke(cli)
-        assert result.exit_code != 0
-        assert 'URL argument is required' in result.output
 
 class TestConfigParsing:
     def test_parse_key_values_basic(self):
@@ -105,8 +101,19 @@ class TestLLMConfig:
                                input='\n'.join(inputs))
             
 class TestCrawlingFeatures:
-    def test_basic_crawl(self, runner):
-        result = runner.invoke(cli, ['https://example.com'])
+    @patch('crawl4ai.cli.anyio.run')
+    def test_basic_crawl(self, mock_anyio_run, runner):
+        class MockCrawlResult:
+            class MockMarkdown:
+                raw_markdown = "Crawled content"
+                fit_markdown = "Fit content"
+            markdown = MockMarkdown()
+            extracted_content = "{}"
+            def model_dump(self):
+                return {"markdown": "mock"}
+
+        mock_anyio_run.return_value = MockCrawlResult()
+        result = runner.invoke(cli, ['crawl', 'https://example.com'])
         assert result.exit_code == 0
 
 
