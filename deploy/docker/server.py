@@ -75,6 +75,32 @@ setup_logging(config)
 
 __version__ = "0.5.1-d1"
 
+# ───────────────────── telemetry setup ────────────────────────
+# Docker/API server telemetry: enabled by default unless CRAWL4AI_TELEMETRY=0
+import os as _os
+if _os.environ.get('CRAWL4AI_TELEMETRY') != '0':
+    # Set environment variable to indicate we're in API server mode
+    _os.environ['CRAWL4AI_API_SERVER'] = 'true'
+    
+    # Import and enable telemetry for Docker/API environment
+    from crawl4ai.telemetry import enable as enable_telemetry
+    from crawl4ai.telemetry import capture_exception
+    
+    # Enable telemetry automatically in Docker mode
+    enable_telemetry(always=True)
+    
+    import logging
+    telemetry_logger = logging.getLogger("telemetry")
+    telemetry_logger.info("✅ Telemetry enabled for Docker/API server")
+else:
+    # Define no-op for capture_exception if telemetry is disabled
+    def capture_exception(exc, context=None):
+        pass
+    
+    import logging
+    telemetry_logger = logging.getLogger("telemetry")
+    telemetry_logger.info("❌ Telemetry disabled via CRAWL4AI_TELEMETRY=0")
+
 # ── global page semaphore (hard cap) ─────────────────────────
 MAX_PAGES = config["crawler"]["pool"].get("max_pages", 30)
 GLOBAL_SEM = asyncio.Semaphore(MAX_PAGES)

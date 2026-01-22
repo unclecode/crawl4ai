@@ -1,0 +1,136 @@
+# Makefile for Crawl4AI Telemetry Testing
+# Usage: make test-telemetry, make test-unit, make test-integration, etc.
+
+.PHONY: help test-all test-telemetry test-unit test-integration test-privacy test-performance test-slow test-coverage test-verbose clean
+
+# Default Python executable
+PYTHON := .venv/bin/python
+PYTEST := $(PYTHON) -m pytest
+
+help:
+	@echo "Crawl4AI Telemetry Testing Commands:"
+	@echo ""
+	@echo "  test-all              Run all telemetry tests"
+	@echo "  test-telemetry        Run all telemetry tests (same as test-all)"
+	@echo "  test-unit             Run unit tests only"
+	@echo "  test-integration      Run integration tests only"
+	@echo "  test-privacy          Run privacy compliance tests only"
+	@echo "  test-performance      Run performance tests only"
+	@echo "  test-slow             Run slow tests only"
+	@echo "  test-coverage         Run tests with coverage report"
+	@echo "  test-verbose          Run tests with verbose output"
+	@echo "  test-specific TEST=   Run specific test (e.g., make test-specific TEST=test_telemetry.py::TestTelemetryConfig)"
+	@echo "  clean                 Clean test artifacts"
+	@echo ""
+	@echo "Environment Variables:"
+	@echo "  CRAWL4AI_TELEMETRY_TEST_REAL=1  Enable real telemetry during tests"
+	@echo "  PYTEST_ARGS                    Additional pytest arguments"
+
+# Run all telemetry tests
+test-all test-telemetry:
+	$(PYTEST) tests/telemetry/ -v
+
+# Run unit tests only
+test-unit:
+	$(PYTEST) tests/telemetry/ -m "unit" -v
+
+# Run integration tests only  
+test-integration:
+	$(PYTEST) tests/telemetry/ -m "integration" -v
+
+# Run privacy compliance tests only
+test-privacy:
+	$(PYTEST) tests/telemetry/ -m "privacy" -v
+
+# Run performance tests only
+test-performance:
+	$(PYTEST) tests/telemetry/ -m "performance" -v
+
+# Run slow tests only
+test-slow:
+	$(PYTEST) tests/telemetry/ -m "slow" -v
+
+# Run tests with coverage
+test-coverage:
+	$(PYTEST) tests/telemetry/ --cov=crawl4ai.telemetry --cov-report=html --cov-report=term-missing -v
+
+# Run tests with verbose output
+test-verbose:
+	$(PYTEST) tests/telemetry/ -vvv --tb=long
+
+# Run specific test
+test-specific:
+	$(PYTEST) tests/telemetry/$(TEST) -v
+
+# Run tests excluding slow ones
+test-fast:
+	$(PYTEST) tests/telemetry/ -m "not slow" -v
+
+# Run tests in parallel
+test-parallel:
+	$(PYTEST) tests/telemetry/ -n auto -v
+
+# Clean test artifacts
+clean:
+	rm -rf .pytest_cache/
+	rm -rf htmlcov/
+	rm -rf .coverage
+	find tests/ -name "*.pyc" -delete
+	find tests/ -name "__pycache__" -type d -exec rm -rf {} +
+	rm -rf tests/telemetry/__pycache__/
+
+# Lint test files
+lint-tests:
+	$(PYTHON) -m flake8 tests/telemetry/
+	$(PYTHON) -m pylint tests/telemetry/
+
+# Type check test files
+typecheck-tests:
+	$(PYTHON) -m mypy tests/telemetry/
+
+# Run all quality checks
+check-tests: lint-tests typecheck-tests test-unit
+
+# Install test dependencies
+install-test-deps:
+	$(PYTHON) -m pip install pytest pytest-asyncio pytest-mock pytest-cov pytest-xdist
+
+# Setup development environment for testing
+setup-dev:
+	$(PYTHON) -m pip install -e .
+	$(MAKE) install-test-deps
+
+# Generate test report
+test-report:
+	$(PYTEST) tests/telemetry/ --html=test-report.html --self-contained-html -v
+
+# Run performance benchmarks
+benchmark:
+	$(PYTEST) tests/telemetry/test_privacy_performance.py::TestTelemetryPerformance -v --benchmark-only
+
+# Test different environments
+test-docker-env:
+	CRAWL4AI_DOCKER=true $(PYTEST) tests/telemetry/ -k "docker" -v
+
+test-cli-env:
+	$(PYTEST) tests/telemetry/ -k "cli" -v
+
+# Validate telemetry implementation
+validate:
+	@echo "Running telemetry validation suite..."
+	$(MAKE) test-unit
+	$(MAKE) test-privacy
+	$(MAKE) test-performance
+	@echo "Validation complete!"
+
+# Debug failing tests
+debug:
+	$(PYTEST) tests/telemetry/ --pdb -x -v
+
+# Show test markers
+show-markers:
+	$(PYTEST) --markers
+
+# Show test collection (dry run)
+show-tests:
+	$(PYTEST) tests/telemetry/ --collect-only -q
