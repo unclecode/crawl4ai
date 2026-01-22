@@ -35,9 +35,13 @@ async def example_callback_cancellation():
     """
     Cancel a crawl after reaching a certain number of pages.
     This simulates checking an external cancellation source.
+
+    Note: We use DFS here because it processes one URL at a time,
+    giving precise cancellation control. BFS processes URLs in batches
+    (levels), so cancellation happens at level boundaries.
     """
     print("\n" + "="*60)
-    print("Example 1: Callback-based Cancellation")
+    print("Example 1: Callback-based Cancellation (DFS)")
     print("="*60)
 
     pages_crawled = 0
@@ -57,7 +61,8 @@ async def example_callback_cancellation():
         cancelled = state.get("cancelled", False)
         print(f"  Progress: {pages_crawled} pages | Cancelled: {cancelled}")
 
-    strategy = BFSDeepCrawlStrategy(
+    # Use DFS for precise per-URL cancellation control
+    strategy = DFSDeepCrawlStrategy(
         max_depth=3,
         max_pages=100,  # Would crawl up to 100, but we'll cancel at 5
         should_cancel=should_cancel,
@@ -249,6 +254,10 @@ async def example_strategy_reuse():
 async def example_best_first_cancellation():
     """
     Cancel a Best-First crawl that prioritizes URLs by relevance score.
+
+    Note: Best-First processes URLs in batches (default 10), so cancellation
+    happens at batch boundaries. You may see more results than the cancel
+    threshold before the crawl stops.
     """
     print("\n" + "="*60)
     print("Example 5: Best-First Strategy with Cancellation")
@@ -257,9 +266,10 @@ async def example_best_first_cancellation():
     from crawl4ai.deep_crawling.scorers import KeywordRelevanceScorer
 
     pages_crawled = 0
+    cancel_threshold = 5
 
     async def should_cancel():
-        return pages_crawled >= 3
+        return pages_crawled >= cancel_threshold
 
     async def track_progress(state: Dict[str, Any]):
         nonlocal pages_crawled
@@ -285,7 +295,8 @@ async def example_best_first_cancellation():
         verbose=False,
     )
 
-    print("Starting Best-First crawl (will cancel after 3 pages)...")
+    print(f"Starting Best-First crawl (will cancel after {cancel_threshold} pages)...")
+    print("  (Note: Best-First processes in batches, so may crawl slightly more)")
 
     results = []
     async with AsyncWebCrawler() as crawler:
