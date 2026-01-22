@@ -24,7 +24,7 @@ Instead, please report via one of these methods:
    - Fill in the details
 
 2. **Email**
-   - Send details to: security@crawl4ai.com
+   - Send details to: aravind@crawl4ai.com and nasrin@crawl4ai.com
    - Use subject: `[SECURITY] Brief description`
    - Include:
      - Description of the vulnerability
