@@ -15,13 +15,118 @@ import shutil
 import json
 import subprocess
 import time
-from typing import List, Dict, Optional, Any
+from enum import Enum
+from pathlib import Path
+from typing import List, Dict, Optional, Any, Set
 from rich.console import Console
 
 from .async_configs import BrowserConfig
 from .browser_manager import ManagedBrowser
 from .async_logger import AsyncLogger, AsyncLoggerBase, LogColor
 from .utils import get_home_folder
+
+
+class ShrinkLevel(str, Enum):
+    """Profile shrink aggressiveness levels."""
+    NONE = "none"           # Keep everything
+    LIGHT = "light"         # Remove caches only
+    MEDIUM = "medium"       # Caches + history/favicons
+    AGGRESSIVE = "aggressive"  # Auth only (recommended)
+    MINIMAL = "minimal"     # Cookies + localStorage only
+
+
+# Whitelist: what to KEEP at each level (everything else gets deleted)
+# Note: "Cookies" can be at root (older Chrome) or in Network/ (Chrome 96+)
+KEEP_PATTERNS: Dict[ShrinkLevel, Set[str]] = {
+    ShrinkLevel.NONE: {"*"},
+    ShrinkLevel.LIGHT: {
+        "Network", "Cookies", "Local Storage", "Session Storage", "IndexedDB",
+        "Preferences", "Secure Preferences", "Login Data", "Login Data For Account",
+        "Web Data", "History", "History-journal", "Visited Links", "Bookmarks",
+        "TransportSecurity", "Trust Tokens",
+    },
+    ShrinkLevel.MEDIUM: {
+        "Network", "Cookies", "Local Storage", "Session Storage", "IndexedDB",
+        "Preferences", "Secure Preferences", "Login Data", "Login Data For Account",
+        "Web Data", "TransportSecurity",
+    },
+    ShrinkLevel.AGGRESSIVE: {"Network", "Cookies", "Local Storage", "IndexedDB", "Preferences"},
+    ShrinkLevel.MINIMAL: {"Network", "Cookies", "Local Storage"},
+}
+
+
+def _get_size(path: Path) -> int:
+    """Get total size in bytes. Works for files and directories."""
+    if path.is_file():
+        return path.stat().st_size
+    total = 0
+    try:
+        for f in path.rglob("*"):
+            if f.is_file():
+                total += f.stat().st_size
+    except (PermissionError, OSError):
+        pass
+    return total
+
+
+def _format_size(n: int) -> str:
+    """Format bytes as human-readable string."""
+    for u in ("B", "KB", "MB", "GB"):
+        if n < 1024:
+            return f"{n:.1f} {u}"
+        n /= 1024
+    return f"{n:.1f} TB"
+
+
+def shrink_profile(
+    profile_path: str,
+    level: ShrinkLevel = ShrinkLevel.AGGRESSIVE,
+    dry_run: bool = False
+) -> Dict[str, Any]:
+    """
+    Shrink a Chrome profile to reduce storage while preserving auth data.
+
+    Args:
+        profile_path: Path to profile directory
+        level: How aggressively to shrink (LIGHT/MEDIUM/AGGRESSIVE/MINIMAL)
+        dry_run: If True, only report what would be removed
+
+    Returns:
+        Dict with 'removed', 'kept', 'bytes_freed', 'size_before', 'size_after', 'errors'
+    """
+    if level == ShrinkLevel.NONE:
+        return {"removed": [], "kept": [], "bytes_freed": 0, "errors": []}
+
+    profile = Path(profile_path)
+    if not profile.exists() or not profile.is_dir():
+        raise ValueError(f"Profile not found: {profile_path}")
+
+    # Chrome profiles may have data in Default/ subdirectory
+    target = profile / "Default" if (profile / "Default").is_dir() else profile
+
+    keep = KEEP_PATTERNS[level]
+    result = {"removed": [], "kept": [], "bytes_freed": 0, "errors": [], "size_before": _get_size(profile)}
+
+    for item in target.iterdir():
+        name = item.name
+        # Check if item matches any keep pattern
+        if any(name == p or name.startswith(p) for p in keep):
+            result["kept"].append(name)
+        else:
+            size = _get_size(item)
+            if not dry_run:
+                try:
+                    shutil.rmtree(item) if item.is_dir() else item.unlink()
+                    result["removed"].append(name)
+                    result["bytes_freed"] += size
+                except Exception as e:
+                    result["errors"].append(f"{name}: {e}")
+            else:
+                result["removed"].append(name)
+                result["bytes_freed"] += size
+
+    result["size_after"] = _get_size(profile) if not dry_run else None
+    return result
 
 
 class BrowserProfiler:
@@ -272,9 +377,12 @@ class BrowserProfiler:
             self.logger.error(f"Fallback listener failed: {e}", tag=tag)
             user_done_event.set()
     
-    async def create_profile(self, 
-                            profile_name: Optional[str] = None, 
-                            browser_config: Optional[BrowserConfig] = None) -> Optional[str]:
+    async def create_profile(
+        self,
+        profile_name: Optional[str] = None,
+        browser_config: Optional[BrowserConfig] = None,
+        shrink_level: ShrinkLevel = ShrinkLevel.NONE,
+    ) -> Optional[str]:
         """
         Creates a browser profile by launching a browser for interactive user setup
         and waits until the user closes it. The profile is stored in a directory that
@@ -285,6 +393,8 @@ class BrowserProfiler:
                 If None, a name is generated based on timestamp.
             browser_config (BrowserConfig, optional): Configuration for the browser.
                 If None, a default configuration is used with headless=False.
+            shrink_level (ShrinkLevel, optional): Optionally shrink profile after creation.
+                Default is NONE (no shrinking).
                 
         Returns:
             str: Path to the created profile directory, or None if creation failed
@@ -487,8 +597,12 @@ class BrowserProfiler:
             
             # Make sure browser is fully cleaned up
             await managed_browser.cleanup()
-        
-        # Return the profile path
+
+        # Shrink profile if requested
+        if shrink_level != ShrinkLevel.NONE and profile_path:
+            self.logger.info(f"Shrinking profile with level: {shrink_level.value}", tag="PROFILE")
+            self.shrink(profile_path, shrink_level)
+
         return profile_path
     
     def list_profiles(self) -> List[Dict[str, Any]]:
@@ -646,7 +760,44 @@ class BrowserProfiler:
             return True
         except Exception:
             return False
-            
+
+    def shrink(
+        self,
+        profile_name_or_path: str,
+        level: ShrinkLevel = ShrinkLevel.AGGRESSIVE,
+        dry_run: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Shrink a profile to reduce storage while preserving authentication data.
+
+        Args:
+            profile_name_or_path: Profile name or full path
+            level: LIGHT, MEDIUM, AGGRESSIVE (default), or MINIMAL
+            dry_run: If True, only preview what would be removed
+
+        Returns:
+            Dict with 'removed', 'kept', 'bytes_freed', 'size_before', 'size_after', 'errors'
+        """
+        # Resolve path
+        if os.path.isabs(profile_name_or_path):
+            profile_path = profile_name_or_path
+        else:
+            profile_path = os.path.join(self.profiles_dir, profile_name_or_path)
+
+        if not os.path.isdir(profile_path):
+            raise ValueError(f"Profile not found: {profile_name_or_path}")
+
+        result = shrink_profile(profile_path, level, dry_run)
+
+        action = "Would free" if dry_run else "Freed"
+        self.logger.info(
+            f"{action} {_format_size(result['bytes_freed'])} "
+            f"({len(result['removed'])} items removed, {len(result['kept'])} kept)",
+            tag="SHRINK"
+        )
+
+        return result
+
     async def interactive_manager(self, crawl_callback=None):
         """
         Launch an interactive profile management console.
