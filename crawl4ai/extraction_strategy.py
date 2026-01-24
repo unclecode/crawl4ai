@@ -1349,11 +1349,11 @@ In this scenario, use your best judgment to generate the schema. You need to exa
         llm_config: 'LLMConfig' = create_llm_config(),
         provider: str = None,
         api_token: str = None,
-        url: str = None,
+        url: Union[str, List[str]] = None,
         **kwargs
     ) -> dict:
         """
-        Generate extraction schema from HTML content or URL (sync version).
+        Generate extraction schema from HTML content or URL(s) (sync version).
 
         Args:
             html (str, optional): The HTML content to analyze. If not provided, url must be set.
@@ -1363,7 +1363,8 @@ In this scenario, use your best judgment to generate the schema. You need to exa
             llm_config (LLMConfig): LLM configuration object.
             provider (str): Legacy Parameter. LLM provider to use.
             api_token (str): Legacy Parameter. API token for LLM provider.
-            url (str, optional): URL to fetch HTML from. If provided, html parameter is ignored.
+            url (str or List[str], optional): URL(s) to fetch HTML from. If provided, html parameter is ignored.
+                When multiple URLs are provided, HTMLs are fetched in parallel and concatenated.
             **kwargs: Additional args passed to LLM processor.
 
         Returns:
@@ -1408,11 +1409,11 @@ In this scenario, use your best judgment to generate the schema. You need to exa
         llm_config: 'LLMConfig' = None,
         provider: str = None,
         api_token: str = None,
-        url: str = None,
+        url: Union[str, List[str]] = None,
         **kwargs
     ) -> dict:
         """
-        Generate extraction schema from HTML content or URL (async version).
+        Generate extraction schema from HTML content or URL(s) (async version).
 
         Use this method when calling from async contexts (e.g., FastAPI) to avoid
         issues with certain LLM providers (e.g., Gemini/Vertex AI) that require
@@ -1426,7 +1427,8 @@ In this scenario, use your best judgment to generate the schema. You need to exa
             llm_config (LLMConfig): LLM configuration object.
             provider (str): Legacy Parameter. LLM provider to use.
             api_token (str): Legacy Parameter. API token for LLM provider.
-            url (str, optional): URL to fetch HTML from. If provided, html parameter is ignored.
+            url (str or List[str], optional): URL(s) to fetch HTML from. If provided, html parameter is ignored.
+                When multiple URLs are provided, HTMLs are fetched in parallel and concatenated.
             **kwargs: Additional args passed to LLM processor.
 
         Returns:
@@ -1438,7 +1440,7 @@ In this scenario, use your best judgment to generate the schema. You need to exa
         from .utils import aperform_completion_with_backoff, preprocess_html_for_schema
 
         # Validate inputs
-        if html is None and url is None:
+        if html is None and (url is None or (isinstance(url, list) and len(url) == 0)):
             raise ValueError("Either 'html' or 'url' must be provided")
 
         # Check deprecated parameters
@@ -1449,7 +1451,7 @@ In this scenario, use your best judgment to generate the schema. You need to exa
         if llm_config is None:
             llm_config = create_llm_config()
 
-        # Fetch HTML from URL if provided
+        # Fetch HTML from URL(s) if provided
         if url is not None:
             from .async_webcrawler import AsyncWebCrawler
             from .async_configs import BrowserConfig, CrawlerRunConfig, CacheMode
@@ -1461,21 +1463,42 @@ In this scenario, use your best judgment to generate the schema. You need to exa
             )
             crawler_config = CrawlerRunConfig(cache_mode=CacheMode.BYPASS)
 
-            async with AsyncWebCrawler(config=browser_config) as crawler:
-                result = await crawler.arun(url=url, config=crawler_config)
-                if not result.success:
-                    raise Exception(f"Failed to fetch URL '{url}': {result.error_message}")
-                if result.status_code >= 400:
-                    raise Exception(f"HTTP {result.status_code} error for URL '{url}'")
-                html = result.html
+            # Normalize to list
+            urls = [url] if isinstance(url, str) else url
 
-        # Preprocess HTML for schema generation (higher text_threshold for better LLM context)
-        html = preprocess_html_for_schema(
-            html_content=html,
-            text_threshold=2000,
-            attr_value_threshold=500,
-            max_size=500_000
-        )
+            async with AsyncWebCrawler(config=browser_config) as crawler:
+                if len(urls) == 1:
+                    result = await crawler.arun(url=urls[0], config=crawler_config)
+                    if not result.success:
+                        raise Exception(f"Failed to fetch URL '{urls[0]}': {result.error_message}")
+                    if result.status_code >= 400:
+                        raise Exception(f"HTTP {result.status_code} error for URL '{urls[0]}'")
+                    html = result.html
+                else:
+                    results = await crawler.arun_many(urls=urls, config=crawler_config)
+                    html_parts = []
+                    for i, result in enumerate(results, 1):
+                        if not result.success:
+                            raise Exception(f"Failed to fetch URL '{result.url}': {result.error_message}")
+                        if result.status_code >= 400:
+                            raise Exception(f"HTTP {result.status_code} error for URL '{result.url}'")
+                        cleaned = preprocess_html_for_schema(
+                            html_content=result.html,
+                            text_threshold=2000,
+                            attr_value_threshold=500,
+                            max_size=500_000
+                        )
+                        html_parts.append(f"'''html example {i}\n{cleaned}\n'''")
+                    html = "\n\n".join(html_parts)
+
+        # Preprocess HTML for schema generation (skip if already preprocessed from multiple URLs)
+        if url is None or isinstance(url, str):
+            html = preprocess_html_for_schema(
+                html_content=html,
+                text_threshold=2000,
+                attr_value_threshold=500,
+                max_size=500_000
+            )
 
         prompt = JsonElementExtractionStrategy._build_schema_prompt(html, schema_type, query, target_json_example)
 
