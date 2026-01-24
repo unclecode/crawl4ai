@@ -2,7 +2,7 @@
 import asyncio
 import logging
 from datetime import datetime
-from typing import AsyncGenerator, Optional, Set, Dict, List, Tuple, Any, Callable, Awaitable
+from typing import AsyncGenerator, Optional, Set, Dict, List, Tuple, Any, Callable, Awaitable, Union
 from urllib.parse import urlparse
 
 from ..models import TraversalStats
@@ -36,6 +36,8 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
         # Optional resume/callback parameters for crash recovery
         resume_state: Optional[Dict[str, Any]] = None,
         on_state_change: Optional[Callable[[Dict[str, Any]], Awaitable[None]]] = None,
+        # Optional cancellation callback - checked before each URL is processed
+        should_cancel: Optional[Callable[[], Union[bool, Awaitable[bool]]]] = None,
     ):
         self.max_depth = max_depth
         self.filter_chain = filter_chain
@@ -56,6 +58,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
         # Store for use in arun methods
         self._resume_state = resume_state
         self._on_state_change = on_state_change
+        self._should_cancel = should_cancel
         self._last_state: Optional[Dict[str, Any]] = None
 
     async def can_process_url(self, url: str, depth: int) -> bool:
@@ -79,6 +82,55 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
             return False
 
         return True
+
+    def cancel(self) -> None:
+        """
+        Cancel the crawl. Thread-safe, can be called from any context.
+
+        The crawl will stop before processing the next URL. The current URL
+        being processed (if any) will complete before the crawl stops.
+        """
+        self._cancel_event.set()
+
+    @property
+    def cancelled(self) -> bool:
+        """
+        Check if the crawl was/is cancelled. Thread-safe.
+
+        Returns:
+            True if the crawl has been cancelled, False otherwise.
+        """
+        return self._cancel_event.is_set()
+
+    async def _check_cancellation(self) -> bool:
+        """
+        Check if crawl should be cancelled.
+
+        Handles both internal cancel flag and external should_cancel callback.
+        Supports both sync and async callbacks.
+
+        Returns:
+            True if crawl should be cancelled, False otherwise.
+        """
+        if self._cancel_event.is_set():
+            return True
+
+        if self._should_cancel:
+            try:
+                # Handle both sync and async callbacks
+                result = self._should_cancel()
+                if asyncio.iscoroutine(result):
+                    result = await result
+
+                if result:
+                    self._cancel_event.set()
+                    self.stats.end_time = datetime.now()
+                    return True
+            except Exception as e:
+                # Fail-open: log warning and continue crawling
+                self.logger.warning(f"should_cancel callback error: {e}")
+
+        return False
 
     async def link_discovery(
         self,
@@ -170,6 +222,9 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
         Batch (non-streaming) mode:
         Processes one BFS level at a time, then yields all the results.
         """
+        # Reset cancel event for strategy reuse
+        self._cancel_event = asyncio.Event()
+
         # Conditional state initialization for resume support
         if self._resume_state:
             visited = set(self._resume_state.get("visited", []))
@@ -194,6 +249,11 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
                 self.logger.info(
                     f"Max pages limit ({self.max_pages}) reached, stopping crawl"
                 )
+                break
+
+            # Check external cancellation callback before processing this level
+            if await self._check_cancellation():
+                self.logger.info("Crawl cancelled by user")
                 break
 
             next_level: List[Tuple[str, Optional[str]]] = []
@@ -236,11 +296,25 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
                             "pending": [{"url": u, "parent_url": p} for u, p in next_level],
                             "depths": depths,
                             "pages_crawled": self._pages_crawled,
+                            "cancelled": self._cancel_event.is_set(),
                         }
                         self._last_state = state
                         await self._on_state_change(state)
 
             current_level = next_level
+
+        # Final state update if cancelled
+        if self._cancel_event.is_set() and self._on_state_change:
+            state = {
+                "strategy_type": "bfs",
+                "visited": list(visited),
+                "pending": [{"url": u, "parent_url": p} for u, p in current_level],
+                "depths": depths,
+                "pages_crawled": self._pages_crawled,
+                "cancelled": True,
+            }
+            self._last_state = state
+            await self._on_state_change(state)
 
         return results
 
@@ -254,6 +328,9 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
         Streaming mode:
         Processes one BFS level at a time and yields results immediately as they arrive.
         """
+        # Reset cancel event for strategy reuse
+        self._cancel_event = asyncio.Event()
+
         # Conditional state initialization for resume support
         if self._resume_state:
             visited = set(self._resume_state.get("visited", []))
@@ -270,6 +347,11 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
             depths: Dict[str, int] = {start_url: 0}
 
         while current_level and not self._cancel_event.is_set():
+            # Check external cancellation callback before processing this level
+            if await self._check_cancellation():
+                self.logger.info("Crawl cancelled by user")
+                break
+
             next_level: List[Tuple[str, Optional[str]]] = []
             urls = [url for url, _ in current_level]
             visited.update(urls)
@@ -315,6 +397,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
                             "pending": [{"url": u, "parent_url": p} for u, p in next_level],
                             "depths": depths,
                             "pages_crawled": self._pages_crawled,
+                            "cancelled": self._cancel_event.is_set(),
                         }
                         self._last_state = state
                         await self._on_state_change(state)
@@ -322,11 +405,22 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
             # If we didn't get results back (e.g. due to errors), avoid getting stuck in an infinite loop
             # by considering these URLs as visited but not counting them toward the max_pages limit
             if results_count == 0 and urls:
-                self.logger.warning(
-                    f"No results returned for {len(urls)} URLs, marking as visited"
-                )
+                self.logger.warning(f"No results returned for {len(urls)} URLs, marking as visited")
 
             current_level = next_level
+
+        # Final state update if cancelled
+        if self._cancel_event.is_set() and self._on_state_change:
+            state = {
+                "strategy_type": "bfs",
+                "visited": list(visited),
+                "pending": [{"url": u, "parent_url": p} for u, p in current_level],
+                "depths": depths,
+                "pages_crawled": self._pages_crawled,
+                "cancelled": True,
+            }
+            self._last_state = state
+            await self._on_state_change(state)
 
     async def shutdown(self) -> None:
         """

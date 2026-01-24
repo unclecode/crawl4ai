@@ -13,6 +13,7 @@ from .config import (
     CHUNK_TOKEN_THRESHOLD,
     OVERLAP_RATE,
     WORD_TOKEN_RATE,
+    HTML_EXAMPLE_DELIMITER,
 )
 from .utils import *  # noqa: F403
 
@@ -1342,81 +1343,164 @@ In this scenario, use your best judgment to generate the schema. You need to exa
 
     @staticmethod
     def generate_schema(
-        html: str,
+        html: str = None,
         schema_type: str = "CSS",
         query: str = None,
         target_json_example: str = None,
         llm_config: 'LLMConfig' = create_llm_config(),
         provider: str = None,
         api_token: str = None,
+        url: Union[str, List[str]] = None,
         **kwargs
     ) -> dict:
         """
-        Generate extraction schema from HTML content and optional query (sync version).
+        Generate extraction schema from HTML content or URL(s) (sync version).
 
         Args:
-            html (str): The HTML content to analyze
-            query (str, optional): Natural language description of what data to extract
-            provider (str): Legacy Parameter. LLM provider to use
-            api_token (str): Legacy Parameter. API token for LLM provider
-            llm_config (LLMConfig): LLM configuration object
-            **kwargs: Additional args passed to LLM processor
+            html (str, optional): The HTML content to analyze. If not provided, url must be set.
+            schema_type (str): "CSS" or "XPATH". Defaults to "CSS".
+            query (str, optional): Natural language description of what data to extract.
+            target_json_example (str, optional): Example of desired JSON output.
+            llm_config (LLMConfig): LLM configuration object.
+            provider (str): Legacy Parameter. LLM provider to use.
+            api_token (str): Legacy Parameter. API token for LLM provider.
+            url (str or List[str], optional): URL(s) to fetch HTML from. If provided, html parameter is ignored.
+                When multiple URLs are provided, HTMLs are fetched in parallel and concatenated.
+            **kwargs: Additional args passed to LLM processor.
 
         Returns:
-            dict: Generated schema following the JsonElementExtractionStrategy format
+            dict: Generated schema following the JsonElementExtractionStrategy format.
+
+        Raises:
+            ValueError: If neither html nor url is provided.
         """
-        from .utils import perform_completion_with_backoff
-
-        for name, message in JsonElementExtractionStrategy._GENERATE_SCHEMA_UNWANTED_PROPS.items():
-            if locals()[name] is not None:
-                raise AttributeError(f"Setting '{name}' is deprecated. {message}")
-
-        prompt = JsonElementExtractionStrategy._build_schema_prompt(html, schema_type, query, target_json_example)
+        import asyncio
 
         try:
-            response = perform_completion_with_backoff(
-                provider=llm_config.provider,
-                prompt_with_variables=prompt,
-                json_response=True,
-                api_token=llm_config.api_token,
-                base_url=llm_config.base_url,
-                extra_args=kwargs
-            )
-            return json.loads(response.choices[0].message.content)
-        except Exception as e:
-            raise Exception(f"Failed to generate schema: {str(e)}")
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        coro = JsonElementExtractionStrategy.agenerate_schema(
+            html=html,
+            schema_type=schema_type,
+            query=query,
+            target_json_example=target_json_example,
+            llm_config=llm_config,
+            provider=provider,
+            api_token=api_token,
+            url=url,
+            **kwargs
+        )
+
+        if loop is None:
+            return asyncio.run(coro)
+        else:
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(asyncio.run, coro)
+                return future.result()
 
     @staticmethod
     async def agenerate_schema(
-        html: str,
+        html: str = None,
         schema_type: str = "CSS",
         query: str = None,
         target_json_example: str = None,
         llm_config: 'LLMConfig' = None,
+        provider: str = None,
+        api_token: str = None,
+        url: Union[str, List[str]] = None,
         **kwargs
     ) -> dict:
         """
-        Generate extraction schema from HTML content (async version).
+        Generate extraction schema from HTML content or URL(s) (async version).
 
         Use this method when calling from async contexts (e.g., FastAPI) to avoid
         issues with certain LLM providers (e.g., Gemini/Vertex AI) that require
         async execution.
 
         Args:
-            html (str): The HTML content to analyze
-            schema_type (str): "CSS" or "XPATH"
-            query (str, optional): Natural language description of what data to extract
-            target_json_example (str, optional): Example of desired JSON output
-            llm_config (LLMConfig): LLM configuration object
-            **kwargs: Additional args passed to LLM processor
+            html (str, optional): The HTML content to analyze. If not provided, url must be set.
+            schema_type (str): "CSS" or "XPATH". Defaults to "CSS".
+            query (str, optional): Natural language description of what data to extract.
+            target_json_example (str, optional): Example of desired JSON output.
+            llm_config (LLMConfig): LLM configuration object.
+            provider (str): Legacy Parameter. LLM provider to use.
+            api_token (str): Legacy Parameter. API token for LLM provider.
+            url (str or List[str], optional): URL(s) to fetch HTML from. If provided, html parameter is ignored.
+                When multiple URLs are provided, HTMLs are fetched in parallel and concatenated.
+            **kwargs: Additional args passed to LLM processor.
 
         Returns:
-            dict: Generated schema following the JsonElementExtractionStrategy format
+            dict: Generated schema following the JsonElementExtractionStrategy format.
+
+        Raises:
+            ValueError: If neither html nor url is provided.
         """
-        from .utils import aperform_completion_with_backoff
+        from .utils import aperform_completion_with_backoff, preprocess_html_for_schema
+
+        # Validate inputs
+        if html is None and (url is None or (isinstance(url, list) and len(url) == 0)):
+            raise ValueError("Either 'html' or 'url' must be provided")
+
+        # Check deprecated parameters
+        for name, message in JsonElementExtractionStrategy._GENERATE_SCHEMA_UNWANTED_PROPS.items():
+            if locals()[name] is not None:
+                raise AttributeError(f"Setting '{name}' is deprecated. {message}")
 
         if llm_config is None:
             llm_config = create_llm_config()
+
+        # Fetch HTML from URL(s) if provided
+        if url is not None:
+            from .async_webcrawler import AsyncWebCrawler
+            from .async_configs import BrowserConfig, CrawlerRunConfig, CacheMode
+
+            browser_config = BrowserConfig(
+                headless=True,
+                text_mode=True,
+                light_mode=True,
+            )
+            crawler_config = CrawlerRunConfig(cache_mode=CacheMode.BYPASS)
+
+            # Normalize to list
+            urls = [url] if isinstance(url, str) else url
+
+            async with AsyncWebCrawler(config=browser_config) as crawler:
+                if len(urls) == 1:
+                    result = await crawler.arun(url=urls[0], config=crawler_config)
+                    if not result.success:
+                        raise Exception(f"Failed to fetch URL '{urls[0]}': {result.error_message}")
+                    if result.status_code >= 400:
+                        raise Exception(f"HTTP {result.status_code} error for URL '{urls[0]}'")
+                    html = result.html
+                else:
+                    results = await crawler.arun_many(urls=urls, config=crawler_config)
+                    html_parts = []
+                    for i, result in enumerate(results, 1):
+                        if not result.success:
+                            raise Exception(f"Failed to fetch URL '{result.url}': {result.error_message}")
+                        if result.status_code >= 400:
+                            raise Exception(f"HTTP {result.status_code} error for URL '{result.url}'")
+                        cleaned = preprocess_html_for_schema(
+                            html_content=result.html,
+                            text_threshold=2000,
+                            attr_value_threshold=500,
+                            max_size=500_000
+                        )
+                        header = HTML_EXAMPLE_DELIMITER.format(index=i)
+                        html_parts.append(f"{header}\n{cleaned}")
+                    html = "\n\n".join(html_parts)
+
+        # Preprocess HTML for schema generation (skip if already preprocessed from multiple URLs)
+        if url is None or isinstance(url, str):
+            html = preprocess_html_for_schema(
+                html_content=html,
+                text_threshold=2000,
+                attr_value_threshold=500,
+                max_size=500_000
+            )
 
         prompt = JsonElementExtractionStrategy._build_schema_prompt(html, schema_type, query, target_json_example)
 

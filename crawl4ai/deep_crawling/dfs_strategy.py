@@ -1,4 +1,5 @@
 # dfs_deep_crawl_strategy.py
+import asyncio
 from typing import AsyncGenerator, Optional, Set, Dict, List, Tuple
 
 from ..models import CrawlResult
@@ -38,6 +39,9 @@ class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
         in control of traversal. Every successful page bumps ``_pages_crawled`` and
         seeds new stack items discovered via :meth:`link_discovery`.
         """
+        # Reset cancel event for strategy reuse
+        self._cancel_event = asyncio.Event()
+
         # Conditional state initialization for resume support
         if self._resume_state:
             visited = set(self._resume_state.get("visited", []))
@@ -59,6 +63,11 @@ class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
             self._reset_seen(start_url)
 
         while stack and not self._cancel_event.is_set():
+            # Check external cancellation callback before processing this URL
+            if await self._check_cancellation():
+                self.logger.info("Crawl cancelled by user")
+                break
+
             url, parent, depth = stack.pop()
             if url in visited or depth > self.max_depth:
                 continue
@@ -105,9 +114,28 @@ class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
                             "depths": depths,
                             "pages_crawled": self._pages_crawled,
                             "dfs_seen": list(self._dfs_seen),
+                            "cancelled": self._cancel_event.is_set(),
                         }
                         self._last_state = state
                         await self._on_state_change(state)
+
+        # Final state update if cancelled
+        if self._cancel_event.is_set() and self._on_state_change:
+            state = {
+                "strategy_type": "dfs",
+                "visited": list(visited),
+                "stack": [
+                    {"url": u, "parent_url": p, "depth": d}
+                    for u, p, d in stack
+                ],
+                "depths": depths,
+                "pages_crawled": self._pages_crawled,
+                "dfs_seen": list(self._dfs_seen),
+                "cancelled": True,
+            }
+            self._last_state = state
+            await self._on_state_change(state)
+
         return results
 
     async def _arun_stream(
@@ -123,6 +151,9 @@ class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
         yielded before we even look at the next stack entry. Successful crawls
         still feed :meth:`link_discovery`, keeping DFS order intact.
         """
+        # Reset cancel event for strategy reuse
+        self._cancel_event = asyncio.Event()
+
         # Conditional state initialization for resume support
         if self._resume_state:
             visited = set(self._resume_state.get("visited", []))
@@ -141,6 +172,11 @@ class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
             self._reset_seen(start_url)
 
         while stack and not self._cancel_event.is_set():
+            # Check external cancellation callback before processing this URL
+            if await self._check_cancellation():
+                self.logger.info("Crawl cancelled by user")
+                break
+
             url, parent, depth = stack.pop()
             if url in visited or depth > self.max_depth:
                 continue
@@ -183,9 +219,27 @@ class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
                             "depths": depths,
                             "pages_crawled": self._pages_crawled,
                             "dfs_seen": list(self._dfs_seen),
+                            "cancelled": self._cancel_event.is_set(),
                         }
                         self._last_state = state
                         await self._on_state_change(state)
+
+        # Final state update if cancelled
+        if self._cancel_event.is_set() and self._on_state_change:
+            state = {
+                "strategy_type": "dfs",
+                "visited": list(visited),
+                "stack": [
+                    {"url": u, "parent_url": p, "depth": d}
+                    for u, p, d in stack
+                ],
+                "depths": depths,
+                "pages_crawled": self._pages_crawled,
+                "dfs_seen": list(self._dfs_seen),
+                "cancelled": True,
+            }
+            self._last_state = state
+            await self._on_state_change(state)
 
     async def link_discovery(
         self,
