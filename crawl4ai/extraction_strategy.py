@@ -13,6 +13,7 @@ from .config import (
     CHUNK_TOKEN_THRESHOLD,
     OVERLAP_RATE,
     WORD_TOKEN_RATE,
+    HTML_EXAMPLE_DELIMITER,
 )
 from .utils import *  # noqa: F403
 
@@ -1488,7 +1489,8 @@ In this scenario, use your best judgment to generate the schema. You need to exa
                             attr_value_threshold=500,
                             max_size=500_000
                         )
-                        html_parts.append(f"'''html example {i}\n{cleaned}\n'''")
+                        header = HTML_EXAMPLE_DELIMITER.format(index=i)
+                        html_parts.append(f"{header}\n{cleaned}")
                     html = "\n\n".join(html_parts)
 
         # Preprocess HTML for schema generation (skip if already preprocessed from multiple URLs)

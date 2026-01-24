@@ -102,6 +102,9 @@ SCREENSHOT_HEIGHT_TRESHOLD = 10000
 PAGE_TIMEOUT = 60000
 DOWNLOAD_PAGE_TIMEOUT = 60000
 
+# Delimiter for concatenating multiple HTML examples in schema generation
+HTML_EXAMPLE_DELIMITER = "=== HTML EXAMPLE {index} ==="
+
 # Global user settings with descriptions and default values
 USER_SETTINGS = {
     "DEFAULT_LLM_PROVIDER": {
