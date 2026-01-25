@@ -34,6 +34,7 @@ from crawl4ai import (
 )
 from crawl4ai.browser_profiler import ShrinkLevel, _format_size
 from crawl4ai.config import USER_SETTINGS
+from crawl4ai.cloud import cloud_cmd
 from litellm import completion
 from pathlib import Path
 
@@ -624,6 +625,9 @@ async def manage_profiles():
 def cli():
     """Crawl4AI CLI - Web content extraction and browser profile management tool"""
     pass
+
+# Add cloud command group
+cli.add_command(cloud_cmd)
 
 
 @cli.group("browser")
