@@ -37,21 +37,23 @@ class ShrinkLevel(str, Enum):
 
 # Whitelist: what to KEEP at each level (everything else gets deleted)
 # Note: "Cookies" can be at root (older Chrome) or in Network/ (Chrome 96+)
+# storage_state.json is Playwright's portable cookie format (unencrypted)
+# It MUST be kept in all levels for cross-machine profile portability
 KEEP_PATTERNS: Dict[ShrinkLevel, Set[str]] = {
     ShrinkLevel.NONE: {"*"},
     ShrinkLevel.LIGHT: {
         "Network", "Cookies", "Local Storage", "Session Storage", "IndexedDB",
         "Preferences", "Secure Preferences", "Login Data", "Login Data For Account",
         "Web Data", "History", "History-journal", "Visited Links", "Bookmarks",
-        "TransportSecurity", "Trust Tokens",
+        "TransportSecurity", "Trust Tokens", "storage_state.json",
     },
     ShrinkLevel.MEDIUM: {
         "Network", "Cookies", "Local Storage", "Session Storage", "IndexedDB",
         "Preferences", "Secure Preferences", "Login Data", "Login Data For Account",
-        "Web Data", "TransportSecurity",
+        "Web Data", "TransportSecurity", "storage_state.json",
     },
-    ShrinkLevel.AGGRESSIVE: {"Network", "Cookies", "Local Storage", "IndexedDB", "Preferences"},
-    ShrinkLevel.MINIMAL: {"Network", "Cookies", "Local Storage"},
+    ShrinkLevel.AGGRESSIVE: {"Network", "Cookies", "Local Storage", "IndexedDB", "Preferences", "storage_state.json"},
+    ShrinkLevel.MINIMAL: {"Network", "Cookies", "Local Storage", "storage_state.json"},
 }
 
 
