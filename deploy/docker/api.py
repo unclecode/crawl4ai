@@ -579,21 +579,33 @@ async def handle_crawl_request(
 
         results = []
         func = getattr(crawler, "arun" if len(urls) == 1 else "arun_many")
-        partial_func = partial(func, 
-                                urls[0] if len(urls) == 1 else urls, 
-                                config=crawler_config, 
+        partial_func = partial(func,
+                                urls[0] if len(urls) == 1 else urls,
+                                config=crawler_config,
                                 dispatcher=dispatcher)
         results = await partial_func()
-        
+
         # Ensure results is always a list
         if not isinstance(results, list):
             results = [results]
 
+        # Clean up idle browser contexts to prevent memory leaks
+        # Only closes contexts with no open pages (safe cleanup)
+        try:
+            if hasattr(crawler, 'crawler_strategy') and hasattr(crawler.crawler_strategy, 'browser_manager'):
+                bm = crawler.crawler_strategy.browser_manager
+                # Clean up idle contexts (keep at most 3 to allow some reuse)
+                cleaned_count = await bm.cleanup_contexts(max_contexts=3)
+                if cleaned_count > 0:
+                    logger.info(f"Browser cleanup: closed {cleaned_count} idle context(s)")
+        except Exception as e:
+            logger.warning(f"Browser context cleanup warning: {e}")
+
         # await crawler.close()
-        
+
         end_mem_mb = _get_memory_mb() # <--- Get memory after
         end_time = time.time()
-        
+
         if start_mem_mb is not None and end_mem_mb is not None:
             mem_delta_mb = end_mem_mb - start_mem_mb # <--- Calculate delta
             peak_mem_mb = max(peak_mem_mb if peak_mem_mb else 0, end_mem_mb) # <--- Get peak memory
