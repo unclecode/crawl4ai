@@ -297,3 +297,6 @@ scripts/
 *.rdb
 *.ldb
 MEMORY.md
+
+# Handoff files
+HANDOFF-*.md

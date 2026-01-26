@@ -1378,17 +1378,104 @@ def config_set_cmd(key: str, value: str):
         
     console.print(f"[green]Successfully set[/green] [cyan]{key}[/cyan] = [green]{display_value}[/green]")
 
-@cli.command("profiles")
-def profiles_cmd():
-    """Manage browser profiles interactively
+@cli.group("profiles", invoke_without_command=True)
+@click.pass_context
+def profiles_cmd(ctx):
+    """Manage browser profiles for authenticated crawling
 
     Launch an interactive browser profile manager where you can:
     - List all existing profiles
     - Create new profiles for authenticated browsing
     - Delete unused profiles
+
+    Subcommands:
+      crwl profiles create <name>  - Create a new profile
+      crwl profiles list           - List all profiles
+      crwl profiles delete <name>  - Delete a profile
+
+    Or run without subcommand for interactive menu:
+      crwl profiles
     """
-    # Run interactive profile manager
-    anyio.run(manage_profiles)
+    # If no subcommand provided, run interactive manager
+    if ctx.invoked_subcommand is None:
+        anyio.run(manage_profiles)
+
+
+@profiles_cmd.command("create")
+@click.argument("name")
+def profiles_create_cmd(name: str):
+    """Create a new browser profile
+
+    Opens a browser window for you to log in and set up your identity.
+    Press 'q' in the terminal when finished to save the profile.
+
+    Example:
+      crwl profiles create github-auth
+    """
+    profiler = BrowserProfiler()
+    console.print(Panel(f"[bold cyan]Creating Profile: {name}[/bold cyan]\n"
+                      "A browser window will open for you to set up your identity.\n"
+                      "Log in to sites, adjust settings, then press 'q' to save.",
+                      border_style="cyan"))
+
+    async def _create():
+        try:
+            profile_path = await profiler.create_profile(name)
+            if profile_path:
+                console.print(f"[green]Profile successfully created at:[/green] {profile_path}")
+            else:
+                console.print("[red]Failed to create profile.[/red]")
+                sys.exit(1)
+        except Exception as e:
+            console.print(f"[red]Error creating profile: {str(e)}[/red]")
+            sys.exit(1)
+
+    anyio.run(_create)
+
+
+@profiles_cmd.command("list")
+def profiles_list_cmd():
+    """List all browser profiles
+
+    Example:
+      crwl profiles list
+    """
+    profiler = BrowserProfiler()
+    profiles = profiler.list_profiles()
+    display_profiles_table(profiles)
+
+
+@profiles_cmd.command("delete")
+@click.argument("name")
+@click.option("--force", "-f", is_flag=True, help="Skip confirmation")
+def profiles_delete_cmd(name: str, force: bool):
+    """Delete a browser profile
+
+    Example:
+      crwl profiles delete old-profile
+      crwl profiles delete old-profile --force
+    """
+    profiler = BrowserProfiler()
+
+    # Find profile by name
+    profiles = profiler.list_profiles()
+    profile = next((p for p in profiles if p["name"] == name), None)
+
+    if not profile:
+        console.print(f"[red]Profile not found:[/red] {name}")
+        sys.exit(1)
+
+    if not force:
+        if not Confirm.ask(f"[yellow]Delete profile '{name}'?[/yellow]"):
+            console.print("[cyan]Cancelled.[/cyan]")
+            return
+
+    try:
+        profiler.delete_profile(name)
+        console.print(f"[green]Profile '{name}' deleted successfully.[/green]")
+    except Exception as e:
+        console.print(f"[red]Error deleting profile: {str(e)}[/red]")
+        sys.exit(1)
 
 
 @cli.command("shrink")

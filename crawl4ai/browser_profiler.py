@@ -421,16 +421,30 @@ class BrowserProfiler:
             ```
         """
         # Create default browser config if none provided
+        # IMPORTANT: We disable cookie encryption so profiles can be transferred
+        # between machines (e.g., local -> cloud). Without this, Chrome encrypts
+        # cookies with OS keychain which isn't portable.
+        portable_profile_args = [
+            "--password-store=basic",      # Linux: use basic store, not gnome-keyring
+            "--use-mock-keychain",         # macOS: use mock keychain, not real one
+        ]
+
         if browser_config is None:
             from .async_configs import BrowserConfig
             browser_config = BrowserConfig(
                 browser_type="chromium",
                 headless=False,  # Must be visible for user interaction
-                verbose=True
+                verbose=True,
+                extra_args=portable_profile_args,
             )
         else:
             # Ensure headless is False for user interaction
             browser_config.headless = False
+            # Add portable profile args
+            if browser_config.extra_args:
+                browser_config.extra_args.extend(portable_profile_args)
+            else:
+                browser_config.extra_args = portable_profile_args
             
         # Generate profile name if not provided
         if not profile_name:
