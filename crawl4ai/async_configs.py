@@ -19,7 +19,10 @@ from .user_agent_generator import UAGen, ValidUAGenerator  # , OnlineUAGenerator
 from .extraction_strategy import ExtractionStrategy, LLMExtractionStrategy
 from .chunking_strategy import ChunkingStrategy, RegexChunking
 
-from .markdown_generation_strategy import MarkdownGenerationStrategy, DefaultMarkdownGenerator
+from .markdown_generation_strategy import (
+    MarkdownGenerationStrategy,
+    DefaultMarkdownGenerator,
+)
 from .content_scraping_strategy import ContentScrapingStrategy, LXMLWebScrapingStrategy
 from .deep_crawling import DeepCrawlStrategy
 from .table_extraction import TableExtractionStrategy, DefaultTableExtraction
@@ -39,8 +42,8 @@ class MatchMode(Enum):
     OR = "or"
     AND = "and"
 
-# from .proxy_strategy import ProxyConfig
 
+# from .proxy_strategy import ProxyConfig
 
 def to_serializable_dict(obj: Any, ignore_default_value : bool = False):
     """
@@ -63,7 +66,11 @@ def to_serializable_dict(obj: Any, ignore_default_value : bool = False):
         return obj.isoformat()
 
     # Handle lists, tuples, and sets, and basically any iterable
-    if isinstance(obj, (list, tuple, set)) or hasattr(obj, '__iter__') and not isinstance(obj, dict):
+    if (
+        isinstance(obj, (list, tuple, set))
+        or hasattr(obj, "__iter__")
+        and not isinstance(obj, dict)
+    ):
         return [to_serializable_dict(item) for item in obj]
 
     # Handle frozensets, which are not iterable
@@ -97,7 +104,7 @@ def to_serializable_dict(obj: Any, ignore_default_value : bool = False):
             if not (is_empty_value(value) and is_empty_value(param.default)):
                 if value != param.default and not ignore_default_value:
                     current_values[name] = to_serializable_dict(value)
-        
+
         # Don't serialize private __slots__ - they're internal implementation details
         # not constructor parameters. This was causing URLPatternFilter to fail
         # because _simple_suffixes was being serialized as 'simple_suffixes'
@@ -178,15 +185,13 @@ def is_empty_value(value: Any) -> bool:
         return True
     return False
 
+
 class GeolocationConfig:
     def __init__(
-        self,
-        latitude: float,
-        longitude: float,
-        accuracy: Optional[float] = 0.0
+        self, latitude: float, longitude: float, accuracy: Optional[float] = 0.0
     ):
         """Configuration class for geolocation settings.
-        
+
         Args:
             latitude: Latitude coordinate (e.g., 37.7749)
             longitude: Longitude coordinate (e.g., -122.4194)
@@ -195,24 +200,24 @@ class GeolocationConfig:
         self.latitude = latitude
         self.longitude = longitude
         self.accuracy = accuracy
-    
+
     @staticmethod
     def from_dict(geo_dict: Dict) -> "GeolocationConfig":
         """Create a GeolocationConfig from a dictionary."""
         return GeolocationConfig(
             latitude=geo_dict.get("latitude"),
             longitude=geo_dict.get("longitude"),
-            accuracy=geo_dict.get("accuracy", 0.0)
+            accuracy=geo_dict.get("accuracy", 0.0),
         )
-    
+
     def to_dict(self) -> Dict:
         """Convert to dictionary representation."""
         return {
             "latitude": self.latitude,
             "longitude": self.longitude,
-            "accuracy": self.accuracy
+            "accuracy": self.accuracy,
         }
-    
+
     def clone(self, **kwargs) -> "GeolocationConfig":
         """Create a copy of this configuration with updated values.
 
@@ -226,6 +231,7 @@ class GeolocationConfig:
         config_dict.update(kwargs)
         return GeolocationConfig.from_dict(config_dict)
 
+
 class ProxyConfig:
     def __init__(
         self,
@@ -235,7 +241,7 @@ class ProxyConfig:
         ip: Optional[str] = None,
     ):
         """Configuration class for a single proxy.
-        
+
         Args:
             server: Proxy server URL (e.g., "http://127.0.0.1:8080")
             username: Optional username for proxy authentication
@@ -245,10 +251,10 @@ class ProxyConfig:
         self.server = server
         self.username = username
         self.password = password
-        
+
         # Extract IP from server if not explicitly provided
         self.ip = ip or self._extract_ip_from_server()
-    
+
     def _extract_ip_from_server(self) -> Optional[str]:
         """Extract IP address from server URL."""
         try:
@@ -261,7 +267,7 @@ class ProxyConfig:
                 return parts[0]
         except Exception:
             return None
-    
+
     @staticmethod
     def from_string(proxy_str: str) -> "ProxyConfig":
         """Create a ProxyConfig from a string.
@@ -292,12 +298,14 @@ class ProxyConfig:
         parts = s.split(":")
         if len(parts) == 4:
             ip, port, username, password = parts
-            return ProxyConfig(server=f"http://{ip}:{port}", username=username, password=password)
+            return ProxyConfig(
+                server=f"http://{ip}:{port}", username=username, password=password
+            )
         if len(parts) == 2:
             ip, port = parts
             return ProxyConfig(server=f"http://{ip}:{port}")
         raise ValueError(f"Invalid proxy string format: {proxy_str}")
-    
+
     @staticmethod
     def from_dict(proxy_dict: Dict) -> "ProxyConfig":
         """Create a ProxyConfig from a dictionary."""
@@ -305,16 +313,16 @@ class ProxyConfig:
             server=proxy_dict.get("server"),
             username=proxy_dict.get("username"),
             password=proxy_dict.get("password"),
-            ip=proxy_dict.get("ip")
+            ip=proxy_dict.get("ip"),
         )
-    
+
     @staticmethod
     def from_env(env_var: str = "PROXIES") -> List["ProxyConfig"]:
         """Load proxies from environment variable.
-        
+
         Args:
             env_var: Name of environment variable containing comma-separated proxy strings
-            
+
         Returns:
             List of ProxyConfig objects
         """
@@ -328,16 +336,16 @@ class ProxyConfig:
         except Exception as e:
             print(f"Error loading proxies from environment: {e}")
         return proxies
-    
+
     def to_dict(self) -> Dict:
         """Convert to dictionary representation."""
         return {
             "server": self.server,
             "username": self.username,
             "password": self.password,
-            "ip": self.ip
+            "ip": self.ip,
         }
-    
+
     def clone(self, **kwargs) -> "ProxyConfig":
         """Create a copy of this configuration with updated values.
 
@@ -350,6 +358,7 @@ class ProxyConfig:
         config_dict = self.to_dict()
         config_dict.update(kwargs)
         return ProxyConfig.from_dict(config_dict)
+
 
 class BrowserConfig:
     """
@@ -479,7 +488,6 @@ class BrowserConfig:
         enable_stealth: bool = False,
         init_scripts: List[str] = None,
     ):
-        
         self.browser_type = browser_type
         self.headless = headless
         self.browser_mode = browser_mode
@@ -497,16 +505,22 @@ class BrowserConfig:
             self.channel = ""
             self.chrome_channel = ""
         if proxy:
-            warnings.warn("The 'proxy' parameter is deprecated and will be removed in a future release. Use 'proxy_config' instead.", UserWarning)
+            warnings.warn(
+                "The 'proxy' parameter is deprecated and will be removed in a future release. Use 'proxy_config' instead.",
+                UserWarning,
+            )
         self.proxy = proxy
         self.proxy_config = proxy_config
         if isinstance(self.proxy_config, dict):
             self.proxy_config = ProxyConfig.from_dict(self.proxy_config)
         if isinstance(self.proxy_config, str):
             self.proxy_config = ProxyConfig.from_string(self.proxy_config)
-        
+
         if self.proxy and self.proxy_config:
-            warnings.warn("Both 'proxy' and 'proxy_config' are provided. 'proxy_config' will take precedence.", UserWarning)
+            warnings.warn(
+                "Both 'proxy' and 'proxy_config' are provided. 'proxy_config' will take precedence.",
+                UserWarning,
+            )
             self.proxy = None
         elif self.proxy:
             # Convert proxy string to ProxyConfig if proxy_config is not provided
@@ -569,9 +583,13 @@ class BrowserConfig:
         # If persistent context is requested, ensure managed browser is enabled
         if self.use_persistent_context:
             self.use_managed_browser = True
-            
+
         # Validate stealth configuration
-        if self.enable_stealth and self.use_managed_browser and self.browser_mode == "builtin":
+        if (
+            self.enable_stealth
+            and self.use_managed_browser
+            and self.browser_mode == "builtin"
+        ):
             raise ValueError(
                 "enable_stealth cannot be used with browser_mode='builtin'. "
                 "Stealth mode requires a dedicated browser instance."
@@ -750,10 +768,14 @@ class BrowserConfig:
 
             # --- Handle API error response ---
             if isinstance(data, dict) and data.get("err"):
-                raise PermissionError(f"[NSTProxy] API Error: {data.get('msg', 'Unknown error')}")
+                raise PermissionError(
+                    f"[NSTProxy] API Error: {data.get('msg', 'Unknown error')}"
+                )
 
             if not isinstance(data, list) or not data:
-                raise ValueError("[NSTProxy] Invalid API response — expected a non-empty list")
+                raise ValueError(
+                    "[NSTProxy] Invalid API response — expected a non-empty list"
+                )
 
             proxy_info = data[0]
 
@@ -768,13 +790,14 @@ class BrowserConfig:
             print(f"[NSTProxy] ❌ Failed to set proxy: {e}")
             raise
 
+
 class VirtualScrollConfig:
     """Configuration for virtual scroll handling.
-    
+
     This config enables capturing content from pages with virtualized scrolling
     (like Twitter, Instagram feeds) where DOM elements are recycled as user scrolls.
     """
-    
+
     def __init__(
         self,
         container_selector: str,
@@ -784,13 +807,13 @@ class VirtualScrollConfig:
     ):
         """
         Initialize virtual scroll configuration.
-        
+
         Args:
             container_selector: CSS selector for the scrollable container
             scroll_count: Maximum number of scrolls to perform
             scroll_by: Amount to scroll - can be:
                 - "container_height": scroll by container's height
-                - "page_height": scroll by viewport height  
+                - "page_height": scroll by viewport height
                 - int: fixed pixel amount
             wait_after_scroll: Seconds to wait after each scroll for content to load
         """
@@ -798,7 +821,7 @@ class VirtualScrollConfig:
         self.scroll_count = scroll_count
         self.scroll_by = scroll_by
         self.wait_after_scroll = wait_after_scroll
-    
+
     def to_dict(self) -> dict:
         """Convert to dictionary for serialization."""
         return {
@@ -807,15 +830,16 @@ class VirtualScrollConfig:
             "scroll_by": self.scroll_by,
             "wait_after_scroll": self.wait_after_scroll,
         }
-    
+
     @classmethod
     def from_dict(cls, data: dict) -> "VirtualScrollConfig":
         """Create instance from dictionary."""
         return cls(**data)
 
+
 class LinkPreviewConfig:
     """Configuration for link head extraction and scoring."""
-    
+
     def __init__(
         self,
         include_internal: bool = True,
@@ -827,14 +851,14 @@ class LinkPreviewConfig:
         max_links: int = 100,
         query: Optional[str] = None,
         score_threshold: Optional[float] = None,
-        verbose: bool = False
+        verbose: bool = False,
     ):
         """
         Initialize link extraction configuration.
-        
+
         Args:
             include_internal: Whether to include same-domain links
-            include_external: Whether to include different-domain links  
+            include_external: Whether to include different-domain links
             include_patterns: List of glob patterns to include (e.g., ["*/docs/*", "*/api/*"])
             exclude_patterns: List of glob patterns to exclude (e.g., ["*/login*", "*/admin*"])
             concurrency: Number of links to process simultaneously
@@ -854,7 +878,7 @@ class LinkPreviewConfig:
         self.query = query
         self.score_threshold = score_threshold
         self.verbose = verbose
-        
+
         # Validation
         if concurrency <= 0:
             raise ValueError("concurrency must be positive")
@@ -865,14 +889,16 @@ class LinkPreviewConfig:
         if score_threshold is not None and not (0.0 <= score_threshold <= 1.0):
             raise ValueError("score_threshold must be between 0.0 and 1.0")
         if not include_internal and not include_external:
-            raise ValueError("At least one of include_internal or include_external must be True")
-    
+            raise ValueError(
+                "At least one of include_internal or include_external must be True"
+            )
+
     @staticmethod
     def from_dict(config_dict: Dict[str, Any]) -> "LinkPreviewConfig":
         """Create LinkPreviewConfig from dictionary (for backward compatibility)."""
         if not config_dict:
             return None
-        
+
         return LinkPreviewConfig(
             include_internal=config_dict.get("include_internal", True),
             include_external=config_dict.get("include_external", False),
@@ -883,9 +909,9 @@ class LinkPreviewConfig:
             max_links=config_dict.get("max_links", 100),
             query=config_dict.get("query"),
             score_threshold=config_dict.get("score_threshold"),
-            verbose=config_dict.get("verbose", False)
+            verbose=config_dict.get("verbose", False),
         )
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary format."""
         return {
@@ -898,9 +924,9 @@ class LinkPreviewConfig:
             "max_links": self.max_links,
             "query": self.query,
             "score_threshold": self.score_threshold,
-            "verbose": self.verbose
+            "verbose": self.verbose,
         }
-    
+
     def clone(self, **kwargs) -> "LinkPreviewConfig":
         """Create a copy with updated values."""
         config_dict = self.to_dict()
@@ -978,8 +1004,8 @@ class HTTPCrawlerConfig:
             return config
         return HTTPCrawlerConfig.from_kwargs(config)
 
-class CrawlerRunConfig():
 
+class CrawlerRunConfig:
     """
     Configuration class for controlling how the crawler runs each crawl operation.
     This includes parameters for content extraction, page manipulation, waiting conditions,
@@ -1005,13 +1031,13 @@ class CrawlerRunConfig():
                           Default: False.
         css_selector (str or None): CSS selector to extract a specific portion of the page.
                                     Default: None.
-        
-        target_elements (list of str or None): List of CSS selectors for specific elements for Markdown generation 
-                                                and structured data extraction. When you set this, only the contents 
-                                                of these elements are processed for extraction and Markdown generation. 
-                                                If you do not set any value, the entire page is processed. 
-                                                The difference between this and css_selector is that this will shrink 
-                                                the initial raw HTML to the selected element, while this will only affect 
+
+        target_elements (list of str or None): List of CSS selectors for specific elements for Markdown generation
+                                                and structured data extraction. When you set this, only the contents
+                                                of these elements are processed for extraction and Markdown generation.
+                                                If you do not set any value, the entire page is processed.
+                                                The difference between this and css_selector is that this will shrink
+                                                the initial raw HTML to the selected element, while this will only affect
                                                 the extraction and Markdown generation.
                                     Default: None
         excluded_tags (list of str or None): List of HTML tags to exclude from processing.
@@ -1151,7 +1177,7 @@ class CrawlerRunConfig():
 
         # Virtual Scroll Parameters
         virtual_scroll_config (VirtualScrollConfig or dict or None): Configuration for handling virtual scroll containers.
-                                                                     Used for capturing content from pages with virtualized 
+                                                                     Used for capturing content from pages with virtualized
                                                                      scrolling (e.g., Twitter, Instagram feeds).
                                                                      Default: None.
 
@@ -1206,17 +1232,18 @@ class CrawlerRunConfig():
 
         # Experimental Parameters
         experimental (dict): Dictionary containing experimental parameters that are in beta phase.
-                            This allows passing temporary features that are not yet fully integrated 
+                            This allows passing temporary features that are not yet fully integrated
                             into the main parameter set.
                             Default: None.
 
         url: str = None  # This is not a compulsory parameter
     """
+
     _UNWANTED_PROPS = {
-        'disable_cache' : 'Instead, use cache_mode=CacheMode.DISABLED',
-        'bypass_cache' : 'Instead, use cache_mode=CacheMode.BYPASS',
-        'no_cache_read' : 'Instead, use cache_mode=CacheMode.WRITE_ONLY',
-        'no_cache_write' : 'Instead, use cache_mode=CacheMode.READ_ONLY',
+        "disable_cache": "Instead, use cache_mode=CacheMode.DISABLED",
+        "bypass_cache": "Instead, use cache_mode=CacheMode.BYPASS",
+        "no_cache_read": "Instead, use cache_mode=CacheMode.WRITE_ONLY",
+        "no_cache_write": "Instead, use cache_mode=CacheMode.READ_ONLY",
     }
 
     def __init__(
@@ -1423,10 +1450,12 @@ class CrawlerRunConfig():
         self.exclude_external_images = exclude_external_images
         self.exclude_all_images = exclude_all_images
         self.table_score_threshold = table_score_threshold
-        
+
         # Table extraction strategy (default to DefaultTableExtraction if not specified)
         if table_extraction is None:
-            self.table_extraction = DefaultTableExtraction(table_score_threshold=table_score_threshold)
+            self.table_extraction = DefaultTableExtraction(
+                table_score_threshold=table_score_threshold
+            )
         else:
             self.table_extraction = table_extraction
 
@@ -1444,7 +1473,7 @@ class CrawlerRunConfig():
         # Debugging and Logging Parameters
         self.verbose = verbose
         self.log_console = log_console
-        
+
         # Network and Console Capturing Parameters
         self.capture_network_requests = capture_network_requests
         self.capture_console_messages = capture_console_messages
@@ -1483,7 +1512,7 @@ class CrawlerRunConfig():
 
         # Deep Crawl Parameters
         self.deep_crawl_strategy = deep_crawl_strategy
-        
+
         # Link Extraction Parameters
         if link_preview_config is None:
             self.link_preview_config = None
@@ -1493,8 +1522,10 @@ class CrawlerRunConfig():
             # Convert dict to config object for backward compatibility
             self.link_preview_config = LinkPreviewConfig.from_dict(link_preview_config)
         else:
-            raise ValueError("link_preview_config must be LinkPreviewConfig object or dict")
-        
+            raise ValueError(
+                "link_preview_config must be LinkPreviewConfig object or dict"
+            )
+
         # Virtual Scroll Parameters
         if virtual_scroll_config is None:
             self.virtual_scroll_config = None
@@ -1502,21 +1533,24 @@ class CrawlerRunConfig():
             self.virtual_scroll_config = virtual_scroll_config
         elif isinstance(virtual_scroll_config, dict):
             # Convert dict to config object for backward compatibility
-            self.virtual_scroll_config = VirtualScrollConfig.from_dict(virtual_scroll_config)
+            self.virtual_scroll_config = VirtualScrollConfig.from_dict(
+                virtual_scroll_config
+            )
         else:
-            raise ValueError("virtual_scroll_config must be VirtualScrollConfig object or dict")
-        
+            raise ValueError(
+                "virtual_scroll_config must be VirtualScrollConfig object or dict"
+            )
+
         # URL Matching Parameters
         self.url_matcher = url_matcher
         self.match_mode = match_mode
-        
+
         # Experimental Parameters
         self.experimental = experimental or {}
-        
+
         # Compile C4A scripts if provided
         if self.c4a_script and not self.js_code:
             self._compile_c4a_script()
-
 
     def _compile_c4a_script(self):
         """Compile C4A script to JavaScript"""
@@ -1526,35 +1560,35 @@ class CrawlerRunConfig():
                 from .script import compile
             except ImportError:
                 from crawl4ai.script import compile
-                
+
             # Handle both string and list inputs
             if isinstance(self.c4a_script, str):
                 scripts = [self.c4a_script]
             else:
                 scripts = self.c4a_script
-                
+
             # Compile each script
             compiled_js = []
             for i, script in enumerate(scripts):
                 result = compile(script)
-                
+
                 if result.success:
                     compiled_js.extend(result.js_code)
                 else:
                     # Format error message following existing patterns
                     error = result.first_error
                     error_msg = (
-                        f"C4A Script compilation error (script {i+1}):\n"
+                        f"C4A Script compilation error (script {i + 1}):\n"
                         f"  Line {error.line}, Column {error.column}: {error.message}\n"
                         f"  Code: {error.source_line}"
                     )
                     if error.suggestions:
                         error_msg += f"\n  Suggestion: {error.suggestions[0].message}"
-                        
+
                     raise ValueError(error_msg)
-                    
+
             self.js_code = compiled_js
-            
+
         except ImportError:
             raise ValueError(
                 "C4A script compiler not available. "
@@ -1565,57 +1599,60 @@ class CrawlerRunConfig():
             if "compilation error" not in str(e).lower():
                 raise ValueError(f"Failed to compile C4A script: {str(e)}")
             raise
-    
+
     def is_match(self, url: str) -> bool:
         """Check if this config matches the given URL.
-        
+
         Args:
             url: The URL to check against this config's matcher
-            
+
         Returns:
             bool: True if this config should be used for the URL or if no matcher is set.
         """
         if self.url_matcher is None:
             return True
-            
+
         if callable(self.url_matcher):
             # Single function matcher
             return self.url_matcher(url)
-        
+
         elif isinstance(self.url_matcher, str):
             # Single pattern string
             from fnmatch import fnmatch
+
             return fnmatch(url, self.url_matcher)
-        
+
         elif isinstance(self.url_matcher, list):
             # List of mixed matchers
             if not self.url_matcher:  # Empty list
                 return False
-                
+
             results = []
             for matcher in self.url_matcher:
                 if callable(matcher):
                     results.append(matcher(url))
                 elif isinstance(matcher, str):
                     from fnmatch import fnmatch
+
                     results.append(fnmatch(url, matcher))
                 else:
                     # Skip invalid matchers
                     continue
-            
+
             # Apply match mode logic
             if self.match_mode == MatchMode.OR:
                 return any(results) if results else False
             else:  # AND mode
                 return all(results) if results else False
-        
-        return False
 
+        return False
 
     def __getattr__(self, name):
         """Handle attribute access."""
         if name in self._UNWANTED_PROPS:
-            raise AttributeError(f"Getting '{name}' is deprecated. {self._UNWANTED_PROPS[name]}")
+            raise AttributeError(
+                f"Getting '{name}' is deprecated. {self._UNWANTED_PROPS[name]}"
+            )
         raise AttributeError(f"'{self.__class__.__name__}' has no attribute '{name}'")
 
     def __setattr__(self, name, value):
@@ -1625,8 +1662,10 @@ class CrawlerRunConfig():
         all_params = sig.parameters  # Dictionary of parameter names and their details
 
         if name in self._UNWANTED_PROPS and value is not all_params[name].default:
-            raise AttributeError(f"Setting '{name}' is deprecated. {self._UNWANTED_PROPS[name]}")
-        
+            raise AttributeError(
+                f"Setting '{name}' is deprecated. {self._UNWANTED_PROPS[name]}"
+            )
+
         super().__setattr__(name, value)
 
     @staticmethod
@@ -1719,7 +1758,9 @@ class CrawlerRunConfig():
             exclude_domains=kwargs.get("exclude_domains", []),
             exclude_internal_links=kwargs.get("exclude_internal_links", False),
             score_links=kwargs.get("score_links", False),
-            preserve_https_for_internal_links=kwargs.get("preserve_https_for_internal_links", False),
+            preserve_https_for_internal_links=kwargs.get(
+                "preserve_https_for_internal_links", False
+            ),
             # Debugging and Logging Parameters
             verbose=kwargs.get("verbose", True),
             log_console=kwargs.get("log_console", False),
@@ -1744,7 +1785,7 @@ class CrawlerRunConfig():
             # URL Matching Parameters
             url_matcher=kwargs.get("url_matcher"),
             match_mode=kwargs.get("match_mode", MatchMode.OR),
-            # Experimental Parameters 
+            # Experimental Parameters
             experimental=kwargs.get("experimental"),
         )
 
@@ -1846,7 +1887,9 @@ class CrawlerRunConfig():
             "user_agent_mode": self.user_agent_mode,
             "user_agent_generator_config": self.user_agent_generator_config,
             "deep_crawl_strategy": self.deep_crawl_strategy,
-            "link_preview_config": self.link_preview_config.to_dict() if self.link_preview_config else None,
+            "link_preview_config": self.link_preview_config.to_dict()
+            if self.link_preview_config
+            else None,
             "url": self.url,
             "url_matcher": self.url_matcher,
             "match_mode": self.match_mode,
@@ -1878,6 +1921,7 @@ class CrawlerRunConfig():
         config_dict = self.to_dict()
         config_dict.update(kwargs)
         return CrawlerRunConfig.from_kwargs(config_dict)
+
 
 class LLMConfig:
     def __init__(
@@ -1911,7 +1955,7 @@ class LLMConfig:
                     (prefix for prefix in prefixes if provider.startswith(prefix)),
                     None,
                 )
-                self.api_token = PROVIDER_MODELS_PREFIXES.get(selected_prefix)                    
+                self.api_token = PROVIDER_MODELS_PREFIXES.get(selected_prefix)
             else:
                 self.provider = DEFAULT_PROVIDER
                 self.api_token = os.getenv(DEFAULT_PROVIDER_API_KEY)
@@ -1975,10 +2019,12 @@ class LLMConfig:
         config_dict.update(kwargs)
         return LLMConfig.from_kwargs(config_dict)
 
+
 class SeedingConfig:
     """
     Configuration class for URL discovery and pre-validation via AsyncUrlSeeder.
     """
+
     def __init__(
         self,
         source: str = "sitemap+cc",
@@ -2001,33 +2047,33 @@ class SeedingConfig:
     ):
         """
         Initialize URL seeding configuration.
-        
+
         Args:
-            source: Discovery source(s) to use. Options: "sitemap", "cc" (Common Crawl), 
+            source: Discovery source(s) to use. Options: "sitemap", "cc" (Common Crawl),
                    or "sitemap+cc" (both). Default: "sitemap+cc"
-            pattern: URL pattern to filter discovered URLs (e.g., "*example.com/blog/*"). 
+            pattern: URL pattern to filter discovered URLs (e.g., "*example.com/blog/*").
                     Supports glob-style wildcards. Default: "*" (all URLs)
-            live_check: Whether to perform HEAD requests to verify URL liveness. 
+            live_check: Whether to perform HEAD requests to verify URL liveness.
                        Default: False
             extract_head: Whether to fetch and parse <head> section for metadata extraction.
                          Required for BM25 relevance scoring. Default: False
-            max_urls: Maximum number of URLs to discover. Use -1 for no limit. 
+            max_urls: Maximum number of URLs to discover. Use -1 for no limit.
                      Default: -1
-            concurrency: Maximum concurrent requests for live checks/head extraction. 
+            concurrency: Maximum concurrent requests for live checks/head extraction.
                         Default: 1000
-            hits_per_sec: Rate limit in requests per second to avoid overwhelming servers. 
+            hits_per_sec: Rate limit in requests per second to avoid overwhelming servers.
                          Default: 5
-            force: If True, bypasses the AsyncUrlSeeder's internal .jsonl cache and 
+            force: If True, bypasses the AsyncUrlSeeder's internal .jsonl cache and
                   re-fetches URLs. Default: False
-            base_directory: Base directory for UrlSeeder's cache files (.jsonl). 
+            base_directory: Base directory for UrlSeeder's cache files (.jsonl).
                            If None, uses default ~/.crawl4ai/. Default: None
-            llm_config: LLM configuration for future features (e.g., semantic scoring). 
+            llm_config: LLM configuration for future features (e.g., semantic scoring).
                        Currently unused. Default: None
-            verbose: Override crawler's general verbose setting for seeding operations. 
+            verbose: Override crawler's general verbose setting for seeding operations.
                     Default: None (inherits from crawler)
-            query: Search query for BM25 relevance scoring (e.g., "python tutorials"). 
+            query: Search query for BM25 relevance scoring (e.g., "python tutorials").
                   Requires extract_head=True. Default: None
-            score_threshold: Minimum relevance score (0.0-1.0) to include URL. 
+            score_threshold: Minimum relevance score (0.0-1.0) to include URL.
                            Only applies when query is provided. Default: None
             scoring_method: Scoring algorithm to use. Currently only "bm25" is supported.
                           Future: "semantic". Default: "bm25"
@@ -2058,13 +2104,15 @@ class SeedingConfig:
 
     # Add to_dict, from_kwargs, and clone methods for consistency
     def to_dict(self) -> Dict[str, Any]:
-        return {k: v for k, v in self.__dict__.items() if k != 'llm_config' or v is not None}
+        return {
+            k: v for k, v in self.__dict__.items() if k != "llm_config" or v is not None
+        }
 
     @staticmethod
-    def from_kwargs(kwargs: Dict[str, Any]) -> 'SeedingConfig':
+    def from_kwargs(kwargs: Dict[str, Any]) -> "SeedingConfig":
         return SeedingConfig(**kwargs)
 
-    def clone(self, **kwargs: Any) -> 'SeedingConfig':
+    def clone(self, **kwargs: Any) -> "SeedingConfig":
         config_dict = self.to_dict()
         config_dict.update(kwargs)
         return SeedingConfig.from_kwargs(config_dict)

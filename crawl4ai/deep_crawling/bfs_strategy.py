@@ -8,20 +8,22 @@ from urllib.parse import urlparse
 from ..models import TraversalStats
 from .filters import FilterChain
 from .scorers import URLScorer
-from . import DeepCrawlStrategy  
+from . import DeepCrawlStrategy
 from ..types import AsyncWebCrawler, CrawlerRunConfig, CrawlResult
 from ..utils import normalize_url_for_deep_crawl, efficient_normalize_url_for_deep_crawl
 from math import inf as infinity
 
+
 class BFSDeepCrawlStrategy(DeepCrawlStrategy):
     """
     Breadth-First Search deep crawling strategy.
-    
+
     Core functions:
       - arun: Main entry point; splits execution into batch or stream modes.
       - link_discovery: Extracts, filters, and (if needed) scores the outgoing URLs.
       - can_process_url: Validates URL format and applies the filter chain.
     """
+
     def __init__(
         self,
         max_depth: int,
@@ -144,7 +146,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
         prepares the next level of URLs.
         Each valid URL is appended to next_level as a tuple (url, parent_url)
         and its depth is tracked.
-        """            
+        """
         next_depth = current_depth + 1
         if next_depth > self.max_depth:
             return
@@ -152,7 +154,9 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
         # If we've reached the max pages limit, don't discover new links
         remaining_capacity = self.max_pages - self._pages_crawled
         if remaining_capacity <= 0:
-            self.logger.info(f"Max pages limit ({self.max_pages}) reached, stopping link discovery")
+            self.logger.info(
+                f"Max pages limit ({self.max_pages}) reached, stopping link discovery"
+            )
             return
 
         # Get internal links and, if enabled, external links.
@@ -161,7 +165,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
             links += result.links.get("external", [])
 
         valid_links = []
-        
+
         # First collect all valid links
         for link in links:
             url = link.get("href")
@@ -176,16 +180,18 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
 
             # Score the URL if a scorer is provided
             score = self.url_scorer.score(base_url) if self.url_scorer else 0
-            
+
             # Skip URLs with scores below the threshold
             if score < self.score_threshold:
-                self.logger.debug(f"URL {url} skipped: score {score} below threshold {self.score_threshold}")
+                self.logger.debug(
+                    f"URL {url} skipped: score {score} below threshold {self.score_threshold}"
+                )
                 self.stats.urls_skipped += 1
                 continue
 
             visited.add(base_url)
             valid_links.append((base_url, score))
-        
+
         # If we have more valid links than capacity, sort by score and take the top ones
         if len(valid_links) > remaining_capacity:
             if self.url_scorer:
@@ -193,8 +199,10 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
                 valid_links.sort(key=lambda x: x[1], reverse=True)
             # Take only as many as we have capacity for
             valid_links = valid_links[:remaining_capacity]
-            self.logger.info(f"Limiting to {remaining_capacity} URLs due to max_pages limit")
-            
+            self.logger.info(
+                f"Limiting to {remaining_capacity} URLs due to max_pages limit"
+            )
+
         # Process the final selected links
         for url, score in valid_links:
             # attach the score to metadata if needed
@@ -238,7 +246,9 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
         while current_level and not self._cancel_event.is_set():
             # Check if we've already reached max_pages before starting a new level
             if self._pages_crawled >= self.max_pages:
-                self.logger.info(f"Max pages limit ({self.max_pages}) reached, stopping crawl")
+                self.logger.info(
+                    f"Max pages limit ({self.max_pages}) reached, stopping crawl"
+                )
                 break
 
             # Check external cancellation callback before processing this level
@@ -253,12 +263,18 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
             batch_config = config.clone(deep_crawl_strategy=None, stream=False)
             batch_results = await crawler.arun_many(urls=urls, config=batch_config)
 
+            # Update pages crawled counter - count only successful crawls
+            successful_results = [r for r in batch_results if r.success]
+            self._pages_crawled += len(successful_results)
+
             for result in batch_results:
                 url = result.url
                 depth = depths.get(url, 0)
                 result.metadata = result.metadata or {}
                 result.metadata["depth"] = depth
-                parent_url = next((parent for (u, parent) in current_level if u == url), None)
+                parent_url = next(
+                    (parent for (u, parent) in current_level if u == url), None
+                )
                 result.metadata["parent_url"] = parent_url
                 results.append(result)
 
@@ -268,7 +284,9 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
                     self._pages_crawled += 1
 
                     # Link discovery will handle the max pages limit internally
-                    await self.link_discovery(result, url, depth, visited, next_level, depths)
+                    await self.link_discovery(
+                        result, url, depth, visited, next_level, depths
+                    )
 
                     # Capture state after EACH URL processed (if callback set)
                     if self._on_state_change:
@@ -340,7 +358,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
 
             stream_config = config.clone(deep_crawl_strategy=None, stream=True)
             stream_gen = await crawler.arun_many(urls=urls, config=stream_config)
-            
+
             # Keep track of processed results for this batch
             results_count = 0
             async for result in stream_gen:
@@ -348,20 +366,24 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
                 depth = depths.get(url, 0)
                 result.metadata = result.metadata or {}
                 result.metadata["depth"] = depth
-                parent_url = next((parent for (u, parent) in current_level if u == url), None)
+                parent_url = next(
+                    (parent for (u, parent) in current_level if u == url), None
+                )
                 result.metadata["parent_url"] = parent_url
-                
+
                 # Count only successful crawls
                 if result.success:
                     self._pages_crawled += 1
                     # Check if we've reached the limit during batch processing
                     if self._pages_crawled >= self.max_pages:
-                        self.logger.info(f"Max pages limit ({self.max_pages}) reached during batch, stopping crawl")
+                        self.logger.info(
+                            f"Max pages limit ({self.max_pages}) reached during batch, stopping crawl"
+                        )
                         break  # Exit the generator
-                
+
                 results_count += 1
                 yield result
-                
+
                 # Only discover links from successful crawls
                 if result.success:
                     # Link discovery will handle the max pages limit internally
