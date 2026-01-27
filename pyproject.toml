@@ -86,7 +86,7 @@ crwl = "crawl4ai.cli:main"
 packages = {find = {where = ["."], include = ["crawl4ai*"]}}
 
 [tool.setuptools.package-data]
-crawl4ai = ["js_snippet/*.js"]
+crawl4ai = ["js_snippet/*.js", "crawlers/google_search/*.js"]
 
 [tool.setuptools.dynamic]
 version = {attr = "crawl4ai.__version__.__version__"}
