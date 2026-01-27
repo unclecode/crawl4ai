@@ -285,6 +285,7 @@ docs/apps/linkdin/debug*/
 docs/apps/linkdin/samples/insights/*
 
 scripts/
+!scripts/gen-sbom.sh
 
 
 # Databse files
