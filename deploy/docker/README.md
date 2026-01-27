@@ -887,6 +887,7 @@ redis:
   port: 6379
   db: 0
   password: ""
+  task_ttl_seconds: 3600  # TTL for task data (1 hour default, 0 to disable)
   # ... other redis options ...
 
 # Rate Limiting Configuration
@@ -989,6 +990,8 @@ You can override the default `config.yml`.
    - Adjust memory_threshold_percent based on available RAM
    - Set timeouts according to your content size and network conditions
    - Use Redis for rate limiting in multi-container setups
+   - Configure `task_ttl_seconds` to control Redis memory usage (default: 3600s/1 hour)
+   - Set `REDIS_TASK_TTL` environment variable to override TTL at runtime
 
 3. **Monitoring** 📊
    - Enable Prometheus if you need metrics
