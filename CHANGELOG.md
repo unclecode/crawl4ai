@@ -48,6 +48,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **⏱️ Crawl-delay Directive Support**: New `respect_crawl_delay` configuration parameter
+  - Honors `Crawl-delay` directives from robots.txt files
+  - Automatically waits the specified delay between requests to the same domain
+  - Per-domain crawl-delay caching for efficiency
+  - Shared HTTP session with connection pooling for robots.txt fetching
+  - Race-condition safe domain initialization with asyncio locks
+  - Works with `arun_many()` for batch crawling scenarios
+  - Fully backward compatible with opt-in flag (default: `False`)
+
 - **🔒 HTTPS Preservation for Internal Links**: New `preserve_https_for_internal_links` configuration flag
   - Maintains HTTPS scheme for internal links even when servers redirect to HTTP
   - Prevents security downgrades during deep crawling

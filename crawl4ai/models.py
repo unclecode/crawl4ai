@@ -17,6 +17,7 @@ class DomainState:
     last_request_time: float = 0
     current_delay: float = 0
     fail_count: int = 0
+    crawl_delay: Optional[float] = None  # Crawl-delay from robots.txt
 
 
 @dataclass

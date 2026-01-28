@@ -1,4 +1,4 @@
-from typing import Dict, Optional, List, Tuple, Union
+from typing import Dict, Optional, List, Tuple, Union, TYPE_CHECKING
 from .async_configs import CrawlerRunConfig
 from .models import (
     CrawlResult,
@@ -10,6 +10,9 @@ from .models import (
 from .components.crawler_monitor import CrawlerMonitor
 
 from .types import AsyncWebCrawler
+
+if TYPE_CHECKING:
+    from .utils import RobotsParser
 
 from collections.abc import AsyncGenerator
 
@@ -32,32 +35,77 @@ class RateLimiter:
         max_delay: float = 60.0,
         max_retries: int = 3,
         rate_limit_codes: List[int] = None,
+        robots_parser: Optional["RobotsParser"] = None,
+        respect_crawl_delay: bool = False,
+        default_user_agent: str = "*",
     ):
         self.base_delay = base_delay
         self.max_delay = max_delay
         self.max_retries = max_retries
         self.rate_limit_codes = rate_limit_codes or [429, 503]
         self.domains: Dict[str, DomainState] = {}
+        self.robots_parser = robots_parser
+        self.respect_crawl_delay = respect_crawl_delay
+        self.default_user_agent = default_user_agent
+        # Lock to prevent race conditions when initializing new domains
+        self._domain_init_lock = asyncio.Lock()
 
     def get_domain(self, url: str) -> str:
         return urlparse(url).netloc
+
+    async def _get_crawl_delay_for_domain(self, url: str) -> Optional[float]:
+        """Fetch and cache crawl-delay for a domain from robots.txt."""
+        if not self.robots_parser or not self.respect_crawl_delay:
+            return None
+        
+        domain = self.get_domain(url)
+        state = self.domains.get(domain)
+        
+        # If we already have crawl_delay cached for this domain, return it
+        if state and state.crawl_delay is not None:
+            return state.crawl_delay
+        
+        # Fetch crawl-delay from robots.txt
+        try:
+            delay = await self.robots_parser.get_crawl_delay(url, self.default_user_agent)
+            return delay
+        except Exception:
+            return None
 
     async def wait_if_needed(self, url: str) -> None:
         domain = self.get_domain(url)
         state = self.domains.get(domain)
 
+        # Initialize new domain with lock to prevent race conditions
         if not state:
-            self.domains[domain] = DomainState()
-            state = self.domains[domain]
+            async with self._domain_init_lock:
+                # Double-check after acquiring lock
+                state = self.domains.get(domain)
+                if not state:
+                    state = DomainState()
+                    
+                    # Fetch crawl-delay before adding to domains dict
+                    if self.robots_parser and self.respect_crawl_delay:
+                        crawl_delay = await self._get_crawl_delay_for_domain(url)
+                        state.crawl_delay = crawl_delay
+                    
+                    self.domains[domain] = state
 
         now = time.time()
+        
+        # Determine the effective delay - use crawl_delay if specified, otherwise current_delay
+        effective_delay = state.current_delay
+        if state.crawl_delay is not None and state.crawl_delay > 0:
+            # Use the larger of crawl_delay and current_delay (which may be increased due to rate limiting)
+            effective_delay = max(state.crawl_delay, state.current_delay)
+        
         if state.last_request_time:
-            wait_time = max(0, state.current_delay - (now - state.last_request_time))
+            wait_time = max(0, effective_delay - (now - state.last_request_time))
             if wait_time > 0:
                 await asyncio.sleep(wait_time)
 
-        # Random delay within base range if no current delay
-        if state.current_delay == 0:
+        # Random delay within base range if no current delay and no crawl_delay
+        if state.current_delay == 0 and (state.crawl_delay is None or state.crawl_delay == 0):
             state.current_delay = random.uniform(*self.base_delay)
 
         state.last_request_time = time.time()
@@ -65,6 +113,9 @@ class RateLimiter:
     def update_delay(self, url: str, status_code: int) -> bool:
         domain = self.get_domain(url)
         state = self.domains[domain]
+        
+        # Get minimum delay from crawl_delay if set
+        min_delay = state.crawl_delay if state.crawl_delay is not None else 0
 
         if status_code in self.rate_limit_codes:
             state.fail_count += 1
@@ -76,10 +127,10 @@ class RateLimiter:
                 state.current_delay * 2 * random.uniform(0.75, 1.25), self.max_delay
             )
         else:
-            # Gradually reduce delay on success
-            state.current_delay = max(
-                random.uniform(*self.base_delay), state.current_delay * 0.75
-            )
+            # Gradually reduce delay on success, but never below crawl_delay
+            base = random.uniform(*self.base_delay)
+            reduced = state.current_delay * 0.75
+            state.current_delay = max(base, reduced, min_delay)
             state.fail_count = 0
 
         return True

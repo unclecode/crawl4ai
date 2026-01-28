@@ -140,6 +140,7 @@ Use these for controlling whether you read or write from a local content cache. 
 | **`wait_for_images`**      | `bool` (False)          | Wait for images to load before finishing. Slows down if you only want text.                                          |
 | **`delay_before_return_html`** | `float` (0.1)       | Additional pause (seconds) before final HTML is captured. Good for last-second updates.                               |
 | **`check_robots_txt`**     | `bool` (False)          | Whether to check and respect robots.txt rules before crawling. If True, caches robots.txt for efficiency.            |
+| **`respect_crawl_delay`**  | `bool` (False)          | Whether to honor `Crawl-delay` directives from robots.txt. Requires `check_robots_txt=True`. Used with `arun_many()`. |
 | **`mean_delay`** and **`max_range`** | `float` (0.1, 0.3) | If you call `arun_many()`, these define random delay intervals between crawls, helping avoid detection or rate limits. |
 | **`semaphore_count`**      | `int` (5)               | Max concurrency for `arun_many()`. Increase if you have resources for parallel crawls.                                |
 
@@ -416,12 +417,14 @@ if __name__ == "__main__":
 | **Parameter**          | **Type / Default**      | **What It Does**                                                                                                    |
 |-----------------------|-------------------------|----------------------------------------------------------------------------------------------------------------------|
 | **`check_robots_txt`**| `bool` (False)          | When True, checks and respects robots.txt rules before crawling. Uses efficient caching with SQLite backend.          |
-| **`user_agent`**      | `str` (None)            | User agent string to identify your crawler. Used for robots.txt checking when enabled.                                |
+| **`respect_crawl_delay`**| `bool` (False)       | When True (and `check_robots_txt=True`), honors `Crawl-delay` directives from robots.txt. Waits the specified delay between requests to the same domain.          |
+| **`user_agent`**      | `str` (None)            | User agent string to identify your crawler. Used for robots.txt checking and crawl-delay lookup.                      |
 
 ```python
 run_config = CrawlerRunConfig(
-    check_robots_txt=True,  # Enable robots.txt compliance
-    user_agent="MyBot/1.0"  # Identify your crawler
+    check_robots_txt=True,       # Enable robots.txt compliance
+    respect_crawl_delay=True,    # Honor Crawl-delay directives
+    user_agent="MyBot/1.0"       # Identify your crawler
 )
 ```
 
