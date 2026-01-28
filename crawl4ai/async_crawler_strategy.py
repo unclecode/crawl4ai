@@ -973,7 +973,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     # Handle comma-separated selectors by splitting them
                     selectors = [s.strip() for s in config.css_selector.split(',')]
                     html_parts = []
-                    
+
                     for selector in selectors:
                         try:
                             content = await self.adapter.evaluate(page,
@@ -984,13 +984,33 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                             html_parts.append(content)
                         except Error as e:
                             print(f"Warning: Could not get content for selector '{selector}': {str(e)}")
-                    
+
                     # Wrap in a div to create a valid HTML structure
-                    html = f"<div class='crawl4ai-result'>\n" + "\n".join(html_parts) + "\n</div>"                    
+                    html = f"<div class='crawl4ai-result'>\n" + "\n".join(html_parts) + "\n</div>"
                 except Error as e:
                     raise RuntimeError(f"Failed to extract HTML content: {str(e)}")
             else:
                 html = await page.content()
+
+            # Extract CSS background images if enabled
+            css_images_data = None
+            if config.extract_css_images:
+                try:
+                    js_script = load_js_script("extract_css_backgrounds")
+                    result = await self.adapter.evaluate(page, js_script)
+                    css_images_data = result.get("css_images", []) if result else []
+                    if self.logger and config.verbose:
+                        self.logger.info(
+                            message=f"Extracted {len(css_images_data)} CSS background images",
+                            tag="CSS_IMAGES",
+                        )
+                except Exception as e:
+                    if self.logger:
+                        self.logger.warning(
+                            message=f"Failed to extract CSS background images: {str(e)}",
+                            tag="CSS_IMAGES",
+                        )
+                    css_images_data = None
             
             # # Get final HTML content
             # html = await page.content()
@@ -1063,6 +1083,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 # Include captured data if enabled
                 network_requests=captured_requests if config.capture_network_requests else None,
                 console_messages=captured_console if config.capture_console_messages else None,
+                css_images_data=css_images_data,
             )
 
         except Exception as e:

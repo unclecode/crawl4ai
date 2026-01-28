@@ -3,7 +3,7 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict
 import json
 import asyncio
 
@@ -406,6 +406,7 @@ class AsyncWebCrawler:
                     screenshot_data = async_response.screenshot
                     pdf_data = async_response.pdf_data
                     js_execution_result = async_response.js_execution_result
+                    css_images_data = async_response.css_images_data
 
                     t2 = time.perf_counter()
                     self.logger.url_status(
@@ -430,6 +431,7 @@ class AsyncWebCrawler:
                         is_raw_html=True if url.startswith("raw:") else False,
                         redirected_url=async_response.redirected_url,
                         original_scheme=urlparse(url).scheme,
+                        css_images_data=css_images_data,
                         **kwargs,
                     )
 
@@ -513,6 +515,7 @@ class AsyncWebCrawler:
         screenshot_data: str,
         pdf_data: str,
         verbose: bool,
+        css_images_data: List[Dict] = None,
         **kwargs,
     ) -> CrawlResult:
         """
@@ -573,7 +576,7 @@ class AsyncWebCrawler:
             # Scraping Strategy Execution  #
             ################################
             result: ScrapingResult = scraping_strategy.scrap(
-                url, html, **params)
+                url, html, css_images_data=css_images_data, **params)
 
             if result is None:
                 raise ValueError(

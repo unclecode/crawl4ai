@@ -340,6 +340,18 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
             except Exception as e:
                 self._log("error", f"Error processing image: {str(e)}", "SCRAPE")
 
+        # Process CSS background images (if enabled)
+        if kwargs.get("extract_css_images", False):
+            try:
+                css_images_data = kwargs.get("css_images_data")
+                processed_css_images = self.process_css_background_images(
+                    css_images_data, url, **kwargs
+                )
+                if processed_css_images:
+                    media["css_images"].extend(processed_css_images)
+            except Exception as e:
+                self._log("error", f"Error processing CSS images: {str(e)}", "SCRAPE")
+
         # Process videos and audios
         for media_type in ["video", "audio"]:
             for elem in element.xpath(f".//{media_type}"):
@@ -513,6 +525,102 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                 add_variant(value)
 
         return image_variants if image_variants else None
+
+    def process_css_background_images(
+        self, css_images_data: List[Dict], url: str, **kwargs
+    ) -> Optional[List[Dict]]:
+        """
+        Process CSS background images extracted from browser.
+
+        Args:
+            css_images_data: Raw data from JavaScript extraction
+            url: Page URL for resolving relative URLs
+            **kwargs: Configuration options
+
+        Returns:
+            List of MediaItem dictionaries or None if no images
+        """
+        from urllib.parse import urljoin
+
+        if not css_images_data:
+            return None
+
+        processed_images = []
+        min_width = kwargs.get("css_image_min_width", 100)
+        min_height = kwargs.get("css_image_min_height", 100)
+        exclude_repeating = kwargs.get("css_exclude_repeating", True)
+        score_threshold = kwargs.get("css_image_score_threshold", 2)
+
+        for img_data in css_images_data:
+            # Filter by element size
+            computed_width = img_data.get("computed_width", 0)
+            computed_height = img_data.get("computed_height", 0)
+
+            if computed_width < min_width or computed_height < min_height:
+                continue
+
+            # Filter repeating patterns
+            if exclude_repeating and img_data.get("is_repeating", False):
+                continue
+
+            # Resolve URL
+            src = img_data["src"]
+            if not src.startswith(("http://", "https://", "data:")):
+                src = urljoin(url, src)
+
+            # Skip data URLs
+            if src.startswith("data:"):
+                continue
+
+            # Calculate score based on element properties
+            score = 0
+
+            # Larger elements get higher scores
+            if computed_width > 300:
+                score += 1
+            if computed_height > 300:
+                score += 1
+
+            # Non-repeating backgrounds are more likely to be content images
+            if not img_data.get("is_repeating", False):
+                score += 1
+
+            # Detect image format
+            image_formats = {"jpg", "jpeg", "png", "webp", "avif", "gif", "svg"}
+            detected_format = None
+            src_lower = src.lower()
+            for fmt in image_formats:
+                if fmt in src_lower:
+                    detected_format = fmt
+                    score += 1
+                    break
+
+            # Apply score threshold
+            if score <= score_threshold:
+                continue
+
+            # Build selector string for description
+            element_tag = img_data.get("element_tag", "element")
+            selector = img_data.get("selector", "")
+            desc = f"CSS background image on {element_tag}"
+            if selector:
+                desc += f" ({selector})"
+
+            # Create MediaItem
+            media_item = {
+                "src": src,
+                "alt": f"Background of {element_tag}",
+                "desc": desc,
+                "score": score,
+                "type": "css_image",
+                "group_id": 0,
+                "format": detected_format,
+                "width": computed_width,
+            }
+
+            processed_images.append(media_item)
+
+        return processed_images if processed_images else None
 
     def remove_empty_elements_fast(self, root, word_count_threshold=5):
         """
@@ -730,7 +838,7 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                         form.getparent().remove(form)
 
             # Process content
-            media = {"images": [], "videos": [], "audios": [], "tables": []}
+            media = {"images": [], "videos": [], "audios": [], "tables": [], "css_images": []}
             internal_links_dict = {}
             external_links_dict = {}
 
