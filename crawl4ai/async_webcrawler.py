@@ -402,6 +402,9 @@ class AsyncWebCrawler:
                         config=config,  # Pass the entire config object
                     )
 
+                    # Detect raw HTML input and prepare display URL
+                    is_raw_html = url.startswith("raw:") or url.startswith("raw://")
+                    url = "Raw HTML" if is_raw_html else url
                     html = sanitize_input_encode(async_response.html)
                     screenshot_data = async_response.screenshot
                     pdf_data = async_response.pdf_data
@@ -427,7 +430,7 @@ class AsyncWebCrawler:
                         screenshot_data=screenshot_data,
                         pdf_data=pdf_data,
                         verbose=config.verbose,
-                        is_raw_html=True if url.startswith("raw:") else False,
+                        is_raw_html=is_raw_html,
                         redirected_url=async_response.redirected_url,
                         original_scheme=urlparse(url).scheme,
                         **kwargs,
