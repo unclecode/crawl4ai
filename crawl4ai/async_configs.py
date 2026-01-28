@@ -1136,6 +1136,9 @@ class CrawlerRunConfig():
                                              Default: None.
         screenshot_height_threshold (int): Threshold for page height to decide screenshot strategy.
                                            Default: SCREENSHOT_HEIGHT_TRESHOLD (from config, e.g. 20000).
+        force_viewport_screenshot (bool): If True, always take viewport-only screenshots regardless of page height.
+                                          When False, uses automatic decision (viewport for short pages, full-page for long pages).
+                                          Default: False.
         pdf (bool): Whether to generate a PDF of the page.
                     Default: False.
         image_description_min_word_threshold (int): Minimum words for image description extraction.
@@ -1288,6 +1291,7 @@ class CrawlerRunConfig():
         screenshot: bool = False,
         screenshot_wait_for: float = None,
         screenshot_height_threshold: int = SCREENSHOT_HEIGHT_TRESHOLD,
+        force_viewport_screenshot: bool = False,
         pdf: bool = False,
         capture_mhtml: bool = False,
         image_description_min_word_threshold: int = IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
@@ -1416,6 +1420,7 @@ class CrawlerRunConfig():
         self.screenshot = screenshot
         self.screenshot_wait_for = screenshot_wait_for
         self.screenshot_height_threshold = screenshot_height_threshold
+        self.force_viewport_screenshot = force_viewport_screenshot
         self.pdf = pdf
         self.capture_mhtml = capture_mhtml
         self.image_description_min_word_threshold = image_description_min_word_threshold
