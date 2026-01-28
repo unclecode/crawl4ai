@@ -87,7 +87,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         """
         # Initialize browser config, either from provided object or kwargs
         self.browser_config = browser_config or BrowserConfig.from_kwargs(kwargs)
-        self.logger = logger
+        # Initialize with default logger if none provided to prevent NoneType errors
+        self.logger = logger if logger is not None else AsyncLogger(verbose=False)
         
         # Initialize browser adapter
         self.adapter = browser_adapter or PlaywrightAdapter()
