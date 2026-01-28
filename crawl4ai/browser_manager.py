@@ -575,7 +575,20 @@ class BrowserManager:
     """
 
     _playwright_instance = None
-    
+
+    # Class-level tracking of pages in use, keyed by browser endpoint (CDP URL or instance id)
+    # This ensures multiple BrowserManager instances connecting to the same browser
+    # share the same page tracking, preventing race conditions.
+    _global_pages_in_use: dict = {}  # endpoint_key -> set of pages
+    _global_pages_lock: asyncio.Lock = None  # Initialized lazily
+
+    @classmethod
+    def _get_global_lock(cls) -> asyncio.Lock:
+        """Get or create the global pages lock (lazy initialization for async context)."""
+        if cls._global_pages_lock is None:
+            cls._global_pages_lock = asyncio.Lock()
+        return cls._global_pages_lock
+
     @classmethod
     async def get_playwright(cls, use_undetected: bool = False):
         if use_undetected:
@@ -617,9 +630,8 @@ class BrowserManager:
         # for all racers). Prevents 'Target page/context closed' errors.
         self._page_lock = asyncio.Lock()
 
-        # Track pages currently in use by crawl operations to prevent
-        # concurrent crawls from reusing the same page (race condition fix)
-        self._pages_in_use = set()
+        # Browser endpoint key for global page tracking (set after browser starts)
+        self._browser_endpoint_key: Optional[str] = None
 
         # Stealth adapter for stealth mode
         self._stealth_adapter = None
@@ -719,6 +731,77 @@ class BrowserManager:
                 self.browser = await self.playwright.chromium.launch(**browser_args)
 
             self.default_context = self.browser
+
+        # Set the browser endpoint key for global page tracking
+        self._browser_endpoint_key = self._compute_browser_endpoint_key()
+        # Initialize global tracking set for this endpoint if needed
+        if self._browser_endpoint_key not in BrowserManager._global_pages_in_use:
+            BrowserManager._global_pages_in_use[self._browser_endpoint_key] = set()
+
+    def _compute_browser_endpoint_key(self) -> str:
+        """
+        Compute a unique key identifying this browser connection.
+
+        For CDP connections, uses the normalized CDP URL so all BrowserManager
+        instances connecting to the same browser share page tracking.
+        For standalone browsers, uses instance id since each is independent.
+
+        Returns:
+            str: Unique identifier for this browser connection
+        """
+        # For CDP connections, use the CDP URL as the key (normalized)
+        if self.config.cdp_url:
+            return self._normalize_cdp_url(self.config.cdp_url)
+
+        # For managed browsers, use the CDP URL/port that was assigned
+        if self.managed_browser:
+            # Use debugging port as the key since it uniquely identifies the browser
+            port = getattr(self.managed_browser, 'debugging_port', None)
+            host = getattr(self.managed_browser, 'host', 'localhost')
+            if port:
+                return f"cdp:http://{host}:{port}"
+
+        # For standalone browsers, use instance id (no sharing needed)
+        return f"instance:{id(self)}"
+
+    def _normalize_cdp_url(self, cdp_url: str) -> str:
+        """
+        Normalize a CDP URL to a canonical form for consistent tracking.
+
+        Handles various formats:
+        - http://localhost:9222
+        - ws://localhost:9222/devtools/browser/xxx
+        - http://localhost:9222?browser_id=xxx
+
+        Returns:
+            str: Normalized CDP key in format "cdp:http://host:port"
+        """
+        from urllib.parse import urlparse
+
+        parsed = urlparse(cdp_url)
+        host = parsed.hostname or 'localhost'
+        port = parsed.port or 9222
+
+        return f"cdp:http://{host}:{port}"
+
+    def _get_pages_in_use(self) -> set:
+        """Get the set of pages currently in use for this browser."""
+        if self._browser_endpoint_key and self._browser_endpoint_key in BrowserManager._global_pages_in_use:
+            return BrowserManager._global_pages_in_use[self._browser_endpoint_key]
+        # Fallback: shouldn't happen, but return empty set
+        return set()
+
+    def _mark_page_in_use(self, page) -> None:
+        """Mark a page as in use."""
+        if self._browser_endpoint_key:
+            if self._browser_endpoint_key not in BrowserManager._global_pages_in_use:
+                BrowserManager._global_pages_in_use[self._browser_endpoint_key] = set()
+            BrowserManager._global_pages_in_use[self._browser_endpoint_key].add(page)
+
+    def _release_page_from_use(self, page) -> None:
+        """Release a page from the in-use tracking."""
+        if self._browser_endpoint_key and self._browser_endpoint_key in BrowserManager._global_pages_in_use:
+            BrowserManager._global_pages_in_use[self._browser_endpoint_key].discard(page)
 
     async def _verify_cdp_ready(self, cdp_url: str) -> bool:
         """Verify CDP endpoint is ready with exponential backoff.
@@ -1228,29 +1311,41 @@ class BrowserManager:
                     if not page:
                         async with self._page_lock:
                             page = await context.new_page()
-                            self._pages_in_use.add(page)
+                            self._mark_page_in_use(page)
                         await self._apply_stealth_to_page(page)
                     else:
                         # Mark pre-existing target as in use
-                        self._pages_in_use.add(page)
+                        self._mark_page_in_use(page)
                 else:
-                    # Use lock to safely check for available pages and track usage
-                    # This prevents race conditions when multiple crawls run concurrently
-                    async with self._page_lock:
-                        pages = context.pages
-                        # Find first available page (exists and not currently in use)
-                        available_page = next(
-                            (p for p in pages if p not in self._pages_in_use),
-                            None
-                        )
-                        if available_page:
-                            page = available_page
-                        else:
-                            # No available pages - create a new one
+                    # For CDP connections (external browser), multiple Playwright connections
+                    # create separate browser/context objects. Page reuse across connections
+                    # isn't reliable because each connection sees different page objects.
+                    # Always create new pages for CDP to avoid cross-connection race conditions.
+                    if self.config.cdp_url and not self.config.use_managed_browser:
+                        async with self._page_lock:
                             page = await context.new_page()
-                            await self._apply_stealth_to_page(page)
-                        # Mark page as in use
-                        self._pages_in_use.add(page)
+                            self._mark_page_in_use(page)
+                        await self._apply_stealth_to_page(page)
+                    else:
+                        # For managed browsers (single process), page reuse is safe.
+                        # Use lock to safely check for available pages and track usage.
+                        # This prevents race conditions when multiple crawls run concurrently.
+                        async with BrowserManager._get_global_lock():
+                            pages = context.pages
+                            pages_in_use = self._get_pages_in_use()
+                            # Find first available page (exists and not currently in use)
+                            available_page = next(
+                                (p for p in pages if p not in pages_in_use),
+                                None
+                            )
+                            if available_page:
+                                page = available_page
+                            else:
+                                # No available pages - create a new one
+                                page = await context.new_page()
+                                await self._apply_stealth_to_page(page)
+                            # Mark page as in use (global tracking)
+                            self._mark_page_in_use(page)
         else:
             # Otherwise, check if we have an existing context for this config
             config_signature = self._make_config_signature(crawlerRunConfig)
@@ -1283,7 +1378,7 @@ class BrowserManager:
         """
         if session_id in self.sessions:
             context, page, _ = self.sessions[session_id]
-            self._pages_in_use.discard(page)
+            self._release_page_from_use(page)
             await page.close()
             if not self.config.use_managed_browser:
                 await context.close()
@@ -1291,7 +1386,7 @@ class BrowserManager:
 
     def release_page(self, page):
         """
-        Release a page from the in-use tracking set.
+        Release a page from the in-use tracking set (global tracking).
 
         This should be called when a crawl operation completes to allow
         the page to be reused by subsequent crawls.
@@ -1299,7 +1394,7 @@ class BrowserManager:
         Args:
             page: The Playwright page to release.
         """
-        self._pages_in_use.discard(page)
+        self._release_page_from_use(page)
 
     def _cleanup_expired_sessions(self):
         """Clean up expired sessions based on TTL."""
