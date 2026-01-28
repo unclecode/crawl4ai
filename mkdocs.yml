@@ -58,6 +58,7 @@ nav:
   - Extraction:
     - "LLM-Free Strategies": "extraction/no-llm-strategies.md"
     - "LLM Strategies": "extraction/llm-strategies.md"
+    - "Claude Code Provider": "extraction/claude-code-provider.md"
     - "Clustering Strategies": "extraction/clustring-strategies.md"
     - "Chunking": "extraction/chunking.md"
   - API Reference:

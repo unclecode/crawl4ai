@@ -36,6 +36,7 @@ PROVIDER_MODELS_PREFIXES = {
     "anthropic": os.getenv("ANTHROPIC_API_KEY"),
     "gemini": os.getenv("GEMINI_API_KEY"),
     "deepseek": os.getenv("DEEPSEEK_API_KEY"),
+    "claude-code": "no-token-needed",  # Uses local Claude Code CLI auth
 }
 
 # Chunk token threshold

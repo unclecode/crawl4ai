@@ -48,12 +48,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **🔐 Claude Code Provider**: New LLM provider using Claude Code CLI authentication
+  - Enables LLM extraction using existing Claude Code subscriptions without API keys
+  - Integrated with LiteLLM as custom provider via `claude-code/` prefix
+  - Supports models: `claude-sonnet-4-20250514`, `claude-opus-4-20250514`, `claude-haiku-3-5-latest`
+  - Async and sync completion with automatic event loop handling
+  - New optional dependency: `pip install crawl4ai[claude-code]`
+  - Provider: `crawl4ai/providers/claude_code_provider.py`
+  - Example: `examples/claude_code_extraction.py`
+  - Contributor: [@chansearrington](https://github.com/chansearrington)
+
 - **🔒 HTTPS Preservation for Internal Links**: New `preserve_https_for_internal_links` configuration flag
   - Maintains HTTPS scheme for internal links even when servers redirect to HTTP
   - Prevents security downgrades during deep crawling
   - Useful for security-conscious crawling and sites supporting both protocols
   - Fully backward compatible with opt-in flag (default: `False`)
   - Fixes issue #1410 where HTTPS URLs were being downgraded to HTTP
+
+### Improved
+- **📊 LLM Verbose Logging**: Now logs provider and model name when `verbose=True`
+  - Shows which LLM provider/model is being used for each extraction
+  - Helps debug configuration issues and track usage across providers
+  - Example output: `[LOG] LLM Provider: claude-code | Model: claude-sonnet-4-20250514`
 
 ## [0.7.3] - 2025-08-09
 

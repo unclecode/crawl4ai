@@ -1,6 +1,10 @@
 # __init__.py
 import warnings
 
+# Register custom LLM providers with LiteLLM
+from .providers import register_custom_providers
+register_custom_providers()
+
 from .async_webcrawler import AsyncWebCrawler, CacheMode
 # MODIFIED: Add SeedingConfig and VirtualScrollConfig here
 from .async_configs import BrowserConfig, CrawlerRunConfig, HTTPCrawlerConfig, LLMConfig, ProxyConfig, GeolocationConfig, SeedingConfig, VirtualScrollConfig, LinkPreviewConfig, MatchMode

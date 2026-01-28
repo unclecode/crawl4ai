@@ -32,7 +32,18 @@ Crawl4AI uses a “provider string” (e.g., `"openai/gpt-4o"`, `"ollama/llama2.
 - **`api_token`**: If needed (for OpenAI, HuggingFace, etc.); local models or Ollama might not require it.  
 - **`base_url`** (optional): If your provider has a custom endpoint.  
 
-This means you **aren’t locked** into a single LLM vendor. Switch or experiment easily.
+This means you **aren't locked** into a single LLM vendor. Switch or experiment easily.
+
+### Claude Code Provider (No API Keys)
+
+If you have a Claude Code subscription, use your local CLI authentication:
+
+```python
+llm_config = LLMConfig(provider="claude-code/claude-sonnet-4-20250514")
+# No api_token needed - uses local Claude Code CLI auth
+```
+
+See [Claude Code Provider](./claude-code-provider.md) for full documentation.
 
 ---
 
