@@ -10,7 +10,7 @@ async def arun_many(
     config: Optional[Union[CrawlerRunConfig, List[CrawlerRunConfig]]] = None,
     dispatcher: Optional[BaseDispatcher] = None,
     ...
-) -> Union[List[CrawlResult], AsyncGenerator[CrawlResult, None]]:
+) -> RunManyReturn:
     """
     Crawl multiple URLs concurrently or in batches.
 
@@ -20,16 +20,16 @@ async def arun_many(
         - A list of `CrawlerRunConfig` objects with url_matcher patterns
     :param dispatcher: (Optional) A concurrency controller (e.g. MemoryAdaptiveDispatcher).
     ...
-    :return: Either a list of `CrawlResult` objects, or an async generator if streaming is enabled.
+    :return: RunManyReturn containing either a list of `CrawlResult` objects or an async generator if streaming is enabled.
     """
 ```
 
 ## Differences from `arun()`
 
-1. **Multiple URLs**:  
-   
-   - Instead of crawling a single URL, you pass a list of them (strings or tasks).  
-   - The function returns either a **list** of `CrawlResult` or an **async generator** if streaming is enabled.
+1. **Multiple URLs**:
+
+   - Instead of crawling a single URL, you pass a list of them (strings or tasks).
+   - The function returns `RunManyReturn` which contains either a **list** of `CrawlResult` or an **async generator** if streaming is enabled.
 
 2. **Concurrency & Dispatchers**:  
 
@@ -164,7 +164,7 @@ results = await crawler.arun_many(
 
 ### Return Value
 
-Either a **list** of [`CrawlResult`](./crawl-result.md) objects, or an **async generator** if streaming is enabled. You can iterate to check `result.success` or read each item’s `extracted_content`, `markdown`, or `dispatch_result`.
+Returns a **`RunManyReturn`** object which contains either a **list** of [`CrawlResult`](./crawl-result.md) objects, or an **async generator** if streaming is enabled. You can iterate to check `result.success` or read each item's `extracted_content`, `markdown`, or `dispatch_result`.
 
 ---
 
