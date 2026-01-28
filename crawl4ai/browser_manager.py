@@ -616,7 +616,11 @@ class BrowserManager:
         # when using a shared persistent context (context.pages may be empty
         # for all racers). Prevents 'Target page/context closed' errors.
         self._page_lock = asyncio.Lock()
-        
+
+        # Track pages currently in use by crawl operations to prevent
+        # concurrent crawls from reusing the same page (race condition fix)
+        self._pages_in_use = set()
+
         # Stealth adapter for stealth mode
         self._stealth_adapter = None
         if self.config.enable_stealth and not self.use_undetected:
@@ -1217,29 +1221,36 @@ class BrowserManager:
                 await self._apply_stealth_to_page(page)
             else:
                 context = self.default_context
-                pages = context.pages
-                page = next((p for p in pages if p.url == crawlerRunConfig.url), None)
-                if not page:
-                    if pages:
-                        page = pages[0]
-                    else:
-                        # Double-check under lock to avoid TOCTOU and ensure only
-                        # one task calls new_page when pages=[] concurrently
+
+                # Handle pre-existing target case (for reconnecting to specific CDP targets)
+                if self.config.browser_context_id and self.config.target_id:
+                    page = await self._get_page_by_target_id(context, self.config.target_id)
+                    if not page:
                         async with self._page_lock:
-                            pages = context.pages
-                            if pages:
-                                page = pages[0]
-                            elif self.config.browser_context_id and self.config.target_id:
-                                # Pre-existing context/target provided - use CDP to get the page
-                                # This handles the case where Playwright doesn't see the target yet
-                                page = await self._get_page_by_target_id(context, self.config.target_id)
-                                if not page:
-                                    # Fallback: create new page in existing context
-                                    page = await context.new_page()
-                                    await self._apply_stealth_to_page(page)
-                            else:
-                                page = await context.new_page()
-                                await self._apply_stealth_to_page(page)
+                            page = await context.new_page()
+                            self._pages_in_use.add(page)
+                        await self._apply_stealth_to_page(page)
+                    else:
+                        # Mark pre-existing target as in use
+                        self._pages_in_use.add(page)
+                else:
+                    # Use lock to safely check for available pages and track usage
+                    # This prevents race conditions when multiple crawls run concurrently
+                    async with self._page_lock:
+                        pages = context.pages
+                        # Find first available page (exists and not currently in use)
+                        available_page = next(
+                            (p for p in pages if p not in self._pages_in_use),
+                            None
+                        )
+                        if available_page:
+                            page = available_page
+                        else:
+                            # No available pages - create a new one
+                            page = await context.new_page()
+                            await self._apply_stealth_to_page(page)
+                        # Mark page as in use
+                        self._pages_in_use.add(page)
         else:
             # Otherwise, check if we have an existing context for this config
             config_signature = self._make_config_signature(crawlerRunConfig)
@@ -1272,10 +1283,23 @@ class BrowserManager:
         """
         if session_id in self.sessions:
             context, page, _ = self.sessions[session_id]
+            self._pages_in_use.discard(page)
             await page.close()
             if not self.config.use_managed_browser:
                 await context.close()
             del self.sessions[session_id]
+
+    def release_page(self, page):
+        """
+        Release a page from the in-use tracking set.
+
+        This should be called when a crawl operation completes to allow
+        the page to be reused by subsequent crawls.
+
+        Args:
+            page: The Playwright page to release.
+        """
+        self._pages_in_use.discard(page)
 
     def _cleanup_expired_sessions(self):
         """Clean up expired sessions based on TTL."""
