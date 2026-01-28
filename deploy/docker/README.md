@@ -881,8 +881,13 @@ llm:
   provider: "openai/gpt-4o-mini"  # Can be overridden by LLM_PROVIDER env var
   # api_key: sk-...  # If you pass the API key directly (not recommended)
 
-# Redis Configuration (Used by internal Redis server managed by supervisord)
+# Redis Configuration
+# By default, an embedded Redis server runs inside the container.
+# To use an external Redis instead, set these environment variables:
+#   REDIS_URL=redis://:password@hostname:6379/0
+#   CRAWL4AI_DISABLE_EMBEDDED_REDIS=true
 redis:
+  # uri: "redis://localhost:6379/0"  # Override with full URI (or use REDIS_URL env var)
   host: "localhost"
   port: 6379
   db: 0
@@ -990,12 +995,26 @@ You can override the default `config.yml`.
    - Set timeouts according to your content size and network conditions
    - Use Redis for rate limiting in multi-container setups
 
-3. **Monitoring** 📊
+3. **External Redis** 🔗
+   - By default, Crawl4AI runs an embedded Redis server inside the container
+   - For production deployments, you may want to use an external Redis for:
+     - Better memory management (embedded Redis can grow unboundedly)
+     - Shared state across multiple Crawl4AI containers
+     - Easier Redis version management and security patching
+   - To use external Redis:
+     ```bash
+     docker run -d -p 11235:11235 \
+       -e REDIS_URL=redis://:password@your-redis-host:6379/0 \
+       -e CRAWL4AI_DISABLE_EMBEDDED_REDIS=true \
+       unclecode/crawl4ai:latest
+     ```
+
+4. **Monitoring** 📊
    - Enable Prometheus if you need metrics
    - Set DEBUG logging in development, INFO in production
    - Regular health check monitoring is crucial
 
-4. **Performance Tuning** ⚡
+5. **Performance Tuning** ⚡
    - Start with conservative rate limiter delays
    - Increase batch_process timeout for large content
    - Adjust stream_init timeout based on initial response times

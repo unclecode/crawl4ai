@@ -14,16 +14,17 @@ llm:
   # api_key: sk-...  # If you pass the API key directly (not recommended)
 
 # Redis Configuration
+# To use external Redis instead of embedded, set REDIS_URL environment variable:
+#   REDIS_URL=redis://:password@hostname:6379/0
+# When using external Redis, also set CRAWL4AI_DISABLE_EMBEDDED_REDIS=true
+# to prevent the embedded Redis from starting.
 redis:
+  # uri: "redis://localhost:6379/0"  # Override with full URI (or use REDIS_URL env var)
   host: "localhost"
   port: 6379
   db: 0
   password: ""
   ssl: False
-  ssl_cert_reqs: None
-  ssl_ca_certs: None
-  ssl_certfile: None
-  ssl_keyfile: None
   ssl_cert_reqs: None
   ssl_ca_certs: None
   ssl_certfile: None

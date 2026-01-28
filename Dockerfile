@@ -178,6 +178,9 @@ COPY deploy/docker/* ${APP_HOME}/
 # copy the playground + any future static assets
 COPY deploy/docker/static ${APP_HOME}/static
 
+# Make entrypoint executable
+RUN chmod +x ${APP_HOME}/entrypoint.sh
+
 # Change ownership of the application directory to the non-root user
 RUN chown -R appuser:appuser ${APP_HOME}
 
@@ -191,15 +194,17 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
         echo "⚠️ Warning: Less than 2GB RAM available! Your container might need a memory boost! 🚀"; \
         exit 1; \
     fi && \
-    redis-cli ping > /dev/null && \
+    if [ "${CRAWL4AI_DISABLE_EMBEDDED_REDIS}" != "true" ]; then \
+        redis-cli ping > /dev/null || exit 1; \
+    fi && \
     curl -f http://localhost:11235/health || exit 1'
 
 EXPOSE 6379
 # Switch to the non-root user before starting the application
 USER appuser
 
-# Set environment variables to ptoduction
-ENV PYTHON_ENV=production 
+# Set environment variables to production
+ENV PYTHON_ENV=production
 
-# Start the application using supervisord
-CMD ["supervisord", "-c", "supervisord.conf"]
+# Start the application using entrypoint (handles conditional Redis)
+ENTRYPOINT ["/app/entrypoint.sh"]
