@@ -1211,23 +1211,9 @@ class BrowserManager:
                 ]
             )
 
-        # Handle navigator overrides
-        if crawlerRunConfig:
-            if (
-                crawlerRunConfig.override_navigator
-                or crawlerRunConfig.simulate_user
-                or crawlerRunConfig.magic
-            ):
-                await context.add_init_script(load_js_script("navigator_overrider"))
-
-        # Force-open closed shadow roots when flatten_shadow_dom is enabled
-        if crawlerRunConfig and crawlerRunConfig.flatten_shadow_dom:
-            await context.add_init_script("""
-                const _origAttachShadow = Element.prototype.attachShadow;
-                Element.prototype.attachShadow = function(init) {
-                    return _origAttachShadow.call(this, {...init, mode: 'open'});
-                };
-            """)
+        # NOTE: navigator_overrider and shadow-DOM init scripts are now
+        # injected per-page in _crawl_web() via page.add_init_script()
+        # to avoid mutating the shared context under concurrent load.
 
         # Apply custom init_scripts from BrowserConfig (for stealth evasions, etc.)
         if self.config.init_scripts:
