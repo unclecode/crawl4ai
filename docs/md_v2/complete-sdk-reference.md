@@ -611,7 +611,7 @@ Each `arun()` returns a **`CrawlResult`** containing:
 - `url`: Final URL (if redirected).
 - `html`: Original HTML.
 - `cleaned_html`: Sanitized HTML.
-- `markdown_v2`: Deprecated. Instead just use regular `markdown`
+- `markdown_v2`: Removed in v0.5. Accessing it raises `AttributeError`. Use `markdown`.
 - `extracted_content`: If an extraction strategy was used (JSON for CSS/LLM strategies).
 - `screenshot`, `pdf`: If screenshots/PDF requested.
 - `media`, `links`: Information about discovered images/links.
@@ -739,10 +739,10 @@ run_config = CrawlerRunConfig(
     cache_mode=CacheMode.BYPASS
 )
 ```
-- `bypass_cache=True` acts like `CacheMode.BYPASS`.
-- `disable_cache=True` acts like `CacheMode.DISABLED`.
-- `no_cache_read=True` acts like `CacheMode.WRITE_ONLY`.
-- `no_cache_write=True` acts like `CacheMode.READ_ONLY`.
+- `cache_mode=CacheMode.BYPASS` acts like `CacheMode.BYPASS`.
+- `cache_mode=CacheMode.DISABLED` acts like `CacheMode.DISABLED`.
+- `cache_mode=CacheMode.WRITE_ONLY` acts like `CacheMode.WRITE_ONLY`.
+- `cache_mode=CacheMode.READ_ONLY` acts like `CacheMode.READ_ONLY`.
 ## 3. Content Processing & Selection
 ### 3.1 Text Processing
 ```python
@@ -1359,8 +1359,8 @@ async def handle_result(result: CrawlResult):
 ```
 ## 9. Key Points & Future
 1. **Deprecated legacy properties of CrawlResult**  
-   - `markdown_v2` - Deprecated in v0.5. Just use `markdown`. It holds the `MarkdownGenerationResult` now!
-   - `fit_markdown` and `fit_html` - Deprecated in v0.5. They can now be accessed via `MarkdownGenerationResult` in `result.markdown`. eg: `result.markdown.fit_markdown` and `result.markdown.fit_html`
+   - `markdown_v2` - Removed in v0.5. Accessing it raises `AttributeError`. Use `markdown`.
+   - `fit_markdown` and `fit_html` - Removed as top-level `CrawlResult` properties in v0.5. Use `result.markdown.fit_markdown` and `result.markdown.fit_html`.
 2. **Fit Content**  
    - **`fit_markdown`** and **`fit_html`** appear in MarkdownGenerationResult, only if you used a content filter (like **PruningContentFilter** or **BM25ContentFilter**) inside your **MarkdownGenerationStrategy** or set them directly.  
    - If no filter is used, they remain `None`.
@@ -1702,7 +1702,7 @@ browser_cfg = BrowserConfig(
     headless=True,
     viewport_width=1280,
     viewport_height=720,
-    proxy="http://user:pass@proxy:8080",
+    proxy_config="http://user:pass@proxy:8080",
     user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/116.0.0.0 Safari/537.36",
 )
 ```
@@ -1927,7 +1927,7 @@ async def main():
         headless=False,
         viewport_width=1280,
         viewport_height=720,
-        proxy="http://user:pass@myproxy:8080",
+        proxy_config="http://user:pass@myproxy:8080",
         text_mode=True
     )
 
@@ -4359,7 +4359,7 @@ async def extract_with_generated_pattern():
         # Get sample HTML for context
         async with AsyncWebCrawler() as crawler:
             result = await crawler.arun("https://example.com/products")
-            html = result.fit_html
+            html = result.markdown.fit_html
 
         # Generate pattern (one-time LLM usage)
         pattern = RegexExtractionStrategy.generate_pattern(
@@ -5164,7 +5164,7 @@ This ensures the newly created context is under your control **before** `arun()`
 
 ## Core Imports
 ```python
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerConfig, CacheMode
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, LLMConfig
 from crawl4ai.extraction_strategy import LLMExtractionStrategy, JsonCssExtractionStrategy, CosineStrategy
 ```
 
@@ -5178,14 +5178,14 @@ async with AsyncWebCrawler() as crawler:
 ## Advanced Pattern
 ```python
 browser_config = BrowserConfig(headless=True, viewport_width=1920)
-crawler_config = CrawlerConfig(
+crawler_config = CrawlerRunConfig(
     cache_mode=CacheMode.BYPASS,
     wait_for="css:.content",
     screenshot=True,
     pdf=True
 )
 strategy = LLMExtractionStrategy(
-    provider="openai/gpt-4",
+    llm_config=LLMConfig(provider="openai/gpt-4", api_token="your-openai-token"),
     instruction="Extract products with name and price"
 )
 

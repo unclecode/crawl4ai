@@ -264,7 +264,7 @@ run_config = CrawlerRunConfig(proxy_config="socks5://proxy.example.com:1080")
 ```python
 # Old (deprecated) approach
 # from crawl4ai import BrowserConfig
-# browser_config = BrowserConfig(proxy="http://proxy.example.com:8080")
+# browser_config = BrowserConfig(proxy_config="http://proxy.example.com:8080")
 
 # New (preferred) approach
 from crawl4ai import CrawlerRunConfig

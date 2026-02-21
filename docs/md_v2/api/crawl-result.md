@@ -401,8 +401,8 @@ async def handle_result(result: CrawlResult):
 ## 9. Key Points & Future
 
 1. **Deprecated legacy properties of CrawlResult**  
-   - `markdown_v2` - Deprecated in v0.5. Just use `markdown`. It holds the `MarkdownGenerationResult` now!
-   - `fit_markdown` and `fit_html` - Deprecated in v0.5. They can now be accessed via `MarkdownGenerationResult` in `result.markdown`. eg: `result.markdown.fit_markdown` and `result.markdown.fit_html`
+   - `markdown_v2` - Removed in v0.5 and now raises `AttributeError`. Use `result.markdown` instead.
+   - `fit_markdown` and `fit_html` - No longer top-level properties in v0.5. Use `result.markdown.fit_markdown` and `result.markdown.fit_html`.
 
 2. **Fit Content**  
    - **`fit_markdown`** and **`fit_html`** appear in MarkdownGenerationResult, only if you used a content filter (like **PruningContentFilter** or **BM25ContentFilter**) inside your **MarkdownGenerationStrategy** or set them directly.  

@@ -10,7 +10,7 @@ browser_cfg = BrowserConfig(
     headless=True,
     viewport_width=1280,
     viewport_height=720,
-    proxy="http://user:pass@proxy:8080",
+    proxy_config="http://user:pass@proxy:8080",
     user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/116.0.0.0 Safari/537.36",
 )
 ```
@@ -379,7 +379,7 @@ async def main():
         headless=False,
         viewport_width=1280,
         viewport_height=720,
-        proxy="http://user:pass@myproxy:8080",
+        proxy_config="http://user:pass@myproxy:8080",
         text_mode=True
     )
 

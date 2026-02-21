@@ -62,10 +62,10 @@ run_config = CrawlerRunConfig(
 
 **Additional flags**:
 
-- `bypass_cache=True` acts like `CacheMode.BYPASS`.
-- `disable_cache=True` acts like `CacheMode.DISABLED`.
-- `no_cache_read=True` acts like `CacheMode.WRITE_ONLY`.
-- `no_cache_write=True` acts like `CacheMode.READ_ONLY`.
+- `cache_mode=CacheMode.BYPASS` acts like `CacheMode.BYPASS`.
+- `cache_mode=CacheMode.DISABLED` acts like `CacheMode.DISABLED`.
+- `cache_mode=CacheMode.WRITE_ONLY` acts like `CacheMode.WRITE_ONLY`.
+- `cache_mode=CacheMode.READ_ONLY` acts like `CacheMode.READ_ONLY`.
 
 ---
 

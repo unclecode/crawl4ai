@@ -643,7 +643,7 @@ browser_config = BrowserConfig(
 # Advanced browser setup with proxy and persistence
 browser_config = BrowserConfig(
     headless=False,
-    proxy="http://user:pass@proxy:8080",
+    proxy_config="http://user:pass@proxy:8080",
     use_persistent_context=True,
     user_data_dir="./browser_data",
     cookies=[
@@ -2412,7 +2412,7 @@ async def batch_llm_extraction():
             if result.success:
                 contents.append({
                     "url": url,
-                    "content": result.fit_markdown[:2000]  # Limit content
+                    "content": result.markdown.fit_markdown[:2000]  # Limit content
                 })
     
     # Process in batches (reduce LLM calls)
@@ -4719,7 +4719,7 @@ browser_config = BrowserConfig(
     headless=True,
     viewport_width=1280,
     viewport_height=720,
-    proxy="http://user:pass@proxy:8080"
+    proxy_config="http://user:pass@proxy:8080"
 )
 
 # Get JSON structure
