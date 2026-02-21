@@ -579,18 +579,11 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             #     [{"name": "cookiesEnabled", "value": "true", "url": url}]
             # )
 
-            # Handle navigator overrides
-            if config.override_navigator or config.simulate_user or config.magic:
-                await context.add_init_script(load_js_script("navigator_overrider"))
-
-            # Force-open closed shadow roots when flatten_shadow_dom is enabled
-            if config.flatten_shadow_dom:
-                await context.add_init_script("""
-                    const _origAttachShadow = Element.prototype.attachShadow;
-                    Element.prototype.attachShadow = function(init) {
-                        return _origAttachShadow.call(this, {...init, mode: 'open'});
-                    };
-                """)
+            # NOTE: navigator_overrider and shadow-DOM init scripts are
+            # already injected once per context in BrowserManager.setup_context().
+            # Do NOT call context.add_init_script() here — it mutates the
+            # shared context from concurrent tasks and causes cascading
+            # "Target page, context or browser has been closed" failures.
 
             # Call hook after page creation
             await self.execute_hook("on_page_context_created", page, context=context, config=config)
