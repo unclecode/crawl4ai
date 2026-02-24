@@ -5,6 +5,46 @@ All notable changes to Crawl4AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-01-12
+
+### Security
+- **🔒 CRITICAL: Remote Code Execution Fix**: Removed `__import__` from hook allowed builtins
+  - Prevents arbitrary module imports in user-provided hook code
+  - Hooks now disabled by default via `CRAWL4AI_HOOKS_ENABLED` environment variable
+  - Credit: Neo by ProjectDiscovery
+- **🔒 HIGH: Local File Inclusion Fix**: Added URL scheme validation to Docker API endpoints
+  - Blocks `file://`, `javascript:`, `data:` URLs on `/execute_js`, `/screenshot`, `/pdf`, `/html`
+  - Only allows `http://`, `https://`, and `raw:` URLs
+  - Credit: Neo by ProjectDiscovery
+
+### Breaking Changes
+- **Docker API: Hooks disabled by default**: Set `CRAWL4AI_HOOKS_ENABLED=true` to enable
+- **Docker API: file:// URLs blocked**: Use Python library directly for local file processing
+
+### Added
+- **🚀 init_scripts for BrowserConfig**: Pre-page-load JavaScript injection for stealth evasions
+- **🔄 CDP Connection Improvements**: WebSocket URL support, proper cleanup, browser reuse
+- **💾 Crash Recovery for Deep Crawl**: `resume_state` and `on_state_change` for BFS/DFS/Best-First strategies
+- **📄 PDF/MHTML for raw:/file:// URLs**: Generate PDFs and MHTML from cached HTML content
+- **📸 Screenshots for raw:/file:// URLs**: Render cached HTML and capture screenshots
+- **🔗 base_url Parameter**: Proper URL resolution for raw: HTML processing
+- **⚡ Prefetch Mode**: Two-phase deep crawling with fast link extraction
+- **🔀 Enhanced Proxy Support**: Improved proxy rotation and sticky sessions
+- **🌐 HTTP Strategy Proxy Support**: Non-browser crawler now supports proxies
+- **🖥️ Browser Pipeline for raw:/file://**: New `process_in_browser` parameter
+- **📋 Smart TTL Cache for Sitemap Seeder**: `cache_ttl_hours` and `validate_sitemap_lastmod` parameters
+- **📚 Security Documentation**: Added SECURITY.md with vulnerability reporting guidelines
+
+### Fixed
+- **raw: URL Parsing**: Fixed truncation at `#` character (CSS color codes like `#eee`)
+- **Caching System**: Various improvements to cache validation and persistence
+
+### Documentation
+- Multi-sample schema generation section
+- URL seeder smart TTL cache parameters
+- v0.8.0 migration guide
+- Security policy and disclosure process
+
 ## [Unreleased]
 
 ### Added

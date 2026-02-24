@@ -1775,6 +1775,8 @@ def perform_completion_with_backoff(
 
     from litellm import completion
     from litellm.exceptions import RateLimitError
+    import litellm
+    litellm.drop_params = True  # Auto-drop unsupported params (e.g., temperature for O-series/GPT-5)
 
     extra_args = {"temperature": 0.01, "api_key": api_token, "base_url": base_url}
     if json_response:
@@ -1864,7 +1866,9 @@ async def aperform_completion_with_backoff(
 
     from litellm import acompletion
     from litellm.exceptions import RateLimitError
+    import litellm
     import asyncio
+    litellm.drop_params = True  # Auto-drop unsupported params (e.g., temperature for O-series/GPT-5)
 
     extra_args = {"temperature": 0.01, "api_key": api_token, "base_url": base_url}
     if json_response:
@@ -2461,6 +2465,54 @@ def normalize_url_tmp(href, base_url):
     return href.strip()
 
 
+def quick_extract_links(html: str, base_url: str) -> Dict[str, List[Dict[str, str]]]:
+    """
+    Fast link extraction for prefetch mode.
+    Only extracts <a href> tags - no media, no cleaning, no heavy processing.
+
+    Args:
+        html: Raw HTML string
+        base_url: Base URL for resolving relative links
+
+    Returns:
+        {"internal": [{"href": "...", "text": "..."}], "external": [...]}
+    """
+    from lxml.html import document_fromstring
+
+    try:
+        doc = document_fromstring(html)
+    except Exception:
+        return {"internal": [], "external": []}
+
+    base_domain = get_base_domain(base_url)
+    internal: List[Dict[str, str]] = []
+    external: List[Dict[str, str]] = []
+    seen: Set[str] = set()
+
+    for a in doc.xpath("//a[@href]"):
+        href = a.get("href", "").strip()
+        if not href or href.startswith(("#", "javascript:", "mailto:", "tel:")):
+            continue
+
+        # Normalize URL
+        normalized = normalize_url_for_deep_crawl(href, base_url)
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+
+        # Extract text (truncated for memory efficiency)
+        text = (a.text_content() or "").strip()[:200]
+
+        link_data = {"href": normalized, "text": text}
+
+        if is_external_url(normalized, base_domain):
+            external.append(link_data)
+        else:
+            internal.append(link_data)
+
+    return {"internal": internal, "external": external}
+
+
 def get_base_domain(url: str) -> str:
     """
     Extract the base domain from a given URL, handling common edge cases.
@@ -2826,6 +2878,67 @@ def generate_content_hash(content: str) -> str:
     """Generate a unique hash for content"""
     return xxhash.xxh64(content.encode()).hexdigest()
     # return hashlib.sha256(content.encode()).hexdigest()
+
+
+def compute_head_fingerprint(head_html: str) -> str:
+    """
+    Compute a fingerprint of <head> content for cache validation.
+
+    Focuses on content that typically changes when page updates:
+    - <title>
+    - <meta name="description">
+    - <meta property="og:title|og:description|og:image|og:updated_time">
+    - <meta property="article:modified_time">
+    - <meta name="last-modified">
+
+    Uses xxhash for speed, combines multiple signals into a single hash.
+
+    Args:
+        head_html: The HTML content of the <head> section
+
+    Returns:
+        A hex string fingerprint, or empty string if no signals found
+    """
+    if not head_html:
+        return ""
+
+    head_lower = head_html.lower()
+    signals = []
+
+    # Extract title
+    title_match = re.search(r'<title[^>]*>(.*?)</title>', head_lower, re.DOTALL)
+    if title_match:
+        signals.append(title_match.group(1).strip())
+
+    # Meta tags to extract (name or property attribute, and the value to match)
+    meta_tags = [
+        ("name", "description"),
+        ("name", "last-modified"),
+        ("property", "og:title"),
+        ("property", "og:description"),
+        ("property", "og:image"),
+        ("property", "og:updated_time"),
+        ("property", "article:modified_time"),
+    ]
+
+    for attr_type, attr_value in meta_tags:
+        # Handle both attribute orders: attr="value" content="..." and content="..." attr="value"
+        patterns = [
+            rf'<meta[^>]*{attr_type}=["\']{ re.escape(attr_value)}["\'][^>]*content=["\']([^"\']*)["\']',
+            rf'<meta[^>]*content=["\']([^"\']*)["\'][^>]*{attr_type}=["\']{re.escape(attr_value)}["\']',
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, head_lower)
+            if match:
+                signals.append(match.group(1).strip())
+                break  # Found this tag, move to next
+
+    if not signals:
+        return ""
+
+    # Combine signals and hash
+    combined = '|'.join(signals)
+    return xxhash.xxh64(combined.encode()).hexdigest()
 
 
 def ensure_content_dirs(base_path: str) -> Dict[str, str]:

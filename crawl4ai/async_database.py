@@ -1,10 +1,11 @@
 import os
+import time
 from pathlib import Path
 import aiosqlite
 import asyncio
 from typing import Optional, Dict
 from contextlib import asynccontextmanager
-import json  
+import json
 from .models import CrawlResult, MarkdownGenerationResult, StringCompatibleMarkdown
 import aiofiles
 from .async_logger import AsyncLogger
@@ -262,6 +263,11 @@ class AsyncDatabaseManager:
                 "screenshot",
                 "response_headers",
                 "downloaded_files",
+                # Smart cache validation columns (added in 0.8.x)
+                "etag",
+                "last_modified",
+                "head_fingerprint",
+                "cached_at",
             ]
 
             for column in new_columns:
@@ -274,6 +280,11 @@ class AsyncDatabaseManager:
         if new_column == "response_headers":
             await db.execute(
                 f'ALTER TABLE crawled_data ADD COLUMN {new_column} TEXT DEFAULT "{{}}"'
+            )
+        elif new_column == "cached_at":
+            # Timestamp column for cache validation
+            await db.execute(
+                f"ALTER TABLE crawled_data ADD COLUMN {new_column} REAL DEFAULT 0"
             )
         else:
             await db.execute(
@@ -378,6 +389,92 @@ class AsyncDatabaseManager:
             )
             return None
 
+    async def aget_cache_metadata(self, url: str) -> Optional[Dict]:
+        """
+        Retrieve only cache validation metadata for a URL (lightweight query).
+
+        Returns dict with: url, etag, last_modified, head_fingerprint, cached_at, response_headers
+        This is used for cache validation without loading full content.
+        """
+        async def _get_metadata(db):
+            async with db.execute(
+                """SELECT url, etag, last_modified, head_fingerprint, cached_at, response_headers
+                   FROM crawled_data WHERE url = ?""",
+                (url,)
+            ) as cursor:
+                row = await cursor.fetchone()
+                if not row:
+                    return None
+
+                columns = [description[0] for description in cursor.description]
+                row_dict = dict(zip(columns, row))
+
+                # Parse response_headers JSON
+                try:
+                    row_dict["response_headers"] = (
+                        json.loads(row_dict["response_headers"])
+                        if row_dict["response_headers"] else {}
+                    )
+                except json.JSONDecodeError:
+                    row_dict["response_headers"] = {}
+
+                return row_dict
+
+        try:
+            return await self.execute_with_retry(_get_metadata)
+        except Exception as e:
+            self.logger.error(
+                message="Error retrieving cache metadata: {error}",
+                tag="ERROR",
+                force_verbose=True,
+                params={"error": str(e)},
+            )
+            return None
+
+    async def aupdate_cache_metadata(
+        self,
+        url: str,
+        etag: Optional[str] = None,
+        last_modified: Optional[str] = None,
+        head_fingerprint: Optional[str] = None,
+    ):
+        """
+        Update only the cache validation metadata for a URL.
+        Used to update etag/last_modified after a successful validation.
+        """
+        async def _update(db):
+            updates = []
+            values = []
+
+            if etag is not None:
+                updates.append("etag = ?")
+                values.append(etag)
+            if last_modified is not None:
+                updates.append("last_modified = ?")
+                values.append(last_modified)
+            if head_fingerprint is not None:
+                updates.append("head_fingerprint = ?")
+                values.append(head_fingerprint)
+
+            if not updates:
+                return
+
+            values.append(url)
+            await db.execute(
+                f"UPDATE crawled_data SET {', '.join(updates)} WHERE url = ?",
+                tuple(values)
+            )
+
+        try:
+            await self.execute_with_retry(_update)
+        except Exception as e:
+            self.logger.error(
+                message="Error updating cache metadata: {error}",
+                tag="ERROR",
+                force_verbose=True,
+                params={"error": str(e)},
+            )
+
     async def acache_url(self, result: CrawlResult):
         """Cache CrawlResult data"""
         # Store content files and get hashes
@@ -425,15 +522,24 @@ class AsyncDatabaseManager:
         for field, (content, content_type) in content_map.items():
             content_hashes[field] = await self._store_content(content, content_type)
 
+        # Extract cache validation headers from response
+        response_headers = result.response_headers or {}
+        etag = response_headers.get("etag") or response_headers.get("ETag") or ""
+        last_modified = response_headers.get("last-modified") or response_headers.get("Last-Modified") or ""
+        # head_fingerprint is set by caller via result attribute (if available)
+        head_fingerprint = getattr(result, "head_fingerprint", None) or ""
+        cached_at = time.time()
+
         async def _cache(db):
             await db.execute(
                 """
                 INSERT INTO crawled_data (
                     url, html, cleaned_html, markdown,
                     extracted_content, success, media, links, metadata,
-                    screenshot, response_headers, downloaded_files
+                    screenshot, response_headers, downloaded_files,
+                    etag, last_modified, head_fingerprint, cached_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(url) DO UPDATE SET
                     html = excluded.html,
                     cleaned_html = excluded.cleaned_html,
@@ -445,7 +551,11 @@ class AsyncDatabaseManager:
                     metadata = excluded.metadata,
                     screenshot = excluded.screenshot,
                     response_headers = excluded.response_headers,
-                    downloaded_files = excluded.downloaded_files
+                    downloaded_files = excluded.downloaded_files,
+                    etag = excluded.etag,
+                    last_modified = excluded.last_modified,
+                    head_fingerprint = excluded.head_fingerprint,
+                    cached_at = excluded.cached_at
             """,
                 (
                     result.url,
@@ -460,6 +570,10 @@ class AsyncDatabaseManager:
                     content_hashes["screenshot"],
                     json.dumps(result.response_headers or {}),
                     json.dumps(result.downloaded_files or []),
+                    etag,
+                    last_modified,
+                    head_fingerprint,
+                    cached_at,
                 ),
             )
 

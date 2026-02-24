@@ -712,9 +712,105 @@ strategy = JsonCssExtractionStrategy(css_schema)
 3. **Consider Both CSS and XPath**: Try both schema types and choose the one that works best for your specific case.
 4. **Cache Generated Schemas**: Since generation uses LLM, save successful schemas for reuse.
 5. **API Token Security**: Never hardcode API tokens. Use environment variables or secure configuration management.
-6. **Choose Provider Wisely**: 
+6. **Choose Provider Wisely**:
    - Use OpenAI for production-quality schemas
    - Use Ollama for development, testing, or when you need a self-hosted solution
+
+### Multi-Sample Schema Generation
+
+When scraping multiple pages with varying DOM structures (e.g., product pages where table rows appear in different positions), single-sample schema generation may produce **fragile selectors** like `tr:nth-child(6)` that break on other pages.
+
+**The Problem:**
+```
+Page A: Manufacturer is in row 6  → selector: tr:nth-child(6) td a
+Page B: Manufacturer is in row 5  → selector FAILS
+Page C: Manufacturer is in row 7  → selector FAILS
+```
+
+**The Solution:** Provide multiple HTML samples so the LLM identifies stable patterns that work across all pages.
+
+```python
+from crawl4ai import JsonCssExtractionStrategy, LLMConfig
+
+# Collect HTML samples from different pages
+html_sample_1 = """
+<table class="specs">
+  <tr><td>Brand</td><td>Apple</td></tr>
+  <tr><td>Manufacturer</td><td><a href="/m/apple">Apple Inc</a></td></tr>
+</table>
+"""
+
+html_sample_2 = """
+<table class="specs">
+  <tr><td>Manufacturer</td><td><a href="/m/samsung">Samsung</a></td></tr>
+  <tr><td>Brand</td><td>Galaxy</td></tr>
+</table>
+"""
+
+html_sample_3 = """
+<table class="specs">
+  <tr><td>Model</td><td>Pixel 8</td></tr>
+  <tr><td>Brand</td><td>Google</td></tr>
+  <tr><td>Manufacturer</td><td><a href="/m/google">Google LLC</a></td></tr>
+</table>
+"""
+
+# Combine samples with labels
+combined_html = """
+## HTML Sample 1 (Product A):
+```html
+""" + html_sample_1 + """
+```
+
+## HTML Sample 2 (Product B):
+```html
+""" + html_sample_2 + """
+```
+
+## HTML Sample 3 (Product C):
+```html
+""" + html_sample_3 + """
+```
+"""
+
+# Provide instructions for stable selectors
+query = """
+IMPORTANT: I'm providing 3 HTML samples from different product pages.
+The manufacturer field appears in different row positions across pages.
+Generate selectors using stable attributes like href patterns (e.g., a[href*='/m/'])
+instead of fragile positional selectors like nth-child().
+Extract: manufacturer name and link.
+"""
+
+# Generate schema with multi-sample awareness
+schema = JsonCssExtractionStrategy.generate_schema(
+    html=combined_html,
+    query=query,
+    schema_type="CSS",
+    llm_config=LLMConfig(provider="openai/gpt-4o", api_token="your-token")
+)
+
+# The generated schema will use stable selectors like:
+# a[href*="/m/"] instead of tr:nth-child(6) td a
+print(schema)
+```
+
+**Key Points for Multi-Sample Queries:**
+
+1. **Format samples clearly** - Use markdown headers and code blocks to separate samples
+2. **State the number of samples** - "I'm providing 3 HTML samples..."
+3. **Explain the variation** - "...the manufacturer field appears in different row positions"
+4. **Request stable selectors** - "Use href patterns, data attributes, or class names instead of nth-child"
+
+**Stable vs Fragile Selectors:**
+
+| Fragile (single sample) | Stable (multi-sample) |
+|------------------------|----------------------|
+| `tr:nth-child(6) td a` | `a[href*="/m/"]` |
+| `div:nth-child(3) .price` | `.price, [data-price]` |
+| `ul li:first-child` | `li[data-featured="true"]` |
+
+This approach lets you generate schemas once that work reliably across hundreds of similar pages with varying structures.
 
 ---
 

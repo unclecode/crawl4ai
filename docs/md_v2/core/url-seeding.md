@@ -255,6 +255,8 @@ The `SeedingConfig` object is your control panel. Here's everything you can conf
 | `scoring_method` | str | None | Scoring method (currently "bm25") |
 | `score_threshold` | float | None | Minimum score to include URL |
 | `filter_nonsense_urls` | bool | True | Filter out utility URLs (robots.txt, etc.) |
+| `cache_ttl_hours` | int | 24 | Hours before sitemap cache expires (0 = no TTL) |
+| `validate_sitemap_lastmod` | bool | True | Check sitemap's lastmod and refetch if newer |
 
 #### Pattern Matching Examples
 
@@ -968,10 +970,49 @@ config = SeedingConfig(
 The seeder automatically caches results to speed up repeated operations:
 
 - **Common Crawl cache**: `~/.crawl4ai/seeder_cache/[index]_[domain]_[hash].jsonl`
-- **Sitemap cache**: `~/.crawl4ai/seeder_cache/sitemap_[domain]_[hash].jsonl`
+- **Sitemap cache**: `~/.crawl4ai/seeder_cache/sitemap_[domain]_[hash].json`
 - **HEAD data cache**: `~/.cache/url_seeder/head/[hash].json`
 
-Cache expires after 7 days by default. Use `force=True` to refresh.
+#### Smart TTL Cache for Sitemaps
+
+Sitemap caches now include intelligent validation:
+
+```python
+# Default: 24-hour TTL with lastmod validation
+config = SeedingConfig(
+    source="sitemap",
+    cache_ttl_hours=24,              # Cache expires after 24 hours
+    validate_sitemap_lastmod=True    # Also check if sitemap was updated
+)
+
+# Aggressive caching (1 week, no lastmod check)
+config = SeedingConfig(
+    source="sitemap",
+    cache_ttl_hours=168,             # 7 days
+    validate_sitemap_lastmod=False   # Trust TTL only
+)
+
+# Always validate (no TTL, only lastmod)
+config = SeedingConfig(
+    source="sitemap",
+    cache_ttl_hours=0,               # Disable TTL
+    validate_sitemap_lastmod=True    # Refetch if sitemap has newer lastmod
+)
+
+# Always fresh (bypass cache completely)
+config = SeedingConfig(
+    source="sitemap",
+    force=True                       # Ignore all caching
+)
+```
+
+**Cache validation priority:**
+1. `force=True` → Always refetch
+2. Cache doesn't exist → Fetch fresh
+3. `validate_sitemap_lastmod=True` and sitemap has newer `<lastmod>` → Refetch
+4. `cache_ttl_hours > 0` and cache is older than TTL → Refetch
+5. Cache corrupted → Refetch (automatic recovery)
+6. Otherwise → Use cache
 
 ### Pattern Matching Strategies
 
@@ -1060,6 +1101,9 @@ config = SeedingConfig(
 | Rate limit errors | Reduce `hits_per_sec` and `concurrency` |
 | Memory issues with large sites | Use `max_urls` to limit results, reduce `concurrency` |
 | Connection not closed | Use context manager or call `await seeder.close()` |
+| Stale/outdated URLs | Set `cache_ttl_hours=0` or use `force=True` |
+| Cache not updating | Check `validate_sitemap_lastmod=True`, or use `force=True` |
+| Incomplete URL list | Delete cache file and refetch, or use `force=True` |
 
 ### Performance Benchmarks
 
@@ -1119,6 +1163,7 @@ config = SeedingConfig(
 3. **Context Manager Support**: Automatic cleanup with `async with` statement
 4. **URL-Based Scoring**: Smart filtering even without head extraction
 5. **Smart URL Filtering**: Automatically excludes utility/nonsense URLs
-6. **Dual Caching**: Separate caches for URL lists and metadata
+6. **Smart TTL Cache**: Sitemap caches with TTL expiry and lastmod validation
+7. **Automatic Cache Recovery**: Corrupted or incomplete caches are automatically refreshed
 
-Now go forth and seed intelligently! 🌱🚀
+Now go forth and seed intelligently!

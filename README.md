@@ -37,13 +37,13 @@ Limited slots._
 
 Crawl4AI turns the web into clean, LLM ready Markdown for RAG, agents, and data pipelines. Fast, controllable, battle tested by a 50k+ star community.
 
-[✨ Check out latest update v0.7.8](#-recent-updates)
+[✨ Check out latest update v0.8.0](#-recent-updates)
 
-✨ **New in v0.7.8**: Stability & Bug Fix Release! 11 bug fixes addressing Docker API issues (ContentRelevanceFilter, ProxyConfig, cache permissions), LLM extraction improvements (configurable backoff, HTML input format), URL handling fixes, and dependency updates (pypdf, Pydantic v2). [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.8.md)
+✨ **New in v0.8.0**: Crash Recovery & Prefetch Mode! Deep crawl crash recovery with `resume_state` and `on_state_change` callbacks for long-running crawls. New `prefetch=True` mode for 5-10x faster URL discovery. Critical security fixes for Docker API (hooks disabled by default, file:// URLs blocked). [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.8.0.md)
 
-✨ Recent v0.7.7: Complete Self-Hosting Platform with Real-time Monitoring! Enterprise-grade monitoring dashboard, comprehensive REST API, WebSocket streaming, smart browser pool management, and production-ready observability. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.7.md)
+✨ Recent v0.7.8: Stability & Bug Fix Release! 11 bug fixes addressing Docker API issues, LLM extraction improvements, URL handling fixes, and dependency updates. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.8.md)
 
-✨ Previous v0.7.6: Complete Webhook Infrastructure for Docker Job Queue API! Real-time notifications for both `/crawl/job` and `/llm/job` endpoints with exponential backoff retry, custom headers, and flexible delivery modes. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.6.md)
+✨ Previous v0.7.7: Complete Self-Hosting Platform with Real-time Monitoring! Enterprise-grade monitoring dashboard, comprehensive REST API, WebSocket streaming, and smart browser pool management. [Release notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.7.md)
 
 <details>
   <summary>🤓 <strong>My Personal Story</strong></summary>
@@ -561,6 +561,45 @@ async def test_news_crawl():
 > **💡 Tip:** Some websites may use **CAPTCHA** based verification mechanisms to prevent automated access. If your workflow encounters such challenges, you may optionally integrate a third-party CAPTCHA-handling service such as <strong>[CapSolver](https://www.capsolver.com/blog/Partners/crawl4ai-capsolver/?utm_source=crawl4ai&utm_medium=github_pr&utm_campaign=crawl4ai_integration)</strong>. They support reCAPTCHA v2/v3, Cloudflare Turnstile, Challenge, AWS WAF, and more. Please ensure that your usage complies with the target website’s terms of service and applicable laws.
 
 ## ✨ Recent Updates
+
+<details open>
+<summary><strong>Version 0.8.0 Release Highlights - Crash Recovery & Prefetch Mode</strong></summary>
+
+This release introduces crash recovery for deep crawls, a new prefetch mode for fast URL discovery, and critical security fixes for Docker deployments.
+
+- **🔄 Deep Crawl Crash Recovery**:
+  - `on_state_change` callback fires after each URL for real-time state persistence
+  - `resume_state` parameter to continue from a saved checkpoint
+  - JSON-serializable state for Redis/database storage
+  - Works with BFS, DFS, and Best-First strategies
+  ```python
+  from crawl4ai.deep_crawling import BFSDeepCrawlStrategy
+
+  strategy = BFSDeepCrawlStrategy(
+      max_depth=3,
+      resume_state=saved_state,  # Continue from checkpoint
+      on_state_change=save_to_redis,  # Called after each URL
+  )
+  ```
+
+- **⚡ Prefetch Mode for Fast URL Discovery**:
+  - `prefetch=True` skips markdown, extraction, and media processing
+  - 5-10x faster than full processing
+  - Perfect for two-phase crawling: discover first, process selectively
+  ```python
+  config = CrawlerRunConfig(prefetch=True)
+  result = await crawler.arun("https://example.com", config=config)
+  # Returns HTML and links only - no markdown generation
+  ```
+
+- **🔒 Security Fixes (Docker API)**:
+  - Hooks disabled by default (`CRAWL4AI_HOOKS_ENABLED=false`)
+  - `file://` URLs blocked on API endpoints to prevent LFI
+  - `__import__` removed from hook execution sandbox
+
+[Full v0.8.0 Release Notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.8.0.md)
+
+</details>
 
 <details>
 <summary><strong>Version 0.7.8 Release Highlights - Stability & Bug Fix Release</strong></summary>
