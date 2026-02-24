@@ -36,6 +36,11 @@ def mcp_tool(name: str | None = None):
         return fn
     return deco
 
+# Timeouts for LLM/backend calls (Issue #1769: avoid default 5s causing LLM errors)
+LLM_REQUEST_TIMEOUT = 300.0
+CONNECT_TIMEOUT = 10.0
+LLM_HTTP_TIMEOUT = httpx.Timeout(LLM_REQUEST_TIMEOUT, connect=CONNECT_TIMEOUT)
+
 # ── HTTP‑proxy helper for FastAPI endpoints ─────────────────────
 def _make_http_proxy(base_url: str, route):
     method = list(route.methods - {"HEAD", "OPTIONS"})[0]
@@ -49,7 +54,7 @@ def _make_http_proxy(base_url: str, route):
                 kwargs.pop(k)
         url = base_url.rstrip("/") + path
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=LLM_HTTP_TIMEOUT) as client:
             try:
                 r = (
                     await client.get(url, params=kwargs)
@@ -58,6 +63,11 @@ def _make_http_proxy(base_url: str, route):
                 )
                 r.raise_for_status()
                 return r.text if method == "GET" else r.json()
+            except httpx.TimeoutException:
+                raise HTTPException(
+                    504,
+                    f"LLM response timed out after {int(LLM_REQUEST_TIMEOUT)}s. Please check the backend latency.",
+                )
             except httpx.HTTPStatusError as e:
                 # surface FastAPI error details instead of plain 500
                 raise HTTPException(e.response.status_code, e.response.text)
