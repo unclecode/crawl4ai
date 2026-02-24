@@ -32,9 +32,12 @@ def _is_default_config(sig: str) -> bool:
     return sig == DEFAULT_CONFIG_SIG
 
 async def get_crawler(cfg: BrowserConfig) -> AsyncWebCrawler:
-    """Get crawler from pool with tiered strategy."""
+    """Get crawler from pool with tiered strategy.
+    Heavy work (browser create/start) is done outside LOCK to avoid blocking pool access.
+    """
     sig = _sig(cfg)
-    async with LOCK:
+    await LOCK.acquire()
+    try:
         # Check permanent browser for default config
         if PERMANENT and _is_default_config(sig):
             LAST_USED[sig] = time.time()
@@ -62,7 +65,7 @@ async def get_crawler(cfg: BrowserConfig) -> AsyncWebCrawler:
                 try:
                     from monitor import get_monitor
                     await get_monitor().track_janitor_event("promote", sig, {"count": USAGE_COUNT[sig]})
-                except:
+                except Exception:
                     pass
 
                 return HOT_POOL[sig]
@@ -70,20 +73,36 @@ async def get_crawler(cfg: BrowserConfig) -> AsyncWebCrawler:
             logger.info(f"❄️  Using cold pool browser (sig={sig[:8]})")
             return COLD_POOL[sig]
 
-        # Memory check before creating new
+        # Memory check before creating new (fast, keep inside lock)
         mem_pct = get_container_memory_percent()
         if mem_pct >= MEM_LIMIT:
             logger.error(f"💥 Memory pressure: {mem_pct:.1f}% >= {MEM_LIMIT}%")
             raise MemoryError(f"Memory at {mem_pct:.1f}%, refusing new browser")
+        # Fall through: need to create new browser (do outside LOCK)
+    finally:
+        LOCK.release()
 
-        # Create new in cold pool
-        logger.info(f"🆕 Creating new browser in cold pool (sig={sig[:8]}, mem={mem_pct:.1f}%)")
-        crawler = AsyncWebCrawler(config=cfg, thread_safe=False)
-        await crawler.start()
+    # Create and start browser outside LOCK (network/process-heavy)
+    logger.info(f"🆕 Creating new browser in cold pool (sig={sig[:8]}, mem={mem_pct:.1f}%)")
+    crawler = AsyncWebCrawler(config=cfg, thread_safe=False)
+    await crawler.start()
+
+    async with LOCK:
+        # Re-check in case another task added same sig while we were creating
+        if sig in COLD_POOL:
+            await crawler.close()
+            LAST_USED[sig] = time.time()
+            USAGE_COUNT[sig] = USAGE_COUNT.get(sig, 0) + 1
+            return COLD_POOL[sig]
+        if sig in HOT_POOL:
+            await crawler.close()
+            LAST_USED[sig] = time.time()
+            USAGE_COUNT[sig] = USAGE_COUNT.get(sig, 0) + 1
+            return HOT_POOL[sig]
         COLD_POOL[sig] = crawler
         LAST_USED[sig] = time.time()
         USAGE_COUNT[sig] = 1
-        return crawler
+    return crawler
 
 async def init_permanent(cfg: BrowserConfig):
     """Initialize permanent default browser."""

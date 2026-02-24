@@ -120,43 +120,54 @@ class MonitorStats:
             "details": details
         })
 
-    def _cleanup_old_entries(self, max_age_seconds: int = 300):
-        """Remove entries older than max_age_seconds (default 5min)."""
+    def _cleanup_old_entries(
+        self, max_age_seconds: int = 300, max_removals_per_deque: int = 50
+    ):
+        """Remove entries older than max_age_seconds (default 5min).
+        Limits removals per deque per call so large queues don't stall update_timeline.
+        """
         now = time.time()
         cutoff = now - max_age_seconds
 
-        # Clean completed requests
-        while self.completed_requests and self.completed_requests[0].get("end_time", 0) < cutoff:
-            self.completed_requests.popleft()
+        def pop_while(deq, key_ts: str, limit: int) -> None:
+            n = 0
+            while n < limit and deq and deq[0].get(key_ts, 0) < cutoff:
+                deq.popleft()
+                n += 1
 
-        # Clean janitor events
-        while self.janitor_events and self.janitor_events[0].get("timestamp", 0) < cutoff:
-            self.janitor_events.popleft()
-
-        # Clean errors
-        while self.errors and self.errors[0].get("timestamp", 0) < cutoff:
-            self.errors.popleft()
+        pop_while(self.completed_requests, "end_time", max_removals_per_deque)
+        pop_while(self.janitor_events, "timestamp", max_removals_per_deque)
+        pop_while(self.errors, "timestamp", max_removals_per_deque)
 
     async def update_timeline(self):
         """Update timeline data points (called every 5s)."""
         now = time.time()
         mem_pct = get_container_memory_percent()
 
-        # Clean old entries (keep last 5 minutes)
+        # Clean old entries (keep last 5 minutes), limited work per call
         self._cleanup_old_entries(max_age_seconds=300)
 
         # Count requests in last 5s
         recent_reqs = sum(1 for req in self.completed_requests
                          if now - req.get("end_time", 0) < 5)
 
-        # Browser counts (acquire lock to prevent race conditions)
+        # Browser counts: try to acquire lock with timeout, skip this point if blocked
         from crawler_pool import PERMANENT, HOT_POOL, COLD_POOL, LOCK
-        async with LOCK:
-            browser_count = {
-                "permanent": 1 if PERMANENT else 0,
-                "hot": len(HOT_POOL),
-                "cold": len(COLD_POOL)
-            }
+        try:
+            await asyncio.wait_for(LOCK.acquire(), timeout=0.5)
+            try:
+                browser_count = {
+                    "permanent": 1 if PERMANENT else 0,
+                    "hot": len(HOT_POOL),
+                    "cold": len(COLD_POOL)
+                }
+            finally:
+                LOCK.release()
+        except asyncio.TimeoutError:
+            logger.debug(
+                "Monitor skip: Could not acquire LOCK within 0.5s, skipping this data point."
+            )
+            return
 
         self.memory_timeline.append({"time": now, "value": mem_pct})
         self.requests_timeline.append({"time": now, "value": recent_reqs})
