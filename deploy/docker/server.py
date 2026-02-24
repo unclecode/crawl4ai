@@ -371,6 +371,10 @@ async def generate_html(
     except Exception as e:
         raise HTTPException(500, detail=str(e))
 
+# PNG file signature (RFC 2083) to enforce format and avoid BMP confusion
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+
+
 # Screenshot endpoint
 
 
@@ -383,9 +387,10 @@ async def generate_screenshot(
     _td: Dict = Depends(token_dep),
 ):
     """
-    Capture a full-page PNG screenshot of the specified URL, waiting an optional delay before capture,
-    Use when you need an image snapshot of the rendered page. Its recommened to provide an output path to save the screenshot.
-    Then in result instead of the screenshot you will get a path to the saved file.
+    Capture a full-page PNG screenshot of the specified URL, waiting an optional delay before capture.
+    Use when you need an image snapshot of the rendered page.
+    Response always includes screenshot_base64 so callers can use data directly without reading from container.
+    Optionally provide output_path to also save the file inside the container.
     """
     validate_url_scheme(body.url)
     from crawler_pool import get_crawler
@@ -396,13 +401,32 @@ async def generate_screenshot(
         if not results[0].success:
             raise HTTPException(500, detail=results[0].error_message or "Crawl failed")
         screenshot_data = results[0].screenshot
+        if not screenshot_data:
+            raise HTTPException(500, detail="No screenshot data returned from crawler.")
+        try:
+            raw_bytes = base64.b64decode(screenshot_data)
+        except Exception as e:
+            raise HTTPException(400, detail=f"Invalid screenshot base64 data: {type(e).__name__}: {e}")
+        if not raw_bytes.startswith(PNG_SIGNATURE):
+            raise HTTPException(500, detail="Screenshot data is not valid PNG format; file header does not match PNG signature.")
+        # Always return base64 data so callers do not need to read from container
+        response = {
+            "success": True,
+            "screenshot_base64": screenshot_data,
+            "screenshot_mime": "image/png",
+        }
         if body.output_path:
             abs_path = os.path.abspath(body.output_path)
+            if not abs_path.lower().endswith(".png"):
+                abs_path = os.path.splitext(abs_path)[0] + ".png"
             os.makedirs(os.path.dirname(abs_path), exist_ok=True)
             with open(abs_path, "wb") as f:
-                f.write(base64.b64decode(screenshot_data))
-            return {"success": True, "path": abs_path}
-        return {"success": True, "screenshot": screenshot_data}
+                f.write(raw_bytes)
+            response["path"] = abs_path
+            response["info"] = (f"File saved to container path: {abs_path}. Note: This path is isolated from host.")
+        return response
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(500, detail=str(e))
 
