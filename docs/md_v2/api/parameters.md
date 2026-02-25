@@ -490,6 +490,8 @@ LLMConfig is useful to pass LLM provider config to strategies and functions that
 2. LLMContentFilter
 3. JsonCssExtractionStrategy.generate_schema
 4. JsonXPathExtractionStrategy.generate_schema
+5. AdaptiveConfig.embedding_llm_config (embedding model for adaptive crawling)
+6. AdaptiveConfig.query_llm_config (chat completion model for query expansion in adaptive crawling)
 
 ## 3.1 Parameters
 | **Parameter**         | **Type / Default**                     | **What It Does**                                                                                                                     |
@@ -517,7 +519,7 @@ llm_config = LLMConfig(
 - **Use** `BrowserConfig` for **global** browser settings: engine, headless, proxy, user agent.  
 - **Use** `CrawlerRunConfig` for each crawl’s **context**: how to filter content, handle caching, wait for dynamic elements, or run JS.  
 - **Pass** both configs to `AsyncWebCrawler` (the `BrowserConfig`) and then to `arun()` (the `CrawlerRunConfig`).  
-- **Use** `LLMConfig` for LLM provider configurations that can be used across all extraction, filtering, schema generation tasks. Can be used in - `LLMExtractionStrategy`, `LLMContentFilter`, `JsonCssExtractionStrategy.generate_schema` & `JsonXPathExtractionStrategy.generate_schema`
+- **Use** `LLMConfig` for LLM provider configurations that can be used across all extraction, filtering, schema generation, and adaptive crawling tasks. Can be used in - `LLMExtractionStrategy`, `LLMContentFilter`, `JsonCssExtractionStrategy.generate_schema`, `JsonXPathExtractionStrategy.generate_schema`, and `AdaptiveConfig` (`embedding_llm_config` / `query_llm_config`)
 
 ```python
 # Create a modified copy with the clone() method

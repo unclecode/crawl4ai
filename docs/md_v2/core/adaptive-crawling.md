@@ -100,7 +100,7 @@ The embedding strategy uses semantic embeddings for deeper understanding:
 - **Best for**: Complex queries, ambiguous topics, conceptual understanding
 
 ```python
-# Configure embedding strategy
+# Configure embedding strategy with local embeddings
 config = AdaptiveConfig(
     strategy="embedding",
     embedding_model="sentence-transformers/all-MiniLM-L6-v2",  # Default
@@ -108,15 +108,20 @@ config = AdaptiveConfig(
     embedding_min_confidence_threshold=0.1  # Stop if completely irrelevant
 )
 
-# With custom LLM provider for query expansion (recommended)
+# With separate LLM configs for embeddings and query expansion (recommended)
 from crawl4ai import LLMConfig
 
 config = AdaptiveConfig(
     strategy="embedding",
+    # Embedding model — used for text-to-vector calls
     embedding_llm_config=LLMConfig(
         provider='openai/text-embedding-3-small',
-        api_token='your-api-key',
-        temperature=0.7
+        api_token='your-api-key'
+    ),
+    # Query model — used for chat completion (query expansion)
+    query_llm_config=LLMConfig(
+        provider='openai/gpt-4o-mini',
+        api_token='your-api-key'
     )
 )
 
@@ -126,9 +131,19 @@ config = AdaptiveConfig(
     embedding_llm_config={
         'provider': 'openai/text-embedding-3-small',
         'api_token': 'your-api-key'
+    },
+    query_llm_config={
+        'provider': 'openai/gpt-4o-mini',
+        'api_token': 'your-api-key'
     }
 )
 ```
+
+> **Note:** The embedding strategy makes two types of API calls that need different model types:
+> - **Embedding calls** (text → vector) require an embedding model like `text-embedding-3-small`
+> - **Query expansion** (chat completion) requires a chat model like `gpt-4o-mini`
+>
+> Use `embedding_llm_config` for the embedding model and `query_llm_config` for the chat model. If `query_llm_config` is not set, it falls back to `embedding_llm_config` for backward compatibility.
 
 ### Strategy Comparison
 
@@ -148,11 +163,12 @@ The embedding strategy offers fine-tuned control through several parameters:
 ```python
 config = AdaptiveConfig(
     strategy="embedding",
-    
+
     # Model configuration
     embedding_model="sentence-transformers/all-MiniLM-L6-v2",
-    embedding_llm_config=None,  # Use for API-based embeddings
-    
+    embedding_llm_config=None,  # Use for API-based embeddings (embedding model)
+    query_llm_config=None,  # Use for query expansion (chat completion model)
+
     # Query expansion
     n_query_variations=10,  # Number of query variations to generate
     
