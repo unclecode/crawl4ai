@@ -676,7 +676,11 @@ class LLMExtractionStrategy(ExtractionStrategy):
                 content = response.choices[0].message.content
                 blocks = None
 
-                if self.force_json_response:
+                if not content:
+                    finish_reason = getattr(response.choices[0], "finish_reason", "unknown")
+                    blocks = [{"index": 0, "error": True, "tags": ["error"],
+                               "content": f"LLM returned no content (finish_reason: {finish_reason})"}]
+                elif self.force_json_response:
                     blocks = json.loads(content)
                     if isinstance(blocks, dict):
                         # If it has only one key which calue is list then assign that to blocks, exampled: {"news": [..]}
@@ -696,9 +700,8 @@ class LLMExtractionStrategy(ExtractionStrategy):
                 for block in blocks:
                     block["error"] = False
             except Exception:
-                parsed, unparsed = split_and_parse_json_objects(
-                    response.choices[0].message.content
-                )
+                raw_content = response.choices[0].message.content or ""
+                parsed, unparsed = split_and_parse_json_objects(raw_content)
                 blocks = parsed
                 if unparsed:
                     blocks.append(
@@ -876,7 +879,11 @@ class LLMExtractionStrategy(ExtractionStrategy):
                 content = response.choices[0].message.content
                 blocks = None
 
-                if self.force_json_response:
+                if not content:
+                    finish_reason = getattr(response.choices[0], "finish_reason", "unknown")
+                    blocks = [{"index": 0, "error": True, "tags": ["error"],
+                               "content": f"LLM returned no content (finish_reason: {finish_reason})"}]
+                elif self.force_json_response:
                     blocks = json.loads(content)
                     if isinstance(blocks, dict):
                         if len(blocks) == 1 and isinstance(list(blocks.values())[0], list):
@@ -892,9 +899,8 @@ class LLMExtractionStrategy(ExtractionStrategy):
                 for block in blocks:
                     block["error"] = False
             except Exception:
-                parsed, unparsed = split_and_parse_json_objects(
-                    response.choices[0].message.content
-                )
+                raw_content = response.choices[0].message.content or ""
+                parsed, unparsed = split_and_parse_json_objects(raw_content)
                 blocks = parsed
                 if unparsed:
                     blocks.append(
