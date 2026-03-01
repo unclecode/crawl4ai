@@ -73,6 +73,7 @@ class HTMLRequest(BaseModel):
 class ScreenshotRequest(BaseModel):
     url: str
     screenshot_wait_for: Optional[float] = 2
+    wait_for_images: Optional[bool] = True
     output_path: Optional[str] = None
 
 class PDFRequest(BaseModel):
