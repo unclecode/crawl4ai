@@ -71,3 +71,4 @@ def get_token_dependency(config: Dict):
 
 class TokenRequest(BaseModel):
     email: EmailStr
+    api_token: Optional[str] = None
