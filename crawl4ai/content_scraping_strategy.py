@@ -484,7 +484,10 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                 unique_urls.add(src)
                 variant = {**base_info, "src": src}
                 if width:
-                    variant["width"] = width
+                    try:
+                        variant["width"] = int(width)
+                    except (ValueError, TypeError):
+                        pass
                 image_variants.append(variant)
 
         # Add variants from different sources
