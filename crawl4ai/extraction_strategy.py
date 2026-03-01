@@ -45,6 +45,16 @@ import re
 from bs4 import BeautifulSoup
 from lxml import html, etree
 
+_MARKDOWN_JSON_FENCE_RE = re.compile(
+    r"^\s*```(?:json)?\s*\n(.*?)\n\s*```\s*$", re.DOTALL
+)
+
+
+def _strip_markdown_json(text: str) -> str:
+    """Strip markdown code fences from LLM JSON responses."""
+    m = _MARKDOWN_JSON_FENCE_RE.match(text.strip())
+    return m.group(1) if m else text
+
 
 class ExtractionStrategy(ABC):
     """
@@ -677,7 +687,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
                 blocks = None
 
                 if self.force_json_response:
-                    blocks = json.loads(content)
+                    blocks = json.loads(_strip_markdown_json(content))
                     if isinstance(blocks, dict):
                         # If it has only one key which calue is list then assign that to blocks, exampled: {"news": [..]}
                         if len(blocks) == 1 and isinstance(list(blocks.values())[0], list):
@@ -877,7 +887,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
                 blocks = None
 
                 if self.force_json_response:
-                    blocks = json.loads(content)
+                    blocks = json.loads(_strip_markdown_json(content))
                     if isinstance(blocks, dict):
                         if len(blocks) == 1 and isinstance(list(blocks.values())[0], list):
                             blocks = list(blocks.values())[0]
@@ -1382,7 +1392,7 @@ In this scenario, use your best judgment to generate the schema. You need to exa
                 base_url=llm_config.base_url,
                 extra_args=kwargs
             )
-            return json.loads(response.choices[0].message.content)
+            return json.loads(_strip_markdown_json(response.choices[0].message.content))
         except Exception as e:
             raise Exception(f"Failed to generate schema: {str(e)}")
 
@@ -1429,7 +1439,7 @@ In this scenario, use your best judgment to generate the schema. You need to exa
                 base_url=llm_config.base_url,
                 extra_args=kwargs
             )
-            return json.loads(response.choices[0].message.content)
+            return json.loads(_strip_markdown_json(response.choices[0].message.content))
         except Exception as e:
             raise Exception(f"Failed to generate schema: {str(e)}")
 
