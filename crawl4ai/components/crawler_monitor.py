@@ -61,14 +61,22 @@ class TerminalUI:
     def _ui_loop(self):
         """Main UI rendering loop."""
         import sys
-        import select
-        import termios
-        import tty
-        
-        # Setup terminal for non-blocking input
-        old_settings = termios.tcgetattr(sys.stdin)
+        import os
+
+        is_windows = os.name == 'nt'
+
+        old_settings = None
+        if is_windows:
+            import msvcrt
+        else:
+            import termios
+            import tty
+            import select
+            old_settings = termios.tcgetattr(sys.stdin)
+
         try:
-            tty.setcbreak(sys.stdin.fileno())
+            if not is_windows:
+                tty.setcbreak(sys.stdin.fileno())
             
             # Use Live display to render the UI
             with Live(self.layout, refresh_per_second=1/self.refresh_rate, screen=True) as live:
@@ -79,15 +87,18 @@ class TerminalUI:
                     self._update_display()
                     
                     # Check for key press (non-blocking)
-                    if select.select([sys.stdin], [], [], 0)[0]:
-                        key = sys.stdin.read(1)
-                        # Check for 'q' to quit
-                        if key == 'q':
-                            # Signal stop but don't call monitor.stop() from UI thread
-                            # as it would cause the thread to try to join itself
-                            self.stop_event.set()
-                            self.monitor.is_running = False
-                            break
+                    key = None
+                    if is_windows:
+                        if msvcrt.kbhit():
+                            key = msvcrt.getwch()
+                    else:
+                        if select.select([sys.stdin], [], [], 0)[0]:
+                            key = sys.stdin.read(1)
+
+                    if key == 'q':
+                        self.stop_event.set()
+                        self.monitor.is_running = False
+                        break
                     
                     time.sleep(self.refresh_rate)
                     
@@ -96,7 +107,9 @@ class TerminalUI:
                         break
         finally:
             # Restore terminal settings
-            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
+            if old_settings is not None:
+                import termios as _termios
+                _termios.tcsetattr(sys.stdin, _termios.TCSADRAIN, old_settings)
     
     def _update_display(self):
         """Update the terminal display with current statistics."""
