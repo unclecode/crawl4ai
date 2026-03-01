@@ -2588,9 +2588,9 @@ def is_external_url(url: str, base_domain: str) -> bool:
         if not parsed.netloc:  # Relative URL
             return False
 
-        # Strip 'www.' from both domains for comparison
-        url_domain = parsed.netloc.lower().replace("www.", "")
-        base = base_domain.lower().replace("www.", "")
+        # Strip port and 'www.' from both domains for comparison
+        url_domain = parsed.netloc.lower().split(":")[0].replace("www.", "")
+        base = base_domain.lower().split(":")[0].replace("www.", "")
 
         # Check if URL domain ends with base domain
         return not url_domain.endswith(base)
