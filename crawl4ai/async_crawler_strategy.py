@@ -1014,7 +1014,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 if config.screenshot_wait_for:
                     await asyncio.sleep(config.screenshot_wait_for)
                 screenshot_data = await self.take_screenshot(
-                    page, screenshot_height_threshold=config.screenshot_height_threshold
+                    page, screenshot_height_threshold=config.screenshot_height_threshold,
+                    scan_full_page=config.scan_full_page
                 )
 
             if screenshot_data or pdf_data or mhtml_data:
@@ -1582,7 +1583,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     await asyncio.sleep(config.screenshot_wait_for)
                 screenshot_height_threshold = getattr(config, 'screenshot_height_threshold', None)
                 screenshot_data = await self.take_screenshot(
-                    page, screenshot_height_threshold=screenshot_height_threshold
+                    page, screenshot_height_threshold=screenshot_height_threshold,
+                    scan_full_page=getattr(config, 'scan_full_page', True)
                 )
 
             return screenshot_data, pdf_data, mhtml_data
@@ -1619,10 +1621,15 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         Args:
             page (Page): The Playwright page object
             kwargs: Additional keyword arguments
+                scan_full_page (bool): If False, take viewport-only screenshot
 
         Returns:
             str: The base64-encoded screenshot data
         """
+        scan_full_page = kwargs.pop("scan_full_page", True)
+        if not scan_full_page:
+            return await self.take_screenshot_naive(page)
+
         need_scroll = await self.page_need_scroll(page)
 
         if not need_scroll:
