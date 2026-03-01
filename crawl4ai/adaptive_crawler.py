@@ -176,6 +176,9 @@ class AdaptiveConfig:
     save_state: bool = False
     state_path: Optional[str] = None
     
+    # Link preview parameters
+    link_preview_timeout: float = 5.0
+    
     # Embedding strategy parameters
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     embedding_llm_config: Optional[Union[LLMConfig, Dict]] = None  # Separate config for embeddings
@@ -1459,7 +1462,7 @@ class AdaptiveCrawler:
                 include_external=False,
                 query=query,  # For BM25 scoring
                 concurrency=5,
-                timeout=5,
+                timeout=self.config.link_preview_timeout,
                 max_links=50,  # Reasonable limit
                 verbose=False
             ),
