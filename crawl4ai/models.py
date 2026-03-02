@@ -1,4 +1,5 @@
-from pydantic import BaseModel, HttpUrl, PrivateAttr, Field, ConfigDict
+from pydantic import BaseModel, HttpUrl, PrivateAttr, Field, ConfigDict, BeforeValidator
+from typing import Annotated
 from typing import List, Dict, Optional, Callable, Awaitable, Union, Any
 from typing import AsyncGenerator
 from typing import Generic, TypeVar
@@ -344,6 +345,15 @@ class AsyncCrawlResponse(BaseModel):
 ###############################
 # Scraping Models
 ###############################
+def _coerce_int(v):
+    """Coerce to int or return None for non-numeric values like '100%' or 'auto'."""
+    if v is None:
+        return None
+    try:
+        return int(v)
+    except (ValueError, TypeError):
+        return None
+
 class MediaItem(BaseModel):
     src: Optional[str] = ""
     data: Optional[str] = ""
@@ -353,7 +363,7 @@ class MediaItem(BaseModel):
     type: str = "image"
     group_id: Optional[int] = 0
     format: Optional[str] = None
-    width: Optional[int] = None
+    width: Annotated[Optional[int], BeforeValidator(_coerce_int)] = None
 
 
 class Link(BaseModel):
