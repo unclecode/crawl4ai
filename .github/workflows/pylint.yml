@@ -1,0 +1,649 @@
+name: Pylint
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.8", "3.9", "3.10"]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pylint
+    - name: Analysing the code with pylint
+      run: |
+        pylint $(git ls-files '*.py')
+            - name: Cache
+  uses: actions/cache@v5.0.3
+  with:
+    # A list of files, directories, and wildcard patterns to cache and restore
+    path: 
+    # An explicit key for restoring and saving the cache
+    key: 
+    # An ordered multiline string listing the prefix-matched keys, that are used for restoring stale cache if no cache hit occurred for key. Note `cache-hit` returns false in this case.
+    restore-keys: # optional
+    # The chunk size used to split up large files during upload, in bytes
+    upload-chunk-size: # optional
+    # An optional boolean when enabled, allows windows runners to save or restore caches that can be restored or saved respectively on other platforms
+    enableCrossOsArchive: # optional, default is false
+    # Fail the workflow if cache entry is not found
+    fail-on-cache-miss: # optional, default is false
+    # Check if a cache entry exists for the given input(s) (key, restore-keys) without downloading the cache
+    lookup-only: # optional, default is false
+    # Run the post step to save the cache even if another step before fails
+    save-always: # optional, default is false
+            - name: Setup Node.js environment
+  uses: actions/setup-node@v6.3.0
+  with:
+    # Version Spec of the version to use. Examples: 12.x, 10.15.1, >=10.15.0.
+    node-version: # optional
+    # File containing the version Spec of the version to use.  Examples: package.json, .nvmrc, .node-version, .tool-versions.
+    node-version-file: # optional
+    # Target architecture for Node to use. Examples: x86, x64. Will use system architecture by default.
+    architecture: # optional
+    # Set this option if you want the action to check for the latest available version that satisfies the version spec.
+    check-latest: # optional
+    # Optional registry to set up for auth. Will set the registry in a project level .npmrc and .yarnrc file, and set up auth to read in from env.NODE_AUTH_TOKEN.
+    registry-url: # optional
+    # Optional scope for authenticating against scoped registries. Will fall back to the repository owner when using the GitHub Packages registry (https://npm.pkg.github.com/).
+    scope: # optional
+    # Used to pull node distributions from node-versions. Since there's a default, this is typically not supplied by the user. When running this action on github.com, the default value is sufficient. When running on GHES, you can pass a personal access token for github.com if you are experiencing rate limiting.
+    token: # optional, default is ${{ github.server_url == 'https://github.com' && github.token || '' }}
+    # Used to specify a package manager for caching in the default directory. Supported values: npm, yarn, pnpm.
+    cache: # optional
+    # Set to false to disable automatic caching. By default, caching is enabled when either devEngines.packageManager or the top-level packageManager field in package.json specifies npm as the package manager.
+    package-manager-cache: # optional, default is true
+    # Used to specify the path to a dependency file: package-lock.json, yarn.lock, etc. Supports wildcards or a list of file names for caching multiple dependencies.
+    cache-dependency-path: # optional
+    # Used to specify an alternative mirror to download Node.js binaries from
+    mirror: # optional
+    # The token used as Authorization header when fetching from the mirror
+    mirror-token: # optional
+            - name: Setup Java JDK
+  uses: actions/setup-java@v5.2.0
+  with:
+    # The Java version to set up. Takes a whole or semver Java version. See examples of supported syntax in README file
+    java-version: # optional
+    # The path to the `.java-version` file. See examples of supported syntax in README file
+    java-version-file: # optional
+    # Java distribution. See the list of supported distributions in README file
+    distribution: 
+    # The package type (jdk, jre, jdk+fx, jre+fx)
+    java-package: # optional, default is jdk
+    # The architecture of the package (defaults to the action runner's architecture)
+    architecture: # optional
+    # Path to where the compressed JDK is located
+    jdkFile: # optional
+    # Set this option if you want the action to check for the latest available version that satisfies the version spec
+    check-latest: # optional
+    # ID of the distributionManagement repository in the pom.xml file. Default is `github`
+    server-id: # optional, default is github
+    # Environment variable name for the username for authentication to the Apache Maven repository. Default is $GITHUB_ACTOR
+    server-username: # optional, default is GITHUB_ACTOR
+    # Environment variable name for password or token for authentication to the Apache Maven repository. Default is $GITHUB_TOKEN
+    server-password: # optional, default is GITHUB_TOKEN
+    # Path to where the settings.xml file will be written. Default is ~/.m2.
+    settings-path: # optional
+    # Overwrite the settings.xml file if it exists. Default is "true".
+    overwrite-settings: # optional, default is true
+    # GPG private key to import. Default is empty string.
+    gpg-private-key: # optional
+    # Environment variable name for the GPG private key passphrase. Default is $GPG_PASSPHRASE.
+    gpg-passphrase: # optional
+    # Name of the build platform to cache dependencies. It can be "maven", "gradle" or "sbt".
+    cache: # optional
+    # The path to a dependency file: pom.xml, build.gradle, build.sbt, etc. This option can be used with the `cache` option. If this option is omitted, the action searches for the dependency file in the entire repository. This option supports wildcards and a list of file names for caching multiple dependencies.
+    cache-dependency-path: # optional
+    # Workaround to pass job status to post job step. This variable is not intended for manual setting
+    job-status: # optional, default is ${{ job.status }}
+    # The token used to authenticate when fetching version manifests hosted on github.com, such as for the Microsoft Build of OpenJDK. When running this action on github.com, the default value is sufficient. When running on GHES, you can pass a personal access token for github.com if you are experiencing rate limiting.
+    token: # optional, default is ${{ github.server_url == 'https://github.com' && github.token || '' }}
+    # Name of Maven Toolchain ID if the default name of "${distribution}_${java-version}" is not wanted. See examples of supported syntax in Advanced Usage file
+    mvn-toolchain-id: # optional
+    # Name of Maven Toolchain Vendor if the default name of "${distribution}" is not wanted. See examples of supported syntax in Advanced Usage file
+    mvn-toolchain-vendor: # optional
+               - name: Close Stale Issues
+  uses: actions/stale@v10.2.0
+  with:
+    # Token for the repository. Can be passed in using `{{ secrets.GITHUB_TOKEN }}`.
+    repo-token: # optional, default is ${{ github.token }}
+    # The message to post on the issue when tagging it. If none provided, will not mark issues stale.
+    stale-issue-message: # optional
+    # The message to post on the pull request when tagging it. If none provided, will not mark pull requests stale.
+    stale-pr-message: # optional
+    # The message to post on the issue when closing it. If none provided, will not comment when closing an issue.
+    close-issue-message: # optional
+    # The message to post on the pull request when closing it. If none provided, will not comment when closing a pull requests.
+    close-pr-message: # optional
+    # The number of days old an issue or a pull request can be before marking it stale. Set to -1 to never mark issues or pull requests as stale automatically.
+    days-before-stale: # optional, default is 60
+    # The number of days old an issue can be before marking it stale. Set to -1 to never mark issues as stale automatically. Override "days-before-stale" option regarding only the issues.
+    days-before-issue-stale: # optional
+    # The number of days old a pull request can be before marking it stale. Set to -1 to never mark pull requests as stale automatically. Override "days-before-stale" option regarding only the pull requests.
+    days-before-pr-stale: # optional
+    # The number of days to wait to close an issue or a pull request after it being marked stale. Set to -1 to never close stale issues or pull requests.
+    days-before-close: # optional, default is 7
+    # The number of days to wait to close an issue after it being marked stale. Set to -1 to never close stale issues. Override "days-before-close" option regarding only the issues.
+    days-before-issue-close: # optional
+    # The number of days to wait to close a pull request after it being marked stale. Set to -1 to never close stale pull requests. Override "days-before-close" option regarding only the pull requests.
+    days-before-pr-close: # optional
+    # The label to apply when an issue is stale.
+    stale-issue-label: # optional, default is Stale
+    # The label to apply when an issue is closed.
+    close-issue-label: # optional
+    # The labels that mean an issue is exempt from being marked stale. Separate multiple labels with commas (eg. "label1,label2").
+    exempt-issue-labels: # optional, default is 
+    # The reason to use when closing an issue.
+    close-issue-reason: # optional, default is not_planned
+    # The label to apply when a pull request is stale.
+    stale-pr-label: # optional, default is Stale
+    # The label to apply when a pull request is closed.
+    close-pr-label: # optional
+    # The labels that mean a pull request is exempt from being marked as stale. Separate multiple labels with commas (eg. "label1,label2").
+    exempt-pr-labels: # optional, default is 
+    # The milestones that mean an issue or a pull request is exempt from being marked as stale. Separate multiple milestones with commas (eg. "milestone1,milestone2").
+    exempt-milestones: # optional, default is 
+    # The milestones that mean an issue is exempt from being marked as stale. Separate multiple milestones with commas (eg. "milestone1,milestone2"). Override "exempt-milestones" option regarding only the issues.
+    exempt-issue-milestones: # optional, default is 
+    # The milestones that mean a pull request is exempt from being marked as stale. Separate multiple milestones with commas (eg. "milestone1,milestone2"). Override "exempt-milestones" option regarding only the pull requests.
+    exempt-pr-milestones: # optional, default is 
+    # Exempt all issues and pull requests with milestones from being marked as stale. Default to false.
+    exempt-all-milestones: # optional, default is false
+    # Exempt all issues with milestones from being marked as stale. Override "exempt-all-milestones" option regarding only the issues.
+    exempt-all-issue-milestones: # optional, default is 
+    # Exempt all pull requests with milestones from being marked as stale. Override "exempt-all-milestones" option regarding only the pull requests.
+    exempt-all-pr-milestones: # optional, default is 
+    # Only issues or pull requests with all of these labels are checked if stale. Defaults to `` (disabled) and can be a comma-separated list of labels.
+    only-labels: # optional, default is 
+    # Only issues or pull requests with at least one of these labels are checked if stale. Defaults to `` (disabled) and can be a comma-separated list of labels.
+    any-of-labels: # optional, default is 
+    # Only issues with at least one of these labels are checked if stale. Defaults to `` (disabled) and can be a comma-separated list of labels. Override "any-of-labels" option regarding only the issues.
+    any-of-issue-labels: # optional, default is 
+    # Only pull requests with at least one of these labels are checked if stale. Defaults to `` (disabled) and can be a comma-separated list of labels. Override "any-of-labels" option regarding only the pull requests.
+    any-of-pr-labels: # optional, default is 
+    # Only issues with all of these labels are checked if stale. Defaults to `[]` (disabled) and can be a comma-separated list of labels. Override "only-labels" option regarding only the issues.
+    only-issue-labels: # optional, default is 
+    # Only pull requests with all of these labels are checked if stale. Defaults to `[]` (disabled) and can be a comma-separated list of labels. Override "only-labels" option regarding only the pull requests.
+    only-pr-labels: # optional, default is 
+    # The maximum number of operations per run, used to control rate limiting (GitHub API CRUD related).
+    operations-per-run: # optional, default is 30
+    # Remove stale labels from issues and pull requests when they are updated or commented on.
+    remove-stale-when-updated: # optional, default is true
+    # Remove stale labels from issues when they are updated or commented on. Override "remove-stale-when-updated" option regarding only the issues.
+    remove-issue-stale-when-updated: # optional, default is 
+    # Remove stale labels from pull requests when they are updated or commented on. Override "remove-stale-when-updated" option regarding only the pull requests.
+    remove-pr-stale-when-updated: # optional, default is 
+    # Run the processor in debug mode without actually performing any operations on live issues.
+    debug-only: # optional, default is false
+    # The order to get issues or pull requests. Defaults to false, which is descending.
+    ascending: # optional, default is false
+    # What to sort results by. Valid options are `created`, `updated`, and `comments`. Defaults to `created`.
+    sort-by: # optional, default is created
+    # Delete the git branch after closing a stale pull request.
+    delete-branch: # optional, default is false
+    # The date used to skip the stale action on issue/pull request created before it (ISO 8601 or RFC 2822).
+    start-date: # optional, default is 
+    # The assignees which exempt an issue or a pull request from being marked as stale. Separate multiple assignees with commas (eg. "user1,user2").
+    exempt-assignees: # optional, default is 
+    # The assignees which exempt an issue from being marked as stale. Separate multiple assignees with commas (eg. "user1,user2"). Override "exempt-assignees" option regarding only the issues.
+    exempt-issue-assignees: # optional, default is 
+    # The assignees which exempt a pull request from being marked as stale. Separate multiple assignees with commas (eg. "user1,user2"). Override "exempt-assignees" option regarding only the pull requests.
+    exempt-pr-assignees: # optional, default is 
+    # Exempt all issues and pull requests with assignees from being marked as stale. Default to false.
+    exempt-all-assignees: # optional, default is false
+    # Exempt all issues with assignees from being marked as stale. Override "exempt-all-assignees" option regarding only the issues.
+    exempt-all-issue-assignees: # optional, default is 
+    # Exempt all pull requests with assignees from being marked as stale. Override "exempt-all-assignees" option regarding only the pull requests.
+    exempt-all-pr-assignees: # optional, default is 
+    # Exempt draft pull requests from being marked as stale. Default to false.
+    exempt-draft-pr: # optional, default is false
+    # Display some statistics at the end regarding the stale workflow (only when the logs are enabled).
+    enable-statistics: # optional, default is true
+    # A comma delimited list of labels to add when an issue or pull request becomes unstale.
+    labels-to-add-when-unstale: # optional, default is 
+    # A comma delimited list of labels to remove when an issue or pull request becomes stale.
+    labels-to-remove-when-stale: # optional, default is 
+    # A comma delimited list of labels to remove when an issue or pull request becomes unstale.
+    labels-to-remove-when-unstale: # optional, default is 
+    # Any update (update/comment) can reset the stale idle time on the issues and pull requests.
+    ignore-updates: # optional, default is false
+    # Any update (update/comment) can reset the stale idle time on the issues. Override "ignore-updates" option regarding only the issues.
+    ignore-issue-updates: # optional, default is 
+    # Any update (update/comment) can reset the stale idle time on the pull requests. Override "ignore-updates" option regarding only the pull requests.
+    ignore-pr-updates: # optional, default is 
+    # Only the issues or the pull requests with an assignee will be marked as stale automatically.
+    include-only-assigned: # optional, default is false
+    # Only issues with a matching type are processed as stale/closed. Defaults to `[]` (disabled) and can be a comma-separated list of issue types.
+    only-issue-types: # optional, default is 
+            - name: Mergify Dependencies Conflicts Resolver
+  # You may pin to the exact commit or the version.
+  # uses: Mergifyio/gha-versionining-conflict-resolver@d2a39ffaa54e155f73aa388d2097fa9227974fb0
+  uses: Mergifyio/gha-versionining-conflict-resolver@0.0.1
+  with:
+    # The full name of the head repository of the PR
+    head-repo: 
+    # The head branch of the PR
+    head-branch: 
+    # The base branch of the PR
+    base-branch: # default is main
+    # User associated to the token used to checkout or to the GITHUB_TOKEN (defaults to github action user)
+    user: # default is github-actions
+    # Email associated to the token used to checkout or to the GITHUB_TOKEN (defaults to github action email)
+    email: # default is github-actions@github.com
+            - name: Priority List
+  # You may pin to the exact commit or the version.
+  # uses: iterative/priority-list@646ca456f8a08495ae4c6259bd20ab274b9eaa03
+  uses: iterative/priority-list@v1.0.2
+  with:
+    # Token with read access to all analysed repos
+    github-token: 
+    # 
+    repos: 
+    # weight for number of comments
+    weight_activity: # default is 14
+    # weight for reactions to original issue
+    weight_reactions: # default is 7
+    # weight for days of inactivity
+    weight_staleness: # default is 1
+    # weight for days open
+    weight_age: # default is 0.142857
+    # weight multiplier for PRs (compared to issues)
+    multiplier_pr: # default is 7
+    # weight multiplier for labels (negative to exclude)
+    multiplier_labels: # default is example:-1 epic:0.142857 blocked:0.142857 invalid:0.142857
+    # largest pN-label (lowest priority)
+    p_label_graveyard: # default is 4
+    # URL to post slack payload to (requires `people.json`)
+    slack_webhook: # optional
+              - name: Privileged Requester
+  uses: github/privileged-requester@v2.3.4
+  with:
+    # 'The GitHub token used to create an authenticated client - Provided for you by default! - Repository scoped token'
+
+You can use the default provided token or you can provide a PAT as an alternative robot user token
+
+    github_token: # default is ${{ github.token }}
+    # When using the default github.token (from above), the "handle" is fetched from this input since the token is repository scoped and it cannot even read its own handle. You should not need to change this input.
+    handle: # default is github-actions[bot]
+    # Path where the privileged requester configuration can be found
+    path: # default is config/privileged-requester.yaml
+    # The creator of the PR for this pull request event
+    prCreator: # default is ${{ github.event.pull_request.user.login }}
+    # The number of the PR for this pull request event
+    prNumber: # default is ${{ github.event.pull_request.number }}
+    # An option to check that every commit in the PR is made from the privileged requester
+    checkCommits: # default is true
+    # An option to check that the PR diff only has a removal diff, with no additions
+    checkDiff: # default is true
+    # An option to check that the labels on the PR match those defined in the privileged requester config
+    checkLabels: # default is true
+    # Whether or not to validate all commits have proper verification via GPG signed commits
+    commitVerification: # default is false
+    # Whether or not to fallback to the commit author value if the commit login value is missing
+    fallback_to_commit_author: # default is false
+- name: Code Review GPT
+  uses: mattzcarey/shippie@v0.20.0         
+  - name: Claude Code Base Action
+  uses: anthropics/claude-code-base-action@beta
+  # Using a direct prompt
+- name: Run Claude Code with direct prompt
+  uses: anthropics/claude-code-base-action@beta
+  with:
+    prompt: "Your prompt here"
+    allowed_tools: "Bash(git:*),View,GlobTool,GrepTool,BatchTool"
+    anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+
+# Or using a prompt from a file
+- name: Run Claude Code with prompt file
+  uses: anthropics/claude-code-base-action@beta
+  with:
+    prompt_file: "/path/to/prompt.txt"
+    allowed_tools: "Bash(git:*),View,GlobTool,GrepTool,BatchTool"
+    anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+
+# Or limiting the conversation turns
+- name: Run Claude Code with limited turns
+  uses: anthropics/claude-code-base-action@beta
+  with:
+    prompt: "Your prompt here"
+    allowed_tools: "Bash(git:*),View,GlobTool,GrepTool,BatchTool"
+    max_turns: "5" # Limit conversation to 5 turns
+    anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+
+# Using custom system prompts
+- name: Run Claude Code with custom system prompt
+  uses: anthropics/claude-code-base-action@beta
+  with:
+    prompt: "Build a REST API"
+    system_prompt: "You are a senior backend engineer. Focus on security, performance, and maintainability."
+    allowed_tools: "Bash(git:*),View,GlobTool,GrepTool,BatchTool"
+    anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+
+# Or appending to the default system prompt
+- name: Run Claude Code with appended system prompt
+  uses: anthropics/claude-code-base-action@beta
+  with:
+    prompt: "Create a database schema"
+    append_system_prompt: "After writing code, be sure to code review yourself."
+    allowed_tools: "Bash(git:*),View,GlobTool,GrepTool,BatchTool"
+    anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+
+# Using custom environment variables
+- name: Run Claude Code with custom environment variables
+  uses: anthropics/claude-code-base-action@beta
+  with:
+    prompt: "Deploy to staging environment"
+    claude_env: |
+      ENVIRONMENT: staging
+      API_URL: https://api-staging.example.com
+      DEBUG: true
+    allowed_tools: "Bash(git:*),View,GlobTool,GrepTool,BatchTool"
+    anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+
+# Using fallback model for handling API errors
+- name: Run Claude Code with fallback model
+  uses: anthropics/claude-code-base-action@beta
+  with:
+    prompt: "Review and fix TypeScript errors"
+    model: "claude-opus-4-1-20250805"
+    fallback_model: "claude-sonnet-4-20250514"
+    allowed_tools: "Bash(git:*),View,GlobTool,GrepTool,BatchTool"
+    anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+
+# Using OAuth token instead of API key
+- name: Run Claude Code with OAuth token
+  uses: anthropics/claude-code-base-action@beta
+  with:
+    prompt: "Update dependencies"
+    allowed_tools: "Bash(git:*),View,GlobTool,GrepTool,BatchTool"
+    claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+    - name: Codecov
+  uses: codecov/codecov-action@v5.5.2
+  steps:
+  - uses: actions/checkout@main
+  - uses: codecov/codecov-action@v5
+    with:
+      fail_ci_if_error: true # optional (default = false)
+      files: ./coverage1.xml,./coverage2.xml # optional
+      flags: unittests # optional
+      name: codecov-umbrella # optional
+      token: ${{ secrets.CODECOV_TOKEN }}
+      verbose: true # optional (default = false)
+      - uses: codecov/codecov-action@v5
+  with:
+    use_oidc: true
+    permissions:
+  id-token: write
+  - name: MegaLinter
+  uses: oxsecurity/megalinter@v9.4.0
+  - name: Setup Node.js environment
+  uses: actions/setup-node@v6.3.0
+  - uses: actions/setup-node@v6
+  with:
+    # Version Spec of the version to use in SemVer notation.
+    # It also admits such aliases as lts/*, latest, nightly and canary builds
+    # Examples: 12.x, 10.15.1, >=10.15.0, lts/Hydrogen, 16-nightly, latest, node
+    node-version: ''
+
+    # File containing the version Spec of the version to use.  Examples: package.json, .nvmrc, .node-version, .tool-versions.
+    # If node-version and node-version-file are both provided the action will use version from node-version.
+    node-version-file: ''
+
+    # Set this option if you want the action to check for the latest available version
+    # that satisfies the version spec.
+    # It will only get affect for lts Nodejs versions (12.x, >=10.15.0, lts/Hydrogen).
+    # Default: false
+    check-latest: false
+
+    # Target architecture for Node to use. Examples: x86, x64. Will use system architecture by default.
+    # Default: ''. The action use system architecture by default
+    architecture: ''
+
+    # Used to pull node distributions from https://github.com/actions/node-versions.
+    # Since there's a default, this is typically not supplied by the user.
+    # When running this action on github.com, the default value is sufficient.
+    # When running on GHES, you can pass a personal access token for github.com if you are experiencing rate limiting.
+    #
+    # We recommend using a service account with the least permissions necessary. Also
+    # when generating a new PAT, select the least scopes necessary.
+    #
+    # [Learn more about creating and using encrypted secrets](https://help.github.com/en/actions/automating-your-workflow-with-github-actions/creating-and-using-encrypted-secrets)
+    #
+    # Default: ${{ github.server_url == 'https://github.com' && github.token || '' }}
+    token: ''
+
+    # Used to specify a package manager for caching in the default directory. Supported values: npm, yarn, pnpm.
+    # Package manager should be pre-installed
+    # Default: ''
+    cache: ''
+
+    # Controls automatic caching for npm. By default, caching for npm is enabled if either the devEngines.packageManager field or the top-level packageManager field in package.json specifies npm and no explicit cache input is provided.
+    # To disable automatic caching for npm, set package-manager-cache to false.
+    # default: true
+    package-manager-cache: true
+
+    # Used to specify the path to a dependency file: package-lock.json, yarn.lock, etc.
+    # It will generate hash from the target file for primary key. It works only If cache is specified.
+    # Supports wildcards or a list of file names for caching multiple dependencies.
+    # Default: ''
+    cache-dependency-path: ''
+
+    # Optional registry to set up for auth. Will set the registry in a project level .npmrc and .yarnrc file,
+    # and set up auth to read in from env.NODE_AUTH_TOKEN.
+    # Default: ''
+    registry-url: ''
+
+    # Optional scope for authenticating against scoped registries.
+    # Will fall back to the repository owner when using the GitHub Packages registry (https://npm.pkg.github.com/).
+    # Default: ''
+    scope: ''
+
+    # Optional mirror to download binaries from.
+    # Artifacts need to match the official Node.js
+    # Example:
+    # V8 Canary Build: <mirror_url>/download/v8-canary
+    # RC Build: <mirror_url>/download/rc
+    # Official: Build <mirror_url>/dist
+    # Nightly build: <mirror_url>/download/nightly
+    # Default: ''
+    mirror: ''
+
+    # Optional mirror token.
+    # The token will be used as a bearer token in the Authorization header
+    # Default: ''
+    mirror-token: ''
+    - name: Add & Commit
+  uses: EndBug/add-and-commit@v9.1.4
+  - uses: EndBug/add-and-commit@v9 # You can change this to use a specific version.
+  with:
+    # The arguments for the `git add` command (see the paragraph below for more info)
+    # Default: '.'
+    add: 'src'
+
+    # The name of the user that will be displayed as the author of the commit.
+    # Default: depends on the default_author input
+    author_name: Author Name
+
+    # The email of the user that will be displayed as the author of the commit.
+    # Default: depends on the default_author input
+    author_email: mail@example.com
+
+    # Additional arguments for the git commit command. The --message argument is already set by the message input.
+    # Default: ''
+    commit: --signoff
+
+    # The name of the custom committer you want to use, if different from the author of the commit.
+    # Default: the name of the author (set with either author_name or default_author)
+    committer_name: Committer Name
+
+    # The email of the custom committer you want to use, if different from the author of the commit.
+    # Default: the email of the author (set with either author_email or default_author)
+    committer_email: mail@example.com
+
+    # The local path to the directory where your repository is located. You should use actions/checkout first to set it up.
+    # Default: '.'
+    cwd: './path/to/the/repo'
+
+    # Determines the way the action fills missing author name and email. Three options are available:
+    # - github_actor -> UserName <UserName@users.noreply.github.com>
+    # - user_info -> Your Display Name <your-actual@email.com>
+    # - github_actions -> github-actions <email associated with the github logo>
+    # Default: github_actor
+    default_author: github_actor
+
+    # Arguments for the git fetch command. If set to false, the action won't fetch the repo.
+    # For more info as to why fetching is usually recommended, please see the "Performance on large repos" FAQ. 
+    # Default: --tags --force
+    fetch: false
+
+    # The message for the commit.
+    # Default: 'Commit from GitHub Actions (name of the workflow)'
+    message: 'Your commit message'
+
+    # If this input is set, the action will push the commit to a new branch with this name.
+    # Default: ''
+    new_branch: custom-new-branch
+
+    # The way the action should handle pathspec errors from the add and remove commands. Three options are available:
+    # - ignore -> errors will be logged but the step won't fail
+    # - exitImmediately -> the action will stop right away, and the step will fail
+    # - exitAtEnd -> the action will go on, every pathspec error will be logged at the end, the step will fail.
+    # Default: ignore
+    pathspec_error_handling: ignore
+
+    # Arguments for the git pull command. By default, the action does not pull.
+    # Default: ''
+    pull: '--rebase --autostash ...'
+
+    # Whether to push the commit and, if any, its tags to the repo. It can also be used to set the git push arguments (see the paragraph below for more info)
+    # Default: true
+    push: false
+
+    # The arguments for the `git rm` command (see the paragraph below for more info)
+    # Default: ''
+    remove: './dir/old_file.js'
+
+    # Arguments for the git tag command (the tag name always needs to be the first word not preceded by an hyphen)
+    # Default: ''
+    tag: 'v1.0.0 --force'
+
+    # Arguments for the git push --tags command (any additional argument will be added after --tags)
+    # Default: ''
+    tag_push: '--force'
+    - name: Dependent Issues
+  uses: z0al/dependent-issues@v1.5.2
+  name: Dependent Issues
+
+on:
+  issues:
+    types:
+      - opened
+      - edited
+      - closed
+      - reopened
+  pull_request_target:
+    types:
+      - opened
+      - edited
+      - closed
+      - reopened
+      # Makes sure we always add status check for PRs. Useful only if
+      # this action is required to pass before merging. Otherwise, it
+      # can be removed.
+      - synchronize
+
+  # Schedule a daily check. Useful if you reference cross-repository
+  # issues or pull requests. Otherwise, it can be removed.
+  schedule:
+    - cron: '0 0 * * *'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: z0al/dependent-issues@v1
+        env:
+          # (Required) The token to use to make API calls to GitHub.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # (Optional) The token to use to make API calls to GitHub for remote repos.
+          GITHUB_READ_TOKEN: ${{ secrets.GITHUB_READ_TOKEN }}
+
+        with:
+          # (Optional) The label to use to mark dependent issues
+          label: dependent
+
+          # (Optional) Enable checking for dependencies in issues.
+          # Enable by setting the value to "on". Default "off"
+          check_issues: off
+
+          # (Optional) Ignore dependabot PRs.
+          # Enable by setting the value to "on". Default "off"
+          ignore_dependabot: off
+
+          # (Optional) A comma-separated list of keywords. Default
+          # "depends on, blocked by"
+          keywords: depends on, blocked by
+
+          # (Optional) A custom comment body. It supports `{{ dependencies }}` token.
+          comment: >
+            This PR/issue depends on:
+
+            {{ dependencies }}
+
+            By **[Dependent Issues](https://github.com/z0al/dependent-issues)** (🤖). Happy coding!
+      - name: Sync GitHub Advanced Security and Jira
+  uses: github/ghas-jira-integration@v1.2.4
+  name: "Sync GHAS to Jira"
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'    # trigger synchronization every 10 minutes
+
+jobs:
+  test_job:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync alerts to Jira issues
+        uses: github/ghas-jira-integration@v1
+        with:
+          jira_url: '<INSERT JIRA SERVER URL>'
+          jira_user: '${{ secrets.JIRA_USER }}'
+          jira_token: '${{ secrets.JIRA_TOKEN }}'
+          jira_project: '<INSERT JIRA PROJECT KEY>'
+          sync_direction: 'gh2jira'
+          with:
+  jira_labels: 'red-team,blue-team,green-team'
+  with:
+  issue_end_state: 'Closed'
+  issue_reopen_state: 'red-team-followup'
+  - name: Setup Sherif
+  uses: QuiiBz/sherif@v1.10.0
+  # Autofix and select the highest version for each dependency matching the `multiple-dependency-versions` rule
+sherif --fix --select highest
+- name: Dependabot Auto Merge
+  uses: ahmadnassri/action-dependabot-auto-merge@v2.6.6
+  name: auto-merge
+
+on:
+  pull_request:
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: ahmadnassri/action-dependabot-auto-merge@v2
+        with:
+          target: minor
+          github-token: ${{ secrets.mytoken }}
+          - match:
+    dependency_type: all
+    update_type: semver:${TARGET}

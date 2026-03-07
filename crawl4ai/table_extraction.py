@@ -930,7 +930,7 @@ Return only a JSON array of extracted tables following the specified format."""
         Returns:
             Tuple of (header_rows, body_rows, footer_rows, has_headers)
         """
-        parser = etree.HTMLParser()
+        parser = etree.HTMLParser(resolve_entities=False)
         tree = etree.fromstring(html_content, parser)
         
         # Find all tables

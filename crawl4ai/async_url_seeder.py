@@ -82,7 +82,8 @@ def _parse_sitemap_lastmod(xml_content: bytes) -> Optional[str]:
     """Extract the most recent lastmod from sitemap XML."""
     try:
         if LXML:
-            root = etree.fromstring(xml_content)
+            parser = etree.XMLParser(resolve_entities=False)
+            root = etree.fromstring(xml_content, parser)
             # Get all lastmod elements (namespace-agnostic)
             lastmods = root.xpath("//*[local-name()='lastmod']/text()")
             if lastmods:
@@ -1119,7 +1120,7 @@ class AsyncUrlSeeder:
         if LXML:
             try:
                 # Use XML parser for sitemaps, not HTML parser
-                parser = etree.XMLParser(recover=True)
+                parser = etree.XMLParser(recover=True, resolve_entities=False)
                 root = etree.fromstring(data, parser=parser)
                 # Namespace-agnostic lookups using local-name() so we honor custom or missing namespaces
                 sitemap_loc_nodes = root.xpath("//*[local-name()='sitemap']/*[local-name()='loc']")

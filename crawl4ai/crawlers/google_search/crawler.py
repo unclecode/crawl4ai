@@ -72,8 +72,13 @@ class GoogleSearchCrawler(BaseCrawler):
         cleaned_html = preprocess_html_for_schema(html) 
 
         organic_schema = None
-        if os.path.exists(f"{home_dir}/schema/organic_schema.json"):
-            with open(f"{home_dir}/schema/organic_schema.json", "r") as f:
+        organic_schema_path = f"{home_dir}/schema/organic_schema.json"
+        base_real = os.path.realpath(home_dir)
+        target_real = os.path.realpath(organic_schema_path)
+        if os.path.commonpath([base_real, target_real]) != base_real:
+            raise Exception("Invalid file path")
+        if os.path.exists(target_real):
+            with open(target_real, "r") as f:
                 organic_schema = json.load(f)
         else:
             organic_schema = JsonCssExtractionStrategy.generate_schema(
@@ -87,12 +92,16 @@ class GoogleSearchCrawler(BaseCrawler):
                 query="""The given html is the crawled html from Google search result. Please find the schema for organic search item in the given html, I am interested in title, link, snippet text. date."""
             )
 
-            with open(f"{home_dir}/schema/organic_schema.json", "w") as f:
+            with open(target_real, "w") as f:
                 f.write(json.dumps(organic_schema))
 
         top_stories_schema = None
-        if os.path.exists(f"{home_dir}/schema/top_stories_schema.json"):
-            with open(f"{home_dir}/schema/top_stories_schema.json", "r") as f:
+        top_stories_schema_path = f"{home_dir}/schema/top_stories_schema.json"
+        target_real = os.path.realpath(top_stories_schema_path)
+        if os.path.commonpath([base_real, target_real]) != base_real:
+            raise Exception("Invalid file path")
+        if os.path.exists(target_real):
+            with open(target_real, "r") as f:
                 top_stories_schema = json.load(f)
         else:
             top_stories_schema = JsonCssExtractionStrategy.generate_schema(
@@ -106,12 +115,16 @@ class GoogleSearchCrawler(BaseCrawler):
                 query="""The given html is the crawled html from Google search result. Please find the schema for Top Story item int he given html, I am interested in title, link, source. date and imageUrl."""
             )
 
-            with open(f"{home_dir}/schema/top_stories_schema.json", "w") as f:
+            with open(target_real, "w") as f:
                 f.write(json.dumps(top_stories_schema))
 
         suggested_query_schema = None
-        if os.path.exists(f"{home_dir}/schema/suggested_query_schema.json"):
-            with open(f"{home_dir}/schema/suggested_query_schema.json", "r") as f:
+        suggested_query_schema_path = f"{home_dir}/schema/suggested_query_schema.json"
+        target_real = os.path.realpath(suggested_query_schema_path)
+        if os.path.commonpath([base_real, target_real]) != base_real:
+            raise Exception("Invalid file path")
+        if os.path.exists(target_real):
+            with open(target_real, "r") as f:
                 suggested_query_schema = json.load(f)
         else:
             suggested_query_schema = JsonCssExtractionStrategy.generate_schema(
@@ -121,7 +134,7 @@ class GoogleSearchCrawler(BaseCrawler):
         }""",
                 query="""The given HTML contains the crawled HTML from Google search results. Please find the schema for each suggested query in the section "People also search for" within the given HTML. I am interested in the queries only."""
             )
-            with open(f"{home_dir}/schema/suggested_query_schema.json", "w") as f:
+            with open(target_real, "w") as f:
                 f.write(json.dumps(suggested_query_schema))
 
         return {

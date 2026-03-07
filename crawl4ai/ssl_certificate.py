@@ -160,6 +160,8 @@ class SSLCertificate(dict):
         # `self` is already the dictionary we want to serialize
         json_str = json.dumps(self, indent=2, ensure_ascii=False)
         if filepath:
+            if ".." in filepath:
+                raise Exception("Invalid file path")
             Path(filepath).write_text(json_str, encoding="utf-8")
             return None
         return json_str
@@ -177,6 +179,8 @@ class SSLCertificate(dict):
             ).decode("utf-8")
 
             if filepath:
+                if ".." in filepath:
+                    raise Exception("Invalid file path")
                 Path(filepath).write_text(pem_data, encoding="utf-8")
                 return None
             return pem_data

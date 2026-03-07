@@ -657,7 +657,11 @@ async def get_chromium_path(browser_type) -> str:
     home_folder = get_home_folder()
     path_file = os.path.join(home_folder, f"{browser_type.lower()}.path")
     if os.path.exists(path_file):
-        with open(path_file, "r") as f:
+        base_real = os.path.realpath(home_folder)
+        target_real = os.path.realpath(path_file)
+        if os.path.commonpath([base_real, target_real]) != base_real:
+            raise RuntimeError("Invalid file path")
+        with open(target_real, "r") as f:
             return f.read()
 
     from playwright.async_api import async_playwright

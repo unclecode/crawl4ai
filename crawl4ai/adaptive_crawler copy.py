@@ -53,6 +53,8 @@ class CrawlState:
     def save(self, path: Union[str, Path]):
         """Save state to disk for persistence"""
         path = Path(path)
+        if '..' in str(path):
+            raise Exception('Invalid file path')
         path.parent.mkdir(parents=True, exist_ok=True)
         
         # Convert CrawlResult objects to dicts for serialization
@@ -83,6 +85,8 @@ class CrawlState:
     def load(cls, path: Union[str, Path]) -> 'CrawlState':
         """Load state from disk"""
         path = Path(path)
+        if '..' in str(path):
+            raise Exception('Invalid file path')
         with open(path, 'r') as f:
             state_dict = json.load(f)
         
@@ -1714,6 +1718,8 @@ class AdaptiveCrawler:
             return
             
         filepath = Path(filepath)
+        if '..' in str(filepath):
+            raise Exception('Invalid file path')
         filepath.parent.mkdir(parents=True, exist_ok=True)
         
         if format == "jsonl":
@@ -1774,6 +1780,8 @@ class AdaptiveCrawler:
             format: Import format - currently supports 'jsonl'
         """
         filepath = Path(filepath)
+        if '..' in str(filepath):
+            raise Exception('Invalid file path')
         if not filepath.exists():
             raise FileNotFoundError(f"File not found: {filepath}")
         
