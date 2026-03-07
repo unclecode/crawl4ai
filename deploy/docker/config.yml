@@ -14,16 +14,17 @@ llm:
   # api_key: sk-...  # If you pass the API key directly (not recommended)
 
 # Redis Configuration
+# Set task_ttl_seconds to automatically expire task data in Redis.
+# This prevents unbounded memory growth from accumulated task results.
+# Default: 3600 (1 hour). Set to 0 to disable TTL (not recommended).
+# Can be overridden with REDIS_TASK_TTL environment variable.
 redis:
   host: "localhost"
   port: 6379
   db: 0
   password: ""
+  task_ttl_seconds: 3600  # TTL for task data (1 hour default)
   ssl: False
-  ssl_cert_reqs: None
-  ssl_ca_certs: None
-  ssl_certfile: None
-  ssl_keyfile: None
   ssl_cert_reqs: None
   ssl_ca_certs: None
   ssl_certfile: None
