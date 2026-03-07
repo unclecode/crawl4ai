@@ -1372,11 +1372,10 @@ class AdaptiveCrawler:
                         if isinstance(result.links, dict):
                             # Extract internal and external links from dict
                             internal_links = [Link(**link) for link in result.links.get('internal', [])]
-                            external_links = [Link(**link) for link in result.links.get('external', [])]
-                            self.state.pending_links.extend(internal_links + external_links)
+                            self.state.pending_links.extend(internal_links)
                         else:
                             # Handle Links object
-                            self.state.pending_links.extend(result.links.internal + result.links.external)
+                            self.state.pending_links.extend(result.links.internal)
                     
                     # Update state
                     await self.strategy.update_state(self.state, [result])
@@ -1426,11 +1425,10 @@ class AdaptiveCrawler:
                                 if isinstance(result.links, dict):
                                     # Extract internal and external links from dict
                                     internal_links = [Link(**link_data) for link_data in result.links.get('internal', [])]
-                                    external_links = [Link(**link_data) for link_data in result.links.get('external', [])]
-                                    new_links = internal_links + external_links
+                                    new_links = internal_links
                                 else:
                                     # Handle Links object
-                                    new_links = result.links.internal + result.links.external
+                                    new_links = result.links.internal
                                 
                                 # Add new links to pending
                                 for new_link in new_links:
