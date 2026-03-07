@@ -47,7 +47,7 @@ WORD_TOKEN_RATE = 1.3
 MIN_WORD_THRESHOLD = 1
 IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD = 1
 
-IMPORTANT_ATTRS = ["src", "href", "alt", "title", "width", "height"]
+IMPORTANT_ATTRS = ["src", "href", "alt", "title", "width", "height", "class", "id"]
 ONLY_TEXT_ELIGIBLE_TAGS = [
     "b",
     "i",
