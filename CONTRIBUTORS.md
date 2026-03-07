@@ -43,6 +43,8 @@ We would like to thank the following people for their contributions to Crawl4AI:
 - [nightcityblade](https://github.com/nightcityblade) - fix: prevent AdaptiveCrawler from crawling external domains [#1805](https://github.com/unclecode/crawl4ai/pull/1805)
 - [Otman404](https://github.com/Otman404) - fix: return in finally block silently suppressing exceptions in dispatcher [#1763](https://github.com/unclecode/crawl4ai/pull/1763)
 - [SohamKukreti](https://github.com/SohamKukreti) - fix: from_serializable_dict ignoring plain data dicts with "type" key [#1803](https://github.com/unclecode/crawl4ai/pull/1803)
+- [Br1an67](https://github.com/Br1an67) - fix: handle nested brackets and parentheses in LINK_PATTERN regex [#1790](https://github.com/unclecode/crawl4ai/pull/1790), identified: strip markdown fences in LLM JSON responses [#1787](https://github.com/unclecode/crawl4ai/pull/1787)
+- [nightcityblade](https://github.com/nightcityblade) - feat: add score_threshold to BestFirstCrawlingStrategy [#1804](https://github.com/unclecode/crawl4ai/pull/1804)
 
 #### Feb-Alpha-1
 - [sufianuddin](https://github.com/sufianuddin) - fix: [Documentation for JsonCssExtractionStrategy](https://github.com/unclecode/crawl4ai/issues/651)
