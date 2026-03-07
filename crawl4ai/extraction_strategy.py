@@ -1759,7 +1759,7 @@ class JsonLxmlExtractionStrategy_naive(JsonElementExtractionStrategy):
     
     def _parse_html(self, html_content: str):
         from lxml import etree
-        parser = etree.HTMLParser(recover=True)
+        parser = etree.HTMLParser(recover=True, resolve_entities=False)
         return etree.fromstring(html_content, parser)
     
     def _get_selector(self, selector_str):
