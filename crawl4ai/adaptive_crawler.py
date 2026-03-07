@@ -1842,7 +1842,7 @@ class AdaptiveCrawler:
         
         return export_dict
     
-    def import_knowledge_base(self, filepath: Union[str, Path], format: str = "jsonl") -> None:
+    async def import_knowledge_base(self, filepath: Union[str, Path], format: str = "jsonl") -> None:
         """Import a knowledge base from a file
         
         Args:
@@ -1871,7 +1871,7 @@ class AdaptiveCrawler:
             self.state.knowledge_base.extend(imported_results)
             
             # Update state with imported data
-            asyncio.run(self.strategy.update_state(self.state, imported_results))
+            await self.strategy.update_state(self.state, imported_results)
             
             print(f"Imported {len(imported_results)} documents from {filepath}")
         else:

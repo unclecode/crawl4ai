@@ -543,7 +543,7 @@ async def adaptive_crawling_demo(auto_mode=False):
         adaptive2 = AdaptiveCrawler(crawler, export_config)
         
         # Import the knowledge base
-        adaptive2.import_knowledge_base(kb_export)
+        await adaptive2.import_knowledge_base(kb_export)
         console.print(f"✓ Imported {len(adaptive2.state.knowledge_base)} documents")
         console.print(f"✓ Starting confidence: {int(adaptive2.confidence * 100)}%")
         

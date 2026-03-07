@@ -1697,7 +1697,7 @@ def extract_xml_data_legacy(tags, string):
     data = {}
 
     for tag in tags:
-        pattern = f"<{tag}>(.*?)</{tag}>"
+        pattern = f"<{tag}>((?:(?!<{tag}>).)*)</{tag}>"
         match = re.search(pattern, string, re.DOTALL)
         if match:
             data[tag] = match.group(1).strip()
@@ -1726,7 +1726,7 @@ def extract_xml_data(tags, string):
     data = {}
 
     for tag in tags:
-        pattern = f"<{tag}>(.*?)</{tag}>"
+        pattern = f"<{tag}>((?:(?!<{tag}>).)*)</{tag}>"
         matches = re.findall(pattern, string, re.DOTALL)
         
         if matches:
@@ -2294,14 +2294,14 @@ def normalize_url(
     # IMPORTANT: Don't use quote(unquote()) as it mangles + signs in URLs
     # The path from urlparse is already properly encoded
     path = parsed.path
-    if path.endswith('/') and path != '/':
-        path = path.rstrip('/')
+    # Preserve trailing slashes -- they are semantically significant per RFC 3986
+    # e.g. /page/9123/ and /page/9123 may return different responses
 
     # ── query ──
     query = parsed.query
     if query:
         # explode, mutate, then rebuild
-        params = [(k.lower(), v) for k, v in parse_qsl(query, keep_blank_values=True)]
+        params = [(k, v) for k, v in parse_qsl(query, keep_blank_values=True)]
 
         if drop_query_tracking:
             default_tracking = {
@@ -2310,7 +2310,7 @@ def normalize_url(
             }
             if extra_drop_params:
                 default_tracking |= {p.lower() for p in extra_drop_params}
-            params = [(k, v) for k, v in params if k not in default_tracking]
+            params = [(k, v) for k, v in params if k.lower() not in default_tracking]
 
         if sort_query:
             params.sort(key=lambda kv: kv[0])
@@ -2383,7 +2383,7 @@ def normalize_url_for_deep_crawl(href, base_url, preserve_https=False, original_
     normalized = urlunparse((
         parsed.scheme,
         netloc,
-        parsed.path.rstrip('/'),  # Normalize trailing slash
+        parsed.path or '/',  # Preserve trailing slash
         parsed.params,
         query,
         fragment
@@ -2422,7 +2422,7 @@ def efficient_normalize_url_for_deep_crawl(href, base_url, preserve_https=False,
     normalized = urlunparse((
         parsed.scheme,
         parsed.netloc.lower(),
-        parsed.path.rstrip('/'),
+        parsed.path or '/',  # Preserve trailing slash
         parsed.params,
         parsed.query,
         ''  # Remove fragment
