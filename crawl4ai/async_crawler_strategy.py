@@ -383,7 +383,11 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         () => {{
                             const iframe = document.getElementById('iframe-{i}');
                             const div = document.createElement('div');
-                            div.innerHTML = `{_iframe}`;
+                            const parser = new DOMParser();
+                            const doc = parser.parseFromString(`{_iframe}`, 'text/html');
+                            while (doc.body.firstChild) {{
+                                div.appendChild(doc.body.firstChild);
+                            }}
                             div.className = '{class_name}';
                             iframe.replaceWith(div);
                         }}

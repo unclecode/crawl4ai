@@ -523,11 +523,15 @@ async def crawl_with_profile_cli(profile_path, url):
         # Run the crawler
         result = await run_crawler(url, browser_cfg, crawler_cfg, True)
         
+        # Get JSON output config
+        config = get_global_config()
+        ensure_ascii = config.get("JSON_ENSURE_ASCII", USER_SETTINGS["JSON_ENSURE_ASCII"]["default"])
+
         # Handle output
         if output_format == "all":
-            console.print(json.dumps(result.model_dump(), indent=2))
+            console.print(json.dumps(result.model_dump(), indent=2, ensure_ascii=ensure_ascii))
         elif output_format == "json":
-            console.print(json.dumps(json.loads(result.extracted_content), indent=2))
+            console.print(json.dumps(json.loads(result.extracted_content), indent=2, ensure_ascii=ensure_ascii))
         elif output_format in ["markdown", "md"]:
             console.print(result.markdown.raw_markdown)
         elif output_format == "title":
@@ -1024,11 +1028,12 @@ def cdp_cmd(user_data_dir: Optional[str], port: int, browser_type: str, headless
 @click.option("--profile", "-p", help="Use a specific browser profile (by name)")
 @click.option("--deep-crawl", type=click.Choice(["bfs", "dfs", "best-first"]), help="Enable deep crawling with specified strategy (bfs, dfs, or best-first)")
 @click.option("--max-pages", type=int, default=10, help="Maximum number of pages to crawl in deep crawl mode")
-def crawl_cmd(url: str, browser_config: str, crawler_config: str, filter_config: str, 
+@click.option("--json-ensure-ascii/--no-json-ensure-ascii", default=None, help="Escape non-ASCII characters in JSON output (default: from global config)")
+def crawl_cmd(url: str, browser_config: str, crawler_config: str, filter_config: str,
            extraction_config: str, json_extract: str, schema: str, browser: Dict, crawler: Dict,
-           output: str, output_file: str, bypass_cache: bool, question: str, verbose: bool, profile: str, deep_crawl: str, max_pages: int):
+           output: str, output_file: str, bypass_cache: bool, question: str, verbose: bool, profile: str, deep_crawl: str, max_pages: int, json_ensure_ascii: Optional[bool]):
     """Crawl a website and extract content
-    
+
     Simple Usage:
         crwl crawl https://example.com
     """
@@ -1191,7 +1196,13 @@ Always return valid, properly formatted JSON."""
         
         browser_cfg.verbose = config.get("VERBOSE", False)
         crawler_cfg.verbose = config.get("VERBOSE", False)
-        
+
+        # Get JSON output config (priority: CLI flag > global config)
+        if json_ensure_ascii is not None:
+            ensure_ascii = json_ensure_ascii
+        else:
+            ensure_ascii = config.get("JSON_ENSURE_ASCII", USER_SETTINGS["JSON_ENSURE_ASCII"]["default"])
+
         # Run crawler
         result : CrawlResult = anyio.run(
             run_crawler,
@@ -1226,14 +1237,14 @@ Always return valid, properly formatted JSON."""
             if output == "all":
                 if isinstance(result, list):
                     output_data = [r.model_dump() for r in all_results]
-                    click.echo(json.dumps(output_data, indent=2))
+                    click.echo(json.dumps(output_data, indent=2, ensure_ascii=ensure_ascii))
                 else:
-                    click.echo(json.dumps(main_result.model_dump(), indent=2))
+                    click.echo(json.dumps(main_result.model_dump(), indent=2, ensure_ascii=ensure_ascii))
             elif output == "json":
                 print(main_result.extracted_content)
                 extracted_items = json.loads(main_result.extracted_content)
-                click.echo(json.dumps(extracted_items, indent=2))
-                
+                click.echo(json.dumps(extracted_items, indent=2, ensure_ascii=ensure_ascii))
+
             elif output in ["markdown", "md"]:
                 if isinstance(result, list):
                     # Combine markdown from all crawled pages for deep crawl
@@ -1255,9 +1266,9 @@ Always return valid, properly formatted JSON."""
                 with open(output_file, "w", encoding="utf-8") as f:
                     if isinstance(result, list):
                         output_data = [r.model_dump() for r in all_results]
-                        f.write(json.dumps(output_data, indent=2))
+                        f.write(json.dumps(output_data, indent=2, ensure_ascii=ensure_ascii))
                     else:
-                        f.write(json.dumps(main_result.model_dump(), indent=2))
+                        f.write(json.dumps(main_result.model_dump(), indent=2, ensure_ascii=ensure_ascii))
             elif output == "json":
                 with open(output_file, "w", encoding="utf-8") as f:
                     f.write(main_result.extracted_content)
@@ -1574,9 +1585,10 @@ def shrink_cmd(profile_name: str, level: str, dry_run: bool):
 @click.option("--profile", "-p", help="Use a specific browser profile (by name)")
 @click.option("--deep-crawl", type=click.Choice(["bfs", "dfs", "best-first"]), help="Enable deep crawling with specified strategy")
 @click.option("--max-pages", type=int, default=10, help="Maximum number of pages to crawl in deep crawl mode")
-def default(url: str, example: bool, browser_config: str, crawler_config: str, filter_config: str, 
+@click.option("--json-ensure-ascii/--no-json-ensure-ascii", default=None, help="Escape non-ASCII characters in JSON output (default: from global config)")
+def default(url: str, example: bool, browser_config: str, crawler_config: str, filter_config: str,
         extraction_config: str, json_extract: str, schema: str, browser: Dict, crawler: Dict,
-        output: str, bypass_cache: bool, question: str, verbose: bool, profile: str, deep_crawl: str, max_pages: int):
+        output: str, bypass_cache: bool, question: str, verbose: bool, profile: str, deep_crawl: str, max_pages: int, json_ensure_ascii: Optional[bool]):
     """Crawl4AI CLI - Web content extraction tool
 
     Simple Usage:
@@ -1628,7 +1640,8 @@ def default(url: str, example: bool, browser_config: str, crawler_config: str, f
         verbose=verbose,
         profile=profile,
         deep_crawl=deep_crawl,
-        max_pages=max_pages
+        max_pages=max_pages,
+        json_ensure_ascii=json_ensure_ascii
     )
 
 def main():

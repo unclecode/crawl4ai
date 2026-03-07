@@ -742,16 +742,19 @@ async def handle_stream_crawl_request(
         crawler_config.scraping_strategy = LXMLWebScrapingStrategy()
         crawler_config.stream = True
 
-        dispatcher = MemoryAdaptiveDispatcher(
-            memory_threshold_percent=config["crawler"]["memory_threshold_percent"],
-            rate_limiter=RateLimiter(
-                base_delay=tuple(config["crawler"]["rate_limiter"]["base_delay"])
+        # Deep crawl streaming supports exactly one start URL
+        if crawler_config.deep_crawl_strategy is not None and len(urls) != 1:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Deep crawling with stream currently supports exactly one URL per request. "
+                    f"Received {len(urls)} URLs."
+                ),
             )
-        )
 
         from crawler_pool import get_crawler, release_crawler
         crawler = await get_crawler(browser_config)
-        
+
         # Attach hooks if provided
         if hooks_config:
             from hook_manager import attach_user_hooks_to_crawler, UserHookManager
@@ -766,11 +769,26 @@ async def handle_stream_crawl_request(
             # Include hook manager in hooks_info for proper tracking
             hooks_info = {'status': hooks_status, 'manager': hook_manager}
 
-        results_gen = await crawler.arun_many(
-            urls=urls,
-            config=crawler_config,
-            dispatcher=dispatcher
-        )
+        # Deep crawl with single URL: use arun() which returns an async generator
+        # mirroring the Python library's streaming behavior
+        if crawler_config.deep_crawl_strategy is not None and len(urls) == 1:
+            results_gen = await crawler.arun(
+                urls[0],
+                config=crawler_config,
+            )
+        else:
+            # Default multi-URL streaming via arun_many
+            dispatcher = MemoryAdaptiveDispatcher(
+                memory_threshold_percent=config["crawler"]["memory_threshold_percent"],
+                rate_limiter=RateLimiter(
+                    base_delay=tuple(config["crawler"]["rate_limiter"]["base_delay"])
+                )
+            )
+            results_gen = await crawler.arun_many(
+                urls=urls,
+                config=crawler_config,
+                dispatcher=dispatcher
+            )
 
         return crawler, results_gen, hooks_info
 

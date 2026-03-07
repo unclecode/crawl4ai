@@ -1009,9 +1009,14 @@ class AsyncWebCrawler:
         #     )
 
         if dispatcher is None:
+            primary_cfg = config[0] if isinstance(config, list) else config
+            mean_delay = getattr(primary_cfg, "mean_delay", 0.1)
+            max_range = getattr(primary_cfg, "max_range", 0.3)
             dispatcher = MemoryAdaptiveDispatcher(
                 rate_limiter=RateLimiter(
-                    base_delay=(1.0, 3.0), max_delay=60.0, max_retries=3
+                    base_delay=(mean_delay, mean_delay + max_range),
+                    max_delay=60.0,
+                    max_retries=3,
                 ),
             )
 

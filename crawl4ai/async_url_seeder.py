@@ -789,7 +789,8 @@ class AsyncUrlSeeder:
 
         Returns:
             * the same URL if it answers 2xx,
-            * the absolute redirect target if it answers 3xx,
+            * the verified absolute redirect target if it answers 3xx
+              and the target also answers 2xx,
             * None on any other status or network error.
         """
         try:
@@ -799,11 +800,23 @@ class AsyncUrlSeeder:
             if 200 <= r.status_code < 300:
                 return str(r.url)
 
-            # single level redirect
+            # single level redirect — verify target is alive
             if r.status_code in (301, 302, 303, 307, 308):
                 loc = r.headers.get("location")
                 if loc:
-                    return urljoin(url, loc)
+                    target = urljoin(url, loc)
+                    # Guard against self-redirects
+                    if target == url:
+                        return None
+                    try:
+                        r2 = await self.client.head(
+                            target, timeout=10, follow_redirects=False
+                        )
+                        if 200 <= r2.status_code < 300:
+                            return str(r2.url)
+                    except Exception:
+                        pass
+                    return None
 
             return None
 

@@ -45,6 +45,7 @@ rate_limiting:
 security:
   enabled: false
   jwt_enabled: false
+  api_token: ""  # When set, /token endpoint requires this secret to issue JWTs
   https_redirect: false
   trusted_hosts: ["*"]
   headers:

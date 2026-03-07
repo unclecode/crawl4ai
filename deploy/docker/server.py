@@ -304,6 +304,9 @@ logger = logging.getLogger(__name__)
 # ──────────────────────── Endpoints ──────────────────────────
 @app.post("/token")
 async def get_token(req: TokenRequest):
+    expected_token = config.get("security", {}).get("api_token", "")
+    if expected_token and req.api_token != expected_token:
+        raise HTTPException(401, "Invalid or missing api_token")
     if not verify_email_domain(req.email):
         raise HTTPException(400, "Invalid email domain")
     token = create_access_token({"sub": req.email})
