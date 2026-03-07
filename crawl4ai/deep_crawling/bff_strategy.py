@@ -39,6 +39,7 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
         filter_chain: FilterChain = FilterChain(),
         url_scorer: Optional[URLScorer] = None,
         include_external: bool = False,
+        score_threshold: float = -infinity,
         max_pages: int = infinity,
         logger: Optional[logging.Logger] = None,
         # Optional resume/callback parameters for crash recovery
@@ -49,6 +50,7 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
         self.filter_chain = filter_chain
         self.url_scorer = url_scorer
         self.include_external = include_external
+        self.score_threshold = score_threshold
         self.max_pages = max_pages
         # self.logger = logger or logging.getLogger(__name__)
         # Ensure logger is always a Logger instance, not a dict from serialization
@@ -245,6 +247,13 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
                     for new_url, new_parent in new_links:
                         new_depth = depths.get(new_url, depth + 1)
                         new_score = self.url_scorer.score(new_url) if self.url_scorer else 0
+                        # Skip URLs with scores below the threshold
+                        if new_score < self.score_threshold:
+                            self.logger.debug(
+                                f"URL {new_url} skipped: score {new_score} below threshold {self.score_threshold}"
+                            )
+                            self.stats.urls_skipped += 1
+                            continue
                         queue_item = (-new_score, new_depth, new_url, new_parent)
                         await queue.put(queue_item)
                         # Add to shadow list if tracking
