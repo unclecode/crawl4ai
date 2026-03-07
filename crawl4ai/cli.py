@@ -1252,17 +1252,17 @@ Always return valid, properly formatted JSON."""
                     click.echo(main_result.markdown.fit_markdown)
         else:
             if output == "all":
-                with open(output_file, "w") as f:
+                with open(output_file, "w", encoding="utf-8") as f:
                     if isinstance(result, list):
                         output_data = [r.model_dump() for r in all_results]
                         f.write(json.dumps(output_data, indent=2))
                     else:
                         f.write(json.dumps(main_result.model_dump(), indent=2))
             elif output == "json":
-                with open(output_file, "w") as f:
+                with open(output_file, "w", encoding="utf-8") as f:
                     f.write(main_result.extracted_content)
             elif output in ["markdown", "md"]:
-                with open(output_file, "w") as f:
+                with open(output_file, "w", encoding="utf-8") as f:
                     if isinstance(result, list):
                         # Combine markdown from all crawled pages for deep crawl
                         for r in all_results:
@@ -1271,7 +1271,7 @@ Always return valid, properly formatted JSON."""
                     else:
                         f.write(main_result.markdown.raw_markdown)
             elif output in ["markdown-fit", "md-fit"]:
-                with open(output_file, "w") as f:
+                with open(output_file, "w", encoding="utf-8") as f:
                     if isinstance(result, list):
                         # Combine fit markdown from all crawled pages for deep crawl
                         for r in all_results:
