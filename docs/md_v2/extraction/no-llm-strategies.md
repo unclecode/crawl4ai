@@ -506,7 +506,7 @@ async def extract_with_generated_pattern():
         # Get sample HTML for context
         async with AsyncWebCrawler() as crawler:
             result = await crawler.arun("https://example.com/products")
-            html = result.fit_html
+            html = result.markdown.fit_html
         
         # Generate pattern (one-time LLM usage)
         pattern = RegexExtractionStrategy.generate_pattern(

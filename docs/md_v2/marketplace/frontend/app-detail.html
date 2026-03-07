@@ -152,19 +152,24 @@ if __name__ == "__main__":
                             <span class="code-lang">python</span>
                             <button class="copy-btn">Copy</button>
                         </div>
-                        <pre><code id="integration-code">from crawl4ai import AsyncWebCrawler
+                        <pre><code id="integration-code">from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
+from crawl4ai import LLMConfig
 from crawl4ai.extraction_strategy import LLMExtractionStrategy
 
 async def extract_with_llm():
     async with AsyncWebCrawler() as crawler:
         result = await crawler.arun(
             url="https://example.com",
-            extraction_strategy=LLMExtractionStrategy(
-                provider="openai",
-                api_key="your-api-key",
-                instruction="Extract product information"
-            ),
-            bypass_cache=True
+            config=CrawlerRunConfig(
+                extraction_strategy=LLMExtractionStrategy(
+                    llm_config=LLMConfig(
+                        provider="openai/gpt-4o",
+                        api_token="your-api-key",
+                    ),
+                    instruction="Extract product information"
+                ),
+                cache_mode=CacheMode.BYPASS
+            )
         )
         return result.extracted_content
 
@@ -175,7 +180,7 @@ print(data)</code></pre>
 
                     <div class="info-box">
                         <h4>💡 Pro Tip</h4>
-                        <p>Use the <code>bypass_cache=True</code> parameter when you need fresh data, or set <code>cache_mode="write"</code> to update the cache with new content.</p>
+                        <p>Use <code>cache_mode=CacheMode.BYPASS</code> for a fresh crawl, or <code>CacheMode.WRITE_ONLY</code> to avoid refetching.</p>
                     </div>
                 </div>
             </section>

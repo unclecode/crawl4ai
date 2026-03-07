@@ -24,22 +24,16 @@ The new system uses a single `CacheMode` enum:
 
 ### Old Code (Deprecated)
 ```python
-import asyncio
 from crawl4ai import AsyncWebCrawler
 
-async def use_proxy():
-    async with AsyncWebCrawler(verbose=True) as crawler:
-        result = await crawler.arun(
-            url="https://www.nbcnews.com/business",
-            bypass_cache=True  # Old way
-        )
-        print(len(result.markdown))
-
-async def main():
-    await use_proxy()
-
-if __name__ == "__main__":
-    asyncio.run(main())
+async def old_code(crawler: AsyncWebCrawler):
+    # Legacy `bypass_cache` / `disable_cache` / `no_cache_read` / `no_cache_write`
+    # were removed in v0.5+. This example no longer applies:
+    result = await crawler.arun(
+        url="https://www.nbcnews.com/business",
+        # cache_mode is the only cache option now.
+    )
+    print(len(result.markdown))
 ```
 
 ### New Code (Recommended)
@@ -67,9 +61,9 @@ if __name__ == "__main__":
 
 ## Common Migration Patterns
 
-| Old Flag              | New Mode                       |
-|-----------------------|---------------------------------|
-| `bypass_cache=True`   | `cache_mode=CacheMode.BYPASS`  |
-| `disable_cache=True`  | `cache_mode=CacheMode.DISABLED`|
-| `no_cache_read=True`  | `cache_mode=CacheMode.WRITE_ONLY` |
-| `no_cache_write=True` | `cache_mode=CacheMode.READ_ONLY` |
+| Legacy Flag            | Replacement                |
+|------------------------|----------------------------|
+| `bypass_cache`    | `cache_mode=CacheMode.BYPASS`    |
+| `disable_cache`   | `cache_mode=CacheMode.DISABLED`  |
+| `no_cache_read`   | `cache_mode=CacheMode.READ_ONLY` |
+| `no_cache_write`  | `cache_mode=CacheMode.WRITE_ONLY`|

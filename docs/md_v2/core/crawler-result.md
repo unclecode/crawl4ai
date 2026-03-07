@@ -110,7 +110,7 @@ print(result.cleaned_html)  # Freed of forms, header, footer, data-* attributes
 ### 3.1 `markdown`
 
 - **`markdown`**: The current location for detailed markdown output, returning a **`MarkdownGenerationResult`** object.  
-- **`markdown_v2`**: Deprecated since v0.5.
+- **`markdown_v2`**: Removed in v0.5. Accessing it now raises `AttributeError`; use `markdown`.
 
 **`MarkdownGenerationResult`** Fields:
 
@@ -328,8 +328,7 @@ else:
     print("Error:", result.error_message)
 ```
 
-**Deprecation**: Since v0.5 `result.markdown_v2`, `result.fit_html`,`result.fit_markdown` are deprecated. Use `result.markdown` instead! It holds `MarkdownGenerationResult`, which includes `fit_html` and `fit_markdown`
-as it's properties.
+**Deprecation**: Since v0.5 `markdown_v2`, `fit_markdown`, and `fit_html` are removed from `CrawlResult`. Use `result.markdown` for markdown output. It holds `MarkdownGenerationResult`, including `fit_html` and `fit_markdown`.
 
 
 ---
