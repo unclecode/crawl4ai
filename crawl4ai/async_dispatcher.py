@@ -458,14 +458,15 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
 
         except Exception as e:
             if self.monitor:
-                self.monitor.update_memory_status(f"QUEUE_ERROR: {str(e)}")                
+                self.monitor.update_memory_status(f"QUEUE_ERROR: {str(e)}")
+            raise       
         
         finally:
             # Clean up
             memory_monitor.cancel()
             if self.monitor:
                 self.monitor.stop()
-            return results
+        return results
                 
     async def _update_queue_priorities(self):
         """Periodically update priorities of items in the queue to prevent starvation"""
