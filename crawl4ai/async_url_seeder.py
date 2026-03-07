@@ -450,16 +450,20 @@ class AsyncUrlSeeder:
         async def producer():
             try:
                 async for u in gen():
-                    if u in seen:
-                        self._log("debug", "Skipping duplicate URL: {url}",
-                                  params={"url": u}, tag="URL_SEED")
+                    try:
+                        if u in seen:
+                            self._log("debug", "Skipping duplicate URL: {url}",
+                                      params={"url": u}, tag="URL_SEED")
+                            continue
+                        if stop_event.is_set():
+                            self._log(
+                                "info", "Producer stopping due to max_urls limit.", tag="URL_SEED")
+                            break
+                        seen.add(u)
+                        await queue.put(u)  # Will block if queue is full, providing backpressure
+                    except UnicodeEncodeError:
+                        # Skip URLs that cause encoding errors (e.g. on Windows)
                         continue
-                    if stop_event.is_set():
-                        self._log(
-                            "info", "Producer stopping due to max_urls limit.", tag="URL_SEED")
-                        break
-                    seen.add(u)
-                    await queue.put(u)  # Will block if queue is full, providing backpressure
             except Exception as e:
                 self._log("error", "Producer encountered an error: {error}", params={
                           "error": str(e)}, tag="URL_SEED")
@@ -987,7 +991,8 @@ class AsyncUrlSeeder:
         def _normalize_loc(raw: Optional[str]) -> Optional[str]:
             if not raw:
                 return None
-            normalized = urljoin(base_url, raw.strip())
+            cleaned = raw.strip().replace("\u200b", "").replace("\ufeff", "")
+            normalized = urljoin(base_url, cleaned)
             if not normalized:
                 return None
             return normalized
@@ -1107,7 +1112,8 @@ class AsyncUrlSeeder:
         def _normalize_loc(raw: Optional[str]) -> Optional[str]:
             if not raw:
                 return None
-            normalized = urljoin(base_url, raw.strip())
+            cleaned = raw.strip().replace("\u200b", "").replace("\ufeff", "")
+            normalized = urljoin(base_url, cleaned)
             if not normalized:
                 return None
             return normalized
