@@ -49,6 +49,7 @@ We would like to thank the following people for their contributions to Crawl4AI:
 - [AkosLukacs](https://github.com/AkosLukacs) - docs: fix docstring param name crawler_config -> config [#1494](https://github.com/unclecode/crawl4ai/pull/1494)
 - [dominicx](https://github.com/dominicx) - docs: fix css_selector type from list to string [#1308](https://github.com/unclecode/crawl4ai/pull/1308)
 - [hoi](https://github.com/hoi) - fix: add TTL expiry for Redis task data [#1730](https://github.com/unclecode/crawl4ai/pull/1730)
+- [maksimzayats](https://github.com/maksimzayats) - docs: modernize deprecated API usage across 25 files [#1770](https://github.com/unclecode/crawl4ai/pull/1770)
 
 #### Feb-Alpha-1
 - [sufianuddin](https://github.com/sufianuddin) - fix: [Documentation for JsonCssExtractionStrategy](https://github.com/unclecode/crawl4ai/issues/651)
