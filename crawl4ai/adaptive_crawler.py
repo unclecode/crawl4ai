@@ -207,6 +207,9 @@ class AdaptiveConfig:
     # Example: Links with >0.85 similarity to existing KB get penalized to avoid redundancy
     # Lower = more aggressive deduplication, Higher = allow more similar content
     
+    # Link preview timeout (seconds)
+    link_preview_timeout: float = 5.0
+
     # Embedding stopping criteria parameters
     embedding_min_relative_improvement: float = 0.1  # Minimum relative improvement to continue
     # Example: If confidence is 0.6, need improvement > 0.06 per batch to continue crawling
@@ -1476,7 +1479,7 @@ class AdaptiveCrawler:
                 include_external=False,
                 query=query,  # For BM25 scoring
                 concurrency=5,
-                timeout=5,
+                timeout=self.config.link_preview_timeout,
                 max_links=50,  # Reasonable limit
                 verbose=False
             ),
