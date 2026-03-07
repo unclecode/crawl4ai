@@ -1,44 +1,23 @@
 # PR Review Todolist
 
-> Last updated: 2026-03-07 | Total open PRs: 21
+> Last updated: 2026-03-07 | Total open PRs: 6
 
 ---
 
-## Remaining Open PRs (21)
+## Remaining Open PRs (6)
 
-### Bug Fixes (5)
+### Bug Fixes (2)
 
 | PR | Author | Description | Notes |
 |----|--------|-------------|-------|
-| #1592 | Ahmed-Tawfik94 | Fix CDP page leaks and race conditions in concurrent crawling (#1563) | Large (400+ lines), needs careful review |
-| #1622 | Ahmed-Tawfik94 | Fix redirect target verification in AsyncUrlSeeder and enhance tests | Medium, needs validation against current code |
 | #1207 | moncapitaine | Fix streaming error handling | Old PR, likely needs rebase |
-| #1796 | Br1an67 | Fix: use DOMParser instead of innerHTML in process_iframes | **NEW** - security fix |
 | #462 | jtanningbed | Fix: Add newline before pre codeblock start in html2text. 1-line fix | Very old, may still apply |
 
-### Features (10)
+### Docs/Maintenance (2)
 
 | PR | Author | Description | Notes |
 |----|--------|-------------|-------|
-| #1786 | Br1an67 | Fix: wire mean_delay and max_range from CrawlerRunConfig into dispatcher | **NEW** - config wiring |
-| #1798 | SohamKukreti | Fix(docker): make deep-crawl streaming mirror Python library behaviour | **NEW** - Docker streaming |
-| #1795 | Br1an67 | Fix: require api_token for /token endpoint when configured | **NEW** - security hardening |
-| #1729 | hoi | Add support for external Redis with embedded Redis disable option | Docker infra |
-| #1707 | dillonledoux | Add `Crawl-delay` directive support from robots.txt | Good compliance feature |
-| #1702 | YxmMyth | Add CSS background image extraction (#1691) | Feature addition |
-| #1668 | microHoffman | Add `--json-ensure-ascii` CLI flag for Unicode handling | Clean, small |
-| #1425 | denrusio | Add OpenRouter API support | LLM provider |
-| #1290 | 130347665 | Support type-list pipeline in JsonElementExtraction (multi-step extract) | Complex feature |
-| #1180 | kunalmanelkar | Add CallbackURLFilter for custom URL filtering in deep crawling | Deep crawl filter |
-| #999 | loliw | Add regex-based filters for deep crawling | Deep crawl filter |
-
-### Docs/Maintenance (4)
-
-| PR | Author | Description | Notes |
-|----|--------|-------------|-------|
-| #1770 | maksimzayats | Docs: modernize deprecated Crawl4AI API usage across shipped docs | **NEW** - doc updates |
-| #1756 | VasiliyRad | Added AG2 community integration example and Quickstart pointer | **NEW** - community example |
-| #1734 | pgoslatara | Update outdated GitHub Actions versions (v4->v6) | CI maintenance |
+| #1756 | VasiliyRad | Added AG2 community integration example and Quickstart pointer | Community example |
 | #1533 | unclecode | Add Claude Code GitHub Workflow | Owner's PR, CI |
 
 ### Skipped (owner PRs)
@@ -50,9 +29,19 @@
 
 ---
 
-## Previously Closed PRs (from old todolist, now closed/gone)
+## Previously Closed PRs (won't merge)
 
-The following PRs from the original todolist are no longer open (closed by authors, superseded, or stale):
+| PR | Author | Description | Reason |
+|----|--------|-------------|--------|
+| #999 | loliw | Regex-based filters for deep crawling | URLPatternFilter already supports regex |
+| #1180 | kunalmanelkar | CallbackURLFilter for deep crawling | Breaks sync apply() interface |
+| #1425 | denrusio | OpenRouter API support | litellm handles openrouter/ natively |
+| #1702 | YxmMyth | CSS background image extraction | Too invasive for niche feature |
+| #1707 | dillonledoux | Crawl-delay from robots.txt | Too complex for non-standard directive |
+| #1729 | hoi | External Redis support | Docker infra - maintainer territory |
+| #1592 | Ahmed-Tawfik94 | CDP page leaks and race conditions | Superseded by develop page lifecycle system |
+
+## Previously Closed PRs (from old todolist)
 
 | PR | Author | Original Description | What happened |
 |----|--------|---------------------|---------------|
@@ -105,7 +94,20 @@ The following PRs from the original todolist are no longer open (closed by autho
 
 ---
 
-## Resolved This Session (batch 4)
+## Resolved This Session (batch 5)
+
+| PR | Author | Description | Date |
+|----|--------|-------------|------|
+| #1622 | Ahmed-Tawfik94 | fix: verify redirect targets in URL seeder | 2026-03-07 |
+| #1786 | Br1an67 | fix: wire mean_delay/max_range into dispatcher | 2026-03-07 |
+| #1796 | Br1an67 | fix: DOMParser in process_iframes | 2026-03-07 |
+| #1795 | Br1an67 | fix: require api_token for /token endpoint | 2026-03-07 |
+| #1798 | SohamKukreti | fix: deep-crawl streaming mirrors Python library | 2026-03-07 |
+| #1734 | pgoslatara | chore: update GitHub Actions versions | 2026-03-07 |
+| #1290 | 130347665 | feat: type-list pipeline in JSON extraction | 2026-03-07 |
+| #1668 | microHoffman | feat: --json-ensure-ascii CLI flag | 2026-03-07 |
+
+## Resolved (batch 4)
 
 | PR | Author | Description | Date |
 |----|--------|-------------|------|
