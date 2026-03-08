@@ -48,12 +48,12 @@ def get_global_config() -> dict:
         config_dir.mkdir(parents=True, exist_ok=True)
         return {}
         
-    with open(config_file) as f:
+    with open(config_file, encoding="utf-8") as f:
         return yaml.safe_load(f) or {}
 
 def save_global_config(config: dict):
     config_file = Path.home() / ".crawl4ai" / "global.yml"
-    with open(config_file, "w") as f:
+    with open(config_file, "w", encoding="utf-8") as f:
         yaml.dump(config, f)
 
 def setup_llm_config() -> tuple[str, str]:
@@ -1235,20 +1235,20 @@ Always return valid, properly formatted JSON."""
                 click.echo(main_result.markdown.fit_markdown)
         else:
             if output == "all":
-                with open(output_file, "w") as f:
+                with open(output_file, "w", encoding="utf-8") as f:
                     if isinstance(result, list):
                         output_data = [r.model_dump() for r in all_results]
                         f.write(json.dumps(output_data, indent=2))
                     else:
                         f.write(json.dumps(main_result.model_dump(), indent=2))
             elif output == "json":
-                with open(output_file, "w") as f:
+                with open(output_file, "w", encoding="utf-8") as f:
                     f.write(main_result.extracted_content)
             elif output in ["markdown", "md"]:
-                with open(output_file, "w") as f:
+                with open(output_file, "w", encoding="utf-8") as f:
                     f.write(main_result.markdown.raw_markdown)
             elif output in ["markdown-fit", "md-fit"]:
-                with open(output_file, "w") as f:
+                with open(output_file, "w", encoding="utf-8") as f:
                     f.write(main_result.markdown.fit_markdown)
             
     except Exception as e:
