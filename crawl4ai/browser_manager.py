@@ -212,12 +212,18 @@ class ManagedBrowser:
                         p.wait(timeout=5)
             else:  # macOS / Linux
                 # kill any process listening on the same debugging port
-                pids = (
-                    subprocess.check_output(shlex.split(f"lsof -t -i:{self.debugging_port}"))
-                    .decode()
-                    .strip()
-                    .splitlines()
-                )
+                try:
+                    pids = (
+                        subprocess.check_output(
+                            shlex.split(f"lsof -t -i:{self.debugging_port}"),
+                            stderr=subprocess.DEVNULL,
+                        )
+                        .decode()
+                        .strip()
+                        .splitlines()
+                    )
+                except (FileNotFoundError, subprocess.CalledProcessError):
+                    pids = []
                 for pid in pids:
                     try:
                         os.kill(int(pid), signal.SIGTERM)
@@ -421,13 +427,17 @@ class ManagedBrowser:
                     # Force kill if still running
                     if self.browser_process.poll() is None:
                         if sys.platform == "win32":
-                            # On Windows we might need taskkill for detached processes
+                            # On Windows, use taskkill /T to kill the entire process tree
                             try:
-                                subprocess.run(["taskkill", "/F", "/PID", str(self.browser_process.pid)])
+                                subprocess.run(["taskkill", "/F", "/T", "/PID", str(self.browser_process.pid)])
                             except Exception:
                                 self.browser_process.kill()
                         else:
-                            self.browser_process.kill()
+                            # On Unix, kill entire process group to reap child processes
+                            try:
+                                os.killpg(os.getpgid(self.browser_process.pid), signal.SIGKILL)
+                            except (ProcessLookupError, OSError):
+                                pass
                         await asyncio.sleep(0.1)  # Brief wait for kill to take effect
 
             except Exception as e:

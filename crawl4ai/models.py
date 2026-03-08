@@ -298,6 +298,10 @@ class CrawlResultContainer(Generic[CrawlResultT]):
     def __iter__(self):
         return iter(self._results)
 
+    async def __aiter__(self):
+        for item in self._results:
+            yield item
+
     def __getitem__(self, index):
         return self._results[index]
 

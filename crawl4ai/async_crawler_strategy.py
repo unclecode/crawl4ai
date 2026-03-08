@@ -941,10 +941,6 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 # await self._handle_full_page_scan(page, config.scroll_delay)
                 await self._handle_full_page_scan(page, config.scroll_delay, config.max_scroll_steps)
 
-            # Handle virtual scroll if configured
-            if config.virtual_scroll_config:
-                await self._handle_virtual_scroll(page, config.virtual_scroll_config)
-
             # --- Phase 1: Pre-wait JS and interaction ---
 
             # Execute js_code_before_wait (for triggering loading that wait_for checks)
@@ -978,6 +974,10 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     )
                 except Exception as e:
                     raise RuntimeError(f"Wait condition failed: {str(e)}")
+
+            # Handle virtual scroll if configured (after wait_for so container exists)
+            if config.virtual_scroll_config:
+                await self._handle_virtual_scroll(page, config.virtual_scroll_config)
 
             # Pre-content retrieval hooks and delay
             await self.execute_hook("before_retrieve_html", page, context=context, config=config)
