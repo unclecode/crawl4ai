@@ -705,6 +705,22 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                 except Exception as e:
                     self._log("error", f"Error with target element detection: {str(e)}", "SCRAPE")
                     return None
+            elif css_selector:
+                try:
+                    # Handle comma-separated selectors
+                    selectors = [s.strip() for s in css_selector.split(',')]
+                    selected_elements = []
+                    for selector in selectors:
+                        selected_elements.extend(body.cssselect(selector))
+                    if selected_elements:
+                        content_element = lhtml.Element("div")
+                        content_element.extend(copy.deepcopy(selected_elements))
+                    else:
+                        self._log("warning", f"No elements found for css_selector: {css_selector}", "SCRAPE")
+                        content_element = body
+                except Exception as e:
+                    self._log("error", f"Error applying css_selector '{css_selector}': {str(e)}", "SCRAPE")
+                    content_element = body
             else:
                 content_element = body
 
