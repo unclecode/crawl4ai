@@ -16,7 +16,7 @@ from .models import (
     DispatchResult,
     ScrapingResult,
     CrawlResultContainer,
-    RunManyReturn
+    RunManyReturn,
 )
 from .async_database import async_db_manager
 from .chunking_strategy import *  # noqa: F403
@@ -115,8 +115,7 @@ class AsyncWebCrawler:
         self,
         crawler_strategy: AsyncCrawlerStrategy = None,
         config: BrowserConfig = None,
-        base_directory: str = str(
-            os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home())),
+        base_directory: str = str(os.getenv("CRAWL4_AI_BASE_DIRECTORY", Path.home())),
         thread_safe: bool = False,
         logger: AsyncLoggerBase = None,
         **kwargs,
@@ -144,8 +143,7 @@ class AsyncWebCrawler:
         )
 
         # Initialize crawler strategy
-        params = {k: v for k, v in kwargs.items() if k in [
-            "browser_config", "logger"]}
+        params = {k: v for k, v in kwargs.items() if k in ["browser_config", "logger"]}
         self.crawler_strategy = crawler_strategy or AsyncPlaywrightCrawlerStrategy(
             browser_config=browser_config,
             logger=self.logger,
@@ -168,7 +166,7 @@ class AsyncWebCrawler:
         # Decorate arun method with deep crawling capabilities
         self._deep_handler = DeepCrawlDecorator(self)
         self.arun = self._deep_handler(self.arun)
-        
+
         self.url_seeder: Optional[AsyncUrlSeeder] = None
 
     async def start(self):
@@ -245,8 +243,7 @@ class AsyncWebCrawler:
 
         config = config or CrawlerRunConfig()
         if not isinstance(url, str) or not url:
-            raise ValueError(
-                "Invalid URL, make sure the URL is a non-empty string")
+            raise ValueError("Invalid URL, make sure the URL is a non-empty string")
 
         async with self._lock or self.nullcontext():
             try:
@@ -275,12 +272,18 @@ class AsyncWebCrawler:
                 if cached_result and config.check_cache_freshness:
                     cache_metadata = await async_db_manager.aget_cache_metadata(url)
                     if cache_metadata:
-                        async with CacheValidator(timeout=config.cache_validation_timeout) as validator:
+                        async with CacheValidator(
+                            timeout=config.cache_validation_timeout
+                        ) as validator:
                             validation = await validator.validate(
                                 url=url,
                                 stored_etag=cache_metadata.get("etag"),
-                                stored_last_modified=cache_metadata.get("last_modified"),
-                                stored_head_fingerprint=cache_metadata.get("head_fingerprint"),
+                                stored_last_modified=cache_metadata.get(
+                                    "last_modified"
+                                ),
+                                stored_head_fingerprint=cache_metadata.get(
+                                    "head_fingerprint"
+                                ),
                             )
 
                         if validation.status == CacheValidationResult.FRESH:
@@ -288,7 +291,7 @@ class AsyncWebCrawler:
                             self.logger.info(
                                 message="Cache validated: {reason}",
                                 tag="CACHE",
-                                params={"reason": validation.reason}
+                                params={"reason": validation.reason},
                             )
                             # Update metadata if we got new values
                             if validation.new_etag or validation.new_last_modified:
@@ -303,14 +306,14 @@ class AsyncWebCrawler:
                             self.logger.warning(
                                 message="Cache validation failed, using cached: {reason}",
                                 tag="CACHE",
-                                params={"reason": validation.reason}
+                                params={"reason": validation.reason},
                             )
                         else:
                             # STALE or UNKNOWN - force recrawl
                             self.logger.info(
                                 message="Cache stale: {reason}",
                                 tag="CACHE",
-                                params={"reason": validation.reason}
+                                params={"reason": validation.reason},
                             )
                             cached_result = None
                 elif cached_result:
@@ -347,9 +350,10 @@ class AsyncWebCrawler:
                 if config and config.proxy_rotation_strategy:
                     # Handle sticky sessions - use same proxy for all requests with same session_id
                     if config.proxy_session_id:
-                        next_proxy: ProxyConfig = await config.proxy_rotation_strategy.get_proxy_for_session(
-                            config.proxy_session_id,
-                            ttl=config.proxy_session_ttl
+                        next_proxy: ProxyConfig = (
+                            await config.proxy_rotation_strategy.get_proxy_for_session(
+                                config.proxy_session_id, ttl=config.proxy_session_ttl
+                            )
                         )
                         if next_proxy:
                             self.logger.info(
@@ -357,18 +361,20 @@ class AsyncWebCrawler:
                                 tag="PROXY",
                                 params={
                                     "session_id": config.proxy_session_id,
-                                    "proxy": next_proxy.server
-                                }
+                                    "proxy": next_proxy.server,
+                                },
                             )
                             config.proxy_config = next_proxy
                     else:
                         # Existing behavior: rotate on each request
-                        next_proxy: ProxyConfig = await config.proxy_rotation_strategy.get_next_proxy()
+                        next_proxy: ProxyConfig = (
+                            await config.proxy_rotation_strategy.get_next_proxy()
+                        )
                         if next_proxy:
                             self.logger.info(
                                 message="Switch proxy: {proxy}",
                                 tag="PROXY",
-                                params={"proxy": next_proxy.server}
+                                params={"proxy": next_proxy.server},
                             )
                             config.proxy_config = next_proxy
 
@@ -450,10 +456,12 @@ class AsyncWebCrawler:
 
                                 if config.user_agent:
                                     self.crawler_strategy.update_user_agent(
-                                        config.user_agent)
+                                        config.user_agent
+                                    )
 
                                 async_response = await self.crawler_strategy.crawl(
-                                    url, config=config)
+                                    url, config=config
+                                )
 
                                 html = sanitize_input_encode(async_response.html)
                                 screenshot_data = async_response.screenshot
@@ -468,31 +476,53 @@ class AsyncWebCrawler:
                                 )
 
                                 crawl_result = await self.aprocess_html(
-                                    url=url, html=html,
+                                    url=url,
+                                    html=html,
                                     extracted_content=extracted_content,
                                     config=config,
                                     screenshot_data=screenshot_data,
                                     pdf_data=pdf_data,
                                     verbose=config.verbose,
-                                    is_raw_html=True if url.startswith("raw:") else False,
+                                    is_raw_html=True
+                                    if url.startswith("raw:")
+                                    else False,
                                     redirected_url=async_response.redirected_url,
                                     original_scheme=urlparse(url).scheme,
                                     **kwargs,
                                 )
 
                                 crawl_result.status_code = async_response.status_code
-                                is_raw_url = url.startswith("raw:") or url.startswith("raw://")
-                                crawl_result.redirected_url = async_response.redirected_url or (None if is_raw_url else url)
-                                crawl_result.redirected_status_code = async_response.redirected_status_code
-                                crawl_result.response_headers = async_response.response_headers
-                                crawl_result.downloaded_files = async_response.downloaded_files
+                                is_raw_url = url.startswith("raw:") or url.startswith(
+                                    "raw://"
+                                )
+                                crawl_result.redirected_url = (
+                                    async_response.redirected_url
+                                    or (None if is_raw_url else url)
+                                )
+                                crawl_result.redirected_status_code = (
+                                    async_response.redirected_status_code
+                                )
+                                crawl_result.response_headers = (
+                                    async_response.response_headers
+                                )
+                                crawl_result.downloaded_files = (
+                                    async_response.downloaded_files
+                                )
                                 crawl_result.js_execution_result = js_execution_result
                                 crawl_result.mhtml = async_response.mhtml_data
-                                crawl_result.ssl_certificate = async_response.ssl_certificate
-                                crawl_result.network_requests = async_response.network_requests
-                                crawl_result.console_messages = async_response.console_messages
+                                crawl_result.ssl_certificate = (
+                                    async_response.ssl_certificate
+                                )
+                                crawl_result.network_requests = (
+                                    async_response.network_requests
+                                )
+                                crawl_result.console_messages = (
+                                    async_response.console_messages
+                                )
                                 crawl_result.success = bool(html)
-                                crawl_result.session_id = getattr(config, "session_id", None)
+                                crawl_result.session_id = getattr(
+                                    config, "session_id", None
+                                )
                                 crawl_result.cache_status = "miss"
 
                                 # Check if blocked (skip for raw: URLs —
@@ -502,27 +532,34 @@ class AsyncWebCrawler:
                                     _block_reason = ""
                                 else:
                                     _blocked, _block_reason = is_blocked(
-                                        async_response.status_code, html)
+                                        async_response.status_code, html
+                                    )
 
-                                _crawl_stats["proxies_used"].append({
-                                    "proxy": _proxy.server if _proxy else None,
-                                    "status_code": async_response.status_code,
-                                    "blocked": _blocked,
-                                    "reason": _block_reason if _blocked else "",
-                                })
+                                _crawl_stats["proxies_used"].append(
+                                    {
+                                        "proxy": _proxy.server if _proxy else None,
+                                        "status_code": async_response.status_code,
+                                        "blocked": _blocked,
+                                        "reason": _block_reason if _blocked else "",
+                                    }
+                                )
 
                                 if not _blocked:
-                                    _crawl_stats["resolved_by"] = "proxy" if _proxy else "direct"
+                                    _crawl_stats["resolved_by"] = (
+                                        "proxy" if _proxy else "direct"
+                                    )
                                     _done = True
                                     break  # Success — exit proxy loop
 
                             except Exception as _crawl_err:
-                                _crawl_stats["proxies_used"].append({
-                                    "proxy": _proxy.server if _proxy else None,
-                                    "status_code": None,
-                                    "blocked": True,
-                                    "reason": str(_crawl_err),
-                                })
+                                _crawl_stats["proxies_used"].append(
+                                    {
+                                        "proxy": _proxy.server if _proxy else None,
+                                        "status_code": None,
+                                        "blocked": True,
+                                        "reason": str(_crawl_err),
+                                    }
+                                )
                                 self.logger.error_status(
                                     url=url,
                                     error=f"Proxy {_proxy.server if _proxy else 'direct'} failed: {_crawl_err}",
@@ -546,7 +583,9 @@ class AsyncWebCrawler:
                     if _fallback_fn and not _done and not _is_raw_url:
                         _needs_fallback = (
                             crawl_result is None  # All proxies threw exceptions
-                            or is_blocked(crawl_result.status_code, crawl_result.html or "")[0]
+                            or is_blocked(
+                                crawl_result.status_code, crawl_result.html or ""
+                            )[0]
                         )
                         if _needs_fallback:
                             self.logger.warning(
@@ -558,7 +597,9 @@ class AsyncWebCrawler:
                             try:
                                 _fallback_html = await _fallback_fn(url)
                                 if _fallback_html:
-                                    _sanitized_html = sanitize_input_encode(_fallback_html)
+                                    _sanitized_html = sanitize_input_encode(
+                                        _fallback_html
+                                    )
                                     try:
                                         crawl_result = await self.aprocess_html(
                                             url=url,
@@ -590,7 +631,9 @@ class AsyncWebCrawler:
                                         )
                                     crawl_result.success = True
                                     crawl_result.status_code = 200
-                                    crawl_result.session_id = getattr(config, "session_id", None)
+                                    crawl_result.session_id = getattr(
+                                        config, "session_id", None
+                                    )
                                     crawl_result.cache_status = "miss"
                                     _crawl_stats["resolved_by"] = "fallback_fetch"
                             except Exception as _fallback_err:
@@ -606,12 +649,18 @@ class AsyncWebCrawler:
                     # (e.g. PerimeterX JS on Walmart) that trigger false positives.
                     # Also skip for raw: URLs — caller-provided content, anti-bot N/A.
                     if crawl_result:
-                        if not _crawl_stats.get("fallback_fetch_used") and not _is_raw_url:
+                        if (
+                            not _crawl_stats.get("fallback_fetch_used")
+                            and not _is_raw_url
+                        ):
                             _blocked, _block_reason = is_blocked(
-                                crawl_result.status_code, crawl_result.html or "")
+                                crawl_result.status_code, crawl_result.html or ""
+                            )
                             if _blocked:
                                 crawl_result.success = False
-                                crawl_result.error_message = f"Blocked by anti-bot protection: {_block_reason}"
+                                crawl_result.error_message = (
+                                    f"Blocked by anti-bot protection: {_block_reason}"
+                                )
                         crawl_result.crawl_stats = _crawl_stats
                     else:
                         # All proxies threw exceptions and fallback either wasn't
@@ -622,16 +671,20 @@ class AsyncWebCrawler:
                             html="",
                             success=False,
                             status_code=None,
-                            error_message=f"All proxies failed: {_block_reason}" if _block_reason else "All proxies failed",
+                            error_message=f"All proxies failed: {_block_reason}"
+                            if _block_reason
+                            else "All proxies failed",
                         )
                         crawl_result.crawl_stats = _crawl_stats
 
                     # Compute head fingerprint for cache validation
                     if crawl_result and crawl_result.html:
-                        head_end = crawl_result.html.lower().find('</head>')
+                        head_end = crawl_result.html.lower().find("</head>")
                         if head_end != -1:
-                            head_html = crawl_result.html[:head_end + 7]
-                            crawl_result.head_fingerprint = compute_head_fingerprint(head_html)
+                            head_html = crawl_result.html[: head_end + 7]
+                            crawl_result.head_fingerprint = compute_head_fingerprint(
+                                head_html
+                            )
 
                     self.logger.url_status(
                         url=cache_context.display_url,
@@ -651,14 +704,15 @@ class AsyncWebCrawler:
                         url=cache_context.display_url,
                         success=True,
                         timing=time.perf_counter() - start_time,
-                        tag="COMPLETE"
+                        tag="COMPLETE",
                     )
                     cached_result.success = bool(html)
-                    cached_result.session_id = getattr(
-                        config, "session_id", None)
+                    cached_result.session_id = getattr(config, "session_id", None)
                     # For raw: URLs, don't fall back to the raw HTML string as redirected_url
                     is_raw_url = url.startswith("raw:") or url.startswith("raw://")
-                    cached_result.redirected_url = cached_result.redirected_url or (None if is_raw_url else url)
+                    cached_result.redirected_url = cached_result.redirected_url or (
+                        None if is_raw_url else url
+                    )
                     return CrawlResultContainer(cached_result)
 
             except Exception as e:
@@ -711,11 +765,13 @@ class AsyncWebCrawler:
             CrawlResult: Processed result containing extracted and formatted content
         """
         # === PREFETCH MODE SHORT-CIRCUIT ===
-        if getattr(config, 'prefetch', False):
+        if getattr(config, "prefetch", False):
             from .utils import quick_extract_links
 
             # Use base_url from config (for raw: URLs), redirected_url, or original url
-            effective_url = getattr(config, 'base_url', None) or kwargs.get('redirected_url') or url
+            effective_url = (
+                getattr(config, "base_url", None) or kwargs.get("redirected_url") or url
+            )
             links = quick_extract_links(html, effective_url)
 
             return CrawlResult(
@@ -723,10 +779,10 @@ class AsyncWebCrawler:
                 html=html,
                 success=True,
                 links=links,
-                status_code=kwargs.get('status_code'),
-                response_headers=kwargs.get('response_headers'),
-                redirected_url=kwargs.get('redirected_url'),
-                ssl_certificate=kwargs.get('ssl_certificate'),
+                status_code=kwargs.get("status_code"),
+                response_headers=kwargs.get("response_headers"),
+                redirected_url=kwargs.get("redirected_url"),
+                ssl_certificate=kwargs.get("ssl_certificate"),
                 # All other fields default to None
             )
         # === END PREFETCH SHORT-CIRCUIT ===
@@ -745,14 +801,12 @@ class AsyncWebCrawler:
             params = config.__dict__.copy()
             params.pop("url", None)
             # add keys from kwargs to params that doesn't exist in params
-            params.update({k: v for k, v in kwargs.items()
-                          if k not in params.keys()})
+            params.update({k: v for k, v in kwargs.items() if k not in params.keys()})
 
             ################################
             # Scraping Strategy Execution  #
             ################################
-            result: ScrapingResult = scraping_strategy.scrap(
-                url, html, **params)
+            result: ScrapingResult = scraping_strategy.scrap(url, html, **params)
 
             if result is None:
                 raise ValueError(
@@ -768,8 +822,7 @@ class AsyncWebCrawler:
 
         # Extract results - handle both dict and ScrapingResult
         if isinstance(result, dict):
-            cleaned_html = sanitize_input_encode(
-                result.get("cleaned_html", ""))
+            cleaned_html = sanitize_input_encode(result.get("cleaned_html", ""))
             media = result.get("media", {})
             tables = media.pop("tables", []) if isinstance(media, dict) else []
             links = result.get("links", {})
@@ -779,12 +832,22 @@ class AsyncWebCrawler:
             # media = result.media.model_dump()
             # tables = media.pop("tables", [])
             # links = result.links.model_dump()
-            media = result.media.model_dump() if hasattr(result.media, 'model_dump') else result.media
+            media = (
+                result.media.model_dump()
+                if hasattr(result.media, "model_dump")
+                else result.media
+            )
             tables = media.pop("tables", []) if isinstance(media, dict) else []
-            links = result.links.model_dump() if hasattr(result.links, 'model_dump') else result.links
+            links = (
+                result.links.model_dump()
+                if hasattr(result.links, "model_dump")
+                else result.links
+            )
             metadata = result.metadata
 
-        fit_html = preprocess_html_for_schema(html_content=html, text_threshold= 500, max_size= 300_000)
+        fit_html = preprocess_html_for_schema(
+            html_content=html, text_threshold=500, max_size=300_000
+        )
 
         ################################
         # Generate Markdown            #
@@ -795,7 +858,9 @@ class AsyncWebCrawler:
 
         # --- SELECT HTML SOURCE BASED ON CONTENT_SOURCE ---
         # Get the desired source from the generator config, default to 'cleaned_html'
-        selected_html_source = getattr(markdown_generator, 'content_source', 'cleaned_html')
+        selected_html_source = getattr(
+            markdown_generator, "content_source", "cleaned_html"
+        )
 
         # Define the source selection logic using dict dispatch
         html_source_selector = {
@@ -808,7 +873,9 @@ class AsyncWebCrawler:
 
         try:
             # Get the appropriate lambda function, default to returning cleaned_html if key not found
-            source_lambda = html_source_selector.get(selected_html_source, lambda: cleaned_html)
+            source_lambda = html_source_selector.get(
+                selected_html_source, lambda: cleaned_html
+            )
             # Execute the lambda to get the selected HTML
             markdown_input_html = source_lambda()
 
@@ -822,7 +889,7 @@ class AsyncWebCrawler:
             if self.logger:
                 self.logger.warning(
                     f"Error getting/processing '{selected_html_source}' for markdown source: {e}. Falling back to cleaned_html.",
-                    tag="MARKDOWN_SRC"
+                    tag="MARKDOWN_SRC",
                 )
             # Ensure markdown_input_html is still the default cleaned_html in case of error
             markdown_input_html = cleaned_html
@@ -835,14 +902,16 @@ class AsyncWebCrawler:
         # Extract <base href> from raw HTML before it gets stripped by cleaning.
         # This ensures relative URLs resolve correctly even with cleaned_html.
         base_url = params.get("base_url") or params.get("redirected_url") or url
-        base_tag_match = re.search(r'<base\s[^>]*href\s*=\s*["\']([^"\']+)["\']', html, re.IGNORECASE)
+        base_tag_match = re.search(
+            r'<base\s[^>]*href\s*=\s*["\']([^"\']+)["\']', html, re.IGNORECASE
+        )
         if base_tag_match:
             base_url = base_tag_match.group(1)
 
         markdown_result: MarkdownGenerationResult = (
             markdown_generator.generate_markdown(
                 input_html=markdown_input_html,
-                base_url=base_url
+                base_url=base_url,
                 # html2text_options=kwargs.get('html2text', {})
             )
         )
@@ -852,7 +921,7 @@ class AsyncWebCrawler:
             url=_url,
             success=True,
             timing=int((time.perf_counter() - t1) * 1000) / 1000,
-            tag="SCRAPE"
+            tag="SCRAPE",
         )
         # self.logger.info(
         #     message="{url:.50}... | Time: {timing}s",
@@ -872,13 +941,12 @@ class AsyncWebCrawler:
             # Choose content based on input_format
             content_format = config.extraction_strategy.input_format
             if content_format == "fit_markdown" and not markdown_result.fit_markdown:
-
                 self.logger.url_status(
-                        url=_url,
-                        success=bool(html),
-                        timing=time.perf_counter() - t1,
-                        tag="EXTRACT",
-                    )
+                    url=_url,
+                    success=bool(html),
+                    timing=time.perf_counter() - t1,
+                    tag="EXTRACT",
+                )
                 content_format = "markdown"
 
             content = {
@@ -899,25 +967,27 @@ class AsyncWebCrawler:
             # extracted_content = config.extraction_strategy.run(_url, sections)
 
             # Use async version if available for better parallelism
-            if hasattr(config.extraction_strategy, 'arun'):
-                extracted_content = await config.extraction_strategy.arun(_url, sections)
+            if hasattr(config.extraction_strategy, "arun"):
+                extracted_content = await config.extraction_strategy.arun(
+                    _url, sections
+                )
             else:
                 # Fallback to sync version run in thread pool to avoid blocking
                 extracted_content = await asyncio.to_thread(
                     config.extraction_strategy.run, url, sections
                 )
-                
+
             extracted_content = json.dumps(
                 extracted_content, indent=4, default=str, ensure_ascii=False
             )
 
             # Log extraction completion
             self.logger.url_status(
-                        url=_url,
-                        success=bool(html),
-                        timing=time.perf_counter() - t1,
-                        tag="EXTRACT",
-                    )
+                url=_url,
+                success=bool(html),
+                timing=time.perf_counter() - t1,
+                tag="EXTRACT",
+            )
 
         # Apply HTML formatting if requested
         if config.prettiify:
@@ -931,7 +1001,7 @@ class AsyncWebCrawler:
             cleaned_html=cleaned_html,
             markdown=markdown_result,
             media=media,
-            tables=tables,                       # NEW
+            tables=tables,  # NEW
             links=links,
             metadata=metadata,
             screenshot=screenshot_data,
@@ -1047,20 +1117,23 @@ class AsyncWebCrawler:
 
         # Helper to release sticky session if auto_release is enabled
         async def maybe_release_session():
-            if (primary_config and
-                primary_config.proxy_session_id and
-                primary_config.proxy_session_auto_release and
-                primary_config.proxy_rotation_strategy):
+            if (
+                primary_config
+                and primary_config.proxy_session_id
+                and primary_config.proxy_session_auto_release
+                and primary_config.proxy_rotation_strategy
+            ):
                 await primary_config.proxy_rotation_strategy.release_session(
                     primary_config.proxy_session_id
                 )
                 self.logger.info(
                     message="Auto-released proxy session: {session_id}",
                     tag="PROXY",
-                    params={"session_id": primary_config.proxy_session_id}
+                    params={"session_id": primary_config.proxy_session_id},
                 )
 
         if stream:
+
             async def result_transformer():
                 try:
                     async for task_result in dispatcher.run_urls_stream(
@@ -1074,8 +1147,31 @@ class AsyncWebCrawler:
             return result_transformer()
         else:
             try:
-                _results = await dispatcher.run_urls(crawler=self, urls=urls, config=config)
-                return [transform_result(res) for res in _results]
+                _results = await dispatcher.run_urls(
+                    crawler=self, urls=urls, config=config
+                )
+                data = []
+                from .models import CrawlerTaskResult
+
+                for task_result in _results:
+                    for res in task_result.result:
+                        # all sub urls within parent url will have same dispatch_results
+                        tsk = CrawlerTaskResult(
+                            task_id=task_result.task_id,
+                            url=task_result.url,
+                            result=res,
+                            memory_usage=task_result.memory_usage,
+                            peak_memory=task_result.peak_memory,
+                            start_time=task_result.start_time,
+                            end_time=task_result.end_time,
+                            error_message=task_result.error_message,
+                            retry_count=task_result.retry_count,
+                            wait_time=task_result.wait_time,
+                        )
+                        data.append(tsk)
+
+                return [transform_result(res) for res in data]
+
             finally:
                 # Auto-release session after batch completes
                 await maybe_release_session()
@@ -1084,7 +1180,7 @@ class AsyncWebCrawler:
         self,
         domain_or_domains: Union[str, List[str]],
         config: Optional[SeedingConfig] = None,
-        **kwargs
+        **kwargs,
     ) -> Union[List[str], Dict[str, List[Union[str, Dict[str, Any]]]]]:
         """
         Discovers, filters, and optionally validates URLs for a given domain(s)
@@ -1127,15 +1223,18 @@ class AsyncWebCrawler:
             # Pass the crawler's base_directory for seeder's cache management
             # Pass the crawler's logger for consistent logging
             self.url_seeder = AsyncUrlSeeder(
-                base_directory=self.crawl4ai_folder,
-                logger=self.logger
-            )                    
+                base_directory=self.crawl4ai_folder, logger=self.logger
+            )
 
         # Merge config object with direct kwargs, giving kwargs precedence
-        seeding_config = config.clone(**kwargs) if config else SeedingConfig.from_kwargs(kwargs)
-        
+        seeding_config = (
+            config.clone(**kwargs) if config else SeedingConfig.from_kwargs(kwargs)
+        )
+
         # Ensure base_directory is set for the seeder's cache
-        seeding_config.base_directory = seeding_config.base_directory or self.crawl4ai_folder        
+        seeding_config.base_directory = (
+            seeding_config.base_directory or self.crawl4ai_folder
+        )
         # Ensure the seeder uses the crawler's logger (if not already set)
         if not self.url_seeder.logger:
             self.url_seeder.logger = self.logger
@@ -1143,30 +1242,25 @@ class AsyncWebCrawler:
         # Pass verbose setting if explicitly provided in SeedingConfig or kwargs
         if seeding_config.verbose is not None:
             self.url_seeder.logger.verbose = seeding_config.verbose
-        else: # Default to crawler's verbose setting
+        else:  # Default to crawler's verbose setting
             self.url_seeder.logger.verbose = self.logger.verbose
-
 
         if isinstance(domain_or_domains, str):
             self.logger.info(
                 message="Starting URL seeding for domain: {domain}",
                 tag="SEED",
-                params={"domain": domain_or_domains}
+                params={"domain": domain_or_domains},
             )
-            return await self.url_seeder.urls(
-                domain_or_domains,
-                seeding_config
-            )
+            return await self.url_seeder.urls(domain_or_domains, seeding_config)
         elif isinstance(domain_or_domains, (list, tuple)):
             self.logger.info(
                 message="Starting URL seeding for {count} domains",
                 tag="SEED",
-                params={"count": len(domain_or_domains)}
+                params={"count": len(domain_or_domains)},
             )
             # AsyncUrlSeeder.many_urls directly accepts a list of domains and individual params.
-            return await self.url_seeder.many_urls(
-                domain_or_domains,
-                seeding_config
-            )
+            return await self.url_seeder.many_urls(domain_or_domains, seeding_config)
         else:
-            raise ValueError("`domain_or_domains` must be a string or a list of strings.")
+            raise ValueError(
+                "`domain_or_domains` must be a string or a list of strings."
+            )
