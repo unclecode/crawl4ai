@@ -274,7 +274,7 @@ adaptive.export_knowledge_base("knowledge_base.jsonl")
 
 # Import into another session
 new_adaptive = AdaptiveCrawler(crawler)
-new_adaptive.import_knowledge_base("knowledge_base.jsonl")
+await new_adaptive.import_knowledge_base("knowledge_base.jsonl")
 ```
 
 ## Best Practices

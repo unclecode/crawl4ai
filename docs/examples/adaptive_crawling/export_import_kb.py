@@ -114,7 +114,7 @@ async def import_and_continue():
         
         # Import existing knowledge base
         print(f"\n1. Importing knowledge base from {kb_path}")
-        adaptive.import_knowledge_base(kb_path)
+        await adaptive.import_knowledge_base(kb_path)
         
         print(f"   - Imported {len(adaptive.state.knowledge_base)} documents")
         print(f"   - Existing URLs: {len(adaptive.state.crawled_urls)}")
@@ -175,10 +175,10 @@ async def share_knowledge_bases():
         merged_crawler = AdaptiveCrawler(crawler)
         
         # Import both knowledge bases
-        merged_crawler.import_knowledge_base(project_a_kb)
+        await merged_crawler.import_knowledge_base(project_a_kb)
         initial_size = len(merged_crawler.state.knowledge_base)
-        
-        merged_crawler.import_knowledge_base(project_b_kb)
+
+        await merged_crawler.import_knowledge_base(project_b_kb)
         final_size = len(merged_crawler.state.knowledge_base)
         
         print(f"   - Project A documents: {initial_size}")

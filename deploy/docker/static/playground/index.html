@@ -128,6 +128,10 @@
             opacity: 1;
         }
 
+        #adv-editor .CodeMirror {
+            height: 100% !important;
+        }
+
         /* copid text highlighted */
         .highlighted {
             background-color: rgba(78, 255, 255, 0.2) !important;
@@ -267,7 +271,7 @@
                     </div>
 
                     <!-- CodeMirror host -->
-                    <div id="adv-editor" class="mt-2 border border-border rounded overflow-hidden h-40"></div>
+                    <div id="adv-editor" class="mt-2 border border-border rounded overflow-auto" style="height: 160px; min-height: 160px; max-height: 500px; resize: vertical;"></div>
                 </details>
 
                 <div class="flex space-x-2">

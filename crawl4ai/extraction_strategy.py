@@ -296,7 +296,7 @@ class CosineStrategy(ExtractionStrategy):
             return documents
 
         if len(documents) < at_least_k:
-            at_least_k = len(documents) // 2
+            at_least_k = max(1, len(documents) // 2)
 
         from sklearn.metrics.pairwise import cosine_similarity
 
@@ -451,7 +451,10 @@ class CosineStrategy(ExtractionStrategy):
         """
         # Assume `html` is a list of text chunks for this strategy
         t = time.time()
-        text_chunks = html.split(self.DEL)  # Split by lines or paragraphs as needed
+        # Split by delimiter; fall back to double-newline splitting for raw text
+        text_chunks = html.split(self.DEL)
+        if len(text_chunks) == 1:
+            text_chunks = [chunk.strip() for chunk in html.split("\n\n") if chunk.strip()]
 
         # Pre-filter documents using embeddings and semantic_filter
         text_chunks = self.filter_documents_embeddings(

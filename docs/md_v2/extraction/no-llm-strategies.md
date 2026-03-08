@@ -191,7 +191,7 @@ Real sites often have **nested** or repeated data—like categories containing p
 
 We have a **sample e-commerce** HTML file on GitHub (example):
 ```
-https://gist.githubusercontent.com/githubusercontent/2d7b8ba3cd8ab6cf3c8da771ddb36878/raw/1ae2f90c6861ce7dd84cc50d3df9920dee5e1fd2/sample_ecommerce.html
+https://raw.githubusercontent.com/unclecode/crawl4ai/main/docs/examples/sample_ecommerce.html
 ```
 This snippet includes categories, products, features, reviews, and related items. Let's see how to define a schema that fully captures that structure **without LLM**.
 
@@ -323,7 +323,7 @@ async def extract_ecommerce_data():
     
     async with AsyncWebCrawler(verbose=True) as crawler:
         result = await crawler.arun(
-            url="https://gist.githubusercontent.com/githubusercontent/2d7b8ba3cd8ab6cf3c8da771ddb36878/raw/1ae2f90c6861ce7dd84cc50d3df9920dee5e1fd2/sample_ecommerce.html",
+            url="https://raw.githubusercontent.com/unclecode/crawl4ai/main/docs/examples/sample_ecommerce.html",
             extraction_strategy=strategy,
             config=config
         )
