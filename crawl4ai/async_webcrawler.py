@@ -1075,7 +1075,26 @@ class AsyncWebCrawler:
         else:
             try:
                 _results = await dispatcher.run_urls(crawler=self, urls=urls, config=config)
-                return [transform_result(res) for res in _results]
+                data = []
+                from .models import CrawlerTaskResult
+
+                for task_result in _results:
+                    for res in task_result.result:
+                        # all child urls within parent url will have same dispatch_results
+                        tsk = CrawlerTaskResult(
+                            task_id=task_result.task_id,
+                            url=task_result.url,
+                            result=res,
+                            memory_usage=task_result.memory_usage,
+                            peak_memory=task_result.peak_memory,
+                            start_time=task_result.start_time,
+                            end_time=task_result.end_time,
+                            error_message=task_result.error_message,
+                            retry_count=task_result.retry_count,
+                            wait_time=task_result.wait_time,
+                        )
+                        data.append(tsk)
+                return [transform_result(res) for res in data]
             finally:
                 # Auto-release session after batch completes
                 await maybe_release_session()
