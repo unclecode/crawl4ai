@@ -135,7 +135,7 @@ ALLOWED_DESERIALIZE_TYPES = {
     "DefaultMarkdownGenerator",
     "PruningContentFilter", "BM25ContentFilter", "LLMContentFilter",
     # Scraping
-    "LXMLWebScrapingStrategy",
+    "LXMLWebScrapingStrategy", "PDFContentScrapingStrategy",
     # Chunking
     "RegexChunking",
     # Deep crawl

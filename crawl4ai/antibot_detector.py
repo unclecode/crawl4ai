@@ -103,7 +103,7 @@ _TIER2_MAX_SIZE = 10000  # Only check tier 2 patterns on pages under 10KB
 # ---------------------------------------------------------------------------
 _STRUCTURAL_MAX_SIZE = 50000  # Only check pages under 50KB
 _CONTENT_ELEMENTS_RE = re.compile(
-    r'<(?:p|h[1-6]|article|section|li|td|a)\b', re.IGNORECASE
+    r'<(?:p|h[1-6]|article|section|li|td|a|pre)\b', re.IGNORECASE
 )
 _SCRIPT_TAG_RE = re.compile(r'<script\b', re.IGNORECASE)
 _STYLE_TAG_RE = re.compile(r'<style\b[\s\S]*?</style>', re.IGNORECASE)
@@ -123,7 +123,16 @@ def _looks_like_data(html: str) -> bool:
     stripped = html.strip()
     if not stripped:
         return False
-    return stripped[0] in ('{', '[', '<' ) and not stripped.startswith('<html') and not stripped.startswith('<!') and not stripped.startswith('<HTML')
+    # Raw JSON/XML (not wrapped in HTML)
+    if stripped[0] in ('{', '['):
+        return True
+    # Browser-rendered JSON: browsers wrap raw JSON in <html><body><pre>{...}</pre>
+    if stripped[:10].lower().startswith(('<html', '<!')):
+        if re.search(r'<body[^>]*>\s*<pre[^>]*>\s*[{\[]', stripped[:500], re.IGNORECASE):
+            return True
+        return False
+    # Other XML-like content
+    return stripped[0] == '<'
 
 
 def _structural_integrity_check(html: str) -> Tuple[bool, str]:

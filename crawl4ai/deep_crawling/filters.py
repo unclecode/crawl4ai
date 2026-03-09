@@ -216,10 +216,11 @@ class URLPatternFilter(URLFilter):
 
     @lru_cache(maxsize=10000)
     def apply(self, url: str) -> bool:
+        url_path = urlparse(url).path
+
         # Quick suffix check (*.html)
         if self._simple_suffixes:
-            path = url.split("?")[0]
-            if path.split("/")[-1].split(".")[-1] in self._simple_suffixes:
+            if url_path.split("/")[-1].split(".")[-1] in self._simple_suffixes:
                 result = True
                 self._update_stats(result)
                 return not result if self._reverse else result
@@ -232,21 +233,13 @@ class URLPatternFilter(URLFilter):
                     self._update_stats(result)
                     return not result if self._reverse else result
 
-        # Prefix check (/foo/*)
+        # Prefix check (/foo/* or https://domain/foo/*)
         if self._simple_prefixes:
-            path = url.split("?")[0]
-            # if any(path.startswith(p) for p in self._simple_prefixes):
-            #     result = True
-            #     self._update_stats(result)
-            #     return not result if self._reverse else result
-            ####
-            # Modified the prefix matching logic to ensure path boundary checking:
-            # - Check if the matched prefix is followed by a path separator (`/`), query parameter (`?`), fragment (`#`), or is at the end of the path
-            # - This ensures `/api/` only matches complete path segments, not substrings like `/apiv2/`
-            ####
             for prefix in self._simple_prefixes:
-                if path.startswith(prefix):
-                    if len(path) == len(prefix) or path[len(prefix)] in ['/', '?', '#']:
+                # Use url_path for path-only prefixes, full URL for absolute prefixes
+                match_against = url if '://' in prefix else url_path
+                if match_against.startswith(prefix):
+                    if len(match_against) == len(prefix) or match_against[len(prefix)] in ['/', '?', '#']:
                         result = True
                         self._update_stats(result)
                         return not result if self._reverse else result
