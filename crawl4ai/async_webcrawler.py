@@ -993,20 +993,34 @@ class AsyncWebCrawler:
             print(f"Processed {result.url}: {len(result.markdown)} chars")
         """
         config = config or CrawlerRunConfig()
-        # if config is None:
-        #     config = CrawlerRunConfig(
-        #         word_count_threshold=word_count_threshold,
-        #         extraction_strategy=extraction_strategy,
-        #         chunking_strategy=chunking_strategy,
-        #         content_filter=content_filter,
-        #         cache_mode=cache_mode,
-        #         bypass_cache=bypass_cache,
-        #         css_selector=css_selector,
-        #         screenshot=screenshot,
-        #         pdf=pdf,
-        #         verbose=verbose,
-        #         **kwargs,
-        #     )
+
+        # When deep_crawl_strategy is set, bypass the dispatcher and call
+        # arun() directly for each URL.  The DeepCrawlDecorator on arun()
+        # will invoke the strategy and return List[CrawlResult].  The
+        # dispatcher cannot handle that return type (it expects a single
+        # CrawlResult), so we must handle it here.
+        primary_cfg = config[0] if isinstance(config, list) else config
+        if getattr(primary_cfg, "deep_crawl_strategy", None):
+            if primary_cfg.stream:
+                async def _deep_crawl_stream():
+                    for url in urls:
+                        result = await self.arun(url, config=primary_cfg)
+                        if isinstance(result, list):
+                            for r in result:
+                                yield r
+                        else:
+                            async for r in result:
+                                yield r
+                return _deep_crawl_stream()
+            else:
+                all_results = []
+                for url in urls:
+                    result = await self.arun(url, config=primary_cfg)
+                    if isinstance(result, list):
+                        all_results.extend(result)
+                    else:
+                        all_results.append(result)
+                return all_results
 
         if dispatcher is None:
             primary_cfg = config[0] if isinstance(config, list) else config

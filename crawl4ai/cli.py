@@ -55,7 +55,7 @@ def get_global_config() -> dict:
 
 def save_global_config(config: dict):
     config_file = Path.home() / ".crawl4ai" / "global.yml"
-    with open(config_file, "w") as f:
+    with open(config_file, "w", encoding="utf-8") as f:
         yaml.dump(config, f)
 
 def setup_llm_config() -> tuple[str, str]:

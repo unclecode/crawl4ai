@@ -566,6 +566,14 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         # Get page for session
         page, context = await self.browser_manager.get_page(crawlerRunConfig=config)
 
+        # When reusing a session page, abort any pending loads from the
+        # previous navigation to prevent timeouts on the next goto().
+        if config.session_id:
+            try:
+                await page.evaluate("window.stop()")
+            except Exception:
+                pass
+
         try:
             # Push updated UA + sec-ch-ua to the page so the server sees them
             if ua_changed:
@@ -1150,6 +1158,21 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             raise e
 
         finally:
+            # Always clean up event listeners to prevent accumulation
+            # across reuses (even for session pages).
+            try:
+                if config.capture_network_requests:
+                    page.remove_listener("request", handle_request_capture)
+                    page.remove_listener("response", handle_response_capture)
+                    page.remove_listener("requestfailed", handle_request_failed_capture)
+                if config.capture_console_messages:
+                    if hasattr(self.adapter, 'retrieve_console_messages'):
+                        final_messages = await self.adapter.retrieve_console_messages(page)
+                        captured_console.extend(final_messages)
+                    await self.adapter.cleanup_console_capture(page, handle_console, handle_error)
+            except Exception:
+                pass
+
             if not config.session_id:
                 # ALWAYS decrement refcount first — must succeed even if
                 # the browser crashed or the page is in a bad state.
@@ -1158,19 +1181,8 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 except Exception:
                     pass
 
-                # Best-effort cleanup: detach listeners and close the page
+                # Close the page unless it's the last one in a headless/managed browser
                 try:
-                    if config.capture_network_requests:
-                        page.remove_listener("request", handle_request_capture)
-                        page.remove_listener("response", handle_response_capture)
-                        page.remove_listener("requestfailed", handle_request_failed_capture)
-                    if config.capture_console_messages:
-                        if hasattr(self.adapter, 'retrieve_console_messages'):
-                            final_messages = await self.adapter.retrieve_console_messages(page)
-                            captured_console.extend(final_messages)
-                        await self.adapter.cleanup_console_capture(page, handle_console, handle_error)
-
-                    # Close the page unless it's the last one in a headless/managed browser
                     all_contexts = page.context.browser.contexts
                     total_pages = sum(len(context.pages) for context in all_contexts)
                     if not (total_pages <= 1 and (self.browser_config.use_managed_browser or self.browser_config.headless)):
@@ -1824,12 +1836,26 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             str: The base64-encoded screenshot data
         """
         try:
+            # Save original viewport so we can restore it after capture
+            original_viewport = page.viewport_size
+
             # Get page height
             dimensions = await self.get_page_dimensions(page)
             page_width = dimensions["width"]
             page_height = dimensions["height"]
-            # page_height = await page.evaluate("document.documentElement.scrollHeight")
-            # page_width = await page.evaluate("document.documentElement.scrollWidth")
+
+            # Freeze element dimensions before viewport change to prevent
+            # responsive CSS from rescaling images (fixes Elementor distortion)
+            await page.evaluate("""
+                document.querySelectorAll('img, video, picture, svg, canvas').forEach(el => {
+                    const rect = el.getBoundingClientRect();
+                    if (rect.width > 0 && rect.height > 0) {
+                        el.style.setProperty('width', rect.width + 'px', 'important');
+                        el.style.setProperty('height', rect.height + 'px', 'important');
+                        el.dataset.crawl4aiFrozen = '1';
+                    }
+                });
+            """)
 
             # Set a large viewport
             large_viewport_height = min(
@@ -1852,28 +1878,33 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 # Special handling for the last segment
                 if i == num_segments - 1:
                     last_part_height = page_height % viewport_height
-                    
+
                     # If page_height is an exact multiple of viewport_height,
                     # we don't need an extra segment
                     if last_part_height == 0:
                         # Skip last segment if page height is exact multiple of viewport
                         break
-                    
+
                     # Adjust viewport to exactly match the remaining content height
                     await page.set_viewport_size({"width": page_width, "height": last_part_height})
-                
+
                 await page.evaluate(f"window.scrollTo(0, {y_offset})")
                 await asyncio.sleep(scroll_delay)  # wait for render (respects scroll_delay config)
-                
+
                 # Capture the current segment
-                # Note: Using compression options (format, quality) would go here
                 seg_shot = await page.screenshot(full_page=False, type="jpeg", quality=85)
-                # seg_shot = await page.screenshot(full_page=False)
                 img = Image.open(BytesIO(seg_shot)).convert("RGB")
                 segments.append(img)
 
-            # Reset viewport to original size after capturing segments
-            await page.set_viewport_size({"width": page_width, "height": viewport_height})
+            # Unfreeze element dimensions and restore original viewport
+            await page.evaluate("""
+                document.querySelectorAll('[data-crawl4ai-frozen]').forEach(el => {
+                    el.style.removeProperty('width');
+                    el.style.removeProperty('height');
+                    delete el.dataset.crawl4aiFrozen;
+                });
+            """)
+            await page.set_viewport_size(original_viewport)
 
             total_height = sum(img.height for img in segments)
             stitched = Image.new("RGB", (segments[0].width, total_height))
