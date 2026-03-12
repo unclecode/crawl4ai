@@ -80,7 +80,10 @@ async def hset_with_ttl(redis, key: str, mapping: dict, config: dict):
 async def handle_llm_qa(
     url: str,
     query: str,
-    config: dict
+    config: dict,
+    provider: Optional[str] = None,
+    temperature: Optional[float] = None,
+    base_url: Optional[str] = None,
 ) -> str:
     """Process QA using LLM with crawled content as context."""
     from crawler_pool import get_crawler, release_crawler
@@ -118,14 +121,13 @@ async def handle_llm_qa(
 
     Answer:"""
 
-        # api_token=os.environ.get(config["llm"].get("api_key_env", ""))
-
+        resolved_provider = provider or config["llm"]["provider"]
         response = perform_completion_with_backoff(
-            provider=config["llm"]["provider"],
+            provider=resolved_provider,
             prompt_with_variables=prompt,
-            api_token=get_llm_api_key(config),  # Returns None to let litellm handle it
-            temperature=get_llm_temperature(config),
-            base_url=get_llm_base_url(config),
+            api_token=get_llm_api_key(config, resolved_provider),
+            temperature=temperature or get_llm_temperature(config, resolved_provider),
+            base_url=base_url or get_llm_base_url(config, resolved_provider),
             base_delay=config["llm"].get("backoff_base_delay", 2),
             max_attempts=config["llm"].get("backoff_max_attempts", 3),
             exponential_factor=config["llm"].get("backoff_exponential_factor", 2)

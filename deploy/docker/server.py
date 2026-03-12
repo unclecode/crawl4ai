@@ -205,7 +205,18 @@ async def root():
     return RedirectResponse("/playground")
 
 # ─────────────────── infra / middleware  ─────────────────────
-redis = aioredis.from_url(config["redis"].get("uri", "redis://localhost"))
+def _build_redis_url(config: dict) -> str:
+    """Build Redis URL from config fields and environment variables."""
+    rc = config.get("redis", {})
+    host = os.environ.get("REDIS_HOST", rc.get("host", "localhost"))
+    port = os.environ.get("REDIS_PORT", rc.get("port", 6379))
+    password = os.environ.get("REDIS_PASSWORD", rc.get("password", ""))
+    db = rc.get("db", 0)
+    scheme = "rediss" if rc.get("ssl", False) else "redis"
+    auth = f":{password}@" if password else ""
+    return f"{scheme}://{auth}{host}:{port}/{db}"
+
+redis = aioredis.from_url(_build_redis_url(config))
 
 limiter = Limiter(
     key_func=get_remote_address,
@@ -540,13 +551,16 @@ async def llm_endpoint(
     request: Request,
     url: str = Path(...),
     q: str = Query(...),
+    provider: Optional[str] = Query(None, description="LLM provider override, e.g. 'openai/gpt-4o-mini'"),
+    temperature: Optional[float] = Query(None, description="LLM temperature override"),
+    base_url: Optional[str] = Query(None, description="LLM API base URL override"),
     _td: Dict = Depends(token_dep),
 ):
     if not q:
         raise HTTPException(400, "Query parameter 'q' is required")
     if not url.startswith(("http://", "https://")) and not url.startswith(("raw:", "raw://")):
         url = "https://" + url
-    answer = await handle_llm_qa(url, q, config)
+    answer = await handle_llm_qa(url, q, config, provider=provider, temperature=temperature, base_url=base_url)
     return JSONResponse({"answer": answer})
 
 
