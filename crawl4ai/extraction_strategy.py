@@ -1409,9 +1409,9 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
 
         Args:
             element: The current base element.
-            source: A sibling selector string. Currently supports the
-                ``"+ <selector>"`` syntax which navigates to the next
-                sibling matching ``<selector>``.
+            source: A sibling selector string. Supports:
+                ``"+ <selector>"`` — adjacent sibling (next sibling matching selector)
+                ``"~ <selector>"`` — general sibling (any following sibling matching selector)
 
         Returns:
             The resolved sibling element, or ``None`` if not found.
@@ -2091,9 +2091,14 @@ class JsonCssExtractionStrategy(JsonElementExtractionStrategy):
 
     def _resolve_source(self, element, source: str):
         source = source.strip()
-        if not source.startswith("+"):
+        if source.startswith("+"):
+            sel = source[1:].strip()
+            find_all = False
+        elif source.startswith("~"):
+            sel = source[1:].strip()
+            find_all = True
+        else:
             return None
-        sel = source[1:].strip()  # e.g. "tr", "tr.subtext", ".classname"
         parts = sel.split(".")
         tag = parts[0].strip() or None
         classes = [p.strip() for p in parts[1:] if p.strip()]
@@ -2102,6 +2107,9 @@ class JsonCssExtractionStrategy(JsonElementExtractionStrategy):
             kwargs["class_"] = lambda c, _cls=classes: c and all(
                 cl in c for cl in _cls
             )
+        if find_all:
+            siblings = element.find_next_siblings(tag, **kwargs)
+            return siblings[0] if siblings else None
         return element.find_next_sibling(tag, **kwargs)
 
 class JsonLxmlExtractionStrategy(JsonElementExtractionStrategy):
@@ -2372,16 +2380,21 @@ class JsonLxmlExtractionStrategy(JsonElementExtractionStrategy):
 
     def _resolve_source(self, element, source: str):
         source = source.strip()
-        if not source.startswith("+"):
+        if source.startswith("+"):
+            sel = source[1:].strip()
+            position_filter = "[1]"
+        elif source.startswith("~"):
+            sel = source[1:].strip()
+            position_filter = "[1]"
+        else:
             return None
-        sel = source[1:].strip()
         parts = sel.split(".")
         tag = parts[0].strip() or "*"
         classes = [p.strip() for p in parts[1:] if p.strip()]
         xpath = f"./following-sibling::{tag}"
         for cls in classes:
             xpath += f"[contains(concat(' ',normalize-space(@class),' '),' {cls} ')]"
-        xpath += "[1]"
+        xpath += position_filter
         results = element.xpath(xpath)
         return results[0] if results else None
 
@@ -2489,16 +2502,21 @@ class JsonLxmlExtractionStrategy_naive(JsonElementExtractionStrategy):
 
     def _resolve_source(self, element, source: str):
         source = source.strip()
-        if not source.startswith("+"):
+        if source.startswith("+"):
+            sel = source[1:].strip()
+            position_filter = "[1]"
+        elif source.startswith("~"):
+            sel = source[1:].strip()
+            position_filter = "[1]"
+        else:
             return None
-        sel = source[1:].strip()
         parts = sel.split(".")
         tag = parts[0].strip() or "*"
         classes = [p.strip() for p in parts[1:] if p.strip()]
         xpath = f"./following-sibling::{tag}"
         for cls in classes:
             xpath += f"[contains(concat(' ',normalize-space(@class),' '),' {cls} ')]"
-        xpath += "[1]"
+        xpath += position_filter
         results = element.xpath(xpath)
         return results[0] if results else None
 
@@ -2568,16 +2586,21 @@ class JsonXPathExtractionStrategy(JsonElementExtractionStrategy):
 
     def _resolve_source(self, element, source: str):
         source = source.strip()
-        if not source.startswith("+"):
+        if source.startswith("+"):
+            sel = source[1:].strip()
+            position_filter = "[1]"
+        elif source.startswith("~"):
+            sel = source[1:].strip()
+            position_filter = "[1]"
+        else:
             return None
-        sel = source[1:].strip()
         parts = sel.split(".")
         tag = parts[0].strip() or "*"
         classes = [p.strip() for p in parts[1:] if p.strip()]
         xpath = f"./following-sibling::{tag}"
         for cls in classes:
             xpath += f"[contains(concat(' ',normalize-space(@class),' '),' {cls} ')]"
-        xpath += "[1]"
+        xpath += position_filter
         results = element.xpath(xpath)
         return results[0] if results else None
 

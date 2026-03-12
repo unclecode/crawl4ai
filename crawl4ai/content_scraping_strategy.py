@@ -340,6 +340,43 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
             except Exception as e:
                 self._log("error", f"Error processing image: {str(e)}", "SCRAPE")
 
+        # Process background images from CSS and data attributes
+        bg_url_re = re.compile(r'url\(["\']?(.*?)["\']?\)')
+        image_extensions = re.compile(r'\.(jpg|jpeg|png|webp|avif|gif|svg)', re.IGNORECASE)
+        seen_bg_urls = set(img.get("src", "") for img in images)
+        for elem in element.xpath(".//*[@style]"):
+            style = elem.get("style", "")
+            if "background" in style:
+                for match in bg_url_re.findall(style):
+                    if match and match not in seen_bg_urls:
+                        seen_bg_urls.add(match)
+                        media["images"].append({
+                            "src": match,
+                            "alt": elem.get("alt", ""),
+                            "desc": self.find_closest_parent_with_useful_text(elem, **kwargs),
+                            "score": 2,
+                            "type": "image",
+                            "group_id": total_images + len(seen_bg_urls),
+                            "format": None,
+                        })
+        for elem in element.xpath(".//*"):
+            if elem.tag == "img":
+                continue
+            for attr, value in elem.attrib.items():
+                if attr.startswith("data-") and image_extensions.search(value):
+                    url_val = value.strip()
+                    if url_val and url_val not in seen_bg_urls:
+                        seen_bg_urls.add(url_val)
+                        media["images"].append({
+                            "src": url_val,
+                            "alt": elem.get("alt", ""),
+                            "desc": self.find_closest_parent_with_useful_text(elem, **kwargs),
+                            "score": 2,
+                            "type": "image",
+                            "group_id": total_images + len(seen_bg_urls),
+                            "format": None,
+                        })
+
         # Process videos and audios
         for media_type in ["video", "audio"]:
             for elem in element.xpath(f".//{media_type}"):
@@ -695,17 +732,30 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                 meta = {}
 
             content_element = None
+            if css_selector:
+                try:
+                    selected = body.cssselect(css_selector)
+                    if selected:
+                        content_element = lhtml.Element("div")
+                        content_element.extend(copy.deepcopy(selected))
+                    else:
+                        content_element = body
+                except Exception as e:
+                    self._log("error", f"Error with css_selector: {str(e)}", "SCRAPE")
+                    content_element = body
+
             if target_elements:
                 try:
+                    source = content_element if content_element is not None else body
                     for_content_targeted_element = []
                     for target_element in target_elements:
-                        for_content_targeted_element.extend(body.cssselect(target_element))
+                        for_content_targeted_element.extend(source.cssselect(target_element))
                     content_element = lhtml.Element("div")
                     content_element.extend(copy.deepcopy(for_content_targeted_element))
                 except Exception as e:
                     self._log("error", f"Error with target element detection: {str(e)}", "SCRAPE")
                     return None
-            else:
+            elif content_element is None:
                 content_element = body
 
             # Remove script and style tags
