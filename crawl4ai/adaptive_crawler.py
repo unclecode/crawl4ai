@@ -617,9 +617,10 @@ class StatisticalStrategy(CrawlStrategy):
 class EmbeddingStrategy(CrawlStrategy):
     """Embedding-based adaptive crawling using semantic space coverage"""
     
-    def __init__(self, embedding_model: str = None, llm_config: Union[LLMConfig, Dict] = None):
+    def __init__(self, embedding_model: str = None, llm_config: Union[LLMConfig, Dict] = None, query_llm_config: Union[LLMConfig, Dict] = None):
         self.embedding_model = embedding_model or "sentence-transformers/all-MiniLM-L6-v2"
         self.llm_config = llm_config
+        self.query_llm_config = query_llm_config
         self._embedding_cache = {}
         self._link_embedding_cache = {}  # Cache for link embeddings
         self._validation_passed = False  # Track if validation passed
@@ -643,6 +644,32 @@ class EmbeddingStrategy(CrawlStrategy):
             'api_token': os.getenv('OPENAI_API_KEY')
         }
         
+    def _get_query_llm_config_dict(self) -> Optional[Dict]:
+        """Get query LLM config as dict for chat completion calls.
+
+        Fallback chain:
+        1. self.query_llm_config (explicit query config on strategy)
+        2. self.config._query_llm_config_dict (from AdaptiveConfig)
+        3. self.llm_config (legacy: single config for both)
+        4. None (caller uses hardcoded defaults)
+        """
+        if self.query_llm_config is not None:
+            if isinstance(self.query_llm_config, dict):
+                return self.query_llm_config
+            return self.query_llm_config.to_dict()
+
+        if hasattr(self, 'config') and self.config:
+            config_dict = getattr(self.config, '_query_llm_config_dict', None)
+            if config_dict:
+                return config_dict
+
+        if self.llm_config is not None:
+            if isinstance(self.llm_config, dict):
+                return self.llm_config
+            return self.llm_config.to_dict()
+
+        return None
+
     async def _get_embeddings(self, texts: List[str]) -> Any:
         """Get embeddings using configured method"""
         from .utils import get_text_embeddings
