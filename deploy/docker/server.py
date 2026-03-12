@@ -513,13 +513,16 @@ async def llm_endpoint(
     request: Request,
     url: str = Path(...),
     q: str = Query(...),
+    provider: Optional[str] = Query(None),
+    temperature: Optional[float] = Query(None),
+    base_url: Optional[str] = Query(None),
     _td: Dict = Depends(token_dep),
 ):
     if not q:
         raise HTTPException(400, "Query parameter 'q' is required")
     if not url.startswith(("http://", "https://")) and not url.startswith(("raw:", "raw://")):
         url = "https://" + url
-    answer = await handle_llm_qa(url, q, config)
+    answer = await handle_llm_qa(url, q, config, provider=provider, temperature=temperature, base_url=base_url)
     return JSONResponse({"answer": answer})
 
 

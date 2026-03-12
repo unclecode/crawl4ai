@@ -712,54 +712,26 @@ class EmbeddingStrategy(CrawlStrategy):
         
         Return as a JSON array of strings."""
         
-        # Use the LLM for query generation
-        # Convert LLMConfig to dict if needed
-        llm_config_dict = None
-        if self.llm_config:
-            if isinstance(self.llm_config, dict):
-                llm_config_dict = self.llm_config
-            else:
-                # Convert LLMConfig object to dict
-                llm_config_dict = {
-                    'provider': self.llm_config.provider,
-                    'api_token': self.llm_config.api_token
-                }
+        # Use a chat completion model for query generation
+        llm_config_dict = self._get_query_llm_config_dict()
         
         provider = llm_config_dict.get('provider', 'openai/gpt-4o-mini') if llm_config_dict else 'openai/gpt-4o-mini'
         api_token = llm_config_dict.get('api_token') if llm_config_dict else None
-        
+        base_url = llm_config_dict.get('base_url') if llm_config_dict else None
+
         response = perform_completion_with_backoff(
             provider=provider,
             prompt_with_variables=prompt,
             api_token=api_token,
-            json_response=True
+            json_response=True,
+            base_url=base_url,
+            base_delay=llm_config_dict.get('backoff_base_delay', 2) if llm_config_dict else 2,
+            max_attempts=llm_config_dict.get('backoff_max_attempts', 3) if llm_config_dict else 3,
+            exponential_factor=llm_config_dict.get('backoff_exponential_factor', 2) if llm_config_dict else 2,
         )
-        
+
         variations = json.loads(response.choices[0].message.content)
-        
-        
-        # # Mock data with more variations for split
-        # variations ={'queries': ['what are the best vegetables to use in fried rice?', 'how do I make vegetable fried rice from scratch?', 'can you provide a quick recipe for vegetable fried rice?', 'what cooking techniques are essential for perfect fried rice with vegetables?', 'how to add flavor to vegetable fried rice?', 'are there any tips for making healthy fried rice with vegetables?']}
-        
-        
-        # variations = {'queries': [
-        #     'How do async and await work with coroutines in Python?',
-        #     'What is the role of event loops in asynchronous programming?',
-        #     'Can you explain the differences between async/await and traditional callback methods?',
-        #     'How do coroutines interact with event loops in JavaScript?',
-        #     'What are the benefits of using async await over promises in Node.js?',
-        #     'How to manage multiple coroutines with an event loop?',
-        #     'What are some common pitfalls when using async await with coroutines?',
-        #     'How do different programming languages implement async await and event loops?',
-        #     'What happens when an async function is called without await?',
-        #     'How does the event loop handle blocking operations?',
-        #     'Can you nest async functions and how does that affect the event loop?',
-        #     'What is the performance impact of using async/await?'
-        # ]}
-        
-        # Split into train and validation
-        # all_queries = [query] + variations['queries']
-        
+
         # Randomly shuffle for proper train/val split (keeping original query in training)
         import random
         

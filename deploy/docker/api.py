@@ -64,7 +64,10 @@ def _get_memory_mb():
 async def handle_llm_qa(
     url: str,
     query: str,
-    config: dict
+    config: dict,
+    provider: Optional[str] = None,
+    temperature: Optional[float] = None,
+    base_url: Optional[str] = None,
 ) -> str:
     """Process QA using LLM with crawled content as context."""
     from crawler_pool import get_crawler
@@ -75,6 +78,14 @@ async def handle_llm_qa(
         last_q_index = url.rfind('?q=')
         if last_q_index != -1:
             url = url[:last_q_index]
+
+        # Validate provider if supplied
+        is_valid, error_msg = validate_llm_provider(config, provider)
+        if not is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=error_msg
+            )
 
         # Get markdown content (use default config)
         from utils import load_config
@@ -101,14 +112,12 @@ async def handle_llm_qa(
 
     Answer:"""
 
-        # api_token=os.environ.get(config["llm"].get("api_key_env", ""))
-
         response = perform_completion_with_backoff(
-            provider=config["llm"]["provider"],
+            provider=provider or config["llm"]["provider"],
             prompt_with_variables=prompt,
-            api_token=get_llm_api_key(config),  # Returns None to let litellm handle it
-            temperature=get_llm_temperature(config),
-            base_url=get_llm_base_url(config),
+            api_token=get_llm_api_key(config, provider),
+            temperature=temperature or get_llm_temperature(config, provider),
+            base_url=base_url or get_llm_base_url(config, provider),
             base_delay=config["llm"].get("backoff_base_delay", 2),
             max_attempts=config["llm"].get("backoff_max_attempts", 3),
             exponential_factor=config["llm"].get("backoff_exponential_factor", 2)
