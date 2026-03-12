@@ -527,7 +527,15 @@ class BM25ContentFilter(RelevantContentFilter):
         # Sort selected candidates by original document order
         selected_candidates.sort(key=lambda x: x[0])
 
-        return [self.clean_element(tag) for _, _, tag in selected_candidates]
+        # Deduplicate by chunk text, keeping first occurrence (lowest index)
+        seen_texts = set()
+        unique_candidates = []
+        for index, chunk, tag in selected_candidates:
+            if chunk not in seen_texts:
+                seen_texts.add(chunk)
+                unique_candidates.append((index, chunk, tag))
+
+        return [self.clean_element(tag) for _, _, tag in unique_candidates]
 
 
 class PruningContentFilter(RelevantContentFilter):
