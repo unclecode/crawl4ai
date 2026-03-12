@@ -8,9 +8,8 @@ import httpx
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.responses import JSONResponse
-from fastapi import Request
-from sse_starlette.sse import EventSourceResponse
 from pydantic import BaseModel
+from starlette.routing import Route, Mount
 from mcp.server.sse import SseServerTransport
 
 import mcp.types as t
@@ -221,18 +220,17 @@ def attach_mcp(
             tg.start_soon(ws_to_srv)
             tg.start_soon(srv_to_ws)
 
-    # ── SSE transport (official) ─────────────────────────────
+    # ── SSE transport (raw ASGI — avoids Starlette middleware conflict) ──
     sse = SseServerTransport(f"{base}/messages/")
 
-    @app.get(f"{base}/sse")
-    async def _mcp_sse(request: Request):
-        async with sse.connect_sse(
-            request.scope, request.receive, request._send  # starlette ASGI primitives
-        ) as (read_stream, write_stream):
+    async def _mcp_sse_handler(scope, receive, send):
+        """Raw ASGI handler for SSE — the MCP SDK calls (scope, receive, send)
+        internally, so wrapping with @app.get() causes an AssertionError (#1594)."""
+        async with sse.connect_sse(scope, receive, send) as (read_stream, write_stream):
             await mcp.run(read_stream, write_stream, init_opts)
 
-    # client → server frames are POSTed here
-    app.mount(f"{base}/messages", app=sse.handle_post_message)
+    app.routes.append(Route(f"{base}/sse", endpoint=_mcp_sse_handler))
+    app.routes.append(Mount(f"{base}/messages", app=sse.handle_post_message))
 
     # ── schema endpoint ───────────────────────────────────────
     @app.get(f"{base}/schema")

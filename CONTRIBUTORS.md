@@ -52,7 +52,7 @@ We would like to thank the following people for their contributions to Crawl4AI:
 - [maksimzayats](https://github.com/maksimzayats) - docs: modernize deprecated API usage across 25 files [#1770](https://github.com/unclecode/crawl4ai/pull/1770)
 - [jtanningbed](https://github.com/jtanningbed) - fix: add newline before opening code fence in html2text [#462](https://github.com/unclecode/crawl4ai/pull/462)
 - [Ahmed-Tawfik94](https://github.com/Ahmed-Tawfik94) - identified: redirect target verification in URL seeder [#1622](https://github.com/unclecode/crawl4ai/pull/1622)
-- [hafezparast](https://github.com/hafezparast) - identified: PDFContentScrapingStrategy deserialization fix [#1815](https://github.com/unclecode/crawl4ai/issues/1815)
+- [hafezparast](https://github.com/hafezparast) - identified: PDFContentScrapingStrategy deserialization fix [#1815](https://github.com/unclecode/crawl4ai/issues/1815); fix: screenshot distortion, deep crawl timeout/arun_many, CLI encoding [#1829](https://github.com/unclecode/crawl4ai/pull/1829)
 - [pgoslatara](https://github.com/pgoslatara) - chore: update GitHub Actions to latest versions [#1734](https://github.com/unclecode/crawl4ai/pull/1734)
 - [130347665](https://github.com/130347665) - feat: type-list pipeline in JsonCssExtractionStrategy [#1290](https://github.com/unclecode/crawl4ai/pull/1290)
 - [microHoffman](https://github.com/microHoffman) - feat: add --json-ensure-ascii CLI flag for Unicode handling [#1668](https://github.com/unclecode/crawl4ai/pull/1668)
