@@ -1089,6 +1089,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     page,
                     screenshot_height_threshold=config.screenshot_height_threshold,
                     force_viewport_screenshot=config.force_viewport_screenshot,
+                    scan_full_page=config.scan_full_page,
                     scroll_delay=config.scroll_delay
                 )
 
@@ -1711,6 +1712,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 screenshot_data = await self.take_screenshot(
                     page,
                     screenshot_height_threshold=screenshot_height_threshold,
+                    scan_full_page=getattr(config, 'scan_full_page', True),
                     scroll_delay=config.scroll_delay if config else 0.2
                 )
 
@@ -1755,8 +1757,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         """
         # Check if viewport-only screenshot is forced
         force_viewport = kwargs.get('force_viewport_screenshot', False)
+        scan_full_page = kwargs.get('scan_full_page', True)
 
-        if force_viewport:
+        if force_viewport or not scan_full_page:
             # Use viewport-only screenshot
             return await self.take_screenshot_naive(page)
 
