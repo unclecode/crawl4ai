@@ -1,43 +1,80 @@
 # deploy/docker/mcp_bridge.py
 
-from __future__ import annotations
-import inspect, json, re, anyio
+import importlib.metadata
+import inspect, json, re, anyio, logging
 from contextlib import suppress
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 import httpx
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.responses import JSONResponse
-from fastapi import Request
-from sse_starlette.sse import EventSourceResponse
 from pydantic import BaseModel
-from mcp.server.sse import SseServerTransport
+from starlette.routing import Route, Mount
 
 import mcp.types as t
 from mcp.server.lowlevel.server import Server, NotificationOptions
 from mcp.server.models import InitializationOptions
 
+logger = logging.getLogger(__name__)
+
+# ── version detection ─────────────────────────────────────────
+_TRANSPORTS_AVAILABLE: Dict[str, Any] = {}
+
+
+def _detect_transports():
+    """Detect available MCP transports based on installed SDK version."""
+    try:
+        ver = importlib.metadata.version("mcp")
+    except importlib.metadata.PackageNotFoundError:
+        logger.error("MCP SDK not installed")
+        return
+
+    _TRANSPORTS_AVAILABLE["version"] = ver
+
+    # SSE: available in all supported versions
+    try:
+        from mcp.server.sse import SseServerTransport  # noqa: F401
+        _TRANSPORTS_AVAILABLE["sse"] = True
+    except ImportError:
+        _TRANSPORTS_AVAILABLE["sse"] = False
+
+    # StreamableHTTP: available in >=1.20.0
+    try:
+        from mcp.server.streamable_http_manager import StreamableHTTPSessionManager  # noqa: F401
+        _TRANSPORTS_AVAILABLE["streamable_http"] = True
+    except ImportError:
+        _TRANSPORTS_AVAILABLE["streamable_http"] = False
+
+    logger.info(
+        f"MCP SDK v{ver} — transports: "
+        f"sse={'yes' if _TRANSPORTS_AVAILABLE.get('sse') else 'no'}, "
+        f"streamable_http={'yes' if _TRANSPORTS_AVAILABLE.get('streamable_http') else 'no'}"
+    )
+
+
+_detect_transports()
+
 # ── opt‑in decorators ───────────────────────────────────────────
-def mcp_resource(name: str | None = None):
+def mcp_resource(name: Optional[str] = None):
     def deco(fn):
         fn.__mcp_kind__, fn.__mcp_name__ = "resource", name
         return fn
     return deco
 
-def mcp_template(name: str | None = None):
+def mcp_template(name: Optional[str] = None):
     def deco(fn):
         fn.__mcp_kind__, fn.__mcp_name__ = "template", name
         return fn
     return deco
 
-def mcp_tool(name: str | None = None):
+def mcp_tool(name: Optional[str] = None):
     def deco(fn):
         fn.__mcp_kind__, fn.__mcp_name__ = "tool", name
         return fn
     return deco
 
 # ── HTTP‑proxy helper for FastAPI endpoints ─────────────────────
-def _make_http_proxy(base_url: str, route, *, timeout: float | None = None):
+def _make_http_proxy(base_url: str, route, *, timeout: Optional[float] = None):
     method = list(route.methods - {"HEAD", "OPTIONS"})[0]
     async def proxy(**kwargs):
         # replace `/items/{id}` style params first
@@ -65,20 +102,66 @@ def _make_http_proxy(base_url: str, route, *, timeout: float | None = None):
                 raise HTTPException(504, "upstream request timed out")
     return proxy
 
+
+# ── transport attachment helpers ──────────────────────────────
+def _attach_sse(app: FastAPI, mcp_server: Server, init_opts, base: str):
+    """Mount SSE transport as raw ASGI routes (no middleware wrapping)."""
+    from mcp.server.sse import SseServerTransport
+
+    sse = SseServerTransport(f"{base}/messages/")
+
+    async def _mcp_sse_handler(scope, receive, send):
+        """Raw ASGI handler for SSE — avoids Starlette middleware conflict."""
+        async with sse.connect_sse(scope, receive, send) as (read_stream, write_stream):
+            await mcp_server.run(read_stream, write_stream, init_opts)
+
+    # Mount as raw ASGI routes (no middleware wrapping)
+    app.routes.append(Route(f"{base}/sse", endpoint=_mcp_sse_handler))
+    app.routes.append(Mount(f"{base}/messages", app=sse.handle_post_message))
+
+    logger.info(f"MCP SSE endpoints: GET {base}/sse, POST {base}/messages/")
+
+
+def _attach_streamable_http(app: FastAPI, mcp_server: Server, init_opts, base: str):
+    """Mount StreamableHTTP transport as a single raw ASGI route."""
+    from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+
+    session_manager = StreamableHTTPSessionManager(
+        app=mcp_server,
+        stateless=True,
+    )
+
+    async def _streamable_handler(scope, receive, send):
+        await session_manager.handle_request(scope, receive, send)
+
+    # Single unified route handles GET, POST, DELETE
+    app.routes.append(
+        Route(f"{base}/mcp", endpoint=_streamable_handler, methods=["GET", "POST", "DELETE"])
+    )
+
+    logger.info(f"MCP StreamableHTTP endpoint: {base}/mcp")
+
+
 # ── main entry point ────────────────────────────────────────────
 def attach_mcp(
     app: FastAPI,
     *,                          # keyword‑only
-    base: str = "/mcp",
-    name: str | None = None,
     base_url: str,              # eg. "http://127.0.0.1:8020"
-    timeout: float | None = None,  # httpx timeout in seconds; None = no limit
+    mcp_config: Optional[Dict] = None,
 ) -> None:
     """Call once after all routes are declared to expose WS+SSE MCP endpoints."""
-    server_name = name or app.title or "FastAPI-MCP"
+    if mcp_config is None:
+        mcp_config = {}
+
+    if not mcp_config.get("enabled", True):
+        logger.info("MCP disabled by config")
+        return
+
+    base = mcp_config.get("base_path", "/mcp")
+    server_name = mcp_config.get("server_name") or app.title or "FastAPI-MCP"
+    timeout = mcp_config.get("timeout")
     mcp = Server(server_name)
 
-    # tools: Dict[str, Callable] = {}
     tools: Dict[str, Tuple[Callable, Callable]] = {}
     resources: Dict[str, Callable] = {}
     templates: Dict[str, Callable] = {}
@@ -92,8 +175,6 @@ def attach_mcp(
 
         key = fn.__mcp_name__ or re.sub(r"[/{}}]", "_", route.path).strip("_")
 
-        # if kind == "tool":
-        #     tools[key] = _make_http_proxy(base_url, route)
         if kind == "tool":
             proxy = _make_http_proxy(base_url, route, timeout=timeout)
             tools[key] = (proxy, fn)
@@ -104,10 +185,10 @@ def attach_mcp(
             templates[key] = fn
 
     # helpers for JSON‑Schema
-    def _schema(model: type[BaseModel] | None) -> dict:
+    def _schema(model: Optional[type] = None) -> dict:
         return {"type": "object"} if model is None else model.model_json_schema()
 
-    def _body_model(fn: Callable) -> type[BaseModel] | None:
+    def _body_model(fn: Callable) -> Optional[type]:
         for p in inspect.signature(fn).parameters.values():
             a = p.annotation
             if inspect.isclass(a) and issubclass(a, BaseModel):
@@ -125,13 +206,13 @@ def attach_mcp(
                 t.Tool(name=k, description=desc, inputSchema=schema)
             )
         return out
-             
+
 
     @mcp.call_tool()
-    async def _call_tool(name: str, arguments: Dict | None) -> List[t.TextContent]:
+    async def _call_tool(name: str, arguments: Optional[Dict] = None) -> List[t.TextContent]:
         if name not in tools:
             raise HTTPException(404, "tool not found")
-        
+
         proxy, _ = tools[name]
         try:
             res = await proxy(**(arguments or {}))
@@ -177,7 +258,7 @@ def attach_mcp(
         ),
     )
 
-    # ── WebSocket transport ────────────────────────────────────
+    # ── WebSocket transport (always on, works correctly) ──────
     @app.websocket_route(f"{base}/ws")
     async def _ws(ws: WebSocket):
         await ws.accept()
@@ -191,7 +272,7 @@ def attach_mcp(
         init_done = anyio.Event()
 
         async def srv_to_ws():
-            first = True 
+            first = True
             try:
                 async for msg in s2c_recv:
                     await ws.send_json(msg.model_dump())
@@ -221,18 +302,41 @@ def attach_mcp(
             tg.start_soon(ws_to_srv)
             tg.start_soon(srv_to_ws)
 
-    # ── SSE transport (official) ─────────────────────────────
-    sse = SseServerTransport(f"{base}/messages/")
+    # ── HTTP transport selection ──────────────────────────────
+    transport = mcp_config.get("transport", "auto")
 
-    @app.get(f"{base}/sse")
-    async def _mcp_sse(request: Request):
-        async with sse.connect_sse(
-            request.scope, request.receive, request._send  # starlette ASGI primitives
-        ) as (read_stream, write_stream):
-            await mcp.run(read_stream, write_stream, init_opts)
+    if transport == "auto":
+        if _TRANSPORTS_AVAILABLE.get("streamable_http"):
+            transport = "streamable_http"
+        elif _TRANSPORTS_AVAILABLE.get("sse"):
+            transport = "sse"
+        else:
+            raise RuntimeError(
+                f"No supported MCP transport found "
+                f"(MCP SDK v{_TRANSPORTS_AVAILABLE.get('version', '?')})"
+            )
 
-    # client → server frames are POSTed here
-    app.mount(f"{base}/messages", app=sse.handle_post_message)
+    if transport == "streamable_http":
+        if not _TRANSPORTS_AVAILABLE.get("streamable_http"):
+            raise RuntimeError(
+                f"transport='streamable_http' requires MCP SDK >=1.20.0 "
+                f"(installed: {_TRANSPORTS_AVAILABLE.get('version', '?')})"
+            )
+        _attach_streamable_http(app, mcp, init_opts, base)
+    elif transport == "sse":
+        if not _TRANSPORTS_AVAILABLE.get("sse"):
+            raise RuntimeError(
+                f"transport='sse' requires MCP SDK with SSE support "
+                f"(installed: {_TRANSPORTS_AVAILABLE.get('version', '?')})"
+            )
+        _attach_sse(app, mcp, init_opts, base)
+    else:
+        raise ValueError(
+            f"Unknown MCP transport: {transport!r}. "
+            f"Use 'auto', 'sse', or 'streamable_http'."
+        )
+
+    logger.info(f"MCP transport: {transport} at {base}")
 
     # ── schema endpoint ───────────────────────────────────────
     @app.get(f"{base}/schema")

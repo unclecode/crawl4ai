@@ -98,6 +98,13 @@ DEFAULT_CONFIG = {
         },
         "headers": {"User-Agent": "Crawl4AI-Webhook/1.0"},
     },
+    "mcp": {
+        "enabled": True,
+        "transport": "auto",
+        "base_path": "/mcp",
+        "server_name": None,
+        "timeout": None,
+    },
 }
 
 
@@ -138,6 +145,12 @@ def load_config() -> Dict:
     if llm_api_key and "api_key" not in config["llm"]:
         config["llm"]["api_key"] = llm_api_key
         logging.info("LLM API key loaded from LLM_API_KEY environment variable")
+
+    # Override MCP transport from environment if set
+    mcp_transport = os.environ.get("MCP_TRANSPORT")
+    if mcp_transport:
+        config["mcp"]["transport"] = mcp_transport
+        logging.info(f"MCP transport overridden from MCP_TRANSPORT: {mcp_transport}")
 
     # Override Redis task TTL from environment if set
     redis_task_ttl = os.environ.get("REDIS_TASK_TTL")

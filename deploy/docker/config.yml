@@ -107,3 +107,10 @@ webhooks:
     timeout_ms: 30000  # 30s timeout per webhook call
   headers:  # Optional: default headers to include
     User-Agent: "Crawl4AI-Webhook/1.0"
+
+# MCP (Model Context Protocol) Configuration
+mcp:
+  enabled: true
+  transport: "auto"     # "auto" (best available), "sse", "streamable_http"
+  base_path: "/mcp"
+  timeout: null

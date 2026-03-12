@@ -865,11 +865,12 @@ async def get_context(
     return JSONResponse(results)
 
 
-# attach MCP layer (adds /mcp/ws, /mcp/sse, /mcp/schema)
+# attach MCP layer (adds /mcp/ws + HTTP transport + /mcp/schema)
 print(f"MCP server running on {config['app']['host']}:{config['app']['port']}")
 attach_mcp(
     app,
-    base_url=f"http://{config['app']['host']}:{config['app']['port']}"
+    base_url=f"http://{config['app']['host']}:{config['app']['port']}",
+    mcp_config=config.get("mcp", {}),
 )
 
 # ────────────────────────── cli ──────────────────────────────
