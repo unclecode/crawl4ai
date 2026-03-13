@@ -22,6 +22,27 @@ MEM_LIMIT = CONFIG.get("crawler", {}).get("memory_threshold_percent", 95.0)
 BASE_IDLE_TTL = CONFIG.get("crawler", {}).get("pool", {}).get("idle_ttl_sec", 300)
 DEFAULT_CONFIG_SIG = None  # Cached sig for default config
 
+
+def get_pool_snapshot() -> dict:
+    """Return a point-in-time snapshot of pool state for monitoring.
+
+    This is intentionally lock-free. Under CPython's GIL, reading
+    ``len(dict)``, ``dict.copy()``, and ``x is not None`` are atomic
+    operations, so the monitor can safely call this without contending
+    on the pool LOCK that is held during slow browser start/close ops.
+    The worst case is a slightly stale count, which is acceptable for
+    dashboard display purposes.
+    """
+    return {
+        "permanent": PERMANENT,
+        "permanent_sig": DEFAULT_CONFIG_SIG,
+        "hot_pool": HOT_POOL.copy(),
+        "cold_pool": COLD_POOL.copy(),
+        "last_used": LAST_USED.copy(),
+        "usage_count": USAGE_COUNT.copy(),
+    }
+
+
 def _sig(cfg: BrowserConfig) -> str:
     """Generate config signature."""
     payload = json.dumps(cfg.to_dict(), sort_keys=True, separators=(",",":"))
