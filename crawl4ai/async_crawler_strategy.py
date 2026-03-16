@@ -2573,6 +2573,62 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
 
         return server
 
+    # Content types treated as text (decoded into html field)
+    _TEXT_CONTENT_TYPES: Final = frozenset({
+        'text/csv', 'text/plain', 'text/tab-separated-values', 'text/xml',
+        'application/json', 'application/xml', 'application/xhtml+xml',
+        'application/rss+xml', 'application/atom+xml', 'application/ld+json',
+        'application/x-ndjson', 'text/calendar', 'text/vcard',
+    })
+
+    def _is_file_download(self, content_type: str, content_disposition: str) -> bool:
+        """Detect if the HTTP response is a file download rather than an HTML page."""
+        if 'attachment' in content_disposition:
+            return True
+        if not content_type or content_type == 'text/html':
+            return False
+        # Anything that isn't text/html is a file download
+        return True
+
+    def _is_text_content(self, content_type: str) -> bool:
+        """Check if content type is text-based (safe to decode and put in html field)."""
+        if content_type in self._TEXT_CONTENT_TYPES:
+            return True
+        # Catch-all for text/* subtypes not in the explicit set
+        return content_type.startswith('text/')
+
+    def _extract_filename(self, content_disposition: str, url: str, content_type: str) -> str:
+        """Extract filename from Content-Disposition header or URL path."""
+        # Try Content-Disposition first
+        if content_disposition:
+            import re
+            # filename*=UTF-8''encoded_name (RFC 5987)
+            match = re.search(r"filename\*=(?:UTF-8''|utf-8'')(.+?)(?:;|$)", content_disposition)
+            if match:
+                from urllib.parse import unquote
+                return unquote(match.group(1).strip())
+            # filename="name" or filename=name
+            match = re.search(r'filename="?([^";]+)"?', content_disposition)
+            if match:
+                return match.group(1).strip()
+
+        # Fall back to URL path
+        path = urlparse(url).path
+        if path and '/' in path:
+            basename = path.rsplit('/', 1)[-1]
+            if '.' in basename and len(basename) <= 255:
+                return basename
+
+        # Last resort: hash-based name with extension from content type
+        ext_map = {
+            'text/csv': '.csv', 'application/pdf': '.pdf',
+            'application/zip': '.zip', 'image/png': '.png',
+            'image/jpeg': '.jpg', 'application/json': '.json',
+            'text/plain': '.txt', 'application/xml': '.xml',
+        }
+        ext = ext_map.get(content_type, '')
+        return f"download_{hashlib.md5(url.encode()).hexdigest()[:10]}{ext}"
+
     async def _handle_http(
         self,
         url: str,
@@ -2612,26 +2668,61 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
 
             try:
                 async with session.request(self.browser_config.method, url, **request_kwargs) as response:
-                    content = memoryview(await response.read())
-                    
+                    raw_bytes = await response.read()
+                    content = memoryview(raw_bytes)
+
                     if not (200 <= response.status < 300):
                         raise HTTPStatusError(
                             response.status,
                             f"Unexpected status code for {url}"
                         )
-                    
-                    encoding = response.charset
-                    if not encoding:
-                        detection_result = await asyncio.to_thread(chardet.detect, content.tobytes())
-                        encoding = detection_result['encoding'] or 'utf-8'                    
-                    
+
+                    response_headers = dict(response.headers)
+                    content_type = response.content_type or 'text/html'
+                    content_type = content_type.split(';')[0].strip().lower()
+                    content_disposition = response_headers.get('Content-Disposition', '')
+
+                    downloaded_files = None
+                    html = ""
+
+                    if self._is_file_download(content_type, content_disposition):
+                        # Save file to disk
+                        downloads_path = self.browser_config.downloads_path or os.path.join(
+                            os.path.expanduser("~"), ".crawl4ai", "downloads"
+                        )
+                        os.makedirs(downloads_path, exist_ok=True)
+
+                        filename = self._extract_filename(content_disposition, url, content_type)
+                        filepath = os.path.join(downloads_path, filename)
+
+                        async with aiofiles.open(filepath, 'wb') as f:
+                            await f.write(raw_bytes)
+
+                        downloaded_files = [filepath]
+
+                        # For text-based files, also decode into html (backward compatible)
+                        if self._is_text_content(content_type):
+                            encoding = response.charset
+                            if not encoding:
+                                detection_result = await asyncio.to_thread(chardet.detect, raw_bytes)
+                                encoding = detection_result['encoding'] or 'utf-8'
+                            html = raw_bytes.decode(encoding, errors='replace')
+                    else:
+                        # Standard HTML response — existing behavior
+                        encoding = response.charset
+                        if not encoding:
+                            detection_result = await asyncio.to_thread(chardet.detect, content.tobytes())
+                            encoding = detection_result['encoding'] or 'utf-8'
+                        html = content.tobytes().decode(encoding, errors='replace')
+
                     result = AsyncCrawlResponse(
-                        html=content.tobytes().decode(encoding, errors='replace'),
-                        response_headers=dict(response.headers),
+                        html=html,
+                        response_headers=response_headers,
                         status_code=response.status,
-                        redirected_url=str(response.url)
+                        redirected_url=str(response.url),
+                        downloaded_files=downloaded_files,
                     )
-                    
+
                     await self.hooks['after_request'](result)
                     return result
 

@@ -1068,6 +1068,7 @@ class HTTPCrawlerConfig:
     json: Optional[Dict[str, Any]] = None
     follow_redirects: bool = True
     verify_ssl: bool = True
+    downloads_path: Optional[str] = None
 
     def __init__(
         self,
@@ -1077,6 +1078,7 @@ class HTTPCrawlerConfig:
         json: Optional[Dict[str, Any]] = None,
         follow_redirects: bool = True,
         verify_ssl: bool = True,
+        downloads_path: Optional[str] = None,
     ):
         self.method = method
         self.headers = headers
@@ -1084,6 +1086,7 @@ class HTTPCrawlerConfig:
         self.json = json
         self.follow_redirects = follow_redirects
         self.verify_ssl = verify_ssl
+        self.downloads_path = downloads_path
 
     @staticmethod
     def from_kwargs(kwargs: dict) -> "HTTPCrawlerConfig":
@@ -1094,6 +1097,7 @@ class HTTPCrawlerConfig:
             json=kwargs.get("json"),
             follow_redirects=kwargs.get("follow_redirects", True),
             verify_ssl=kwargs.get("verify_ssl", True),
+            downloads_path=kwargs.get("downloads_path"),
         )
 
     def to_dict(self):
@@ -1104,6 +1108,7 @@ class HTTPCrawlerConfig:
             "json": self.json,
             "follow_redirects": self.follow_redirects,
             "verify_ssl": self.verify_ssl,
+            "downloads_path": self.downloads_path,
         }
 
     def clone(self, **kwargs):
