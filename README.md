@@ -565,6 +565,48 @@ async def test_news_crawl():
 ## ✨ Recent Updates
 
 <details open>
+<summary><strong>Version 0.8.5 Release Highlights - Anti-Bot Detection, Shadow DOM & 60+ Bug Fixes</strong></summary>
+
+Our biggest release since v0.8.0. Anti-bot detection with proxy escalation, Shadow DOM flattening, deep crawl cancellation, and over 60 bug fixes.
+
+- **🛡️ Anti-Bot Detection & Proxy Escalation**:
+  - 3-tier detection: known vendors, generic block indicators, structural integrity checks
+  - Automatic retry with proxy chain and fallback fetch function
+  ```python
+  from crawl4ai import CrawlerRunConfig
+  from crawl4ai.async_configs import ProxyConfig
+
+  config = CrawlerRunConfig(
+      proxy_config=[ProxyConfig.DIRECT, ProxyConfig(server="http://my-proxy:8080")],
+      max_retries=2,
+      fallback_fetch_function=my_web_unlocker,
+  )
+  ```
+
+- **🌑 Shadow DOM Flattening**:
+  - Extract content hidden inside shadow DOM components
+  ```python
+  config = CrawlerRunConfig(flatten_shadow_dom=True)
+  ```
+
+- **🛑 Deep Crawl Cancellation**:
+  - Stop long crawls gracefully with `cancel()` or `should_cancel` callback
+  - Works with BFS, DFS, and BestFirst strategies
+
+- **⚙️ Config Defaults API**:
+  - `set_defaults()` / `get_defaults()` / `reset_defaults()` on BrowserConfig and CrawlerRunConfig
+
+- **🔒 Critical Security Fixes**:
+  - RCE via deserialization in Docker `/crawl` endpoint — removed `eval()`, added allowlist
+  - Redis CVE-2025-49844 (CVSS 10.0) — upgraded to 7.2.7
+
+- **60+ Bug Fixes** across browser management, proxy, deep crawling, extraction, CLI, and Docker
+
+[Full v0.8.5 Release Notes →](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.8.5.md)
+
+</details>
+
+<details>
 <summary><strong>Version 0.8.0 Release Highlights - Crash Recovery & Prefetch Mode</strong></summary>
 
 This release introduces crash recovery for deep crawls, a new prefetch mode for fast URL discovery, and critical security fixes for Docker deployments.
