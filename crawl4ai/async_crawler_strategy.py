@@ -946,8 +946,18 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
 
             # Handle full page scanning
             if config.scan_full_page:
-                # await self._handle_full_page_scan(page, config.scroll_delay)
-                await self._handle_full_page_scan(page, config.scroll_delay, config.max_scroll_steps)
+                scan_timeout = (config.page_timeout or 30000) / 1000  # ms to seconds
+                try:
+                    await asyncio.wait_for(
+                        self._handle_full_page_scan(page, config.scroll_delay, config.max_scroll_steps),
+                        timeout=scan_timeout,
+                    )
+                except asyncio.TimeoutError:
+                    self.logger.warning(
+                        message="Full page scan timed out after {timeout}s, continuing with partial scroll",
+                        tag="PAGE_SCAN",
+                        params={"timeout": scan_timeout},
+                    )
 
             # --- Phase 1: Pre-wait JS and interaction ---
 
@@ -1206,9 +1216,13 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         Args:
             page (Page): The Playwright page object
             scroll_delay (float): The delay between page scrolls
-            max_scroll_steps (Optional[int]): Maximum number of scroll steps to perform. If None, scrolls until end.
+            max_scroll_steps (Optional[int]): Maximum number of scroll steps to perform. Defaults to 10 to prevent infinite scroll hangs.
 
         """
+        # Default to 10 steps to prevent infinite scroll on dynamic pages
+        if max_scroll_steps is None:
+            max_scroll_steps = 10
+
         try:
             viewport_size = page.viewport_size
             if viewport_size is None:
