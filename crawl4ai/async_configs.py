@@ -2236,6 +2236,7 @@ class DomainMapperConfig:
         scoring_method: str = "bm25",
         probe_paths: Optional[List[str]] = None,
         common_subdomains: Optional[List[str]] = None,
+        include_subdomains: bool = True,
         use_browser_for_homepage: bool = False,
         verbose: Optional[bool] = None,
         cache_ttl_hours: int = 24,
@@ -2259,6 +2260,9 @@ class DomainMapperConfig:
             scoring_method: Scoring algorithm. Currently only "bm25".
             probe_paths: Extra paths to probe on each host (added to defaults).
             common_subdomains: Extra subdomain prefixes to guess (added to defaults).
+            include_subdomains: Discover and scan subdomains. When False, only scans
+                               the exact domain provided (skips crt.sh, DNS guessing,
+                               Wayback/CC host discovery). Default True.
             use_browser_for_homepage: Use Playwright for JS-rendered homepages.
             verbose: Override logger verbose setting.
             cache_ttl_hours: Hours before cached results expire.
@@ -2279,6 +2283,7 @@ class DomainMapperConfig:
         self.scoring_method = scoring_method
         self.probe_paths = probe_paths
         self.common_subdomains = common_subdomains
+        self.include_subdomains = include_subdomains
         self.use_browser_for_homepage = use_browser_for_homepage
         self.verbose = verbose
         self.cache_ttl_hours = cache_ttl_hours

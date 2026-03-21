@@ -308,6 +308,14 @@ class DomainMapper:
         """Discover all subdomains/hosts under base_domain."""
         hosts: Set[str] = {base_domain}
 
+        # When include_subdomains is False, skip all subdomain discovery
+        # and only scan the exact domain provided
+        if not getattr(config, "include_subdomains", True):
+            self._log("info", "Subdomain discovery disabled, scanning only {domain}",
+                      params={"domain": base_domain})
+            validated = await self._validate_hosts(hosts, config)
+            return validated
+
         discovery_tasks = []
 
         if "crt" in sources:
