@@ -29,6 +29,7 @@ nav:
     - "Deep Crawling": "core/deep-crawling.md"
     - "Adaptive Crawling": "core/adaptive-crawling.md"
     - "URL Seeding": "core/url-seeding.md"
+    - "Domain Mapping": "core/domain-mapping.md"
     - "C4A-Script": "core/c4a-script.md"
     - "Crawler Result": "core/crawler-result.md"
     - "Browser, Crawler & LLM Config": "core/browser-crawler-config.md"

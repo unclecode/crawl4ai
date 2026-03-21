@@ -36,10 +36,11 @@ from .markdown_generation_strategy import (
 )
 from .deep_crawling import DeepCrawlDecorator
 from .async_logger import AsyncLogger, AsyncLoggerBase
-from .async_configs import BrowserConfig, CrawlerRunConfig, ProxyConfig, SeedingConfig
+from .async_configs import BrowserConfig, CrawlerRunConfig, ProxyConfig, SeedingConfig, DomainMapperConfig
 from .async_dispatcher import *  # noqa: F403
 from .async_dispatcher import BaseDispatcher, MemoryAdaptiveDispatcher, RateLimiter
 from .async_url_seeder import AsyncUrlSeeder
+from .domain_mapper import DomainMapper
 
 from .utils import (
     sanitize_input_encode,
@@ -170,6 +171,7 @@ class AsyncWebCrawler:
         self.arun = self._deep_handler(self.arun)
         
         self.url_seeder: Optional[AsyncUrlSeeder] = None
+        self._domain_mapper: Optional[DomainMapper] = None
 
     async def start(self):
         """
@@ -1199,3 +1201,35 @@ class AsyncWebCrawler:
             )
         else:
             raise ValueError("`domain_or_domains` must be a string or a list of strings.")
+
+    async def amap_domain(
+        self,
+        domain: str,
+        config: Optional[DomainMapperConfig] = None,
+        **kwargs,
+    ) -> List[Dict[str, Any]]:
+        """
+        Discover all URLs under a domain without deep crawling.
+
+        Uses DomainMapper to combine sitemap, Common Crawl, Wayback Machine,
+        certificate transparency, path probing, robots.txt mining, feed discovery,
+        and homepage link extraction.
+
+        Args:
+            domain: Domain to map (e.g., "example.com")
+            config: DomainMapperConfig object. kwargs override config fields.
+
+        Returns:
+            List of discovered URL dicts with metadata.
+        """
+        if not self._domain_mapper:
+            self._domain_mapper = DomainMapper(
+                logger=self.logger,
+                base_directory=self.crawl4ai_folder,
+            )
+
+        mapper_config = config.clone(**kwargs) if config and kwargs else (
+            config or DomainMapperConfig(**kwargs) if kwargs else DomainMapperConfig()
+        )
+
+        return await self._domain_mapper.scan(domain, mapper_config)
