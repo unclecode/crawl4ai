@@ -29,12 +29,16 @@ ARG TARGETARCH
 
 # Redis version — pinned to a CVE-patched release by default.
 # Override with --build-arg REDIS_VERSION="" for latest, or
-# --build-arg REDIS_VERSION="6:7.2.7-1rl1~bookworm1" for a specific version.
-ARG REDIS_VERSION="6:7.2.7-1rl1~bookworm1"
+# --build-arg REDIS_VERSION="6:7.2.13-1rl1~bookworm1" for a specific version.
+ARG REDIS_VERSION="6:7.2.13-1rl1~bookworm1"
 
 LABEL maintainer="unclecode"
 LABEL description="🔥🕷️ Crawl4AI: Open-source LLM Friendly Web Crawler & scraper"
 LABEL version="1.0"
+
+# Install curl and gnupg first (needed to add the Redis apt repo)
+RUN apt-get update && apt-get install -y --no-install-recommends curl gnupg \
+    && rm -rf /var/lib/apt/lists/*
 
 # Add official Redis repository for security-patched versions
 RUN curl -fsSL https://packages.redis.io/gpg | gpg --dearmor -o /usr/share/keyrings/redis-archive-keyring.gpg \
@@ -51,9 +55,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     python3-dev \
     libjpeg-dev \
+    redis-tools${REDIS_VERSION:+=$REDIS_VERSION} \
     redis-server${REDIS_VERSION:+=$REDIS_VERSION} \
     supervisor \
-    && apt-get clean \ 
+    && if [ -n "$REDIS_VERSION" ]; then apt-mark hold redis-server redis-tools; fi \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
