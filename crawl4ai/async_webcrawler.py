@@ -1029,7 +1029,9 @@ class AsyncWebCrawler:
             primary_cfg = config[0] if isinstance(config, list) else config
             mean_delay = getattr(primary_cfg, "mean_delay", 0.1)
             max_range = getattr(primary_cfg, "max_range", 0.3)
+            semaphore_count = getattr(primary_cfg, "semaphore_count", 5)
             dispatcher = MemoryAdaptiveDispatcher(
+                max_session_permit=semaphore_count,
                 rate_limiter=RateLimiter(
                     base_delay=(mean_delay, mean_delay + max_range),
                     max_delay=60.0,
