@@ -8,6 +8,14 @@ class CrawlRequest(BaseModel):
     urls: List[str] = Field(min_length=1, max_length=100)
     browser_config: Optional[Dict] = Field(default_factory=dict)
     crawler_config: Optional[Dict] = Field(default_factory=dict)
+    crawler_configs: Optional[List[Dict]] = Field(
+        default=None,
+        description=(
+            "List of per-URL CrawlerRunConfig dicts for arun_many(). "
+            "When provided, each config can include a 'url_matcher' pattern "
+            "to match against specific URLs. Takes precedence over crawler_config."
+        ),
+    )
 
 
 class HookConfig(BaseModel):
