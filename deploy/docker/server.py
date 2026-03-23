@@ -624,7 +624,10 @@ async def crawl(
     if crawl_request.hooks and not HOOKS_ENABLED:
         raise HTTPException(403, "Hooks are disabled. Set CRAWL4AI_HOOKS_ENABLED=true to enable.")
     # Check whether it is a redirection for a streaming request
-    crawler_config = CrawlerRunConfig.load(crawl_request.crawler_config)
+    try:
+        crawler_config = CrawlerRunConfig.load(crawl_request.crawler_config)
+    except ValueError as e:
+        raise HTTPException(400, detail=str(e))
     if crawler_config.stream:
         return await stream_process(crawl_request=crawl_request)
     

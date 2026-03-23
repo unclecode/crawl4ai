@@ -117,6 +117,15 @@ def to_serializable_dict(obj: Any, ignore_default_value : bool = False):
     return str(obj)
 
 
+# Allowlist for from_serializable_dict. Only type names listed here (or in
+# the CRAWL4AI_DESERIALIZE_ALLOW env var) may be instantiated during
+# deserialization. Empty/unset env var = deny all typed deserialization.
+_DESERIALIZE_ALLOW_ENV = os.environ.get("CRAWL4AI_DESERIALIZE_ALLOW", "")
+ALLOWED_DESERIALIZE_TYPES: set = {
+    t.strip() for t in _DESERIALIZE_ALLOW_ENV.split(",") if t.strip()
+}
+
+
 def from_serializable_dict(data: Any) -> Any:
     """
     Recursively convert a serializable dictionary back to an object instance.
@@ -133,6 +142,12 @@ def from_serializable_dict(data: Any) -> Any:
         # Handle plain dictionaries
         if data["type"] == "dict" and "value" in data:
             return {k: from_serializable_dict(v) for k, v in data["value"].items()}
+
+        if data["type"] not in ALLOWED_DESERIALIZE_TYPES:
+            raise ValueError(
+                f"Disallowed type for deserialization: {data['type']}. "
+                f"Add it to CRAWL4AI_DESERIALIZE_ALLOW to permit."
+            )
 
         cls = None
         # If you are receiving an error while trying to convert a dict to an object:
