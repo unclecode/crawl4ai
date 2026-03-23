@@ -1227,7 +1227,12 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
     def _compute_field(self, item, field):
         try:
             if "expression" in field:
-                return eval(field["expression"], {}, item)
+                import logging
+                logging.getLogger(__name__).warning(
+                    "Computed field expressions are disabled for security. "
+                    "Use 'function' for programmatic access."
+                )
+                return field.get("default")
             elif "function" in field:
                 return field["function"](item)
         except Exception as e:
