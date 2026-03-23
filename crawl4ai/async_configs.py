@@ -2237,6 +2237,7 @@ class DomainMapperConfig:
         probe_paths: Optional[List[str]] = None,
         common_subdomains: Optional[List[str]] = None,
         include_subdomains: bool = True,
+        source_timeout: float = 30.0,
         use_browser_for_homepage: bool = False,
         verbose: Optional[bool] = None,
         cache_ttl_hours: int = 24,
@@ -2263,6 +2264,9 @@ class DomainMapperConfig:
             include_subdomains: Discover and scan subdomains. When False, only scans
                                the exact domain provided (skips crt.sh, DNS guessing,
                                Wayback/CC host discovery). Default True.
+            source_timeout: Max seconds per discovery source. Sources that exceed
+                           this are killed and skipped. Prevents slow sources from
+                           blocking fast results. Default 30.0.
             use_browser_for_homepage: Use Playwright for JS-rendered homepages.
             verbose: Override logger verbose setting.
             cache_ttl_hours: Hours before cached results expire.
@@ -2284,6 +2288,7 @@ class DomainMapperConfig:
         self.probe_paths = probe_paths
         self.common_subdomains = common_subdomains
         self.include_subdomains = include_subdomains
+        self.source_timeout = source_timeout
         self.use_browser_for_homepage = use_browser_for_homepage
         self.verbose = verbose
         self.cache_ttl_hours = cache_ttl_hours

@@ -332,13 +332,20 @@ class DomainMapper:
                 prefixes.extend(config.common_subdomains)
             discovery_tasks.append(("dns", self._guess_subdomains(base_domain, prefixes, config)))
 
-        # Run all discovery in parallel
+        # Run all discovery in parallel (per-source timeout)
         if discovery_tasks:
-            coros = [t[1] for t in discovery_tasks]
+            source_timeout = getattr(config, "source_timeout", 30.0)
+            coros = [
+                asyncio.wait_for(t[1], timeout=source_timeout)
+                for t in discovery_tasks
+            ]
             names = [t[0] for t in discovery_tasks]
             results = await asyncio.gather(*coros, return_exceptions=True)
             for name, result in zip(names, results):
-                if isinstance(result, Exception):
+                if isinstance(result, asyncio.TimeoutError):
+                    self._log("warning", "{source} discovery timed out after {timeout}s, skipping",
+                              params={"source": name, "timeout": source_timeout})
+                elif isinstance(result, Exception):
                     self._log("warning", "{source} discovery failed: {err}",
                               params={"source": name, "err": str(result)})
                 else:
@@ -542,13 +549,21 @@ class DomainMapper:
         if "homepage" in sources:
             tasks["homepage"] = self._scan_homepage(host, base_domain, config)
 
-        # Run in parallel
+        # Run in parallel (per-source timeout)
         if tasks:
+            source_timeout = getattr(config, "source_timeout", 30.0)
             source_names = list(tasks.keys())
-            coros = list(tasks.values())
+            coros = [
+                asyncio.wait_for(c, timeout=source_timeout)
+                for c in tasks.values()
+            ]
             task_results = await asyncio.gather(*coros, return_exceptions=True)
 
             for name, result in zip(source_names, task_results):
+                if isinstance(result, asyncio.TimeoutError):
+                    self._log("warning", "{source} scan timed out on {host} after {timeout}s, skipping",
+                              params={"source": name, "host": host, "timeout": source_timeout})
+                    continue
                 if isinstance(result, Exception):
                     self._log("warning", "{source} scan failed on {host}: {err}",
                               params={"source": name, "host": host, "err": str(result)})
