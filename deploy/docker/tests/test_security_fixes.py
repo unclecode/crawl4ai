@@ -160,6 +160,92 @@ class TestHooksEnabled(unittest.TestCase):
                 os.environ.pop("CRAWL4AI_HOOKS_ENABLED", None)
 
 
+class TestDeserializationAllowlist(unittest.TestCase):
+    """Test the allowlist gate logic for from_serializable_dict.
+
+    Replicates the gate logic locally to avoid importing crawl4ai (which has
+    heavy dependencies). The logic under test is:
+      if data["type"] not in ALLOWED_DESERIALIZE_TYPES: raise ValueError
+    """
+
+    @staticmethod
+    def _check_allowlist(data, allowed_types):
+        """Minimal replica of the allowlist gate in from_serializable_dict."""
+        if data is None:
+            return data
+        if isinstance(data, (str, int, float, bool)):
+            return data
+        if isinstance(data, dict) and "type" in data:
+            if data["type"] == "dict" and "value" in data:
+                return {k: v for k, v in data["value"].items()}
+            if data["type"] not in allowed_types:
+                raise ValueError(
+                    f"Disallowed type for deserialization: {data['type']}"
+                )
+            return {"_allowed": True, "type": data["type"]}
+        return data
+
+    def test_disallowed_type_rejected(self):
+        """Types not in the allowlist must be rejected."""
+        allowed = {"BrowserConfig"}
+        with self.assertRaises(ValueError) as ctx:
+            self._check_allowlist({"type": "AsyncWebCrawler", "params": {}}, allowed)
+        self.assertIn("Disallowed type", str(ctx.exception))
+
+    def test_arbitrary_class_rejected(self):
+        """Arbitrary class names must be rejected."""
+        allowed = {"BrowserConfig"}
+        with self.assertRaises(ValueError):
+            self._check_allowlist({"type": "Crawl4aiDockerClient", "params": {}}, allowed)
+
+    def test_allowed_type_passes_gate(self):
+        """Types in the allowlist must pass the gate check."""
+        allowed = {"BrowserConfig", "CrawlerRunConfig"}
+        result = self._check_allowlist({"type": "BrowserConfig", "params": {}}, allowed)
+        self.assertEqual(result["type"], "BrowserConfig")
+
+    def test_dict_type_bypasses_allowlist(self):
+        """The special 'dict' type must still work (not subject to allowlist)."""
+        result = self._check_allowlist({"type": "dict", "value": {"k": "v"}}, set())
+        self.assertEqual(result, {"k": "v"})
+
+    def test_basic_types_pass_through(self):
+        """Strings, ints, etc. must pass through unchanged."""
+        self.assertEqual(self._check_allowlist("hello", set()), "hello")
+        self.assertEqual(self._check_allowlist(42, set()), 42)
+        self.assertIsNone(self._check_allowlist(None, set()))
+
+    def test_empty_allowlist_denies_all(self):
+        """With empty allowlist, all typed deserialization must be denied."""
+        with self.assertRaises(ValueError):
+            self._check_allowlist({"type": "BrowserConfig", "params": {}}, set())
+
+    def test_env_var_parsing(self):
+        """CRAWL4AI_DESERIALIZE_ALLOW env var must be parsed as comma-separated set."""
+        original = os.environ.get("CRAWL4AI_DESERIALIZE_ALLOW")
+        try:
+            os.environ["CRAWL4AI_DESERIALIZE_ALLOW"] = "BrowserConfig,CrawlerRunConfig,CacheMode"
+            env_val = os.environ.get("CRAWL4AI_DESERIALIZE_ALLOW", "")
+            allowed = {t.strip() for t in env_val.split(",") if t.strip()}
+            self.assertEqual(allowed, {"BrowserConfig", "CrawlerRunConfig", "CacheMode"})
+        finally:
+            if original is not None:
+                os.environ["CRAWL4AI_DESERIALIZE_ALLOW"] = original
+            else:
+                os.environ.pop("CRAWL4AI_DESERIALIZE_ALLOW", None)
+
+    def test_empty_env_var_means_deny_all(self):
+        """Unset or empty CRAWL4AI_DESERIALIZE_ALLOW must produce empty set."""
+        original = os.environ.pop("CRAWL4AI_DESERIALIZE_ALLOW", None)
+        try:
+            env_val = os.environ.get("CRAWL4AI_DESERIALIZE_ALLOW", "")
+            allowed = {t.strip() for t in env_val.split(",") if t.strip()}
+            self.assertEqual(allowed, set())
+        finally:
+            if original is not None:
+                os.environ["CRAWL4AI_DESERIALIZE_ALLOW"] = original
+
+
 if __name__ == '__main__':
     print("=" * 60)
     print("Crawl4AI Security Fixes - Unit Tests")

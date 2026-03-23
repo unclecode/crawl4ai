@@ -539,8 +539,11 @@ async def handle_crawl_request(
 
     try:
         urls = [('https://' + url) if not url.startswith(('http://', 'https://')) and not url.startswith(("raw:", "raw://")) else url for url in urls]
-        browser_config = BrowserConfig.load(browser_config)
-        crawler_config = CrawlerRunConfig.load(crawler_config)
+        try:
+            browser_config = BrowserConfig.load(browser_config)
+            crawler_config = CrawlerRunConfig.load(crawler_config)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
 
         dispatcher = MemoryAdaptiveDispatcher(
             memory_threshold_percent=config["crawler"]["memory_threshold_percent"],
@@ -548,7 +551,7 @@ async def handle_crawl_request(
                 base_delay=tuple(config["crawler"]["rate_limiter"]["base_delay"])
             ) if config["crawler"]["rate_limiter"]["enabled"] else None
         )
-        
+
         from crawler_pool import get_crawler
         crawler = await get_crawler(browser_config)
 
@@ -720,10 +723,13 @@ async def handle_stream_crawl_request(
     """Handle streaming crawl requests with optional hooks."""
     hooks_info = None
     try:
-        browser_config = BrowserConfig.load(browser_config)
+        try:
+            browser_config = BrowserConfig.load(browser_config)
+            crawler_config = CrawlerRunConfig.load(crawler_config)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
         # browser_config.verbose = True # Set to False or remove for production stress testing
         browser_config.verbose = False
-        crawler_config = CrawlerRunConfig.load(crawler_config)
         crawler_config.scraping_strategy = LXMLWebScrapingStrategy()
         crawler_config.stream = True
 
