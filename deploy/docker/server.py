@@ -253,6 +253,47 @@ def validate_url_scheme(url: str, allow_raw: bool = False) -> None:
         raise HTTPException(400, f"URL must start with {schemes}")
 
 
+# ── SSRF protection: block loopback and link-local targets ──
+import socket
+import ipaddress
+from urllib.parse import urlparse
+
+SSRF_PROTECTION = os.environ.get("CRAWL4AI_SSRF_PROTECTION", "true").lower() == "true"
+
+
+def validate_url_target(url: str) -> None:
+    """Block requests to loopback, link-local, and metadata addresses.
+
+    This is a best-effort check — it resolves the hostname before Playwright
+    connects, so DNS rebinding can bypass it. Full SSRF protection requires
+    network policies at the infrastructure level.
+    """
+    if not SSRF_PROTECTION:
+        return
+    if url.startswith(("raw:", "raw://")):
+        return
+
+    try:
+        parsed = urlparse(url)
+        hostname = parsed.hostname
+        if not hostname:
+            return
+
+        addrs = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
+        for family, _, _, _, sockaddr in addrs:
+            ip = ipaddress.ip_address(sockaddr[0])
+            if ip.is_loopback or ip.is_link_local or ip.is_unspecified:
+                raise HTTPException(
+                    400,
+                    f"URL targets a blocked address ({ip}). "
+                    "Loopback, link-local, and unspecified addresses are not allowed."
+                )
+    except HTTPException:
+        raise
+    except Exception:
+        pass  # DNS resolution failures are not a security issue — let Playwright handle them
+
+
 # ───────────────── safe config‑dump helper ─────────────────
 ALLOWED_TYPES = {
     "CrawlerRunConfig": CrawlerRunConfig,
@@ -328,6 +369,7 @@ async def get_markdown(
     if not body.url.startswith(("http://", "https://")) and not body.url.startswith(("raw:", "raw://")):
         raise HTTPException(
             400, "Invalid URL format. Must start with http://, https://, or for raw HTML (raw:, raw://)")
+    validate_url_target(body.url)
     markdown = await handle_markdown_request(
         body.url, body.f, body.q, body.c, config, body.provider,
         body.temperature, body.base_url
@@ -387,6 +429,7 @@ async def generate_screenshot(
     Then in result instead of the screenshot you will get a path to the saved file.
     """
     validate_url_scheme(body.url)
+    validate_url_target(body.url)
     from crawler_pool import get_crawler
     try:
         cfg = CrawlerRunConfig(screenshot=True, screenshot_wait_for=body.screenshot_wait_for)
@@ -422,6 +465,7 @@ async def generate_pdf(
     Then in result instead of the PDF you will get a path to the saved file.
     """
     validate_url_scheme(body.url)
+    validate_url_target(body.url)
     from crawler_pool import get_crawler
     try:
         cfg = CrawlerRunConfig(pdf=True)
@@ -495,6 +539,7 @@ async def execute_js(
 
     """
     validate_url_scheme(body.url)
+    validate_url_target(body.url)
     from crawler_pool import get_crawler
     try:
         cfg = CrawlerRunConfig(js_code=body.scripts)
