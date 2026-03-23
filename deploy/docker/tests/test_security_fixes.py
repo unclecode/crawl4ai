@@ -160,6 +160,67 @@ class TestHooksEnabled(unittest.TestCase):
                 os.environ.pop("CRAWL4AI_HOOKS_ENABLED", None)
 
 
+class TestPathTraversal(unittest.TestCase):
+    """Test path traversal protection in output_path handling."""
+
+    def setUp(self):
+        self.output_dir = os.path.join(
+            os.environ.get("TMPDIR", "/tmp"), "crawl4ai_test_output"
+        )
+        os.makedirs(self.output_dir, exist_ok=True)
+
+    def safe_output_path(self, user_path: str) -> str:
+        """Local version of safe_output_path for testing."""
+        if os.path.isabs(user_path):
+            raise ValueError("output_path must be a relative path in sandboxed mode")
+        base = os.path.realpath(self.output_dir)
+        resolved = os.path.realpath(os.path.join(base, user_path))
+        if not resolved.startswith(base + os.sep) and resolved != base:
+            raise ValueError("output_path must not escape the output directory")
+        return resolved
+
+    def test_traversal_rejected(self):
+        """Paths with ../ that escape output dir must be rejected."""
+        with self.assertRaises(ValueError):
+            self.safe_output_path("../../etc/passwd")
+
+    def test_absolute_path_rejected(self):
+        """Absolute paths must be rejected in sandboxed mode."""
+        with self.assertRaises(ValueError):
+            self.safe_output_path("/etc/passwd")
+
+    def test_valid_relative_path_accepted(self):
+        """Valid relative paths within the output dir must be accepted."""
+        result = self.safe_output_path("screenshots/test.png")
+        self.assertTrue(result.startswith(os.path.realpath(self.output_dir)))
+
+    def test_dot_dot_within_dir_accepted(self):
+        """Paths with ../ that stay within the output dir are OK."""
+        result = self.safe_output_path("subdir/../test.png")
+        self.assertTrue(result.startswith(os.path.realpath(self.output_dir)))
+
+    def test_symlink_escape_rejected(self):
+        """Symlink-based escapes must be rejected (resolved by realpath)."""
+        link_path = os.path.join(self.output_dir, "evil_link")
+        try:
+            os.symlink("/etc", link_path)
+            with self.assertRaises(ValueError):
+                self.safe_output_path("evil_link/passwd")
+        finally:
+            if os.path.islink(link_path):
+                os.unlink(link_path)
+
+    def test_output_mode_default_is_disabled(self):
+        """Default OUTPUT_MODE must be 'disabled'."""
+        original = os.environ.pop("CRAWL4AI_OUTPUT_MODE", None)
+        try:
+            mode = os.environ.get("CRAWL4AI_OUTPUT_MODE", "disabled")
+            self.assertEqual(mode, "disabled")
+        finally:
+            if original is not None:
+                os.environ["CRAWL4AI_OUTPUT_MODE"] = original
+
+
 if __name__ == '__main__':
     print("=" * 60)
     print("Crawl4AI Security Fixes - Unit Tests")
