@@ -29,7 +29,9 @@ from schemas import (
     RawCode,
     HTMLRequest,
     ScreenshotRequest,
+    ScreenshotRequestWithOutput,
     PDFRequest,
+    PDFRequestWithOutput,
     JSEndpointRequest,
 )
 
@@ -82,6 +84,24 @@ GLOBAL_SEM = asyncio.Semaphore(MAX_PAGES)
 # ── security feature flags ───────────────────────────────────
 # Hooks are disabled by default for security (RCE risk). Set to "true" to enable.
 HOOKS_ENABLED = os.environ.get("CRAWL4AI_HOOKS_ENABLED", "false").lower() == "true"
+
+# Output mode for /screenshot and /pdf endpoints.
+# "disabled" (default): always return base64 inline, output_path not accepted
+# "sandboxed": write only within CRAWL4AI_OUTPUT_DIR
+# "unrestricted": original behavior, no path validation
+OUTPUT_MODE = os.environ.get("CRAWL4AI_OUTPUT_MODE", "disabled")
+OUTPUT_DIR = os.environ.get("CRAWL4AI_OUTPUT_DIR", "/tmp/crawl4ai_output")
+
+
+def safe_output_path(user_path: str) -> str:
+    """Resolve user_path within OUTPUT_DIR. Raise if it escapes."""
+    if os.path.isabs(user_path):
+        raise HTTPException(400, "output_path must be a relative path in sandboxed mode")
+    base = os.path.realpath(OUTPUT_DIR)
+    resolved = os.path.realpath(os.path.join(base, user_path))
+    if not resolved.startswith(base + os.sep) and resolved != base:
+        raise HTTPException(400, "output_path must not escape the output directory")
+    return resolved
 
 # ── default browser config helper ─────────────────────────────
 def get_default_browser_config() -> BrowserConfig:
@@ -378,13 +398,13 @@ async def generate_html(
 @mcp_tool("screenshot")
 async def generate_screenshot(
     request: Request,
-    body: ScreenshotRequest,
+    body: ScreenshotRequestWithOutput if OUTPUT_MODE != "disabled" else ScreenshotRequest,
     _td: Dict = Depends(token_dep),
 ):
     """
-    Capture a full-page PNG screenshot of the specified URL, waiting an optional delay before capture,
-    Use when you need an image snapshot of the rendered page. Its recommened to provide an output path to save the screenshot.
-    Then in result instead of the screenshot you will get a path to the saved file.
+    Capture a full-page PNG screenshot of the specified URL, waiting an optional delay before capture.
+    Use when you need an image snapshot of the rendered page. When output mode is enabled,
+    provide an output_path to save the screenshot to disk.
     """
     validate_url_scheme(body.url)
     from crawler_pool import get_crawler
@@ -395,8 +415,14 @@ async def generate_screenshot(
         if not results[0].success:
             raise HTTPException(500, detail=results[0].error_message or "Crawl failed")
         screenshot_data = results[0].screenshot
-        if body.output_path:
-            abs_path = os.path.abspath(body.output_path)
+        output_path = getattr(body, "output_path", None)
+        if output_path:
+            if OUTPUT_MODE == "sandboxed":
+                abs_path = safe_output_path(output_path)
+            elif OUTPUT_MODE == "unrestricted":
+                abs_path = os.path.abspath(output_path)
+            else:
+                raise HTTPException(400, "File output is disabled")
             os.makedirs(os.path.dirname(abs_path), exist_ok=True)
             with open(abs_path, "wb") as f:
                 f.write(base64.b64decode(screenshot_data))
@@ -413,13 +439,13 @@ async def generate_screenshot(
 @mcp_tool("pdf")
 async def generate_pdf(
     request: Request,
-    body: PDFRequest,
+    body: PDFRequestWithOutput if OUTPUT_MODE != "disabled" else PDFRequest,
     _td: Dict = Depends(token_dep),
 ):
     """
-    Generate a PDF document of the specified URL,
-    Use when you need a printable or archivable snapshot of the page. It is recommended to provide an output path to save the PDF.
-    Then in result instead of the PDF you will get a path to the saved file.
+    Generate a PDF document of the specified URL.
+    Use when you need a printable or archivable snapshot of the page. When output mode is
+    enabled, provide an output_path to save the PDF to disk.
     """
     validate_url_scheme(body.url)
     from crawler_pool import get_crawler
@@ -430,8 +456,14 @@ async def generate_pdf(
         if not results[0].success:
             raise HTTPException(500, detail=results[0].error_message or "Crawl failed")
         pdf_data = results[0].pdf
-        if body.output_path:
-            abs_path = os.path.abspath(body.output_path)
+        output_path = getattr(body, "output_path", None)
+        if output_path:
+            if OUTPUT_MODE == "sandboxed":
+                abs_path = safe_output_path(output_path)
+            elif OUTPUT_MODE == "unrestricted":
+                abs_path = os.path.abspath(output_path)
+            else:
+                raise HTTPException(400, "File output is disabled")
             os.makedirs(os.path.dirname(abs_path), exist_ok=True)
             with open(abs_path, "wb") as f:
                 f.write(pdf_data)
