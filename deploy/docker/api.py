@@ -538,6 +538,12 @@ async def handle_crawl_request(
     hook_manager = None
 
     try:
+        _allowed_schemes = ('http://', 'https://', 'raw:', 'raw://')
+        for url in urls:
+            # Detect explicit scheme: contains :// or starts with a known no-// scheme
+            has_scheme = '://' in url or url.lower().startswith(('javascript:', 'data:', 'vbscript:'))
+            if has_scheme and not url.startswith(_allowed_schemes):
+                raise HTTPException(400, f"URL scheme not allowed: {url[:50]}")
         urls = [('https://' + url) if not url.startswith(('http://', 'https://')) and not url.startswith(("raw:", "raw://")) else url for url in urls]
         browser_config = BrowserConfig.load(browser_config)
         crawler_config = CrawlerRunConfig.load(crawler_config)
@@ -720,6 +726,12 @@ async def handle_stream_crawl_request(
     """Handle streaming crawl requests with optional hooks."""
     hooks_info = None
     try:
+        _allowed_schemes = ('http://', 'https://', 'raw:', 'raw://')
+        for url in urls:
+            # Detect explicit scheme: contains :// or starts with a known no-// scheme
+            has_scheme = '://' in url or url.lower().startswith(('javascript:', 'data:', 'vbscript:'))
+            if has_scheme and not url.startswith(_allowed_schemes):
+                raise HTTPException(400, f"URL scheme not allowed: {url[:50]}")
         browser_config = BrowserConfig.load(browser_config)
         # browser_config.verbose = True # Set to False or remove for production stress testing
         browser_config.verbose = False
