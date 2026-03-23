@@ -1,6 +1,8 @@
 import os
 import json
 import asyncio
+import socket
+import ipaddress
 from typing import List, Tuple, Dict
 from functools import partial
 from uuid import uuid4
@@ -9,7 +11,7 @@ from base64 import b64encode
 
 import logging
 from typing import Optional, AsyncGenerator
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse
 from fastapi import HTTPException, Request, status
 from fastapi.background import BackgroundTasks
 from fastapi.responses import JSONResponse
@@ -513,6 +515,39 @@ async def stream_results(crawler: AsyncWebCrawler, results_gen: AsyncGenerator) 
         #     logger.error(f"Crawler cleanup error: {e}")
         pass
 
+SSRF_PROTECTION = os.environ.get("CRAWL4AI_SSRF_PROTECTION", "true").lower() == "true"
+
+
+def validate_url_target(url: str) -> None:
+    """Block requests to loopback, link-local, and metadata addresses.
+
+    Best-effort check — DNS rebinding can bypass it. Full SSRF protection
+    requires network policies at the infrastructure level.
+    """
+    if not SSRF_PROTECTION:
+        return
+    if url.startswith(("raw:", "raw://")):
+        return
+    try:
+        parsed = urlparse(url)
+        hostname = parsed.hostname
+        if not hostname:
+            return
+        addrs = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
+        for family, _, _, _, sockaddr in addrs:
+            ip = ipaddress.ip_address(sockaddr[0])
+            if ip.is_loopback or ip.is_link_local or ip.is_unspecified:
+                raise HTTPException(
+                    400,
+                    f"URL targets a blocked address ({ip}). "
+                    "Loopback, link-local, and unspecified addresses are not allowed."
+                )
+    except HTTPException:
+        raise
+    except Exception:
+        pass  # DNS failures are not a security issue — let Playwright handle them
+
+
 async def handle_crawl_request(
     urls: List[str],
     browser_config: dict,
@@ -539,6 +574,8 @@ async def handle_crawl_request(
 
     try:
         urls = [('https://' + url) if not url.startswith(('http://', 'https://')) and not url.startswith(("raw:", "raw://")) else url for url in urls]
+        for url in urls:
+            validate_url_target(url)
         browser_config = BrowserConfig.load(browser_config)
         crawler_config = CrawlerRunConfig.load(crawler_config)
 
@@ -720,6 +757,8 @@ async def handle_stream_crawl_request(
     """Handle streaming crawl requests with optional hooks."""
     hooks_info = None
     try:
+        for url in urls:
+            validate_url_target(url)
         browser_config = BrowserConfig.load(browser_config)
         # browser_config.verbose = True # Set to False or remove for production stress testing
         browser_config.verbose = False
