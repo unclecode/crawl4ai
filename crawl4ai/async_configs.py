@@ -195,6 +195,12 @@ def to_serializable_dict(obj: Any, ignore_default_value : bool = False):
 
     # Handle class instances
     if hasattr(obj, "__class__"):
+        # Skip types that cannot be deserialized (e.g. logging.Logger, callables).
+        # Only serialize objects whose type is in ALLOWED_DESERIALIZE_TYPES so that
+        # from_serializable_dict can reconstruct them on the other side.
+        if _type not in ALLOWED_DESERIALIZE_TYPES:
+            return None
+
         # Get constructor signature
         sig = inspect.signature(obj.__class__.__init__)
         params = sig.parameters
@@ -258,13 +264,12 @@ def from_serializable_dict(data: Any) -> Any:
         if data["type"] == "dict" and "value" in data:
             return {k: from_serializable_dict(v) for k, v in data["value"].items()}
 
-        # Security: only allow known-safe types to be deserialized
+        # Security: only allow known-safe types to be deserialized.
+        # Unknown types (e.g. logging.Logger serialized by older clients) are
+        # silently dropped (returned as None) instead of crashing the request.
         type_name = data["type"]
         if type_name not in ALLOWED_DESERIALIZE_TYPES:
-            raise ValueError(
-                f"Deserialization of type '{type_name}' is not allowed. "
-                f"Only allowlisted configuration and strategy types can be deserialized."
-            )
+            return None
 
         cls = None
         module_paths = ["crawl4ai"]

@@ -750,11 +750,11 @@ class TestSerializableDict:
         assert result["type"] == "dict"
         assert result["value"]["key"] == "value"
 
-    def test_disallowed_type_raises(self):
-        """Deserializing a non-allowlisted type should raise ValueError."""
+    def test_disallowed_type_returns_none(self):
+        """Deserializing a non-allowlisted type should return None (not instantiate it)."""
         bad_data = {"type": "os.system", "params": {"command": "rm -rf /"}}
-        with pytest.raises(ValueError, match="not allowed"):
-            from_serializable_dict(bad_data)
+        result = from_serializable_dict(bad_data)
+        assert result is None
 
     def test_geolocation_config_roundtrip(self):
         """GeolocationConfig should survive serialization roundtrip."""
