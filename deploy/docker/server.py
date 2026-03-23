@@ -83,6 +83,10 @@ GLOBAL_SEM = asyncio.Semaphore(MAX_PAGES)
 # Hooks are disabled by default for security (RCE risk). Set to "true" to enable.
 HOOKS_ENABLED = os.environ.get("CRAWL4AI_HOOKS_ENABLED", "false").lower() == "true"
 
+# /config/dump endpoint uses eval() and is disabled by default for security.
+# Set to "true" to enable (e.g. for local development).
+CONFIG_DUMP_ENABLED = os.environ.get("CRAWL4AI_CONFIG_DUMP_ENABLED", "false").lower() == "true"
+
 # ── default browser config helper ─────────────────────────────
 def get_default_browser_config() -> BrowserConfig:
     """Get default BrowserConfig from config.yml."""
@@ -311,6 +315,8 @@ async def get_token(req: TokenRequest):
 
 @app.post("/config/dump")
 async def config_dump(raw: RawCode):
+    if not CONFIG_DUMP_ENABLED:
+        raise HTTPException(403, "/config/dump is disabled. Set CRAWL4AI_CONFIG_DUMP_ENABLED=true to enable.")
     try:
         return JSONResponse(_safe_eval_config(raw.code.strip()))
     except Exception as e:
