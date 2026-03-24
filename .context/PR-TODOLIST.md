@@ -1,6 +1,6 @@
 # PR Review Todolist
 
-> Last updated: 2026-03-07 | Total open PRs: 6
+> Last updated: 2026-03-13 | Total open PRs: 6
 
 ---
 
@@ -94,7 +94,13 @@
 
 ---
 
-## Resolved This Session (batch 5)
+## Resolved This Session (batch 6)
+
+| PR | Author | Description | Date |
+|----|--------|-------------|------|
+| #1834 | ntohidi | fix: remove shared LOCK contention in monitor to prevent pod deadlock (#1754) | 2026-03-13 |
+
+## Resolved (batch 5)
 
 | PR | Author | Description | Date |
 |----|--------|-------------|------|

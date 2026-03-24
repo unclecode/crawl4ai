@@ -601,12 +601,15 @@ class AsyncWebCrawler:
                                 )
 
                     # --- Mark blocked results as failed ---
-                    # Skip re-check when fallback was used — the fallback result is
-                    # authoritative.  Real pages may contain anti-bot script markers
+                    # Skip re-check ONLY when fallback SUCCEEDED — the fallback result
+                    # is authoritative and real pages may contain anti-bot script markers
                     # (e.g. PerimeterX JS on Walmart) that trigger false positives.
+                    # When fallback was attempted but FAILED, we must still re-check
+                    # because the result is from a blocked proxy attempt.
                     # Also skip for raw: URLs — caller-provided content, anti-bot N/A.
                     if crawl_result:
-                        if not _crawl_stats.get("fallback_fetch_used") and not _is_raw_url:
+                        _fallback_succeeded = _crawl_stats.get("resolved_by") == "fallback_fetch"
+                        if not _fallback_succeeded and not _is_raw_url:
                             _blocked, _block_reason = is_blocked(
                                 crawl_result.status_code, crawl_result.html or "")
                             if _blocked:
