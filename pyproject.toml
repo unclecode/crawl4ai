@@ -18,7 +18,7 @@ dependencies = [
     "aiosqlite~=0.20",
     "anyio>=4.0.0",
     "lxml~=5.3",
-    "litellm @ git+https://github.com/unclecode/litellm.git@safe-v1.81.13",
+    "unclecode-litellm==1.81.13",
     "numpy>=1.26.0,<3",
     "pillow>=10.4",
     "playwright>=1.49.0",
