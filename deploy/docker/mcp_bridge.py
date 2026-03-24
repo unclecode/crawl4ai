@@ -223,13 +223,16 @@ def attach_mcp(
     # ── SSE transport (raw ASGI — avoids Starlette middleware conflict) ──
     sse = SseServerTransport(f"{base}/messages/")
 
-    async def _mcp_sse_handler(scope, receive, send):
-        """Raw ASGI handler for SSE — the MCP SDK calls (scope, receive, send)
-        internally, so wrapping with @app.get() causes an AssertionError (#1594)."""
-        async with sse.connect_sse(scope, receive, send) as (read_stream, write_stream):
-            await mcp.run(read_stream, write_stream, init_opts)
+    # Starlette's Route wraps plain async functions in request_response(),
+    # which calls handler(request) instead of handler(scope, receive, send).
+    # Using a callable class bypasses this — Route passes classes through
+    # as raw ASGI apps.  See #1594, #1850.
+    class _MCPSseApp:
+        async def __call__(self, scope, receive, send):
+            async with sse.connect_sse(scope, receive, send) as (read_stream, write_stream):
+                await mcp.run(read_stream, write_stream, init_opts)
 
-    app.routes.append(Route(f"{base}/sse", endpoint=_mcp_sse_handler))
+    app.routes.append(Route(f"{base}/sse", endpoint=_MCPSseApp()))
     app.routes.append(Mount(f"{base}/messages", app=sse.handle_post_message))
 
     # ── schema endpoint ───────────────────────────────────────
