@@ -15,8 +15,9 @@ Below is a quick overview of how to do it.
 
 ### Basic Execution
 
-**`js_code`** in **`CrawlerRunConfig`** accepts either a single JS string or a list of JS snippets.  
-**Example**: We’ll scroll to the bottom of the page, then optionally click a “Load More” button.
+**`js_code`** in **`CrawlerRunConfig`** accepts either a single JS string or a list of JS snippets. It runs **after** `wait_for` and `delay_before_return_html` — so the page is fully loaded when your code executes.
+
+**Example**: We'll scroll to the bottom of the page, then optionally click a "Load More" button.
 
 ```python
 import asyncio
@@ -55,9 +56,35 @@ if __name__ == "__main__":
 ```
 
 **Relevant `CrawlerRunConfig` params**:
-- **`js_code`**: A string or list of strings with JavaScript to run after the page loads.
-- **`js_only`**: If set to `True` on subsequent calls, indicates we’re continuing an existing session without a new full navigation.  
+- **`js_code`**: JavaScript to run **after** `wait_for` and `delay_before_return_html` complete. Runs on the fully-loaded page.
+- **`js_code_before_wait`**: JavaScript to run **before** `wait_for`. Use when you need to trigger loading that `wait_for` then checks.
+- **`js_only`**: If set to `True` on subsequent calls, indicates we're continuing an existing session without a new full navigation.
 - **`session_id`**: If you want to keep the same page across multiple calls, specify an ID.
+
+### Execution Order
+
+Understanding when your JavaScript runs relative to other pipeline steps:
+
+```
+1. Page navigation (page.goto)
+2. js_code_before_wait     ← triggers loading / clicks tabs
+3. wait_for                ← waits for content to appear
+4. delay_before_return_html ← extra safety margin
+5. js_code                 ← runs on the fully-loaded page
+6. flatten_shadow_dom      ← if enabled
+7. page.content()          ← HTML capture
+```
+
+If you need JS to trigger something and then wait for the result, use `js_code_before_wait` + `wait_for`:
+
+```python
+config = CrawlerRunConfig(
+    # Click a tab first
+    js_code_before_wait="document.querySelector('#specs-tab')?.click();",
+    # Then wait for the tab content to appear
+    wait_for="css:#specs-panel .content",
+)
+```
 
 ---
 
@@ -317,34 +344,55 @@ When done, check `result.extracted_content` for the JSON.
 
 ---
 
-## 7. Relevant `CrawlerRunConfig` Parameters
+## 7. Shadow DOM Flattening
 
-Below are the key interaction-related parameters in `CrawlerRunConfig`. For a full list, see [Configuration Parameters](../api/parameters.md).
+Sites built with **Web Components** (Stencil, Lit, Shoelace, etc.) render content inside Shadow DOM — an encapsulated sub-tree that is invisible to normal page serialization. Set `flatten_shadow_dom=True` to extract it:
 
-- **`js_code`**: JavaScript to run after initial load.  
-- **`js_only`**: If `True`, no new page navigation—only JS in the existing session.  
-- **`wait_for`**: CSS (`"css:..."`) or JS (`"js:..."`) expression to wait for.  
-- **`session_id`**: Reuse the same page across calls.  
-- **`cache_mode`**: Whether to read/write from the cache or bypass.  
-- **`remove_overlay_elements`**: Remove certain popups automatically.  
-- **`simulate_user`, `override_navigator`, `magic`**: Anti-bot or “human-like” interactions.
+```python
+config = CrawlerRunConfig(
+    flatten_shadow_dom=True,
+    wait_until="load",
+    delay_before_return_html=3.0,  # give components time to hydrate
+)
+```
+
+This walks all shadow trees, resolves `<slot>` projections, and produces flat HTML. It also force-opens closed shadow roots via an init script. For details and a full example, see [Flattening Shadow DOM](content-selection.md#31-flattening-shadow-dom) and [`shadow_dom_crawling.py`](https://github.com/unclecode/crawl4ai/blob/main/docs/examples/shadow_dom_crawling.py).
 
 ---
 
-## 8. Conclusion
+## 8. Relevant `CrawlerRunConfig` Parameters
 
-Crawl4AI’s **page interaction** features let you:
+Below are the key interaction-related parameters in `CrawlerRunConfig`. For a full list, see [Configuration Parameters](../api/parameters.md).
+
+- **`js_code`**: JavaScript to run after `wait_for` + `delay_before_return_html`, on the fully-loaded page.
+- **`js_code_before_wait`**: JavaScript to run before `wait_for`. For triggering loading that `wait_for` then checks.
+- **`js_only`**: If `True`, no new page navigation—only JS in the existing session.
+- **`wait_for`**: CSS (`"css:..."`) or JS (`"js:..."`) expression to wait for.
+- **`session_id`**: Reuse the same page across calls.
+- **`cache_mode`**: Whether to read/write from the cache or bypass.
+- **`flatten_shadow_dom`**: Flatten Shadow DOM content into the light DOM before capture.
+- **`process_iframes`**: Inline iframe content into the main document.
+- **`remove_overlay_elements`**: Remove certain popups automatically.
+- **`remove_consent_popups`**: Remove GDPR/cookie consent popups from known CMP providers (OneTrust, Cookiebot, Didomi, etc.).
+- **`simulate_user`, `override_navigator`, `magic`**: Anti-bot or "human-like" interactions.
+
+---
+
+## 9. Conclusion
+
+Crawl4AI's **page interaction** features let you:
 
 1. **Execute JavaScript** for scrolling, clicks, or form filling.  
 2. **Wait** for CSS or custom JS conditions before capturing data.  
 3. **Handle** multi-step flows (like “Load More”) with partial reloads or persistent sessions.  
-4. Combine with **structured extraction** for dynamic sites.
+4. **Flatten Shadow DOM** on Web Component sites to extract hidden content.
+5. Combine with **structured extraction** for dynamic sites.
 
 With these tools, you can scrape modern, interactive webpages confidently. For advanced hooking, user simulation, or in-depth config, check the [API reference](../api/parameters.md) or related advanced docs. Happy scripting!
 
 ---
 
-## 9. Virtual Scrolling
+## 10. Virtual Scrolling
 
 For sites that use **virtual scrolling** (where content is replaced rather than appended as you scroll, like Twitter or Instagram), Crawl4AI provides a dedicated `VirtualScrollConfig`:
 

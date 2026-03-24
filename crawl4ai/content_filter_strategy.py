@@ -527,7 +527,15 @@ class BM25ContentFilter(RelevantContentFilter):
         # Sort selected candidates by original document order
         selected_candidates.sort(key=lambda x: x[0])
 
-        return [self.clean_element(tag) for _, _, tag in selected_candidates]
+        # Deduplicate by chunk text, keeping first occurrence (lowest index)
+        seen_texts = set()
+        unique_candidates = []
+        for index, chunk, tag in selected_candidates:
+            if chunk not in seen_texts:
+                seen_texts.add(chunk)
+                unique_candidates.append((index, chunk, tag))
+
+        return [self.clean_element(tag) for _, _, tag in unique_candidates]
 
 
 class PruningContentFilter(RelevantContentFilter):
@@ -665,7 +673,7 @@ class PruningContentFilter(RelevantContentFilter):
 
     def _remove_comments(self, soup):
         """Removes HTML comments"""
-        for element in soup(text=lambda text: isinstance(text, Comment)):
+        for element in soup(string=lambda string: isinstance(string, Comment)):
             element.extract()
 
     def _remove_unwanted_tags(self, soup):

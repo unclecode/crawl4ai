@@ -19,11 +19,113 @@ class FilterType(str, Enum):
     BM25 = "bm25"
     LLM = "llm"
 
+DEFAULT_CONFIG = {
+    "app": {
+        "title": "Crawl4AI API",
+        "version": "1.0.0",
+        "host": "0.0.0.0",
+        "port": 11235,
+        "reload": False,
+        "workers": 1,
+        "timeout_keep_alive": 300,
+    },
+    "llm": {
+        "provider": "openai/gpt-4o-mini",
+    },
+    "redis": {
+        "host": "localhost",
+        "port": 6379,
+        "db": 0,
+        "password": "",
+        "task_ttl_seconds": 3600,
+        "ssl": False,
+    },
+    "rate_limiting": {
+        "enabled": True,
+        "default_limit": "1000/minute",
+        "trusted_proxies": [],
+        "storage_uri": "memory://",
+    },
+    "security": {
+        "enabled": False,
+        "jwt_enabled": False,
+        "api_token": "",
+        "https_redirect": False,
+        "trusted_hosts": ["*"],
+        "headers": {
+            "x_content_type_options": "nosniff",
+            "x_frame_options": "DENY",
+            "content_security_policy": "default-src 'self'",
+            "strict_transport_security": "max-age=63072000; includeSubDomains",
+        },
+    },
+    "crawler": {
+        "base_config": {"simulate_user": True},
+        "memory_threshold_percent": 95.0,
+        "rate_limiter": {"enabled": True, "base_delay": [1.0, 2.0]},
+        "timeouts": {"stream_init": 30.0, "batch_process": 300.0},
+        "pool": {"max_pages": 40, "idle_ttl_sec": 300},
+        "browser": {
+            "kwargs": {"headless": True, "text_mode": True},
+            "extra_args": [
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--disable-software-rasterizer",
+                "--disable-web-security",
+                "--allow-insecure-localhost",
+                "--ignore-certificate-errors",
+            ],
+        },
+    },
+    "logging": {
+        "level": "INFO",
+        "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    },
+    "observability": {
+        "prometheus": {"enabled": True, "endpoint": "/metrics"},
+        "health_check": {"endpoint": "/health"},
+    },
+    "webhooks": {
+        "enabled": True,
+        "default_url": None,
+        "data_in_payload": False,
+        "retry": {
+            "max_attempts": 5,
+            "initial_delay_ms": 1000,
+            "max_delay_ms": 32000,
+            "timeout_ms": 30000,
+        },
+        "headers": {"User-Agent": "Crawl4AI-Webhook/1.0"},
+    },
+}
+
+
+def _deep_merge(base: dict, override: dict) -> dict:
+    """Recursively merge override into base. Override values take precedence."""
+    merged = base.copy()
+    for key, value in override.items():
+        if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
+            merged[key] = _deep_merge(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
 def load_config() -> Dict:
     """Load and return application configuration with environment variable overrides."""
     config_path = Path(__file__).parent / "config.yml"
     with open(config_path, "r") as config_file:
-        config = yaml.safe_load(config_file)
+        user_config = yaml.safe_load(config_file) or {}
+
+    # Deep-merge user config on top of defaults so missing keys get safe values
+    config = _deep_merge(DEFAULT_CONFIG, user_config)
+
+    for section in DEFAULT_CONFIG:
+        if section not in user_config:
+            logging.warning(
+                f"Config section '{section}' missing from config.yml, using defaults"
+            )
     
     # Override LLM provider from environment if set
     llm_provider = os.environ.get("LLM_PROVIDER")
@@ -36,7 +138,16 @@ def load_config() -> Dict:
     if llm_api_key and "api_key" not in config["llm"]:
         config["llm"]["api_key"] = llm_api_key
         logging.info("LLM API key loaded from LLM_API_KEY environment variable")
-    
+
+    # Override Redis task TTL from environment if set
+    redis_task_ttl = os.environ.get("REDIS_TASK_TTL")
+    if redis_task_ttl:
+        try:
+            config["redis"]["task_ttl_seconds"] = int(redis_task_ttl)
+            logging.info(f"Redis task TTL overridden from REDIS_TASK_TTL: {redis_task_ttl}s")
+        except ValueError:
+            logging.warning(f"Invalid REDIS_TASK_TTL value: {redis_task_ttl}, using default")
+
     return config
 
 def setup_logging(config: Dict) -> None:
@@ -69,6 +180,17 @@ def decode_redis_hash(hash_data: Dict[bytes, bytes]) -> Dict[str, str]:
     """Decode Redis hash data from bytes to strings."""
     return {k.decode('utf-8'): v.decode('utf-8') for k, v in hash_data.items()}
 
+
+def get_redis_task_ttl(config: Dict) -> int:
+    """Get Redis task TTL in seconds from config.
+
+    Args:
+        config: The application configuration dictionary
+
+    Returns:
+        TTL in seconds (default 3600). Returns 0 if TTL is disabled.
+    """
+    return config.get("redis", {}).get("task_ttl_seconds", 3600)
 
 
 def get_llm_api_key(config: Dict, provider: Optional[str] = None) -> Optional[str]:

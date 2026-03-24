@@ -1,7 +1,7 @@
 FROM python:3.12-slim-bookworm AS build
 
 # C4ai version
-ARG C4AI_VER=0.8.0
+ARG C4AI_VER=0.8.5
 ENV C4AI_VERSION=$C4AI_VER
 LABEL c4ai.version=$C4AI_VER
 
@@ -27,9 +27,23 @@ ARG INSTALL_TYPE=default
 ARG ENABLE_GPU=false
 ARG TARGETARCH
 
+# Redis version — pinned to a CVE-patched release by default.
+# Override with --build-arg REDIS_VERSION="" for latest, or
+# --build-arg REDIS_VERSION="6:7.2.7-1rl1~bookworm1" for a specific version.
+ARG REDIS_VERSION="6:7.2.7-1rl1~bookworm1"
+
 LABEL maintainer="unclecode"
 LABEL description="🔥🕷️ Crawl4AI: Open-source LLM Friendly Web Crawler & scraper"
 LABEL version="1.0"
+
+# Install curl and gnupg first (needed to add Redis repo)
+RUN apt-get update && apt-get install -y --no-install-recommends curl gnupg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add official Redis repository for security-patched versions
+RUN curl -fsSL https://packages.redis.io/gpg | gpg --dearmor -o /usr/share/keyrings/redis-archive-keyring.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb bookworm main" \
+    > /etc/apt/sources.list.d/redis.list
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -41,7 +55,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     python3-dev \
     libjpeg-dev \
-    redis-server \
+    redis-tools${REDIS_VERSION:+=$REDIS_VERSION} \
+    redis-server${REDIS_VERSION:+=$REDIS_VERSION} \
     supervisor \
     && apt-get clean \ 
     && rm -rf /var/lib/apt/lists/*

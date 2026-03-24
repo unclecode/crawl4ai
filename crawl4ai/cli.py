@@ -15,15 +15,15 @@ from rich.prompt import Prompt, Confirm
 
 from crawl4ai import (
     CacheMode,
-    AsyncWebCrawler, 
+    AsyncWebCrawler,
     CrawlResult,
-    BrowserConfig, 
+    BrowserConfig,
     CrawlerRunConfig,
-    LLMExtractionStrategy, 
+    LLMExtractionStrategy,
     LXMLWebScrapingStrategy,
     JsonCssExtractionStrategy,
     JsonXPathExtractionStrategy,
-    BM25ContentFilter, 
+    BM25ContentFilter,
     PruningContentFilter,
     BrowserProfiler,
     DefaultMarkdownGenerator,
@@ -32,7 +32,9 @@ from crawl4ai import (
     DFSDeepCrawlStrategy,
     BestFirstCrawlingStrategy,
 )
+from crawl4ai.browser_profiler import ShrinkLevel, _format_size
 from crawl4ai.config import USER_SETTINGS
+from crawl4ai.cloud import cloud_cmd
 from litellm import completion
 from pathlib import Path
 
@@ -53,7 +55,7 @@ def get_global_config() -> dict:
 
 def save_global_config(config: dict):
     config_file = Path.home() / ".crawl4ai" / "global.yml"
-    with open(config_file, "w") as f:
+    with open(config_file, "w", encoding="utf-8") as f:
         yaml.dump(config, f)
 
 def setup_llm_config() -> tuple[str, str]:
@@ -521,11 +523,15 @@ async def crawl_with_profile_cli(profile_path, url):
         # Run the crawler
         result = await run_crawler(url, browser_cfg, crawler_cfg, True)
         
+        # Get JSON output config
+        config = get_global_config()
+        ensure_ascii = config.get("JSON_ENSURE_ASCII", USER_SETTINGS["JSON_ENSURE_ASCII"]["default"])
+
         # Handle output
         if output_format == "all":
-            console.print(json.dumps(result.model_dump(), indent=2))
+            console.print(json.dumps(result.model_dump(), indent=2, ensure_ascii=ensure_ascii))
         elif output_format == "json":
-            console.print(json.dumps(json.loads(result.extracted_content), indent=2))
+            console.print(json.dumps(json.loads(result.extracted_content), indent=2, ensure_ascii=ensure_ascii))
         elif output_format in ["markdown", "md"]:
             console.print(result.markdown.raw_markdown)
         elif output_format == "title":
@@ -623,6 +629,9 @@ async def manage_profiles():
 def cli():
     """Crawl4AI CLI - Web content extraction and browser profile management tool"""
     pass
+
+# Add cloud command group
+cli.add_command(cloud_cmd)
 
 
 @cli.group("browser")
@@ -1019,11 +1028,12 @@ def cdp_cmd(user_data_dir: Optional[str], port: int, browser_type: str, headless
 @click.option("--profile", "-p", help="Use a specific browser profile (by name)")
 @click.option("--deep-crawl", type=click.Choice(["bfs", "dfs", "best-first"]), help="Enable deep crawling with specified strategy (bfs, dfs, or best-first)")
 @click.option("--max-pages", type=int, default=10, help="Maximum number of pages to crawl in deep crawl mode")
-def crawl_cmd(url: str, browser_config: str, crawler_config: str, filter_config: str, 
+@click.option("--json-ensure-ascii/--no-json-ensure-ascii", default=None, help="Escape non-ASCII characters in JSON output (default: from global config)")
+def crawl_cmd(url: str, browser_config: str, crawler_config: str, filter_config: str,
            extraction_config: str, json_extract: str, schema: str, browser: Dict, crawler: Dict,
-           output: str, output_file: str, bypass_cache: bool, question: str, verbose: bool, profile: str, deep_crawl: str, max_pages: int):
+           output: str, output_file: str, bypass_cache: bool, question: str, verbose: bool, profile: str, deep_crawl: str, max_pages: int, json_ensure_ascii: Optional[bool]):
     """Crawl a website and extract content
-    
+
     Simple Usage:
         crwl crawl https://example.com
     """
@@ -1186,7 +1196,13 @@ Always return valid, properly formatted JSON."""
         
         browser_cfg.verbose = config.get("VERBOSE", False)
         crawler_cfg.verbose = config.get("VERBOSE", False)
-        
+
+        # Get JSON output config (priority: CLI flag > global config)
+        if json_ensure_ascii is not None:
+            ensure_ascii = json_ensure_ascii
+        else:
+            ensure_ascii = config.get("JSON_ENSURE_ASCII", USER_SETTINGS["JSON_ENSURE_ASCII"]["default"])
+
         # Run crawler
         result : CrawlResult = anyio.run(
             run_crawler,
@@ -1221,35 +1237,59 @@ Always return valid, properly formatted JSON."""
             if output == "all":
                 if isinstance(result, list):
                     output_data = [r.model_dump() for r in all_results]
-                    click.echo(json.dumps(output_data, indent=2))
+                    click.echo(json.dumps(output_data, indent=2, ensure_ascii=ensure_ascii))
                 else:
-                    click.echo(json.dumps(main_result.model_dump(), indent=2))
+                    click.echo(json.dumps(main_result.model_dump(), indent=2, ensure_ascii=ensure_ascii))
             elif output == "json":
                 print(main_result.extracted_content)
                 extracted_items = json.loads(main_result.extracted_content)
-                click.echo(json.dumps(extracted_items, indent=2))
-                
+                click.echo(json.dumps(extracted_items, indent=2, ensure_ascii=ensure_ascii))
+
             elif output in ["markdown", "md"]:
-                click.echo(main_result.markdown.raw_markdown)
+                if isinstance(result, list):
+                    # Combine markdown from all crawled pages for deep crawl
+                    for r in all_results:
+                        click.echo(f"\n\n{'='*60}\n# {r.url}\n{'='*60}\n\n")
+                        click.echo(r.markdown.raw_markdown)
+                else:
+                    click.echo(main_result.markdown.raw_markdown)
             elif output in ["markdown-fit", "md-fit"]:
-                click.echo(main_result.markdown.fit_markdown)
+                if isinstance(result, list):
+                    # Combine fit markdown from all crawled pages for deep crawl
+                    for r in all_results:
+                        click.echo(f"\n\n{'='*60}\n# {r.url}\n{'='*60}\n\n")
+                        click.echo(r.markdown.fit_markdown)
+                else:
+                    click.echo(main_result.markdown.fit_markdown)
         else:
             if output == "all":
-                with open(output_file, "w") as f:
+                with open(output_file, "w", encoding="utf-8") as f:
                     if isinstance(result, list):
                         output_data = [r.model_dump() for r in all_results]
-                        f.write(json.dumps(output_data, indent=2))
+                        f.write(json.dumps(output_data, indent=2, ensure_ascii=ensure_ascii))
                     else:
-                        f.write(json.dumps(main_result.model_dump(), indent=2))
+                        f.write(json.dumps(main_result.model_dump(), indent=2, ensure_ascii=ensure_ascii))
             elif output == "json":
-                with open(output_file, "w") as f:
+                with open(output_file, "w", encoding="utf-8") as f:
                     f.write(main_result.extracted_content)
             elif output in ["markdown", "md"]:
-                with open(output_file, "w") as f:
-                    f.write(main_result.markdown.raw_markdown)
+                with open(output_file, "w", encoding="utf-8") as f:
+                    if isinstance(result, list):
+                        # Combine markdown from all crawled pages for deep crawl
+                        for r in all_results:
+                            f.write(f"\n\n{'='*60}\n# {r.url}\n{'='*60}\n\n")
+                            f.write(r.markdown.raw_markdown)
+                    else:
+                        f.write(main_result.markdown.raw_markdown)
             elif output in ["markdown-fit", "md-fit"]:
-                with open(output_file, "w") as f:
-                    f.write(main_result.markdown.fit_markdown)
+                with open(output_file, "w", encoding="utf-8") as f:
+                    if isinstance(result, list):
+                        # Combine fit markdown from all crawled pages for deep crawl
+                        for r in all_results:
+                            f.write(f"\n\n{'='*60}\n# {r.url}\n{'='*60}\n\n")
+                            f.write(r.markdown.fit_markdown)
+                    else:
+                        f.write(main_result.markdown.fit_markdown)
             
     except Exception as e:
         raise click.ClickException(str(e))
@@ -1373,17 +1413,159 @@ def config_set_cmd(key: str, value: str):
         
     console.print(f"[green]Successfully set[/green] [cyan]{key}[/cyan] = [green]{display_value}[/green]")
 
-@cli.command("profiles")
-def profiles_cmd():
-    """Manage browser profiles interactively
-    
+@cli.group("profiles", invoke_without_command=True)
+@click.pass_context
+def profiles_cmd(ctx):
+    """Manage browser profiles for authenticated crawling
+
     Launch an interactive browser profile manager where you can:
     - List all existing profiles
     - Create new profiles for authenticated browsing
     - Delete unused profiles
+
+    Subcommands:
+      crwl profiles create <name>  - Create a new profile
+      crwl profiles list           - List all profiles
+      crwl profiles delete <name>  - Delete a profile
+
+    Or run without subcommand for interactive menu:
+      crwl profiles
     """
-    # Run interactive profile manager
-    anyio.run(manage_profiles)
+    # If no subcommand provided, run interactive manager
+    if ctx.invoked_subcommand is None:
+        anyio.run(manage_profiles)
+
+
+@profiles_cmd.command("create")
+@click.argument("name")
+def profiles_create_cmd(name: str):
+    """Create a new browser profile
+
+    Opens a browser window for you to log in and set up your identity.
+    Press 'q' in the terminal when finished to save the profile.
+
+    Example:
+      crwl profiles create github-auth
+    """
+    profiler = BrowserProfiler()
+    console.print(Panel(f"[bold cyan]Creating Profile: {name}[/bold cyan]\n"
+                      "A browser window will open for you to set up your identity.\n"
+                      "Log in to sites, adjust settings, then press 'q' to save.",
+                      border_style="cyan"))
+
+    async def _create():
+        try:
+            profile_path = await profiler.create_profile(name)
+            if profile_path:
+                console.print(f"[green]Profile successfully created at:[/green] {profile_path}")
+            else:
+                console.print("[red]Failed to create profile.[/red]")
+                sys.exit(1)
+        except Exception as e:
+            console.print(f"[red]Error creating profile: {str(e)}[/red]")
+            sys.exit(1)
+
+    anyio.run(_create)
+
+
+@profiles_cmd.command("list")
+def profiles_list_cmd():
+    """List all browser profiles
+
+    Example:
+      crwl profiles list
+    """
+    profiler = BrowserProfiler()
+    profiles = profiler.list_profiles()
+    display_profiles_table(profiles)
+
+
+@profiles_cmd.command("delete")
+@click.argument("name")
+@click.option("--force", "-f", is_flag=True, help="Skip confirmation")
+def profiles_delete_cmd(name: str, force: bool):
+    """Delete a browser profile
+
+    Example:
+      crwl profiles delete old-profile
+      crwl profiles delete old-profile --force
+    """
+    profiler = BrowserProfiler()
+
+    # Find profile by name
+    profiles = profiler.list_profiles()
+    profile = next((p for p in profiles if p["name"] == name), None)
+
+    if not profile:
+        console.print(f"[red]Profile not found:[/red] {name}")
+        sys.exit(1)
+
+    if not force:
+        if not Confirm.ask(f"[yellow]Delete profile '{name}'?[/yellow]"):
+            console.print("[cyan]Cancelled.[/cyan]")
+            return
+
+    try:
+        profiler.delete_profile(name)
+        console.print(f"[green]Profile '{name}' deleted successfully.[/green]")
+    except Exception as e:
+        console.print(f"[red]Error deleting profile: {str(e)}[/red]")
+        sys.exit(1)
+
+
+@cli.command("shrink")
+@click.argument("profile_name")
+@click.option(
+    "--level", "-l",
+    type=click.Choice(["light", "medium", "aggressive", "minimal"]),
+    default="aggressive",
+    help="Shrink level (default: aggressive)"
+)
+@click.option("--dry-run", "-n", is_flag=True, help="Preview without removing files")
+def shrink_cmd(profile_name: str, level: str, dry_run: bool):
+    """Shrink a browser profile to reduce storage.
+
+    Removes cache, history, and other non-essential data while preserving
+    authentication (cookies, localStorage, IndexedDB).
+
+    Shrink levels:
+      light      - Remove caches only
+      medium     - Remove caches + history
+      aggressive - Keep only auth data (recommended)
+      minimal    - Keep only cookies + localStorage
+
+    Examples:
+      crwl shrink my_profile
+      crwl shrink my_profile --level minimal
+      crwl shrink my_profile --dry-run
+    """
+    profiler = BrowserProfiler()
+
+    try:
+        result = profiler.shrink(profile_name, ShrinkLevel(level), dry_run)
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        sys.exit(1)
+
+    # Display results
+    action = "Would remove" if dry_run else "Removed"
+    console.print(f"\n[cyan]Shrink Results ({level.upper()}):[/cyan]")
+    console.print(f"  {action}: {len(result['removed'])} items")
+    console.print(f"  Kept: {len(result['kept'])} items")
+    console.print(f"  Space freed: {_format_size(result['bytes_freed'])}")
+
+    if result.get("size_before"):
+        console.print(f"  Size before: {_format_size(result['size_before'])}")
+    if result.get("size_after"):
+        console.print(f"  Size after: {_format_size(result['size_after'])}")
+
+    if result["errors"]:
+        console.print(f"\n[red]Errors ({len(result['errors'])}):[/red]")
+        for err in result["errors"]:
+            console.print(f"  - {err}")
+
+    if dry_run:
+        console.print("\n[yellow]Dry run - no files were actually removed.[/yellow]")
 
 @cli.command(name="")
 @click.argument("url", required=False)
@@ -1403,9 +1585,10 @@ def profiles_cmd():
 @click.option("--profile", "-p", help="Use a specific browser profile (by name)")
 @click.option("--deep-crawl", type=click.Choice(["bfs", "dfs", "best-first"]), help="Enable deep crawling with specified strategy")
 @click.option("--max-pages", type=int, default=10, help="Maximum number of pages to crawl in deep crawl mode")
-def default(url: str, example: bool, browser_config: str, crawler_config: str, filter_config: str, 
+@click.option("--json-ensure-ascii/--no-json-ensure-ascii", default=None, help="Escape non-ASCII characters in JSON output (default: from global config)")
+def default(url: str, example: bool, browser_config: str, crawler_config: str, filter_config: str,
         extraction_config: str, json_extract: str, schema: str, browser: Dict, crawler: Dict,
-        output: str, bypass_cache: bool, question: str, verbose: bool, profile: str, deep_crawl: str, max_pages: int):
+        output: str, bypass_cache: bool, question: str, verbose: bool, profile: str, deep_crawl: str, max_pages: int, json_ensure_ascii: Optional[bool]):
     """Crawl4AI CLI - Web content extraction tool
 
     Simple Usage:
@@ -1457,7 +1640,8 @@ def default(url: str, example: bool, browser_config: str, crawler_config: str, f
         verbose=verbose,
         profile=profile,
         deep_crawl=deep_crawl,
-        max_pages=max_pages
+        max_pages=max_pages,
+        json_ensure_ascii=json_ensure_ascii
     )
 
 def main():

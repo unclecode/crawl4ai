@@ -204,7 +204,9 @@ llm_strategy.show_usage()
 # e.g. “Total usage: 1241 tokens across 2 chunk calls”
 ```
 
-If your model provider doesn’t return usage info, these fields might be partial or empty.
+If your model provider doesn't return usage info, these fields might be partial or empty.
+
+> **Tip:** `JsonCssExtractionStrategy.generate_schema()` also supports token usage tracking via an optional `usage` parameter. See [Token Usage Tracking in Schema Generation](./no-llm-strategies.md#token-usage-tracking) for details.
 
 ---
 

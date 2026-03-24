@@ -112,6 +112,7 @@ if __name__ == "__main__":
 **Relevant Parameters**  
 - **`pdf=True`**: Exports the current page as a PDF (base64-encoded in `result.pdf`).  
 - **`screenshot=True`**: Creates a screenshot (base64-encoded in `result.screenshot`).  
+- **`scroll_delay`**: Controls the delay (seconds) between scroll steps when taking a full-page screenshot of a tall page. Defaults to `0.2`. Increase for pages with slow-loading assets.  
 - **`scan_full_page`** or advanced hooking can further refine how the crawler captures content.
 
 ---

@@ -695,24 +695,57 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                 meta = {}
 
             content_element = None
+            if css_selector:
+                try:
+                    selected = body.cssselect(css_selector)
+                    if selected:
+                        content_element = lhtml.Element("div")
+                        content_element.extend(copy.deepcopy(selected))
+                    else:
+                        content_element = body
+                except Exception as e:
+                    self._log("error", f"Error with css_selector: {str(e)}", "SCRAPE")
+                    content_element = body
+
             if target_elements:
                 try:
+                    source = content_element if content_element is not None else body
                     for_content_targeted_element = []
                     for target_element in target_elements:
-                        for_content_targeted_element.extend(body.cssselect(target_element))
+                        for_content_targeted_element.extend(source.cssselect(target_element))
                     content_element = lhtml.Element("div")
                     content_element.extend(copy.deepcopy(for_content_targeted_element))
                 except Exception as e:
                     self._log("error", f"Error with target element detection: {str(e)}", "SCRAPE")
                     return None
-            else:
+            elif content_element is None:
                 content_element = body
 
             # Remove script and style tags
-            for tag in ["script", "style", "link", "meta", "noscript"]:
+            for tag in ["style", "link", "meta", "noscript"]:
                 for element in body.xpath(f".//{tag}"):
                     if element.getparent() is not None:
                         element.getparent().remove(element)
+                        
+            # Handle script separately
+            for element in body.xpath(f".//script"):
+                parent = element.getparent()
+                if parent is not None:
+                    tail = element.tail  # Get the tail text
+                    if tail:
+                        prev = element.getprevious()  # Get the previous sibling node
+                        if prev is not None:
+                            if prev.tail:
+                                prev.tail += tail 
+                            else:
+                                prev.tail = tail
+                        else:
+                            if parent.text:
+                                parent.text += tail
+                            else:
+                                parent.text = tail
+                    parent.remove(element)  # Delete the element
+
 
             # Handle social media and domain exclusions
             kwargs["exclude_domains"] = set(kwargs.get("exclude_domains", []))

@@ -1,6 +1,6 @@
 import asyncio
 import time
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 import os
 import sys
 import shutil
@@ -70,9 +70,6 @@ class ManagedBrowser:
     def build_browser_flags(config: BrowserConfig) -> List[str]:
         """Common CLI flags for launching Chromium"""
         flags = [
-            "--disable-gpu",
-            "--disable-gpu-compositing",
-            "--disable-software-rasterizer",
             "--no-sandbox",
             "--disable-dev-shm-usage",
             "--no-first-run",
@@ -88,7 +85,24 @@ class ManagedBrowser:
             "--force-color-profile=srgb",
             "--mute-audio",
             "--disable-background-timer-throttling",
+            # Memory-saving flags: disable unused Chrome features
+            "--disable-features=OptimizationHints,MediaRouter,DialMediaRouteProvider",
+            "--disable-component-update",
+            "--disable-domain-reliability",
         ]
+        # GPU flags disable WebGL which anti-bot sensors detect as headless.
+        # Keep WebGL working (via SwiftShader) when stealth mode is active.
+        if not config.enable_stealth:
+            flags.extend([
+                "--disable-gpu",
+                "--disable-gpu-compositing",
+                "--disable-software-rasterizer",
+            ])
+        if config.memory_saving_mode:
+            flags.extend([
+                "--aggressive-cache-discard",
+                '--js-flags=--max-old-space-size=512',
+            ])
         if config.light_mode:
             flags.extend(BROWSER_DISABLE_OPTIONS)
         if config.text_mode:
@@ -100,14 +114,13 @@ class ManagedBrowser:
                 "--disable-software-rasterizer",
                 "--disable-dev-shm-usage",
             ])
-        # proxy support
+        # proxy support — only pass server URL, never credentials.
+        # Chromium's --proxy-server flag silently ignores inline user:pass@.
+        # Auth credentials are handled at the Playwright context level instead.
         if config.proxy:
             flags.append(f"--proxy-server={config.proxy}")
         elif config.proxy_config:
-            creds = ""
-            if config.proxy_config.username and config.proxy_config.password:
-                creds = f"{config.proxy_config.username}:{config.proxy_config.password}@"
-            flags.append(f"--proxy-server={creds}{config.proxy_config.server}")
+            flags.append(f"--proxy-server={config.proxy_config.server}")
         # dedupe
         return list(dict.fromkeys(flags))
 
@@ -199,12 +212,18 @@ class ManagedBrowser:
                         p.wait(timeout=5)
             else:  # macOS / Linux
                 # kill any process listening on the same debugging port
-                pids = (
-                    subprocess.check_output(shlex.split(f"lsof -t -i:{self.debugging_port}"))
-                    .decode()
-                    .strip()
-                    .splitlines()
-                )
+                try:
+                    pids = (
+                        subprocess.check_output(
+                            shlex.split(f"lsof -t -i:{self.debugging_port}"),
+                            stderr=subprocess.DEVNULL,
+                        )
+                        .decode()
+                        .strip()
+                        .splitlines()
+                    )
+                except (FileNotFoundError, subprocess.CalledProcessError):
+                    pids = []
                 for pid in pids:
                     try:
                         os.kill(int(pid), signal.SIGTERM)
@@ -408,13 +427,17 @@ class ManagedBrowser:
                     # Force kill if still running
                     if self.browser_process.poll() is None:
                         if sys.platform == "win32":
-                            # On Windows we might need taskkill for detached processes
+                            # On Windows, use taskkill /T to kill the entire process tree
                             try:
-                                subprocess.run(["taskkill", "/F", "/PID", str(self.browser_process.pid)])
+                                subprocess.run(["taskkill", "/F", "/T", "/PID", str(self.browser_process.pid)])
                             except Exception:
                                 self.browser_process.kill()
                         else:
-                            self.browser_process.kill()
+                            # On Unix, kill entire process group to reap child processes
+                            try:
+                                os.killpg(os.getpgid(self.browser_process.pid), signal.SIGKILL)
+                            except (ProcessLookupError, OSError):
+                                pass
                         await asyncio.sleep(0.1)  # Brief wait for kill to take effect
 
             except Exception as e:
@@ -559,6 +582,91 @@ async def clone_runtime_state(
 
 
 
+class _CDPConnectionCache:
+    """
+    Class-level cache for Playwright + CDP browser connections.
+
+    When enabled via BrowserConfig(cache_cdp_connection=True), multiple
+    BrowserManager instances connecting to the same cdp_url will share
+    a single Playwright subprocess and CDP WebSocket. Reference-counted;
+    the connection is closed when the last user releases it.
+    """
+
+    _cache: Dict[str, Tuple] = {}  # cdp_url -> (playwright, browser, ref_count)
+    _lock: Optional[asyncio.Lock] = None  # lazy-init to avoid event loop issues
+    _lock_loop: Optional[asyncio.AbstractEventLoop] = None
+
+    @classmethod
+    def _get_lock(cls) -> asyncio.Lock:
+        loop = asyncio.get_running_loop()
+        if cls._lock is None or cls._lock_loop is not loop:
+            cls._lock = asyncio.Lock()
+            cls._lock_loop = loop
+        return cls._lock
+
+    @classmethod
+    async def acquire(cls, cdp_url: str, use_undetected: bool = False):
+        """Get or create a cached (playwright, browser) for this cdp_url."""
+        async with cls._get_lock():
+            if cdp_url in cls._cache:
+                pw, browser, count = cls._cache[cdp_url]
+                if browser.is_connected():
+                    cls._cache[cdp_url] = (pw, browser, count + 1)
+                    return pw, browser
+                # Stale connection — clean up and fall through to create new
+                try:
+                    await pw.stop()
+                except Exception:
+                    pass
+                del cls._cache[cdp_url]
+
+            # Create new connection
+            if use_undetected:
+                from patchright.async_api import async_playwright
+            else:
+                from playwright.async_api import async_playwright
+            pw = await async_playwright().start()
+            browser = await pw.chromium.connect_over_cdp(cdp_url)
+            cls._cache[cdp_url] = (pw, browser, 1)
+            return pw, browser
+
+    @classmethod
+    async def release(cls, cdp_url: str):
+        """Decrement ref count; close connection when last user releases."""
+        async with cls._get_lock():
+            if cdp_url not in cls._cache:
+                return
+            pw, browser, count = cls._cache[cdp_url]
+            if count <= 1:
+                try:
+                    await browser.close()
+                except Exception:
+                    pass
+                try:
+                    await pw.stop()
+                except Exception:
+                    pass
+                del cls._cache[cdp_url]
+            else:
+                cls._cache[cdp_url] = (pw, browser, count - 1)
+
+    @classmethod
+    async def close_all(cls):
+        """Force-close all cached connections. Call on application shutdown."""
+        async with cls._get_lock():
+            for cdp_url in list(cls._cache.keys()):
+                pw, browser, _ = cls._cache[cdp_url]
+                try:
+                    await browser.close()
+                except Exception:
+                    pass
+                try:
+                    await pw.stop()
+                except Exception:
+                    pass
+            cls._cache.clear()
+
+
 class BrowserManager:
     """
     Manages the browser instance and context.
@@ -575,7 +683,20 @@ class BrowserManager:
     """
 
     _playwright_instance = None
-    
+
+    # Class-level tracking of pages in use, keyed by browser endpoint (CDP URL or instance id)
+    # This ensures multiple BrowserManager instances connecting to the same browser
+    # share the same page tracking, preventing race conditions.
+    _global_pages_in_use: dict = {}  # endpoint_key -> set of pages
+    _global_pages_lock: asyncio.Lock = None  # Initialized lazily
+
+    @classmethod
+    def _get_global_lock(cls) -> asyncio.Lock:
+        """Get or create the global pages lock (lazy initialization for async context)."""
+        if cls._global_pages_lock is None:
+            cls._global_pages_lock = asyncio.Lock()
+        return cls._global_pages_lock
+
     @classmethod
     async def get_playwright(cls, use_undetected: bool = False):
         if use_undetected:
@@ -603,6 +724,8 @@ class BrowserManager:
         self.default_context = None
         self.managed_browser = None
         self.playwright = None
+        self._using_cached_cdp = False
+        self._launched_persistent = False  # True when using launch_persistent_context
 
         # Session management
         self.sessions = {}
@@ -611,12 +734,30 @@ class BrowserManager:
         # Keep track of contexts by a "config signature," so each unique config reuses a single context
         self.contexts_by_config = {}
         self._contexts_lock = asyncio.Lock()
-        
+
+        # Context lifecycle tracking for LRU eviction
+        self._context_refcounts = {}    # sig -> int  (active crawls using this context)
+        self._context_last_used = {}    # sig -> float (monotonic timestamp for LRU)
+        self._page_to_sig = {}          # page -> sig  (for decrement lookup on release)
+        self._max_contexts = 20         # LRU eviction threshold
+
         # Serialize context.new_page() across concurrent tasks to avoid races
         # when using a shared persistent context (context.pages may be empty
         # for all racers). Prevents 'Target page/context closed' errors.
         self._page_lock = asyncio.Lock()
-        
+
+        # Browser endpoint key for global page tracking (set after browser starts)
+        self._browser_endpoint_key: Optional[str] = None
+
+        # Browser recycling state (version-based approach)
+        self._pages_served = 0
+        self._browser_version = 1  # included in signature, bump to create new browser
+        self._pending_cleanup = {}  # old_sig -> {"browser": browser, "contexts": [...], "done": Event}
+        self._pending_cleanup_lock = asyncio.Lock()
+        self._max_pending_browsers = 3  # safety cap — block if too many draining
+        self._cleanup_slot_available = asyncio.Event()
+        self._cleanup_slot_available.set()  # starts open
+
         # Stealth adapter for stealth mode
         self._stealth_adapter = None
         if self.config.enable_stealth and not self.use_undetected:
@@ -649,24 +790,106 @@ class BrowserManager:
         """
         if self.playwright is not None:
             await self.close()
-            
-        if self.use_undetected:
-            from patchright.async_api import async_playwright
-        else:
-            from playwright.async_api import async_playwright
 
-        # Initialize playwright
-        self.playwright = await async_playwright().start()
+        # Use cached CDP connection if enabled and cdp_url is set
+        if self.config.cache_cdp_connection and self.config.cdp_url:
+            self._using_cached_cdp = True
+            self.config.use_managed_browser = True
+            self.playwright, self.browser = await _CDPConnectionCache.acquire(
+                self.config.cdp_url, self.use_undetected
+            )
+        else:
+            self._using_cached_cdp = False
+            if self.use_undetected:
+                from patchright.async_api import async_playwright
+            else:
+                from playwright.async_api import async_playwright
+
+            # Initialize playwright
+            self.playwright = await async_playwright().start()
+
+        # ── Persistent context via Playwright's native API ──────────────
+        # When use_persistent_context is set and we're not connecting to an
+        # external CDP endpoint, use launch_persistent_context() instead of
+        # subprocess + CDP.  This properly supports proxy authentication
+        # (server + username + password) which the --proxy-server CLI flag
+        # cannot handle.
+        if (
+            self.config.use_persistent_context
+            and not self.config.cdp_url
+            and not self._using_cached_cdp
+        ):
+            # Collect stealth / optimization CLI flags, excluding ones that
+            # launch_persistent_context handles via keyword arguments.
+            _skip_prefixes = (
+                "--proxy-server",
+                "--remote-debugging-port",
+                "--user-data-dir",
+                "--headless",
+                "--window-size",
+            )
+            cli_args = [
+                flag
+                for flag in ManagedBrowser.build_browser_flags(self.config)
+                if not flag.startswith(_skip_prefixes)
+            ]
+            if self.config.extra_args:
+                cli_args.extend(self.config.extra_args)
+
+            launch_kwargs = {
+                "headless": self.config.headless,
+                "args": list(dict.fromkeys(cli_args)),  # dedupe
+                "viewport": {
+                    "width": self.config.viewport_width,
+                    "height": self.config.viewport_height,
+                },
+                "user_agent": self.config.user_agent or None,
+                "ignore_https_errors": self.config.ignore_https_errors,
+                "accept_downloads": self.config.accept_downloads,
+            }
+
+            if self.config.proxy_config:
+                launch_kwargs["proxy"] = {
+                    "server": self.config.proxy_config.server,
+                    "username": self.config.proxy_config.username,
+                    "password": self.config.proxy_config.password,
+                }
+
+            if self.config.storage_state:
+                launch_kwargs["storage_state"] = self.config.storage_state
+
+            user_data_dir = self.config.user_data_dir or tempfile.mkdtemp(
+                prefix="crawl4ai-persistent-"
+            )
+
+            self.default_context = (
+                await self.playwright.chromium.launch_persistent_context(
+                    user_data_dir, **launch_kwargs
+                )
+            )
+            self.browser = None  # persistent context has no separate Browser
+            self._launched_persistent = True
+
+            await self.setup_context(self.default_context)
+
+            # Set the browser endpoint key for global page tracking
+            self._browser_endpoint_key = self._compute_browser_endpoint_key()
+            if self._browser_endpoint_key not in BrowserManager._global_pages_in_use:
+                BrowserManager._global_pages_in_use[self._browser_endpoint_key] = set()
+            return
 
         if self.config.cdp_url or self.config.use_managed_browser:
             self.config.use_managed_browser = True
-            cdp_url = await self.managed_browser.start() if not self.config.cdp_url else self.config.cdp_url
 
-            # Add CDP endpoint verification before connecting
-            if not await self._verify_cdp_ready(cdp_url):
-                raise Exception(f"CDP endpoint at {cdp_url} is not ready after startup")
+            if not self._using_cached_cdp:
+                cdp_url = await self.managed_browser.start() if not self.config.cdp_url else self.config.cdp_url
 
-            self.browser = await self.playwright.chromium.connect_over_cdp(cdp_url)
+                # Add CDP endpoint verification before connecting
+                if not await self._verify_cdp_ready(cdp_url):
+                    raise Exception(f"CDP endpoint at {cdp_url} is not ready after startup")
+
+                self.browser = await self.playwright.chromium.connect_over_cdp(cdp_url)
+
             contexts = self.browser.contexts
 
             # If browser_context_id is provided, we're using a pre-created context
@@ -715,6 +938,77 @@ class BrowserManager:
                 self.browser = await self.playwright.chromium.launch(**browser_args)
 
             self.default_context = self.browser
+
+        # Set the browser endpoint key for global page tracking
+        self._browser_endpoint_key = self._compute_browser_endpoint_key()
+        # Initialize global tracking set for this endpoint if needed
+        if self._browser_endpoint_key not in BrowserManager._global_pages_in_use:
+            BrowserManager._global_pages_in_use[self._browser_endpoint_key] = set()
+
+    def _compute_browser_endpoint_key(self) -> str:
+        """
+        Compute a unique key identifying this browser connection.
+
+        For CDP connections, uses the normalized CDP URL so all BrowserManager
+        instances connecting to the same browser share page tracking.
+        For standalone browsers, uses instance id since each is independent.
+
+        Returns:
+            str: Unique identifier for this browser connection
+        """
+        # For CDP connections, use the CDP URL as the key (normalized)
+        if self.config.cdp_url:
+            return self._normalize_cdp_url(self.config.cdp_url)
+
+        # For managed browsers, use the CDP URL/port that was assigned
+        if self.managed_browser:
+            # Use debugging port as the key since it uniquely identifies the browser
+            port = getattr(self.managed_browser, 'debugging_port', None)
+            host = getattr(self.managed_browser, 'host', 'localhost')
+            if port:
+                return f"cdp:http://{host}:{port}"
+
+        # For standalone browsers, use instance id (no sharing needed)
+        return f"instance:{id(self)}"
+
+    def _normalize_cdp_url(self, cdp_url: str) -> str:
+        """
+        Normalize a CDP URL to a canonical form for consistent tracking.
+
+        Handles various formats:
+        - http://localhost:9222
+        - ws://localhost:9222/devtools/browser/xxx
+        - http://localhost:9222?browser_id=xxx
+
+        Returns:
+            str: Normalized CDP key in format "cdp:http://host:port"
+        """
+        from urllib.parse import urlparse
+
+        parsed = urlparse(cdp_url)
+        host = parsed.hostname or 'localhost'
+        port = parsed.port or 9222
+
+        return f"cdp:http://{host}:{port}"
+
+    def _get_pages_in_use(self) -> set:
+        """Get the set of pages currently in use for this browser."""
+        if self._browser_endpoint_key and self._browser_endpoint_key in BrowserManager._global_pages_in_use:
+            return BrowserManager._global_pages_in_use[self._browser_endpoint_key]
+        # Fallback: shouldn't happen, but return empty set
+        return set()
+
+    def _mark_page_in_use(self, page) -> None:
+        """Mark a page as in use."""
+        if self._browser_endpoint_key:
+            if self._browser_endpoint_key not in BrowserManager._global_pages_in_use:
+                BrowserManager._global_pages_in_use[self._browser_endpoint_key] = set()
+            BrowserManager._global_pages_in_use[self._browser_endpoint_key].add(page)
+
+    def _release_page_from_use(self, page) -> None:
+        """Release a page from the in-use tracking."""
+        if self._browser_endpoint_key and self._browser_endpoint_key in BrowserManager._global_pages_in_use:
+            BrowserManager._global_pages_in_use[self._browser_endpoint_key].discard(page)
 
     async def _verify_cdp_ready(self, cdp_url: str) -> bool:
         """Verify CDP endpoint is ready with exponential backoff.
@@ -781,9 +1075,19 @@ class BrowserManager:
             "--force-color-profile=srgb",
             "--mute-audio",
             "--disable-background-timer-throttling",
+            # Memory-saving flags: disable unused Chrome features
+            "--disable-features=OptimizationHints,MediaRouter,DialMediaRouteProvider",
+            "--disable-component-update",
+            "--disable-domain-reliability",
             # "--single-process",
             f"--window-size={self.config.viewport_width},{self.config.viewport_height}",
         ]
+
+        if self.config.memory_saving_mode:
+            args.extend([
+                "--aggressive-cache-discard",
+                '--js-flags=--max-old-space-size=512',
+            ])
 
         if self.config.light_mode:
             args.extend(BROWSER_DISABLE_OPTIONS)
@@ -925,6 +1229,17 @@ class BrowserManager:
                 or crawlerRunConfig.magic
             ):
                 await context.add_init_script(load_js_script("navigator_overrider"))
+                context._crawl4ai_nav_overrider_injected = True
+
+        # Force-open closed shadow roots when flatten_shadow_dom is enabled
+        if crawlerRunConfig and crawlerRunConfig.flatten_shadow_dom:
+            await context.add_init_script("""
+                const _origAttachShadow = Element.prototype.attachShadow;
+                Element.prototype.attachShadow = function(init) {
+                    return _origAttachShadow.call(this, {...init, mode: 'open'});
+                };
+            """)
+            context._crawl4ai_shadow_dom_injected = True
 
         # Apply custom init_scripts from BrowserConfig (for stealth evasions, etc.)
         if self.config.init_scripts:
@@ -939,6 +1254,12 @@ class BrowserManager:
         Returns:
             Context: Browser context object with the specified configurations
         """
+        if self.browser is None:
+            raise RuntimeError(
+                "Cannot create new browser contexts when using "
+                "use_persistent_context=True. Persistent context uses a "
+                "single shared context."
+            )
         # Base settings
         user_agent = self.config.headers.get("User-Agent", self.config.user_agent) 
         viewport_settings = {
@@ -947,59 +1268,47 @@ class BrowserManager:
         }
         proxy_settings = {"server": self.config.proxy} if self.config.proxy else None
 
-        blocked_extensions = [
+        # CSS extensions (blocked separately via avoid_css flag)
+        css_extensions = ["css", "less", "scss", "sass"]
+
+        # Static resource extensions (blocked when text_mode is enabled)
+        static_extensions = [
             # Images
-            "jpg",
-            "jpeg",
-            "png",
-            "gif",
-            "webp",
-            "svg",
-            "ico",
-            "bmp",
-            "tiff",
-            "psd",
+            "jpg", "jpeg", "png", "gif", "webp", "svg", "ico", "bmp", "tiff", "psd",
             # Fonts
-            "woff",
-            "woff2",
-            "ttf",
-            "otf",
-            "eot",
-            # Styles
-            # 'css', 'less', 'scss', 'sass',
+            "woff", "woff2", "ttf", "otf", "eot",
             # Media
-            "mp4",
-            "webm",
-            "ogg",
-            "avi",
-            "mov",
-            "wmv",
-            "flv",
-            "m4v",
-            "mp3",
-            "wav",
-            "aac",
-            "m4a",
-            "opus",
-            "flac",
+            "mp4", "webm", "ogg", "avi", "mov", "wmv", "flv", "m4v",
+            "mp3", "wav", "aac", "m4a", "opus", "flac",
             # Documents
-            "pdf",
-            "doc",
-            "docx",
-            "xls",
-            "xlsx",
-            "ppt",
-            "pptx",
+            "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
             # Archives
-            "zip",
-            "rar",
-            "7z",
-            "tar",
-            "gz",
+            "zip", "rar", "7z", "tar", "gz",
             # Scripts and data
-            "xml",
-            "swf",
-            "wasm",
+            "xml", "swf", "wasm",
+        ]
+
+        # Ad and tracker domain patterns (curated from uBlock/EasyList sources)
+        ad_tracker_patterns = [
+            "**/google-analytics.com/**",
+            "**/googletagmanager.com/**",
+            "**/googlesyndication.com/**",
+            "**/doubleclick.net/**",
+            "**/adservice.google.com/**",
+            "**/adsystem.com/**",
+            "**/adzerk.net/**",
+            "**/adnxs.com/**",
+            "**/ads.linkedin.com/**",
+            "**/facebook.net/**",
+            "**/analytics.twitter.com/**",
+            "**/ads-twitter.com/**",
+            "**/hotjar.com/**",
+            "**/clarity.ms/**",
+            "**/scorecardresearch.com/**",
+            "**/pixel.wp.com/**",
+            "**/amazon-adsystem.com/**",
+            "**/mixpanel.com/**",
+            "**/segment.com/**",
         ]
 
         # Common context settings
@@ -1010,21 +1319,19 @@ class BrowserManager:
             "accept_downloads": self.config.accept_downloads,
             "storage_state": self.config.storage_state,
             "ignore_https_errors": self.config.ignore_https_errors,
-            "device_scale_factor": 1.0,
+            "device_scale_factor": self.config.device_scale_factor,
             "java_script_enabled": self.config.java_script_enabled,
         }
         
         if crawlerRunConfig:
             # Check if there is value for crawlerRunConfig.proxy_config set add that to context
             if crawlerRunConfig.proxy_config:
-                proxy_settings = {
-                    "server": crawlerRunConfig.proxy_config.server,
-                }
-                if crawlerRunConfig.proxy_config.username:
-                    proxy_settings.update({
-                        "username": crawlerRunConfig.proxy_config.username,
-                        "password": crawlerRunConfig.proxy_config.password,
-                    })
+                from playwright.async_api import ProxySettings
+                proxy_settings = ProxySettings(
+                    server=crawlerRunConfig.proxy_config.server,
+                    username=crawlerRunConfig.proxy_config.username,
+                    password=crawlerRunConfig.proxy_config.password,
+                )
                 context_settings["proxy"] = proxy_settings
 
         if self.config.text_mode:
@@ -1055,48 +1362,103 @@ class BrowserManager:
         # Create and return the context with all settings
         context = await self.browser.new_context(**context_settings)
 
-        # Apply text mode settings if enabled
+        # Build dynamic blocking list based on config flags
+        to_block = []
+        if self.config.avoid_css:
+            to_block.extend(css_extensions)
         if self.config.text_mode:
-            # Create and apply route patterns for each extension
-            for ext in blocked_extensions:
+            to_block.extend(static_extensions)
+
+        if to_block:
+            for ext in to_block:
                 await context.route(f"**/*.{ext}", lambda route: route.abort())
+
+        if self.config.avoid_ads:
+            for pattern in ad_tracker_patterns:
+                await context.route(pattern, lambda route: route.abort())
+
         return context
 
     def _make_config_signature(self, crawlerRunConfig: CrawlerRunConfig) -> str:
         """
-        Converts the crawlerRunConfig into a dict, excludes ephemeral fields,
-        then returns a hash of the sorted JSON. This yields a stable signature
-        that identifies configurations requiring a unique browser context.
+        Hash ONLY the CrawlerRunConfig fields that affect browser context
+        creation (create_browser_context) or context setup (setup_context).
+
+        Whitelist approach: fields like css_selector, word_count_threshold,
+        screenshot, verbose, etc. do NOT cause a new context to be created.
         """
         import json
 
-        config_dict = crawlerRunConfig.__dict__.copy()
-        # Exclude items that do not affect browser-level setup.
-        # Expand or adjust as needed, e.g. chunking_strategy is purely for data extraction, not for browser config.
-        ephemeral_keys = [
-            "session_id",
-            "js_code",
-            "scraping_strategy",
-            "extraction_strategy",
-            "chunking_strategy",
-            "cache_mode",
-            "content_filter",
-            "semaphore_count",
-            "url"
-        ]
-        
-        # Do NOT exclude locale, timezone_id, or geolocation as these DO affect browser context
-        # and should cause a new context to be created if they change
-        
-        for key in ephemeral_keys:
-            if key in config_dict:
-                del config_dict[key]
-        # Convert to canonical JSON string
-        signature_json = json.dumps(config_dict, sort_keys=True, default=str)
+        sig_dict = {}
 
-        # Hash the JSON so we get a compact, unique string
-        signature_hash = hashlib.sha256(signature_json.encode("utf-8")).hexdigest()
-        return signature_hash
+        # Fields that flow into create_browser_context()
+        pc = crawlerRunConfig.proxy_config
+        if pc is not None:
+            sig_dict["proxy_config"] = {
+                "server": getattr(pc, "server", None),
+                "username": getattr(pc, "username", None),
+                "password": getattr(pc, "password", None),
+            }
+        else:
+            sig_dict["proxy_config"] = None
+
+        sig_dict["locale"] = crawlerRunConfig.locale
+        sig_dict["timezone_id"] = crawlerRunConfig.timezone_id
+
+        geo = crawlerRunConfig.geolocation
+        if geo is not None:
+            sig_dict["geolocation"] = {
+                "latitude": geo.latitude,
+                "longitude": geo.longitude,
+                "accuracy": geo.accuracy,
+            }
+        else:
+            sig_dict["geolocation"] = None
+
+        # Fields that flow into setup_context() as init scripts
+        sig_dict["override_navigator"] = crawlerRunConfig.override_navigator
+        sig_dict["simulate_user"] = crawlerRunConfig.simulate_user
+        sig_dict["magic"] = crawlerRunConfig.magic
+
+        # Browser version — bumped on recycle to force new browser instance
+        sig_dict["_browser_version"] = self._browser_version
+
+        signature_json = json.dumps(sig_dict, sort_keys=True, default=str)
+        return hashlib.sha256(signature_json.encode("utf-8")).hexdigest()
+
+    def _evict_lru_context_locked(self):
+        """
+        If contexts exceed the limit, find the least-recently-used context
+        with zero active crawls and remove it from all tracking dicts.
+
+        MUST be called while holding self._contexts_lock.
+
+        Returns the BrowserContext to close (caller closes it OUTSIDE the
+        lock), or None if no eviction is needed or possible.
+        """
+        if len(self.contexts_by_config) <= self._max_contexts:
+            return None
+
+        # Sort candidates by last-used timestamp (oldest first)
+        candidates = sorted(
+            self._context_last_used.items(),
+            key=lambda item: item[1],
+        )
+        for evict_sig, _ in candidates:
+            if self._context_refcounts.get(evict_sig, 0) == 0:
+                ctx = self.contexts_by_config.pop(evict_sig, None)
+                self._context_refcounts.pop(evict_sig, None)
+                self._context_last_used.pop(evict_sig, None)
+                # Clean up stale page->sig mappings for evicted context
+                stale_pages = [
+                    p for p, s in self._page_to_sig.items() if s == evict_sig
+                ]
+                for p in stale_pages:
+                    del self._page_to_sig[p]
+                return ctx
+
+        # All contexts are in active use — cannot evict
+        return None
 
     async def _apply_stealth_to_page(self, page):
         """Apply stealth to a page if stealth mode is enabled"""
@@ -1194,6 +1556,7 @@ class BrowserManager:
             # context reuse for multiple URLs with the same config (e.g., batch/deep crawls).
             if self.config.create_isolated_context:
                 config_signature = self._make_config_signature(crawlerRunConfig)
+                to_close = None
 
                 async with self._contexts_lock:
                     if config_signature in self.contexts_by_config:
@@ -1202,14 +1565,44 @@ class BrowserManager:
                         context = await self.create_browser_context(crawlerRunConfig)
                         await self.setup_context(context, crawlerRunConfig)
                         self.contexts_by_config[config_signature] = context
+                        self._context_refcounts[config_signature] = 0
+                        to_close = self._evict_lru_context_locked()
+
+                    # Increment refcount INSIDE lock before releasing
+                    self._context_refcounts[config_signature] = (
+                        self._context_refcounts.get(config_signature, 0) + 1
+                    )
+                    self._context_last_used[config_signature] = time.monotonic()
+
+                # Close evicted context OUTSIDE lock
+                if to_close is not None:
+                    try:
+                        await to_close.close()
+                    except Exception:
+                        pass
 
                 # Always create a new page for each crawl (isolation for navigation)
-                page = await context.new_page()
+                try:
+                    page = await context.new_page()
+                except Exception:
+                    async with self._contexts_lock:
+                        if config_signature in self._context_refcounts:
+                            self._context_refcounts[config_signature] = max(
+                                0, self._context_refcounts[config_signature] - 1
+                            )
+                    raise
                 await self._apply_stealth_to_page(page)
+                self._page_to_sig[page] = config_signature
             elif self.config.storage_state:
-                context = await self.create_browser_context(crawlerRunConfig)
+                tmp_context = await self.create_browser_context(crawlerRunConfig)
                 ctx = self.default_context        # default context, one window only
-                ctx = await clone_runtime_state(context, ctx, crawlerRunConfig, self.config)
+                ctx = await clone_runtime_state(tmp_context, ctx, crawlerRunConfig, self.config)
+                # Close the temporary context — only needed as a clone source
+                try:
+                    await tmp_context.close()
+                except Exception:
+                    pass
+                context = ctx  # so (page, context) return value is correct
                 # Avoid concurrent new_page on shared persistent context
                 # See GH-1198: context.pages can be empty under races
                 async with self._page_lock:
@@ -1217,32 +1610,52 @@ class BrowserManager:
                 await self._apply_stealth_to_page(page)
             else:
                 context = self.default_context
-                pages = context.pages
-                page = next((p for p in pages if p.url == crawlerRunConfig.url), None)
-                if not page:
-                    if pages:
-                        page = pages[0]
-                    else:
-                        # Double-check under lock to avoid TOCTOU and ensure only
-                        # one task calls new_page when pages=[] concurrently
+
+                # Handle pre-existing target case (for reconnecting to specific CDP targets)
+                if self.config.browser_context_id and self.config.target_id:
+                    page = await self._get_page_by_target_id(context, self.config.target_id)
+                    if not page:
                         async with self._page_lock:
+                            page = await context.new_page()
+                            self._mark_page_in_use(page)
+                        await self._apply_stealth_to_page(page)
+                    else:
+                        # Mark pre-existing target as in use
+                        self._mark_page_in_use(page)
+                else:
+                    # For CDP connections (external browser), multiple Playwright connections
+                    # create separate browser/context objects. Page reuse across connections
+                    # isn't reliable because each connection sees different page objects.
+                    # Always create new pages for CDP to avoid cross-connection race conditions.
+                    if self.config.cdp_url and not self.config.use_managed_browser:
+                        async with self._page_lock:
+                            page = await context.new_page()
+                            self._mark_page_in_use(page)
+                        await self._apply_stealth_to_page(page)
+                    else:
+                        # For managed browsers (single process), page reuse is safe.
+                        # Use lock to safely check for available pages and track usage.
+                        # This prevents race conditions when multiple crawls run concurrently.
+                        async with BrowserManager._get_global_lock():
                             pages = context.pages
-                            if pages:
-                                page = pages[0]
-                            elif self.config.browser_context_id and self.config.target_id:
-                                # Pre-existing context/target provided - use CDP to get the page
-                                # This handles the case where Playwright doesn't see the target yet
-                                page = await self._get_page_by_target_id(context, self.config.target_id)
-                                if not page:
-                                    # Fallback: create new page in existing context
-                                    page = await context.new_page()
-                                    await self._apply_stealth_to_page(page)
+                            pages_in_use = self._get_pages_in_use()
+                            # Find first available page (exists and not currently in use)
+                            available_page = next(
+                                (p for p in pages if p not in pages_in_use),
+                                None
+                            )
+                            if available_page:
+                                page = available_page
                             else:
+                                # No available pages - create a new one
                                 page = await context.new_page()
                                 await self._apply_stealth_to_page(page)
+                            # Mark page as in use (global tracking)
+                            self._mark_page_in_use(page)
         else:
             # Otherwise, check if we have an existing context for this config
             config_signature = self._make_config_signature(crawlerRunConfig)
+            to_close = None
 
             async with self._contexts_lock:
                 if config_signature in self.contexts_by_config:
@@ -1252,14 +1665,44 @@ class BrowserManager:
                     context = await self.create_browser_context(crawlerRunConfig)
                     await self.setup_context(context, crawlerRunConfig)
                     self.contexts_by_config[config_signature] = context
+                    self._context_refcounts[config_signature] = 0
+                    to_close = self._evict_lru_context_locked()
+
+                # Increment refcount INSIDE lock before releasing
+                self._context_refcounts[config_signature] = (
+                    self._context_refcounts.get(config_signature, 0) + 1
+                )
+                self._context_last_used[config_signature] = time.monotonic()
+
+            # Close evicted context OUTSIDE lock
+            if to_close is not None:
+                try:
+                    await to_close.close()
+                except Exception:
+                    pass
 
             # Create a new page from the chosen context
-            page = await context.new_page()
+            try:
+                page = await context.new_page()
+            except Exception:
+                async with self._contexts_lock:
+                    if config_signature in self._context_refcounts:
+                        self._context_refcounts[config_signature] = max(
+                            0, self._context_refcounts[config_signature] - 1
+                        )
+                raise
             await self._apply_stealth_to_page(page)
+            self._page_to_sig[page] = config_signature
 
         # If a session_id is specified, store this session so we can reuse later
         if crawlerRunConfig.session_id:
             self.sessions[crawlerRunConfig.session_id] = (context, page, time.time())
+
+        self._pages_served += 1
+
+        # Check if browser recycle threshold is hit — bump version for next requests
+        # This happens AFTER incrementing counter so concurrent requests see correct count
+        await self._maybe_bump_browser_version()
 
         return page, context
 
@@ -1272,10 +1715,234 @@ class BrowserManager:
         """
         if session_id in self.sessions:
             context, page, _ = self.sessions[session_id]
+            self._release_page_from_use(page)
+            # Decrement context refcount for the session's page
+            should_close_context = False
+            async with self._contexts_lock:
+                sig = self._page_to_sig.pop(page, None)
+                if sig is not None and sig in self._context_refcounts:
+                    self._context_refcounts[sig] = max(
+                        0, self._context_refcounts[sig] - 1
+                    )
+                    # Only close the context if no other pages are using it
+                    # (refcount dropped to 0) AND we own the context (not managed)
+                    if not self.config.use_managed_browser:
+                        if self._context_refcounts.get(sig, 0) == 0:
+                            self.contexts_by_config.pop(sig, None)
+                            self._context_refcounts.pop(sig, None)
+                            self._context_last_used.pop(sig, None)
+                            should_close_context = True
             await page.close()
-            if not self.config.use_managed_browser:
+            if should_close_context:
                 await context.close()
             del self.sessions[session_id]
+
+    def release_page(self, page):
+        """
+        Release a page from the in-use tracking set (global tracking).
+        Sync variant — does NOT decrement context refcount.
+        """
+        self._release_page_from_use(page)
+
+    async def release_page_with_context(self, page):
+        """
+        Release a page and decrement its context's refcount under the lock.
+
+        Should be called from the async crawl finally block instead of
+        release_page() so the context lifecycle is properly tracked.
+        """
+        self._release_page_from_use(page)
+        sig = None
+        refcount = -1
+        async with self._contexts_lock:
+            sig = self._page_to_sig.pop(page, None)
+            if sig is not None and sig in self._context_refcounts:
+                self._context_refcounts[sig] = max(
+                    0, self._context_refcounts[sig] - 1
+                )
+                refcount = self._context_refcounts[sig]
+
+        # Check if this signature belongs to an old browser waiting to be cleaned up
+        if sig is not None and refcount == 0:
+            await self._maybe_cleanup_old_browser(sig)
+
+    def _should_recycle(self) -> bool:
+        """Check if page threshold reached for browser recycling."""
+        limit = self.config.max_pages_before_recycle
+        if limit <= 0:
+            return False
+        return self._pages_served >= limit
+
+    async def _maybe_bump_browser_version(self):
+        """Bump browser version if threshold reached, moving old browser to pending cleanup.
+
+        New requests automatically get a new browser (via new signature).
+        Old browser drains naturally and gets cleaned up when refcount hits 0.
+        """
+        if not self._should_recycle():
+            return
+
+        # Safety cap: wait if too many old browsers are draining
+        while True:
+            async with self._pending_cleanup_lock:
+                # Re-check threshold under lock (another request may have bumped already)
+                if not self._should_recycle():
+                    return
+
+                # Check safety cap
+                if len(self._pending_cleanup) >= self._max_pending_browsers:
+                    if self.logger:
+                        self.logger.debug(
+                            message="Waiting for old browser to drain (pending: {count})",
+                            tag="BROWSER",
+                            params={"count": len(self._pending_cleanup)},
+                        )
+                    self._cleanup_slot_available.clear()
+                    # Release lock and wait
+                else:
+                    # We have a slot — do the bump inside this lock hold
+                    old_version = self._browser_version
+                    active_sigs = []
+                    idle_sigs = []
+                    async with self._contexts_lock:
+                        for sig in list(self._context_refcounts.keys()):
+                            if self._context_refcounts.get(sig, 0) > 0:
+                                active_sigs.append(sig)
+                            else:
+                                idle_sigs.append(sig)
+
+                    if self.logger:
+                        self.logger.info(
+                            message="Bumping browser version {old} -> {new} after {count} pages ({active} active, {idle} idle sigs)",
+                            tag="BROWSER",
+                            params={
+                                "old": old_version,
+                                "new": old_version + 1,
+                                "count": self._pages_served,
+                                "active": len(active_sigs),
+                                "idle": len(idle_sigs),
+                            },
+                        )
+
+                    # Only add sigs with active crawls to pending cleanup.
+                    # Sigs with refcount 0 are cleaned up immediately below
+                    # to avoid them being stuck in _pending_cleanup forever
+                    # (no future release would trigger their cleanup).
+                    done_event = asyncio.Event()
+                    for sig in active_sigs:
+                        self._pending_cleanup[sig] = {
+                            "version": old_version,
+                            "done": done_event,
+                        }
+
+                    # Bump version — new get_page() calls will create new contexts
+                    self._browser_version += 1
+                    self._pages_served = 0
+
+                    # Clean up idle sigs immediately (outside pending_cleanup_lock below)
+                    break  # exit while loop to do cleanup outside locks
+
+            # Safety cap path: wait for a cleanup slot, then retry.
+            # Timeout prevents permanent deadlock if stuck entries never drain.
+            try:
+                await asyncio.wait_for(
+                    self._cleanup_slot_available.wait(), timeout=30.0
+                )
+            except asyncio.TimeoutError:
+                # Force-clean any pending entries that have refcount 0
+                # (they're stuck and will never drain naturally)
+                async with self._pending_cleanup_lock:
+                    stuck_sigs = [
+                        s for s in list(self._pending_cleanup.keys())
+                        if self._context_refcounts.get(s, 0) == 0
+                    ]
+                    for sig in stuck_sigs:
+                        self._pending_cleanup.pop(sig, None)
+                    if stuck_sigs:
+                        if self.logger:
+                            self.logger.warning(
+                                message="Force-cleaned {count} stuck pending entries after timeout",
+                                tag="BROWSER",
+                                params={"count": len(stuck_sigs)},
+                            )
+                        # Clean up the stuck contexts
+                        for sig in stuck_sigs:
+                            async with self._contexts_lock:
+                                context = self.contexts_by_config.pop(sig, None)
+                                self._context_refcounts.pop(sig, None)
+                                self._context_last_used.pop(sig, None)
+                            if context is not None:
+                                try:
+                                    await context.close()
+                                except Exception:
+                                    pass
+                        if len(self._pending_cleanup) < self._max_pending_browsers:
+                            self._cleanup_slot_available.set()
+
+        # Reached via break — clean up idle sigs immediately (outside locks)
+        for sig in idle_sigs:
+            async with self._contexts_lock:
+                context = self.contexts_by_config.pop(sig, None)
+                self._context_refcounts.pop(sig, None)
+                self._context_last_used.pop(sig, None)
+            if context is not None:
+                try:
+                    await context.close()
+                except Exception:
+                    pass
+        if idle_sigs and self.logger:
+            self.logger.debug(
+                message="Immediately cleaned up {count} idle contexts from version {version}",
+                tag="BROWSER",
+                params={"count": len(idle_sigs), "version": old_version},
+            )
+
+    async def _maybe_cleanup_old_browser(self, sig: str):
+        """Clean up an old browser's context if its refcount hit 0 and it's pending cleanup."""
+        async with self._pending_cleanup_lock:
+            if sig not in self._pending_cleanup:
+                return  # Not an old browser signature
+
+            cleanup_info = self._pending_cleanup.pop(sig)
+            old_version = cleanup_info["version"]
+
+            if self.logger:
+                self.logger.debug(
+                    message="Cleaning up context from browser version {version} (sig: {sig})",
+                    tag="BROWSER",
+                    params={"version": old_version, "sig": sig[:12]},
+                )
+
+            # Remove context from tracking
+            async with self._contexts_lock:
+                context = self.contexts_by_config.pop(sig, None)
+                self._context_refcounts.pop(sig, None)
+                self._context_last_used.pop(sig, None)
+
+            # Close context outside locks
+            if context is not None:
+                try:
+                    await context.close()
+                except Exception:
+                    pass
+
+            # Check if any signatures from this old version remain
+            remaining_old = [
+                s for s, info in self._pending_cleanup.items()
+                if info["version"] == old_version
+            ]
+
+            if not remaining_old:
+                if self.logger:
+                    self.logger.info(
+                        message="All contexts from browser version {version} cleaned up",
+                        tag="BROWSER",
+                        params={"version": old_version},
+                    )
+
+            # Open a cleanup slot if we're below the cap
+            if len(self._pending_cleanup) < self._max_pending_browsers:
+                self._cleanup_slot_available.set()
 
     def _cleanup_expired_sessions(self):
         """Clean up expired sessions based on TTL."""
@@ -1290,6 +1957,27 @@ class BrowserManager:
 
     async def close(self):
         """Close all browser resources and clean up."""
+        # Cached CDP path: only clean up this instance's sessions/contexts,
+        # then release the shared connection reference.
+        if self._using_cached_cdp:
+            session_ids = list(self.sessions.keys())
+            for session_id in session_ids:
+                await self.kill_session(session_id)
+            for ctx in self.contexts_by_config.values():
+                try:
+                    await ctx.close()
+                except Exception:
+                    pass
+            self.contexts_by_config.clear()
+            self._context_refcounts.clear()
+            self._context_last_used.clear()
+            self._page_to_sig.clear()
+            await _CDPConnectionCache.release(self.config.cdp_url)
+            self.browser = None
+            self.playwright = None
+            self._using_cached_cdp = False
+            return
+
         if self.config.cdp_url:
             # When using external CDP, we don't own the browser process.
             # If cdp_cleanup_on_close is True, properly disconnect from the browser
@@ -1307,6 +1995,9 @@ class BrowserManager:
                     except Exception:
                         pass
                 self.contexts_by_config.clear()
+                self._context_refcounts.clear()
+                self._context_last_used.clear()
+                self._page_to_sig.clear()
 
                 # Disconnect from browser (doesn't terminate it, just releases connection)
                 if self.browser:
@@ -1321,12 +2012,42 @@ class BrowserManager:
                             )
                     self.browser = None
                     # Allow time for CDP connection to fully release before another client connects
-                    await asyncio.sleep(1.0)
+                    if self.config.cdp_close_delay > 0:
+                        await asyncio.sleep(self.config.cdp_close_delay)
 
                 # Stop Playwright instance to prevent memory leaks
                 if self.playwright:
                     await self.playwright.stop()
                     self.playwright = None
+            return
+
+        # ── Persistent context launched via launch_persistent_context ──
+        if self._launched_persistent:
+            session_ids = list(self.sessions.keys())
+            for session_id in session_ids:
+                await self.kill_session(session_id)
+            for ctx in self.contexts_by_config.values():
+                try:
+                    await ctx.close()
+                except Exception:
+                    pass
+            self.contexts_by_config.clear()
+            self._context_refcounts.clear()
+            self._context_last_used.clear()
+            self._page_to_sig.clear()
+
+            # Closing the persistent context also terminates the browser
+            if self.default_context:
+                try:
+                    await self.default_context.close()
+                except Exception:
+                    pass
+                self.default_context = None
+
+            if self.playwright:
+                await self.playwright.stop()
+                self.playwright = None
+            self._launched_persistent = False
             return
 
         if self.config.sleep_on_close:
@@ -1347,6 +2068,9 @@ class BrowserManager:
                     params={"error": str(e)}
                 )
         self.contexts_by_config.clear()
+        self._context_refcounts.clear()
+        self._context_last_used.clear()
+        self._page_to_sig.clear()
 
         if self.browser:
             await self.browser.close()

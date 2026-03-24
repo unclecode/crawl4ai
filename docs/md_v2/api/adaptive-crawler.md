@@ -161,7 +161,7 @@ adaptive.export_knowledge_base("my_knowledge.jsonl")
 Import a previously exported knowledge base.
 
 ```python
-def import_knowledge_base(
+async def import_knowledge_base(
     self,
     path: Union[str, Path]
 ) -> None

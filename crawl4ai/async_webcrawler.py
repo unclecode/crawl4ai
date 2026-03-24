@@ -1,5 +1,6 @@
 from .__version__ import __version__ as crawl4ai_version
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -50,6 +51,7 @@ from .utils import (
     compute_head_fingerprint,
 )
 from .cache_validator import CacheValidator, CacheValidationResult
+from .antibot_detector import is_blocked
 
 
 class AsyncWebCrawler:
@@ -227,11 +229,11 @@ class AsyncWebCrawler:
                 screenshot=True,
                 ...
             )
-            result = await crawler.arun(url="https://example.com", crawler_config=config)
+            result = await crawler.arun(url="https://example.com", config=config)
 
         Args:
             url: The URL to crawl (http://, https://, file://, or raw:)
-            crawler_config: Configuration object controlling crawl behavior
+            config: Configuration object controlling crawl behavior
             [other parameters maintained for backwards compatibility]
 
         Returns:
@@ -372,13 +374,9 @@ class AsyncWebCrawler:
 
                 # Fetch fresh content if needed
                 if not cached_result or not html:
-                    t1 = time.perf_counter()
+                    from urllib.parse import urlparse
 
-                    if config.user_agent:
-                        self.crawler_strategy.update_user_agent(
-                            config.user_agent)
-
-                    # Check robots.txt if enabled
+                    # Check robots.txt if enabled (once, before any attempts)
                     if config and config.check_robots_txt:
                         if not await self.robots_parser.can_fetch(
                             url, self.browser_config.user_agent
@@ -394,71 +392,250 @@ class AsyncWebCrawler:
                                 },
                             )
 
-                    ##############################
-                    # Call CrawlerStrategy.crawl #
-                    ##############################
-                    async_response = await self.crawler_strategy.crawl(
-                        url,
-                        config=config,  # Pass the entire config object
-                    )
+                    # --- Anti-bot retry setup ---
+                    # raw: URLs contain caller-provided HTML (e.g. from cache),
+                    # not content fetched from a web server.  Anti-bot detection,
+                    # proxy retries, and fallback fetching are meaningless here.
+                    _is_raw_url = url.startswith("raw:") or url.startswith("raw://")
 
-                    html = sanitize_input_encode(async_response.html)
-                    screenshot_data = async_response.screenshot
-                    pdf_data = async_response.pdf_data
-                    js_execution_result = async_response.js_execution_result
+                    _max_attempts = 1 + getattr(config, "max_retries", 0)
+                    _proxy_list = config._get_proxy_list()
+                    _original_proxy_config = config.proxy_config
+                    _block_reason = ""
+                    _done = False
+                    crawl_result = None
+                    _crawl_stats = {
+                        "attempts": 0,
+                        "retries": 0,
+                        "proxies_used": [],
+                        "fallback_fetch_used": False,
+                        "resolved_by": None,
+                    }
 
-                    t2 = time.perf_counter()
-                    self.logger.url_status(
-                        url=cache_context.display_url,
-                        success=bool(html),
-                        timing=t2 - t1,
-                        tag="FETCH",
-                    )
+                    for _attempt in range(_max_attempts):
+                        if _done:
+                            break
 
-                    ###############################################################
-                    # Process the HTML content, Call CrawlerStrategy.process_html #
-                    ###############################################################
-                    from urllib.parse import urlparse
-                    crawl_result: CrawlResult = await self.aprocess_html(
-                        url=url,
-                        html=html,
-                        extracted_content=extracted_content,
-                        config=config,  # Pass the config object instead of individual parameters
-                        screenshot_data=screenshot_data,
-                        pdf_data=pdf_data,
-                        verbose=config.verbose,
-                        is_raw_html=True if url.startswith("raw:") else False,
-                        redirected_url=async_response.redirected_url,
-                        original_scheme=urlparse(url).scheme,
-                        **kwargs,
-                    )
+                        if _attempt > 0:
+                            _crawl_stats["retries"] = _attempt
+                            self.logger.warning(
+                                message="Anti-bot retry {attempt}/{max_retries} for {url} — {reason}",
+                                tag="ANTIBOT",
+                                params={
+                                    "attempt": _attempt,
+                                    "max_retries": config.max_retries,
+                                    "url": url[:80],
+                                    "reason": _block_reason,
+                                },
+                            )
 
-                    crawl_result.status_code = async_response.status_code
-                    crawl_result.redirected_url = async_response.redirected_url or url
-                    crawl_result.response_headers = async_response.response_headers
-                    crawl_result.downloaded_files = async_response.downloaded_files
-                    crawl_result.js_execution_result = js_execution_result
-                    crawl_result.mhtml = async_response.mhtml_data
-                    crawl_result.ssl_certificate = async_response.ssl_certificate
-                    # Add captured network and console data if available
-                    crawl_result.network_requests = async_response.network_requests
-                    crawl_result.console_messages = async_response.console_messages
+                        for _p_idx, _proxy in enumerate(_proxy_list):
+                            if _p_idx > 0 or _attempt > 0:
+                                self.logger.info(
+                                    message="Trying proxy {idx}/{total}: {proxy}",
+                                    tag="ANTIBOT",
+                                    params={
+                                        "idx": _p_idx + 1,
+                                        "total": len(_proxy_list),
+                                        "proxy": _proxy.server if _proxy else "direct",
+                                    },
+                                )
 
-                    crawl_result.success = bool(html)
-                    crawl_result.session_id = getattr(
-                        config, "session_id", None)
-                    crawl_result.cache_status = "miss"
+                            # Set the active proxy for this attempt
+                            config.proxy_config = _proxy
+                            _crawl_stats["attempts"] += 1
+
+                            try:
+                                t1 = time.perf_counter()
+
+                                if config.user_agent:
+                                    self.crawler_strategy.update_user_agent(
+                                        config.user_agent)
+
+                                async_response = await self.crawler_strategy.crawl(
+                                    url, config=config)
+
+                                html = sanitize_input_encode(async_response.html)
+                                screenshot_data = async_response.screenshot
+                                pdf_data = async_response.pdf_data
+                                js_execution_result = async_response.js_execution_result
+
+                                self.logger.url_status(
+                                    url=cache_context.display_url,
+                                    success=bool(html),
+                                    timing=time.perf_counter() - t1,
+                                    tag="FETCH",
+                                )
+
+                                crawl_result = await self.aprocess_html(
+                                    url=url, html=html,
+                                    extracted_content=extracted_content,
+                                    config=config,
+                                    screenshot_data=screenshot_data,
+                                    pdf_data=pdf_data,
+                                    verbose=config.verbose,
+                                    is_raw_html=True if url.startswith("raw:") else False,
+                                    redirected_url=async_response.redirected_url,
+                                    original_scheme=urlparse(url).scheme,
+                                    **kwargs,
+                                )
+
+                                crawl_result.status_code = async_response.status_code
+                                is_raw_url = url.startswith("raw:") or url.startswith("raw://")
+                                crawl_result.redirected_url = async_response.redirected_url or (None if is_raw_url else url)
+                                crawl_result.redirected_status_code = async_response.redirected_status_code
+                                crawl_result.response_headers = async_response.response_headers
+                                crawl_result.downloaded_files = async_response.downloaded_files
+                                crawl_result.js_execution_result = js_execution_result
+                                crawl_result.mhtml = async_response.mhtml_data
+                                crawl_result.ssl_certificate = async_response.ssl_certificate
+                                crawl_result.network_requests = async_response.network_requests
+                                crawl_result.console_messages = async_response.console_messages
+                                crawl_result.success = bool(html)
+                                crawl_result.session_id = getattr(config, "session_id", None)
+                                crawl_result.cache_status = "miss"
+
+                                # Check if blocked (skip for raw: URLs —
+                                # caller-provided content, anti-bot N/A)
+                                if _is_raw_url:
+                                    _blocked = False
+                                    _block_reason = ""
+                                else:
+                                    _blocked, _block_reason = is_blocked(
+                                        async_response.status_code, html)
+
+                                _crawl_stats["proxies_used"].append({
+                                    "proxy": _proxy.server if _proxy else None,
+                                    "status_code": async_response.status_code,
+                                    "blocked": _blocked,
+                                    "reason": _block_reason if _blocked else "",
+                                })
+
+                                if not _blocked:
+                                    _crawl_stats["resolved_by"] = "proxy" if _proxy else "direct"
+                                    _done = True
+                                    break  # Success — exit proxy loop
+
+                            except Exception as _crawl_err:
+                                _crawl_stats["proxies_used"].append({
+                                    "proxy": _proxy.server if _proxy else None,
+                                    "status_code": None,
+                                    "blocked": True,
+                                    "reason": str(_crawl_err),
+                                })
+                                self.logger.error_status(
+                                    url=url,
+                                    error=f"Proxy {_proxy.server if _proxy else 'direct'} failed: {_crawl_err}",
+                                    tag="ANTIBOT",
+                                )
+                                _block_reason = str(_crawl_err)
+                                # If this is the only proxy and only attempt, re-raise
+                                # so the caller gets the real error (not a silent swallow).
+                                # But if there are more proxies or retries to try, continue.
+                                if len(_proxy_list) <= 1 and _max_attempts <= 1:
+                                    raise
+
+                    # Restore original proxy_config
+                    config.proxy_config = _original_proxy_config
+
+                    # --- Fallback fetch function (last resort after all retries+proxies exhausted) ---
+                    # Invoke fallback when: (a) crawl_result exists but is blocked, OR
+                    # (b) crawl_result is None because all proxies threw exceptions (browser crash, timeout).
+                    # Skip for raw: URLs — fallback expects a real URL, not raw HTML content.
+                    _fallback_fn = getattr(config, "fallback_fetch_function", None)
+                    if _fallback_fn and not _done and not _is_raw_url:
+                        _needs_fallback = (
+                            crawl_result is None  # All proxies threw exceptions
+                            or is_blocked(crawl_result.status_code, crawl_result.html or "")[0]
+                        )
+                        if _needs_fallback:
+                            self.logger.warning(
+                                message="All retries exhausted, invoking fallback_fetch_function for {url}",
+                                tag="ANTIBOT",
+                                params={"url": url[:80]},
+                            )
+                            _crawl_stats["fallback_fetch_used"] = True
+                            try:
+                                _fallback_html = await _fallback_fn(url)
+                                if _fallback_html:
+                                    _sanitized_html = sanitize_input_encode(_fallback_html)
+                                    try:
+                                        crawl_result = await self.aprocess_html(
+                                            url=url,
+                                            html=_sanitized_html,
+                                            extracted_content=extracted_content,
+                                            config=config,
+                                            screenshot_data=None,
+                                            pdf_data=None,
+                                            verbose=config.verbose,
+                                            is_raw_html=True,
+                                            redirected_url=url,
+                                            original_scheme=urlparse(url).scheme,
+                                            **kwargs,
+                                        )
+                                    except Exception as _proc_err:
+                                        # aprocess_html may fail if browser is dead (e.g.,
+                                        # consent popup removal needs Page.evaluate).
+                                        # Fall back to a minimal result with raw HTML.
+                                        self.logger.warning(
+                                            message="Fallback HTML processing failed ({err}), using raw HTML",
+                                            tag="ANTIBOT",
+                                            params={"err": str(_proc_err)[:100]},
+                                        )
+                                        crawl_result = CrawlResult(
+                                            url=url,
+                                            html=_sanitized_html,
+                                            success=True,
+                                            status_code=200,
+                                        )
+                                    crawl_result.success = True
+                                    crawl_result.status_code = 200
+                                    crawl_result.session_id = getattr(config, "session_id", None)
+                                    crawl_result.cache_status = "miss"
+                                    _crawl_stats["resolved_by"] = "fallback_fetch"
+                            except Exception as _fallback_err:
+                                self.logger.error_status(
+                                    url=url,
+                                    error=f"Fallback fetch failed: {_fallback_err}",
+                                    tag="ANTIBOT",
+                                )
+
+                    # --- Mark blocked results as failed ---
+                    # Skip re-check when fallback was used — the fallback result is
+                    # authoritative.  Real pages may contain anti-bot script markers
+                    # (e.g. PerimeterX JS on Walmart) that trigger false positives.
+                    # Also skip for raw: URLs — caller-provided content, anti-bot N/A.
+                    if crawl_result:
+                        if not _crawl_stats.get("fallback_fetch_used") and not _is_raw_url:
+                            _blocked, _block_reason = is_blocked(
+                                crawl_result.status_code, crawl_result.html or "")
+                            if _blocked:
+                                crawl_result.success = False
+                                crawl_result.error_message = f"Blocked by anti-bot protection: {_block_reason}"
+                        crawl_result.crawl_stats = _crawl_stats
+                    else:
+                        # All proxies threw exceptions and fallback either wasn't
+                        # configured or also failed.  Build a minimal result so the
+                        # caller gets crawl_stats instead of None.
+                        crawl_result = CrawlResult(
+                            url=url,
+                            html="",
+                            success=False,
+                            status_code=None,
+                            error_message=f"All proxies failed: {_block_reason}" if _block_reason else "All proxies failed",
+                        )
+                        crawl_result.crawl_stats = _crawl_stats
 
                     # Compute head fingerprint for cache validation
-                    if html:
-                        head_end = html.lower().find('</head>')
+                    if crawl_result and crawl_result.html:
+                        head_end = crawl_result.html.lower().find('</head>')
                         if head_end != -1:
-                            head_html = html[:head_end + 7]
+                            head_html = crawl_result.html[:head_end + 7]
                             crawl_result.head_fingerprint = compute_head_fingerprint(head_html)
 
                     self.logger.url_status(
                         url=cache_context.display_url,
-                        success=crawl_result.success,
+                        success=crawl_result.success if crawl_result else False,
                         timing=time.perf_counter() - start_time,
                         tag="COMPLETE",
                     )
@@ -479,7 +656,9 @@ class AsyncWebCrawler:
                     cached_result.success = bool(html)
                     cached_result.session_id = getattr(
                         config, "session_id", None)
-                    cached_result.redirected_url = cached_result.redirected_url or url
+                    # For raw: URLs, don't fall back to the raw HTML string as redirected_url
+                    is_raw_url = url.startswith("raw:") or url.startswith("raw://")
+                    cached_result.redirected_url = cached_result.redirected_url or (None if is_raw_url else url)
                     return CrawlResultContainer(cached_result)
 
             except Exception as e:
@@ -653,11 +832,17 @@ class AsyncWebCrawler:
         # if not config.content_filter and not markdown_generator.content_filter:
         #     markdown_generator.content_filter = PruningContentFilter()
 
+        # Extract <base href> from raw HTML before it gets stripped by cleaning.
+        # This ensures relative URLs resolve correctly even with cleaned_html.
+        base_url = params.get("base_url") or params.get("redirected_url") or url
+        base_tag_match = re.search(r'<base\s[^>]*href\s*=\s*["\']([^"\']+)["\']', html, re.IGNORECASE)
+        if base_tag_match:
+            base_url = base_tag_match.group(1)
+
         markdown_result: MarkdownGenerationResult = (
             markdown_generator.generate_markdown(
                 input_html=markdown_input_html,
-                # Use explicit base_url if provided (for raw: HTML), otherwise redirected_url, then url
-                base_url=params.get("base_url") or params.get("redirected_url") or url
+                base_url=base_url
                 # html2text_options=kwargs.get('html2text', {})
             )
         )
@@ -808,25 +993,44 @@ class AsyncWebCrawler:
             print(f"Processed {result.url}: {len(result.markdown)} chars")
         """
         config = config or CrawlerRunConfig()
-        # if config is None:
-        #     config = CrawlerRunConfig(
-        #         word_count_threshold=word_count_threshold,
-        #         extraction_strategy=extraction_strategy,
-        #         chunking_strategy=chunking_strategy,
-        #         content_filter=content_filter,
-        #         cache_mode=cache_mode,
-        #         bypass_cache=bypass_cache,
-        #         css_selector=css_selector,
-        #         screenshot=screenshot,
-        #         pdf=pdf,
-        #         verbose=verbose,
-        #         **kwargs,
-        #     )
+
+        # When deep_crawl_strategy is set, bypass the dispatcher and call
+        # arun() directly for each URL.  The DeepCrawlDecorator on arun()
+        # will invoke the strategy and return List[CrawlResult].  The
+        # dispatcher cannot handle that return type (it expects a single
+        # CrawlResult), so we must handle it here.
+        primary_cfg = config[0] if isinstance(config, list) else config
+        if getattr(primary_cfg, "deep_crawl_strategy", None):
+            if primary_cfg.stream:
+                async def _deep_crawl_stream():
+                    for url in urls:
+                        result = await self.arun(url, config=primary_cfg)
+                        if isinstance(result, list):
+                            for r in result:
+                                yield r
+                        else:
+                            async for r in result:
+                                yield r
+                return _deep_crawl_stream()
+            else:
+                all_results = []
+                for url in urls:
+                    result = await self.arun(url, config=primary_cfg)
+                    if isinstance(result, list):
+                        all_results.extend(result)
+                    else:
+                        all_results.append(result)
+                return all_results
 
         if dispatcher is None:
+            primary_cfg = config[0] if isinstance(config, list) else config
+            mean_delay = getattr(primary_cfg, "mean_delay", 0.1)
+            max_range = getattr(primary_cfg, "max_range", 0.3)
             dispatcher = MemoryAdaptiveDispatcher(
                 rate_limiter=RateLimiter(
-                    base_delay=(1.0, 3.0), max_delay=60.0, max_retries=3
+                    base_delay=(mean_delay, mean_delay + max_range),
+                    max_delay=60.0,
+                    max_retries=3,
                 ),
             )
 

@@ -47,7 +47,7 @@ WORD_TOKEN_RATE = 1.3
 MIN_WORD_THRESHOLD = 1
 IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD = 1
 
-IMPORTANT_ATTRS = ["src", "href", "alt", "title", "width", "height"]
+IMPORTANT_ATTRS = ["src", "href", "alt", "title", "width", "height", "class", "id"]
 ONLY_TEXT_ELIGIBLE_TAGS = [
     "b",
     "i",
@@ -102,6 +102,9 @@ SCREENSHOT_HEIGHT_TRESHOLD = 10000
 PAGE_TIMEOUT = 60000
 DOWNLOAD_PAGE_TIMEOUT = 60000
 
+# Delimiter for concatenating multiple HTML examples in schema generation
+HTML_EXAMPLE_DELIMITER = "=== HTML EXAMPLE {index} ==="
+
 # Global user settings with descriptions and default values
 USER_SETTINGS = {
     "DEFAULT_LLM_PROVIDER": {
@@ -142,5 +145,10 @@ USER_SETTINGS = {
         "description": "Default user agent mode (default, random, or mobile)",
         "type": "string",
         "options": ["default", "random", "mobile"]
+    },
+    "JSON_ENSURE_ASCII": {
+        "default": True,
+        "description": "Whether to escape non-ASCII characters in JSON output (False preserves Unicode like 'š', True escapes as '\\u0161')",
+        "type": "boolean"
     }
 }

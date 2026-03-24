@@ -149,14 +149,15 @@ class MonitorStats:
         recent_reqs = sum(1 for req in self.completed_requests
                          if now - req.get("end_time", 0) < 5)
 
-        # Browser counts (acquire lock to prevent race conditions)
-        from crawler_pool import PERMANENT, HOT_POOL, COLD_POOL, LOCK
-        async with LOCK:
-            browser_count = {
-                "permanent": 1 if PERMANENT else 0,
-                "hot": len(HOT_POOL),
-                "cold": len(COLD_POOL)
-            }
+        # Browser counts — lock-free snapshot to avoid contending on
+        # the pool LOCK held during slow browser start/close (issue #1754)
+        from crawler_pool import get_pool_snapshot
+        snap = get_pool_snapshot()
+        browser_count = {
+            "permanent": 1 if snap["permanent"] else 0,
+            "hot": len(snap["hot_pool"]),
+            "cold": len(snap["cold_pool"]),
+        }
 
         self.memory_timeline.append({"time": now, "value": mem_pct})
         self.requests_timeline.append({"time": now, "value": recent_reqs})
@@ -232,17 +233,17 @@ class MonitorStats:
         # Network I/O (delta since last call)
         net = psutil.net_io_counters()
 
-        # Pool status (acquire lock to prevent race conditions)
-        from crawler_pool import PERMANENT, HOT_POOL, COLD_POOL, LOCK
-        async with LOCK:
-            # TODO: Track actual browser process memory instead of estimates
-            # These are conservative estimates based on typical Chromium usage
-            permanent_mem = 270 if PERMANENT else 0  # Estimate: ~270MB for permanent browser
-            hot_mem = len(HOT_POOL) * 180  # Estimate: ~180MB per hot pool browser
-            cold_mem = len(COLD_POOL) * 180  # Estimate: ~180MB per cold pool browser
-            permanent_active = PERMANENT is not None
-            hot_count = len(HOT_POOL)
-            cold_count = len(COLD_POOL)
+        # Pool status — lock-free snapshot (issue #1754)
+        from crawler_pool import get_pool_snapshot
+        snap = get_pool_snapshot()
+        # TODO: Track actual browser process memory instead of estimates
+        # These are conservative estimates based on typical Chromium usage
+        permanent_mem = 270 if snap["permanent"] else 0  # Estimate: ~270MB for permanent browser
+        hot_mem = len(snap["hot_pool"]) * 180  # Estimate: ~180MB per hot pool browser
+        cold_mem = len(snap["cold_pool"]) * 180  # Estimate: ~180MB per cold pool browser
+        permanent_active = snap["permanent"] is not None
+        hot_count = len(snap["hot_pool"])
+        cold_count = len(snap["cold_pool"])
 
         return {
             "container": {
@@ -287,45 +288,52 @@ class MonitorStats:
 
     async def get_browser_list(self) -> List[Dict]:
         """Get detailed browser pool information."""
-        from crawler_pool import PERMANENT, HOT_POOL, COLD_POOL, LAST_USED, USAGE_COUNT, DEFAULT_CONFIG_SIG, LOCK
+        from crawler_pool import get_pool_snapshot
 
         browsers = []
         now = time.time()
 
-        # Acquire lock to prevent race conditions during iteration
-        async with LOCK:
-            if PERMANENT:
-                browsers.append({
-                    "type": "permanent",
-                    "sig": DEFAULT_CONFIG_SIG[:8] if DEFAULT_CONFIG_SIG else "unknown",
-                    "age_seconds": int(now - self.start_time),
-                    "last_used_seconds": int(now - LAST_USED.get(DEFAULT_CONFIG_SIG, now)),
-                    "memory_mb": 270,
-                    "hits": USAGE_COUNT.get(DEFAULT_CONFIG_SIG, 0),
-                    "killable": False
-                })
+        # Lock-free snapshot — iterates over copies (issue #1754)
+        snap = get_pool_snapshot()
+        permanent = snap["permanent"]
+        permanent_sig = snap["permanent_sig"]
+        hot_pool = snap["hot_pool"]
+        cold_pool = snap["cold_pool"]
+        last_used = snap["last_used"]
+        usage_count = snap["usage_count"]
 
-            for sig, crawler in HOT_POOL.items():
-                browsers.append({
-                    "type": "hot",
-                    "sig": sig[:8],
-                    "age_seconds": int(now - self.start_time),  # Approximation
-                    "last_used_seconds": int(now - LAST_USED.get(sig, now)),
-                    "memory_mb": 180,  # Estimate
-                    "hits": USAGE_COUNT.get(sig, 0),
-                    "killable": True
-                })
+        if permanent:
+            browsers.append({
+                "type": "permanent",
+                "sig": permanent_sig[:8] if permanent_sig else "unknown",
+                "age_seconds": int(now - self.start_time),
+                "last_used_seconds": int(now - last_used.get(permanent_sig, now)),
+                "memory_mb": 270,
+                "hits": usage_count.get(permanent_sig, 0),
+                "killable": False
+            })
 
-            for sig, crawler in COLD_POOL.items():
-                browsers.append({
-                    "type": "cold",
-                    "sig": sig[:8],
-                    "age_seconds": int(now - self.start_time),
-                    "last_used_seconds": int(now - LAST_USED.get(sig, now)),
-                    "memory_mb": 180,
-                    "hits": USAGE_COUNT.get(sig, 0),
-                    "killable": True
-                })
+        for sig, crawler in hot_pool.items():
+            browsers.append({
+                "type": "hot",
+                "sig": sig[:8],
+                "age_seconds": int(now - self.start_time),  # Approximation
+                "last_used_seconds": int(now - last_used.get(sig, now)),
+                "memory_mb": 180,  # Estimate
+                "hits": usage_count.get(sig, 0),
+                "killable": True
+            })
+
+        for sig, crawler in cold_pool.items():
+            browsers.append({
+                "type": "cold",
+                "sig": sig[:8],
+                "age_seconds": int(now - self.start_time),
+                "last_used_seconds": int(now - last_used.get(sig, now)),
+                "memory_mb": 180,
+                "hits": usage_count.get(sig, 0),
+                "killable": True
+            })
 
         return browsers
 

@@ -7,7 +7,7 @@ docs_dir: docs/md_v2
 
 nav:
   - Home: 'index.md'
-  - "📚 Complete SDK Reference": "complete-sdk-reference.md"
+  - "Growth": "stats.md"
   - "Ask AI": "core/ask-ai.md"
   - "Quick Start": "core/quickstart.md"
   - "Code Examples": "core/examples.md"
@@ -47,6 +47,7 @@ nav:
     - "Lazy Loading": "advanced/lazy-loading.md"
     - "Hooks & Auth": "advanced/hooks-auth.md"
     - "Proxy & Security": "advanced/proxy-security.md"
+    - "Anti-Bot & Fallback": "advanced/anti-bot-and-fallback.md"
     - "Undetected Browser": "advanced/undetected-browser.md"
     - "Session Management": "advanced/session-management.md"
     - "Multi-URL Crawling": "advanced/multi-url-crawling.md"
@@ -69,6 +70,10 @@ nav:
     - "Strategies": "api/strategies.md"
     - "C4A-Script Reference": "api/c4a-script-reference.md"
   - "Brand Book": "branding/index.md"
+  - Community:
+    - "Contributing Guide": "CONTRIBUTING.md"
+    - "Code of Conduct": "https://github.com/unclecode/crawl4ai/blob/main/CODE_OF_CONDUCT.md"
+    - "Contributors": "https://github.com/unclecode/crawl4ai/blob/main/CONTRIBUTORS.md"
 
 theme:
   name: 'terminal'

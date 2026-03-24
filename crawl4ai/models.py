@@ -1,4 +1,5 @@
-from pydantic import BaseModel, HttpUrl, PrivateAttr, Field, ConfigDict
+from pydantic import BaseModel, HttpUrl, PrivateAttr, Field, ConfigDict, BeforeValidator
+from typing import Annotated
 from typing import List, Dict, Optional, Callable, Awaitable, Union, Any
 from typing import AsyncGenerator
 from typing import Generic, TypeVar
@@ -149,6 +150,7 @@ class CrawlResult(BaseModel):
     ssl_certificate: Optional[SSLCertificate] = None
     dispatch_result: Optional[DispatchResult] = None
     redirected_url: Optional[str] = None
+    redirected_status_code: Optional[int] = None
     network_requests: Optional[List[Dict[str, Any]]] = None
     console_messages: Optional[List[Dict[str, Any]]] = None
     tables: List[Dict] = Field(default_factory=list)  # NEW – [{headers,rows,caption,summary}]
@@ -156,6 +158,8 @@ class CrawlResult(BaseModel):
     head_fingerprint: Optional[str] = None
     cached_at: Optional[float] = None
     cache_status: Optional[str] = None  # "hit", "hit_validated", "hit_fallback", "miss"
+    # Anti-bot retry/proxy usage stats
+    crawl_stats: Optional[Dict[str, Any]] = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -294,6 +298,10 @@ class CrawlResultContainer(Generic[CrawlResultT]):
     def __iter__(self):
         return iter(self._results)
 
+    async def __aiter__(self):
+        for item in self._results:
+            yield item
+
     def __getitem__(self, index):
         return self._results[index]
 
@@ -332,6 +340,7 @@ class AsyncCrawlResponse(BaseModel):
     downloaded_files: Optional[List[str]] = None
     ssl_certificate: Optional[SSLCertificate] = None
     redirected_url: Optional[str] = None
+    redirected_status_code: Optional[int] = None
     network_requests: Optional[List[Dict[str, Any]]] = None
     console_messages: Optional[List[Dict[str, Any]]] = None
 
@@ -340,6 +349,15 @@ class AsyncCrawlResponse(BaseModel):
 ###############################
 # Scraping Models
 ###############################
+def _coerce_int(v):
+    """Coerce to int or return None for non-numeric values like '100%' or 'auto'."""
+    if v is None:
+        return None
+    try:
+        return int(v)
+    except (ValueError, TypeError):
+        return None
+
 class MediaItem(BaseModel):
     src: Optional[str] = ""
     data: Optional[str] = ""
@@ -349,7 +367,7 @@ class MediaItem(BaseModel):
     type: str = "image"
     group_id: Optional[int] = 0
     format: Optional[str] = None
-    width: Optional[int] = None
+    width: Annotated[Optional[int], BeforeValidator(_coerce_int)] = None
 
 
 class Link(BaseModel):

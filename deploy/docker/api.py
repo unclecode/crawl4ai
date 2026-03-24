@@ -44,7 +44,8 @@ from utils import (
     get_llm_api_key,
     validate_llm_provider,
     get_llm_temperature,
-    get_llm_base_url
+    get_llm_base_url,
+    get_redis_task_ttl
 )
 from webhook import WebhookDeliveryService
 
@@ -61,13 +62,32 @@ def _get_memory_mb():
         return None
 
 
+async def hset_with_ttl(redis, key: str, mapping: dict, config: dict):
+    """Set Redis hash with automatic TTL expiry.
+
+    Args:
+        redis: Redis client instance
+        key: Redis key (e.g., "task:abc123")
+        mapping: Hash field-value mapping
+        config: Application config containing redis.task_ttl_seconds
+    """
+    await redis.hset(key, mapping=mapping)
+    ttl = get_redis_task_ttl(config)
+    if ttl > 0:
+        await redis.expire(key, ttl)
+
+
 async def handle_llm_qa(
     url: str,
     query: str,
-    config: dict
+    config: dict,
+    provider: Optional[str] = None,
+    temperature: Optional[float] = None,
+    base_url: Optional[str] = None,
 ) -> str:
     """Process QA using LLM with crawled content as context."""
-    from crawler_pool import get_crawler
+    from crawler_pool import get_crawler, release_crawler
+    crawler = None
     try:
         if not url.startswith(('http://', 'https://')) and not url.startswith(("raw:", "raw://")):
             url = 'https://' + url
@@ -101,14 +121,13 @@ async def handle_llm_qa(
 
     Answer:"""
 
-        # api_token=os.environ.get(config["llm"].get("api_key_env", ""))
-
+        resolved_provider = provider or config["llm"]["provider"]
         response = perform_completion_with_backoff(
-            provider=config["llm"]["provider"],
+            provider=resolved_provider,
             prompt_with_variables=prompt,
-            api_token=get_llm_api_key(config),  # Returns None to let litellm handle it
-            temperature=get_llm_temperature(config),
-            base_url=get_llm_base_url(config),
+            api_token=get_llm_api_key(config, resolved_provider),
+            temperature=temperature or get_llm_temperature(config, resolved_provider),
+            base_url=base_url or get_llm_base_url(config, resolved_provider),
             base_delay=config["llm"].get("backoff_base_delay", 2),
             max_attempts=config["llm"].get("backoff_max_attempts", 3),
             exponential_factor=config["llm"].get("backoff_exponential_factor", 2)
@@ -121,6 +140,9 @@ async def handle_llm_qa(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
+    finally:
+        if crawler:
+            await release_crawler(crawler)
 
 async def process_llm_extraction(
     redis: aioredis.Redis,
@@ -143,10 +165,10 @@ async def process_llm_extraction(
         # Validate provider
         is_valid, error_msg = validate_llm_provider(config, provider)
         if not is_valid:
-            await redis.hset(f"task:{task_id}", mapping={
+            await hset_with_ttl(redis, f"task:{task_id}", {
                 "status": TaskStatus.FAILED,
                 "error": error_msg
-            })
+            }, config)
 
             # Send webhook notification on failure
             await webhook_service.notify_job_completion(
@@ -183,10 +205,10 @@ async def process_llm_extraction(
             )
 
         if not result.success:
-            await redis.hset(f"task:{task_id}", mapping={
+            await hset_with_ttl(redis, f"task:{task_id}", {
                 "status": TaskStatus.FAILED,
                 "error": result.error_message
-            })
+            }, config)
 
             # Send webhook notification on failure
             await webhook_service.notify_job_completion(
@@ -206,10 +228,10 @@ async def process_llm_extraction(
 
         result_data = {"extracted_content": content}
 
-        await redis.hset(f"task:{task_id}", mapping={
+        await hset_with_ttl(redis, f"task:{task_id}", {
             "status": TaskStatus.COMPLETED,
             "result": json.dumps(content)
-        })
+        }, config)
 
         # Send webhook notification on successful completion
         await webhook_service.notify_job_completion(
@@ -223,10 +245,10 @@ async def process_llm_extraction(
 
     except Exception as e:
         logger.error(f"LLM extraction error: {str(e)}", exc_info=True)
-        await redis.hset(f"task:{task_id}", mapping={
+        await hset_with_ttl(redis, f"task:{task_id}", {
             "status": TaskStatus.FAILED,
             "error": str(e)
-        })
+        }, config)
 
         # Send webhook notification on failure
         await webhook_service.notify_job_completion(
@@ -249,6 +271,7 @@ async def handle_markdown_request(
     base_url: Optional[str] = None
 ) -> str:
     """Handle markdown generation requests."""
+    crawler = None
     try:
         # Validate provider if using LLM filter
         if filter_type == FilterType.LLM:
@@ -282,7 +305,7 @@ async def handle_markdown_request(
 
         cache_mode = CacheMode.ENABLED if cache == "1" else CacheMode.WRITE_ONLY
 
-        from crawler_pool import get_crawler
+        from crawler_pool import get_crawler, release_crawler
         from utils import load_config as _load_config
         _cfg = _load_config()
         browser_cfg = BrowserConfig(
@@ -315,6 +338,9 @@ async def handle_markdown_request(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
+    finally:
+        if crawler:
+            await release_crawler(crawler)
 
 async def handle_llm_request(
     redis: aioredis.Redis,
@@ -430,7 +456,7 @@ async def create_new_task(
     if webhook_config:
         task_data["webhook_config"] = json.dumps(webhook_config)
 
-    await redis.hset(f"task:{task_id}", mapping=task_data)
+    await hset_with_ttl(redis, f"task:{task_id}", task_data, config)
 
     background_tasks.add_task(
         process_llm_extraction,
@@ -481,6 +507,7 @@ async def stream_results(crawler: AsyncWebCrawler, results_gen: AsyncGenerator) 
     """Stream results with heartbeats and completion markers."""
     import json
     from utils import datetime_handler
+    from crawler_pool import release_crawler
 
     try:
         async for result in results_gen:
@@ -507,11 +534,8 @@ async def stream_results(crawler: AsyncWebCrawler, results_gen: AsyncGenerator) 
     except asyncio.CancelledError:
         logger.warning("Client disconnected during streaming")
     finally:
-        # try:
-        #     await crawler.close()
-        # except Exception as e:
-        #     logger.error(f"Crawler cleanup error: {e}")
-        pass
+        if crawler:
+            await release_crawler(crawler)
 
 async def handle_crawl_request(
     urls: List[str],
@@ -523,6 +547,7 @@ async def handle_crawl_request(
     """Handle non-streaming crawl requests with optional hooks."""
     # Track request start
     request_id = f"req_{uuid4().hex[:8]}"
+    crawler = None
     try:
         from monitor import get_monitor
         await get_monitor().track_request_start(
@@ -549,11 +574,8 @@ async def handle_crawl_request(
             ) if config["crawler"]["rate_limiter"]["enabled"] else None
         )
         
-        from crawler_pool import get_crawler
+        from crawler_pool import get_crawler, release_crawler
         crawler = await get_crawler(browser_config)
-
-        # crawler: AsyncWebCrawler = AsyncWebCrawler(config=browser_config)
-        # await crawler.start()
         
         # Attach hooks if provided
         hooks_status = {}
@@ -589,8 +611,6 @@ async def handle_crawl_request(
         if not isinstance(results, list):
             results = [results]
 
-        # await crawler.close()
-        
         end_mem_mb = _get_memory_mb() # <--- Get memory after
         end_time = time.time()
         
@@ -689,13 +709,6 @@ async def handle_crawl_request(
         except:
             pass
 
-        if 'crawler' in locals() and crawler.ready: # Check if crawler was initialized and started
-            #  try:
-            #      await crawler.close()
-            #  except Exception as close_e:
-            #       logger.error(f"Error closing crawler during exception handling: {close_e}")
-            logger.error(f"Error closing crawler during exception handling: {str(e)}")
-
         # Measure memory even on error if possible
         end_mem_mb_error = _get_memory_mb()
         if start_mem_mb is not None and end_mem_mb_error is not None:
@@ -709,6 +722,9 @@ async def handle_crawl_request(
                 "server_peak_memory_mb": max(peak_mem_mb if peak_mem_mb else 0, end_mem_mb_error or 0)
             })
         )
+    finally:
+        if crawler:
+            await release_crawler(crawler)
 
 async def handle_stream_crawl_request(
     urls: List[str],
@@ -719,6 +735,7 @@ async def handle_stream_crawl_request(
 ) -> Tuple[AsyncWebCrawler, AsyncGenerator, Optional[Dict]]:
     """Handle streaming crawl requests with optional hooks."""
     hooks_info = None
+    crawler = None
     try:
         browser_config = BrowserConfig.load(browser_config)
         # browser_config.verbose = True # Set to False or remove for production stress testing
@@ -727,19 +744,19 @@ async def handle_stream_crawl_request(
         crawler_config.scraping_strategy = LXMLWebScrapingStrategy()
         crawler_config.stream = True
 
-        dispatcher = MemoryAdaptiveDispatcher(
-            memory_threshold_percent=config["crawler"]["memory_threshold_percent"],
-            rate_limiter=RateLimiter(
-                base_delay=tuple(config["crawler"]["rate_limiter"]["base_delay"])
+        # Deep crawl streaming supports exactly one start URL
+        if crawler_config.deep_crawl_strategy is not None and len(urls) != 1:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Deep crawling with stream currently supports exactly one URL per request. "
+                    f"Received {len(urls)} URLs."
+                ),
             )
-        )
 
-        from crawler_pool import get_crawler
+        from crawler_pool import get_crawler, release_crawler
         crawler = await get_crawler(browser_config)
 
-        # crawler = AsyncWebCrawler(config=browser_config)
-        # await crawler.start()
-        
         # Attach hooks if provided
         if hooks_config:
             from hook_manager import attach_user_hooks_to_crawler, UserHookManager
@@ -754,22 +771,34 @@ async def handle_stream_crawl_request(
             # Include hook manager in hooks_info for proper tracking
             hooks_info = {'status': hooks_status, 'manager': hook_manager}
 
-        results_gen = await crawler.arun_many(
-            urls=urls,
-            config=crawler_config,
-            dispatcher=dispatcher
-        )
+        # Deep crawl with single URL: use arun() which returns an async generator
+        # mirroring the Python library's streaming behavior
+        if crawler_config.deep_crawl_strategy is not None and len(urls) == 1:
+            results_gen = await crawler.arun(
+                urls[0],
+                config=crawler_config,
+            )
+        else:
+            # Default multi-URL streaming via arun_many
+            dispatcher = MemoryAdaptiveDispatcher(
+                memory_threshold_percent=config["crawler"]["memory_threshold_percent"],
+                rate_limiter=RateLimiter(
+                    base_delay=tuple(config["crawler"]["rate_limiter"]["base_delay"])
+                )
+            )
+            results_gen = await crawler.arun_many(
+                urls=urls,
+                config=crawler_config,
+                dispatcher=dispatcher
+            )
 
         return crawler, results_gen, hooks_info
 
     except Exception as e:
-        # Make sure to close crawler if started during an error here
-        if 'crawler' in locals() and crawler.ready:
-            #  try:
-            #       await crawler.close()
-            #  except Exception as close_e:
-            #       logger.error(f"Error closing crawler during stream setup exception: {close_e}")
-            logger.error(f"Error closing crawler during stream setup exception: {str(e)}")
+        # Release crawler on setup error (for successful streams,
+        # release happens in stream_results finally block)
+        if crawler:
+            await release_crawler(crawler)
         logger.error(f"Stream crawl error: {str(e)}", exc_info=True)
         # Raising HTTPException here will prevent streaming response
         raise HTTPException(
@@ -806,7 +835,7 @@ async def handle_crawl_job(
     if webhook_config:
         task_data["webhook_config"] = json.dumps(webhook_config)
 
-    await redis.hset(f"task:{task_id}", mapping=task_data)
+    await hset_with_ttl(redis, f"task:{task_id}", task_data, config)
 
     # Initialize webhook service
     webhook_service = WebhookDeliveryService(config)
@@ -819,10 +848,10 @@ async def handle_crawl_job(
                 crawler_config=crawler_config,
                 config=config,
             )
-            await redis.hset(f"task:{task_id}", mapping={
+            await hset_with_ttl(redis, f"task:{task_id}", {
                 "status": TaskStatus.COMPLETED,
                 "result": json.dumps(result),
-            })
+            }, config)
 
             # Send webhook notification on successful completion
             await webhook_service.notify_job_completion(
@@ -836,10 +865,10 @@ async def handle_crawl_job(
 
             await asyncio.sleep(5)  # Give Redis time to process the update
         except Exception as exc:
-            await redis.hset(f"task:{task_id}", mapping={
+            await hset_with_ttl(redis, f"task:{task_id}", {
                 "status": TaskStatus.FAILED,
                 "error": str(exc),
-            })
+            }, config)
 
             # Send webhook notification on failure
             await webhook_service.notify_job_completion(

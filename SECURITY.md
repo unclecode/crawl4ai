@@ -98,9 +98,20 @@ When using Crawl4AI as a Python library:
 | CVE-pending-1 | CRITICAL | RCE via hooks `__import__` | Removed from allowed builtins |
 | CVE-pending-2 | HIGH | LFI via `file://` URLs | URL scheme validation added |
 
+### Fixed in v0.8.1
+
+| ID | Severity | Description | Fix |
+|----|----------|-------------|-----|
+| CVE-pending-3 | CRITICAL | RCE via deserialization + `eval()` in `/crawl` endpoint | Allowlisted deserializable types; AST-validated computed field expressions |
+
 See [Security Advisory](https://github.com/unclecode/crawl4ai/security/advisories) for details.
 
 ## Security Features
+
+### v0.8.1+
+
+- **Deserialization Allowlist**: Only known-safe types can be instantiated via API config
+- **Safe Expression Evaluation**: Computed fields use AST validation (no `__import__`, no dunder access)
 
 ### v0.8.0+
 
@@ -115,7 +126,8 @@ See [Security Advisory](https://github.com/unclecode/crawl4ai/security/advisorie
 
 We thank the following security researchers for responsibly disclosing vulnerabilities:
 
-- **[Neo by ProjectDiscovery](https://projectdiscovery.io/blog/introducing-neo)** - RCE and LFI vulnerabilities (December 2025)
+- **Alec M** — RCE via deserialization in `/crawl` endpoint (January 2026)
+- **[Neo by ProjectDiscovery](https://projectdiscovery.io/blog/introducing-neo)** — RCE and LFI vulnerabilities (December 2025)
 
 ---
 

@@ -120,7 +120,8 @@ schema = {
             "attribute": str, # For type="attribute"
             "pattern": str,  # For type="regex"
             "transform": str, # Optional: "lowercase", "uppercase", "strip"
-            "default": Any    # Default value if extraction fails
+            "default": Any,   # Default value if extraction fails
+            "source": str,   # Optional: navigate to sibling first, e.g. "+ tr"
         }
     ]
 }
@@ -216,7 +217,7 @@ from crawl4ai import LLMConfig
 async with AsyncWebCrawler() as crawler:
     # Get sample HTML first
     sample_result = await crawler.arun("https://example.com/products")
-    html = sample_result.fit_html
+    html = sample_result.markdown.fit_html
     
     # Generate regex pattern once
     pattern = RegexExtractionStrategy.generate_pattern(

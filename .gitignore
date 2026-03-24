@@ -286,6 +286,7 @@ docs/apps/linkdin/samples/insights/*
 
 scripts/
 !scripts/gen-sbom.sh
+!scripts/update_stats.py
 
 
 # Databse files
@@ -298,3 +299,6 @@ scripts/
 *.rdb
 *.ldb
 MEMORY.md
+
+# Handoff files
+HANDOFF-*.md

@@ -392,3 +392,4 @@ Remember:
 - [Proxy & Security](proxy-security.md) - Using proxies with anti-bot features
 - [Session Management](session-management.md) - Maintaining sessions across requests
 - [Identity Based Crawling](identity-based-crawling.md) - Additional anti-detection strategies
+- [Anti-Bot Detection & Fallback](anti-bot-and-fallback.md) - Automatic retry and proxy escalation when blocking is detected

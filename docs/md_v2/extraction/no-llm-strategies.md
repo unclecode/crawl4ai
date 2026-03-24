@@ -92,9 +92,10 @@ asyncio.run(extract_crypto_prices())
 
 **Highlights**:
 
-- **`baseSelector`**: Tells us where each "item" (crypto row) is.  
-- **`fields`**: Two fields (`coin_name`, `price`) using simple CSS selectors.  
+- **`baseSelector`**: Tells us where each "item" (crypto row) is.
+- **`fields`**: Two fields (`coin_name`, `price`) using simple CSS selectors.
 - Each field defines a **`type`** (e.g., `text`, `attribute`, `html`, `regex`, etc.).
+- Optional keys: **`transform`**, **`default`**, **`attribute`**, **`pattern`**, and **`source`** (for sibling data — see [Extracting Sibling Data](#sibling-data)).
 
 No LLM is needed, and the performance is **near-instant** for hundreds or thousands of items.
 
@@ -190,7 +191,7 @@ Real sites often have **nested** or repeated data—like categories containing p
 
 We have a **sample e-commerce** HTML file on GitHub (example):
 ```
-https://gist.githubusercontent.com/githubusercontent/2d7b8ba3cd8ab6cf3c8da771ddb36878/raw/1ae2f90c6861ce7dd84cc50d3df9920dee5e1fd2/sample_ecommerce.html
+https://raw.githubusercontent.com/unclecode/crawl4ai/main/docs/examples/sample_ecommerce.html
 ```
 This snippet includes categories, products, features, reviews, and related items. Let's see how to define a schema that fully captures that structure **without LLM**.
 
@@ -322,7 +323,7 @@ async def extract_ecommerce_data():
     
     async with AsyncWebCrawler(verbose=True) as crawler:
         result = await crawler.arun(
-            url="https://gist.githubusercontent.com/githubusercontent/2d7b8ba3cd8ab6cf3c8da771ddb36878/raw/1ae2f90c6861ce7dd84cc50d3df9920dee5e1fd2/sample_ecommerce.html",
+            url="https://raw.githubusercontent.com/unclecode/crawl4ai/main/docs/examples/sample_ecommerce.html",
             extraction_strategy=strategy,
             config=config
         )
@@ -505,7 +506,7 @@ async def extract_with_generated_pattern():
         # Get sample HTML for context
         async with AsyncWebCrawler() as crawler:
             result = await crawler.arun("https://example.com/products")
-            html = result.fit_html
+            html = result.markdown.fit_html
         
         # Generate pattern (one-time LLM usage)
         pattern = RegexExtractionStrategy.generate_pattern(
@@ -623,7 +624,60 @@ Then run with `JsonCssExtractionStrategy(schema)` to get an array of blog post o
 
 ---
 
-## 8. Tips & Best Practices
+## 8. Extracting Sibling Data with `source` {#sibling-data}
+
+Some websites split a single logical item across **sibling elements** rather than nesting everything inside one container. A classic example is Hacker News, where each submission spans two adjacent `<tr>` rows:
+
+```html
+<tr class="athing submission">  <!-- rank, title, url -->
+  <td><span class="rank">1.</span></td>
+  <td><span class="titleline"><a href="https://example.com">Example Title</a></span></td>
+</tr>
+<tr>                             <!-- score, author, comments (sibling!) -->
+  <td class="subtext">
+    <span class="score">100 points</span>
+    <a class="hnuser">johndoe</a>
+  </td>
+</tr>
+```
+
+Normally, field selectors only search **descendants** of the base element — siblings are unreachable. The `source` field key solves this by navigating to a sibling element before running the selector.
+
+### Syntax
+
+```
+"source": "+ <selector>"
+```
+
+- **`+ tr`** — next sibling `<tr>`
+- **`+ div.details`** — next sibling `<div>` with class `details`
+- **`+ .subtext`** — next sibling with class `subtext`
+
+### Example: Hacker News
+
+```python
+schema = {
+    "name": "HN Submissions",
+    "baseSelector": "tr.athing.submission",
+    "fields": [
+        {"name": "rank", "selector": "span.rank", "type": "text"},
+        {"name": "title", "selector": "span.titleline a", "type": "text"},
+        {"name": "url", "selector": "span.titleline a", "type": "attribute", "attribute": "href"},
+        {"name": "score", "selector": "span.score", "type": "text", "source": "+ tr"},
+        {"name": "author", "selector": "a.hnuser", "type": "text", "source": "+ tr"},
+    ],
+}
+
+strategy = JsonCssExtractionStrategy(schema)
+```
+
+The `score` and `author` fields first navigate to the next sibling `<tr>`, then run their selectors inside that element. Fields without `source` work as before — searching descendants of the base element.
+
+`source` works with all field types (`text`, `attribute`, `nested`, `list`, etc.) and with both `JsonCssExtractionStrategy` and `JsonXPathExtractionStrategy`. If the sibling isn't found, the field returns its `default` value.
+
+---
+
+## 9. Tips & Best Practices
 
 1. **Inspect the DOM** in Chrome DevTools or Firefox's Inspector to find stable selectors.  
 2. **Start Simple**: Verify you can extract a single field. Then add complexity like nested objects or lists.  
@@ -636,7 +690,7 @@ Then run with `JsonCssExtractionStrategy(schema)` to get an array of blog post o
 
 ---
 
-## 9. Schema Generation Utility
+## 10. Schema Generation Utility
 
 While manually crafting schemas is powerful and precise, Crawl4AI now offers a convenient utility to **automatically generate** extraction schemas using LLM. This is particularly useful when:
 
@@ -669,7 +723,7 @@ html = """
 # Option 1: Using OpenAI (requires API token)
 css_schema = JsonCssExtractionStrategy.generate_schema(
     html,
-    schema_type="css", 
+    schema_type="css",
     llm_config = LLMConfig(provider="openai/gpt-4o",api_token="your-openai-token")
 )
 
@@ -683,6 +737,61 @@ xpath_schema = JsonXPathExtractionStrategy.generate_schema(
 # Use the generated schema for fast, repeated extractions
 strategy = JsonCssExtractionStrategy(css_schema)
 ```
+
+### Schema Validation
+
+By default, `generate_schema` **validates** the generated schema against the HTML to ensure that it actually extracts the data you expect. If the schema doesn't produce results, it automatically refines the selectors before returning.
+
+You can control this with the `validate` parameter:
+
+```python
+# Default: validated (recommended)
+schema = JsonCssExtractionStrategy.generate_schema(
+    url="https://news.ycombinator.com",
+    query="Extract each story: title, url, score, author",
+)
+
+# Skip validation if you want raw LLM output
+schema = JsonCssExtractionStrategy.generate_schema(
+    url="https://news.ycombinator.com",
+    query="Extract each story: title, url, score, author",
+    validate=False,
+)
+```
+
+The generator also understands sibling layouts — for sites like Hacker News where data is split across sibling elements, it will automatically use the [`source` field](#sibling-data) to reach sibling data.
+
+### Token Usage Tracking
+
+`generate_schema` may make multiple LLM calls internally (field inference, schema generation, validation retries). To track the total token consumption across all of these calls, pass a `TokenUsage` accumulator:
+
+```python
+from crawl4ai import JsonCssExtractionStrategy
+from crawl4ai.models import TokenUsage
+
+usage = TokenUsage()
+
+schema = JsonCssExtractionStrategy.generate_schema(
+    url="https://news.ycombinator.com",
+    query="Extract each story: title, url, score, author",
+    usage=usage,
+)
+
+print(f"Prompt tokens:     {usage.prompt_tokens}")
+print(f"Completion tokens: {usage.completion_tokens}")
+print(f"Total tokens:      {usage.total_tokens}")
+```
+
+The `usage` parameter is optional — omitting it changes nothing (fully backward-compatible). You can also reuse the same accumulator across multiple calls to get a grand total:
+
+```python
+usage = TokenUsage()
+schema1 = JsonCssExtractionStrategy.generate_schema(url=url1, query=q1, usage=usage)
+schema2 = JsonCssExtractionStrategy.generate_schema(url=url2, query=q2, usage=usage)
+print(f"Grand total: {usage.total_tokens} tokens")
+```
+
+Both `generate_schema` (sync) and `agenerate_schema` (async) support the `usage` parameter.
 
 ### LLM Provider Options
 
@@ -814,7 +923,7 @@ This approach lets you generate schemas once that work reliably across hundreds 
 
 ---
 
-## 10. Conclusion
+## 11. Conclusion
 
 With Crawl4AI's LLM-free extraction strategies - `JsonCssExtractionStrategy`, `JsonXPathExtractionStrategy`, and now `RegexExtractionStrategy` - you can build powerful pipelines that:
 

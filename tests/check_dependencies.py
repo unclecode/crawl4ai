@@ -67,7 +67,7 @@ PACKAGE_MAPPINGS = {
     'patchright': 'patchright',
     'dotenv': 'python-dotenv',
     'fake_useragent': 'fake-useragent',
-    'playwright_stealth': 'tf-playwright-stealth',
+    'playwright_stealth': 'playwright-stealth',
     'sentence_transformers': 'sentence-transformers',
     'rank_bm25': 'rank-bm25',
     'snowballstemmer': 'snowballstemmer',

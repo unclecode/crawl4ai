@@ -10,6 +10,7 @@ from .content_scraping_strategy import (
     LXMLWebScrapingStrategy,
     WebScrapingStrategy,  # Backward compatibility alias
 )
+from .processors.pdf import PDFContentScrapingStrategy
 from .async_logger import (
     AsyncLoggerBase,
     AsyncLogger,

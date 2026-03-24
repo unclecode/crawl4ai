@@ -8,7 +8,7 @@ import re
 from urllib.parse import urljoin
 
 # Pre-compile the regex pattern
-LINK_PATTERN = re.compile(r'!?\[([^\]]+)\]\(([^)]+?)(?:\s+"([^"]*)")?\)')
+LINK_PATTERN = re.compile(r'!?\[((?:[^\[\]]|\[(?:[^\[\]]|\[[^\]]*\])*\])*)\]\(((?:[^()\s]|\([^()]*\))*)(?:\s+"([^"]*)")?\)')
 
 
 def fast_urljoin(base: str, url: str) -> str:
