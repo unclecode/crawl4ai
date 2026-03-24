@@ -1255,10 +1255,16 @@ class BrowserManager:
             Context: Browser context object with the specified configurations
         """
         if self.browser is None:
+            if self._launched_persistent:
+                raise RuntimeError(
+                    "Cannot create new browser contexts when using "
+                    "use_persistent_context=True. Persistent context uses a "
+                    "single shared context."
+                )
             raise RuntimeError(
-                "Cannot create new browser contexts when using "
-                "use_persistent_context=True. Persistent context uses a "
-                "single shared context."
+                "Browser is not available. It may have been closed, crashed, "
+                "or not yet started. Ensure the browser is running before "
+                "creating new contexts."
             )
         # Base settings
         user_agent = self.config.headers.get("User-Agent", self.config.user_agent) 
