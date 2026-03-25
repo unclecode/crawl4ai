@@ -776,11 +776,11 @@ class PruningContentFilter(RelevantContentFilter):
         class_id_score = 0
         if "class" in node.attrs:
             classes = " ".join(node["class"])
-            if self.negative_patterns.match(classes):
+            if self.negative_patterns.search(classes):
                 class_id_score -= 0.5
         if "id" in node.attrs:
             element_id = node["id"]
-            if self.negative_patterns.match(element_id):
+            if self.negative_patterns.search(element_id):
                 class_id_score -= 0.5
         return class_id_score
 
