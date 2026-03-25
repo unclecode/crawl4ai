@@ -579,7 +579,7 @@ class PruningContentFilter(RelevantContentFilter):
             threshold_type (str): Threshold type for dynamic threshold (default: 'fixed').
             threshold (float): Fixed threshold value (default: 0.48).
         """
-        super().__init__(None)
+        super().__init__(user_query=user_query)
         self.min_word_threshold = min_word_threshold
         self.threshold_type = threshold_type
         self.threshold = threshold
@@ -831,7 +831,7 @@ class LLMContentFilter(RelevantContentFilter):
         api_base: Optional[str] = None,
         extra_args: Dict = None,
     ):
-        super().__init__(None)
+        super().__init__(user_query=user_query)
         self.provider = provider
         self.api_token = api_token
         self.base_url = base_url or api_base
