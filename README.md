@@ -35,6 +35,10 @@ Limited slots._
   </p>
 </div>
 
+<p align="center">
+    <a href="README.zh.md">简体中文</a> | <strong>English</strong>
+  </p>
+
 Crawl4AI turns the web into clean, LLM ready Markdown for RAG, agents, and data pipelines. Fast, controllable, battle tested by a 50k+ star community.
 
 [✨ Check out latest update v0.8.5](#-recent-updates)
