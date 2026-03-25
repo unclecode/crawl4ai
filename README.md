@@ -972,7 +972,7 @@ from crawl4ai import CrawlerRunConfig, MatchMode, CacheMode
 
 - **⚡ Performance Boost**: Up to 3x faster with optimized resource handling and memory efficiency
 
-Read the full details in our [0.7.0 Release Notes](https://docs.crawl4ai.com/blog/release-v0.7.0) or check the [CHANGELOG](https://github.com/unclecode/crawl4ai/blob/main/CHANGELOG.md).
+Read the full details in our [0.7.0 Release Notes](https://github.com/unclecode/crawl4ai/blob/main/docs/blog/release-v0.7.0.md) or check the [CHANGELOG](https://github.com/unclecode/crawl4ai/blob/main/CHANGELOG.md).
 
 </details>
 
