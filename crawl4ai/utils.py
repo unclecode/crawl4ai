@@ -1774,10 +1774,10 @@ def perform_completion_with_backoff(
         dict: The API response or an error message after all retries.
     """
 
-    from litellm import completion
-    from litellm.exceptions import RateLimitError
-    import litellm
-    litellm.drop_params = True  # Auto-drop unsupported params (e.g., temperature for O-series/GPT-5)
+    from nanollm import completion
+    from nanollm.exceptions import RateLimitError
+    import nanollm
+    nanollm.drop_params = True  # Auto-drop unsupported params (e.g., temperature for O-series/GPT-5)
 
     extra_args = {"temperature": 0.01, "api_key": api_token, "base_url": base_url}
     if json_response:
@@ -1866,11 +1866,11 @@ async def aperform_completion_with_backoff(
         dict: The API response or an error message after all retries.
     """
 
-    from litellm import acompletion
-    from litellm.exceptions import RateLimitError
-    import litellm
+    from nanollm import acompletion
+    from nanollm.exceptions import RateLimitError
+    import nanollm
     import asyncio
-    litellm.drop_params = True  # Auto-drop unsupported params (e.g., temperature for O-series/GPT-5)
+    nanollm.drop_params = True  # Auto-drop unsupported params (e.g., temperature for O-series/GPT-5)
 
     extra_args = {"temperature": 0.01, "api_key": api_token, "base_url": base_url}
     if json_response:
@@ -1991,7 +1991,7 @@ def extract_blocks_batch(batch_data, provider="groq/llama3-70b-8192", api_token=
     """
 
     api_token = os.getenv("GROQ_API_KEY", None) if not api_token else api_token
-    from litellm import batch_completion
+    from nanollm import batch_completion
 
     messages = []
 
@@ -3566,9 +3566,9 @@ async def get_text_embeddings(
     if not texts:
         return np.array([])
     
-    # If LLMConfig provided, use litellm for embeddings
+    # If LLMConfig provided, use nanollm for embeddings
     if llm_config is not None:
-        from litellm import aembedding
+        from nanollm import aembedding
         
         # Get embedding model from config or use default
         embedding_model = llm_config.get('provider', 'text-embedding-3-small')
