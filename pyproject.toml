@@ -18,7 +18,7 @@ dependencies = [
     "aiosqlite~=0.20",
     "anyio>=4.0.0",
     "lxml~=5.3",
-    "nanollm @ git+https://github.com/hafezparast/nanollm.git@35a0c4b15582cb5e5bb21503aec5b7d8921fb8f5",
+    "nanollm @ git+https://github.com/hafezparast/nanollm.git@v0.1.1",
     "numpy>=1.26.0,<3",
     "pillow>=10.4",
     "playwright>=1.49.0",
