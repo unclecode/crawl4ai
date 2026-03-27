@@ -11,14 +11,14 @@ from rank_bm25 import BM25Okapi
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
-from litellm import batch_completion
+from nanollm import batch_completion
 from .async_logger import AsyncLogger
-import litellm
+import nanollm
 import pickle
 import hashlib  # <--- ADDED for file-hash
 import glob
 
-litellm.set_verbose = False
+nanollm.set_verbose = False
 
 
 def _compute_file_hash(file_path: Path) -> str:
