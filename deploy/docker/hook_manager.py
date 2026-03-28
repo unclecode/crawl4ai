@@ -128,7 +128,13 @@ class UserHookManager:
                 'zip', 'map', 'filter', 'any', 'all', 'sum', 'min', 'max',
                 'sorted', 'reversed', 'abs', 'round', 'isinstance', 'type',
                 'getattr', 'hasattr', 'setattr', 'callable', 'iter', 'next',
-                '__build_class__'  # Required for class definitions in exec
+                '__build_class__',  # Required for class definitions in exec
+                # Exception classes (safe — no code execution risk)
+                'Exception', 'BaseException',
+                'ValueError', 'TypeError', 'KeyError', 'IndexError',
+                'AttributeError', 'RuntimeError', 'StopIteration',
+                'NotImplementedError', 'ZeroDivisionError', 'OSError',
+                'IOError', 'TimeoutError', 'ConnectionError',
             ]
             
             for name in allowed_builtins:
@@ -140,11 +146,16 @@ class UserHookManager:
                 '__builtins__': safe_builtins
             }
             
-            # Add commonly needed imports
-            exec("import asyncio", namespace)
-            exec("import json", namespace)
-            exec("import re", namespace)
-            exec("from typing import Dict, List, Optional", namespace)
+            # Add commonly needed modules directly (no __import__ needed)
+            import json
+            import re
+            from typing import Dict, List, Optional
+            namespace['asyncio'] = asyncio
+            namespace['json'] = json
+            namespace['re'] = re
+            namespace['Dict'] = Dict
+            namespace['List'] = List
+            namespace['Optional'] = Optional
             
             # Execute the code to define the function
             exec(hook_code, namespace)
