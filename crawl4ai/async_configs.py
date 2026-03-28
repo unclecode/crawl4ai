@@ -584,6 +584,18 @@ class BrowserConfig:
         light_mode (bool): Disables certain background features for performance gains. Default: False.
         extra_args (list): Additional command-line arguments passed to the browser.
                            Default: [].
+        executable_path (str or None): Path to a custom browser executable (e.g., ungoogled-chromium,
+                                       Brave, or a stealth-patched binary). If None, uses the default
+                                       Playwright-managed browser. Default: None.
+        ignore_default_args (list or None): List of default Chromium flags to exclude from launch.
+                                            Passed directly to Playwright's chromium.launch(). Default: None.
+        skip_default_browser_args (bool): If True, skips the hardcoded browser args in _build_browser_args()
+                                          and only uses extra_args. Useful when a custom browser binary manages
+                                          its own flags and the defaults cause conflicts. Default: False.
+        skip_default_headers (bool): If True, skips the forced User-Agent and sec-ch-ua header overrides
+                                     in setup_context(). Useful when a custom browser binary manages its own
+                                     fingerprint and Crawl4AI's overrides create detectable mismatches.
+                                     Default: False.
         enable_stealth (bool): If True, applies playwright-stealth to bypass basic bot detection.
                               Cannot be used with use_undetected browser mode. Default: False.
         memory_saving_mode (bool): If True, adds aggressive cache discard and V8 heap cap flags
@@ -644,6 +656,10 @@ class BrowserConfig:
         text_mode: bool = False,
         light_mode: bool = False,
         extra_args: list = None,
+        executable_path: str = None,
+        ignore_default_args: list = None,
+        skip_default_browser_args: bool = False,
+        skip_default_headers: bool = False,
         debugging_port: int = 9222,
         host: str = "localhost",
         enable_stealth: bool = False,
@@ -709,6 +725,10 @@ class BrowserConfig:
         self.text_mode = text_mode
         self.light_mode = light_mode
         self.extra_args = extra_args if extra_args is not None else []
+        self.executable_path = executable_path
+        self.ignore_default_args = ignore_default_args
+        self.skip_default_browser_args = skip_default_browser_args
+        self.skip_default_headers = skip_default_headers
         self.sleep_on_close = sleep_on_close
         self.verbose = verbose
         self.debugging_port = debugging_port
@@ -804,6 +824,10 @@ class BrowserConfig:
             "text_mode": self.text_mode,
             "light_mode": self.light_mode,
             "extra_args": self.extra_args,
+            "executable_path": self.executable_path,
+            "ignore_default_args": self.ignore_default_args,
+            "skip_default_browser_args": self.skip_default_browser_args,
+            "skip_default_headers": self.skip_default_headers,
             "sleep_on_close": self.sleep_on_close,
             "verbose": self.verbose,
             "debugging_port": self.debugging_port,
