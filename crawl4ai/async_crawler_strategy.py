@@ -1234,53 +1234,181 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             viewport_height = viewport_size.get(
                 "height", self.browser_config.viewport_height
             )
+
+            # Snapshot visible elements before first scroll so we capture
+            # the initial viewport on virtual-scroll pages.
+            await page.evaluate("""() => {
+                window.__c4ai_snapshot = new Map();
+                window.__c4ai_snapshot_fn = (function() {
+                    const MAX_ITEMS = 10000;
+                    function fingerprint(el) {
+                        // Prefer id attribute for uniqueness
+                        if (el.id) return 'id:' + el.id;
+                        // Look for data-* ID attributes (data-id, data-item-id,
+                        // data-user-id, etc.) but skip type/role markers like
+                        // data-testid which are shared across items.
+                        for (const attr of el.attributes) {
+                            if (attr.name.startsWith('data-')
+                                && (attr.name === 'data-id'
+                                    || attr.name.endsWith('-id')
+                                    || attr.name.endsWith('-key'))
+                                && attr.value) {
+                                return 'data:' + attr.name + '=' + attr.value;
+                            }
+                        }
+                        // Fallback: two independent 32-bit hashes combined into
+                        // a 64-bit-equivalent string to avoid collisions at scale.
+                        const tag = el.tagName;
+                        const href = el.getAttribute('href') || '';
+                        const text = (el.textContent || '').trim();
+                        let h1 = 0, h2 = 0x9e3779b9;
+                        for (let i = 0; i < text.length; i++) {
+                            const c = text.charCodeAt(i);
+                            h1 = ((h1 << 5) - h1 + c) | 0;
+                            h2 = ((h2 << 7) ^ (h2 >>> 3) ^ c) | 0;
+                        }
+                        return 'hash:' + tag + ':' + href + ':' + h1 + ':' + h2;
+                    }
+                    // Check if element carries a data-* unique identifier
+                    // (data-item-id, data-user-id, etc.). We do NOT check
+                    // el.id here because structural containers commonly have
+                    // ids (id="feed", id="main") without being content items.
+                    function hasDataId(el) {
+                        for (const attr of el.attributes) {
+                            if (attr.name.startsWith('data-')
+                                && (attr.name === 'data-id'
+                                    || attr.name.endsWith('-id')
+                                    || attr.name.endsWith('-key'))
+                                && attr.value) {
+                                return true;
+                            }
+                        }
+                        return false;
+                    }
+                    // Detect whether an element is a repeating-item container
+                    // (a feed/list parent) vs. a content item. A container has
+                    // many children that share the same tagName AND does not
+                    // itself carry a unique identifier.
+                    function isItemContainer(el) {
+                        // Elements with data-*-id are content items, not containers
+                        if (hasDataId(el)) return false;
+                        const kids = el.children;
+                        if (kids.length < 3) return false;
+                        const tagCounts = {};
+                        for (const c of kids) {
+                            tagCounts[c.tagName] = (tagCounts[c.tagName] || 0) + 1;
+                        }
+                        const maxSame = Math.max(...Object.values(tagCounts));
+                        // If most children share a tag, this is a list/feed.
+                        return maxSame >= kids.length * 0.5 && maxSame >= 3;
+                    }
+                    return function snapshot() {
+                        const map = window.__c4ai_snapshot;
+                        if (map.size >= MAX_ITEMS) return;
+                        const walk = (parent, depth) => {
+                            if (depth > 30) return;
+                            for (const el of parent.children) {
+                                if (map.size >= MAX_ITEMS) return;
+                                const text = (el.textContent || '').trim();
+                                if (text.length <= 5) continue;
+                                // If this looks like a list container, walk
+                                // into it to capture individual items.
+                                if (isItemContainer(el)) {
+                                    walk(el, depth + 1);
+                                    continue;
+                                }
+                                const fp = fingerprint(el);
+                                if (!map.has(fp)) {
+                                    map.set(fp, el.outerHTML);
+                                }
+                            }
+                        };
+                        walk(document.body, 0);
+                    };
+                })();
+                window.__c4ai_snapshot_fn();
+            }""")
+
             current_position = viewport_height
 
-            # await page.evaluate(f"window.scrollTo(0, {current_position})")
             await self.safe_scroll(page, 0, current_position, delay=scroll_delay)
-            # await self.csp_scroll_to(page, 0, current_position)
-            # await asyncio.sleep(scroll_delay)
 
-            # total_height = await page.evaluate("document.documentElement.scrollHeight")
             dimensions = await self.get_page_dimensions(page)
             total_height = dimensions["height"]
 
             scroll_step_count = 0
             while current_position < total_height:
-                #### 
-                # NEW FEATURE: Check if we've reached the maximum allowed scroll steps
-                # This prevents infinite scrolling on very long pages or infinite scroll scenarios
-                # If max_scroll_steps is None, this check is skipped (unlimited scrolling - original behavior)
-                ####
                 if max_scroll_steps is not None and scroll_step_count >= max_scroll_steps:
                     break
+
                 current_position = min(current_position + viewport_height, total_height)
+
+                # Use window.scrollBy as fallback if scrollTo doesn't move
+                prev_scroll = await page.evaluate("window.scrollY")
                 await self.safe_scroll(page, 0, current_position, delay=scroll_delay)
+                new_scroll = await page.evaluate("window.scrollY")
+                if new_scroll == prev_scroll and current_position > prev_scroll:
+                    await page.evaluate(f"window.scrollBy(0, {viewport_height})")
+                    await asyncio.sleep(scroll_delay)
 
-                # Increment the step counter for max_scroll_steps tracking
+                # Snapshot after each scroll step
+                await page.evaluate("window.__c4ai_snapshot_fn && window.__c4ai_snapshot_fn()")
+
                 scroll_step_count += 1
-                
-                # await page.evaluate(f"window.scrollTo(0, {current_position})")
-                # await asyncio.sleep(scroll_delay)
 
-                # new_height = await page.evaluate("document.documentElement.scrollHeight")
                 dimensions = await self.get_page_dimensions(page)
                 new_height = dimensions["height"]
 
                 if new_height > total_height:
                     total_height = new_height
 
-            # await page.evaluate("window.scrollTo(0, 0)")
+            # Inject accumulated snapshot content into a hidden div so that
+            # subsequent page.content() includes all scrolled-through items.
+            merge_result = await page.evaluate(r"""() => {
+                const map = window.__c4ai_snapshot;
+                delete window.__c4ai_snapshot;
+                delete window.__c4ai_snapshot_fn;
+                if (!map || map.size === 0) {
+                    return { injected: false, count: 0 };
+                }
+
+                const parts = [];
+                for (const html of map.values()) {
+                    parts.push(html);
+                }
+
+                const container = document.createElement('div');
+                container.id = '__c4ai_accumulated_content';
+                container.style.display = 'none';
+                container.innerHTML = parts.join('\n');
+                document.body.appendChild(container);
+                return { injected: true, count: map.size };
+            }""")
+
+            if merge_result and merge_result.get("injected"):
+                self.logger.info(
+                    message="Virtual scroll detected: accumulated {count} unique elements",
+                    tag="PAGE_SCAN",
+                    params={"count": merge_result.get("count", 0)},
+                )
+
             await self.safe_scroll(page, 0, 0)
 
         except Exception as e:
+            # Clean up snapshot state on error
+            try:
+                await page.evaluate("""() => {
+                    delete window.__c4ai_snapshot;
+                    delete window.__c4ai_snapshot_fn;
+                }""")
+            except Exception:
+                pass
             self.logger.warning(
                 message="Failed to perform full page scan: {error}",
                 tag="PAGE_SCAN",
                 params={"error": str(e)},
             )
         else:
-            # await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
             await self.safe_scroll(page, 0, total_height)
 
     async def _handle_virtual_scroll(self, page: Page, config: "VirtualScrollConfig"):
@@ -1341,15 +1469,22 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 
                 // Perform scrolling
                 while (scrollCount < config.scroll_count) {
-                    // Scroll the container
+                    // Scroll the container; fall back to window if container
+                    // doesn't scroll (e.g. Twitter scrolls the window, not a
+                    // container element).
+                    const prevScrollTop = container.scrollTop;
                     container.scrollTop += scrollAmount;
-                    
+                    const usedWindowScroll = (container.scrollTop === prevScrollTop);
+                    if (usedWindowScroll) {
+                        window.scrollBy(0, scrollAmount);
+                    }
+
                     // Wait for content to potentially load
                     await new Promise(resolve => setTimeout(resolve, config.wait_after_scroll * 1000));
-                    
+
                     // Get current HTML
                     const currentHTML = container.innerHTML;
-                    
+
                     // Determine what changed
                     if (currentHTML === previousHTML) {
                         // Case 0: No change - continue scrolling
@@ -1362,13 +1497,15 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         console.log(`Scroll ${scrollCount + 1}: Content replaced, capturing chunk`);
                         htmlChunks.push(previousHTML);
                     }
-                    
+
                     // Update previous HTML for next iteration
                     previousHTML = currentHTML;
                     scrollCount++;
-                    
-                    // Check if we've reached the end
-                    if (container.scrollTop + container.clientHeight >= container.scrollHeight - 10) {
+
+                    // Check if we've reached the end of scrollable content
+                    const atContainerEnd = container.scrollTop + container.clientHeight >= container.scrollHeight - 10;
+                    const atWindowEnd = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 10;
+                    if (usedWindowScroll ? atWindowEnd : atContainerEnd) {
                         console.log(`Reached end of scrollable content at scroll ${scrollCount}`);
                         // Capture final chunk if content was replaced
                         if (htmlChunks.length > 0) {
