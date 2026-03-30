@@ -1,4 +1,4 @@
-from pydantic import BaseModel, HttpUrl, PrivateAttr, Field, ConfigDict, BeforeValidator
+from pydantic import BaseModel, HttpUrl, PrivateAttr, Field, ConfigDict, BeforeValidator, field_validator
 from typing import Annotated
 from typing import List, Dict, Optional, Callable, Awaitable, Union, Any
 from typing import AsyncGenerator
@@ -140,6 +140,12 @@ class CrawlResult(BaseModel):
     screenshot: Optional[str] = None
     pdf: Optional[bytes] = None
     mhtml: Optional[str] = None
+    markdown_data: Optional[MarkdownGenerationResult] = Field(
+        default=None,
+        alias="markdown",
+        exclude=True,
+        repr=False,
+    )
     _markdown: Optional[MarkdownGenerationResult] = PrivateAttr(default=None)
     extracted_content: Optional[str] = None
     metadata: Optional[dict] = None
@@ -163,7 +169,16 @@ class CrawlResult(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-# NOTE: The StringCompatibleMarkdown class, custom __init__ method, property getters/setters,
+    @field_validator("markdown_data", mode="before")
+    @classmethod
+    def validate_markdown(cls, v):
+        if isinstance(v, dict):
+            # This converts a raw dictionary (from cache/JSON)
+            # into the structured Pydantic object
+            return MarkdownGenerationResult(**v)
+        return v
+
+# NOTE: The StringCompatibleMarkdown class, model_post_init hook, property getters/setters,
 # and model_dump override all exist to support a smooth transition from markdown as a string
 # to markdown as a MarkdownGenerationResult object, while maintaining backward compatibility.
 # 
@@ -175,15 +190,8 @@ class CrawlResult(BaseModel):
 # When backward compatibility is no longer needed in future versions, this entire mechanism
 # can be simplified to a standard field with no custom accessors or serialization logic.
     
-    def __init__(self, **data):
-        markdown_result = data.pop('markdown', None)
-        super().__init__(**data)
-        if markdown_result is not None:
-            self._markdown = (
-                MarkdownGenerationResult(**markdown_result)
-                if isinstance(markdown_result, dict)
-                else markdown_result
-            )
+    def model_post_init(self, __context):
+        self._markdown = self.markdown_data
     
     @property
     def markdown(self):
@@ -203,7 +211,10 @@ class CrawlResult(BaseModel):
         """
         Setter for the markdown property.
         """
+        if isinstance(value, dict):
+            value = MarkdownGenerationResult(**value)
         self._markdown = value
+        self.markdown_data = value
     
     @property
     def markdown_v2(self):
