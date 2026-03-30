@@ -682,7 +682,8 @@ async def crawl(
         browser_config=crawl_request.browser_config,
         crawler_config=crawl_request.crawler_config,
         config=config,
-        hooks_config=hooks_config
+        hooks_config=hooks_config,
+        crawler_configs=crawl_request.crawler_configs,
     )
     # check if all of the results are not successful
     if all(not result["success"] for result in results["results"]):
