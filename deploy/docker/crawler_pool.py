@@ -97,7 +97,7 @@ async def get_crawler(cfg: BrowserConfig) -> AsyncWebCrawler:
                 except:
                     pass
 
-                return HOT_POOL[sig]
+                return crawler
 
             logger.info(f"❄️  Using cold pool browser (sig={sig[:8]})")
             return crawler
@@ -111,12 +111,17 @@ async def get_crawler(cfg: BrowserConfig) -> AsyncWebCrawler:
         # Create new in cold pool
         logger.info(f"🆕 Creating new browser in cold pool (sig={sig[:8]}, mem={mem_pct:.1f}%)")
         crawler = AsyncWebCrawler(config=cfg, thread_safe=False)
-        await crawler.start()
-        crawler.active_requests = 1
-        COLD_POOL[sig] = crawler
-        LAST_USED[sig] = time.time()
-        USAGE_COUNT[sig] = 1
-        return crawler
+        try:
+            await crawler.start()
+            crawler.active_requests = 1
+            COLD_POOL[sig] = crawler
+            LAST_USED[sig] = time.time()
+            USAGE_COUNT[sig] = 1
+            return crawler
+        except Exception:
+            # Clean up crawler on start failure to prevent resource leak
+            await crawler.close()
+            raise
 
 async def release_crawler(crawler: AsyncWebCrawler):
     """Decrement active request count for a pooled crawler.
