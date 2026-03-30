@@ -75,7 +75,7 @@ class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
 
             # Clone config to disable recursive deep crawling.
             batch_config = config.clone(deep_crawl_strategy=None, stream=False)
-            url_results = await crawler.arun_many(urls=[url], config=batch_config)
+            url_results = await crawler.arun_many(urls=[url], config=batch_config, dispatcher=self.dispatcher)
             
             for result in url_results:
                 result.metadata = result.metadata or {}
@@ -183,7 +183,7 @@ class DFSDeepCrawlStrategy(BFSDeepCrawlStrategy):
             visited.add(url)
 
             stream_config = config.clone(deep_crawl_strategy=None, stream=True)
-            stream_gen = await crawler.arun_many(urls=[url], config=stream_config)
+            stream_gen = await crawler.arun_many(urls=[url], config=stream_config, dispatcher=self.dispatcher)
             async for result in stream_gen:
                 result.metadata = result.metadata or {}
                 result.metadata["depth"] = depth
