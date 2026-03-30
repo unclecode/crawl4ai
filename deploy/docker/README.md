@@ -88,6 +88,9 @@ ANTHROPIC_API_KEY=your-anthropic-key
 # TOGETHER_API_KEY=your-together-key
 # MISTRAL_API_KEY=your-mistral-key
 # GEMINI_API_TOKEN=your-gemini-token
+# Novita AI (OpenAI-compatible)
+# NOVITA_API_KEY=your-novita-key
+# NOVITA_BASE_URL=https://api.novita.ai/openai
 EOL
 ```
 > 🔑 **Note**: Keep your API keys secure! Never commit `.llm.env` to version control.

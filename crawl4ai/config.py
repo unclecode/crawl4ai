@@ -28,6 +28,9 @@ PROVIDER_MODELS = {
     'gemini/gemini-2.0-flash-exp': os.getenv("GEMINI_API_KEY"),
     'gemini/gemini-2.0-flash-lite-preview-02-05': os.getenv("GEMINI_API_KEY"),
     "deepseek/deepseek-chat": os.getenv("DEEPSEEK_API_KEY"),
+    "novita/moonshotai/kimi-k2.5": os.getenv("NOVITA_API_KEY"),
+    "novita/zai-org/glm-5": os.getenv("NOVITA_API_KEY"),
+    "novita/minimax/minimax-m2.5": os.getenv("NOVITA_API_KEY"),
 }
 PROVIDER_MODELS_PREFIXES = {
     "ollama": "no-token-needed",  # Any model from Ollama no need for API token
@@ -36,6 +39,7 @@ PROVIDER_MODELS_PREFIXES = {
     "anthropic": os.getenv("ANTHROPIC_API_KEY"),
     "gemini": os.getenv("GEMINI_API_KEY"),
     "deepseek": os.getenv("DEEPSEEK_API_KEY"),
+    "novita": os.getenv("NOVITA_API_KEY"),  # OpenAI-compatible; set base_url="https://api.novita.ai/openai"
 }
 
 # Chunk token threshold
