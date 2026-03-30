@@ -1236,6 +1236,28 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             )
             current_position = viewport_height
 
+            # Install MutationObserver to capture elements removed during
+            # scrolling.  On virtual-scroll pages the DOM recycles elements,
+            # so removed nodes contain content that would otherwise be lost.
+            await page.evaluate("""() => {
+                window.__c4ai_removed = [];
+                window.__c4ai_observer = new MutationObserver(mutations => {
+                    for (const m of mutations) {
+                        for (const node of m.removedNodes) {
+                            if (node.nodeType === Node.ELEMENT_NODE) {
+                                const text = (node.innerText || '').trim();
+                                if (text.length > 5) {
+                                    window.__c4ai_removed.push(node.outerHTML);
+                                }
+                            }
+                        }
+                    }
+                });
+                window.__c4ai_observer.observe(document.body, {
+                    childList: true, subtree: true
+                });
+            }""")
+
             # await page.evaluate(f"window.scrollTo(0, {current_position})")
             await self.safe_scroll(page, 0, current_position, delay=scroll_delay)
             # await self.csp_scroll_to(page, 0, current_position)
@@ -1270,10 +1292,69 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 if new_height > total_height:
                     total_height = new_height
 
+            # Disconnect observer and re-inject any recycled elements so that
+            # the subsequent HTML capture (page.content()) includes them.
+            merge_result = await page.evaluate(r"""() => {
+                if (window.__c4ai_observer) {
+                    window.__c4ai_observer.disconnect();
+                    delete window.__c4ai_observer;
+                }
+                const removed = window.__c4ai_removed || [];
+                delete window.__c4ai_removed;
+                if (removed.length === 0) return { injected: false, count: 0 };
+
+                // Fingerprint currently-visible elements so we skip duplicates
+                const seen = new Set();
+                for (const el of document.body.querySelectorAll('*')) {
+                    const t = (el.innerText || '').trim().toLowerCase().replace(/\s+/g, ' ');
+                    if (t.length > 5) seen.add(t.substring(0, 200));
+                }
+
+                const uniqueHTML = [];
+                const tmp = document.createElement('div');
+                for (const html of removed) {
+                    tmp.innerHTML = html;
+                    const el = tmp.firstElementChild;
+                    if (!el) continue;
+                    const t = (el.innerText || '').trim().toLowerCase().replace(/\s+/g, ' ');
+                    const fp = t.substring(0, 200);
+                    if (t.length > 5 && !seen.has(fp)) {
+                        seen.add(fp);
+                        uniqueHTML.push(html);
+                    }
+                }
+                if (uniqueHTML.length === 0) return { injected: false, count: 0 };
+
+                const container = document.createElement('div');
+                container.id = '__c4ai_accumulated_content';
+                container.style.display = 'none';
+                container.innerHTML = uniqueHTML.join('\n');
+                document.body.appendChild(container);
+                return { injected: true, count: uniqueHTML.length };
+            }""")
+
+            if merge_result and merge_result.get("injected"):
+                self.logger.info(
+                    message="Virtual scroll detected: re-injected {count} recycled elements",
+                    tag="PAGE_SCAN",
+                    params={"count": merge_result.get("count", 0)},
+                )
+
             # await page.evaluate("window.scrollTo(0, 0)")
             await self.safe_scroll(page, 0, 0)
 
         except Exception as e:
+            # Clean up observer on error
+            try:
+                await page.evaluate("""() => {
+                    if (window.__c4ai_observer) {
+                        window.__c4ai_observer.disconnect();
+                        delete window.__c4ai_observer;
+                    }
+                    delete window.__c4ai_removed;
+                }""")
+            except Exception:
+                pass
             self.logger.warning(
                 message="Failed to perform full page scan: {error}",
                 tag="PAGE_SCAN",
@@ -1341,15 +1422,22 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 
                 // Perform scrolling
                 while (scrollCount < config.scroll_count) {
-                    // Scroll the container
+                    // Scroll the container; fall back to window if container
+                    // doesn't scroll (e.g. Twitter scrolls the window, not a
+                    // container element).
+                    const prevScrollTop = container.scrollTop;
                     container.scrollTop += scrollAmount;
-                    
+                    const usedWindowScroll = (container.scrollTop === prevScrollTop);
+                    if (usedWindowScroll) {
+                        window.scrollBy(0, scrollAmount);
+                    }
+
                     // Wait for content to potentially load
                     await new Promise(resolve => setTimeout(resolve, config.wait_after_scroll * 1000));
-                    
+
                     // Get current HTML
                     const currentHTML = container.innerHTML;
-                    
+
                     // Determine what changed
                     if (currentHTML === previousHTML) {
                         // Case 0: No change - continue scrolling
@@ -1362,13 +1450,15 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                         console.log(`Scroll ${scrollCount + 1}: Content replaced, capturing chunk`);
                         htmlChunks.push(previousHTML);
                     }
-                    
+
                     // Update previous HTML for next iteration
                     previousHTML = currentHTML;
                     scrollCount++;
-                    
-                    // Check if we've reached the end
-                    if (container.scrollTop + container.clientHeight >= container.scrollHeight - 10) {
+
+                    // Check if we've reached the end of scrollable content
+                    const atContainerEnd = container.scrollTop + container.clientHeight >= container.scrollHeight - 10;
+                    const atWindowEnd = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 10;
+                    if (usedWindowScroll ? atWindowEnd : atContainerEnd) {
                         console.log(`Reached end of scrollable content at scroll ${scrollCount}`);
                         // Capture final chunk if content was replaced
                         if (htmlChunks.length > 0) {
