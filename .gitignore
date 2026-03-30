@@ -174,7 +174,6 @@ cython_debug/
 Crawl4AI.egg-info/
 Crawl4AI.egg-info/*
 crawler_data.db
-.vscode/
 .tests/
 .test_pads/
 test_pad.py
@@ -258,8 +257,6 @@ continue_config.json
 .continue-downloads/
 
 # Continue VS Code specific
-.vscode-continue/
-.vscode-continue-cache/
 
 .prompts/
 
@@ -302,3 +299,6 @@ MEMORY.md
 
 # Handoff files
 HANDOFF-*.md
+branch_structure.json
+temp_auto_push.bat
+temp_interactive_push.bat

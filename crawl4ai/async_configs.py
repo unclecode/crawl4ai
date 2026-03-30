@@ -1660,6 +1660,19 @@ class CrawlerRunConfig():
             raise ValueError(
                 "chunking_strategy must be an instance of ChunkingStrategy"
             )
+        if self.markdown_generator is not None and not isinstance(
+            self.markdown_generator, MarkdownGenerationStrategy
+        ):
+            hint = ""
+            if isinstance(self.markdown_generator, dict):
+                hint = (
+                    ' The JSON format must be {"type": "<ClassName>", "params": {...}}.'
+                    ' Note: "params" is required — "options" or other keys are not recognized.'
+                )
+            raise ValueError(
+                "markdown_generator must be an instance of MarkdownGenerationStrategy, "
+                f"got {type(self.markdown_generator).__name__}.{hint}"
+            )
 
         # Set default chunking strategy if None
         if self.chunking_strategy is None:
