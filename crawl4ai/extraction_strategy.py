@@ -32,6 +32,7 @@ from .models import * # noqa: F403
 from .models import TokenUsage
 
 from .model_loader import * # noqa: F403
+from .html2text import CustomHTML2Text
 from .model_loader import (
     get_device,
     load_HF_embedding_model,
@@ -1273,6 +1274,15 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
                 value = self._get_element_attribute(value, field["attribute"])
             elif step == "html":
                 value = self._get_element_html(value)
+            elif step == "markdown":
+                # Convert element (or HTML string) to markdown
+                if not isinstance(value, str):
+                    value = self._get_element_html(value)
+                if isinstance(value, str):
+                    converter = CustomHTML2Text()
+                    value = converter.handle(value).strip()
+                else:
+                    value = None
             elif step == "regex":
                 pattern = field.get("pattern")
                 if pattern:
