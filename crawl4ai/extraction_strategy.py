@@ -1052,13 +1052,47 @@ _SAFE_EVAL_BUILTINS = {
     "isinstance": isinstance, "type": type,
 }
 
+# Allowlist of attribute names permitted in computed field expressions.
+# Uses allowlist (not blocklist) to prevent sandbox escapes via Python internal
+# attributes like gi_frame, f_back, f_builtins, cr_frame, etc.
+_SAFE_EVAL_ALLOWED_ATTRS = frozenset({
+    # String methods
+    "upper", "lower", "strip", "lstrip", "rstrip", "title", "capitalize",
+    "swapcase", "casefold",
+    "split", "rsplit", "join", "replace", "find", "rfind", "index", "rindex",
+    "count", "startswith", "endswith", "contains",
+    "isalpha", "isdigit", "isalnum", "isspace", "isupper", "islower", "isnumeric",
+    "isdecimal", "istitle", "isidentifier", "isprintable", "isascii",
+    "encode", "decode", "format", "center", "ljust", "rjust", "zfill",
+    "expandtabs", "partition", "rpartition", "removeprefix", "removesuffix",
+    "maketrans", "translate",
+    # Dict methods
+    "get", "keys", "values", "items", "update", "pop", "setdefault",
+    # List/sequence methods
+    "append", "extend", "insert", "remove", "reverse", "sort", "copy", "clear",
+    # General
+    "format_map", "real", "imag", "bit_length", "conjugate",
+    "as_integer_ratio", "is_integer", "hex",
+})
+
+# Names that must never appear as ast.Name identifiers in expressions
+_UNSAFE_EVAL_NAMES = frozenset({
+    "exec", "eval", "compile", "__import__", "globals", "locals",
+    "vars", "dir", "getattr", "setattr", "delattr", "hasattr",
+    "open", "input", "breakpoint", "exit", "quit",
+    "classmethod", "staticmethod", "property", "super",
+    "memoryview", "bytearray", "bytes",
+    "help", "copyright", "credits", "license",
+})
+
 
 def _safe_eval_expression(expression: str, local_vars: dict) -> Any:
     """
     Evaluate a computed field expression safely using AST validation.
 
-    Allows simple transforms (math, string methods, attribute access on data)
-    while blocking dangerous operations (__import__, dunder access, etc.).
+    Uses an allowlist of permitted attribute names to prevent sandbox escapes
+    via Python internal attributes (gi_frame, f_back, f_builtins, cr_frame, etc.).
+    Only simple data transforms (math, string methods, dict access) are permitted.
 
     Args:
         expression: The Python expression string to evaluate.
@@ -1080,22 +1114,42 @@ def _safe_eval_expression(expression: str, local_vars: dict) -> Any:
         if isinstance(node, (ast.Import, ast.ImportFrom)):
             raise ValueError("Import statements are not allowed in expressions")
 
-        # Block attribute access to dunder attributes (e.g., __class__, __globals__)
-        if isinstance(node, ast.Attribute) and node.attr.startswith("_"):
+        # Block lambda, generator expressions, comprehensions — prevent frame walking
+        if isinstance(node, ast.Lambda):
+            raise ValueError("Lambda expressions are not allowed")
+        if isinstance(node, (ast.GeneratorExp, ast.ListComp, ast.SetComp, ast.DictComp)):
+            raise ValueError("Comprehensions and generator expressions are not allowed")
+
+        # Allowlist for attribute access — blocks gi_frame, f_back, f_builtins, etc.
+        if isinstance(node, ast.Attribute):
+            if node.attr not in _SAFE_EVAL_ALLOWED_ATTRS:
+                raise ValueError(
+                    f"Access to attribute '{node.attr}' is not allowed in expressions"
+                )
+
+        # Block dangerous name references
+        if isinstance(node, ast.Name) and node.id in _UNSAFE_EVAL_NAMES:
             raise ValueError(
-                f"Access to private/dunder attribute '{node.attr}' is not allowed"
+                f"Reference to '{node.id}' is not allowed in expressions"
             )
 
-        # Block calls to __import__ or any name starting with _
+        # Block all function calls except to allowed builtins and allowed methods
         if isinstance(node, ast.Call):
             func = node.func
-            if isinstance(func, ast.Name) and func.id.startswith("_"):
+            if isinstance(func, ast.Name):
+                if func.id not in _SAFE_EVAL_BUILTINS and func.id not in local_vars:
+                    raise ValueError(
+                        f"Calling '{func.id}' is not allowed in expressions"
+                    )
+            elif isinstance(func, ast.Attribute):
+                if func.attr not in _SAFE_EVAL_ALLOWED_ATTRS:
+                    raise ValueError(
+                        f"Calling method '{func.attr}' is not allowed in expressions"
+                    )
+            else:
+                # Block calls via subscript (e.g., d['__import__']('os'))
                 raise ValueError(
-                    f"Calling '{func.id}' is not allowed in expressions"
-                )
-            if isinstance(func, ast.Attribute) and func.attr.startswith("_"):
-                raise ValueError(
-                    f"Calling '{func.attr}' is not allowed in expressions"
+                    "Only direct function/method calls are allowed in expressions"
                 )
 
     safe_globals = {"__builtins__": _SAFE_EVAL_BUILTINS}
