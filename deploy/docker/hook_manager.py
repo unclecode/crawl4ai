@@ -122,12 +122,14 @@ class UserHookManager:
             safe_builtins = {}
 
             # Add safe built-in functions (no __import__ for security)
+            # SECURITY: getattr/setattr removed - classic sandbox escape vectors.
+            # hasattr kept (read-only attribute check, not exploitable).
             allowed_builtins = [
                 'print', 'len', 'str', 'int', 'float', 'bool',
                 'list', 'dict', 'set', 'tuple', 'range', 'enumerate',
                 'zip', 'map', 'filter', 'any', 'all', 'sum', 'min', 'max',
                 'sorted', 'reversed', 'abs', 'round', 'isinstance', 'type',
-                'getattr', 'hasattr', 'setattr', 'callable', 'iter', 'next',
+                'hasattr', 'callable', 'iter', 'next',
                 '__build_class__'  # Required for class definitions in exec
             ]
             

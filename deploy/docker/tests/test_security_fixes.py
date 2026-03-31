@@ -18,7 +18,6 @@ class TestURLValidation(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        # Import the validation constants and function
         self.ALLOWED_URL_SCHEMES = ("http://", "https://")
         self.ALLOWED_URL_SCHEMES_WITH_RAW = ("http://", "https://", "raw:", "raw://")
 
@@ -92,8 +91,8 @@ class TestHookBuiltins(unittest.TestCase):
             'list', 'dict', 'set', 'tuple', 'range', 'enumerate',
             'zip', 'map', 'filter', 'any', 'all', 'sum', 'min', 'max',
             'sorted', 'reversed', 'abs', 'round', 'isinstance', 'type',
-            'getattr', 'hasattr', 'setattr', 'callable', 'iter', 'next',
-            '__build_class__'  # Required for class definitions in exec
+            'hasattr', 'callable', 'iter', 'next',
+            '__build_class__'
         ]
 
         self.assertNotIn('__import__', allowed_builtins)
@@ -101,6 +100,9 @@ class TestHookBuiltins(unittest.TestCase):
         self.assertNotIn('exec', allowed_builtins)
         self.assertNotIn('compile', allowed_builtins)
         self.assertNotIn('open', allowed_builtins)
+        # getattr/setattr are sandbox escape vectors - must not be present
+        self.assertNotIn('getattr', allowed_builtins)
+        self.assertNotIn('setattr', allowed_builtins)
 
     def test_build_class_in_allowed_builtins(self):
         """__build_class__ must be in allowed_builtins (needed for class definitions)."""
@@ -109,7 +111,7 @@ class TestHookBuiltins(unittest.TestCase):
             'list', 'dict', 'set', 'tuple', 'range', 'enumerate',
             'zip', 'map', 'filter', 'any', 'all', 'sum', 'min', 'max',
             'sorted', 'reversed', 'abs', 'round', 'isinstance', 'type',
-            'getattr', 'hasattr', 'setattr', 'callable', 'iter', 'next',
+            'hasattr', 'callable', 'iter', 'next',
             '__build_class__'
         ]
 
@@ -121,10 +123,6 @@ class TestHooksEnabled(unittest.TestCase):
 
     def test_hooks_disabled_by_default(self):
         """Hooks must be disabled by default."""
-        # Simulate the default behavior
-        hooks_enabled = os.environ.get("CRAWL4AI_HOOKS_ENABLED", "false").lower() == "true"
-
-        # Clear any existing env var to test default
         original = os.environ.pop("CRAWL4AI_HOOKS_ENABLED", None)
         try:
             hooks_enabled = os.environ.get("CRAWL4AI_HOOKS_ENABLED", "false").lower() == "true"
@@ -160,109 +158,81 @@ class TestHooksEnabled(unittest.TestCase):
                 os.environ.pop("CRAWL4AI_HOOKS_ENABLED", None)
 
 
-class TestComputedFieldSafety(unittest.TestCase):
-    """Test that computed field expressions block dangerous operations.
+class TestComputedFieldExpressionDisabled(unittest.TestCase):
+    """Test that computed field 'expression' key is completely disabled.
 
-    Mirrors the AST-based _safe_eval_expression() logic from extraction_strategy.py
-    to test without importing heavy crawl4ai dependencies.
+    eval() on untrusted input is fundamentally unsafe - no sandbox survives.
+    The expression path is now disabled; only 'function' key works.
     """
 
-    def setUp(self):
-        """Set up the safe eval function (local copy of the logic)."""
-        import ast
+    def test_expression_returns_default(self):
+        """expression key must return default value, not evaluate."""
+        import logging
+        # Import the actual class
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+        from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
 
-        SAFE_BUILTINS = {
-            "str": str, "int": int, "float": float, "bool": bool,
-            "len": len, "round": round, "abs": abs, "min": min, "max": max,
-            "sum": sum, "sorted": sorted, "reversed": reversed,
-            "list": list, "dict": dict, "tuple": tuple, "set": set,
-            "enumerate": enumerate, "zip": zip, "map": map, "filter": filter,
-            "any": any, "all": all, "range": range,
-            "True": True, "False": False, "None": None,
-            "isinstance": isinstance, "type": type,
+        schema = {
+            "baseSelector": "div",
+            "fields": [
+                {"name": "price", "selector": "span", "type": "text"},
+                {
+                    "name": "computed",
+                    "type": "computed",
+                    "expression": "price * 2",
+                    "default": "DISABLED",
+                },
+            ],
         }
+        strategy = JsonCssExtractionStrategy(schema)
+        result = strategy._compute_field({"price": 100}, schema["fields"][1])
+        self.assertEqual(result, "DISABLED")
 
-        def safe_eval(expression, local_vars):
-            tree = ast.parse(expression, mode="eval")
-            for node in ast.walk(tree):
-                if isinstance(node, (ast.Import, ast.ImportFrom)):
-                    raise ValueError("Import statements are not allowed")
-                if isinstance(node, ast.Attribute) and node.attr.startswith("_"):
-                    raise ValueError(f"Access to '{node.attr}' is not allowed")
-                if isinstance(node, ast.Call):
-                    func = node.func
-                    if isinstance(func, ast.Name) and func.id.startswith("_"):
-                        raise ValueError(f"Calling '{func.id}' is not allowed")
-                    if isinstance(func, ast.Attribute) and func.attr.startswith("_"):
-                        raise ValueError(f"Calling '{func.attr}' is not allowed")
-            safe_globals = {"__builtins__": SAFE_BUILTINS}
-            return eval(compile(tree, "<expression>", "eval"), safe_globals, local_vars)
+    def test_expression_does_not_execute_code(self):
+        """expression must NEVER execute - even harmless code."""
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+        from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
 
-        self.safe_eval = safe_eval
+        schema = {
+            "baseSelector": "div",
+            "fields": [{"name": "x", "selector": "span", "type": "text"}],
+        }
+        strategy = JsonCssExtractionStrategy(schema)
 
-    # === SECURITY TESTS: These expressions must be BLOCKED ===
+        # These should all return default, never execute
+        dangerous_expressions = [
+            "__import__('os').system('id')",
+            "open('/etc/passwd').read()",
+            "().__class__.__bases__[0].__subclasses__()",
+        ]
+        for expr in dangerous_expressions:
+            field = {"name": "test", "type": "computed", "expression": expr, "default": None}
+            result = strategy._compute_field({}, field)
+            self.assertIsNone(result, f"Expression should not execute: {expr}")
 
-    def test_import_blocked(self):
-        """__import__('os') must be blocked."""
-        with self.assertRaises(ValueError):
-            self.safe_eval("__import__('os').system('id')", {})
+    def test_function_key_still_works(self):
+        """function key with Python callable must still work."""
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+        from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
 
-    def test_dunder_attribute_blocked(self):
-        """Access to __class__, __globals__, etc. must be blocked."""
-        with self.assertRaises(ValueError):
-            self.safe_eval("''.__class__.__bases__", {})
-
-    def test_dunder_method_call_blocked(self):
-        """Calls to dunder methods must be blocked."""
-        with self.assertRaises(ValueError):
-            self.safe_eval("x.__getattribute__('y')", {"x": {}})
-
-    def test_os_popen_via_import_blocked(self):
-        """The exact POC from the vulnerability report must be blocked."""
-        with self.assertRaises(ValueError):
-            self.safe_eval('__import__("os").popen("id").read()', {})
-
-    # === FUNCTIONALITY TESTS: These expressions must WORK ===
-
-    def test_simple_math(self):
-        """Basic arithmetic on item values must work."""
-        result = self.safe_eval("price * 1.1", {"price": 100})
-        self.assertAlmostEqual(result, 110.0)
-
-    def test_string_method(self):
-        """String methods on item values must work."""
-        result = self.safe_eval("name.upper()", {"name": "hello"})
-        self.assertEqual(result, "HELLO")
-
-    def test_string_concatenation(self):
-        """String concatenation must work."""
-        result = self.safe_eval("first + ' ' + last", {"first": "John", "last": "Doe"})
-        self.assertEqual(result, "John Doe")
-
-    def test_dict_access(self):
-        """Dict-style field access must work."""
-        result = self.safe_eval("a + b", {"a": 10, "b": 20})
-        self.assertEqual(result, 30)
-
-    def test_builtin_functions(self):
-        """Safe builtins like len, str, int must work."""
-        result = self.safe_eval("len(name)", {"name": "hello"})
-        self.assertEqual(result, 5)
-
-    def test_round_function(self):
-        """round() must work for numeric formatting."""
-        result = self.safe_eval("round(price, 2)", {"price": 10.456})
-        self.assertEqual(result, 10.46)
+        schema = {
+            "baseSelector": "div",
+            "fields": [{"name": "price", "selector": "span", "type": "text"}],
+        }
+        strategy = JsonCssExtractionStrategy(schema)
+        field = {
+            "name": "computed",
+            "type": "computed",
+            "function": lambda item: item["price"] * 2,
+        }
+        result = strategy._compute_field({"price": 100}, field)
+        self.assertEqual(result, 200)
 
 
 class TestDeserializationAllowlist(unittest.TestCase):
-    """Test that the deserialization allowlist blocks non-allowlisted types.
-
-    Tests the allowlist constant directly without importing heavy dependencies.
-    """
+    """Test that the deserialization allowlist blocks non-allowlisted types."""
 
     def setUp(self):
-        """Set up the allowlist (local copy of the constant)."""
         self.allowed_types = {
             "BrowserConfig", "CrawlerRunConfig", "HTTPCrawlerConfig",
             "LLMConfig", "ProxyConfig", "GeolocationConfig",
@@ -285,33 +255,23 @@ class TestDeserializationAllowlist(unittest.TestCase):
             "RoundRobinProxyStrategy",
         }
 
-    # === SECURITY TESTS: Non-allowlisted types must be BLOCKED ===
-
     def test_arbitrary_class_not_in_allowlist(self):
-        """AsyncWebCrawler must NOT be in the allowlist."""
         self.assertNotIn("AsyncWebCrawler", self.allowed_types)
 
     def test_crawler_hub_not_in_allowlist(self):
-        """CrawlerHub must NOT be in the allowlist."""
         self.assertNotIn("CrawlerHub", self.allowed_types)
 
     def test_browser_profiler_not_in_allowlist(self):
-        """BrowserProfiler must NOT be in the allowlist."""
         self.assertNotIn("BrowserProfiler", self.allowed_types)
 
     def test_docker_client_not_in_allowlist(self):
-        """Crawl4aiDockerClient must NOT be in the allowlist."""
         self.assertNotIn("Crawl4aiDockerClient", self.allowed_types)
 
-    # === FUNCTIONALITY TESTS: Allowlisted types must be present ===
-
     def test_allowlist_has_core_config_types(self):
-        """Core config types must be in the allowlist."""
         required = {"BrowserConfig", "CrawlerRunConfig", "LLMConfig", "ProxyConfig"}
         self.assertTrue(required.issubset(self.allowed_types))
 
     def test_allowlist_has_extraction_strategies(self):
-        """Extraction strategy types must be in the allowlist."""
         required = {
             "JsonCssExtractionStrategy", "LLMExtractionStrategy",
             "RegexExtractionStrategy",
@@ -319,7 +279,6 @@ class TestDeserializationAllowlist(unittest.TestCase):
         self.assertTrue(required.issubset(self.allowed_types))
 
     def test_allowlist_has_enums(self):
-        """Enum types must be in the allowlist."""
         required = {"CacheMode", "MatchMode", "DisplayMode"}
         self.assertTrue(required.issubset(self.allowed_types))
 
@@ -329,6 +288,4 @@ if __name__ == '__main__':
     print("Crawl4AI Security Fixes - Unit Tests")
     print("=" * 60)
     print()
-
-    # Run tests with verbosity
     unittest.main(verbosity=2)
