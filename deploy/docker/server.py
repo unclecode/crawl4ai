@@ -84,6 +84,15 @@ GLOBAL_SEM = asyncio.Semaphore(MAX_PAGES)
 # Hooks are disabled by default for security (RCE risk). Set to "true" to enable.
 HOOKS_ENABLED = os.environ.get("CRAWL4AI_HOOKS_ENABLED", "false").lower() == "true"
 
+# Warn loudly if API token is not set (all endpoints unauthenticated)
+_api_token = config.get("security", {}).get("api_token", "") or os.environ.get("CRAWL4AI_API_TOKEN", "")
+if not _api_token:
+    import logging as _logging
+    _logging.getLogger("crawl4ai.security").warning(
+        "CRAWL4AI_API_TOKEN is not set. All API endpoints are unauthenticated. "
+        "Set CRAWL4AI_API_TOKEN environment variable to enable authentication."
+    )
+
 # ── default browser config helper ─────────────────────────────
 def get_default_browser_config() -> BrowserConfig:
     """Get default BrowserConfig from config.yml."""
