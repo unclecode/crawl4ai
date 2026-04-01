@@ -84,6 +84,11 @@ GLOBAL_SEM = asyncio.Semaphore(MAX_PAGES)
 # Hooks are disabled by default for security (RCE risk). Set to "true" to enable.
 HOOKS_ENABLED = os.environ.get("CRAWL4AI_HOOKS_ENABLED", "false").lower() == "true"
 
+# /execute_js runs arbitrary JavaScript in the headless browser, which can
+# make unrestricted network requests (bypassing any Python-level SSRF checks).
+# Disabled by default. Set to "true" to enable.
+EXECUTE_JS_ENABLED = os.environ.get("CRAWL4AI_EXECUTE_JS_ENABLED", "false").lower() == "true"
+
 # ── default browser config helper ─────────────────────────────
 def get_default_browser_config() -> BrowserConfig:
     """Get default BrowserConfig from config.yml."""
@@ -529,6 +534,8 @@ async def execute_js(
         ```
 
     """
+    if not EXECUTE_JS_ENABLED:
+        raise HTTPException(403, "/execute_js is disabled. Set CRAWL4AI_EXECUTE_JS_ENABLED=true to enable.")
     validate_url_scheme(body.url)
     crawler = None
     try:
@@ -544,6 +551,10 @@ async def execute_js(
     finally:
         if crawler:
             await release_crawler(crawler)
+
+# Hide from MCP tool list when disabled
+if not EXECUTE_JS_ENABLED:
+    del execute_js.__mcp_kind__
 
 
 @app.get("/llm/{url:path}")
