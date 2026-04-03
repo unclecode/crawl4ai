@@ -2649,8 +2649,10 @@ class AsyncHTTPCrawlerStrategy(AsyncCrawlerStrategy):
         config: CrawlerRunConfig
     ) -> AsyncCrawlResponse:
         async with self._session_context() as session:
+            # page_timeout is in ms (Playwright convention), but aiohttp expects seconds
+            timeout_sec = (config.page_timeout / 1000) if config.page_timeout else self.DEFAULT_TIMEOUT
             timeout = ClientTimeout(
-                total=config.page_timeout or self.DEFAULT_TIMEOUT,
+                total=timeout_sec,
                 connect=10,
                 sock_read=30
             )
