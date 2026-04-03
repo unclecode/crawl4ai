@@ -455,45 +455,83 @@ class AsyncWebCrawler:
                                 async_response = await self.crawler_strategy.crawl(
                                     url, config=config)
 
-                                html = sanitize_input_encode(async_response.html)
-                                screenshot_data = async_response.screenshot
-                                pdf_data = async_response.pdf_data
-                                js_execution_result = async_response.js_execution_result
+                                # Document extraction: detect binary documents before HTML processing
+                                doc_strategy = getattr(config, "document_extraction_strategy", None)
+                                if doc_strategy and doc_strategy.detect(async_response):
+                                    self.logger.info(
+                                        message="Document detected for {url}, using document extraction",
+                                        tag="DOCUMENT",
+                                        params={"url": url},
+                                    )
+                                    doc_result = await doc_strategy.extract(async_response, url)
+                                    crawl_result = CrawlResult(
+                                        url=url,
+                                        html="",
+                                        success=True,
+                                        cleaned_html="",
+                                        _markdown=MarkdownGenerationResult(
+                                            raw_markdown=doc_result.content,
+                                            markdown_with_citations=doc_result.content,
+                                            references_markdown="",
+                                            fit_markdown="",
+                                            fit_html="",
+                                        ),
+                                        metadata={
+                                            "is_document": True,
+                                            "content_type": doc_result.content_type,
+                                            **(doc_result.metadata or {}),
+                                        },
+                                        status_code=async_response.status_code,
+                                        response_headers=async_response.response_headers,
+                                        downloaded_files=async_response.downloaded_files,
+                                        redirected_url=async_response.redirected_url,
+                                        redirected_status_code=async_response.redirected_status_code,
+                                        ssl_certificate=async_response.ssl_certificate,
+                                        network_requests=async_response.network_requests,
+                                        console_messages=async_response.console_messages,
+                                        session_id=getattr(config, "session_id", None),
+                                        cache_status="miss",
+                                    )
+                                else:
+                                    html = sanitize_input_encode(async_response.html)
+                                    screenshot_data = async_response.screenshot
+                                    pdf_data = async_response.pdf_data
+                                    js_execution_result = async_response.js_execution_result
 
-                                self.logger.url_status(
-                                    url=cache_context.display_url,
-                                    success=bool(html),
-                                    timing=time.perf_counter() - t1,
-                                    tag="FETCH",
-                                )
+                                    self.logger.url_status(
+                                        url=cache_context.display_url,
+                                        success=bool(html),
+                                        timing=time.perf_counter() - t1,
+                                        tag="FETCH",
+                                    )
 
-                                crawl_result = await self.aprocess_html(
-                                    url=url, html=html,
-                                    extracted_content=extracted_content,
-                                    config=config,
-                                    screenshot_data=screenshot_data,
-                                    pdf_data=pdf_data,
-                                    verbose=config.verbose,
-                                    is_raw_html=True if url.startswith("raw:") else False,
-                                    redirected_url=async_response.redirected_url,
-                                    original_scheme=urlparse(url).scheme,
-                                    **kwargs,
-                                )
+                                    crawl_result = await self.aprocess_html(
+                                        url=url, html=html,
+                                        extracted_content=extracted_content,
+                                        config=config,
+                                        screenshot_data=screenshot_data,
+                                        pdf_data=pdf_data,
+                                        verbose=config.verbose,
+                                        is_raw_html=True if url.startswith("raw:") else False,
+                                        redirected_url=async_response.redirected_url,
+                                        original_scheme=urlparse(url).scheme,
+                                        **kwargs,
+                                    )
 
-                                crawl_result.status_code = async_response.status_code
-                                is_raw_url = url.startswith("raw:") or url.startswith("raw://")
-                                crawl_result.redirected_url = async_response.redirected_url or (None if is_raw_url else url)
-                                crawl_result.redirected_status_code = async_response.redirected_status_code
-                                crawl_result.response_headers = async_response.response_headers
-                                crawl_result.downloaded_files = async_response.downloaded_files
-                                crawl_result.js_execution_result = js_execution_result
-                                crawl_result.mhtml = async_response.mhtml_data
-                                crawl_result.ssl_certificate = async_response.ssl_certificate
-                                crawl_result.network_requests = async_response.network_requests
-                                crawl_result.console_messages = async_response.console_messages
-                                crawl_result.success = bool(html)
-                                crawl_result.session_id = getattr(config, "session_id", None)
-                                crawl_result.cache_status = "miss"
+                                    crawl_result.status_code = async_response.status_code
+                                    is_raw_url = url.startswith("raw:") or url.startswith("raw://")
+                                    crawl_result.redirected_url = async_response.redirected_url or (None if is_raw_url else url)
+                                    crawl_result.redirected_status_code = async_response.redirected_status_code
+                                    crawl_result.response_headers = async_response.response_headers
+                                    crawl_result.downloaded_files = async_response.downloaded_files
+                                    crawl_result.js_execution_result = js_execution_result
+                                    crawl_result.mhtml = async_response.mhtml_data
+                                    crawl_result.ssl_certificate = async_response.ssl_certificate
+                                    crawl_result.network_requests = async_response.network_requests
+                                    crawl_result.console_messages = async_response.console_messages
+                                    crawl_result.success = bool(html)
+                                    crawl_result.session_id = getattr(config, "session_id", None)
+                                    crawl_result.cache_status = "miss"
 
                                 # Check if blocked (skip for raw: URLs —
                                 # caller-provided content, anti-bot N/A)
