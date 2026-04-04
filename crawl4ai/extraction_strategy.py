@@ -558,7 +558,7 @@ class LLMExtractionStrategy(ExtractionStrategy):
         llm_config: 'LLMConfig' = None,
         instruction: str = None,
         schema: Dict = None,
-        extraction_type="block",
+        extraction_type="schema",
         chunk_token_threshold=CHUNK_TOKEN_THRESHOLD,
         overlap_rate=OVERLAP_RATE,
         word_token_rate=WORD_TOKEN_RATE,
