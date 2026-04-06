@@ -542,7 +542,8 @@ async def handle_crawl_request(
     browser_config: dict,
     crawler_config: dict,
     config: dict,
-    hooks_config: Optional[dict] = None
+    hooks_config: Optional[dict] = None,
+    crawler_configs: Optional[List[dict]] = None,
 ) -> dict:
     """Handle non-streaming crawl requests with optional hooks."""
     # Track request start
@@ -591,19 +592,32 @@ async def handle_crawl_request(
             logger.info(f"Hooks attachment status: {hooks_status['status']}")
         
         base_config = config["crawler"]["base_config"]
-        # Iterate on key-value pairs in global_config then use hasattr to set them
-        for key, value in base_config.items():
-            if hasattr(crawler_config, key):
-                current_value = getattr(crawler_config, key)
-                # Only set base config if user didn't provide a value
-                if current_value is None or current_value == "":
-                    setattr(crawler_config, key, value)
+
+        # Build the config(s) to pass to arun/arun_many
+        if crawler_configs and len(urls) > 1:
+            # Per-URL config list: deserialize each and apply base_config
+            config_list = [CrawlerRunConfig.load(cc) for cc in crawler_configs]
+            for cfg in config_list:
+                for key, value in base_config.items():
+                    if hasattr(cfg, key):
+                        current_value = getattr(cfg, key)
+                        if current_value is None or current_value == "":
+                            setattr(cfg, key, value)
+            effective_config = config_list
+        else:
+            # Single config (original behavior)
+            for key, value in base_config.items():
+                if hasattr(crawler_config, key):
+                    current_value = getattr(crawler_config, key)
+                    if current_value is None or current_value == "":
+                        setattr(crawler_config, key, value)
+            effective_config = crawler_config
 
         results = []
         func = getattr(crawler, "arun" if len(urls) == 1 else "arun_many")
-        partial_func = partial(func, 
-                                urls[0] if len(urls) == 1 else urls, 
-                                config=crawler_config, 
+        partial_func = partial(func,
+                                urls[0] if len(urls) == 1 else urls,
+                                config=effective_config,
                                 dispatcher=dispatcher)
         results = await partial_func()
         
