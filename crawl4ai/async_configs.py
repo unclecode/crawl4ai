@@ -30,11 +30,62 @@ from .cache_context import CacheMode
 from .proxy_strategy import ProxyRotationStrategy
 
 import inspect
-from typing import Any, Awaitable, Callable, Dict, List, Literal, Optional, Union
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Union
 from enum import Enum
 
 # Type alias for URL matching
 UrlMatcher = Union[str, Callable[[str], bool], List[Union[str, Callable[[str], bool]]]]
+
+
+LEGACY_DEFAULT_CHROMIUM_USER_AGENT = (
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+    "Chrome/116.0.0.0 Safari/537.36"
+)
+DEFAULT_FIREFOX_USER_AGENT = (
+    "Mozilla/5.0 (X11; Linux x86_64; rv:135.0) "
+    "Gecko/20100101 Firefox/135.0"
+)
+CAMOUFOX_RUNTIME = "camoufox"
+CAMOUFOX_IDENTITY_HEADER_NAMES = {"user-agent", "accept-language"}
+CAMOUFOX_IDENTITY_HEADER_PREFIXES = ("sec-ch-ua",)
+CAMOUFOX_BLOCKED_RUN_FIELDS = (
+    "proxy_config",
+    "user_agent",
+    "user_agent_mode",
+    "locale",
+    "timezone_id",
+    "geolocation",
+    "override_navigator",
+    "magic",
+)
+
+
+def _header_names(headers: Optional[Dict[str, Any]]) -> List[str]:
+    if not headers:
+        return []
+    return [str(name).lower() for name in headers.keys()]
+
+
+def _find_identity_headers(headers: Optional[Dict[str, Any]]) -> List[str]:
+    matches = []
+    for name in _header_names(headers):
+        if name in CAMOUFOX_IDENTITY_HEADER_NAMES or name.startswith(
+            CAMOUFOX_IDENTITY_HEADER_PREFIXES
+        ):
+            matches.append(name)
+    return matches
+
+
+def _config_value_is_set(value: Any) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value != ""
+    if isinstance(value, (list, tuple, set, dict)):
+        return len(value) > 0
+    return True
 
 
 def _with_defaults(cls):
@@ -498,6 +549,8 @@ class BrowserConfig:
     code will then reference these settings to initialize the browser in a consistent, documented manner.
 
     Attributes:
+        browser_runtime (str): Browser automation runtime. Supported values: "playwright" and "camoufox".
+                               Default: "playwright".
         browser_type (str): The type of browser to launch. Supported values: "chromium", "firefox", "webkit".
                             Default: "chromium".
         headless (bool): Whether to run the browser in headless mode (no visible GUI).
@@ -508,6 +561,7 @@ class BrowserConfig:
                            "cdp" - use explicit CDP settings provided in cdp_url
                            "docker" - run browser in Docker container with isolation
                            Default: "dedicated"
+                           Note: Camoufox currently supports only "dedicated".
         use_managed_browser (bool): Launch the browser using a managed approach (e.g., via CDP), allowing
                                     advanced manipulation. Default: False.
         cdp_url (str): URL for the Chrome DevTools Protocol (CDP) endpoint. Default: "ws://localhost:9222/devtools/browser/".
@@ -573,12 +627,14 @@ class BrowserConfig:
                         Default: [].
         headers (dict): Extra HTTP headers to apply to all requests in this context.
                         Default: {}.
-        user_agent (str): Custom User-Agent string to use. Default: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                           "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36".
+        user_agent (str or None): Custom User-Agent string to use. If None, Crawl4AI derives a browser-specific
+                                  default. Camoufox rejects explicit overrides.
         user_agent_mode (str or None): Mode for generating the user agent (e.g., "random"). If None, use the provided
                                        user_agent as-is. Default: None.
         user_agent_generator_config (dict or None): Configuration for user agent generation if user_agent_mode is set.
                                                     Default: None.
+        camoufox_options (dict or None): Pass-through options for Camoufox launch and fingerprint configuration.
+                                         Default: None.
         text_mode (bool): If True, disables images and other rich content for potentially faster load times.
                           Default: False.
         light_mode (bool): Disables certain background features for performance gains. Default: False.
@@ -603,8 +659,8 @@ class BrowserConfig:
 
     def __init__(
         self,
+        browser_runtime: str = "playwright",
         browser_type: str = "chromium",
-        browser_runtime: Literal["playwright", "camoufox"] = "playwright",
         headless: bool = True,
         browser_mode: str = "dedicated",
         use_managed_browser: bool = False,
@@ -621,7 +677,6 @@ class BrowserConfig:
         channel: str = "chromium",
         proxy: str = None,
         proxy_config: Union[ProxyConfig, dict, None] = None,
-        camoufox_options: dict = None,
         viewport_width: int = 1080,
         viewport_height: int = 600,
         viewport: dict = None,
@@ -635,14 +690,10 @@ class BrowserConfig:
         verbose: bool = True,
         cookies: list = None,
         headers: dict = None,
-        user_agent: str = (
-            # "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) AppleWebKit/537.36 "
-            # "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-            # "(KHTML, like Gecko) Chrome/116.0.5845.187 Safari/604.1 Edg/117.0.2045.47"
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/116.0.0.0 Safari/537.36"
-        ),
+        user_agent: Optional[str] = None,
         user_agent_mode: str = "",
-        user_agent_generator_config: dict = {},
+        user_agent_generator_config: dict = None,
+        camoufox_options: Optional[Dict[str, Any]] = None,
         text_mode: bool = False,
         light_mode: bool = False,
         extra_args: list = None,
@@ -655,9 +706,14 @@ class BrowserConfig:
         memory_saving_mode: bool = False,
         max_pages_before_recycle: int = 0,
     ):
-        
-        self.browser_type = browser_type
+        requested_user_agent = user_agent
+        requested_headers = copy.deepcopy(headers) if headers is not None else {}
+        requested_camoufox_options = (
+            copy.deepcopy(camoufox_options) if camoufox_options is not None else None
+        )
+
         self.browser_runtime = browser_runtime
+        self.browser_type = browser_type
         self.headless = headless
         self.browser_mode = browser_mode
         self.use_managed_browser = use_managed_browser
@@ -679,7 +735,6 @@ class BrowserConfig:
             warnings.warn("The 'proxy' parameter is deprecated and will be removed in a future release. Use 'proxy_config' instead.", UserWarning)
         self.proxy = proxy
         self.proxy_config = proxy_config
-        self.camoufox_options = camoufox_options or {}
         if isinstance(self.proxy_config, dict):
             self.proxy_config = ProxyConfig.from_dict(self.proxy_config)
         if isinstance(self.proxy_config, str):
@@ -707,9 +762,10 @@ class BrowserConfig:
         self.java_script_enabled = java_script_enabled
         self.cookies = cookies if cookies is not None else []
         self.headers = headers if headers is not None else {}
-        self.user_agent = user_agent
+        self.user_agent = user_agent or self._default_user_agent()
         self.user_agent_mode = user_agent_mode
-        self.user_agent_generator_config = user_agent_generator_config
+        self.user_agent_generator_config = user_agent_generator_config or {}
+        self.camoufox_options = camoufox_options if camoufox_options is not None else None
         self.text_mode = text_mode
         self.light_mode = light_mode
         self.extra_args = extra_args if extra_args is not None else []
@@ -724,39 +780,25 @@ class BrowserConfig:
         self.memory_saving_mode = memory_saving_mode
         self.max_pages_before_recycle = max_pages_before_recycle
 
-        if self.browser_runtime not in ("playwright", "camoufox"):
-            raise ValueError("browser_runtime must be 'playwright' or 'camoufox'")
-
-        if self.browser_runtime == "camoufox":
-            if self.browser_type != "firefox":
-                raise ValueError("browser_runtime='camoufox' requires browser_type='firefox'")
-            if self.browser_mode != "dedicated":
-                raise ValueError("browser_runtime='camoufox' requires browser_mode='dedicated'")
-            if self.cdp_url or self.browser_context_id or self.target_id:
-                raise ValueError("browser_runtime='camoufox' does not support CDP settings")
-            if self.use_managed_browser:
-                raise ValueError("browser_runtime='camoufox' does not support managed browser mode")
-            if self.enable_stealth:
-                raise ValueError("browser_runtime='camoufox' does not support enable_stealth")
-            if self.user_agent_mode:
-                raise ValueError("browser_runtime='camoufox' does not support user_agent_mode")
-            if any(key.lower() == "user-agent" for key in self.headers):
-                raise ValueError("browser_runtime='camoufox' does not support User-Agent headers")
-            if self.proxy_config and self.camoufox_options.get("proxy"):
-                raise ValueError(
-                    "browser_runtime='camoufox' cannot use both proxy_config and camoufox_options['proxy']"
-                )
+        self._validate_runtime_inputs(
+            requested_user_agent=requested_user_agent,
+            requested_headers=requested_headers,
+            requested_camoufox_options=requested_camoufox_options,
+        )
 
         fa_user_agenr_generator = ValidUAGenerator()
         if self.user_agent_mode == "random":
             self.user_agent = fa_user_agenr_generator.generate(
                 **(self.user_agent_generator_config or {})
             )
-        else:
-            pass
 
-        self.browser_hint = UAGen.generate_client_hints(self.user_agent)
-        self.headers.setdefault("sec-ch-ua", self.browser_hint)
+        self.browser_hint = (
+            UAGen.generate_client_hints(self.user_agent)
+            if self.browser_type == "chromium"
+            else ""
+        )
+        if self.browser_hint and not self.uses_browser_scoped_identity:
+            self.headers.setdefault("sec-ch-ua", self.browser_hint)
 
         # Set appropriate browser management flags based on browser_mode
         if self.browser_mode == "builtin":
@@ -785,6 +827,105 @@ class BrowserConfig:
                 "Stealth mode requires a dedicated browser instance."
             )
 
+    @property
+    def is_camoufox(self) -> bool:
+        return self.browser_runtime == CAMOUFOX_RUNTIME
+
+    @property
+    def uses_browser_scoped_identity(self) -> bool:
+        return self.is_camoufox
+
+    def _default_user_agent(self) -> str:
+        if self.browser_type == "firefox":
+            return DEFAULT_FIREFOX_USER_AGENT
+        return LEGACY_DEFAULT_CHROMIUM_USER_AGENT
+
+    def _validate_runtime_inputs(
+        self,
+        requested_user_agent: Optional[str],
+        requested_headers: Dict[str, Any],
+        requested_camoufox_options: Optional[Dict[str, Any]],
+    ) -> None:
+        if self.browser_runtime not in {"playwright", CAMOUFOX_RUNTIME}:
+            raise ValueError(
+                "browser_runtime must be one of: 'playwright', 'camoufox'."
+            )
+
+        if not self.is_camoufox:
+            return
+
+        if self.browser_type != "firefox":
+            raise ValueError(
+                "browser_runtime='camoufox' requires browser_type='firefox'."
+            )
+        if self.browser_mode != "dedicated":
+            raise ValueError(
+                "browser_runtime='camoufox' currently supports only "
+                "browser_mode='dedicated'."
+            )
+        if self.cdp_url:
+            raise ValueError(
+                "browser_runtime='camoufox' does not support cdp_url or CDP-based "
+                "browser connections."
+            )
+        if self.use_managed_browser and not self.use_persistent_context:
+            raise ValueError(
+                "browser_runtime='camoufox' does not support managed-browser "
+                "startup outside use_persistent_context=True."
+            )
+        if self.use_persistent_context and self.storage_state:
+            raise ValueError(
+                "browser_runtime='camoufox' does not support storage_state when "
+                "use_persistent_context=True. Reuse browser state through "
+                "user_data_dir instead."
+            )
+        if self.enable_stealth:
+            raise ValueError(
+                "browser_runtime='camoufox' cannot be combined with enable_stealth. "
+                "Camoufox must own stealth and fingerprint behavior."
+            )
+        if (
+            _config_value_is_set(requested_user_agent)
+            and requested_user_agent != self._default_user_agent()
+        ):
+            raise ValueError(
+                "browser_runtime='camoufox' does not accept BrowserConfig.user_agent. "
+                "Use camoufox_options for browser-scoped identity settings."
+            )
+        if _config_value_is_set(self.user_agent_mode):
+            raise ValueError(
+                "browser_runtime='camoufox' does not accept BrowserConfig.user_agent_mode. "
+                "Use camoufox_options for browser-scoped identity settings."
+            )
+        bad_headers = _find_identity_headers(requested_headers)
+        if bad_headers:
+            rendered = ", ".join(sorted(set(bad_headers)))
+            raise ValueError(
+                "browser_runtime='camoufox' does not allow identity-bearing "
+                f"BrowserConfig.headers: {rendered}. Use camoufox_options instead."
+            )
+        if self.proxy_config and requested_camoufox_options and "proxy" in requested_camoufox_options:
+            raise ValueError(
+                "browser_runtime='camoufox' received both proxy_config and "
+                "camoufox_options['proxy']. Set only one proxy source."
+            )
+
+    def validate_crawler_run_config(self, crawler_run_config: Optional["CrawlerRunConfig"]) -> None:
+        if not self.is_camoufox or crawler_run_config is None:
+            return
+
+        invalid_fields = []
+        for field_name in CAMOUFOX_BLOCKED_RUN_FIELDS:
+            if _config_value_is_set(getattr(crawler_run_config, field_name, None)):
+                invalid_fields.append(field_name)
+
+        if invalid_fields:
+            rendered = ", ".join(invalid_fields)
+            raise ValueError(
+                "browser_runtime='camoufox' requires browser-scoped identity. "
+                f"Remove these CrawlerRunConfig overrides: {rendered}."
+            )
+
     @staticmethod
     def from_kwargs(kwargs: dict) -> "BrowserConfig":
         # Auto-deserialize any dict values that use the {"type": ..., "params": ...}
@@ -800,8 +941,8 @@ class BrowserConfig:
 
     def to_dict(self):
         result = {
-            "browser_type": self.browser_type,
             "browser_runtime": self.browser_runtime,
+            "browser_type": self.browser_type,
             "headless": self.headless,
             "browser_mode": self.browser_mode,
             "use_managed_browser": self.use_managed_browser,
@@ -816,7 +957,6 @@ class BrowserConfig:
             "channel": self.channel,
             "proxy": self.proxy,
             "proxy_config": self.proxy_config.to_dict() if hasattr(self.proxy_config, 'to_dict') else self.proxy_config,
-            "camoufox_options": self.camoufox_options,
             "viewport_width": self.viewport_width,
             "viewport_height": self.viewport_height,
             "device_scale_factor": self.device_scale_factor,
@@ -830,6 +970,7 @@ class BrowserConfig:
             "user_agent": self.user_agent,
             "user_agent_mode": self.user_agent_mode,
             "user_agent_generator_config": self.user_agent_generator_config,
+            "camoufox_options": self.camoufox_options,
             "text_mode": self.text_mode,
             "light_mode": self.light_mode,
             "extra_args": self.extra_args,

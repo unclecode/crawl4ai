@@ -15,6 +15,7 @@ In most examples, you create **one** `BrowserConfig` for the entire crawler sess
 ```python
 class BrowserConfig:
     def __init__(
+        browser_runtime="playwright",
         browser_type="chromium",
         headless=True,
         browser_mode="dedicated",
@@ -30,13 +31,9 @@ class BrowserConfig:
         user_data_dir=None,
         cookies=None,
         headers=None,
-        user_agent=(
-            # "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) AppleWebKit/537.36 "
-            # "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-            # "(KHTML, like Gecko) Chrome/116.0.5845.187 Safari/604.1 Edg/117.0.2045.47"
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/116.0.0.0 Safari/537.36"
-        ),
+        user_agent=None,
         user_agent_mode="",
+        camoufox_options=None,
         text_mode=False,
         light_mode=False,
         extra_args=None,
@@ -48,32 +45,39 @@ class BrowserConfig:
 
 ### Key Fields to Note
 
-1.⠀**`browser_type`**  
+1.⠀**`browser_runtime`**
+   - Options: `"playwright"` (default) or `"camoufox"`.
+   - Use `"camoufox"` for Firefox-based Camoufox sessions.
+   - Camoufox support is local-first in v1: dedicated launch and persistent contexts only.
+
+2.⠀**`browser_type`**
    - Options: `"chromium"`, `"firefox"`, or `"webkit"`.  
    - Defaults to `"chromium"`.  
-   - If you need a different engine, specify it here.
+   - If `browser_runtime="camoufox"`, `browser_type` must be `"firefox"`.
 
-2.⠀**`headless`**  
+3.⠀**`headless`**
    - `True`: Runs the browser in headless mode (invisible browser).  
    - `False`: Runs the browser in visible mode, which helps with debugging.
 
-3.⠀**`browser_mode`**  
+4.⠀**`browser_mode`**
    - Determines how the browser should be initialized:
      - `"dedicated"` (default): Creates a new browser instance each time
      - `"builtin"`: Uses the builtin CDP browser running in background
      - `"custom"`: Uses explicit CDP settings provided in `cdp_url`
      - `"docker"`: Runs browser in Docker container with isolation
+   - Camoufox currently supports only `"dedicated"`.
 
-4.⠀**`use_managed_browser`** & **`cdp_url`**  
+5.⠀**`use_managed_browser`** & **`cdp_url`**
    - `use_managed_browser=True`: Launch browser using Chrome DevTools Protocol (CDP) for advanced control
    - `cdp_url`: URL for CDP endpoint (e.g., `"ws://localhost:9222/devtools/browser/"`)
    - Automatically set based on `browser_mode`
+   - Camoufox does not support Crawl4AI's CDP/custom browser path in v1.
 
-5.⠀**`debugging_port`** & **`host`**  
+6.⠀**`debugging_port`** & **`host`**
    - `debugging_port`: Port for browser debugging protocol (default: 9222)
    - `host`: Host for browser connection (default: "localhost")
 
-6.⠀**`proxy_config`**  
+7.⠀**`proxy_config`**
    - A `ProxyConfig` object or dictionary with fields like:  
 ```json
 {
@@ -84,48 +88,57 @@ class BrowserConfig:
 ```
    - Leave as `None` if a proxy is not required.
 
-7.⠀**`viewport_width` & `viewport_height`**
+8.⠀**`viewport_width` & `viewport_height`**
    - The initial window size.
    - Some sites behave differently with smaller or bigger viewports.
 
-8.⠀**`device_scale_factor`**
+9.⠀**`device_scale_factor`**
    - Controls the device pixel ratio (DPR) for rendering. Default is `1.0`.
    - Set to `2.0` for Retina-quality screenshots (e.g., a 1920×1080 viewport produces 3840×2160 images).
    - Higher values increase screenshot size and rendering time proportionally.
 
-9.⠀**`verbose`**  
+10.⠀**`verbose`**
    - If `True`, prints extra logs.  
    - Handy for debugging.
 
-9.⠀**`use_persistent_context`**  
+11.⠀**`use_persistent_context`**
    - If `True`, uses a **persistent** browser profile, storing cookies/local storage across runs.  
    - Typically also set `user_data_dir` to point to a folder.
+   - In Camoufox mode, prefer `user_data_dir` over `storage_state` for persistent sessions.
 
-10.⠀**`cookies`** & **`headers`**  
+12.⠀**`cookies`** & **`headers`**
     - If you want to start with specific cookies or add universal HTTP headers to the browser context, set them here.  
     - E.g. `cookies=[{"name": "session", "value": "abc123", "domain": "example.com"}]`.
+    - In Camoufox mode, only non-identity headers are allowed here.
 
-11.⠀**`user_agent`** & **`user_agent_mode`**  
+13.⠀**`user_agent`** & **`user_agent_mode`**
     - `user_agent`: Custom User-Agent string. If `None`, a default is used.  
     - `user_agent_mode`: Set to `"random"` for randomization (helps fight bot detection).
+    - In Camoufox mode, keep identity settings inside `camoufox_options` instead of `user_agent` or `user_agent_mode`.
 
-12.⠀**`text_mode`** & **`light_mode`**
+14.⠀**`camoufox_options`**
+    - Optional dict of Camoufox-specific launch and fingerprint settings.
+    - Good home for options like `geoip`, `humanize`, `os`, `screen`, `window`, and browser-scope proxy/fingerprint tuning.
+    - See the dedicated [Camoufox guide](../advanced/camoufox-browser.md) for the recommended setup.
+
+15.⠀**`text_mode`** & **`light_mode`**
     - `text_mode=True` disables images, possibly speeding up text-only crawls.
     - `light_mode=True` turns off certain background features for performance.
 
-13.⠀**`avoid_ads`** & **`avoid_css`**
+16.⠀**`avoid_ads`** & **`avoid_css`**
     - `avoid_ads=True` blocks requests to common ad and tracker domains (Google Analytics, DoubleClick, Facebook, Hotjar, etc.) at the browser context level. Reduces network overhead and memory usage.
     - `avoid_css=True` blocks loading of CSS files (`.css`, `.less`, `.scss`, `.sass`), useful when you only need text content and want faster, leaner crawls.
     - Both default to `False` (opt-in). Can be combined with each other and with `text_mode`.
 
-14.⠀**`extra_args`**  
+17.⠀**`extra_args`**
     - Additional flags for the underlying browser.  
     - E.g. `["--disable-extensions"]`.
 
-15.⠀**`enable_stealth`**
+18.⠀**`enable_stealth`**
     - If `True`, enables stealth mode using playwright-stealth.
     - Modifies browser fingerprints to avoid basic bot detection.
     - Default is `False`. Recommended for sites with bot protection.
+    - Do not combine this with Camoufox. Camoufox owns stealth and fingerprint behavior itself.
 
 ### Helper Methods
 
