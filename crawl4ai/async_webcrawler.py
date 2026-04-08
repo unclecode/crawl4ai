@@ -210,7 +210,7 @@ class AsyncWebCrawler:
         url: str,
         config: CrawlerRunConfig = None,
         **kwargs,
-    ) -> RunManyReturn:
+    ) -> CrawlResultContainer[CrawlResult]:
         """
         Runs the crawler for a single source: URL (web, local file, or raw HTML).
 
@@ -237,7 +237,8 @@ class AsyncWebCrawler:
             [other parameters maintained for backwards compatibility]
 
         Returns:
-            CrawlResult: The result of crawling and processing
+            CrawlResultContainer[CrawlResult]: A single-result container that proxies
+            attribute access to the underlying CrawlResult for backwards compatibility.
         """
         # Auto-start if not ready
         if not self.ready:
