@@ -2,6 +2,7 @@
 import warnings
 
 from .async_webcrawler import AsyncWebCrawler, CacheMode
+from .async_plasmate_strategy import AsyncPlasmateCrawlerStrategy
 # MODIFIED: Add SeedingConfig and VirtualScrollConfig here
 from .async_configs import BrowserConfig, CrawlerRunConfig, HTTPCrawlerConfig, LLMConfig, ProxyConfig, GeolocationConfig, SeedingConfig, VirtualScrollConfig, LinkPreviewConfig, MatchMode
 
