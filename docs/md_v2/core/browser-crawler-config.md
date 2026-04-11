@@ -46,7 +46,7 @@ class BrowserConfig:
         ...
 ```
 
-### Key Fields to Note
+### Key Fields to Note {: #browser-config-key-fields }
 
 1.⠀**`browser_type`**  
    - Options: `"chromium"`, `"firefox"`, or `"webkit"`.  
@@ -127,7 +127,7 @@ class BrowserConfig:
     - Modifies browser fingerprints to avoid basic bot detection.
     - Default is `False`. Recommended for sites with bot protection.
 
-### Helper Methods
+### Helper Methods {: #browser-config-helper-methods }
 
 Both configuration classes provide a `clone()` method to create modified copies:
 
@@ -238,7 +238,7 @@ class CrawlerRunConfig:
         ...
 ```
 
-### Key Fields to Note
+### Key Fields to Note {: #crawler-config-key-fields }
 
 1.⠀**`word_count_threshold`**:  
    - The minimum word count before a block is considered.  
@@ -315,7 +315,7 @@ class CrawlerRunConfig:
     - Allows handling results incrementally instead of waiting for all URLs to finish.
 
 
-### Helper Methods
+### Helper Methods {: #crawler-config-helper-methods}
 
 The `clone()` method is particularly useful for creating variations of your crawler configuration:
 
@@ -350,7 +350,7 @@ The `clone()` method:
 
 ## 3. LLMConfig Essentials
 
-### Key fields to note
+### Key fields to note {: #llm-config-key-fields }
 
 1.⠀**`provider`**:  
 - Which LLM provider to use. 
