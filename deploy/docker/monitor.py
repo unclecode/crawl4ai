@@ -1,4 +1,5 @@
 # monitor.py - Real-time monitoring stats with Redis persistence
+import html
 import time
 import json
 import asyncio
@@ -42,7 +43,7 @@ class MonitorStats:
         req_info = {
             "id": request_id,
             "endpoint": endpoint,
-            "url": url[:100],  # Truncate long URLs
+            "url": html.escape(url[:100]),  # Truncate + escape for XSS prevention
             "start_time": time.time(),
             "config_sig": config.get("sig", "default") if config else "default",
             "mem_start": psutil.Process().memory_info().rss / (1024 * 1024)
@@ -105,7 +106,7 @@ class MonitorStats:
                 "timestamp": end_time,
                 "endpoint": endpoint,
                 "url": req_info["url"],
-                "error": error,
+                "error": html.escape(str(error)),
                 "request_id": request_id
             })
 

@@ -293,6 +293,73 @@ def get_llm_base_url(config: Dict, provider: Optional[str] = None) -> Optional[s
     return os.environ.get("LLM_BASE_URL")
 
 
+# ── Security utilities ──────────────────────────────────────
+
+ALLOWED_OUTPUT_DIR = os.environ.get("CRAWL4AI_OUTPUT_DIR", "/tmp/crawl4ai-outputs")
+
+
+def validate_output_path(user_path: str) -> str:
+    """Resolve and restrict output_path to ALLOWED_OUTPUT_DIR.
+    Prevents arbitrary file write via path traversal."""
+    from fastapi import HTTPException
+    safe_path = os.path.normpath(user_path).lstrip(os.sep)
+    abs_path = os.path.abspath(os.path.join(ALLOWED_OUTPUT_DIR, safe_path))
+    abs_allowed = os.path.abspath(ALLOWED_OUTPUT_DIR) + os.sep
+    if not abs_path.startswith(abs_allowed):
+        raise HTTPException(
+            status_code=400,
+            detail=f"output_path must resolve within {ALLOWED_OUTPUT_DIR}"
+        )
+    return abs_path
+
+
+import ipaddress
+import socket
+from urllib.parse import urlparse
+
+_BLOCKED_NETWORKS = [
+    ipaddress.ip_network("0.0.0.0/8"),
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("100.64.0.0/10"),
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("169.254.0.0/16"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.0.0.0/24"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("198.18.0.0/15"),
+    ipaddress.ip_network("::1/128"),
+    ipaddress.ip_network("fc00::/7"),
+    ipaddress.ip_network("fe80::/10"),
+]
+
+_BLOCKED_HOSTNAMES = {
+    "localhost", "metadata.google.internal", "metadata",
+    "kubernetes.default", "kubernetes.default.svc",
+}
+
+
+def validate_webhook_url(url: str) -> None:
+    """Reject webhook URLs targeting internal/private/reserved networks (SSRF protection)."""
+    parsed = urlparse(str(url))
+    hostname = parsed.hostname
+    if not hostname:
+        raise ValueError("Webhook URL must have a valid hostname")
+    hostname_lower = hostname.lower()
+    if hostname_lower in _BLOCKED_HOSTNAMES:
+        raise ValueError(f"Webhook URL hostname '{hostname}' is blocked")
+    if hostname_lower.startswith("host.docker.internal"):
+        raise ValueError(f"Webhook URL hostname '{hostname}' is blocked")
+    try:
+        resolved = socket.getaddrinfo(hostname, None)
+    except socket.gaierror:
+        raise ValueError(f"Cannot resolve webhook hostname '{hostname}'")
+    for _, _, _, _, sockaddr in resolved:
+        ip = ipaddress.ip_address(sockaddr[0])
+        for network in _BLOCKED_NETWORKS:
+            if ip in network:
+                raise ValueError(f"Webhook URL resolves to blocked address: {ip}")
+
+
 def verify_email_domain(email: str) -> bool:
     try:
         domain = email.split('@')[1]

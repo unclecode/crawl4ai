@@ -35,7 +35,8 @@ from schemas import (
 )
 
 from utils import (
-    FilterType, load_config, setup_logging, verify_email_domain
+    FilterType, load_config, setup_logging, verify_email_domain,
+    validate_output_path, validate_webhook_url,
 )
 import os
 import sys
@@ -386,7 +387,7 @@ app.include_router(init_job_router(redis, config, token_dep))
 
 # ── monitor router ──────────────────────────────────────────
 from monitor_routes import router as monitor_router
-app.include_router(monitor_router)
+app.include_router(monitor_router, dependencies=[Depends(token_dep)])
 
 logger = logging.getLogger(__name__)
 
@@ -503,7 +504,7 @@ async def generate_screenshot(
             raise HTTPException(500, detail=results[0].error_message or "Crawl failed")
         screenshot_data = results[0].screenshot
         if body.output_path:
-            abs_path = os.path.abspath(body.output_path)
+            abs_path = validate_output_path(body.output_path)
             os.makedirs(os.path.dirname(abs_path), exist_ok=True)
             with open(abs_path, "wb") as f:
                 f.write(base64.b64decode(screenshot_data))
@@ -541,7 +542,7 @@ async def generate_pdf(
             raise HTTPException(500, detail=results[0].error_message or "Crawl failed")
         pdf_data = results[0].pdf
         if body.output_path:
-            abs_path = os.path.abspath(body.output_path)
+            abs_path = validate_output_path(body.output_path)
             os.makedirs(os.path.dirname(abs_path), exist_ok=True)
             with open(abs_path, "wb") as f:
                 f.write(pdf_data)

@@ -360,6 +360,15 @@ async def websocket_endpoint(websocket: WebSocket):
     - Browser pool status
     - Timeline data
     """
+    # WebSocket endpoints don't inherit router dependencies in FastAPI.
+    # Validate token from query params if auth is configured.
+    import os
+    expected_token = os.environ.get("CRAWL4AI_API_TOKEN", "")
+    if expected_token:
+        token = websocket.query_params.get("token", "")
+        if token != expected_token:
+            await websocket.close(code=4003, reason="Authentication required")
+            return
     await websocket.accept()
     logger.info("WebSocket client connected")
 

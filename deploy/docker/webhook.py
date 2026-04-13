@@ -45,11 +45,15 @@ class WebhookDeliveryService:
         Returns:
             bool: True if delivered successfully, False otherwise
         """
+        # SECURITY: Validate webhook URL at send time (defense-in-depth against SSRF)
+        from utils import validate_webhook_url
+        validate_webhook_url(webhook_url)
+
         default_headers = self.config.get("headers", {})
         merged_headers = {**default_headers, **(headers or {})}
         merged_headers["Content-Type"] = "application/json"
 
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
+        async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=False) as client:
             for attempt in range(self.max_attempts):
                 try:
                     logger.info(
