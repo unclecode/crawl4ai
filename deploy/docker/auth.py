@@ -11,8 +11,38 @@ import base64
 
 instance = JWT()
 security = HTTPBearer(auto_error=False)
-SECRET_KEY = os.environ.get("SECRET_KEY", "mysecret")
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
+
+_WEAK_SECRETS = {"mysecret", "secret", "password", "changeme", "test", "12345678"}
+
+
+def _resolve_secret_key() -> str:
+    """Resolve SECRET_KEY: validate if set, auto-generate if JWT enabled but unset."""
+    import logging
+    import secrets as _secrets
+    key = os.environ.get("SECRET_KEY", "")
+    if key:
+        if key.lower() in _WEAK_SECRETS:
+            raise RuntimeError(
+                "FATAL: SECRET_KEY is a known weak value. "
+                "Generate a strong one: python3 -c \"import secrets; print(secrets.token_hex(32))\""
+            )
+        if len(key) < 32:
+            raise RuntimeError(
+                "FATAL: SECRET_KEY must be at least 32 characters. "
+                "Generate one: python3 -c \"import secrets; print(secrets.token_hex(32))\""
+            )
+        return key
+    # No key set -- auto-generate ephemeral key
+    generated = _secrets.token_hex(32)
+    logging.getLogger("crawl4ai.security").warning(
+        "No SECRET_KEY set. Auto-generated ephemeral key (changes on restart). "
+        "Set SECRET_KEY env var for production."
+    )
+    return generated
+
+
+SECRET_KEY = _resolve_secret_key()
 
 def get_jwk_from_secret(secret: str):
     """Convert a secret string into a JWK object."""

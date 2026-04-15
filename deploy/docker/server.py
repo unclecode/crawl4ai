@@ -85,6 +85,9 @@ GLOBAL_SEM = asyncio.Semaphore(MAX_PAGES)
 # Hooks are disabled by default for security (RCE risk). Set to "true" to enable.
 HOOKS_ENABLED = os.environ.get("CRAWL4AI_HOOKS_ENABLED", "false").lower() == "true"
 
+# /execute_js disabled by default (arbitrary JS + SSRF risk). Set to "true" to enable.
+EXECUTE_JS_ENABLED = os.environ.get("CRAWL4AI_EXECUTE_JS_ENABLED", "false").lower() == "true"
+
 # Warn loudly if API token is not set (all endpoints unauthenticated)
 _api_token = config.get("security", {}).get("api_token", "") or os.environ.get("CRAWL4AI_API_TOKEN", "")
 if not _api_token:
@@ -282,103 +285,17 @@ ALLOWED_TYPES = {
 }
 
 
-_SAFE_CONFIG_ALLOWED_NAMES = {
-    # Config constructors
-    "CrawlerRunConfig", "BrowserConfig", "HTTPCrawlerConfig",
-    # Sub-config types
-    "LLMConfig", "ProxyConfig", "GeolocationConfig",
-    "SeedingConfig", "VirtualScrollConfig", "LinkPreviewConfig",
-    # Extraction strategies
-    "JsonCssExtractionStrategy", "JsonXPathExtractionStrategy",
-    "JsonLxmlExtractionStrategy", "LLMExtractionStrategy",
-    "CosineStrategy", "RegexExtractionStrategy",
-    # Markdown / content filters
-    "DefaultMarkdownGenerator",
-    "PruningContentFilter", "BM25ContentFilter", "LLMContentFilter",
-    "LXMLWebScrapingStrategy",
-    # Chunking
-    "RegexChunking",
-    # Deep crawl
-    "BFSDeepCrawlStrategy", "DFSDeepCrawlStrategy", "BestFirstCrawlingStrategy",
-    # Filters & scorers
-    "FilterChain", "URLPatternFilter", "DomainFilter",
-    "ContentTypeFilter", "URLFilter", "SEOFilter", "ContentRelevanceFilter",
-    "KeywordRelevanceScorer", "URLScorer", "CompositeScorer",
-    "DomainAuthorityScorer", "FreshnessScorer", "PathDepthScorer",
-    # Enums
-    "CacheMode", "MatchMode", "DisplayMode",
-    # Dispatchers
-    "MemoryAdaptiveDispatcher", "SemaphoreDispatcher",
-    # Table extraction
-    "DefaultTableExtraction", "NoTableExtraction",
-    # Proxy
-    "RoundRobinProxyStrategy",
-}
-
-# Attributes safe to access in config constructor args (e.g. CacheMode.BYPASS)
-_SAFE_CONFIG_ALLOWED_ATTRS = frozenset({
-    # Enum values commonly used in config
-    "BYPASS", "READ_ONLY", "WRITE_ONLY", "ENABLED", "DISABLED",
-    "READ_WRITE", "BYPASS_CACHE", "STANDARD", "COMPACT", "DETAILED",
-    # Common config field names accessed via dot notation
-    "value", "name",
-})
-
-
-def _safe_eval_config(expr: str) -> dict:
-    """
-    Accept exactly one top-level call to CrawlerRunConfig(...) or BrowserConfig(...).
-    Hardened with allowlists for names, attributes, and blocked AST constructs.
-    """
-    tree = ast.parse(expr, mode="eval")
-
-    # must be a single call
-    if not isinstance(tree.body, ast.Call):
-        raise ValueError("Expression must be a single constructor call")
-
-    call = tree.body
-    if not (isinstance(call.func, ast.Name) and call.func.id in {"CrawlerRunConfig", "BrowserConfig"}):
-        raise ValueError(
-            "Only CrawlerRunConfig(...) or BrowserConfig(...) are allowed")
-
-    for node in ast.walk(call):
-        # Block nested function calls
-        if isinstance(node, ast.Call) and node is not call:
-            raise ValueError("Nested function calls are not permitted")
-
-        # Block lambdas
-        if isinstance(node, ast.Lambda):
-            raise ValueError("Lambda expressions are not permitted")
-
-        # Block generators and comprehensions
-        if isinstance(node, (ast.GeneratorExp, ast.ListComp, ast.SetComp, ast.DictComp)):
-            raise ValueError("Comprehensions and generators are not permitted")
-
-        # Allowlist attribute access
-        if isinstance(node, ast.Attribute):
-            if node.attr not in _SAFE_CONFIG_ALLOWED_ATTRS:
-                raise ValueError(
-                    f"Attribute access '{node.attr}' is not permitted in config expressions")
-
-        # Allowlist name references
-        if isinstance(node, ast.Name) and node.id not in _SAFE_CONFIG_ALLOWED_NAMES:
-            # Allow Python literals/constants used as keyword arg values
-            if node.id not in {"True", "False", "None"}:
-                raise ValueError(
-                    f"Name '{node.id}' is not permitted in config expressions")
-
-    # Only expose allowlisted names from crawl4ai
-    safe_env = {}
-    for name in _SAFE_CONFIG_ALLOWED_NAMES:
-        obj = getattr(_c4, name, None)
-        if obj is not None:
-            safe_env[name] = obj
-    safe_env["True"] = True
-    safe_env["False"] = False
-    safe_env["None"] = None
-
-    obj = eval(compile(tree, "<config>", "eval"),
-               {"__builtins__": {}}, safe_env)
+def _config_from_json(data: dict) -> dict:
+    """Create CrawlerRunConfig or BrowserConfig from JSON {type, params}.
+    No eval() -- uses Pydantic constructors directly."""
+    config_type = data.get("type")
+    params = data.get("params", {})
+    if config_type == "CrawlerRunConfig":
+        obj = CrawlerRunConfig(**params)
+    elif config_type == "BrowserConfig":
+        obj = BrowserConfig(**params)
+    else:
+        raise ValueError("type must be 'CrawlerRunConfig' or 'BrowserConfig'")
     return obj.dump()
 
 
@@ -404,10 +321,13 @@ async def get_token(req: TokenRequest):
 
 
 @app.post("/config/dump")
-async def config_dump(raw: RawCode):
+async def config_dump(
+    data: dict,
+    _td: Dict = Depends(token_dep),
+):
     try:
-        return JSONResponse(_safe_eval_config(raw.code.strip()))
-    except Exception as e:
+        return JSONResponse(_config_from_json(data))
+    except (TypeError, ValueError) as e:
         raise HTTPException(400, str(e))
 
 
@@ -608,7 +528,14 @@ async def execute_js(
         ```
 
     """
+    if not EXECUTE_JS_ENABLED:
+        raise HTTPException(403, "execute_js endpoint is disabled. Set CRAWL4AI_EXECUTE_JS_ENABLED=true to enable.")
     validate_url_scheme(body.url)
+    # Block SSRF: reject internal/private IPs
+    try:
+        validate_webhook_url(body.url)  # reuse SSRF blocklist
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     crawler = None
     try:
         cfg = CrawlerRunConfig(js_code=body.scripts)

@@ -78,7 +78,7 @@ crawler:
       - "--disable-dev-shm-usage"
       - "--disable-gpu"
       - "--disable-software-rasterizer"
-      - "--disable-web-security"
+      # --disable-web-security removed for security (enables cross-origin access)
       - "--allow-insecure-localhost"
       - "--ignore-certificate-errors"
 

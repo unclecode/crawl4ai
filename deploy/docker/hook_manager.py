@@ -122,15 +122,17 @@ class UserHookManager:
             safe_builtins = {}
 
             # Add safe built-in functions (no __import__ for security)
-            # SECURITY: getattr/setattr removed - classic sandbox escape vectors.
-            # hasattr kept (read-only attribute check, not exploitable).
+            # SECURITY: Minimal builtins only. Removed:
+            # - getattr/setattr: sandbox escape via attribute access
+            # - type: enables __subclasses__() MRO chain attacks
+            # - __build_class__: enables malicious __init_subclass__
+            # - hasattr: information disclosure
             allowed_builtins = [
                 'print', 'len', 'str', 'int', 'float', 'bool',
                 'list', 'dict', 'set', 'tuple', 'range', 'enumerate',
                 'zip', 'map', 'filter', 'any', 'all', 'sum', 'min', 'max',
-                'sorted', 'reversed', 'abs', 'round', 'isinstance', 'type',
-                'hasattr', 'callable', 'iter', 'next',
-                '__build_class__'  # Required for class definitions in exec
+                'sorted', 'reversed', 'abs', 'round', 'isinstance',
+                'callable', 'iter', 'next',
             ]
             
             for name in allowed_builtins:
@@ -151,22 +153,31 @@ class UserHookManager:
             import re as _re_mod
             from typing import Dict as _Dict, List as _List, Optional as _Optional
 
-            # SECURITY: Sanitize asyncio to prevent RCE via
-            # asyncio.subprocess.create_subprocess_shell() etc.
-            # Hooks need asyncio for sleep/gather/etc but NOT subprocess.
+            # SECURITY: Create safe module proxies that strip __builtins__
+            # and dangerous sub-modules. Without this, hook code can reach
+            # real __import__ via e.g. asyncio.__builtins__['__import__'].
             import types
-            safe_asyncio = types.ModuleType("asyncio")
-            for _attr in dir(_asyncio_mod):
-                if _attr not in ("subprocess", "create_subprocess_exec",
-                                 "create_subprocess_shell"):
+
+            def _safe_module(mod, exclude_attrs=None):
+                """Create a proxy module without __builtins__ or dangerous attrs."""
+                proxy = types.ModuleType(mod.__name__)
+                skip = {"__builtins__", "__loader__", "__spec__"}
+                if exclude_attrs:
+                    skip.update(exclude_attrs)
+                for attr in dir(mod):
+                    if attr in skip:
+                        continue
                     try:
-                        setattr(safe_asyncio, _attr, getattr(_asyncio_mod, _attr))
+                        setattr(proxy, attr, getattr(mod, attr))
                     except (AttributeError, TypeError):
                         pass
+                return proxy
 
-            namespace["asyncio"] = safe_asyncio
-            namespace["json"] = _json_mod
-            namespace["re"] = _re_mod
+            namespace["asyncio"] = _safe_module(_asyncio_mod, {
+                "subprocess", "create_subprocess_exec", "create_subprocess_shell"
+            })
+            namespace["json"] = _safe_module(_json_mod)
+            namespace["re"] = _safe_module(_re_mod)
             namespace["Dict"] = _Dict
             namespace["List"] = _List
             namespace["Optional"] = _Optional
