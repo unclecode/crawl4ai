@@ -316,8 +316,34 @@ class MemoryAdaptiveDispatcher(BaseDispatcher):
                     retry_count=retry_count + 1
                 )
             
-            # Execute the crawl with selected config
-            result = await self.crawler.arun(url, config=selected_config, session_id=task_id)
+            # Calculate total timeout: use total_timeout if set, otherwise fallback to page_timeout + buffer
+            total_timeout_ms = getattr(selected_config, "total_timeout", None)
+            if total_timeout_ms is None:
+                # Fallback: page_timeout (ms) + 30 seconds buffer
+                total_timeout_ms = getattr(selected_config, "page_timeout", 60000) + 30000
+            
+            timeout_seconds = total_timeout_ms / 1000.0
+
+            # Execute the crawl with selected config and a global watchdog
+            try:
+                result = await asyncio.wait_for(
+                    self.crawler.arun(url, config=selected_config, session_id=task_id),
+                    timeout=timeout_seconds
+                )
+            except asyncio.TimeoutError:
+                error_message = f"Crawl task exceeded total timeout of {timeout_seconds} seconds"
+                self.crawler.logger.error_status(
+                    url=url,
+                    error=error_message,
+                    tag="TIMEOUT",
+                )
+                result = CrawlResult(
+                    url=url, 
+                    html="", 
+                    metadata={}, 
+                    success=False, 
+                    error_message=error_message
+                )
             
             # Measure memory usage
             end_memory = process.memory_info().rss / (1024 * 1024)
@@ -685,7 +711,34 @@ class SemaphoreDispatcher(BaseDispatcher):
             async with semaphore:
                 process = psutil.Process()
                 start_memory = process.memory_info().rss / (1024 * 1024)
-                result = await self.crawler.arun(url, config=selected_config, session_id=task_id)
+                
+                # Calculate total timeout: use total_timeout if set, otherwise fallback to page_timeout + buffer
+                total_timeout_ms = getattr(selected_config, "total_timeout", None)
+                if total_timeout_ms is None:
+                    # Fallback: page_timeout (ms) + 30 seconds buffer
+                    total_timeout_ms = getattr(selected_config, "page_timeout", 60000) + 30000
+                
+                timeout_seconds = total_timeout_ms / 1000.0
+
+                try:
+                    result = await asyncio.wait_for(
+                        self.crawler.arun(url, config=selected_config, session_id=task_id),
+                        timeout=timeout_seconds
+                    )
+                except asyncio.TimeoutError:
+                    error_message = f"Crawl task exceeded total timeout of {timeout_seconds} seconds"
+                    self.crawler.logger.error_status(
+                        url=url,
+                        error=error_message,
+                        tag="TIMEOUT",
+                    )
+                    result = CrawlResult(
+                        url=url, 
+                        html="", 
+                        metadata={}, 
+                        success=False, 
+                        error_message=error_message
+                    )
                 end_memory = process.memory_info().rss / (1024 * 1024)
 
                 memory_usage = peak_memory = end_memory - start_memory
