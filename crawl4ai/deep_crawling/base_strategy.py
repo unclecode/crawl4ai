@@ -32,13 +32,13 @@ class DeepCrawlDecorator:
                             async for result in result_obj:
                                 yield result
                         finally:
-                            self.deep_crawl_active.reset(token)
+                            self.deep_crawl_active.set(False)
                     return result_wrapper()
                 else:
                     try:
                         return result_obj
                     finally:
-                        self.deep_crawl_active.reset(token)
+                        self.deep_crawl_active.set(False)
             return await original_arun(url, config=config, **kwargs)
         return wrapped_arun
 
