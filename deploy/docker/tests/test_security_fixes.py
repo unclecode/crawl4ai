@@ -251,7 +251,7 @@ class TestDeserializationAllowlist(unittest.TestCase):
             "DomainAuthorityScorer", "FreshnessScorer", "PathDepthScorer",
             "CacheMode", "MatchMode", "DisplayMode",
             "MemoryAdaptiveDispatcher", "SemaphoreDispatcher",
-            "DefaultTableExtraction", "NoTableExtraction",
+            "DefaultTableExtraction", "NoTableExtraction", "LLMTableExtraction",
             "RoundRobinProxyStrategy",
         }
 
