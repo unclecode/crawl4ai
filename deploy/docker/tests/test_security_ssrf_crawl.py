@@ -37,6 +37,19 @@ _BLOCKED_HOSTNAMES = {
 }
 
 
+def _expand_ip_candidates(ip):
+    """Mirror of utils.py: unwrap IPv4 from IPv4-mapped/compat IPv6."""
+    candidates = [ip]
+    if isinstance(ip, ipaddress.IPv6Address):
+        if ip.ipv4_mapped is not None:
+            candidates.append(ip.ipv4_mapped)
+        else:
+            as_int = int(ip)
+            if 0 < as_int < 2**32:
+                candidates.append(ipaddress.IPv4Address(as_int))
+    return candidates
+
+
 def _validate_webhook_url(url):
     parsed = urlparse(str(url))
     hostname = parsed.hostname
@@ -52,9 +65,10 @@ def _validate_webhook_url(url):
         raise ValueError(f"Cannot resolve hostname '{hostname}'")
     for _, _, _, _, sockaddr in resolved:
         ip = ipaddress.ip_address(sockaddr[0])
-        for network in _BLOCKED_NETWORKS:
-            if ip in network:
-                raise ValueError(f"URL resolves to blocked address: {ip}")
+        for candidate in _expand_ip_candidates(ip):
+            for network in _BLOCKED_NETWORKS:
+                if candidate in network:
+                    raise ValueError(f"URL resolves to blocked address: {ip}")
 
 
 def validate_url_destination(url, allow_internal=False):
@@ -128,6 +142,46 @@ class TestCrawlURLSSRF(unittest.TestCase):
         validate_url_destination("http://127.0.0.1:8080", allow_internal=True)
         validate_url_destination("http://10.0.0.1/internal", allow_internal=True)
         validate_url_destination("http://169.254.169.254/meta", allow_internal=True)
+
+
+# ============================================================================
+# IPv6-mapped IPv4 bypass (caught in internal security review)
+# Prior code only checked blocked networks directly; ::ffff:127.0.0.1
+# parses as ::ffff:7f00:1 which is not in 127.0.0.0/8, bypassing the guard.
+# ============================================================================
+
+class TestIPv6MappedBypass(unittest.TestCase):
+    """Test the IPv4-mapped IPv6 SSRF bypass class."""
+
+    def test_mapped_loopback_blocked(self):
+        """http://[::ffff:127.0.0.1]/ must be blocked (maps to 127.0.0.1)."""
+        with self.assertRaises(ValueError):
+            validate_url_destination("http://[::ffff:127.0.0.1]/admin")
+
+    def test_mapped_private_10_blocked(self):
+        """::ffff:10.0.0.1 must be blocked (maps to RFC 1918)."""
+        with self.assertRaises(ValueError):
+            validate_url_destination("http://[::ffff:10.0.0.1]/")
+
+    def test_mapped_aws_metadata_blocked(self):
+        """::ffff:169.254.169.254 must be blocked (maps to cloud metadata)."""
+        with self.assertRaises(ValueError):
+            validate_url_destination("http://[::ffff:169.254.169.254]/latest/meta-data/")
+
+    def test_mapped_192_168_blocked(self):
+        """::ffff:192.168.1.1 must be blocked."""
+        with self.assertRaises(ValueError):
+            validate_url_destination("http://[::ffff:192.168.1.1]/")
+
+    def test_ipv4_compatible_loopback_blocked(self):
+        """IPv4-compatible IPv6 (deprecated but still exists): ::127.0.0.1."""
+        with self.assertRaises(ValueError):
+            validate_url_destination("http://[::127.0.0.1]/")
+
+    def test_regular_ipv6_loopback_still_blocked(self):
+        """::1 must remain blocked (IPv6 loopback)."""
+        with self.assertRaises(ValueError):
+            validate_url_destination("http://[::1]:8080/")
 
 
 # ============================================================================

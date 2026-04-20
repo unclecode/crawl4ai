@@ -355,6 +355,21 @@ def validate_url_destination(url: str) -> None:
         raise HTTPException(status_code=400, detail=f"URL blocked (SSRF protection): {e}")
 
 
+def _expand_ip_candidates(ip):
+    """Return [ip] plus any IPv4 form wrapped inside the IPv6 address.
+    SSRF guards must check the unwrapped form because ::ffff:127.0.0.1 and
+    ::127.0.0.1 route to 127.0.0.1 but would not match IPv4 blocklists directly."""
+    candidates = [ip]
+    if isinstance(ip, ipaddress.IPv6Address):
+        if ip.ipv4_mapped is not None:
+            candidates.append(ip.ipv4_mapped)
+        else:
+            as_int = int(ip)
+            if 0 < as_int < 2**32:
+                candidates.append(ipaddress.IPv4Address(as_int))
+    return candidates
+
+
 def validate_webhook_url(url: str) -> None:
     """Reject webhook URLs targeting internal/private/reserved networks (SSRF protection)."""
     parsed = urlparse(str(url))
@@ -372,9 +387,10 @@ def validate_webhook_url(url: str) -> None:
         raise ValueError(f"Cannot resolve webhook hostname '{hostname}'")
     for _, _, _, _, sockaddr in resolved:
         ip = ipaddress.ip_address(sockaddr[0])
-        for network in _BLOCKED_NETWORKS:
-            if ip in network:
-                raise ValueError(f"Webhook URL resolves to blocked address: {ip}")
+        for candidate in _expand_ip_candidates(ip):
+            for network in _BLOCKED_NETWORKS:
+                if candidate in network:
+                    raise ValueError(f"Webhook URL resolves to blocked address: {ip}")
 
 
 def verify_email_domain(email: str) -> bool:
