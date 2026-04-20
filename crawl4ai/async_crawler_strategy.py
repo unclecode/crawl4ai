@@ -50,7 +50,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
     Attributes:
         browser_config (BrowserConfig): Configuration object containing browser settings.
         logger (AsyncLogger): Logger instance for recording events and errors.
-        _downloaded_files (List[str]): List of downloaded file paths.
+        _downloads_by_crawl (Dict[str, List[str]]): Downloaded file paths keyed by crawl invocation ID.
         hooks (Dict[str, Callable]): Dictionary of hooks for custom behavior.
         browser_manager (BrowserManager): Manager for browser creation and management.
 
@@ -95,7 +95,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         self.adapter = browser_adapter or PlaywrightAdapter()
 
         # Initialize session management
-        self._downloaded_files = []
+        self._downloads_by_crawl: Dict[str, List[str]] = {}
 
         # Initialize hooks system
         self.hooks = {
@@ -532,8 +532,9 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
         redirected_url = url
         redirected_status_code = None
 
-        # Reset downloaded files list for new crawl
-        self._downloaded_files = []
+        # Scope downloaded files to this crawl invocation
+        crawl_id = uuid.uuid4().hex
+        self._downloads_by_crawl[crawl_id] = []
         
         # Initialize capture lists
         captured_requests = []
@@ -711,12 +712,12 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             if config.fetch_ssl_certificate:
                 ssl_cert = SSLCertificate.from_url(url)
 
-            # Set up download handling
+            # Set up download handling scoped to this crawl invocation
             if self.browser_config.accept_downloads:
                 page.on(
                     "download",
-                    lambda download: asyncio.create_task(
-                        self._handle_download(download)
+                    lambda download, _cid=crawl_id: asyncio.create_task(
+                        self._handle_download(download, _cid)
                     ),
                 )
 
@@ -1155,7 +1156,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 get_delayed_content=get_delayed_content,
                 ssl_certificate=ssl_cert,
                 downloaded_files=(
-                    self._downloaded_files if self._downloaded_files else None
+                    self._downloads_by_crawl.pop(crawl_id, []) or None
                 ),
                 redirected_url=redirected_url,
                 redirected_status_code=redirected_status_code,
@@ -1454,23 +1455,13 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             )
             # Continue with normal flow even if virtual scroll fails
 
-    async def _handle_download(self, download):
+    async def _handle_download(self, download, crawl_id: str):
         """
-        Handle file downloads.
-
-        How it works:
-        1. Get the suggested filename.
-        2. Get the download path.
-        3. Log the download.
-        4. Start the download.
-        5. Save the downloaded file.
-        6. Log the completion.
+        Handle file downloads, scoped to a specific crawl invocation.
 
         Args:
             download (Download): The Playwright download object
-
-        Returns:
-            None
+            crawl_id (str): Unique ID of the crawl invocation that triggered this download
         """
         try:
             suggested_filename = download.suggested_filename
@@ -1485,7 +1476,18 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             start_time = time.perf_counter()
             await download.save_as(download_path)
             end_time = time.perf_counter()
-            self._downloaded_files.append(download_path)
+
+            # Append to the correct crawl's list (if it still exists).
+            # If the crawl already returned and popped its list, the download
+            # was too late — log it but don't corrupt another crawl's results.
+            if crawl_id in self._downloads_by_crawl:
+                self._downloads_by_crawl[crawl_id].append(download_path)
+            else:
+                self.logger.warning(
+                    message="Download {filename} completed after crawl finished, not attached to any result",
+                    tag="DOWNLOAD",
+                    params={"filename": suggested_filename},
+                )
 
             self.logger.success(
                 message="Downloaded {filename} successfully",
