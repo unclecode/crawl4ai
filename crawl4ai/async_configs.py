@@ -1337,8 +1337,6 @@ class CrawlerRunConfig():
                                                     Default: SOCIAL_MEDIA_DOMAINS (from config).
         exclude_external_links (bool): If True, exclude all external links from the results.
                                        Default: False.
-        exclude_internal_links (bool): If True, exclude internal links from the results.
-                                       Default: False.
         exclude_social_media_links (bool): If True, exclude links pointing to social media domains.
                                            Default: False.
         exclude_domains (list of str): List of specific domains to exclude from results.
@@ -1348,6 +1346,9 @@ class CrawlerRunConfig():
         score_links (bool): If True, calculate intrinsic quality scores for all links using URL structure,
                            text quality, and contextual relevance metrics. Separate from link_preview_config.
                            Default: False.
+        preserve_https_for_internal_links (bool): If True, preserves HTTPS scheme for internal links even when the server redirects to HTTP. 
+                                                  Useful for security-conscious crawling.
+                                                  Default: False.
 
         # Debugging and Logging Parameters
         verbose (bool): Enable verbose logging.
