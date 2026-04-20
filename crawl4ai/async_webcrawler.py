@@ -866,6 +866,7 @@ class AsyncWebCrawler:
         ################################
         # Structured Content Extraction           #
         ################################
+        token_usage = None
         if (
             not bool(extracted_content)
             and config.extraction_strategy
@@ -914,6 +915,17 @@ class AsyncWebCrawler:
                 extracted_content, indent=4, default=str, ensure_ascii=False
             )
 
+            # Capture token usage from extraction strategy
+            if hasattr(config.extraction_strategy, 'total_usage'):
+                _token_usage = config.extraction_strategy.total_usage
+                if _token_usage and hasattr(_token_usage, '__dict__'):
+                    token_usage = {
+                        k: v for k, v in _token_usage.__dict__.items()
+                        if v is not None and v != 0
+                    } or None
+                else:
+                    token_usage = None
+
             # Log extraction completion
             self.logger.url_status(
                         url=_url,
@@ -940,6 +952,7 @@ class AsyncWebCrawler:
             screenshot=screenshot_data,
             pdf=pdf_data,
             extracted_content=extracted_content,
+            token_usage=token_usage,
             success=True,
             error_message="",
         )
