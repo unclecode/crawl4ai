@@ -36,6 +36,12 @@ class DeepCrawlDecorator:
                     return result_wrapper()
                 else:
                     try:
+                        crwl_rslt = [
+                            data
+                            for crwl_cntr in result_obj
+                            for data in crwl_cntr._results
+                        ]
+                        result_obj = CrawlResultContainer(results=crwl_rslt)
                         return result_obj
                     finally:
                         self.deep_crawl_active.reset(token)
