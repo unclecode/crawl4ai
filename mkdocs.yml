@@ -74,6 +74,10 @@ nav:
     - "Contributing Guide": "CONTRIBUTING.md"
     - "Code of Conduct": "https://github.com/unclecode/crawl4ai/blob/main/CODE_OF_CONDUCT.md"
     - "Contributors": "https://github.com/unclecode/crawl4ai/blob/main/CONTRIBUTORS.md"
+  - Legal:
+    - "Privacy Policy": "privacy.md"
+    - "Terms of Service": "terms.md"
+    - "Support": "support.md"
 
 theme:
   name: 'terminal'
