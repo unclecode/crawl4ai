@@ -337,6 +337,24 @@ _BLOCKED_HOSTNAMES = {
 }
 
 
+ALLOW_INTERNAL_URLS = os.environ.get("CRAWL4AI_ALLOW_INTERNAL_URLS", "false").lower() == "true"
+
+
+def validate_url_destination(url: str) -> None:
+    """Block crawl URLs targeting internal/private networks (SSRF protection).
+    Skipped when CRAWL4AI_ALLOW_INTERNAL_URLS=true.
+    Skipped for raw: URLs (inline HTML, no network fetch)."""
+    if ALLOW_INTERNAL_URLS:
+        return
+    if str(url).startswith(("raw:", "raw://")):
+        return
+    try:
+        validate_webhook_url(url)
+    except ValueError as e:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail=f"URL blocked (SSRF protection): {e}")
+
+
 def validate_webhook_url(url: str) -> None:
     """Reject webhook URLs targeting internal/private/reserved networks (SSRF protection)."""
     parsed = urlparse(str(url))

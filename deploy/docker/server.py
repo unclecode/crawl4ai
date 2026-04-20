@@ -36,7 +36,7 @@ from schemas import (
 
 from utils import (
     FilterType, load_config, setup_logging, verify_email_domain,
-    validate_output_path, validate_webhook_url,
+    validate_output_path, validate_webhook_url, validate_url_destination,
 )
 import os
 import sys
@@ -271,11 +271,12 @@ ALLOWED_URL_SCHEMES_WITH_RAW = ("http://", "https://", "raw:", "raw://")
 
 
 def validate_url_scheme(url: str, allow_raw: bool = False) -> None:
-    """Validate URL scheme to prevent file:// LFI attacks."""
+    """Validate URL scheme (LFI) and destination (SSRF)."""
     allowed = ALLOWED_URL_SCHEMES_WITH_RAW if allow_raw else ALLOWED_URL_SCHEMES
     if not url.startswith(allowed):
         schemes = ", ".join(allowed)
         raise HTTPException(400, f"URL must start with {schemes}")
+    validate_url_destination(url)
 
 
 # ───────────────── safe config‑dump helper ─────────────────

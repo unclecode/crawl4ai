@@ -8,3 +8,4 @@ We thank the following security researchers for their responsible disclosure:
 | Jeongbean Jeon | wjswjdqls7@gmail.com | File write, SSRF, monitor auth bypass, stored XSS | 2026-04-13 |
 | wulonchia | wulonchia@gmail.com | File write via output_path (independent report) | 2026-04-13 |
 | by111 (August829) | GitHub: [August829](https://github.com/August829) | Hardcoded JWT secret, eval in /config/dump, /execute_js, hook sandbox escape | 2026-04-14 |
+| secsys_codex | secsys_codex@163.com | SSRF via /md, /crawl, /llm endpoints (URL destination validation) | 2026-04-18 |
