@@ -937,23 +937,33 @@ class VirtualScrollConfig:
         scroll_count: int = 10,
         scroll_by: Union[str, int] = "container_height",
         wait_after_scroll: float = 0.5,
+        max_no_change: int = 5,
+        max_captured_elements: int = 10000,
     ):
         """
         Initialize virtual scroll configuration.
-        
+
         Args:
             container_selector: CSS selector for the scrollable container
             scroll_count: Maximum number of scrolls to perform
             scroll_by: Amount to scroll - can be:
                 - "container_height": scroll by container's height
-                - "page_height": scroll by viewport height  
+                - "page_height": scroll by viewport height
                 - int: fixed pixel amount
             wait_after_scroll: Seconds to wait after each scroll for content to load
+            max_no_change: Stop scrolling after this many consecutive scrolls with no
+                new content detected. Prevents wasting time at the end of a feed.
+                Set to 0 to disable early termination.
+            max_captured_elements: Maximum number of unique elements to accumulate
+                before stopping. Prevents browser OOM on very large feeds.
+                Set to 0 to disable the cap.
         """
         self.container_selector = container_selector
         self.scroll_count = scroll_count
         self.scroll_by = scroll_by
         self.wait_after_scroll = wait_after_scroll
+        self.max_no_change = max_no_change
+        self.max_captured_elements = max_captured_elements
     
     def to_dict(self) -> dict:
         """Convert to dictionary for serialization."""
@@ -962,12 +972,18 @@ class VirtualScrollConfig:
             "scroll_count": self.scroll_count,
             "scroll_by": self.scroll_by,
             "wait_after_scroll": self.wait_after_scroll,
+            "max_no_change": self.max_no_change,
+            "max_captured_elements": self.max_captured_elements,
         }
     
     @classmethod
     def from_dict(cls, data: dict) -> "VirtualScrollConfig":
-        """Create instance from dictionary."""
-        return cls(**data)
+        """Create instance from dictionary.  Unknown keys are ignored for
+        forward-compatibility with newer config versions."""
+        known = {"container_selector", "scroll_count", "scroll_by",
+                 "wait_after_scroll", "max_no_change", "max_captured_elements"}
+        filtered = {k: v for k, v in data.items() if k in known}
+        return cls(**filtered)
 
 class LinkPreviewConfig:
     """Configuration for link head extraction and scoring."""

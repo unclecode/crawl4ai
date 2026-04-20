@@ -1200,88 +1200,935 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 except Exception:
                     pass
 
-    # async def _handle_full_page_scan(self, page: Page, scroll_delay: float = 0.1):
     async def _handle_full_page_scan(self, page: Page, scroll_delay: float = 0.1, max_scroll_steps: Optional[int] = None):
         """
-        Helper method to handle full page scanning.
+        Progressive full-page scan with automatic DOM recycling detection.
 
-        How it works:
-        1. Get the viewport height.
-        2. Scroll to the bottom of the page.
-        3. Get the total height of the page.
-        4. Scroll back to the top of the page.
-        5. Scroll to the bottom of the page again.
-        6. Continue scrolling until the bottom of the page is reached.
+        Five phases:
+          1. Setup — viewport, timeout, helpers (fingerprint, cleanOuterHTML,
+             expandCollapsed).
+          2. Detect recycling — fingerprint candidate containers before/after
+             a probe scroll; also run a MutationObserver for innerHTML-wipe
+             detection.  Collects all recycling containers.
+          3. Scroll + capture recycling containers — for each detected
+             recycling container: deterministic scroll with fingerprint-based
+             dedup, nested inner-container scrolling, then inject merged HTML.
+             Supports vertical, horizontal, and 2D zigzag scroll.
+          4. Container-scroll pass — scans for overflow-y/x scrollable
+             containers not handled in phase 3 and scrolls them.
+          5. Fallback — normal scroll-to-bottom for append-based lazy loading.
+
+        For pages that do NOT recycle DOM nodes the behaviour is identical to
+        the previous implementation — scroll top to bottom.
 
         Args:
             page (Page): The Playwright page object
             scroll_delay (float): The delay between page scrolls
-            max_scroll_steps (Optional[int]): Maximum number of scroll steps to perform. Defaults to 10 to prevent infinite scroll hangs.
-
+            max_scroll_steps (Optional[int]): Maximum number of scroll steps.
+                If None, scrolls until the bottom is reached.
         """
-        # Default to 10 steps to prevent infinite scroll on dynamic pages
-        if max_scroll_steps is None:
-            max_scroll_steps = 10
-
+        prev_timeout = page._timeout_settings._timeout if hasattr(page, '_timeout_settings') else None
         try:
             viewport_size = page.viewport_size
             if viewport_size is None:
                 await page.set_viewport_size(
                     {"width": self.browser_config.viewport_width, "height": self.browser_config.viewport_height}
                 )
-                viewport_size = page.viewport_size
 
-            viewport_height = viewport_size.get(
-                "height", self.browser_config.viewport_height
+            # Virtual-scroll pages may need many scroll steps, easily
+            # exceeding Playwright's default 30s evaluate timeout.
+            # Temporarily raise it for this call.
+            page.set_default_timeout(300_000)  # 5 minutes
+
+            result = await page.evaluate(
+                """async (cfg) => {
+                    // ── Config ──────────────────────────────────────────────────────────
+                    const scrollDelay = cfg.scrollDelay;
+                    const maxSteps   = cfg.maxSteps;
+                    const memCap     = cfg.memCap || 50000;
+
+                    // ── Helpers ─────────────────────────────────────────────────────────
+                    const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+                    // Deterministic fingerprint.
+                    // Priority: href on element or child a[href]
+                    //        → data-id / data-key / data-index / data-testid / id
+                    //        → full text djb2 hash (no truncation, no outerHTML fallback)
+                    function fingerprint(el) {
+                        try {
+                            if (!el || el.nodeType !== 1) return null;
+                            const tag = el.tagName.toLowerCase();
+                            if (['script','style','link','meta','noscript','br','hr'].indexOf(tag) !== -1) return null;
+
+                            // 1. href
+                            const href = el.getAttribute('href')
+                                || (el.querySelector ? (el.querySelector('a[href]') || {getAttribute: ()=>null}).getAttribute('href') : null);
+                            if (href && href.length > 1 && href !== '#' && href !== '/') return 'u:' + href;
+
+                            // 2. stable data attributes
+                            const aid = el.getAttribute('data-id')
+                                || el.getAttribute('data-key')
+                                || el.getAttribute('data-index')
+                                || el.getAttribute('data-testid')
+                                || el.id;
+                            if (aid) return 'a:' + aid;
+
+                            // 3. full-text djb2 hash — no truncation
+                            const txt = (el.textContent || '').trim();
+                            if (txt.length > 0) {
+                                let h = 5381;
+                                for (let i = 0; i < txt.length; i++) {
+                                    h = ((h << 5) + h + txt.charCodeAt(i)) | 0;
+                                }
+                                return 't:' + h + ':' + txt.length;
+                            }
+                            return null;
+                        } catch(e) { return null; }
+                    }
+
+                    // Strip volatile positioning from inline style before capturing.
+                    // Uses cloneNode to avoid mutating live DOM (which could trigger
+                    // framework re-renders or race with MutationObservers).
+                    function cleanOuterHTML(el) {
+                        try {
+                            const clone = el.cloneNode(true);
+                            const s = clone.style;
+                            if (s) {
+                                for (const prop of ['transform', 'translate', 'top', 'left']) {
+                                    if (s[prop]) s[prop] = '';
+                                }
+                            }
+                            return clone.outerHTML;
+                        } catch(e) {
+                            return el.outerHTML;
+                        }
+                    }
+
+                    // ── expandCollapsed — preserved exactly ─────────────────────────────
+                    const EXPAND_RE = /^\+\d+\s*more|show\s*(all|more)|load\s*more|see\s*(all|more)|expand/i;
+                    const expandedSet = new WeakSet();
+                    async function expandCollapsed() {
+                        let count = 0;
+                        for (const el of document.querySelectorAll('[role="button"], button')) {
+                            if (expandedSet.has(el)) continue;
+                            const txt = (el.textContent || '').trim();
+                            if (EXPAND_RE.test(txt) && !el.closest('nav') && !el.closest('header') && !el.closest('footer')) {
+                                expandedSet.add(el);
+                                try { el.click(); count++; } catch(e) {}
+                            }
+                        }
+                        for (const d of document.querySelectorAll('details:not([open])')) {
+                            if (expandedSet.has(d)) continue;
+                            expandedSet.add(d);
+                            d.setAttribute('open', '');
+                            count++;
+                        }
+                        for (const el of document.querySelectorAll('[aria-expanded="false"]')) {
+                            if (expandedSet.has(el)) continue;
+                            const txt = (el.textContent || '').trim();
+                            if (txt.length < 200 && !el.closest('nav') && !el.closest('header')) {
+                                expandedSet.add(el);
+                                try { el.click(); count++; } catch(e) {}
+                            }
+                        }
+                        if (count > 0) await sleep(scrollDelay * 1000);
+                        return count;
+                    }
+
+                    // ── Phase 1: Setup ─────────────────────────────────────────────
+                    let steps = 0;
+                    const limit = (maxSteps && maxSteps > 0) ? maxSteps : 1000000;
+                    let totalExpanded = 0;
+                    let removedCount = 0;
+
+                    // ── Phase 2: Detect recycling via content comparison ────────
+                    // Three recycling patterns exist:
+                    //   a) Transform-based: DOM nodes stay, style.transform changes content
+                    //   b) innerHTML-wipe: container cleared and rebuilt on scroll
+                    //   c) Node swap: individual nodes removed and new ones added
+                    // We detect ALL patterns by:
+                    //   1. Fingerprinting all children of candidate containers before scroll
+                    //   2. Scrolling down
+                    //   3. Fingerprinting again — if fingerprints changed but child count
+                    //      didn't grow proportionally, it's recycling
+                    // Also run MutationObserver for innerHTML-wipe detection.
+                    
+                    let recyclingContainers = [];
+
+                    // Find candidate containers: elements with 3+ children in the viewport area
+                    function findCandidates() {
+                        const candidates = [];
+                        const elems = document.body.querySelectorAll('*');
+                        const max = Math.min(elems.length, 5000);
+                        for (let i = 0; i < max; i++) {
+                            const el = elems[i];
+                            if (el.children.length < 3) continue;
+                            // Check first child tag — list containers have same-tag children
+                            const firstTag = el.children[0].tagName;
+                            let sameTag = 0;
+                            for (const c of el.children) { if (c.tagName === firstTag) sameTag++; }
+                            if (sameTag >= 3) candidates.push(el);
+                        }
+                        return candidates;
+                    }
+                    
+                    // Snapshot: collect fingerprints of all children
+                    function snapshotFps(el) {
+                        const fps = new Set();
+                        for (const child of el.children) {
+                            if (child.nodeType !== 1) continue;
+                            const f = fingerprint(child);
+                            if (f) fps.add(f);
+                        }
+                        return fps;
+                    }
+                    
+                    // MutationObserver for innerHTML-wipe detection
+                    let hadChildListRecycling = null;  // element or null
+                    const recycleParents = new Map();
+                    const probeObserver = new MutationObserver(mutations => {
+                        for (const mut of mutations) {
+                            if (mut.type !== 'childList') continue;
+                            if (!recycleParents.has(mut.target)) {
+                                recycleParents.set(mut.target, {adds: 0, removes: 0});
+                            }
+                            const rec = recycleParents.get(mut.target);
+                            if (mut.addedNodes.length > 0) rec.adds += mut.addedNodes.length;
+                            if (mut.removedNodes.length > 0) {
+                                rec.removes += mut.removedNodes.length;
+                                for (const node of mut.removedNodes) {
+                                    if (node.nodeType === 1) removedCount++;
+                                }
+                            }
+                        }
+                    });
+                    probeObserver.observe(document.body, {childList: true, subtree: true});
+                    
+                    // Snapshot candidates before scroll
+                    const candidates = findCandidates();
+                    const beforeMap = new Map();  // element → Set<fingerprint>
+                    for (const c of candidates) {
+                        beforeMap.set(c, snapshotFps(c));
+                    }
+                    const beforeChildCounts = new Map();
+                    for (const c of candidates) {
+                        beforeChildCounts.set(c, c.children.length);
+                    }
+                    
+                    // Helper: find nearest scrollable ancestor of el (excluding window).
+                    // Checks both vertical (overflowY) and horizontal (overflowX).
+                    function scrollableAncestor(el) {
+                        let p = el.parentElement;
+                        while (p && p !== document.body && p !== document.documentElement) {
+                            const cs = window.getComputedStyle(p);
+                            const oy = cs.overflowY;
+                            if ((oy === 'scroll' || oy === 'auto') && p.scrollHeight > p.clientHeight) {
+                                return p;
+                            }
+                            const ox = cs.overflowX;
+                            if ((ox === 'scroll' || ox === 'auto') && p.scrollWidth > p.clientWidth) {
+                                return p;
+                            }
+                            p = p.parentElement;
+                        }
+                        return null;
+                    }
+
+                    // Scroll down by one viewport height (window-level).
+                    // Also probe each candidate container's own scrollTop/scrollLeft
+                    // for container-level virtual scroll (overflow-y/x: scroll).
+                    // If a candidate is not itself scrollable, scroll its nearest
+                    // scrollable ancestor (e.g. #inner inside #scroller).
+                    const probeDistance = window.innerHeight;
+                    window.scrollBy(0, probeDistance);
+                    const probedAncestors = new Set();
+                    for (const c of candidates) {
+                        const cs = window.getComputedStyle(c);
+                        const oy = cs.overflowY;
+                        const ox = cs.overflowX;
+                        if ((oy === 'scroll' || oy === 'auto') && c.scrollHeight > c.clientHeight) {
+                            c.scrollTop += c.clientHeight;
+                        } else if ((ox === 'scroll' || ox === 'auto') && c.scrollWidth > c.clientWidth) {
+                            c.scrollLeft += c.clientWidth;
+                        } else {
+                            // Candidate itself doesn't scroll — try scrollable parent
+                            const anc = scrollableAncestor(c);
+                            if (anc && !probedAncestors.has(anc)) {
+                                probedAncestors.add(anc);
+                                const ancCs = window.getComputedStyle(anc);
+                                const ancOx = ancCs.overflowX;
+                                if ((ancOx === 'scroll' || ancOx === 'auto') && anc.scrollWidth > anc.clientWidth) {
+                                    anc.scrollLeft += anc.clientWidth;
+                                } else {
+                                    anc.scrollTop += anc.clientHeight;
+                                }
+                            }
+                        }
+                    }
+                    await sleep(Math.max(scrollDelay * 1000, 300));
+                    
+                    // Compare: which containers had their content change?
+                    for (const c of candidates) {
+                        const before = beforeMap.get(c);
+                        const after  = snapshotFps(c);
+                        const beforeCount = beforeChildCounts.get(c);
+                        const afterCount  = c.children.length;
+                        
+                        // Content changed?
+                        let changed = 0;
+                        for (const f of before) {
+                            if (!after.has(f)) changed++;
+                        }
+                        let added = 0;
+                        for (const f of after) {
+                            if (!before.has(f)) added++;
+                        }
+                        
+                        // Recycling = content changed significantly but child count
+                        // didn't grow (or grew very little). If child count doubled,
+                        // it's append-based, not recycling.
+                        if (changed >= 2 && afterCount <= beforeCount * 1.5) {
+                            recyclingContainers.push(c);
+                        }
+                    }
+                    
+                    // Also check MutationObserver results for childList recycling.
+                    // Require significant mutation count (>= 4) to avoid false positives
+                    // from loading spinners or minor DOM updates (1 add + 1 remove).
+                    // Also check MutationObserver for containers not already detected
+                    // via fingerprint comparison above.
+                    {
+                        const alreadyFound = new Set(recyclingContainers);
+                        for (const [el, counts] of recycleParents) {
+                            if (alreadyFound.has(el)) continue;
+                            if (counts.adds >= 2 && counts.removes >= 2) {
+                                recyclingContainers.push(el);
+                                alreadyFound.add(el);
+                            }
+                        }
+                    }
+                    
+                    probeObserver.disconnect();
+
+                    // Scroll back to top/left (window + all probed containers + their ancestors)
+                    window.scrollTo(0, 0);
+                    for (const c of candidates) {
+                        if (c.scrollTop > 0) c.scrollTop = 0;
+                        if (c.scrollLeft > 0) c.scrollLeft = 0;
+                    }
+                    for (const anc of probedAncestors) {
+                        anc.scrollTop = 0;
+                        anc.scrollLeft = 0;
+                    }
+                    await sleep(scrollDelay * 1000);
+
+                    // ── Phase 3: Scroll + capture all recycling containers ────
+                    let phase2TotalMerged = 0;
+                    let phase2CapReached = false;
+
+                    for (let rci = 0; rci < recyclingContainers.length && steps < limit && !phase2CapReached; rci++) {
+                        const recyclingContainer = recyclingContainers[rci];
+                        const children = recyclingContainer.children;
+                        if (children.length < 2) {
+                            continue;  // can't measure, skip
+                        } else {
+                            // Measure item dimension — try vertical first, then horizontal.
+                            let itemHeight = Math.abs(
+                                children[1].getBoundingClientRect().top -
+                                children[0].getBoundingClientRect().top
+                            );
+                            if (itemHeight <= 0) {
+                                // Vertical offset is zero — try horizontal offset
+                                // (items may be laid out horizontally with translateX)
+                                itemHeight = Math.abs(
+                                    children[1].getBoundingClientRect().left -
+                                    children[0].getBoundingClientRect().left
+                                );
+                            }
+                            if (itemHeight <= 0) {
+                                itemHeight = children[0].getBoundingClientRect().height;
+                            }
+                            if (itemHeight <= 0) {
+                                itemHeight = children[0].getBoundingClientRect().width;
+                            }
+                            if (itemHeight <= 0) {
+                                continue;  // can't determine step size, skip this container
+                            } else {
+                                // Determine total virtual size (height or width).
+                                // Check container's explicit style.height/width first (set by
+                                // virtual-scroll frameworks for scrollbar sizing).
+                                // Fall back to scrollHeight/scrollWidth.
+                                // For window-level scroll, use documentElement dimensions.
+                                let totalHeight = 0;
+                                if (recyclingContainer.style && recyclingContainer.style.width) {
+                                    const pw = parseFloat(recyclingContainer.style.width) || 0;
+                                    if (pw > 0) totalHeight = pw;
+                                }
+                                if (!totalHeight && recyclingContainer.style && recyclingContainer.style.height) {
+                                    totalHeight = parseFloat(recyclingContainer.style.height) || 0;
+                                }
+                                if (!totalHeight || totalHeight <= 0) {
+                                    totalHeight = Math.max(
+                                        document.documentElement.scrollHeight,
+                                        document.documentElement.scrollWidth
+                                    );
+                                }
+                                const totalItems  = Math.round(totalHeight / itemHeight);
+                                const cappedTotal = Math.min(totalItems, memCap);
+
+                                // ── Phase 3a: Deterministic scroll + capture ────────────
+                                // captured: fingerprint → cleanOuterHTML (first-seen wins)
+                                const captured = new Map();
+
+                                function captureVisible() {
+                                    for (const child of recyclingContainer.children) {
+                                        if (child.nodeType !== 1) continue;
+                                        const key = fingerprint(child);
+                                        if (key && !captured.has(key)) {
+                                            captured.set(key, cleanOuterHTML(child));
+                                            if (captured.size >= memCap) return;
+                                        }
+                                        // Also capture children inside nested scrollable
+                                        // containers within each recycled child.
+                                        try {
+                                            const subs = child.querySelectorAll('*');
+                                            for (const isc of subs) {
+                                                const ics = window.getComputedStyle(isc);
+                                                const iox = ics.overflowX;
+                                                const ioy = ics.overflowY;
+                                                const hS = (iox === 'scroll' || iox === 'auto') && isc.scrollWidth > isc.clientWidth;
+                                                const vS = (ioy === 'scroll' || ioy === 'auto') && isc.scrollHeight > isc.clientHeight;
+                                                if (!hS && !vS) continue;
+                                                for (const ic of isc.children) {
+                                                    if (ic.nodeType !== 1) continue;
+                                                    const ik = fingerprint(ic);
+                                                    if (ik && !captured.has(ik)) {
+                                                        captured.set(ik, cleanOuterHTML(ic));
+                                                        if (captured.size >= memCap) return;
+                                                    }
+                                                }
+                                            }
+                                        } catch(e) {}
+                                    }
+                                }
+
+                                // Scroll nested scrollable containers within visible
+                                // recycled children to reveal nested recycled content.
+                                async function scrollInnerContainers() {
+                                    for (const child of recyclingContainer.children) {
+                                        if (child.nodeType !== 1) continue;
+                                        if (captured.size >= memCap) return;
+                                        try {
+                                            const subs = child.querySelectorAll('*');
+                                            for (const isc of subs) {
+                                                if (captured.size >= memCap) return;
+                                                const ics = window.getComputedStyle(isc);
+                                                const iox = ics.overflowX;
+                                                const ioy = ics.overflowY;
+                                                const hS = (iox === 'scroll' || iox === 'auto') && isc.scrollWidth > isc.clientWidth;
+                                                const vS = (ioy === 'scroll' || ioy === 'auto') && isc.scrollHeight > isc.clientHeight;
+                                                if (!hS && !vS) continue;
+                                                let iDim = hS ? isc.clientWidth : isc.clientHeight;
+                                                if (isc.children.length >= 2) {
+                                                    const d = hS
+                                                        ? Math.abs(isc.children[1].getBoundingClientRect().left - isc.children[0].getBoundingClientRect().left)
+                                                        : Math.abs(isc.children[1].getBoundingClientRect().top - isc.children[0].getBoundingClientRect().top);
+                                                    if (d > 0) iDim = d;
+                                                }
+                                                const iStep = Math.max(iDim, iDim * 2);
+                                                for (let si = 0; si < 200; si++) {
+                                                    if (hS) isc.scrollLeft += iStep;
+                                                    else isc.scrollTop += iStep;
+                                                    await sleep(Math.min(scrollDelay * 500, 100));
+                                                    for (const ic of isc.children) {
+                                                        if (ic.nodeType !== 1) continue;
+                                                        const ik = fingerprint(ic);
+                                                        if (ik && !captured.has(ik)) {
+                                                            captured.set(ik, cleanOuterHTML(ic));
+                                                        }
+                                                    }
+                                                    if (captured.size >= memCap) break;
+                                                    if (hS) {
+                                                        if (isc.scrollLeft + isc.clientWidth >= isc.scrollWidth - iDim) break;
+                                                    } else {
+                                                        if (isc.scrollTop + isc.clientHeight >= isc.scrollHeight - iDim) break;
+                                                    }
+                                                }
+                                                if (hS) isc.scrollLeft = 0;
+                                                else isc.scrollTop = 0;
+                                            }
+                                        } catch(e) {}
+                                    }
+                                }
+
+                                // Second observer: capture items at the moment of removal
+                                // (innerHTML-wipe fallback — ensures we don't miss items
+                                //  whose container is wiped rather than recycled).
+                                const wipeObserver = new MutationObserver(mutations => {
+                                    for (const mut of mutations) {
+                                        if (mut.type !== 'childList') continue;
+                                        for (const node of mut.removedNodes) {
+                                            if (node.nodeType !== 1) continue;
+                                            const key = fingerprint(node);
+                                            if (key && !captured.has(key)) {
+                                                try { captured.set(key, cleanOuterHTML(node)); } catch(e) {}
+                                            }
+                                        }
+                                    }
+                                });
+                                wipeObserver.observe(recyclingContainer, {childList: true, subtree: false});
+                                let capReached = false;
+                                try {
+
+                                // Determine the element to actually scroll.
+                                // Priority:
+                                //   1. recyclingContainer itself, if it has overflow-y/x scroll/auto
+                                //      and is actually scrollable.
+                                //   2. Its nearest scrollable ancestor (e.g. #scroller wrapping #inner).
+                                //   3. Window (fallback).
+                                // This handles the pattern where the DATA container (#inner) is not
+                                // scrollable but its PARENT (#scroller) is.
+                                let scrollTarget = null;  // null → use window
+                                let isHorizontal = false;  // true if the scroll axis is horizontal
+                                if (
+                                    recyclingContainer !== document.documentElement &&
+                                    recyclingContainer !== document.body
+                                ) {
+                                    const rcs = window.getComputedStyle(recyclingContainer);
+                                    const oy = rcs.overflowY;
+                                    const ox = rcs.overflowX;
+                                    if ((oy === 'scroll' || oy === 'auto') &&
+                                        recyclingContainer.scrollHeight > recyclingContainer.clientHeight) {
+                                        scrollTarget = recyclingContainer;
+                                        isHorizontal = false;
+                                    } else if ((ox === 'scroll' || ox === 'auto') &&
+                                        recyclingContainer.scrollWidth > recyclingContainer.clientWidth) {
+                                        scrollTarget = recyclingContainer;
+                                        isHorizontal = true;
+                                    } else {
+                                        // Not scrollable itself — look for a scrollable ancestor
+                                        const anc = scrollableAncestor(recyclingContainer);
+                                        if (anc) {
+                                            scrollTarget = anc;
+                                            const ancCs = window.getComputedStyle(anc);
+                                            const ancOx = ancCs.overflowX;
+                                            if ((ancOx === 'scroll' || ancOx === 'auto') &&
+                                                anc.scrollWidth > anc.clientWidth &&
+                                                !(anc.scrollHeight > anc.clientHeight)) {
+                                                isHorizontal = true;
+                                            }
+                                        }
+                                    }
+                                }
+                                const useWindowScroll = (scrollTarget === null);
+
+                                // Detect 2D scrollable containers (both horizontal + vertical)
+                                let is2D = false;
+                                if (!useWindowScroll) {
+                                    const st = scrollTarget;
+                                    const stCs = window.getComputedStyle(st);
+                                    const stOx = stCs.overflowX;
+                                    const stOy = stCs.overflowY;
+                                    const hasH = (stOx === 'scroll' || stOx === 'auto') && st.scrollWidth > st.clientWidth;
+                                    const hasV = (stOy === 'scroll' || stOy === 'auto') && st.scrollHeight > st.clientHeight;
+                                    if (hasH && hasV) is2D = true;
+                                }
+
+                                // Measure item width (separate from height) for 2D / horizontal
+                                let itemWidth = itemHeight;
+                                if (recyclingContainer.children.length >= 2) {
+                                    const iw = Math.abs(
+                                        recyclingContainer.children[1].getBoundingClientRect().left -
+                                        recyclingContainer.children[0].getBoundingClientRect().left
+                                    );
+                                    if (iw > 0) itemWidth = iw;
+                                }
+                                // For pure horizontal scroll, reuse itemHeight variable for width
+                                if (isHorizontal && !is2D) {
+                                    itemHeight = itemWidth;
+                                }
+
+                                // Capture at position 0
+                                captureVisible();
+                                await scrollInnerContainers();
+                                totalExpanded += await expandCollapsed();
+
+                                let consecutiveEmpty = 0;
+
+                                if (is2D) {
+                                    // ── 2D zigzag scroll ──────────────────────────────────
+                                    // For containers scrollable in both X and Y (e.g. 2D grids),
+                                    // sweep horizontally at each vertical band, then step down.
+                                    // Use single-item steps to ensure the pool (which may be
+                                    // smaller than the visible cell count) renders every cell
+                                    // at least once across the sweep.
+                                    const vpW = scrollTarget.clientWidth;
+                                    const vpH2 = scrollTarget.clientHeight;
+                                    const hStep = itemWidth;   // one column at a time
+                                    const vStep = itemHeight;  // one row at a time
+
+                                    let yPos = 0;
+                                    let atBottomRow = false;
+                                    while (!atBottomRow && steps < limit && !capReached) {
+                                        // Set vertical position and reset horizontal
+                                        scrollTarget.scrollTop = yPos;
+                                        scrollTarget.scrollLeft = 0;
+                                        await sleep(scrollDelay * 1000);
+                                        captureVisible();
+                                        steps++;
+                                        if (captured.size >= memCap) { capReached = true; break; }
+
+                                        // Sweep all the way right
+                                        while (steps < limit && !capReached) {
+                                            scrollTarget.scrollLeft += hStep;
+                                            await sleep(scrollDelay * 1000);
+                                            captureVisible();
+                                            steps++;
+                                            if (captured.size >= memCap) { capReached = true; break; }
+                                            if (scrollTarget.scrollLeft + vpW >= scrollTarget.scrollWidth - itemWidth) break;
+                                        }
+
+                                        // Check if at bottom
+                                        if (yPos + vpH2 >= scrollTarget.scrollHeight - itemHeight) {
+                                            atBottomRow = true;
+                                        } else {
+                                            yPos += vStep;
+                                        }
+                                    }
+                                } else {
+                                    // ── 1D scroll (original logic) ────────────────────────
+                                    const vpH = useWindowScroll
+                                        ? (isHorizontal ? window.innerWidth : window.innerHeight)
+                                        : (isHorizontal ? scrollTarget.clientWidth : scrollTarget.clientHeight);
+                                    const scrollStep = Math.max(
+                                        itemHeight,
+                                        Math.floor(vpH / itemHeight - 1) * itemHeight
+                                    );
+
+                                    while (steps < limit && !capReached) {
+                                        if (useWindowScroll) {
+                                            if (isHorizontal) {
+                                                window.scrollBy(scrollStep, 0);
+                                            } else {
+                                                window.scrollBy(0, scrollStep);
+                                            }
+                                        } else {
+                                            if (isHorizontal) {
+                                                scrollTarget.scrollLeft += scrollStep;
+                                            } else {
+                                                scrollTarget.scrollTop += scrollStep;
+                                            }
+                                        }
+                                        await sleep(scrollDelay * 1000);
+                                        totalExpanded += await expandCollapsed();
+
+                                        const beforeSize = captured.size;
+                                        captureVisible();
+                                        await scrollInnerContainers();
+                                        const newItems = captured.size - beforeSize;
+
+                                        if (newItems === 0) {
+                                            consecutiveEmpty++;
+                                            let atEnd;
+                                            if (useWindowScroll) {
+                                                if (isHorizontal) {
+                                                    atEnd = (window.scrollX + window.innerWidth >= document.documentElement.scrollWidth - itemHeight * 2);
+                                                } else {
+                                                    atEnd = (window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - itemHeight * 2);
+                                                }
+                                            } else {
+                                                if (isHorizontal) {
+                                                    atEnd = (scrollTarget.scrollLeft + scrollTarget.clientWidth >= scrollTarget.scrollWidth - itemHeight * 2);
+                                                } else {
+                                                    atEnd = (scrollTarget.scrollTop + scrollTarget.clientHeight >= scrollTarget.scrollHeight - itemHeight * 2);
+                                                }
+                                            }
+                                            if (consecutiveEmpty >= 3 && atEnd) break;
+                                        } else {
+                                            consecutiveEmpty = 0;
+                                        }
+
+                                        steps++;
+
+                                        if (captured.size >= memCap) { capReached = true; break; }
+
+                                        if (useWindowScroll) {
+                                            if (isHorizontal) {
+                                                const scrolled = window.scrollX || window.pageXOffset || 0;
+                                                const docWidth = document.documentElement.scrollWidth;
+                                                if (scrolled + window.innerWidth >= docWidth - itemHeight) break;
+                                            } else {
+                                                const scrolled = window.scrollY || window.pageYOffset || 0;
+                                                const docHeight = document.documentElement.scrollHeight;
+                                                if (scrolled + window.innerHeight >= docHeight - itemHeight) break;
+                                            }
+                                        } else {
+                                            if (isHorizontal) {
+                                                if (scrollTarget.scrollLeft + scrollTarget.clientWidth >=
+                                                    scrollTarget.scrollWidth - itemHeight) break;
+                                            } else {
+                                                if (scrollTarget.scrollTop + scrollTarget.clientHeight >=
+                                                    scrollTarget.scrollHeight - itemHeight) break;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Final capture at scroll bottom
+                                captureVisible();
+                                await scrollInnerContainers();
+
+                                } finally { wipeObserver.disconnect(); }
+
+                                // ── Phase 3b: Inject results for this container ─────────
+                                if (captured.size > recyclingContainer.children.length) {
+                                    recyclingContainer.style.display = 'none';
+                                    const mergedDiv = document.createElement('div');
+                                    mergedDiv.id = 'crawl4ai-merged-' + rci;
+                                    mergedDiv.innerHTML = Array.from(captured.values()).join('\\n');
+                                    recyclingContainer.parentElement.insertBefore(mergedDiv, recyclingContainer);
+                                }
+                                phase2TotalMerged += captured.size;
+                                if (capReached) phase2CapReached = true;
+                            }
+                        }
+                    }  // end for each recyclingContainer
+
+                    // ── Phase 3 complete — store result, fall through to Phase 4 ──
+                    // Even if Phase 3 handled recycling containers, there may be
+                    // OTHER scrollable containers (nested scroll, overflow-y/x)
+                    // that Phase 4 should also scroll.
+                    let phase2Result = null;
+                    if (phase2TotalMerged > 0) {
+                        window.scrollTo(0, 0);
+                        phase2Result = {
+                            recyclingDetected: true,
+                            removedCount: removedCount,
+                            totalMerged: phase2TotalMerged,
+                            scrollSteps: steps,
+                            capReached: phase2CapReached,
+                            expandedGroups: totalExpanded,
+                            phase: 3,
+                            phase2Containers: recyclingContainers
+                        };
+                    }
+
+                    // ── Phase 4: Container-scroll (overflow-y/x: scroll/auto) ──
+                    // Handles scrollable containers not caught by Phase 3's
+                    // recycling detection.  Uses the same fingerprint + Map
+                    // approach.  Detects both vertical and horizontal containers.
+                    const allEls3 = document.querySelectorAll('*');
+                    const scanLimit = Math.min(allEls3.length, 5000);
+                    const scrollContainers = [];
+                    for (let i = 0; i < scanLimit; i++) {
+                        try {
+                            const el = allEls3[i];
+                            const cs3 = window.getComputedStyle(el);
+                            const oy = cs3.overflowY;
+                            const ox = cs3.overflowX;
+                            if ((oy === 'auto' || oy === 'scroll') &&
+                                el.scrollHeight > el.clientHeight * 2 &&
+                                el.clientHeight > 50 &&
+                                el.children.length > 0) {
+                                scrollContainers.push({el: el, horizontal: false});
+                            } else if ((ox === 'auto' || ox === 'scroll') &&
+                                el.scrollWidth > el.clientWidth * 2 &&
+                                el.clientWidth > 50 &&
+                                el.children.length > 0) {
+                                scrollContainers.push({el: el, horizontal: true});
+                            }
+                        } catch(e) { continue; }
+                    }
+
+                    let phase3Merged = 0;
+                    let phase3CapReached = false;
+
+                    // Collect containers already handled by Phase 3 to skip them
+                    const phase3Handled = new Set();
+                    if (phase2Result && phase2Result.phase2Containers) {
+                        for (const rc of phase2Result.phase2Containers) {
+                            phase3Handled.add(rc);
+                        }
+                    }
+
+                    for (let ci = 0; ci < scrollContainers.length && steps < limit && !phase3CapReached; ci++) {
+                        try {
+                            const ct = scrollContainers[ci].el;
+                            const ctHoriz = scrollContainers[ci].horizontal;
+                            if (ctHoriz ? ct.clientWidth === 0 : ct.clientHeight === 0) continue;
+                            // Skip containers already handled by Phase 3
+                            if (phase3Handled.has(ct)) continue;
+                            // Skip containers that are display:none (hidden by Phase 3)
+                            if (ct.style.display === 'none') continue;
+                            // Skip containers inside a display:none parent (merged by Phase 3)
+                            if (ct.closest('[style*="display: none"]') || ct.closest('[style*="display:none"]')) continue;
+
+                            // Measure item dimension from first two children
+                            let ctItemDim = ctHoriz ? ct.clientWidth : ct.clientHeight;  // fallback
+                            if (ct.children.length >= 2) {
+                                const ih = ctHoriz
+                                    ? Math.abs(ct.children[1].getBoundingClientRect().left - ct.children[0].getBoundingClientRect().left)
+                                    : Math.abs(ct.children[1].getBoundingClientRect().top - ct.children[0].getBoundingClientRect().top);
+                                if (ih > 0) ctItemDim = ih;
+                            } else if (ct.children.length === 1) {
+                                const ih = ctHoriz
+                                    ? ct.children[0].getBoundingClientRect().width
+                                    : ct.children[0].getBoundingClientRect().height;
+                                if (ih > 0) ctItemDim = ih;
+                            }
+
+                            const ctCaptured = new Map();
+
+                            function ctCaptureVisible() {
+                                for (const child of ct.children) {
+                                    if (child.nodeType !== 1) continue;
+                                    const key = fingerprint(child);
+                                    if (key && !ctCaptured.has(key)) {
+                                        ctCaptured.set(key, cleanOuterHTML(child));
+                                        if (ctCaptured.size >= memCap) return;
+                                    }
+                                }
+                            }
+
+                            ctCaptureVisible();
+                            let ctConsecutiveEmpty = 0;
+
+                            for (let si = 0; si < 1000 && ctConsecutiveEmpty < 5 && steps < limit; si++) {
+                                if (ctHoriz) {
+                                    ct.scrollLeft += ctItemDim;
+                                } else {
+                                    ct.scrollTop += ctItemDim;
+                                }
+                                await sleep(scrollDelay * 1000);
+                                steps++;
+
+                                const beforeSize = ctCaptured.size;
+                                ctCaptureVisible();
+                                const newItems = ctCaptured.size - beforeSize;
+
+                                if (newItems === 0) {
+                                    ctConsecutiveEmpty++;
+                                } else {
+                                    ctConsecutiveEmpty = 0;
+                                }
+
+                                if (ctCaptured.size >= memCap) { phase3CapReached = true; break; }
+                                if (ctHoriz) {
+                                    if (ct.scrollLeft + ct.clientWidth >= ct.scrollWidth - ctItemDim) break;
+                                } else {
+                                    if (ct.scrollTop + ct.clientHeight >= ct.scrollHeight - ctItemDim) break;
+                                }
+                            }
+
+                            // Only inject if we found more items than currently visible
+                            if (ctCaptured.size > ct.children.length) {
+                                ct.innerHTML = Array.from(ctCaptured.values()).join('\\n');
+                                phase3Merged += ctCaptured.size;
+                            }
+                        } catch(e) { continue; }
+                    }
+
+                    if (phase3Merged > 0 || phase2Result) {
+                        window.scrollTo(0, document.documentElement.scrollHeight);
+                        const totalMerged = (phase2Result ? phase2Result.totalMerged : 0) + phase3Merged;
+                        return {
+                            recyclingDetected: true,
+                            removedCount: totalMerged,
+                            totalMerged: totalMerged,
+                            scrollSteps: steps,
+                            capReached: phase3CapReached || (phase2Result && phase2Result.capReached),
+                            expandedGroups: totalExpanded,
+                            phase: phase2Result ? 3 : 4
+                        };
+                    }
+
+                    // No recycling and no container-scroll found.
+                    // Do a normal scroll-to-bottom for append-based infinite scroll
+                    // (items are lazy-loaded as user scrolls down).
+                    let totalHeight = document.documentElement.scrollHeight;
+                    const vpHeight  = window.innerHeight;
+                    let pos = 0;
+                    while (pos < totalHeight && steps < limit) {
+                        pos = Math.min(pos + vpHeight, totalHeight);
+                        window.scrollTo(0, pos);
+                        await sleep(scrollDelay * 1000);
+                        totalExpanded += await expandCollapsed();
+                        const nh = document.documentElement.scrollHeight;
+                        if (nh > totalHeight) totalHeight = nh;
+                        steps++;
+                    }
+                    window.scrollTo(0, document.documentElement.scrollHeight);
+                    return {
+                        recyclingDetected: false,
+                        scrollSteps: steps,
+                        removedButNotRecycled: removedCount
+                    };
+                }""",
+                {
+                    "scrollDelay": scroll_delay,
+                    "maxSteps": max_scroll_steps if max_scroll_steps else 0,
+                    "memCap": 50000,
+                },
             )
-            current_position = viewport_height
 
-            # await page.evaluate(f"window.scrollTo(0, {current_position})")
-            await self.safe_scroll(page, 0, current_position, delay=scroll_delay)
-            # await self.csp_scroll_to(page, 0, current_position)
-            # await asyncio.sleep(scroll_delay)
+            if result and result.get("recyclingDetected"):
+                if result.get("capReached"):
+                    self.logger.warning(
+                        message="DOM recycling detected — recovered {removed} elements, "
+                                "{total} total after merge ({steps} scroll steps) "
+                                "[MEMORY CAP REACHED — results may be incomplete]",
+                        tag="PAGE_SCAN",
+                        params={
+                            "removed": result.get("removedCount", 0),
+                            "total": result.get("totalMerged", 0),
+                            "steps": result.get("scrollSteps", 0),
+                        },
+                    )
+                else:
+                    expanded = result.get("expandedGroups", 0)
+                    extra = f", expanded {expanded} collapsed groups" if expanded else ""
+                    self.logger.success(
+                        message="DOM recycling detected — recovered {removed} elements, "
+                                "{total} total after merge ({steps} scroll steps)"
+                                + extra,
+                        tag="PAGE_SCAN",
+                        params={
+                            "removed": result.get("removedCount", 0),
+                            "total": result.get("totalMerged", 0),
+                            "steps": result.get("scrollSteps", 0),
+                        },
+                    )
+            else:
+                removed_not_recycled = result.get("removedButNotRecycled", 0) if result else 0
+                if removed_not_recycled > 0:
+                    self.logger.warning(
+                        message="Full page scan completed but {count} DOM removals "
+                                "were not confirmed as recycling. Content may be incomplete.",
+                        tag="PAGE_SCAN",
+                        params={"count": removed_not_recycled},
+                    )
+                else:
+                    self.logger.info(
+                        message="Full page scan completed in {steps} scroll steps",
+                        tag="PAGE_SCAN",
+                        params={"steps": result.get("scrollSteps", 0) if result else 0},
+                    )
 
-            # total_height = await page.evaluate("document.documentElement.scrollHeight")
-            dimensions = await self.get_page_dimensions(page)
-            total_height = dimensions["height"]
-
-            scroll_step_count = 0
-            while current_position < total_height:
-                #### 
-                # NEW FEATURE: Check if we've reached the maximum allowed scroll steps
-                # This prevents infinite scrolling on very long pages or infinite scroll scenarios
-                # If max_scroll_steps is None, this check is skipped (unlimited scrolling - original behavior)
-                ####
-                if max_scroll_steps is not None and scroll_step_count >= max_scroll_steps:
-                    break
-                current_position = min(current_position + viewport_height, total_height)
-                await self.safe_scroll(page, 0, current_position, delay=scroll_delay)
-
-                # Increment the step counter for max_scroll_steps tracking
-                scroll_step_count += 1
-                
-                # await page.evaluate(f"window.scrollTo(0, {current_position})")
-                # await asyncio.sleep(scroll_delay)
-
-                # new_height = await page.evaluate("document.documentElement.scrollHeight")
-                dimensions = await self.get_page_dimensions(page)
-                new_height = dimensions["height"]
-
-                if new_height > total_height:
-                    total_height = new_height
-
-            # await page.evaluate("window.scrollTo(0, 0)")
-            await self.safe_scroll(page, 0, 0)
-
+        except (asyncio.CancelledError, KeyboardInterrupt):
+            raise
         except Exception as e:
-            self.logger.warning(
-                message="Failed to perform full page scan: {error}",
+            self.logger.error(
+                message="Full page scan failed: {error}. HTML will contain only "
+                        "the first viewport of content.",
                 tag="PAGE_SCAN",
                 params={"error": str(e)},
             )
-        else:
-            # await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            await self.safe_scroll(page, 0, total_height)
+        finally:
+            # Always restore the previous timeout, even on error
+            if prev_timeout is not None:
+                page.set_default_timeout(prev_timeout)
+            else:
+                page.set_default_timeout(30_000)
 
     async def _handle_virtual_scroll(self, page: Page, config: "VirtualScrollConfig"):
         """
@@ -1316,113 +2163,158 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 params={"selector": config.container_selector}
             )
             
-            # JavaScript function to handle virtual scroll capture
             virtual_scroll_js = """
             async (config) => {
                 const container = document.querySelector(config.container_selector);
                 if (!container) {
                     throw new Error(`Container not found: ${config.container_selector}`);
                 }
-                
-                // List to store HTML chunks when content is replaced
+
                 const htmlChunks = [];
                 let previousHTML = container.innerHTML;
+                let previousChildCount = container.children.length;
                 let scrollCount = 0;
-                
+                let consecutiveNoChange = 0;
+                const maxNoChange = config.max_no_change || 5;
+                const maxCaptured = config.max_captured_elements || 0;
+                let totalCapturedCount = 0;
+                let capReached = false;
+
                 // Determine scroll amount
                 let scrollAmount;
                 if (typeof config.scroll_by === 'number') {
                     scrollAmount = config.scroll_by;
                 } else if (config.scroll_by === 'page_height') {
                     scrollAmount = window.innerHeight;
-                } else { // container_height
+                } else {
                     scrollAmount = container.offsetHeight;
                 }
-                
-                // Perform scrolling
-                while (scrollCount < config.scroll_count) {
-                    // Scroll the container
-                    container.scrollTop += scrollAmount;
-                    
-                    // Wait for content to potentially load
-                    await new Promise(resolve => setTimeout(resolve, config.wait_after_scroll * 1000));
-                    
-                    // Get current HTML
-                    const currentHTML = container.innerHTML;
-                    
-                    // Determine what changed
-                    if (currentHTML === previousHTML) {
-                        // Case 0: No change - continue scrolling
-                        console.log(`Scroll ${scrollCount + 1}: No change in content`);
-                    } else if (currentHTML.startsWith(previousHTML)) {
-                        // Case 1: New items appended - content already in page
-                        console.log(`Scroll ${scrollCount + 1}: New items appended`);
+
+                let useWindowScroll = false;
+                const prevScrollTop = container.scrollTop;
+                container.scrollTop += 1;
+                if (container.scrollTop === prevScrollTop) {
+                    useWindowScroll = true;
+
+                } else {
+                    container.scrollTop = prevScrollTop;
+                }
+
+                function doScroll() {
+                    if (useWindowScroll) {
+                        window.scrollBy(0, scrollAmount);
                     } else {
-                        // Case 2: Items replaced - capture the previous HTML
-                        console.log(`Scroll ${scrollCount + 1}: Content replaced, capturing chunk`);
-                        htmlChunks.push(previousHTML);
-                    }
-                    
-                    // Update previous HTML for next iteration
-                    previousHTML = currentHTML;
-                    scrollCount++;
-                    
-                    // Check if we've reached the end
-                    if (container.scrollTop + container.clientHeight >= container.scrollHeight - 10) {
-                        console.log(`Reached end of scrollable content at scroll ${scrollCount}`);
-                        // Capture final chunk if content was replaced
-                        if (htmlChunks.length > 0) {
-                            htmlChunks.push(currentHTML);
-                        }
-                        break;
+                        container.scrollTop += scrollAmount;
                     }
                 }
-                
-                // If we have chunks (case 2 occurred), merge them
+
+                function isAtEnd() {
+                    if (useWindowScroll) {
+                        return window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 10;
+                    }
+                    return container.scrollTop + container.clientHeight >= container.scrollHeight - 10;
+                }
+
+                function getElementFingerprint(el) {
+                    try {
+                        const attrId = el.getAttribute('data-id')
+                            || el.getAttribute('data-index')
+                            || el.getAttribute('data-key')
+                            || el.getAttribute('data-testid')
+                            || el.id;
+                        if (attrId) return 'attr:' + attrId;
+                        const txt = (el.innerText || '').trim();
+                        if (txt.length > 10)
+                            return 'text:' + txt.toLowerCase().replace(/[\\s\\W]/g, '').substring(0, 200);
+                        if (el.outerHTML && el.outerHTML.length > 0)
+                            return 'html:' + el.outerHTML.length + ':' + el.outerHTML.substring(0, 120);
+                        return null;
+                    } catch(e) { return null; }
+                }
+
+                function isContentAppended(prevHTML, currHTML, prevCount) {
+                    try {
+                        const currCount = container.children.length;
+                        if (currCount <= prevCount) return false;
+                        if (prevCount > 0 && currCount > prevCount && container.children[0]) {
+                            const firstChild = container.children[0];
+                            const prefix = firstChild.outerHTML.substring(0, Math.min(100, firstChild.outerHTML.length));
+                            return prevHTML.startsWith(prefix);
+                        }
+                        return false;
+                    } catch(e) { return false; }
+                }
+
+                while (scrollCount < config.scroll_count && !capReached) {
+                    doScroll();
+                    await new Promise(resolve => setTimeout(resolve, config.wait_after_scroll * 1000));
+
+                    const currentHTML = container.innerHTML;
+
+                    if (currentHTML === previousHTML) {
+                        consecutiveNoChange++;
+                        if (maxNoChange > 0 && consecutiveNoChange >= maxNoChange) {
+                            break;
+                        }
+                    } else if (isContentAppended(previousHTML, currentHTML, previousChildCount)) {
+                        consecutiveNoChange = 0;
+                    } else {
+                        htmlChunks.push(previousHTML);
+                        totalCapturedCount += container.children.length;
+                        consecutiveNoChange = 0;
+                        if (maxCaptured > 0 && totalCapturedCount >= maxCaptured) {
+                            capReached = true;
+                        }
+                    }
+
+                    previousHTML = currentHTML;
+                    previousChildCount = container.children.length;
+                    scrollCount++;
+
+                    if (isAtEnd()) { break; }
+                }
+
                 if (htmlChunks.length > 0) {
-                    console.log(`Merging ${htmlChunks.length} HTML chunks`);
-                    
-                    // Parse all chunks to extract unique elements
+                    htmlChunks.push(previousHTML);
+                }
+
+                if (htmlChunks.length > 0) {
                     const tempDiv = document.createElement('div');
-                    const seenTexts = new Set();
+                    const seenFingerprints = new Set();
                     const uniqueElements = [];
-                    
-                    // Process each chunk
+
                     for (const chunk of htmlChunks) {
                         tempDiv.innerHTML = chunk;
-                        const elements = tempDiv.children;
-                        
-                        for (let i = 0; i < elements.length; i++) {
-                            const element = elements[i];
-                            // Normalize text for deduplication
-                            const normalizedText = element.innerText
-                                .toLowerCase()
-                                .replace(/[\\s\\W]/g, ''); // Remove spaces and symbols
-                            
-                            if (!seenTexts.has(normalizedText)) {
-                                seenTexts.add(normalizedText);
+                        const elements = Array.from(tempDiv.children);
+                        for (const element of elements) {
+                            const fp = getElementFingerprint(element);
+                            if (fp && !seenFingerprints.has(fp)) {
+                                seenFingerprints.add(fp);
+                                uniqueElements.push(element.outerHTML);
+                            } else if (!fp) {
                                 uniqueElements.push(element.outerHTML);
                             }
                         }
                     }
-                    
-                    // Replace container content with merged unique elements
+
                     container.innerHTML = uniqueElements.join('\\n');
-                    console.log(`Merged ${uniqueElements.length} unique elements from ${htmlChunks.length} chunks`);
-                    
+
                     return {
                         success: true,
                         chunksCount: htmlChunks.length,
                         uniqueCount: uniqueElements.length,
-                        replaced: true
+                        replaced: true,
+                        usedWindowScroll: useWindowScroll,
+                        capReached: capReached
                     };
                 } else {
-                    console.log('No content replacement detected, all content remains in page');
                     return {
                         success: true,
                         chunksCount: 0,
                         uniqueCount: 0,
-                        replaced: false
+                        replaced: false,
+                        usedWindowScroll: useWindowScroll,
+                        capReached: false
                     };
                 }
             }
@@ -1432,12 +2324,18 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             result = await self.adapter.evaluate(page, virtual_scroll_js, config.to_dict())
             
             if result.get("replaced", False):
+                extra = ""
+                if result.get("usedWindowScroll"):
+                    extra += " (window scroll fallback)"
+                if result.get("capReached"):
+                    extra += " [memory cap reached]"
                 self.logger.success(
-                    message="Virtual scroll completed. Merged {unique} unique elements from {chunks} chunks",
+                    message="Virtual scroll completed. Merged {unique} unique elements from {chunks} chunks{extra}",
                     tag="VSCROLL",
                     params={
                         "unique": result.get("uniqueCount", 0),
-                        "chunks": result.get("chunksCount", 0)
+                        "chunks": result.get("chunksCount", 0),
+                        "extra": extra,
                     }
                 )
             else:
