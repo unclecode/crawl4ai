@@ -42,6 +42,7 @@ from .content_filter_strategy import (
     LLMContentFilter,
     RelevantContentFilter,
 )
+from .document_extraction_strategy import DocumentExtractionStrategy, DocumentExtractionResult
 from .models import CrawlResult, MarkdownGenerationResult, DisplayMode
 from .components.crawler_monitor import CrawlerMonitor
 from .link_preview import LinkPreview
