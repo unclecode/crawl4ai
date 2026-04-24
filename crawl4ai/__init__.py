@@ -169,6 +169,7 @@ __all__ = [
     "TableExtractionStrategy",
     "DefaultTableExtraction",
     "NoTableExtraction",
+    "LLMTableExtraction",
     "RelevantContentFilter",
     "PruningContentFilter",
     "BM25ContentFilter",
