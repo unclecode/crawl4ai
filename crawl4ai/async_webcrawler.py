@@ -1029,7 +1029,7 @@ class AsyncWebCrawler:
             primary_cfg = config[0] if isinstance(config, list) else config
             mean_delay = getattr(primary_cfg, "mean_delay", 0.1)
             max_range = getattr(primary_cfg, "max_range", 0.3)
-            max_session_permit = max(1, int(getattr(primary_cfg, "semaphore_count", 5) or 5))
+            max_session_permit = max(1, int(getattr(primary_cfg, "semaphore_count", 10) or 10))
             dispatcher = MemoryAdaptiveDispatcher(
                 max_session_permit=max_session_permit,
                 rate_limiter=RateLimiter(
