@@ -210,7 +210,7 @@ class AsyncWebCrawler:
         url: str,
         config: CrawlerRunConfig = None,
         **kwargs,
-    ) -> RunManyReturn:
+    ) -> CrawlResultContainer:
         """
         Runs the crawler for a single source: URL (web, local file, or raw HTML).
 
