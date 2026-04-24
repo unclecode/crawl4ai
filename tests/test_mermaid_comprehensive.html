@@ -1,0 +1,1766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mermaid Diagram Test Suite — crawl4ai</title>
+  <style>
+    :root { --bg: #f8f9fa; --card: #fff; --border: #dee2e6; --text: #212529; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); padding: 2rem; line-height: 1.5; }
+    h1 { margin-bottom: 0.5rem; }
+    .version-bar { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 2rem; display: flex; align-items: center; gap: 1rem; }
+    .version-bar label { font-weight: 600; }
+    .version-bar select { padding: 0.4rem 0.8rem; border-radius: 4px; border: 1px solid var(--border); }
+    .version-bar .status { margin-left: auto; font-size: 0.85rem; color: #6c757d; }
+    section { margin-bottom: 3rem; }
+    section > h2 { border-bottom: 2px solid var(--border); padding-bottom: 0.5rem; margin-bottom: 1.5rem; }
+    .diagram-group { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+    .diagram-group h3 { margin-bottom: 1rem; color: #495057; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .mermaid { margin: 0 auto; }
+    .priority-badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; margin-left: 0.5rem; vertical-align: middle; }
+    .p1 { background: #dc3545; color: #fff; }
+    .p2 { background: #fd7e14; color: #fff; }
+    .p3 { background: #6c757d; color: #fff; }
+    .edge-case { background: #0d6efd; color: #fff; }
+    .toc { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin-bottom: 2rem; }
+    .toc h2 { margin-bottom: 1rem; }
+    .toc ul { list-style: none; columns: 3; }
+    .toc li { margin-bottom: 0.3rem; }
+    .toc a { text-decoration: none; color: #0d6efd; }
+    .toc a:hover { text-decoration: underline; }
+    @media (max-width: 768px) { .toc ul { columns: 1; } }
+  </style>
+</head>
+<body>
+
+<h1>Mermaid Diagram Test Suite</h1>
+<p>Comprehensive test page for crawl4ai mermaid SVG extraction — 59 diagrams across 27 types.</p>
+
+<!-- Version Selector -->
+<div class="version-bar">
+  <label for="mermaid-version">Mermaid Version:</label>
+  <select id="mermaid-version">
+    <option value="11.14.0" selected>v11.14.0 (latest stable)</option>
+    <option value="11.6.0">v11.6.0</option>
+    <option value="11.0.0">v11.0.0 (first v11)</option>
+    <option value="10.9.1">v10.9.1 (last v10)</option>
+  </select>
+  <span class="status" id="render-status">Loading...</span>
+</div>
+
+<!-- Table of Contents -->
+<nav class="toc">
+  <h2>Table of Contents</h2>
+  <ul>
+    <li><a href="#flowchart">Flowchart</a> <span class="priority-badge p1">P1</span></li>
+    <li><a href="#sequence">Sequence</a> <span class="priority-badge p1">P1</span></li>
+    <li><a href="#class">Class</a> <span class="priority-badge p1">P1</span></li>
+    <li><a href="#state">State</a> <span class="priority-badge p1">P1</span></li>
+    <li><a href="#er">ER</a> <span class="priority-badge p1">P1</span></li>
+    <li><a href="#gantt">Gantt</a> <span class="priority-badge p1">P1</span></li>
+    <li><a href="#pie">Pie</a> <span class="priority-badge p1">P1</span></li>
+    <li><a href="#journey">User Journey</a> <span class="priority-badge p2">P2</span></li>
+    <li><a href="#gitgraph">GitGraph</a> <span class="priority-badge p2">P2</span></li>
+    <li><a href="#mindmap">Mindmap</a> <span class="priority-badge p2">P2</span></li>
+    <li><a href="#timeline">Timeline</a> <span class="priority-badge p2">P2</span></li>
+    <li><a href="#quadrant">Quadrant</a> <span class="priority-badge p2">P2</span></li>
+    <li><a href="#requirement">Requirement</a> <span class="priority-badge p2">P2</span></li>
+    <li><a href="#c4">C4</a> <span class="priority-badge p2">P2</span></li>
+    <li><a href="#zenuml">ZenUML</a> <span class="priority-badge p2">P2</span></li>
+    <li><a href="#sankey">Sankey</a> <span class="priority-badge p3">P3</span></li>
+    <li><a href="#xychart">XY Chart</a> <span class="priority-badge p3">P3</span></li>
+    <li><a href="#block">Block</a> <span class="priority-badge p3">P3</span></li>
+    <li><a href="#packet">Packet</a> <span class="priority-badge p3">P3</span></li>
+    <li><a href="#kanban">Kanban</a> <span class="priority-badge p3">P3</span></li>
+    <li><a href="#architecture">Architecture</a> <span class="priority-badge p3">P3</span></li>
+    <li><a href="#radar">Radar</a> <span class="priority-badge p3">P3</span></li>
+    <li><a href="#treemap">Treemap</a> <span class="priority-badge p3">P3</span></li>
+    <li><a href="#venn">Venn</a> <span class="priority-badge p3">P3</span></li>
+    <li><a href="#ishikawa">Ishikawa</a> <span class="priority-badge p3">P3</span></li>
+    <li><a href="#treeview">TreeView</a> <span class="priority-badge p3">P3</span></li>
+    <li><a href="#wardley">Wardley Maps</a> <span class="priority-badge p3">P3</span></li>
+    <li><a href="#edge-cases">Edge Cases</a> <span class="priority-badge edge-case">Edge</span></li>
+  </ul>
+</nav>
+
+<!-- ============================================================ -->
+<!-- PRIORITY 1: CORE TYPES (7 types × 3 variants + 2 extras = 23) -->
+<!-- ============================================================ -->
+
+<!-- ==================== FLOWCHART ==================== -->
+<section id="flowchart" data-diagram-type="flowchart">
+  <h2>Flowchart <span class="priority-badge p1">P1</span></h2>
+
+  <div class="diagram-group" data-variant="simple" data-diagram-id="flowchart-simple">
+    <h3>Simple (TD, 3 nodes)</h3>
+    <pre class="mermaid">
+flowchart TD
+    A[Start] --> B[Process]
+    B --> C[End]
+    </pre>
+  </div>
+
+  <div class="diagram-group" data-variant="medium" data-diagram-id="flowchart-medium">
+    <h3>Medium (LR, 6 nodes, edge labels, mixed shapes)</h3>
+    <pre class="mermaid">
+flowchart LR
+    A([Terminal]) --> B{Decision}
+    B -->|Yes| C[Process A]
+    B -->|No| D[Process B]
+    C --> E[(Database)]
+    D --> E
+    E --> F((End))
+    </pre>
+  </div>
+
+  <div class="diagram-group" data-variant="complex" data-diagram-id="flowchart-complex">
+    <h3>Complex (TB, subgraphs, styling, 12+ nodes)</h3>
+    <pre class="mermaid">
+flowchart TB
+    subgraph Frontend ["Frontend Layer"]
+        A["User Interface"] --> B["API Gateway"]
+        B --> C{"Auth Check"}
+    end
+    subgraph Backend ["Backend Services"]
+        D["User Service"] --> E[("PostgreSQL")]
+        F["Order Service"] --> G[("MongoDB")]
+    end
+    subgraph Cache ["Cache Layer"]
+        I["Redis Primary"]
+        J["Redis Replica"]
+        I --> J
+    end
+    C -->|Authenticated| D
+    C -->|Failed| H["Login Page"]
+    D --> I
+    F --> I
+    H --> A
+    G --> K["Analytics Service"]
+    K --> L[("Data Warehouse")]
+    style A fill:#f9f,stroke:#333
+    style E fill:#bbf
+    style I fill:#bfb
+    </pre>
+  </div>
+
+  <div class="diagram-group" data-variant="direction-bt" data-diagram-id="flowchart-bt">
+    <h3>Direction Variant: Bottom-to-Top</h3>
+    <pre class="mermaid">
+flowchart BT
+    A[Foundation] --> B[Structure]
+    B --> C[Roof]
+    C --> D[Chimney]
+    </pre>
+  </div>
+
+  <div class="diagram-group" data-variant="direction-rl" data-diagram-id="flowchart-rl">
+    <h3>Direction Variant: Right-to-Left</h3>
+    <pre class="mermaid">
+flowchart RL
+    A[Output] --> B[Transform]
+    B --> C[Validate]
+    C --> D[Input]
+    </pre>
+  </div>
+
+  <div class="diagram-group" data-variant="div-selector" data-diagram-id="flowchart-div">
+    <h3>WordPress/PHP Style (div.mermaid selector)</h3>
+    <div class="mermaid">
+flowchart LR
+    WP[WordPress] --> Plugin[Mermaid Plugin]
+    Plugin --> Render[Client Render]
+    Render --> SVG[SVG Output]
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SEQUENCE ==================== -->
+<section id="sequence" data-diagram-type="sequence">
+  <h2>Sequence Diagram <span class="priority-badge p1">P1</span></h2>
+
+  <div class="diagram-group" data-variant="simple" data-diagram-id="sequence-simple">
+    <h3>Simple (2 participants)</h3>
+    <pre class="mermaid">
+sequenceDiagram
+    Alice->>Bob: Hello Bob
+    Bob-->>Alice: Hi Alice
+    </pre>
+  </div>
+
+  <div class="diagram-group" data-variant="medium" data-diagram-id="sequence-medium">
+    <h3>Medium (5 participants, activations, notes)</h3>
+    <pre class="mermaid">
+sequenceDiagram
+    participant U as User
+    participant F as Frontend
+    participant A as API
+    participant C as Cache
+    participant D as Database
+    U->>F: Click Login
+    F->>A: POST /auth
+    activate A
+    A->>C: Check session
+    C-->>A: Cache miss
+    A->>D: SELECT user
+    D-->>A: User record
+    A->>C: Store session
+    A-->>F: JWT token
+    deactivate A
+    Note over F,A: Token stored in cookie
+    F-->>U: Dashboard
+    </pre>
+  </div>
+
+  <div class="diagram-group" data-variant="complex" data-diagram-id="sequence-complex">
+    <h3>Complex (autonumber, alt/loop/par blocks)</h3>
+    <pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant LB as Load Balancer
+    participant S1 as Server 1
+    participant S2 as Server 2
+    participant DB as Database
+
+    C->>LB: Request
+    alt Server 1 available
+        LB->>S1: Forward
+        activate S1
+        S1->>DB: Query
+        DB-->>S1: Results
+        S1-->>LB: Response
+        deactivate S1
+    else Server 2 fallback
+        LB->>S2: Forward
+        activate S2
+        S2->>DB: Query
+        DB-->>S2: Results
+        S2-->>LB: Response
+        deactivate S2
+    end
+    LB-->>C: Response
+
+    loop Every 30s
+        C->>LB: Heartbeat
+        LB-->>C: ACK
+    end
+
+    par Background Tasks
+        S1->>DB: Cleanup old sessions
+    and
+        S2->>DB: Sync replicas
+    end
+
+    Note right of C: Connection closed
+    </pre>
+  </div>
+</section>
+
+<!-- ==================== CLASS ==================== -->
+<section id="class" data-diagram-type="class">
+  <h2>Class Diagram <span class="priority-badge p1">P1</span></h2>
+
+  <div class="diagram-group" data-variant="simple" data-diagram-id="class-simple">
+    <h3>Simple (1 class with fields and methods)</h3>
+    <pre class="mermaid">
+classDiagram
+    class Animal {
+        +String name
+        +int age
+        +makeSound()
+        +move(distance)
+    }
+    </pre>
+  </div>
+
+  <div class="diagram-group" data-variant="medium" data-diagram-id="class-medium">
+    <h3>Medium (3 classes, inheritance, associations)</h3>
+    <pre class="mermaid">
+classDiagram
+    class Vehicle {
+        +String make
+        +String model
+        +int year
+        +start()
+        +stop()
+    }
+    class Car {
+        +int doors
+        +String bodyType
+        +drive()
+    }
+    class Truck {
+        +int payload
+        +bool hasTrailer
+        +haul()
+    }
+    class Wheel {
+        +int diameter
+        +String material
+        +rotate()
+    }
+    Vehicle <|-- Car
+    Vehicle <|-- Truck
+    Car "1" --> "4" Wheel : has
+    Truck "1" --> "6" Wheel : has
+    </pre>
+  </div>
+
+  <div class="diagram-group" data-variant="complex" data-diagram-id="class-complex">
+    <h3>Complex (generics, interfaces, annotations, notes)</h3>
+    <pre class="mermaid">
+classDiagram
+    class List~T~ {
+        &lt;&lt;interface&gt;&gt;
+        +add(T item) bool
+        +get(int index) T
+        +size() int
+        +remove(int index) T
+    }
+    class ArrayList~T~ {
+        -T[] data
+        -int capacity
+        +add(T item) bool
+        +get(int index) T
+        +ensureCapacity(int min)
+    }
+    class LinkedList~T~ {
+        -Node~T~ head
+        -Node~T~ tail
+        -int count
+        +add(T item) bool
+        +get(int index) T
+        +addFirst(T item)
+    }
+    class Comparable~T~ {
+        &lt;&lt;interface&gt;&gt;
+        +compareTo(T other) int
+    }
+    class Serializable {
+        &lt;&lt;interface&gt;&gt;
+        +serialize() byte[]
+    }
+    List~T~ <|.. ArrayList~T~
+    List~T~ <|.. LinkedList~T~
+    ArrayList~T~ ..|> Comparable~T~
+    ArrayList~T~ ..|> Serializable
+    note for List "Core collection interface\nfrom java.util"
+    </pre>
+  </div>
+</section>
+
+<!-- ==================== STATE ==================== -->
+<section id="state" data-diagram-type="state">
+  <h2>State Diagram <span class="priority-badge p1">P1</span></h2>
+
+  <div class="diagram-group" data-variant="simple" data-diagram-id="state-simple">
+    <h3>Simple (3 states)</h3>
+    <pre class="mermaid">
+stateDiagram-v2
+    [*] --> Idle
+    Idle --> Processing : start
+    Processing --> Done : complete
+    Done --> [*]
+    </pre>
+  </div>
+
+  <div class="diagram-group" data-variant="medium" data-diagram-id="state-medium">
+    <h3>Medium (6 states with transitions)</h3>
+    <pre class="mermaid">
+stateDiagram-v2
+    [*] --> Draft
+    Draft --> Review : Submit
+    Review --> Approved : Approve
+    Review --> Draft : Reject
+    Approved --> Published : Publish
+    Published --> Archived : Archive
+    Archived --> Draft : Revive
+    Archived --> [*]
+    </pre>
+  </div>
+
+  <div class="diagram-group" data-variant="complex" data-diagram-id="state-complex">
+    <h3>Complex (nested/composite states, notes)</h3>
+    <pre class="mermaid">
+stateDiagram-v2
+    [*] --> Active
+    state Active {
+        [*] --> Idle
+        Idle --> Processing : event_received
+        Processing --> Waiting : need_input
+        Waiting --> Processing : input_received
+        Processing --> Idle : done
+
+        state Processing {
+            [*] --> Validating
+            Validating --> Transforming : valid
+            Validating --> ErrorState : invalid
+            Transforming --> Saving
+            Saving --> [*]
+            ErrorState --> [*]
+        }
+    }
+    Active --> Failed : critical_error
+    Active --> [*] : shutdown
+    Failed --> Active : retry
+
+    note right of Active : Main operational state
+    note left of Failed : Requires manual intervention
+    </pre>
+  </div>
+</section>
+
+<!-- ==================== ER ==================== -->
+<section id="er" data-diagram-type="er">
+  <h2>Entity Relationship Diagram <span class="priority-badge p1">P1</span></h2>
+
+  <div class="diagram-group" data-variant="simple" data-diagram-id="er-simple">
+    <h3>Simple (2 entities)</h3>
+    <pre class="mermaid">
+erDiagram
+    USER ||--o{ ORDER : places
+    ORDER ||--|{ LINE_ITEM : contains
+    </pre>
+  </div>
+
+  <div class="diagram-group" data-variant="medium" data-diagram-id="er-medium">
+    <h3>Medium (4 entities with attributes)</h3>
+    <pre class="mermaid">
+erDiagram
+    CUSTOMER ||--o{ ORDER : places
+    CUSTOMER {
+        int id PK
+        string name
+        string email UK
+        date created_at
+    }
+    ORDER ||--|{ LINE_ITEM : contains
+    ORDER {
+        int id PK
+        date created
+        string status
+        float total
+    }
+    PRODUCT ||--o{ LINE_ITEM : "is in"
+    PRODUCT {
+        int id PK
+        string name
+        float price
+        int stock
+    }
+    LINE_ITEM {
+        int id PK
+        int quantity
+        float unit_price
+    }
+    </pre>
+  </div>
+
+  <div class="diagram-group" data-variant="complex" data-diagram-id="er-complex">
+    <h3>Complex (6 entities, all cardinality types)</h3>
+    <pre class="mermaid">
+erDiagram
+    DEPARTMENT ||--o{ EMPLOYEE : employs
+    EMPLOYEE ||--o{ PROJECT_ASSIGNMENT : "works on"
+    PROJECT ||--o{ PROJECT_ASSIGNMENT : includes
+    EMPLOYEE ||--o| ADDRESS : "lives at"
+    EMPLOYEE }|--|| ROLE : has
+    MANAGER ||--o{ EMPLOYEE : supervises
+    DEPARTMENT {
+        int dept_id PK
+        string dept_name
+        string location
+        string budget
+    }
+    EMPLOYEE {
+        int emp_id PK
+        string first_name
+        string last_name
+        date hire_date
+        float salary
+        int dept_id FK
+    }
+    PROJECT {
+        int proj_id PK
+        string proj_name
+        date start_date
+        date end_date
+        string status
+    }
+    ROLE {
+        int role_id PK
+        string title
+        string description
+        string level
+    }
+    ADDRESS {
+        int addr_id PK
+        string street
+        string city
+        string country
+        string postal_code
+    }
+    MANAGER {
+        int mgr_id PK
+        string region
+    }
+    </pre>
+  </div>
+</section>
+
+<!-- ==================== GANTT ==================== -->
+<section id="gantt" data-diagram-type="gantt">
+  <h2>Gantt Chart <span class="priority-badge p1">P1</span></h2>
+
+  <div class="diagram-group" data-variant="simple" data-diagram-id="gantt-simple">
+    <h3>Simple (2 tasks)</h3>
+    <pre class="mermaid">
+gantt
+    title Simple Project
+    dateFormat YYYY-MM-DD
+    section Phase 1
+    Task A :a1, 2024-01-01, 7d
+    Task B :after a1, 5d
+    </pre>
+  </div>
+
+  <div class="diagram-group" data-variant="medium" data-diagram-id="gantt-medium">
+    <h3>Medium (milestones, sections, done/active)</h3>
+    <pre class="mermaid">
+gantt
+    title Product Launch
+    dateFormat YYYY-MM-DD
+    section Planning
+    Requirements  :done, req, 2024-01-01, 14d
+    Design        :active, des, after req, 10d
+    section Development
+    Frontend      :dev1, after des, 21d
+    Backend       :dev2, after des, 28d
+    section Testing
+    QA            :qa, after dev2, 14d
+    UAT           :uat, after qa, 7d
+    section Launch
+    Deploy        :milestone, after uat, 0d
+    </pre>
+  </div>
+
+  <div class="diagram-group" data-variant="complex" data-diagram-id="gantt-complex">
+    <h3>Complex (critical path, excludes weekends, many sections)</h3>
+    <pre class="mermaid">
+gantt
+    title Enterprise Migration
+    dateFormat YYYY-MM-DD
+    excludes weekends
+    section Analysis
+    Current State    :done, cs, 2024-01-01, 21d
+    Gap Analysis     :done, ga, after cs, 14d
+    Requirements     :crit, req, after ga, 14d
+    section Design
+    Architecture     :crit, arch, after req, 21d
+    Data Model       :dm, after req, 14d
+    API Design       :api, after dm, 10d
+    section Build
+    Sprint 1         :crit, s1, after arch, 14d
+    Sprint 2         :crit, s2, after s1, 14d
+    Sprint 3         :s3, after s2, 14d
+    Sprint 4         :s4, after s3, 14d
+    section Test
+    Integration      :it, after s2, 21d
+    Performance      :pt, after it, 14d
+    Security Audit   :crit, sa, after pt, 7d
+    section Deploy
+    Staging          :stg, after sa, 7d
+    Production       :milestone, crit, prod, after stg, 0d
+    </pre>
+  </div>
+</section>
+
+<!-- ==================== PIE ==================== -->
+<section id="pie" data-diagram-type="pie">
+  <h2>Pie Chart <span class="priority-badge p1">P1</span></h2>
+
+  <div class="diagram-group" data-variant="simple" data-diagram-id="pie-simple">
+    <h3>Simple (3 slices)</h3>
+    <pre class="mermaid">
+pie title Browser Usage
+    "Chrome" : 65
+    "Firefox" : 20
+    "Safari" : 15
+    </pre>
+  </div>
+
+  <div class="diagram-group" data-variant="medium" data-diagram-id="pie-medium">
+    <h3>Medium (showData, 6 slices with decimals)</h3>
+    <pre class="mermaid">
+pie showData title Programming Languages 2024
+    "Python" : 28.11
+    "JavaScript" : 15.71
+    "Java" : 8.33
+    "C++" : 6.98
+    "C#" : 6.52
+    "Others" : 34.35
+    </pre>
+  </div>
+
+  <div class="diagram-group" data-variant="complex" data-diagram-id="pie-complex">
+    <h3>Complex (many slices, special characters)</h3>
+    <pre class="mermaid">
+pie title Revenue by Region Q4 2024
+    "North America" : 42.5
+    "Europe (EU + UK)" : 28.3
+    "Asia-Pacific" : 18.7
+    "Latin America" : 6.2
+    "Middle East and Africa" : 4.3
+    </pre>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- PRIORITY 2: SECONDARY TYPES (8 types × 2 variants = 16)      -->
+<!-- ============================================================ -->
+
+<!-- ==================== USER JOURNEY ==================== -->
+<section id="journey" data-diagram-type="journey">
+  <h2>User Journey <span class="priority-badge p2">P2</span></h2>
+
+  <div class="diagram-group" data-variant="simple" data-diagram-id="journey-simple">
+    <h3>Simple</h3>
+    <pre class="mermaid">
+journey
+    title Morning Routine
+    section Getting Ready
+      Wake up: 3: Me
+      Brush teeth: 5: Me
+      Get dressed: 4: Me
+    section Commute
+      Drive to work: 2: Me
+      Find parking: 1: Me
+    </pre>
+  </div>
+
+  <div class="diagram-group" data-variant="medium" data-diagram-id="journey-medium">
+    <h3>Medium (multiple actors, more sections)</h3>
+    <pre class="mermaid">
+journey
+    title User Purchase Flow
+    section Browse
+      Visit homepage: 5: User
+      Search product: 4: User
+      View details: 3: User, System
+    section Purchase
+      Add to cart: 5: User
+      Checkout: 3: User, System
+      Payment: 2: User, Payment Gateway
+    section Post-Purchase
+      Confirmation email: 5: System
+      Delivery tracking: 4: User, System
+      Leave review: 3: User
+    </pre>
+  </div>
+</section>
+
+<!-- ==================== GITGRAPH ==================== -->
+<section id="gitgraph" data-diagram-type="gitgraph">
+  <h2>GitGraph <span class="priority-badge p2">P2</span></h2>
+
+  <div class="diagram-group" data-variant="simple" data-diagram-id="gitgraph-simple">
+    <h3>Simple</h3>
+    <pre class="mermaid">
+gitGraph
+    commit id: "init"
+    commit id: "add-readme"
+    branch develop
+    commit id: "feat-1"
+    checkout main
+    merge develop id: "merge-1"
+    </pre>
+  </div>
+
+  <div class="diagram-group" data-variant="medium" data-diagram-id="gitgraph-medium">
+    <h3>Medium (branches, tags, cherry-pick)</h3>
+    <pre class="mermaid">
+gitGraph
+    commit id: "init"
+    branch develop
+    commit id: "feat-1"
+    commit id: "feat-2"
+    checkout main
+    merge develop id: "release-1.0" tag: "v1.0"
+    branch hotfix
+    commit id: "fix-critical-bug"
+    checkout main
+    merge hotfix id: "patch" tag: "v1.0.1"
+    checkout develop
+    commit id: "feat-3"
+    branch feature-x
+    commit id: "wip-x-1"
+    commit id: "wip-x-2"
+    checkout develop
+    merge feature-x id: "merge-feature-x"
+    </pre>
+  </div>
+</section>
+
+<!-- ==================== MINDMAP ==================== -->
+<section id="mindmap" data-diagram-type="mindmap">
+  <h2>Mindmap <span class="priority-badge p2">P2</span></h2>
+
+  <div class="diagram-group" data-variant="simple" data-diagram-id="mindmap-simple">
+    <h3>Simple</h3>
+    <pre class="mermaid">
+mindmap
+    root((Animals))
+        Mammals
+            Dog
+            Cat
+        Birds
+            Eagle
+            Parrot
+    </pre>
+  </div>
+
+  <div class="diagram-group" data-variant="medium" data-diagram-id="mindmap-medium">
+    <h3>Medium (deeper nesting, more branches)</h3>
+    <pre class="mermaid">
+mindmap
+    root((Project))
+        Frontend
+            React
+            TypeScript
+            CSS Modules
+            Testing
+                Jest
+                Playwright
+        Backend
+            Python
+                FastAPI
+                SQLAlchemy
+            Database
+                PostgreSQL
+                Redis
+        DevOps
+            Docker
+            Kubernetes
+            CI/CD
+                GitHub Actions
+                ArgoCD
+    </pre>
+  </div>
+</section>
+
+<!-- ==================== TIMELINE ==================== -->
+<section id="timeline" data-diagram-type="timeline">
+  <h2>Timeline <span class="priority-badge p2">P2</span></h2>
+
+  <div class="diagram-group" data-variant="simple" data-diagram-id="timeline-simple">
+    <h3>Simple</h3>
+    <pre class="mermaid">
+timeline
+    title Web History
+    2004 : Gmail launched
+    2007 : iPhone released
+    2010 : Instagram founded
+    </pre>
+  </div>
+
+  <div class="diagram-group" data-variant="medium" data-diagram-id="timeline-medium">
+    <h3>Medium (multiple events per period)</h3>
+    <pre class="mermaid">
+timeline
+    title History of Web Frameworks
+    2005 : Ruby on Rails
+         : Django
+    2010 : AngularJS
+         : Express.js
+         : Backbone.js
+    2013 : React
+    2014 : Vue.js
+    2016 : Angular 2
+         : Next.js
+    2019 : Svelte 3
+    2022 : Remix
+         : Fresh
+    </pre>
+  </div>
+</section>
+
+<!-- ==================== QUADRANT ==================== -->
+<section id="quadrant" data-diagram-type="quadrant">
+  <h2>Quadrant Chart <span class="priority-badge p2">P2</span></h2>
+
+  <div class="diagram-group" data-variant="simple" data-diagram-id="quadrant-simple">
+    <h3>Simple</h3>
+    <pre class="mermaid">
+quadrantChart
+    title Feature Priority
+    x-axis Low Effort --> High Effort
+    y-axis Low Impact --> High Impact
+    quadrant-1 Do First
+    quadrant-2 Plan
+    quadrant-3 Delegate
+    quadrant-4 Eliminate
+    Feature A: [0.3, 0.8]
+    Feature B: [0.7, 0.9]
+    Feature C: [0.2, 0.3]
+    </pre>
+  </div>
+
+  <div class="diagram-group" data-variant="medium" data-diagram-id="quadrant-medium">
+    <h3>Medium (more data points)</h3>
+    <pre class="mermaid">
+quadrantChart
+    title Technology Evaluation
+    x-axis Low Maturity --> High Maturity
+    y-axis Low Fit --> High Fit
+    quadrant-1 Adopt
+    quadrant-2 Trial
+    quadrant-3 Assess
+    quadrant-4 Hold
+    React: [0.9, 0.85]
+    Vue: [0.8, 0.7]
+    Svelte: [0.5, 0.75]
+    Angular: [0.85, 0.5]
+    Solid: [0.3, 0.6]
+    Qwik: [0.2, 0.65]
+    htmx: [0.4, 0.55]
+    Alpine: [0.45, 0.4]
+    </pre>
+  </div>
+</section>
+
+<!-- ==================== REQUIREMENT ==================== -->
+<section id="requirement" data-diagram-type="requirement">
+  <h2>Requirement Diagram <span class="priority-badge p2">P2</span></h2>
+
+  <div class="diagram-group" data-variant="simple" data-diagram-id="requirement-simple">
+    <h3>Simple</h3>
+    <pre class="mermaid">
+requirementDiagram
+requirement high_availability {
+id: 1
+text: System uptime must be at least 99.9 percent
+risk: high
+verifymethod: test
+}
+element load_balancer {
+type: simulation
+}
+load_balancer - satisfies -> high_availability
+    </pre>
+  </div>
+
+  <div class="diagram-group" data-variant="medium" data-diagram-id="requirement-medium">
+    <h3>Medium (multiple requirements and elements)</h3>
+    <pre class="mermaid">
+requirementDiagram
+requirement performance {
+id: 1
+text: Response time under 200ms
+risk: high
+verifymethod: test
+}
+requirement security {
+id: 2
+text: All data encrypted at rest
+risk: medium
+verifymethod: inspection
+}
+requirement scalability {
+id: 3
+text: Handle 10k concurrent users
+risk: high
+verifymethod: test
+}
+element api_gateway {
+type: simulation
+}
+element database_cluster {
+type: simulation
+}
+element cdn {
+type: simulation
+}
+api_gateway - satisfies -> performance
+database_cluster - satisfies -> security
+cdn - satisfies -> performance
+database_cluster - satisfies -> scalability
+    </pre>
+  </div>
+</section>
+
+<!-- ==================== C4 ==================== -->
+<section id="c4" data-diagram-type="c4">
+  <h2>C4 Diagram <span class="priority-badge p2">P2</span></h2>
+
+  <div class="diagram-group" data-variant="simple" data-diagram-id="c4-simple">
+    <h3>Simple (Context level)</h3>
+    <pre class="mermaid">
+C4Context
+    title System Context for Banking
+    Person(customer, "Customer", "A bank customer")
+    System(banking, "Banking System", "Online banking")
+    System_Ext(email, "Email System", "Sendgrid")
+    Rel(customer, banking, "Uses")
+    Rel(banking, email, "Sends emails", "SMTP")
+    </pre>
+  </div>
+
+  <div class="diagram-group" data-variant="medium" data-diagram-id="c4-medium">
+    <h3>Medium (Context with more systems)</h3>
+    <pre class="mermaid">
+C4Context
+    title E-Commerce Platform Context
+    Person(shopper, "Shopper", "Browses and buys products")
+    Person(admin, "Admin", "Manages catalog and orders")
+    System(ecom, "E-Commerce Platform", "Main shopping system")
+    System_Ext(payment, "Payment Provider", "Stripe")
+    System_Ext(shipping, "Shipping API", "FedEx/UPS")
+    System_Ext(analytics, "Analytics", "Google Analytics")
+    System_Ext(email, "Email Service", "SendGrid")
+    Rel(shopper, ecom, "Browses, purchases")
+    Rel(admin, ecom, "Manages products")
+    Rel(ecom, payment, "Processes payments")
+    Rel(ecom, shipping, "Ships orders")
+    Rel(ecom, analytics, "Sends events")
+    Rel(ecom, email, "Sends notifications")
+    </pre>
+  </div>
+</section>
+
+<!-- ==================== ZENUML ==================== -->
+<section id="zenuml" data-diagram-type="zenuml">
+  <h2>ZenUML <span class="priority-badge p2">P2</span></h2>
+
+  <div class="diagram-group" data-variant="simple" data-diagram-id="zenuml-simple">
+    <h3>Simple</h3>
+    <pre class="mermaid">
+zenuml
+Alice->Bob: Hello
+Bob->Alice: Hi back
+    </pre>
+  </div>
+
+  <div class="diagram-group" data-variant="medium" data-diagram-id="zenuml-medium">
+    <h3>Medium (nested calls, return)</h3>
+    <pre class="mermaid">
+zenuml
+@Actor Client
+@Database DB
+Client->Server.handleRequest() {
+  Server->DB.query() {
+    return results
+  }
+  return response
+}
+    </pre>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- PRIORITY 3: TERTIARY TYPES (12 types × 1 variant = 12)        -->
+<!-- ============================================================ -->
+
+<!-- ==================== SANKEY ==================== -->
+<section id="sankey" data-diagram-type="sankey">
+  <h2>Sankey Diagram <span class="priority-badge p3">P3</span></h2>
+
+  <div class="diagram-group" data-variant="simple" data-diagram-id="sankey-simple">
+    <h3>Simple</h3>
+    <pre class="mermaid">
+sankey-beta
+    Source A,Target X,30
+    Source A,Target Y,20
+    Source B,Target X,15
+    Source B,Target Z,25
+    </pre>
+  </div>
+</section>
+
+<!-- ==================== XY CHART ==================== -->
+<section id="xychart" data-diagram-type="xychart">
+  <h2>XY Chart <span class="priority-badge p3">P3</span></h2>
+
+  <div class="diagram-group" data-variant="simple" data-diagram-id="xychart-simple">
+    <h3>Simple (bar + line)</h3>
+    <pre class="mermaid">
+xychart-beta
+    title "Monthly Revenue"
+    x-axis [Jan, Feb, Mar, Apr, May, Jun]
+    y-axis "Revenue (USD)" 0 --> 15000
+    bar [5000, 6000, 7500, 8200, 9800, 12000]
+    line [5000, 6000, 7500, 8200, 9800, 12000]
+    </pre>
+  </div>
+</section>
+
+<!-- ==================== BLOCK ==================== -->
+<section id="block" data-diagram-type="block">
+  <h2>Block Diagram <span class="priority-badge p3">P3</span></h2>
+
+  <div class="diagram-group" data-variant="simple" data-diagram-id="block-simple">
+    <h3>Simple</h3>
+    <pre class="mermaid">
+block-beta
+    columns 3
+    a["Frontend"] b["API"] c["Database"]
+    d["Cache"]:3
+    </pre>
+  </div>
+</section>
+
+<!-- ==================== PACKET ==================== -->
+<section id="packet" data-diagram-type="packet">
+  <h2>Packet Diagram <span class="priority-badge p3">P3</span></h2>
+
+  <div class="diagram-group" data-variant="simple" data-diagram-id="packet-simple">
+    <h3>Simple (TCP header)</h3>
+    <pre class="mermaid">
+packet-beta
+    0-15: "Source Port"
+    16-31: "Destination Port"
+    32-63: "Sequence Number"
+    64-95: "Acknowledgment Number"
+    96-99: "Data Offset"
+    100-105: "Reserved"
+    106-111: "Flags"
+    112-127: "Window Size"
+    </pre>
+  </div>
+</section>
+
+<!-- ==================== KANBAN ==================== -->
+<section id="kanban" data-diagram-type="kanban">
+  <h2>Kanban <span class="priority-badge p3">P3</span></h2>
+
+  <div class="diagram-group" data-variant="simple" data-diagram-id="kanban-simple">
+    <h3>Simple</h3>
+    <pre class="mermaid">
+kanban
+    Todo
+        task1[Design mockups]
+        task2[Write specs]
+    In Progress
+        task3[Build API]
+    Done
+        task4[Setup CI]
+    </pre>
+  </div>
+</section>
+
+<!-- ==================== ARCHITECTURE ==================== -->
+<section id="architecture" data-diagram-type="architecture">
+  <h2>Architecture Diagram <span class="priority-badge p3">P3</span></h2>
+
+  <div class="diagram-group" data-variant="simple" data-diagram-id="architecture-simple">
+    <h3>Simple</h3>
+    <pre class="mermaid">
+architecture-beta
+    group cloud(cloud)[Cloud]
+    service server(server)[Web Server] in cloud
+    service db(database)[Database] in cloud
+    server:R --> L:db
+    </pre>
+  </div>
+</section>
+
+<!-- ==================== RADAR ==================== -->
+<section id="radar" data-diagram-type="radar">
+  <h2>Radar Chart <span class="priority-badge p3">P3</span></h2>
+
+  <div class="diagram-group" data-variant="simple" data-diagram-id="radar-simple">
+    <h3>Simple</h3>
+    <pre class="mermaid">
+radar-beta
+title Skills Assessment
+axis Speed, Reliability, Scalability, Security, Usability
+curve TeamA {4, 3, 5, 4, 3}
+curve TeamB {3, 5, 3, 5, 4}
+    </pre>
+  </div>
+</section>
+
+<!-- ==================== TREEMAP ==================== -->
+<section id="treemap" data-diagram-type="treemap">
+  <h2>Treemap <span class="priority-badge p3">P3</span></h2>
+
+  <div class="diagram-group" data-variant="simple" data-diagram-id="treemap-simple">
+    <h3>Simple</h3>
+    <pre class="mermaid">
+treemap-beta
+title Investment Portfolio
+  "Portfolio"
+    "Stocks"
+      "Tech"
+      "Health"
+      "Finance"
+    "Bonds"
+    "Cash"
+    </pre>
+  </div>
+</section>
+
+<!-- ==================== VENN ==================== -->
+<section id="venn" data-diagram-type="venn">
+  <h2>Venn Diagram <span class="priority-badge p3">P3</span></h2>
+
+  <div class="diagram-group" data-variant="simple" data-diagram-id="venn-simple">
+    <h3>Simple</h3>
+    <pre class="mermaid">
+venn-beta
+title Skills Overlap
+set A["Frontend"]
+set B["Backend"]
+set C["DevOps"]
+union A, B["Full Stack"]
+union B, C["SRE"]
+union A, B, C["Unicorn"]
+    </pre>
+  </div>
+</section>
+
+<!-- ==================== ISHIKAWA ==================== -->
+<section id="ishikawa" data-diagram-type="ishikawa">
+  <h2>Ishikawa Diagram <span class="priority-badge p3">P3</span></h2>
+
+  <div class="diagram-group" data-variant="simple" data-diagram-id="ishikawa-simple">
+    <h3>Simple (cause and effect)</h3>
+    <pre class="mermaid">
+ishikawa-beta
+    title Production Delays
+    People
+        Understaffed
+        Lack of training
+    Process
+        Manual steps
+        No automation
+    Technology
+        Legacy systems
+        Poor tooling
+    </pre>
+  </div>
+</section>
+
+<!-- ==================== TREEVIEW ==================== -->
+<section id="treeview" data-diagram-type="treeview">
+  <h2>TreeView <span class="priority-badge p3">P3</span></h2>
+
+  <div class="diagram-group" data-variant="simple" data-diagram-id="treeview-simple">
+    <h3>Simple</h3>
+    <p><em>Note: treeView requires Mermaid v11.14.0+ and may need additional configuration. Syntax is experimental.</em></p>
+    <pre class="mermaid">
+mindmap
+  root((src))
+    components
+      Header.tsx
+      Footer.tsx
+    pages
+      index.tsx
+      about.tsx
+    utils
+      api.ts
+    </pre>
+  </div>
+</section>
+
+<!-- ==================== WARDLEY MAPS ==================== -->
+<section id="wardley" data-diagram-type="wardley">
+  <h2>Wardley Maps <span class="priority-badge p3">P3</span></h2>
+
+  <div class="diagram-group" data-variant="simple" data-diagram-id="wardley-simple">
+    <h3>Simple</h3>
+    <pre class="mermaid">
+wardley-beta
+    title Tea Shop
+    anchor Customer [0.95, 0.63]
+    component Cup of Tea [0.79, 0.61]
+    component Tea [0.63, 0.81]
+    component Water [0.44, 0.94]
+    component Kettle [0.52, 0.72]
+    Customer->Cup of Tea
+    Cup of Tea->Tea
+    Cup of Tea->Water
+    Cup of Tea->Kettle
+    </pre>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- EDGE CASES (7 diagrams)                                       -->
+<!-- ============================================================ -->
+
+<section id="edge-cases" data-diagram-type="edge-cases">
+  <h2>Edge Cases <span class="priority-badge edge-case">Edge</span></h2>
+
+  <div class="diagram-group" data-variant="unicode" data-diagram-id="edge-unicode">
+    <h3>Unicode / CJK / Arabic</h3>
+    <pre class="mermaid">
+flowchart LR
+    A["English"] --> B["日本語テスト"]
+    B --> C["中文测试"]
+    C --> D["한국어"]
+    D --> E["Ελληνικά"]
+    </pre>
+  </div>
+
+  <div class="diagram-group" data-variant="html-labels" data-diagram-id="edge-html-labels">
+    <h3>HTML in Labels</h3>
+    <pre class="mermaid">
+flowchart TD
+    A["<b>Bold</b> and <i>italic</i>"] --> B["Line 1<br/>Line 2<br/>Line 3"]
+    B --> C["<u>Underlined</u> text"]
+    </pre>
+  </div>
+
+  <div class="diagram-group" data-variant="special-chars" data-diagram-id="edge-special-chars">
+    <h3>Special Characters</h3>
+    <pre class="mermaid">
+flowchart LR
+    A["Ampersand &amp; More"] --> B["Less &lt; Greater &gt;"]
+    B --> C["At @ Hash # Dollar $"]
+    C --> D["Percent % Caret ^"]
+    </pre>
+  </div>
+
+  <div class="diagram-group" data-variant="long-labels" data-diagram-id="edge-long-labels">
+    <h3>Long Labels</h3>
+    <pre class="mermaid">
+flowchart TD
+    A["This is a very long label that should test how the extractor handles text wrapping and truncation in SVG foreignObject elements when the content exceeds the normal node width"] --> B["Short"]
+    B --> C["Another moderately long label that spans multiple lines in the rendered output"]
+    </pre>
+  </div>
+
+  <div class="diagram-group" data-variant="single-node" data-diagram-id="edge-single-node">
+    <h3>Single Node (minimal diagram)</h3>
+    <pre class="mermaid">
+flowchart TD
+    A[Alone]
+    </pre>
+  </div>
+
+  <div class="diagram-group" data-variant="styled" data-diagram-id="edge-styled">
+    <h3>Themed / Styled</h3>
+    <pre class="mermaid">
+%%{init: {'theme': 'dark'}}%%
+flowchart LR
+    A:::highlight --> B --> C:::highlight
+    classDef highlight fill:#f96,stroke:#333,stroke-width:4px,color:#fff
+    </pre>
+  </div>
+
+  <div class="diagram-group" data-variant="many-edges" data-diagram-id="edge-many-edges">
+    <h3>Dense Graph (many edges)</h3>
+    <pre class="mermaid">
+flowchart TD
+    A --> B
+    A --> C
+    A --> D
+    B --> C
+    B --> D
+    B --> E
+    C --> D
+    C --> E
+    C --> F
+    D --> E
+    D --> F
+    E --> F
+    </pre>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- GROUND TRUTH JSON                                             -->
+<!-- ============================================================ -->
+
+<script type="application/json" id="ground-truth">
+{
+  "flowchart-simple": {
+    "type": "flowchart",
+    "direction": "TD",
+    "aria_roledescription": "flowchart-v2",
+    "expected_nodes": ["Start", "Process", "End"],
+    "expected_edges": [["A", "B", null], ["B", "C", null]],
+    "source": "flowchart TD\n    A[Start] --> B[Process]\n    B --> C[End]"
+  },
+  "flowchart-medium": {
+    "type": "flowchart",
+    "direction": "LR",
+    "aria_roledescription": "flowchart-v2",
+    "expected_nodes": ["Terminal", "Decision", "Process A", "Process B", "Database", "End"],
+    "expected_edges": [["A", "B", null], ["B", "C", "Yes"], ["B", "D", "No"], ["C", "E", null], ["D", "E", null], ["E", "F", null]],
+    "source": "flowchart LR\n    A([Terminal]) --> B{Decision}\n    B -->|Yes| C[Process A]\n    B -->|No| D[Process B]\n    C --> E[(Database)]\n    D --> E\n    E --> F((End))"
+  },
+  "flowchart-complex": {
+    "type": "flowchart",
+    "direction": "TB",
+    "aria_roledescription": "flowchart-v2",
+    "expected_nodes": ["User Interface", "API Gateway", "Auth Check", "User Service", "PostgreSQL", "Order Service", "MongoDB", "Redis Primary", "Redis Replica", "Login Page", "Analytics Service", "Data Warehouse"],
+    "expected_edges": [["C", "D", "Authenticated"], ["C", "H", "Failed"]],
+    "source": "flowchart TB ..."
+  },
+  "flowchart-bt": {
+    "type": "flowchart",
+    "direction": "BT",
+    "aria_roledescription": "flowchart-v2",
+    "expected_nodes": ["Foundation", "Structure", "Roof", "Chimney"],
+    "expected_edges": [],
+    "source": "flowchart BT ..."
+  },
+  "flowchart-rl": {
+    "type": "flowchart",
+    "direction": "RL",
+    "aria_roledescription": "flowchart-v2",
+    "expected_nodes": ["Output", "Transform", "Validate", "Input"],
+    "expected_edges": [],
+    "source": "flowchart RL ..."
+  },
+  "flowchart-div": {
+    "type": "flowchart",
+    "direction": "LR",
+    "aria_roledescription": "flowchart-v2",
+    "expected_nodes": ["WordPress", "Mermaid Plugin", "Client Render", "SVG Output"],
+    "expected_edges": [],
+    "source": "flowchart LR — div.mermaid selector test"
+  },
+  "sequence-simple": {
+    "type": "sequence",
+    "aria_roledescription": "sequence",
+    "expected_nodes": ["Alice", "Bob"],
+    "expected_messages": ["Hello Bob", "Hi Alice"],
+    "source": "sequenceDiagram ..."
+  },
+  "sequence-medium": {
+    "type": "sequence",
+    "aria_roledescription": "sequence",
+    "expected_nodes": ["User", "Frontend", "API", "Cache", "Database"],
+    "expected_messages": ["Click Login", "POST /auth", "Check session", "Cache miss", "SELECT user", "User record", "Store session", "JWT token", "Token stored in cookie", "Dashboard"],
+    "source": "sequenceDiagram ..."
+  },
+  "sequence-complex": {
+    "type": "sequence",
+    "aria_roledescription": "sequence",
+    "expected_nodes": ["Client", "Load Balancer", "Server 1", "Server 2", "Database"],
+    "expected_messages": ["Request", "Forward", "Query", "Results", "Response", "Heartbeat", "ACK", "Cleanup old sessions", "Sync replicas"],
+    "source": "sequenceDiagram ..."
+  },
+  "class-simple": {
+    "type": "class",
+    "aria_roledescription": "classDiagram",
+    "expected_nodes": ["Animal"],
+    "expected_members": ["name", "age", "makeSound", "move"],
+    "source": "classDiagram ..."
+  },
+  "class-medium": {
+    "type": "class",
+    "aria_roledescription": "classDiagram",
+    "expected_nodes": ["Vehicle", "Car", "Truck", "Wheel"],
+    "expected_members": ["make", "model", "year", "start", "stop", "doors", "drive", "payload", "haul", "diameter", "rotate"],
+    "source": "classDiagram ..."
+  },
+  "class-complex": {
+    "type": "class",
+    "aria_roledescription": "classDiagram",
+    "expected_nodes": ["List~T~", "ArrayList~T~", "LinkedList~T~", "Comparable~T~", "Serializable"],
+    "expected_members": ["add", "get", "size", "remove", "data", "capacity", "head", "tail", "compareTo", "serialize"],
+    "source": "classDiagram ..."
+  },
+  "state-simple": {
+    "type": "state",
+    "aria_roledescription": "stateDiagram",
+    "expected_nodes": ["Idle", "Processing", "Done"],
+    "expected_transitions": ["start", "complete"],
+    "source": "stateDiagram-v2 ..."
+  },
+  "state-medium": {
+    "type": "state",
+    "aria_roledescription": "stateDiagram",
+    "expected_nodes": ["Draft", "Review", "Approved", "Published", "Archived"],
+    "expected_transitions": ["Submit", "Approve", "Reject", "Publish", "Archive", "Revive"],
+    "source": "stateDiagram-v2 ..."
+  },
+  "state-complex": {
+    "type": "state",
+    "aria_roledescription": "stateDiagram",
+    "expected_nodes": ["Active", "Idle", "Processing", "Waiting", "Validating", "Transforming", "Saving", "ErrorState", "Failed"],
+    "expected_transitions": ["event_received", "need_input", "input_received", "done", "critical_error", "shutdown", "retry", "valid", "invalid"],
+    "source": "stateDiagram-v2 ..."
+  },
+  "er-simple": {
+    "type": "er",
+    "aria_roledescription": "erDiagram",
+    "expected_entities": ["USER", "ORDER", "LINE_ITEM"],
+    "expected_relationships": ["places", "contains"],
+    "source": "erDiagram ..."
+  },
+  "er-medium": {
+    "type": "er",
+    "aria_roledescription": "erDiagram",
+    "expected_entities": ["CUSTOMER", "ORDER", "PRODUCT", "LINE_ITEM"],
+    "expected_relationships": ["places", "contains", "is in"],
+    "expected_attributes": ["id", "name", "email", "created", "status", "total", "price", "stock", "quantity", "unit_price"],
+    "source": "erDiagram ..."
+  },
+  "er-complex": {
+    "type": "er",
+    "aria_roledescription": "erDiagram",
+    "expected_entities": ["DEPARTMENT", "EMPLOYEE", "PROJECT_ASSIGNMENT", "PROJECT", "ROLE", "ADDRESS", "MANAGER"],
+    "expected_relationships": ["employs", "works on", "includes", "lives at", "has", "supervises"],
+    "source": "erDiagram ..."
+  },
+  "gantt-simple": {
+    "type": "gantt",
+    "aria_roledescription": "gantt",
+    "expected_tasks": ["Task A", "Task B"],
+    "expected_sections": ["Phase 1"],
+    "source": "gantt ..."
+  },
+  "gantt-medium": {
+    "type": "gantt",
+    "aria_roledescription": "gantt",
+    "expected_tasks": ["Requirements", "Design", "Frontend", "Backend", "QA", "UAT", "Deploy"],
+    "expected_sections": ["Planning", "Development", "Testing", "Launch"],
+    "source": "gantt ..."
+  },
+  "gantt-complex": {
+    "type": "gantt",
+    "aria_roledescription": "gantt",
+    "expected_tasks": ["Current State", "Gap Analysis", "Requirements", "Architecture", "Data Model", "API Design", "Sprint 1", "Sprint 2", "Sprint 3", "Sprint 4", "Integration", "Performance", "Security Audit", "Staging", "Production"],
+    "expected_sections": ["Analysis", "Design", "Build", "Test", "Deploy"],
+    "source": "gantt ..."
+  },
+  "pie-simple": {
+    "type": "pie",
+    "aria_roledescription": "pie",
+    "expected_slices": {"Chrome": 65, "Firefox": 20, "Safari": 15},
+    "expected_title": "Browser Usage",
+    "source": "pie ..."
+  },
+  "pie-medium": {
+    "type": "pie",
+    "aria_roledescription": "pie",
+    "expected_slices": {"Python": 28.11, "JavaScript": 15.71, "Java": 8.33, "C++": 6.98, "C#": 6.52, "Others": 34.35},
+    "expected_title": "Programming Languages 2024",
+    "source": "pie ..."
+  },
+  "pie-complex": {
+    "type": "pie",
+    "aria_roledescription": "pie",
+    "expected_slices": {"North America": 42.5, "Europe (EU + UK)": 28.3, "Asia-Pacific": 18.7, "Latin America": 6.2, "Middle East and Africa": 4.3},
+    "expected_title": "Revenue by Region Q4 2024",
+    "source": "pie ..."
+  },
+  "journey-simple": {
+    "type": "journey",
+    "aria_roledescription": "journey",
+    "expected_tasks": ["Wake up", "Brush teeth", "Get dressed", "Drive to work", "Find parking"],
+    "expected_sections": ["Getting Ready", "Commute"],
+    "source": "journey ..."
+  },
+  "journey-medium": {
+    "type": "journey",
+    "aria_roledescription": "journey",
+    "expected_tasks": ["Visit homepage", "Search product", "View details", "Add to cart", "Checkout", "Payment", "Confirmation email", "Delivery tracking", "Leave review"],
+    "expected_sections": ["Browse", "Purchase", "Post-Purchase"],
+    "source": "journey ..."
+  },
+  "gitgraph-simple": {
+    "type": "gitgraph",
+    "aria_roledescription": "gitGraph",
+    "expected_commits": ["init", "add-readme", "feat-1", "merge-1"],
+    "expected_branches": ["main", "develop"],
+    "source": "gitGraph ..."
+  },
+  "gitgraph-medium": {
+    "type": "gitgraph",
+    "aria_roledescription": "gitGraph",
+    "expected_commits": ["init", "feat-1", "feat-2", "release-1.0", "fix-critical-bug", "patch", "feat-3", "wip-x-1", "wip-x-2", "merge-feature-x"],
+    "expected_branches": ["main", "develop", "hotfix", "feature-x"],
+    "expected_tags": ["v1.0", "v1.0.1"],
+    "source": "gitGraph ..."
+  },
+  "mindmap-simple": {
+    "type": "mindmap",
+    "aria_roledescription": "mindmap",
+    "expected_nodes": ["Animals", "Mammals", "Dog", "Cat", "Birds", "Eagle", "Parrot"],
+    "source": "mindmap ..."
+  },
+  "mindmap-medium": {
+    "type": "mindmap",
+    "aria_roledescription": "mindmap",
+    "expected_nodes": ["Project", "Frontend", "React", "TypeScript", "CSS Modules", "Testing", "Jest", "Playwright", "Backend", "Python", "FastAPI", "SQLAlchemy", "Database", "PostgreSQL", "Redis", "DevOps", "Docker", "Kubernetes", "CI/CD", "GitHub Actions", "ArgoCD"],
+    "source": "mindmap ..."
+  },
+  "timeline-simple": {
+    "type": "timeline",
+    "aria_roledescription": "timeline",
+    "expected_events": ["Gmail launched", "iPhone released", "Instagram founded"],
+    "expected_periods": ["2004", "2007", "2010"],
+    "source": "timeline ..."
+  },
+  "timeline-medium": {
+    "type": "timeline",
+    "aria_roledescription": "timeline",
+    "expected_events": ["Ruby on Rails", "Django", "AngularJS", "Express.js", "Backbone.js", "React", "Vue.js", "Angular 2", "Next.js", "Svelte 3", "Remix", "Fresh"],
+    "source": "timeline ..."
+  },
+  "quadrant-simple": {
+    "type": "quadrant",
+    "aria_roledescription": "quadrantChart",
+    "expected_points": ["Feature A", "Feature B", "Feature C"],
+    "expected_labels": ["Low Effort", "High Effort", "Low Impact", "High Impact", "Do First", "Plan", "Delegate", "Eliminate"],
+    "source": "quadrantChart ..."
+  },
+  "quadrant-medium": {
+    "type": "quadrant",
+    "aria_roledescription": "quadrantChart",
+    "expected_points": ["React", "Vue", "Svelte", "Angular", "Solid", "Qwik", "htmx", "Alpine"],
+    "source": "quadrantChart ..."
+  },
+  "requirement-simple": {
+    "type": "requirement",
+    "aria_roledescription": "requirementDiagram",
+    "expected_requirements": ["High Availability"],
+    "expected_elements": ["Load Balancer"],
+    "source": "requirementDiagram ..."
+  },
+  "requirement-medium": {
+    "type": "requirement",
+    "aria_roledescription": "requirementDiagram",
+    "expected_requirements": ["Performance", "Security", "Scalability"],
+    "expected_elements": ["API Gateway", "Database Cluster", "CDN"],
+    "source": "requirementDiagram ..."
+  },
+  "c4-simple": {
+    "type": "c4",
+    "aria_roledescription": "c4diagram",
+    "expected_nodes": ["Customer", "Banking System", "Email System"],
+    "source": "C4Context ..."
+  },
+  "c4-medium": {
+    "type": "c4",
+    "aria_roledescription": "c4diagram",
+    "expected_nodes": ["Shopper", "Admin", "E-Commerce Platform", "Payment Provider", "Shipping API", "Analytics", "Email Service"],
+    "source": "C4Context ..."
+  },
+  "zenuml-simple": {
+    "type": "zenuml",
+    "aria_roledescription": "zenuml",
+    "expected_participants": ["Alice", "Bob"],
+    "expected_messages": ["Hello", "Hi back"],
+    "source": "zenuml ..."
+  },
+  "zenuml-medium": {
+    "type": "zenuml",
+    "aria_roledescription": "zenuml",
+    "expected_participants": ["Client", "Server", "Database"],
+    "expected_messages": ["handleRequest", "query", "validate", "results", "response"],
+    "source": "zenuml ..."
+  },
+  "sankey-simple": {
+    "type": "sankey",
+    "aria_roledescription": "sankey",
+    "expected_nodes": ["Source A", "Source B", "Target X", "Target Y", "Target Z"],
+    "source": "sankey-beta ..."
+  },
+  "xychart-simple": {
+    "type": "xychart",
+    "aria_roledescription": "xychart",
+    "expected_labels": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
+    "expected_title": "Monthly Revenue",
+    "source": "xychart-beta ..."
+  },
+  "block-simple": {
+    "type": "block",
+    "aria_roledescription": "block",
+    "expected_nodes": ["Frontend", "API", "Database", "Cache"],
+    "source": "block-beta ..."
+  },
+  "packet-simple": {
+    "type": "packet",
+    "aria_roledescription": "packet",
+    "expected_fields": ["Source Port", "Destination Port", "Sequence Number", "Acknowledgment Number", "Data Offset", "Reserved", "Flags", "Window Size"],
+    "source": "packet-beta ..."
+  },
+  "kanban-simple": {
+    "type": "kanban",
+    "aria_roledescription": "kanban",
+    "expected_columns": ["Todo", "In Progress", "Done"],
+    "expected_tasks": ["Design mockups", "Write specs", "Build API", "Setup CI"],
+    "source": "kanban ..."
+  },
+  "architecture-simple": {
+    "type": "architecture",
+    "aria_roledescription": "architecture",
+    "expected_nodes": ["Web Server", "Database"],
+    "expected_groups": ["Cloud"],
+    "source": "architecture-beta ..."
+  },
+  "radar-simple": {
+    "type": "radar",
+    "aria_roledescription": "radar",
+    "expected_axes": ["Speed", "Reliability", "Scalability", "Security", "Usability"],
+    "expected_curves": ["Team A", "Team B"],
+    "source": "radar-beta ..."
+  },
+  "treemap-simple": {
+    "type": "treemap",
+    "aria_roledescription": "treemap",
+    "expected_nodes": ["Portfolio", "Stocks", "Tech", "Health", "Finance", "Bonds", "Cash"],
+    "source": "treemap-beta ..."
+  },
+  "venn-simple": {
+    "type": "venn",
+    "aria_roledescription": "venn",
+    "expected_sets": ["Frontend", "Backend", "DevOps"],
+    "expected_intersections": ["Full Stack", "SRE", "Unicorn"],
+    "source": "venn-beta ..."
+  },
+  "ishikawa-simple": {
+    "type": "ishikawa",
+    "aria_roledescription": "ishikawa",
+    "expected_categories": ["People", "Process", "Technology"],
+    "expected_causes": ["Understaffed", "Lack of training", "Manual steps", "No automation", "Legacy systems", "Poor tooling"],
+    "source": "ishikawa-beta ..."
+  },
+  "treeview-simple": {
+    "type": "treeview",
+    "aria_roledescription": "treeview",
+    "expected_nodes": ["src", "components", "Header.tsx", "Footer.tsx", "pages", "index.tsx", "about.tsx", "utils", "api.ts"],
+    "source": "treeview ..."
+  },
+  "wardley-simple": {
+    "type": "wardley",
+    "aria_roledescription": "wardley",
+    "expected_components": ["Customer", "Cup of Tea", "Tea", "Water", "Kettle"],
+    "source": "wardley-beta ..."
+  },
+  "edge-unicode": {
+    "type": "flowchart",
+    "aria_roledescription": "flowchart-v2",
+    "expected_nodes": ["English", "日本語テスト", "中文测试", "한국어", "Ελληνικά"],
+    "source": "flowchart LR ..."
+  },
+  "edge-html-labels": {
+    "type": "flowchart",
+    "aria_roledescription": "flowchart-v2",
+    "expected_nodes": ["Bold and italic", "Line 1\nLine 2\nLine 3", "Underlined text"],
+    "source": "flowchart TD ..."
+  },
+  "edge-special-chars": {
+    "type": "flowchart",
+    "aria_roledescription": "flowchart-v2",
+    "expected_nodes": ["Ampersand & More", "Less < Greater >", "At @ Hash # Dollar $", "Percent % Caret ^"],
+    "source": "flowchart LR ..."
+  },
+  "edge-long-labels": {
+    "type": "flowchart",
+    "aria_roledescription": "flowchart-v2",
+    "expected_nodes": ["This is a very long label that should test how the extractor handles text wrapping and truncation in SVG foreignObject elements when the content exceeds the normal node width", "Short", "Another moderately long label that spans multiple lines in the rendered output"],
+    "source": "flowchart TD ..."
+  },
+  "edge-single-node": {
+    "type": "flowchart",
+    "aria_roledescription": "flowchart-v2",
+    "expected_nodes": ["Alone"],
+    "source": "flowchart TD ..."
+  },
+  "edge-styled": {
+    "type": "flowchart",
+    "aria_roledescription": "flowchart-v2",
+    "expected_nodes": ["A", "B", "C"],
+    "source": "flowchart LR ..."
+  },
+  "edge-many-edges": {
+    "type": "flowchart",
+    "aria_roledescription": "flowchart-v2",
+    "expected_nodes": ["A", "B", "C", "D", "E", "F"],
+    "source": "flowchart TD ..."
+  }
+}
+</script>
+
+<!-- ============================================================ -->
+<!-- MERMAID INITIALIZATION                                        -->
+<!-- ============================================================ -->
+
+<script>
+  const DEFAULT_VERSION = '11.14.0';
+
+  function loadMermaid(version) {
+    const status = document.getElementById('render-status');
+    status.textContent = `Loading Mermaid v${version}...`;
+
+    // Remove existing mermaid script if any
+    const existing = document.getElementById('mermaid-script');
+    if (existing) existing.remove();
+
+    // Reset all diagram containers to their original source
+    document.querySelectorAll('.diagram-group').forEach(group => {
+      const svg = group.querySelector('svg[id^="mermaid-"]');
+      if (svg) {
+        const original = group.getAttribute('data-original-source');
+        if (original) {
+          const pre = document.createElement('pre');
+          pre.className = 'mermaid';
+          pre.textContent = original;
+          svg.replaceWith(pre);
+        }
+      }
+    });
+
+    // Store original sources on first load
+    document.querySelectorAll('.diagram-group').forEach(group => {
+      if (!group.getAttribute('data-original-source')) {
+        const pre = group.querySelector('pre.mermaid');
+        if (pre) {
+          group.setAttribute('data-original-source', pre.textContent);
+        }
+      }
+    });
+
+    const script = document.createElement('script');
+    script.id = 'mermaid-script';
+    script.src = `https://cdn.jsdelivr.net/npm/mermaid@${version}/dist/mermaid.min.js`;
+    script.onload = async () => {
+      window.mermaid.initialize({
+        startOnLoad: false,
+        securityLevel: 'loose',
+        theme: 'default'
+      });
+
+      // Load ZenUML external plugin
+      try {
+        const zenumlModule = await import(`https://unpkg.com/@mermaid-js/mermaid-zenuml/dist/mermaid-zenuml.esm.min.mjs`);
+        await window.mermaid.registerExternalDiagrams([zenumlModule.default || zenumlModule]);
+      } catch (e) {
+        console.warn('ZenUML plugin not available for this version:', e.message);
+      }
+
+      window.mermaid.run().then(() => {
+        const count = document.querySelectorAll('svg[id^="mermaid-"]').length;
+        const errorCount = document.querySelectorAll('.error-text').length;
+        const ok = count - errorCount;
+        status.textContent = `Mermaid v${version} — ${ok}/${count} diagrams rendered` + (errorCount ? ` (${errorCount} errors)` : '');
+      }).catch(err => {
+        status.textContent = `Mermaid v${version} — rendered with errors (see console)`;
+        console.error('Mermaid render error:', err);
+      });
+    };
+    script.onerror = () => {
+      status.textContent = `Failed to load Mermaid v${version}`;
+    };
+    document.body.appendChild(script);
+  }
+
+  // Version selector handler
+  document.getElementById('mermaid-version').addEventListener('change', (e) => {
+    loadMermaid(e.target.value);
+  });
+
+  // Initial load
+  loadMermaid(DEFAULT_VERSION);
+</script>
+
+</body>
+</html>

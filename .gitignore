@@ -302,3 +302,7 @@ MEMORY.md
 
 # Handoff files
 HANDOFF-*.md
+
+# Mermaid dev/demo artifacts
+tests/mermaid_comparison*.html
+tests/mermaid_*_comparison.html
