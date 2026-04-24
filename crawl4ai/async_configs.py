@@ -150,7 +150,7 @@ ALLOWED_DESERIALIZE_TYPES = {
     # Dispatchers
     "MemoryAdaptiveDispatcher", "SemaphoreDispatcher",
     # Table extraction
-    "DefaultTableExtraction", "NoTableExtraction",
+    "DefaultTableExtraction", "NoTableExtraction", "LLMTableExtraction",
     # Proxy
     "RoundRobinProxyStrategy",
 }
