@@ -237,7 +237,9 @@ class AsyncWebCrawler:
             [other parameters maintained for backwards compatibility]
 
         Returns:
-            CrawlResult: The result of crawling and processing
+            CrawlResultContainer: A single-result container that proxies
+                attribute access to the underlying CrawlResult for backwards
+                compatibility (e.g. result.markdown, result.html).
         """
         # Auto-start if not ready
         if not self.ready:
