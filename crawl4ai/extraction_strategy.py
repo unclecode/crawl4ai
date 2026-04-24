@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import time
 from enum import IntFlag, auto
+from decimal  import Decimal, ROUND_HALF_UP
 
 from .prompts import PROMPT_EXTRACT_BLOCKS, PROMPT_EXTRACT_BLOCKS_WITH_INSTRUCTION, PROMPT_EXTRACT_SCHEMA_WITH_INSTRUCTION, JSON_SCHEMA_BUILDER_XPATH, PROMPT_EXTRACT_INFERRED_SCHEMA
 from .config import (
@@ -1270,16 +1271,20 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
         Apply a transformation to a value.
 
         How it works:
-        1. Checks the transformation type (e.g., `lowercase`, `strip`).
+        1. Checks the transformation type (e.g., `lowercase`, `strip`, `int`).
         2. Applies the transformation to the value.
         3. Returns the transformed value.
 
+        Special Handling:
+            Values for `int` round away from zero using common rounding (e.g., 1.5 -> 2).
+            Values for `bool` default to False if not matched.
+        
         Args:
             value (str): The value to transform.
             transform (str): The type of transformation to apply.
 
         Returns:
-            str: The transformed value.
+            str | int | float | bool: The transformed value.
         """
 
         if transform == "lowercase":
@@ -1288,6 +1293,13 @@ class JsonElementExtractionStrategy(ExtractionStrategy):
             return value.upper()
         elif transform == "strip":
             return value.strip()
+        elif transform == "int":
+            return int(Decimal(value).quantize(Decimal("0."), rounding=ROUND_HALF_UP))
+        elif transform == "float":
+            return float(value)
+        elif transform == "bool":
+            bool_map = {"true": True, "false" : False, "1": True, "0": False}
+            return bool_map.get(value.strip().lower(), False)
         return value
 
     def _compute_field(self, item, field):
