@@ -86,7 +86,7 @@ class NlpSentenceChunking(ChunkingStrategy):
         sentences = sent_tokenize(text)
         sens = [sent.strip() for sent in sentences]
 
-        return list(set(sens))
+        return sens
 
 
 # Topic-based segmentation using TextTiling
