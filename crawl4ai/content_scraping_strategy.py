@@ -721,6 +721,30 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
             elif content_element is None:
                 content_element = body
 
+            # Replace mermaid SVGs with text before they get stripped
+            for svg in body.xpath('.//svg[starts-with(@id, "mermaid-")]'):
+                try:
+                    diagram_type = svg.get("aria-roledescription", "diagram")
+                    # Extract text from node/edge labels
+                    labels = []
+                    seen = set()
+                    for el in svg.cssselect(".nodeLabel, .label span, .edgeLabel span"):
+                        text = el.text_content().strip()
+                        if text and text not in seen:
+                            seen.add(text)
+                            labels.append(text)
+                    if labels:
+                        # Build a pre block so it survives markdown conversion
+                        placeholder = lhtml.Element("pre")
+                        code = etree.SubElement(placeholder, "code")
+                        code.set("class", "language-mermaid")
+                        code.text = f"%% {diagram_type} diagram\n" + "\n".join(labels)
+                        parent = svg.getparent()
+                        if parent is not None:
+                            parent.replace(svg, placeholder)
+                except Exception:
+                    pass
+
             # Remove script and style tags
             for tag in ["style", "link", "meta", "noscript"]:
                 for element in body.xpath(f".//{tag}"):
