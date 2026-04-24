@@ -130,7 +130,10 @@ class UserHookManager:
                 'getattr', 'hasattr', 'setattr', 'callable', 'iter', 'next',
                 '__build_class__',  # Required for class definitions in exec
                 # Exception classes (safe — no code execution risk)
-                'Exception', 'BaseException',
+                # NOTE: BaseException excluded intentionally — catching it defeats
+                # asyncio.wait_for timeout (asyncio.CancelledError is a BaseException
+                # in Python 3.9+), creating a DoS vector.
+                'Exception',
                 'ValueError', 'TypeError', 'KeyError', 'IndexError',
                 'AttributeError', 'RuntimeError', 'StopIteration',
                 'NotImplementedError', 'ZeroDivisionError', 'OSError',
@@ -149,13 +152,19 @@ class UserHookManager:
             # Add commonly needed modules directly (no __import__ needed)
             import json
             import re
-            from typing import Dict, List, Optional
+            import typing
+            from typing import Dict, List, Optional, Union, Any, Tuple, Set
             namespace['asyncio'] = asyncio
             namespace['json'] = json
             namespace['re'] = re
+            namespace['typing'] = typing
             namespace['Dict'] = Dict
             namespace['List'] = List
             namespace['Optional'] = Optional
+            namespace['Union'] = Union
+            namespace['Any'] = Any
+            namespace['Tuple'] = Tuple
+            namespace['Set'] = Set
             
             # Execute the code to define the function
             exec(hook_code, namespace)
@@ -205,7 +214,7 @@ class UserHookManager:
         Returns:
             Tuple of (result, error_dict)
         """
-        start_time = asyncio.get_event_loop().time()
+        start_time = asyncio.get_running_loop().time()
         
         try:
             # Add timeout to prevent infinite loops
@@ -215,7 +224,7 @@ class UserHookManager:
             )
             
             # Log successful execution
-            execution_time = asyncio.get_event_loop().time() - start_time
+            execution_time = asyncio.get_running_loop().time() - start_time
             self.execution_log.append({
                 'hook_point': hook_point,
                 'status': 'success',
@@ -244,7 +253,7 @@ class UserHookManager:
             return args[0] if args else None, error
             
         except Exception as e:
-            execution_time = asyncio.get_event_loop().time() - start_time
+            execution_time = asyncio.get_running_loop().time() - start_time
             error = {
                 'hook_point': hook_point,
                 'error': str(e),

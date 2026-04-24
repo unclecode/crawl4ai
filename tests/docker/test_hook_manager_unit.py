@@ -47,7 +47,7 @@ async def hook(page, context, **kwargs):
     return page
 """
         fn = compile_ok(mgr, code)
-        result = asyncio.get_event_loop().run_until_complete(run_hook(fn, "PAGE", "CTX"))
+        result = asyncio.run(run_hook(fn, "PAGE", "CTX"))
         assert result == "PAGE"
 
     def test_hook_using_asyncio(self):
@@ -58,7 +58,7 @@ async def hook(page, context, **kwargs):
     return page
 """
         fn = compile_ok(mgr, code)
-        result = asyncio.get_event_loop().run_until_complete(run_hook(fn, "PAGE", "CTX"))
+        result = asyncio.run(run_hook(fn, "PAGE", "CTX"))
         assert result == "PAGE"
 
     def test_hook_using_json(self):
@@ -69,7 +69,7 @@ async def hook(page, context, **kwargs):
     return page
 """
         fn = compile_ok(mgr, code)
-        result = asyncio.get_event_loop().run_until_complete(run_hook(fn, "PAGE", "CTX"))
+        result = asyncio.run(run_hook(fn, "PAGE", "CTX"))
         assert result == "PAGE"
 
     def test_hook_using_re(self):
@@ -80,7 +80,7 @@ async def hook(page, context, **kwargs):
     return page
 """
         fn = compile_ok(mgr, code)
-        result = asyncio.get_event_loop().run_until_complete(run_hook(fn, "PAGE", "CTX"))
+        result = asyncio.run(run_hook(fn, "PAGE", "CTX"))
         assert result == "PAGE"
 
     def test_hook_using_typing(self):
@@ -119,7 +119,7 @@ async def hook(page, context, **kwargs):
 """
         fn = compile_ok(mgr, code)  # compiles (body not executed yet)
         with pytest.raises(ImportError):
-            asyncio.get_event_loop().run_until_complete(run_hook(fn, "PAGE", "CTX"))
+            asyncio.run(run_hook(fn, "PAGE", "CTX"))
 
     def test_dunder_import_blocked_at_runtime(self):
         """__import__('os') must fail at runtime."""
@@ -131,7 +131,7 @@ async def hook(page, context, **kwargs):
 """
         fn = compile_ok(mgr, code)
         with pytest.raises(NameError):
-            asyncio.get_event_loop().run_until_complete(run_hook(fn, "PAGE", "CTX"))
+            asyncio.run(run_hook(fn, "PAGE", "CTX"))
 
     def test_builtins_import_via_getattr_blocked(self):
         """Trying to fish __import__ from builtins dict should fail."""
@@ -144,7 +144,7 @@ async def hook(page, context, **kwargs):
 """
         fn = compile_ok(mgr, code)
         with pytest.raises(KeyError):
-            asyncio.get_event_loop().run_until_complete(run_hook(fn, "PAGE", "CTX"))
+            asyncio.run(run_hook(fn, "PAGE", "CTX"))
 
     def test_exec_inside_hook_cannot_import(self):
         """exec() is not in safe builtins, so nested exec should fail."""
@@ -156,7 +156,7 @@ async def hook(page, context, **kwargs):
 """
         fn = compile_ok(mgr, code)
         with pytest.raises(NameError):
-            asyncio.get_event_loop().run_until_complete(run_hook(fn, "PAGE", "CTX"))
+            asyncio.run(run_hook(fn, "PAGE", "CTX"))
 
     def test_eval_not_available(self):
         """eval() should not be in safe builtins."""
@@ -168,7 +168,7 @@ async def hook(page, context, **kwargs):
 """
         fn = compile_ok(mgr, code)
         with pytest.raises(NameError):
-            asyncio.get_event_loop().run_until_complete(run_hook(fn, "PAGE", "CTX"))
+            asyncio.run(run_hook(fn, "PAGE", "CTX"))
 
     def test_open_not_available(self):
         """open() should not be in safe builtins."""
@@ -180,7 +180,7 @@ async def hook(page, context, **kwargs):
 """
         fn = compile_ok(mgr, code)
         with pytest.raises(NameError):
-            asyncio.get_event_loop().run_until_complete(run_hook(fn, "PAGE", "CTX"))
+            asyncio.run(run_hook(fn, "PAGE", "CTX"))
 
 
 # ── Validation edge cases ────────────────────────────────────────────────
@@ -286,7 +286,7 @@ async def hook(page, context, **kwargs):
     return page
 """
         fn = compile_ok(mgr, code)
-        result = asyncio.get_event_loop().run_until_complete(run_hook(fn, "PAGE", "CTX"))
+        result = asyncio.run(run_hook(fn, "PAGE", "CTX"))
         assert result == "PAGE"
 
     def test_none_return_handled(self):
@@ -319,7 +319,7 @@ async def hook(page, context, **kwargs):
 """
         compile_ok(mgr, code1)
         fn2 = compile_ok(mgr, code2)
-        result = asyncio.get_event_loop().run_until_complete(run_hook(fn2, "PAGE", "CTX"))
+        result = asyncio.run(run_hook(fn2, "PAGE", "CTX"))
         assert result == "PAGE"
 
     def test_multiple_functions_picks_async(self):
@@ -404,7 +404,7 @@ async def hook(page, context, **kwargs):
     return page
 """
         fn = compile_ok(mgr, code)
-        asyncio.get_event_loop().run_until_complete(run_hook(fn, "P", "C"))
+        asyncio.run(run_hook(fn, "P", "C"))
 
     def test_list_dict_operations(self):
         mgr = UserHookManager()
@@ -417,7 +417,7 @@ async def hook(page, context, **kwargs):
     return page
 """
         fn = compile_ok(mgr, code)
-        asyncio.get_event_loop().run_until_complete(run_hook(fn, "P", "C"))
+        asyncio.run(run_hook(fn, "P", "C"))
 
     def test_isinstance_type(self):
         mgr = UserHookManager()
@@ -428,7 +428,7 @@ async def hook(page, context, **kwargs):
     return page
 """
         fn = compile_ok(mgr, code)
-        asyncio.get_event_loop().run_until_complete(run_hook(fn, "P", "C"))
+        asyncio.run(run_hook(fn, "P", "C"))
 
 
 # ── Exception classes available in hooks ─────────────────────────────────
@@ -447,7 +447,7 @@ async def hook(page, context, **kwargs):
     return page
 """
         fn = compile_ok(mgr, code)
-        result = asyncio.get_event_loop().run_until_complete(run_hook(fn, "P", "C"))
+        result = asyncio.run(run_hook(fn, "P", "C"))
         assert result == "P"
 
     def test_raise_and_catch_key_error(self):
@@ -461,7 +461,7 @@ async def hook(page, context, **kwargs):
     return page
 """
         fn = compile_ok(mgr, code)
-        result = asyncio.get_event_loop().run_until_complete(run_hook(fn, "P", "C"))
+        result = asyncio.run(run_hook(fn, "P", "C"))
         assert result == "P"
 
     def test_catch_broad_exception(self):
@@ -475,7 +475,7 @@ async def hook(page, context, **kwargs):
     return page
 """
         fn = compile_ok(mgr, code)
-        result = asyncio.get_event_loop().run_until_complete(run_hook(fn, "P", "C"))
+        result = asyncio.run(run_hook(fn, "P", "C"))
         assert result == "P"
 
     def test_isinstance_check_on_exceptions(self):
@@ -489,7 +489,7 @@ async def hook(page, context, **kwargs):
     return page
 """
         fn = compile_ok(mgr, code)
-        result = asyncio.get_event_loop().run_until_complete(run_hook(fn, "P", "C"))
+        result = asyncio.run(run_hook(fn, "P", "C"))
         assert result == "P"
 
     def test_all_exception_classes_accessible(self):
