@@ -721,27 +721,90 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
             elif content_element is None:
                 content_element = body
 
-            # Replace mermaid SVGs with text before they get stripped
+            # Replace mermaid SVGs with their source (or extracted labels) before
+            # they get stripped by the HTML cleaner.
+            mermaid_sources: list = list(kwargs.get("mermaid_sources") or [])
+            mermaid_source_iter = iter(mermaid_sources)
+
             for svg in body.xpath('.//svg[starts-with(@id, "mermaid-")]'):
                 try:
+                    parent = svg.getparent()
+                    if parent is None:
+                        continue
+
+                    # --- Path A: actual mermaid source captured pre-render ---
+                    source = next(mermaid_source_iter, None)
+                    if source:
+                        placeholder = lhtml.Element("pre")
+                        placeholder.set("class", "language-mermaid")
+                        code = etree.SubElement(placeholder, "code")
+                        code.set("class", "language-mermaid")
+                        code.text = source
+
+                        # Find ancestor <pre> (mermaid.js wraps the SVG in the
+                        # original <pre class="mermaid"> element).  Replace the
+                        # whole ancestor so we don't create nested fences.
+                        pre_ancestor = None
+                        node = parent
+                        while node is not None:
+                            if node.tag == "pre":
+                                pre_ancestor = node
+                                break
+                            node = node.getparent()
+
+                        if pre_ancestor is not None:
+                            pre_parent = pre_ancestor.getparent()
+                            if pre_parent is not None:
+                                pre_parent.replace(pre_ancestor, placeholder)
+                        else:
+                            parent.replace(svg, placeholder)
+                        continue
+
+                    # --- Path B: fallback — extract visible labels from the SVG ---
                     diagram_type = svg.get("aria-roledescription", "diagram")
-                    # Extract text from node/edge labels
                     labels = []
-                    seen = set()
+                    seen: set = set()
+
+                    # foreignObject-based labels (flowchart, class, state…)
                     for el in svg.cssselect(".nodeLabel, .label span, .edgeLabel span"):
                         text = el.text_content().strip()
                         if text and text not in seen:
                             seen.add(text)
                             labels.append(text)
-                    if labels:
-                        # Build a pre block so it survives markdown conversion
+
+                    # Native SVG text/tspan fallback (sequence, gantt, git…)
+                    if not labels:
+                        for el in svg.xpath(
+                            './/*[local-name()="text"] | .//*[local-name()="tspan"]'
+                        ):
+                            text = (el.text or "").strip()
+                            if text and text not in seen:
+                                seen.add(text)
+                                labels.append(text)
+
+                    if not labels:
+                        continue
+
+                    # Detect outer <pre> to avoid nested fences
+                    ancestor = parent
+                    inside_pre = False
+                    while ancestor is not None:
+                        if ancestor.tag == "pre":
+                            inside_pre = True
+                            break
+                        ancestor = ancestor.getparent()
+
+                    if inside_pre:
+                        placeholder = lhtml.Element("span")
+                        placeholder.text = "\n".join(labels)
+                        parent.replace(svg, placeholder)
+                    else:
                         placeholder = lhtml.Element("pre")
+                        placeholder.set("class", "language-mermaid")
                         code = etree.SubElement(placeholder, "code")
                         code.set("class", "language-mermaid")
                         code.text = f"%% {diagram_type} diagram\n" + "\n".join(labels)
-                        parent = svg.getparent()
-                        if parent is not None:
-                            parent.replace(svg, placeholder)
+                        parent.replace(svg, placeholder)
                 except Exception:
                     pass
 

@@ -461,6 +461,7 @@ class AsyncWebCrawler:
                                 screenshot_data = async_response.screenshot
                                 pdf_data = async_response.pdf_data
                                 js_execution_result = async_response.js_execution_result
+                                mermaid_sources = async_response.mermaid_sources
 
                                 self.logger.url_status(
                                     url=cache_context.display_url,
@@ -479,6 +480,7 @@ class AsyncWebCrawler:
                                     is_raw_html=True if url.startswith("raw:") else False,
                                     redirected_url=async_response.redirected_url,
                                     original_scheme=urlparse(url).scheme,
+                                    mermaid_sources=mermaid_sources,
                                     **kwargs,
                                 )
 

@@ -27,6 +27,44 @@ from .browser_adapter import BrowserAdapter, PlaywrightAdapter, UndetectedAdapte
 import aiofiles
 import aiohttp
 import chardet
+
+# ---------------------------------------------------------------------------
+# Mermaid source capture — injected via page.add_init_script() before goto()
+# Runs at document creation time, before mermaid.js replaces <pre class="mermaid">
+# with SVGs.  Captured sources land in window.__mermaidSources.
+# ---------------------------------------------------------------------------
+_MERMAID_OBSERVER_SCRIPT = """
+(function () {
+  if (window.__mermaidSources) return;   // guard against double-injection
+  window.__mermaidSources = [];
+  const _captured = new WeakSet();
+
+  function _captureMermaid() {
+    document.querySelectorAll(
+      'pre.mermaid, div.mermaid, pre[class*="mermaid"], [class="mermaid"]'
+    ).forEach(function (el) {
+      if (!_captured.has(el) && el.textContent.trim()) {
+        _captured.add(el);
+        window.__mermaidSources.push(el.textContent.trim());
+      }
+    });
+  }
+
+  // Capture anything already in the DOM
+  _captureMermaid();
+
+  // Watch for mermaid elements added dynamically (e.g. React/Next.js SSR hydration)
+  var _observer = new MutationObserver(_captureMermaid);
+  _observer.observe(document.documentElement || document, {
+    subtree: true, childList: true
+  });
+
+  // Stop observing once the page is interactive (mermaid.js will have run)
+  document.addEventListener('DOMContentLoaded', function () {
+    setTimeout(function () { _observer.disconnect(); }, 3000);
+  }, { once: true });
+})();
+"""
 from aiohttp.client import ClientTimeout
 from urllib.parse import urlparse
 from types import MappingProxyType
@@ -720,6 +758,12 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                     ),
                 )
 
+            # Inject mermaid source capture observer before navigation
+            # Must run before mermaid.js replaces <pre class="mermaid"> with SVGs
+            mermaid_sources: List[str] = []
+            if getattr(config, "extract_mermaid_source", False):
+                await page.add_init_script(_MERMAID_OBSERVER_SCRIPT)
+
             # Handle page navigation and content loading
             if not config.js_only:
                 await self.execute_hook("before_goto", page, context=context, url=url, config=config)
@@ -1019,6 +1063,27 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 await self.execute_hook("on_execution_started", page, context=context, config=config)
                 await self.execute_hook("on_execution_ended", page, context=context, config=config, result=execution_result)
 
+            # Retrieve mermaid sources captured by the init_script observer
+            if getattr(config, "extract_mermaid_source", False):
+                try:
+                    raw = await self.adapter.evaluate(
+                        page, "() => window.__mermaidSources || []"
+                    )
+                    mermaid_sources = [s for s in (raw or []) if isinstance(s, str) and s.strip()]
+                    if mermaid_sources:
+                        self.logger.info(
+                            message="Captured {count} mermaid diagram source(s)",
+                            tag="MERMAID",
+                            params={"count": len(mermaid_sources)},
+                        )
+                except Exception as e:
+                    self.logger.warning(
+                        message="Failed to retrieve mermaid sources: {error}",
+                        tag="MERMAID",
+                        params={"error": str(e)},
+                    )
+                    mermaid_sources = []
+
             # --- Phase 4: DOM processing before HTML capture ---
 
             # Update image dimensions if needed
@@ -1162,6 +1227,7 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
                 # Include captured data if enabled
                 network_requests=captured_requests if config.capture_network_requests else None,
                 console_messages=captured_console if config.capture_console_messages else None,
+                mermaid_sources=mermaid_sources if mermaid_sources else None,
             )
 
         except Exception as e:
