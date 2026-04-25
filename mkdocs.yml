@@ -49,6 +49,7 @@ nav:
     - "Proxy & Security": "advanced/proxy-security.md"
     - "Anti-Bot & Fallback": "advanced/anti-bot-and-fallback.md"
     - "Undetected Browser": "advanced/undetected-browser.md"
+    - "Camoufox Runtime": "advanced/camoufox-browser.md"
     - "Session Management": "advanced/session-management.md"
     - "Multi-URL Crawling": "advanced/multi-url-crawling.md"
     - "Crawl Dispatcher": "advanced/crawl-dispatcher.md"
