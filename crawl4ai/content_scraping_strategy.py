@@ -808,6 +808,30 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
                 except Exception:
                     pass
 
+            # --- Pass 2: handle raw .mermaid containers whose source was
+            # captured by the observer but mermaid.js never rendered them
+            # (e.g. MkDocs Material with Intersection-Observer lazy rendering).
+            # Only process elements that still contain raw text (no SVG child).
+            remaining_sources = list(mermaid_source_iter)  # sources not consumed above
+            if remaining_sources:
+                raw_containers = body.xpath(
+                    './/*[contains(concat(" ", normalize-space(@class), " "), " mermaid ")]'
+                    '[not(.//svg)]'
+                )
+                for container, source in zip(raw_containers, remaining_sources):
+                    try:
+                        parent = container.getparent()
+                        if parent is None:
+                            continue
+                        placeholder = lhtml.Element("pre")
+                        placeholder.set("class", "language-mermaid")
+                        code = etree.SubElement(placeholder, "code")
+                        code.set("class", "language-mermaid")
+                        code.text = source
+                        parent.replace(container, placeholder)
+                    except Exception:
+                        pass
+
             # Remove script and style tags
             for tag in ["style", "link", "meta", "noscript"]:
                 for element in body.xpath(f".//{tag}"):
