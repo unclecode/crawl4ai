@@ -1491,6 +1491,8 @@ class CrawlerRunConfig():
         # Network and Console Capturing Parameters
         capture_network_requests: bool = False,
         capture_console_messages: bool = False,
+        # Mermaid diagram source capture
+        extract_mermaid_source: bool = False,
         # Connection Parameters
         method: str = "GET",
         stream: bool = False,
@@ -1632,6 +1634,8 @@ class CrawlerRunConfig():
         # Network and Console Capturing Parameters
         self.capture_network_requests = capture_network_requests
         self.capture_console_messages = capture_console_messages
+        # Mermaid diagram source capture
+        self.extract_mermaid_source = extract_mermaid_source
 
         # Connection Parameters
         self.stream = stream

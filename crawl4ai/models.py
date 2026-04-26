@@ -343,6 +343,7 @@ class AsyncCrawlResponse(BaseModel):
     redirected_status_code: Optional[int] = None
     network_requests: Optional[List[Dict[str, Any]]] = None
     console_messages: Optional[List[Dict[str, Any]]] = None
+    mermaid_sources: Optional[List[str]] = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 

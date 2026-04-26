@@ -1146,7 +1146,14 @@ class CustomHTML2Text(HTML2Text):
         # Handle pre tags
         if tag == "pre":
             if start:
-                self.o("\n```\n")  # Markdown code block start
+                # Detect language from class="language-X" on the <pre> element
+                cls = attrs.get("class", "")
+                lang = ""
+                for part in cls.split():
+                    if part.startswith("language-"):
+                        lang = part[len("language-"):]
+                        break
+                self.o(f"\n```{lang}\n")  # Markdown code block start
                 self.inside_pre = True
             else:
                 self.o("\n```\n")  # Markdown code block end
