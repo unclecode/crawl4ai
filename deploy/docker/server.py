@@ -295,11 +295,11 @@ def _safe_eval_config(expr: str) -> dict:
         if isinstance(node, ast.Call) and node is not call:
             raise ValueError("Nested function calls are not permitted")
 
-    # expose everything that crawl4ai exports, nothing else
-    safe_env = {name: getattr(_c4, name)
-                for name in dir(_c4) if not name.startswith("_")}
-    obj = eval(compile(tree, "<config>", "eval"),
-               {"__builtins__": {}}, safe_env)
+    # directly instantiate from ALLOWED_TYPES using ast.literal_eval for argument values
+    cls = ALLOWED_TYPES[call.func.id]
+    args = [ast.literal_eval(arg) for arg in call.args]
+    kwargs = {kw.arg: ast.literal_eval(kw.value) for kw in call.keywords}
+    obj = cls(*args, **kwargs)
     return obj.dump()
 
 
@@ -325,7 +325,7 @@ async def get_token(req: TokenRequest):
 
 
 @app.post("/config/dump")
-async def config_dump(raw: RawCode):
+async def config_dump(raw: RawCode, _td: Dict = Depends(token_dep)):
     try:
         return JSONResponse(_safe_eval_config(raw.code.strip()))
     except Exception as e:
