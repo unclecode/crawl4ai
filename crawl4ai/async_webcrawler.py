@@ -652,6 +652,37 @@ class AsyncWebCrawler:
                     return CrawlResultContainer(crawl_result)
 
                 else:
+                    # If an extraction strategy is configured, re-run the
+                    # processing pipeline on cached HTML so the strategy is
+                    # applied (e.g. LLMExtractionStrategy).  Without this,
+                    # the cache-hit path returns stale/empty extracted_content.
+                    if config.extraction_strategy and html:
+                        from urllib.parse import urlparse as _urlparse
+                        crawl_result = await self.aprocess_html(
+                            url=url, html=html,
+                            extracted_content=extracted_content,
+                            config=config,
+                            screenshot_data=cached_result.screenshot,
+                            pdf_data=cached_result.pdf,
+                            verbose=config.verbose,
+                            is_raw_html=url.startswith("raw:"),
+                            redirected_url=cached_result.redirected_url or url,
+                            original_scheme=_urlparse(url).scheme,
+                            **kwargs,
+                        )
+                        crawl_result.cache_status = cached_result.cache_status
+                        crawl_result.status_code = cached_result.status_code
+                        crawl_result.redirected_url = cached_result.redirected_url or url
+                        crawl_result.response_headers = cached_result.response_headers
+
+                        self.logger.url_status(
+                            url=cache_context.display_url,
+                            success=crawl_result.success,
+                            timing=time.perf_counter() - start_time,
+                            tag="COMPLETE",
+                        )
+                        return CrawlResultContainer(crawl_result)
+
                     self.logger.url_status(
                         url=cache_context.display_url,
                         success=True,
