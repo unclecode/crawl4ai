@@ -725,17 +725,53 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
             for svg in body.xpath('.//svg[starts-with(@id, "mermaid-")]'):
                 try:
                     diagram_type = svg.get("aria-roledescription", "diagram")
-                    # Extract text from node/edge labels
                     labels = []
                     seen = set()
+
+                    # Primary: foreignObject-based labels (flowchart, class, state…)
                     for el in svg.cssselect(".nodeLabel, .label span, .edgeLabel span"):
                         text = el.text_content().strip()
                         if text and text not in seen:
                             seen.add(text)
                             labels.append(text)
-                    if labels:
-                        # Build a pre block so it survives markdown conversion
+
+                    # Fallback: native SVG text/tspan elements (sequence, gantt, git…)
+                    if not labels:
+                        for el in svg.xpath(
+                            './/*[local-name()="text"] | .//*[local-name()="tspan"]'
+                        ):
+                            text = (el.text or "").strip()
+                            if text and text not in seen:
+                                seen.add(text)
+                                labels.append(text)
+
+                    if not labels:
+                        continue
+
+                    # Check whether the SVG already lives inside a <pre> block.
+                    # If so, avoid creating a nested fence; just let the outer
+                    # <pre> preserve the text that lxml has already flattened.
+                    ancestor = svg.getparent()
+                    inside_pre = False
+                    while ancestor is not None:
+                        if ancestor.tag == "pre":
+                            inside_pre = True
+                            break
+                        ancestor = ancestor.getparent()
+
+                    if inside_pre:
+                        # The outer <pre> will format the text as a code block.
+                        # Replace the SVG with a plain span so lxml preserves
+                        # the label text without the SVG markup noise.
+                        placeholder = lhtml.Element("span")
+                        placeholder.text = "\n".join(labels)
+                        parent = svg.getparent()
+                        if parent is not None:
+                            parent.replace(svg, placeholder)
+                    else:
+                        # Build a fenced code block that survives markdown conversion
                         placeholder = lhtml.Element("pre")
+                        placeholder.set("data-language", "mermaid")
                         code = etree.SubElement(placeholder, "code")
                         code.set("class", "language-mermaid")
                         code.text = f"%% {diagram_type} diagram\n" + "\n".join(labels)
