@@ -30,7 +30,7 @@ from .cache_context import CacheMode
 from .proxy_strategy import ProxyRotationStrategy
 
 import inspect
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Union
+from typing import Any, Awaitable, Callable, Dict, List, Literal, Optional, Union
 from enum import Enum
 
 # Type alias for URL matching
@@ -604,6 +604,7 @@ class BrowserConfig:
     def __init__(
         self,
         browser_type: str = "chromium",
+        browser_runtime: Literal["playwright", "camoufox"] = "playwright",
         headless: bool = True,
         browser_mode: str = "dedicated",
         use_managed_browser: bool = False,
@@ -620,6 +621,7 @@ class BrowserConfig:
         channel: str = "chromium",
         proxy: str = None,
         proxy_config: Union[ProxyConfig, dict, None] = None,
+        camoufox_options: dict = None,
         viewport_width: int = 1080,
         viewport_height: int = 600,
         viewport: dict = None,
@@ -655,6 +657,7 @@ class BrowserConfig:
     ):
         
         self.browser_type = browser_type
+        self.browser_runtime = browser_runtime
         self.headless = headless
         self.browser_mode = browser_mode
         self.use_managed_browser = use_managed_browser
@@ -676,6 +679,7 @@ class BrowserConfig:
             warnings.warn("The 'proxy' parameter is deprecated and will be removed in a future release. Use 'proxy_config' instead.", UserWarning)
         self.proxy = proxy
         self.proxy_config = proxy_config
+        self.camoufox_options = camoufox_options or {}
         if isinstance(self.proxy_config, dict):
             self.proxy_config = ProxyConfig.from_dict(self.proxy_config)
         if isinstance(self.proxy_config, str):
@@ -719,6 +723,29 @@ class BrowserConfig:
         self.init_scripts = init_scripts if init_scripts is not None else []
         self.memory_saving_mode = memory_saving_mode
         self.max_pages_before_recycle = max_pages_before_recycle
+
+        if self.browser_runtime not in ("playwright", "camoufox"):
+            raise ValueError("browser_runtime must be 'playwright' or 'camoufox'")
+
+        if self.browser_runtime == "camoufox":
+            if self.browser_type != "firefox":
+                raise ValueError("browser_runtime='camoufox' requires browser_type='firefox'")
+            if self.browser_mode != "dedicated":
+                raise ValueError("browser_runtime='camoufox' requires browser_mode='dedicated'")
+            if self.cdp_url or self.browser_context_id or self.target_id:
+                raise ValueError("browser_runtime='camoufox' does not support CDP settings")
+            if self.use_managed_browser:
+                raise ValueError("browser_runtime='camoufox' does not support managed browser mode")
+            if self.enable_stealth:
+                raise ValueError("browser_runtime='camoufox' does not support enable_stealth")
+            if self.user_agent_mode:
+                raise ValueError("browser_runtime='camoufox' does not support user_agent_mode")
+            if any(key.lower() == "user-agent" for key in self.headers):
+                raise ValueError("browser_runtime='camoufox' does not support User-Agent headers")
+            if self.proxy_config and self.camoufox_options.get("proxy"):
+                raise ValueError(
+                    "browser_runtime='camoufox' cannot use both proxy_config and camoufox_options['proxy']"
+                )
 
         fa_user_agenr_generator = ValidUAGenerator()
         if self.user_agent_mode == "random":
@@ -774,6 +801,7 @@ class BrowserConfig:
     def to_dict(self):
         result = {
             "browser_type": self.browser_type,
+            "browser_runtime": self.browser_runtime,
             "headless": self.headless,
             "browser_mode": self.browser_mode,
             "use_managed_browser": self.use_managed_browser,
@@ -788,6 +816,7 @@ class BrowserConfig:
             "channel": self.channel,
             "proxy": self.proxy,
             "proxy_config": self.proxy_config.to_dict() if hasattr(self.proxy_config, 'to_dict') else self.proxy_config,
+            "camoufox_options": self.camoufox_options,
             "viewport_width": self.viewport_width,
             "viewport_height": self.viewport_height,
             "device_scale_factor": self.device_scale_factor,
