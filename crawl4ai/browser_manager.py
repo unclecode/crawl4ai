@@ -1,6 +1,7 @@
 import asyncio
+import importlib
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 import os
 import sys
 import shutil
@@ -724,6 +725,7 @@ class BrowserManager:
         self.default_context = None
         self.managed_browser = None
         self.playwright = None
+        self._camoufox_manager = None
         self._using_cached_cdp = False
         self._launched_persistent = False  # True when using launch_persistent_context
 
@@ -790,6 +792,10 @@ class BrowserManager:
         """
         if self.playwright is not None:
             await self.close()
+
+        if self.config.browser_runtime == "camoufox":
+            await self._start_camoufox()
+            return
 
         # Use cached CDP connection if enabled and cdp_url is set
         if self.config.cache_cdp_connection and self.config.cdp_url:
@@ -944,6 +950,55 @@ class BrowserManager:
         # Initialize global tracking set for this endpoint if needed
         if self._browser_endpoint_key not in BrowserManager._global_pages_in_use:
             BrowserManager._global_pages_in_use[self._browser_endpoint_key] = set()
+
+    async def _start_camoufox(self):
+        async_camoufox = self._resolve_async_camoufox()
+        launch_kwargs = self._build_camoufox_launch_kwargs()
+        self._camoufox_manager = async_camoufox(**launch_kwargs)
+        browser_or_context = await self._camoufox_manager.__aenter__()
+
+        if self.config.use_persistent_context:
+            self.default_context = browser_or_context
+            self.browser = None
+            self._launched_persistent = True
+            await self.setup_context(self.default_context)
+        else:
+            self.browser = browser_or_context
+            self.default_context = self.browser
+
+        self._browser_endpoint_key = self._compute_browser_endpoint_key()
+        if self._browser_endpoint_key not in BrowserManager._global_pages_in_use:
+            BrowserManager._global_pages_in_use[self._browser_endpoint_key] = set()
+
+    def _resolve_async_camoufox(self) -> Any:
+        try:
+            module = importlib.import_module("camoufox.async_api")
+        except ImportError as exc:
+            raise RuntimeError(
+                "camoufox is not installed; install crawl4ai[camoufox] to use browser_runtime='camoufox'"
+            ) from exc
+        return module.AsyncCamoufox
+
+    def _build_camoufox_launch_kwargs(self) -> dict:
+        kwargs = dict(self.config.camoufox_options or {})
+        kwargs.setdefault("headless", self.config.headless)
+
+        if self.config.proxy_config:
+            kwargs["proxy"] = {
+                "server": self.config.proxy_config.server,
+                "username": self.config.proxy_config.username,
+                "password": self.config.proxy_config.password,
+            }
+
+        if self.config.use_persistent_context:
+            if not self.config.user_data_dir:
+                raise ValueError(
+                    "browser_runtime='camoufox' with use_persistent_context=True requires user_data_dir"
+                )
+            kwargs["persistent_context"] = True
+            kwargs["user_data_dir"] = self.config.user_data_dir
+
+        return kwargs
 
     def _compute_browser_endpoint_key(self) -> str:
         """
@@ -1963,6 +2018,10 @@ class BrowserManager:
 
     async def close(self):
         """Close all browser resources and clean up."""
+        if self.config.browser_runtime == "camoufox":
+            await self._close_camoufox()
+            return
+
         # Cached CDP path: only clean up this instance's sessions/contexts,
         # then release the shared connection reference.
         if self._using_cached_cdp:
@@ -2090,3 +2149,41 @@ class BrowserManager:
         if self.playwright:
             await self.playwright.stop()
             self.playwright = None
+
+    async def _close_camoufox(self):
+        if self.config.sleep_on_close:
+            await asyncio.sleep(0.5)
+
+        session_ids = list(self.sessions.keys())
+        for session_id in session_ids:
+            await self.kill_session(session_id)
+
+        for ctx in self.contexts_by_config.values():
+            try:
+                await ctx.close()
+            except Exception:
+                pass
+        self.contexts_by_config.clear()
+        self._context_refcounts.clear()
+        self._context_last_used.clear()
+        self._page_to_sig.clear()
+
+        if self.default_context and self._launched_persistent:
+            try:
+                await self.default_context.close()
+            except Exception:
+                pass
+            self.default_context = None
+
+        if self.browser:
+            try:
+                await self.browser.close()
+            except Exception:
+                pass
+            self.browser = None
+
+        if self._camoufox_manager:
+            await self._camoufox_manager.__aexit__(None, None, None)
+            self._camoufox_manager = None
+
+        self._launched_persistent = False
