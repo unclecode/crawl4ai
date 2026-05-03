@@ -586,6 +586,10 @@ class BrowserConfig:
                            Default: [].
         enable_stealth (bool): If True, applies playwright-stealth to bypass basic bot detection.
                               Cannot be used with use_undetected browser mode. Default: False.
+        no_sandbox (bool): If True (default), passes --no-sandbox to the browser. Set to False to
+                          enable Chromium's sandbox protections, which is required by some enterprise
+                          security policies. Note: running with sandbox enabled requires proper OS-level
+                          setup (e.g., user namespaces on Linux). Default: True.
         memory_saving_mode (bool): If True, adds aggressive cache discard and V8 heap cap flags
                                    to reduce Chromium memory growth. Recommended for high-volume
                                    crawling (1000+ pages). May slightly reduce performance due to
@@ -650,6 +654,7 @@ class BrowserConfig:
         avoid_ads: bool = False,
         avoid_css: bool = False,
         init_scripts: List[str] = None,
+        no_sandbox: bool = True,
         memory_saving_mode: bool = False,
         max_pages_before_recycle: int = 0,
     ):
@@ -717,6 +722,7 @@ class BrowserConfig:
         self.avoid_ads = avoid_ads
         self.avoid_css = avoid_css
         self.init_scripts = init_scripts if init_scripts is not None else []
+        self.no_sandbox = no_sandbox
         self.memory_saving_mode = memory_saving_mode
         self.max_pages_before_recycle = max_pages_before_recycle
 
@@ -812,6 +818,7 @@ class BrowserConfig:
             "avoid_ads": self.avoid_ads,
             "avoid_css": self.avoid_css,
             "init_scripts": self.init_scripts,
+            "no_sandbox": self.no_sandbox,
             "memory_saving_mode": self.memory_saving_mode,
             "max_pages_before_recycle": self.max_pages_before_recycle,
         }
