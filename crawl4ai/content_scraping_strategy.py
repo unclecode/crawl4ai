@@ -562,6 +562,15 @@ class LXMLWebScrapingStrategy(ContentScrapingStrategy):
             ):
                 parent = el.getparent()
                 if parent is not None:
+                    # Preserve tail text before removal — tail belongs to
+                    # the parent's content flow, not the removed element
+                    tail = el.tail
+                    if tail:
+                        prev = el.getprevious()
+                        if prev is not None:
+                            prev.tail = (prev.tail or "") + tail
+                        else:
+                            parent.text = (parent.text or "") + tail
                     parent.remove(el)
 
         return root
