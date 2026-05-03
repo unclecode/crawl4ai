@@ -739,7 +739,7 @@ class PruningContentFilter(RelevantContentFilter):
         if self.min_word_threshold:
             # Get raw text from metrics node - avoid extra processing
             text = metrics["node"].get_text(strip=True)
-            word_count = text.count(" ") + 1
+            word_count = len(text.split())
             if word_count < self.min_word_threshold:
                 return -1.0  # Guaranteed removal
         score = 0.0
