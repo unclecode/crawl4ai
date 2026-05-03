@@ -566,6 +566,8 @@ class PruningContentFilter(RelevantContentFilter):
         min_word_threshold: int = None,
         threshold_type: str = "fixed",
         threshold: float = 0.48,
+        preserve_classes: list = None,
+        preserve_tags: list = None,
     ):
         """
         Initializes the PruningContentFilter class, if not provided, falls back to page metadata.
@@ -578,11 +580,15 @@ class PruningContentFilter(RelevantContentFilter):
             min_word_threshold (int): Minimum word threshold for filtering (optional).
             threshold_type (str): Threshold type for dynamic threshold (default: 'fixed').
             threshold (float): Fixed threshold value (default: 0.48).
+            preserve_classes (list): CSS class names to always keep regardless of score (optional).
+            preserve_tags (list): HTML tag names to always keep regardless of score (optional).
         """
         super().__init__(None)
         self.min_word_threshold = min_word_threshold
         self.threshold_type = threshold_type
         self.threshold = threshold
+        self.preserve_classes = set(preserve_classes) if preserve_classes else set()
+        self.preserve_tags = set(preserve_tags) if preserve_tags else set()
 
         # Add tag importance for dynamic threshold
         self.tag_importance = {
@@ -682,6 +688,16 @@ class PruningContentFilter(RelevantContentFilter):
             for element in soup.find_all(tag):
                 element.decompose()
 
+    def _is_preserved(self, node):
+        """Check if a node matches the preserve whitelist."""
+        if self.preserve_tags and node.name in self.preserve_tags:
+            return True
+        if self.preserve_classes and "class" in getattr(node, "attrs", {}):
+            node_classes = set(node["class"]) if isinstance(node["class"], list) else {node["class"]}
+            if node_classes & self.preserve_classes:
+                return True
+        return False
+
     def _prune_tree(self, node):
         """
         Prunes the tree starting from the given node.
@@ -690,6 +706,10 @@ class PruningContentFilter(RelevantContentFilter):
             node (Tag): The node from which the pruning starts.
         """
         if not node or not hasattr(node, "name") or node.name is None:
+            return
+
+        # Skip pruning for preserved nodes — always keep them
+        if self._is_preserved(node):
             return
 
         text_len = len(node.get_text(strip=True))
