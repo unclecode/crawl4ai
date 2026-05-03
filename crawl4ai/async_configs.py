@@ -1403,6 +1403,7 @@ class CrawlerRunConfig():
         extraction_strategy: ExtractionStrategy = None,
         chunking_strategy: ChunkingStrategy = RegexChunking(),
         markdown_generator: MarkdownGenerationStrategy = DefaultMarkdownGenerator(),
+        document_extraction_strategy=None,
         only_text: bool = False,
         css_selector: str = None,
         target_elements: List[str] = None,
@@ -1526,6 +1527,7 @@ class CrawlerRunConfig():
         self.extraction_strategy = extraction_strategy
         self.chunking_strategy = chunking_strategy
         self.markdown_generator = markdown_generator
+        self.document_extraction_strategy = document_extraction_strategy
         self.only_text = only_text
         self.css_selector = css_selector
         self.target_elements = target_elements or []
