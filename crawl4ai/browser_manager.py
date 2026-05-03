@@ -69,51 +69,56 @@ class ManagedBrowser:
     @staticmethod
     def build_browser_flags(config: BrowserConfig) -> List[str]:
         """Common CLI flags for launching Chromium"""
-        flags = [
-            "--no-sandbox",
-            "--disable-dev-shm-usage",
-            "--no-first-run",
-            "--no-default-browser-check",
-            "--disable-infobars",
-            "--window-position=0,0",
-            "--ignore-certificate-errors",
-            "--ignore-certificate-errors-spki-list",
-            "--disable-blink-features=AutomationControlled",
-            "--window-position=400,0",
-            "--disable-renderer-backgrounding",
-            "--disable-ipc-flooding-protection",
-            "--force-color-profile=srgb",
-            "--mute-audio",
-            "--disable-background-timer-throttling",
-            # Memory-saving flags: disable unused Chrome features
-            "--disable-features=OptimizationHints,MediaRouter,DialMediaRouteProvider",
-            "--disable-component-update",
-            "--disable-domain-reliability",
-        ]
-        # GPU flags disable WebGL which anti-bot sensors detect as headless.
-        # Keep WebGL working (via SwiftShader) when stealth mode is active.
-        if not config.enable_stealth:
-            flags.extend([
-                "--disable-gpu",
-                "--disable-gpu-compositing",
-                "--disable-software-rasterizer",
-            ])
-        if config.memory_saving_mode:
-            flags.extend([
-                "--aggressive-cache-discard",
-                '--js-flags=--max-old-space-size=512',
-            ])
-        if config.light_mode:
-            flags.extend(BROWSER_DISABLE_OPTIONS)
-        if config.text_mode:
-            flags.extend([
-                "--blink-settings=imagesEnabled=false",
-                "--disable-remote-fonts",
-                "--disable-images",
-                "--disable-javascript",
-                "--disable-software-rasterizer",
+        if config.skip_default_browser_args:
+            flags = list(config.extra_args) if config.extra_args else []
+        else:
+            flags = [
+                "--no-sandbox",
                 "--disable-dev-shm-usage",
-            ])
+                "--no-first-run",
+                "--no-default-browser-check",
+                "--disable-infobars",
+                "--window-position=0,0",
+                "--ignore-certificate-errors",
+                "--ignore-certificate-errors-spki-list",
+                "--disable-blink-features=AutomationControlled",
+                "--window-position=400,0",
+                "--disable-renderer-backgrounding",
+                "--disable-ipc-flooding-protection",
+                "--force-color-profile=srgb",
+                "--mute-audio",
+                "--disable-background-timer-throttling",
+                # Memory-saving flags: disable unused Chrome features
+                "--disable-features=OptimizationHints,MediaRouter,DialMediaRouteProvider",
+                "--disable-component-update",
+                "--disable-domain-reliability",
+            ]
+            # GPU flags disable WebGL which anti-bot sensors detect as headless.
+            # Keep WebGL working (via SwiftShader) when stealth mode is active.
+            if not config.enable_stealth:
+                flags.extend([
+                    "--disable-gpu",
+                    "--disable-gpu-compositing",
+                    "--disable-software-rasterizer",
+                ])
+            if config.memory_saving_mode:
+                flags.extend([
+                    "--aggressive-cache-discard",
+                    '--js-flags=--max-old-space-size=512',
+                ])
+            if config.light_mode:
+                flags.extend(BROWSER_DISABLE_OPTIONS)
+            if config.text_mode:
+                flags.extend([
+                    "--blink-settings=imagesEnabled=false",
+                    "--disable-remote-fonts",
+                    "--disable-images",
+                    "--disable-javascript",
+                    "--disable-software-rasterizer",
+                    "--disable-dev-shm-usage",
+                ])
+            if config.extra_args:
+                flags.extend(config.extra_args)
         # proxy support — only pass server URL, never credentials.
         # Chromium's --proxy-server flag silently ignores inline user:pass@.
         # Auth credentials are handled at the Playwright context level instead.
@@ -1056,61 +1061,71 @@ class BrowserManager:
 
     def _build_browser_args(self) -> dict:
         """Build browser launch arguments from config."""
-        args = [
-            "--disable-gpu",
-            "--disable-gpu-compositing",
-            "--disable-software-rasterizer",
-            "--no-sandbox",
-            "--disable-dev-shm-usage",
-            "--no-first-run",
-            "--no-default-browser-check",
-            "--disable-infobars",
-            "--window-position=0,0",
-            "--ignore-certificate-errors",
-            "--ignore-certificate-errors-spki-list",
-            "--disable-blink-features=AutomationControlled",
-            "--window-position=400,0",
-            "--disable-renderer-backgrounding",
-            "--disable-ipc-flooding-protection",
-            "--force-color-profile=srgb",
-            "--mute-audio",
-            "--disable-background-timer-throttling",
-            # Memory-saving flags: disable unused Chrome features
-            "--disable-features=OptimizationHints,MediaRouter,DialMediaRouteProvider",
-            "--disable-component-update",
-            "--disable-domain-reliability",
-            # "--single-process",
-            f"--window-size={self.config.viewport_width},{self.config.viewport_height}",
-        ]
+        if self.config.skip_default_browser_args:
+            # Skip all hardcoded args — only use extra_args
+            args = list(self.config.extra_args) if self.config.extra_args else []
+        else:
+            args = [
+                "--disable-gpu",
+                "--disable-gpu-compositing",
+                "--disable-software-rasterizer",
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--no-first-run",
+                "--no-default-browser-check",
+                "--disable-infobars",
+                "--window-position=0,0",
+                "--ignore-certificate-errors",
+                "--ignore-certificate-errors-spki-list",
+                "--disable-blink-features=AutomationControlled",
+                "--window-position=400,0",
+                "--disable-renderer-backgrounding",
+                "--disable-ipc-flooding-protection",
+                "--force-color-profile=srgb",
+                "--mute-audio",
+                "--disable-background-timer-throttling",
+                # Memory-saving flags: disable unused Chrome features
+                "--disable-features=OptimizationHints,MediaRouter,DialMediaRouteProvider",
+                "--disable-component-update",
+                "--disable-domain-reliability",
+                # "--single-process",
+                f"--window-size={self.config.viewport_width},{self.config.viewport_height}",
+            ]
 
-        if self.config.memory_saving_mode:
-            args.extend([
-                "--aggressive-cache-discard",
-                '--js-flags=--max-old-space-size=512',
-            ])
+            if self.config.memory_saving_mode:
+                args.extend([
+                    "--aggressive-cache-discard",
+                    '--js-flags=--max-old-space-size=512',
+                ])
 
-        if self.config.light_mode:
-            args.extend(BROWSER_DISABLE_OPTIONS)
+            if self.config.light_mode:
+                args.extend(BROWSER_DISABLE_OPTIONS)
 
-        if self.config.text_mode:
-            args.extend(
-                [
-                    "--blink-settings=imagesEnabled=false",
-                    "--disable-remote-fonts",
-                    "--disable-images",
-                    "--disable-javascript",
-                    "--disable-software-rasterizer",
-                    "--disable-dev-shm-usage",
-                ]
-            )
+            if self.config.text_mode:
+                args.extend(
+                    [
+                        "--blink-settings=imagesEnabled=false",
+                        "--disable-remote-fonts",
+                        "--disable-images",
+                        "--disable-javascript",
+                        "--disable-software-rasterizer",
+                        "--disable-dev-shm-usage",
+                    ]
+                )
 
-        if self.config.extra_args:
-            args.extend(self.config.extra_args)
+            if self.config.extra_args:
+                args.extend(self.config.extra_args)
 
         # Deduplicate args
         args = list(dict.fromkeys(args))
         
         browser_args = {"headless": self.config.headless, "args": args}
+
+        if self.config.executable_path:
+            browser_args["executable_path"] = self.config.executable_path
+
+        if self.config.ignore_default_args:
+            browser_args["ignore_default_args"] = self.config.ignore_default_args
 
         if self.config.chrome_channel:
             browser_args["channel"] = self.config.chrome_channel
@@ -1191,7 +1206,7 @@ class BrowserManager:
                 ] = self.config.downloads_path
 
         # Handle user agent and browser hints
-        if self.config.user_agent:
+        if self.config.user_agent and not self.config.skip_default_headers:
             combined_headers = {
                 "User-Agent": self.config.user_agent,
                 "sec-ch-ua": self.config.browser_hint,
