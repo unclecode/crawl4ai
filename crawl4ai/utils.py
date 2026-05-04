@@ -12,7 +12,14 @@ from .prompts import PROMPT_EXTRACT_BLOCKS
 from array import array
 from .html2text import html2text, CustomHTML2Text
 # from .config import *
-from .config import MIN_WORD_THRESHOLD, IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD, IMAGE_SCORE_THRESHOLD, DEFAULT_PROVIDER, PROVIDER_MODELS
+from .config import (
+    MIN_WORD_THRESHOLD,
+    IMAGE_DESCRIPTION_MIN_WORD_THRESHOLD,
+    IMAGE_SCORE_THRESHOLD,
+    DEFAULT_PROVIDER,
+    PROVIDER_MODELS,
+    ONLY_TEXT_ELIGIBLE_TAGS,
+)
 import httpx
 from socket import gaierror
 from pathlib import Path
@@ -1382,33 +1389,13 @@ def get_content_of_website_optimized(
                 return True  # Always keep video and audio elements
 
             if element.name != "pre":
-                if element.name in [
-                    "b",
-                    "i",
-                    "u",
-                    "span",
-                    "del",
-                    "ins",
-                    "sub",
-                    "sup",
-                    "strong",
-                    "em",
-                    "code",
-                    "kbd",
-                    "var",
-                    "s",
-                    "q",
-                    "abbr",
-                    "cite",
-                    "dfn",
-                    "time",
-                    "small",
-                    "mark",
-                ]:
+                if element.name in ONLY_TEXT_ELIGIBLE_TAGS:
+                    replacement_text = element.get_text()
                     if kwargs.get("only_text", False):
-                        element.replace_with(element.get_text())
+                        element.replace_with(replacement_text)
                     else:
                         element.unwrap()
+                    return bool(replacement_text.strip())
                 elif element.name != "img":
                     element.attrs = {}
 
