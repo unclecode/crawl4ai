@@ -638,6 +638,14 @@ class AsyncWebCrawler:
                             head_html = crawl_result.html[:head_end + 7]
                             crawl_result.head_fingerprint = compute_head_fingerprint(head_html)
 
+                    # Log failure reason before COMPLETE so users can see why it failed.
+                    if crawl_result and not crawl_result.success and crawl_result.error_message:
+                        self.logger.error_status(
+                            url=cache_context.display_url,
+                            error=crawl_result.error_message,
+                            tag="ERROR",
+                        )
+
                     self.logger.url_status(
                         url=cache_context.display_url,
                         success=crawl_result.success if crawl_result else False,
@@ -852,10 +860,10 @@ class AsyncWebCrawler:
             )
         )
 
-        # Log processing completion
+        # Log processing completion — reflect actual content outcome
         self.logger.url_status(
             url=_url,
-            success=True,
+            success=bool(cleaned_html),
             timing=int((time.perf_counter() - t1) * 1000) / 1000,
             tag="SCRAPE"
         )
