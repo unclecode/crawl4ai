@@ -210,7 +210,7 @@ class AsyncWebCrawler:
         url: str,
         config: CrawlerRunConfig = None,
         **kwargs,
-    ) -> CrawlResultContainer:
+    ) -> CrawlResult:
         """
         Runs the crawler for a single source: URL (web, local file, or raw HTML).
 
@@ -237,9 +237,11 @@ class AsyncWebCrawler:
             [other parameters maintained for backwards compatibility]
 
         Returns:
-            CrawlResultContainer: A single-result container that proxies
-                attribute access to the underlying CrawlResult for backwards
-                compatibility (e.g. result.markdown, result.html).
+            CrawlResult: The result of crawling and processing the URL.
+
+        Note:
+            When deep_crawl_strategy is set with stream=True, the return type
+            is overridden by DeepCrawlDecorator to AsyncGenerator[CrawlResult, None].
         """
         # Auto-start if not ready
         if not self.ready:
@@ -657,7 +659,7 @@ class AsyncWebCrawler:
                     if cache_context.should_write() and not bool(cached_result):
                         await async_db_manager.acache_url(crawl_result)
 
-                    return CrawlResultContainer(crawl_result)
+                    return crawl_result
 
                 else:
                     self.logger.url_status(
@@ -672,7 +674,7 @@ class AsyncWebCrawler:
                     # For raw: URLs, don't fall back to the raw HTML string as redirected_url
                     is_raw_url = url.startswith("raw:") or url.startswith("raw://")
                     cached_result.redirected_url = cached_result.redirected_url or (None if is_raw_url else url)
-                    return CrawlResultContainer(cached_result)
+                    return cached_result
 
             except Exception as e:
                 error_context = get_error_context(sys.exc_info())
@@ -690,10 +692,8 @@ class AsyncWebCrawler:
                     tag="ERROR",
                 )
 
-                return CrawlResultContainer(
-                    CrawlResult(
-                        url=url, html="", success=False, error_message=error_message
-                    )
+                return CrawlResult(
+                    url=url, html="", success=False, error_message=error_message
                 )
 
     async def aprocess_html(
