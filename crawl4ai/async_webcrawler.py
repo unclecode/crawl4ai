@@ -615,9 +615,17 @@ class AsyncWebCrawler:
                     # When fallback was attempted but FAILED, we must still re-check
                     # because the result is from a blocked proxy attempt.
                     # Also skip for raw: URLs — caller-provided content, anti-bot N/A.
+                    # Also skip for binary downloads (PDFs, archives, etc.) — content
+                    # was delivered via downloaded_files, html is empty by design,
+                    # and is_blocked() would misread "0 bytes html" as a block.
                     if crawl_result:
                         _fallback_succeeded = _crawl_stats.get("resolved_by") == "fallback_fetch"
-                        if not _fallback_succeeded and not _is_raw_url:
+                        # Skip the block check for binary downloads (PDFs, archives,
+                        # etc.) — content was delivered via downloaded_files, html is
+                        # empty by design, and is_blocked() would misread "0 bytes
+                        # html" as a block.
+                        _has_download = bool(getattr(crawl_result, "downloaded_files", None))
+                        if not _fallback_succeeded and not _is_raw_url and not _has_download:
                             _blocked, _block_reason = is_blocked(
                                 crawl_result.status_code, crawl_result.html or "")
                             if _blocked:
